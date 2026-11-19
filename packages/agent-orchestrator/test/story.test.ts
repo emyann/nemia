@@ -1,75 +1,81 @@
 /**
  * The story helper (`test/story.ts`): checkpoints run in order and share their state, and once one fails every later one is filed
- * skipped, naming it. Told over a fake context that records what it was given, so a failing checkpoint fails nothing here.
+ * skipped, naming it. Told over a fake runner that records what it was given, so a failing checkpoint fails nothing here.
  */
 import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { story, type Teller } from './story.ts';
 
-/** What the fake context was given: each checkpoint's name, and its skip reason or whether its body ran and threw. */
+/** What the fake runner was given: each checkpoint's name, and its skip note or whether its body ran and threw. */
 type Filed = { name: string; skip?: string; threw?: unknown };
 
-/** A context that runs each body at once, as node does, and records it; a throw is kept, as node keeps a subtest's failure. */
-const recorder = (): { t: Teller<'sub'>; filed: Filed[] } => {
+/** The context the fake runner hands a body: it records a skip on the checkpoint's entry. */
+type Sub = { skip: (note?: string) => void; entry: Filed };
+
+/**
+ * A runner that runs each body in turn, as Vitest runs a describe's tests, and records it; a throw is kept, as the runner keeps a
+ * test's failure. `done` is when every body filed so far has run.
+ */
+const recorder = (): { t: Teller<Sub>; filed: Filed[]; done: () => Promise<void> } => {
   const filed: Filed[] = [];
-  const t = {
-    async test(name: string, how: ((sub: 'sub') => void | Promise<void>) | { skip: string }) {
-      if (typeof how !== 'function') {
-        filed.push({ name, skip: how.skip });
-        return;
-      }
-      const entry: Filed = { name };
-      filed.push(entry);
+  let chain = Promise.resolve();
+  const t: Teller<Sub> = (name, how) => {
+    const entry: Filed = { name };
+    filed.push(entry);
+    chain = chain.then(async () => {
       try {
-        await how('sub');
+        await how({ skip: (note) => void (entry.skip = note), entry });
       } catch (error) {
         entry.threw = error;
       }
-    },
-  } as Teller<'sub'>;
-  return { t, filed };
+    });
+  };
+  return { t, filed, done: () => chain };
 };
 
 test('checkpoints run in order, each named as filed, and share the state the story built', async () => {
-  const { t, filed } = recorder();
+  const { t, filed, done } = recorder();
   const s = story(t);
   const seen: string[] = [];
   let shared = 0;
-  await s.test('first', (sub) => {
-    assert.equal(sub, 'sub', "a body is handed the subtest's own context");
+  s.test('first', (sub) => {
+    assert.equal(sub.entry, filed[0], "a body is handed its test's own context");
     shared += 1;
     seen.push('first');
   });
-  await s.test('second', () => {
+  s.test('second', () => {
     shared += 1;
     seen.push('second');
   });
+  await done();
   assert.deepEqual(seen, ['first', 'second']);
   assert.equal(shared, 2);
-  assert.deepEqual(filed, [{ name: 'first' }, { name: 'second' }]);
+  assert.deepEqual(filed.map((f) => f.name), ["first", "second"]);
+  assert.ok(filed.every((f) => f.skip === undefined && f.threw === undefined));
   assert.equal(s.failed(), undefined);
 });
 
 test('REFUSED: after a checkpoint fails, the next is filed skipped with its name, its body never runs, and the error surfaces', async () => {
-  const { t, filed } = recorder();
+  const { t, filed, done } = recorder();
   const s = story(t);
   const broke = new Error('the gate did not hold');
   let thirdRan = false;
-  await s.test('first', () => {});
-  await s.test('second', () => {
+  s.test('first', () => {});
+  s.test('second', () => {
     throw broke;
   });
-  await s.test('third', () => {
+  s.test('third', () => {
     thirdRan = true;
   });
+  await done();
   assert.equal(thirdRan, false, 'a checkpoint after a failure never runs');
-  assert.equal(filed[1]?.threw, broke, "the failing checkpoint's own error is what its subtest fails with");
+  assert.equal(filed[1]?.threw, broke, "the failing checkpoint's own error is what its test fails with");
   assert.equal(filed[2]?.name, 'third');
   assert.ok(filed[2]?.skip?.includes('second'), 'the skip names the checkpoint that failed');
   assert.equal(s.failed(), 'second');
 });
 
-describe("a story told on node's own context files its checkpoints as subtests", () => {
+describe("a story told on Vitest's own test files its checkpoints as the describe's tests", () => {
   const s = story(test);
   let n = 0;
   s.test('one', () => {

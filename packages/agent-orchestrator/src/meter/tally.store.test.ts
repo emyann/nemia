@@ -5,7 +5,7 @@
  * A file of its own, since `tick` reads every run of its store: its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full
  * every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

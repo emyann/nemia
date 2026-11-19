@@ -560,7 +560,7 @@ describe("a command the client holds is no name of this CLI's: typed here, it pr
         });
       const before = snapshot(YOURS);
       const { out, refused } = await said(sub, ...(typedArgs[name] ?? [...name.split(' '), 'x']));
-      handler.mockRestore();
+      handler?.mockRestore();
       assert.equal(refused, undefined, refused);
       assert.equal(out, HELP, `nemia ${name} prints the help`);
       assert.deepEqual(handed, [], `nemia ${name} reaches no handler here`);

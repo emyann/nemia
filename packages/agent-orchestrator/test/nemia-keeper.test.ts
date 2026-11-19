@@ -16,7 +16,7 @@
  * the laws of `contracts/nemia-keep.contract.ts`; the stretches and what a write asks, `src/level/level.test.ts`.
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -131,7 +131,7 @@ const herTask = (): string => herTasks(ROOT).at(-1) ?? '';
  * Her let go in the story told in `t`: every level at manual, her open task stopped from outside, and the keeper's beats run until it
  * owes nothing — her subscription dropped and her end marked — then a moment passed, so a word of the person's comes after the mark.
  */
-const letGo = async (t: TestContext): Promise<void> => {
+const letGo = async (): Promise<void> => {
   await level({ level: 'manual' });
   const b = stage.board();
   const task = b.tasks.get(herTask());
@@ -147,7 +147,7 @@ const letGo = async (t: TestContext): Promise<void> => {
  */
 const keptAnew = async (t: TestContext): Promise<string> => {
   withPipao();
-  await letGo(t);
+  await letGo();
   vi.advanceTimersByTime(2);
   await level({ level: 'semi-auto' });
   assert.deepEqual(await beat(), ['file']);
@@ -158,15 +158,9 @@ const keptAnew = async (t: TestContext): Promise<string> => {
   return task;
 };
 
-/** `Date` mocked for the story told in `t`, at `now`: her task is named for the moment she is raised, and a raise ends on the wall. */
-const mockedAt = (t: TestContext, now: string) => vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
 
 describe("Nemia kept and let go: trusted late, filed long-lived in auto with the daemon's bin first, subscribed once, stopped from outside, let go at manual", () => {
-  beforeAll(() => {
-    const t = teardowns();
-    mockedAt(t, '2026-10-05T16:00:00.000Z');
-    return t.end;
-  });
+  heldDate(Date.parse('2026-10-05T16:00:00.000Z'));
   const s = story(test);
   let first = '';
   s.test('no level set owes nothing, trusted or not: the keeper writes no level', async () => {
@@ -200,7 +194,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       "the trust written in the harness's own file",
     );
     assert.equal((await level({})).untrusted, null);
-    await letGo(t);
+    await letGo();
     fs.rmSync(levelFile(ROOT));
   });
   s.test(
@@ -227,7 +221,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       trust(false);
       assert.equal((await level({})).untrusted, null, 'a trust taken back by hand, with nothing refused, is no refusal');
       trust(true);
-      await letGo(t);
+      await letGo();
       fs.rmSync(levelFile(ROOT));
     },
   );
@@ -252,7 +246,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       } finally {
         await stopped();
       }
-      await letGo(t);
+      await letGo();
       fs.rmSync(levelFile(ROOT));
     },
   );
@@ -404,7 +398,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       assert.ok(!b.stopped.includes(fresh), 'the conversation is not cut');
       assert.deepEqual(listSubscriptions(ROOT), []);
       assert.deepEqual(await beat(), []);
-      await letGo(t);
+      await letGo();
     },
   );
   s.test('nemia memory lists her facts and prints one; a fact she does not keep is refused, naming those she does', async () => {
@@ -425,11 +419,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
 });
 
 describe('A factory raised for a stretch keeps her, the store at manual; its end passing stops her with no write; an end, a default, an untrusted folder', () => {
-  beforeAll(() => {
-    const t = teardowns();
-    mockedAt(t, '2026-10-06T08:00:00.000Z');
-    return t.end;
-  });
+  heldDate(Date.parse('2026-10-06T08:00:00.000Z'));
   const s = story(test);
   s.test("a factory raised for an hour keeps her; once the raise's end passes she stops operating, with no write", async (t) => {
     withPipao();
@@ -469,7 +459,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
     names(await refusal(() => level({ factory: 'pipao', level: 'semi-auto', for: '1h' })), 'pipao is at semi-auto by default');
     await level({ factory: 'pipao', level: 'manual' });
     assert.deepEqual(await beat(), ['drop']);
-    await letGo(t);
+    await letGo();
   });
   s.test(
     "a factory's raise or default above manual while her folder is not trusted is written, and the keeper trusts it and files her at once",
@@ -494,7 +484,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
         assert.deepEqual(b.filings.slice(filings), [herTask()]);
         const factory = String(ask.factory);
         await level(ask.for === undefined ? { factory, level: 'manual' } : { factory, end: true });
-        await letGo(t);
+        await letGo();
         fs.rmSync(factoryLevelFile(ROOT, factory), { force: true });
       }
     },
@@ -502,9 +492,9 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
 });
 
 describe("Kept, she is told what changed: the person's custom words once, never by a filing or a stop, and their chat words once she is live", () => {
+  heldDate(Date.parse('2026-10-07T08:00:00.000Z'));
   beforeAll(() => {
     const t = teardowns();
-    mockedAt(t, '2026-10-07T08:00:00.000Z');
     fs.rmSync(customInstructionsFile(ROOT, 'nemia'), { force: true });
     return t.end;
   });
@@ -729,9 +719,9 @@ describe('She answers her chat at any level: a message files her, she rests once
   let QUIET!: number;
   let b!: import('./story.ts').Board;
   let factory!: string;
+  heldDate(Date.parse('2026-10-09T08:00:00.000Z'));
   beforeAll(() => {
     const t = teardowns();
-    mockedAt(t, '2026-10-09T08:00:00.000Z');
     QUIET = 15 * 60_000;
     b = stage.board();
     withPipao();

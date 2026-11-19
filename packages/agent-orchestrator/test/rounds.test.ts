@@ -529,30 +529,26 @@ describe("a loop's target over its budget whose check refused: the round reads i
 });
 
 describe('REFUSED: `nemia retry --round` and `nemia approve`, and their former spellings `nemia round` and `nemia accept` typed on purpose, before anything is written', () => {
-  beforeAll(async () => {
-    const t = teardowns();
-    await refused(['retry', 'no-such-run', 'review', 'again', '--round'], 'Invalid', 'does not take again', '--round');
-    await refused(['retry', 'no-such-run', '--round', '--budget', 'lots'], 'Invalid', 'lots is not one', '--budget <amount>');
-    await refused(
-      ['approve', 'no-such-run', 'review', '--message', ' '],
-      'Invalid',
-      '--message is empty',
-      'nemia approve no-such-run review',
-    );
-    await refused(['approve', 'no-such-run', 'review'], 'Missing', 'no such run: no-such-run');
-    await refused(['round', 'no-such-run', 'review', 'again'], 'Invalid', 'does not take again', '--round');
-    await refused(
-      ['accept', 'no-such-run', 'review', '--message', ' '],
-      'Invalid',
-      '--message is empty',
-      'nemia approve no-such-run review',
-    );
-    return t.end;
-  });
   const refused = (argv: string[], tag: string, ...facts: string[]) =>
-    t.test(`nemia ${argv.join(' ')}`, async () => {
+    test(`nemia ${argv.join(' ')}`, async () => {
       await assert.rejects(stage.main(argv), refusedAs(tag, ...facts));
     });
+  refused(['retry', 'no-such-run', 'review', 'again', '--round'], 'Invalid', 'does not take again', '--round');
+  refused(['retry', 'no-such-run', '--round', '--budget', 'lots'], 'Invalid', 'lots is not one', '--budget <amount>');
+  refused(
+    ['approve', 'no-such-run', 'review', '--message', ' '],
+    'Invalid',
+    '--message is empty',
+    'nemia approve no-such-run review',
+  );
+  refused(['approve', 'no-such-run', 'review'], 'Missing', 'no such run: no-such-run');
+  refused(['round', 'no-such-run', 'review', 'again'], 'Invalid', 'does not take again', '--round');
+  refused(
+    ['accept', 'no-such-run', 'review', '--message', ' '],
+    'Invalid',
+    '--message is empty',
+    'nemia approve no-such-run review',
+  );
   test('a cancelled run: a round would never be honoured, and no ask is written', async () => {
     const id = await startedLoop(looped('rounds: 1\n'));
     markCancelled(ROOT, id);

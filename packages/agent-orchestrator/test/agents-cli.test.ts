@@ -233,32 +233,26 @@ describe("nemia agents' handlers: both places read with what each agent can do, 
 });
 
 describe('REFUSED at shipped defaults: nemia agents, its card and its custom words, each by its exit code and what it names, writing nothing', () => {
-  let repo!: string;
-  let theirs!: string;
-  beforeAll(async () => {
-    const t = teardowns();
-    repo = repoAt('refused');
-    theirs = path.join(repo, 'workflows', 'agents');
-    anAgent(theirs, 'twin', 'The repository’s.');
-    anAgent(theirs, 'scribe', 'Writes it down.');
-    await row(
-      'a card for an agent in neither place',
-      ['agents', 'card', 'ghost', '--repo', repo],
-      undefined,
-      'no agent named ghost',
-      'Looked in',
-      'nemia agents lists them',
-    );
-    await row(
-      'a --from that is neither place',
-      ['agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere'],
-      undefined,
-      'nemia agents --from takes repo or user, not elsewhere',
-    );
-    return t.end;
-  });
+  const repo = repoAt('refused');
+  const theirs = path.join(repo, 'workflows', 'agents');
+  anAgent(theirs, 'twin', 'The repository’s.');
+  anAgent(theirs, 'scribe', 'Writes it down.');
   const row = (name: string, argv: string[], tag: string | undefined, ...facts: string[]) =>
-    t.test(name, async () => void (await refusedBy(() => asked(...argv), tag, ...facts)));
+    test(name, async () => void (await refusedBy(() => asked(...argv), tag, ...facts)));
+  row(
+    'a card for an agent in neither place',
+    ['agents', 'card', 'ghost', '--repo', repo],
+    undefined,
+    'no agent named ghost',
+    'Looked in',
+    'nemia agents lists them',
+  );
+  row(
+    'a --from that is neither place',
+    ['agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere'],
+    undefined,
+    'nemia agents --from takes repo or user, not elsewhere',
+  );
   test('a card for an agent in both places with nothing saying which; said which, each place answers for its own', async () => {
     anAgent(YOURS, 'twin', 'Yours.');
     await refusedBy(

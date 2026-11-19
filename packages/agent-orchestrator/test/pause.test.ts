@@ -21,7 +21,7 @@
  * schedule's fire is held by the pause alone.
  */
 import { beforeAll, describe, test, vi } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -253,9 +253,9 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       onError?: (e: unknown) => void;
     }) => Effect.Effect<{ stop: () => void }>;
   };
+  heldDate(Date.parse('2026-10-04T12:00:00Z'));
   beforeAll(async () => {
     const t = teardowns();
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-04T12:00:00Z') });
     parked = new Set<string>();
     b = ticking(parked);
     repo = aRepo();

@@ -172,7 +172,7 @@ const aParent = async (repo: string, { work, signed = Boolean(work) }: { work?: 
  * `nemia <argv>` as a person types it: `rm` and `prune` as the client runs them over the api (`forgetTyped`), any other through the CLI;
  * the lines it printed, what `rm` answered of each run it forgot, and the error it ended with, if it did.
  */
-const typed = async (t: TestContext, ...argv: string[]): Promise<Typed> => {
+const typed = async (...argv: string[]): Promise<Typed> => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e(), effect), ROOT, argv);
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
@@ -242,7 +242,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       fs.mkdirSync(path.join(ROOT, 'runs', id, 'inputs'), { recursive: true });
       fs.writeFileSync(path.join(ROOT, 'runs', id, 'inputs', 'kept.md'), 'kept\n');
       const before = board().forgets.length;
-      const dry = await typed(t, 'prune', id, '--artifacts');
+      const dry = await typed('prune', id, '--artifacts');
       assert.equal(dry.error, undefined);
       names(dry.printed.join('\n'), `${id}  would remove its files`, path.join(ROOT, 'runs', id, 'artifacts'), '--yes');
       assert.equal(board().forgets.length, before, 'a preview asks the engine nothing: what rm would forget is no longer counted');
@@ -262,7 +262,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     async (t) => {
       const branch = runRecord(ROOT, id).steps.implement.branch!;
       const before = board().forgets.length;
-      const said = await typed(t, 'rm', id);
+      const said = await typed('rm', id);
       assert.equal(said.error, undefined);
       assert.deepEqual([said.printed, said.forgot.map((f) => [f.id, f.kind])], [[], [[id, 'forgotten']]], 'one run forgotten, answered');
       const [forgot] = said.forgot;
@@ -286,7 +286,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     },
   );
   s.test('a second `nemia rm` finds no such run: the Missing of the api, exit 2, its line saying so', async (t) => {
-    const again = await typed(t, 'rm', id);
+    const again = await typed('rm', id);
     assert.equal(again.error?.exitCode, 2);
     names(again.printed.join('\n'), `${id}  no such run — nothing to forget`);
   });
@@ -299,7 +299,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       world().commit(at, 'Merge it');
       const unmerged = await aParent(at, { work: 'unmerged.txt' });
       const forced = await aParent(at, { work: 'forced.txt' });
-      const one = await typed(t, 'rm', merged.run.id, unmerged.run.id, '--delete-branches');
+      const one = await typed('rm', merged.run.id, unmerged.run.id, '--delete-branches');
       assert.equal(one.error, undefined);
       assert.deepEqual(
         one.forgot.map((f) => [f.id, f.base, f.branches, f.engine?.forgotten.length]),
@@ -309,7 +309,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         ],
       );
       assert.deepEqual([hasBranch(at, merged.branch), hasBranch(at, unmerged.branch)], [false, true]);
-      const two = await typed(t, 'rm', forced.run.id, '--force-unmerged', '--delete-branches');
+      const two = await typed('rm', forced.run.id, '--force-unmerged', '--delete-branches');
       assert.deepEqual(
         two.forgot.map((f) => [f.base, f.branches]),
         [['main', [{ branch: forced.branch, deleted: true, why: 'forced' }]]],
@@ -319,7 +319,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       const direct = await stage.runPlaced(startRun({ brief: 'on the base itself', repo: at, workflowDir: oneStep(), isolate: false }));
       await pass(direct.id);
       board().settle(`${direct.id}-implement`, 'succeeded', SIGNED);
-      const three = await typed(t, 'rm', direct.id, '--delete-branches', '--force-unmerged');
+      const three = await typed('rm', direct.id, '--delete-branches', '--force-unmerged');
       assert.deepEqual(
         [three.printed, three.forgot.map((f) => [f.id, f.kind, f.removed, f.isolate, f.repo, f.branches])],
         [[], [[direct.id, 'forgotten', [], false, at, []]]],
@@ -412,7 +412,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
         () => stepsOf(runRecord(ROOT, legacy.id)),
         (err: Error) => err.message.includes(legacy.id) && err.message.includes(legacyDir),
       );
-      const said = await typed(t, 'rm', legacy.id);
+      const said = await typed('rm', legacy.id);
       assert.equal(said.error, undefined);
       assert.deepEqual(
         said.forgot.map((f) => [f.id, f.kind, f.removed]),
@@ -424,7 +424,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
 
       fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
       fs.mkdirSync(path.join(ROOT, 'runs', 'gone-run-3c4d.asks', 'done'), { recursive: true });
-      const leftover = await typed(t, 'rm', 'gone-run-3c4d');
+      const leftover = await typed('rm', 'gone-run-3c4d');
       assert.equal(leftover.error?.exitCode, 2);
       assert.equal(leftover.printed.length, 1);
       names(leftover.printed[0], 'gone-run-3c4d  no such run', 'runs/gone-run-3c4d.cancelled', 'runs/gone-run-3c4d.asks/');
@@ -436,7 +436,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     const id = live.run.id;
     fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'checks', `${id}-implement-check.stderr`), "the live run's\n");
-    const sibling = await typed(t, 'rm', `${id}-implement`);
+    const sibling = await typed('rm', `${id}-implement`);
     assert.equal(sibling.error?.exitCode, 2);
     names(sibling.printed.join('\n'), `${id}-implement  no such run — nothing to forget`);
     assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
@@ -444,7 +444,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
     fs.writeFileSync(path.join(ROOT, 'runs', `${torn}.json`), '{ "id": ');
     fs.writeFileSync(path.join(ROOT, 'checks', `${torn}-review-check.stderr`), "a torn run's\n");
     tt.onTestFinished(() => fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true }));
-    const prefix = await typed(t, 'rm', 'torn-record');
+    const prefix = await typed('rm', 'torn-record');
     assert.equal(prefix.error?.exitCode, 2);
     names(prefix.printed.join('\n'), 'torn-record  no such run — nothing to forget');
     assert.ok(under('checks', `${torn}-review-check.stderr`), 'nor a run whose record does not read');
@@ -477,7 +477,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
       const over = await aParent(repo, { work: 'over.txt' });
       Object.assign(ids, { running: running.id, ready: readyRun.id, asked: asked.id, parent: parent.run.id, child: child.id });
 
-      const { printed, forgot, error } = await typed(t, 'rm', running.id, readyRun.id, asked.id, parent.run.id, over.run.id);
+      const { printed, forgot, error } = await typed('rm', running.id, readyRun.id, asked.id, parent.run.id, over.run.id);
       assert.equal(error?.exitCode, 2, error?.message);
       names(error?.message, running.id, readyRun.id, asked.id, parent.run.id);
       assert.ok(!error?.message.includes(over.run.id), 'the run forgotten is not among them');
@@ -607,7 +607,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
         JSON.stringify({ step: 'implement', try: 2, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
       );
       for (const suffix of ['.json', '.cancelled', '.asks']) {
-        const { printed, error } = await typed(t, 'rm', `${id}${suffix}`);
+        const { printed, error } = await typed('rm', `${id}${suffix}`);
         assert.equal(error?.exitCode, 2, suffix);
         assert.equal(printed.length, 1);
         names(printed[0], `${id}${suffix}  not forgotten`, suffix, `nemia rm ${id}.`);
@@ -690,7 +690,7 @@ describe('REFUSED before any run is read: what `nemia rm` does not take, each re
     return t.end;
   });
   const refused = async (args: string[], ...facts: string[]) => {
-    const { printed, error } = await typed(t, 'rm', ...args);
+    const { printed, error } = await typed('rm', ...args);
     assert.deepEqual([error?._tag, error?.exitCode], ['Invalid', 2], `${args.join(' ')}: ${error?.message}`);
     names(error?.message, ...facts);
     assert.deepEqual(printed, [], 'refused before any run is read');
@@ -702,7 +702,7 @@ describe('REFUSED before any run is read: what `nemia rm` does not take, each re
   test('a switch with no run to forget', () => refused(['--delete-branches'], 'nemia rm <runId>', 'nemia ls'));
   for (const id of ['..', '.', 'runs/../..', '', 'R-XYZ', 'r_xyz', 'r.xyz'])
     test(`an id that is not a name, ${JSON.stringify(id)}: its line says what an id is, and the store is where it was`, async (t) => {
-      const { printed, error } = await typed(t, 'rm', id);
+      const { printed, error } = await typed('rm', id);
       assert.equal(error?.exitCode, 2, '`..` would be the store itself');
       assert.equal(printed.length, 1);
       names(printed[0], `${id}  not forgotten`, JSON.stringify(id), 'WF_ROOT', 'nemia rm add-a-flag-x1y2');
@@ -725,7 +725,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       assert.ok(closed.includes(task), 'its task held open is closed');
       assert.deepEqual([forgot.engine?.forgotten, forgot.engine?.waiting, forgot.engine?.marker], [[], [task], markerOf(run.id)]);
       assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
-      const said = await typed(t, 'rm', run.id);
+      const said = await typed('rm', run.id);
       assert.equal(said.error?.exitCode, 2);
       names(said.printed[0], `${run.id}  no such run`, `${task} has not settled yet`);
       assert.ok(fs.existsSync(markerOf(run.id)), 'it is still not settled: the marker stands');
@@ -778,7 +778,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       const marker = markerOf(p.run.id);
       refusing.whole = 'forget: the store is read-only.';
       try {
-        const said = await typed(t, 'rm', p.run.id);
+        const said = await typed('rm', p.run.id);
         assert.equal(said.error, undefined, 'exit 0: the run is removed');
         assert.deepEqual(
           said.forgot.map((f) => [f.id, f.kind, f.engine?.marker, f.engine?.forgotten]),
@@ -822,7 +822,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
       refusing.task = { taskId: refused, message };
       try {
         const before = board().forgets.length;
-        const said = await typed(t, 'rm', run.id);
+        const said = await typed('rm', run.id);
         assert.equal(said.error, undefined, 'exit 0: the run is removed');
         assert.deepEqual(
           board().forgets.slice(before),

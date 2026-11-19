@@ -11,7 +11,7 @@
 
  */
 import { beforeAll, describe, test, vi } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,9 +56,9 @@ const STORE = { kind: 'Store', name: 'store' };
 
 describe("a factory's level said on the feed: each change of the level in force is one line of the store, labelled with its factory, and nothing else is", () => {
   let b!: import('./story.ts').Board;
+  heldDate(Date.parse(NOW));
   beforeAll(() => {
     const t = teardowns();
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(NOW) });
     b = stage.board();
     Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
     for (const name of ['acme', 'quiet']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });

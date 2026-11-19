@@ -14,7 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -1086,7 +1086,11 @@ describe('a feed cut under a watch — truncated, deleted, replaced — is said 
   const got: FeedLine[] = [];
   const cut: string[] = [];
   const failed: string[] = [];
-  const heard = (ok: () => boolean, what: string) => until(t, ok, what, { bell: spoke, everyMs: 20 });
+  let current!: TestContext;
+  beforeEach((ctx) => {
+    current = ctx;
+  });
+  const heard = (ok: () => boolean, what: string) => until(current, ok, what, { bell: spoke, everyMs: 20 });
   const said = (from: number, ok: (l: RunLine) => boolean) => got.slice(from).some((l) => isRunLine(l) && ok(l));
   s.test('a watch from the feed’s end, its engine asked nothing', async () => {
     run = await started('the cut');

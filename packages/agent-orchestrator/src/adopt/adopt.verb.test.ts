@@ -47,7 +47,7 @@ const bytesUnder = (dir: string): Record<string, string> =>
     : {};
 
 /** What `argv` printed, as `nemia` prints it, line by line. */
-async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
+async function printedBy(...argv: string[]): Promise<string[]> {
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
   try {
@@ -91,9 +91,9 @@ function repoAndTemplate(): { repo: string; dir: string } {
 }
 
 /** A hand-made factory `name` on `repo`, offering the team's `dev`. */
-async function madeByHand(t: Finishes, name: string, repo: string): Promise<void> {
-  await printedBy(t, 'factory', 'add', name, '--repo', repo, '--no-trust');
-  await printedBy(t, 'factory', 'attach', name, 'dev');
+async function madeByHand(name: string, repo: string): Promise<void> {
+  await printedBy('factory', 'add', name, '--repo', repo, '--no-trust');
+  await printedBy('factory', 'attach', name, 'dev');
 }
 
 /**
@@ -134,9 +134,9 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
     'a factory made by hand: a repository, a schedule, an instruction, a later key, a filed card, a run in flight and one finished',
     async (t) => {
       ({ repo, dir } = repoAndTemplate());
-      await madeByHand(t, 'crew', repo);
-      await printedBy(t, 'factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
-      await printedBy(t, 'factory', 'instruction', 'crew', '--store');
+      await madeByHand('crew', repo);
+      await printedBy('factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
+      await printedBy('factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
       run = await startedId('Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo);
       runBefore = JSON.stringify(runRecord(ROOT, run));
@@ -157,7 +157,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
     assert.ok(planned.line.includes(`nemia factory adopt crew --template ${dir} --plan ${digest}`), planned.line);
   });
   s.test('nemia factory adopt --plan stages the render and gives the file the template, every other key kept', async (t) => {
-    await printedBy(t, 'factory', 'adopt', 'crew', '--template', dir, '--plan', digest);
+    await printedBy('factory', 'adopt', 'crew', '--template', dir, '--plan', digest);
     const file = fileOf('crew');
     const template = file.template as { source: string; version: string; params: Record<string, unknown> };
     assert.equal(template.source, dir);
@@ -193,7 +193,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
     const { template: _gone, ...rest } = fileOf('crew');
     fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify(rest, null, 2)}\n`);
     const { digest: again } = await previewed('crew', dir);
-    await printedBy(t, 'factory', 'adopt', 'crew', '--template', dir, '--plan', again);
+    await printedBy('factory', 'adopt', 'crew', '--template', dir, '--plan', again);
     assert.equal((fileOf('crew').template as { source: string }).source, dir);
   });
 });
@@ -211,20 +211,20 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
   };
   const planOf = async (_t: unknown, name: string) => (await previewed(name, dir)).digest;
   test('no --plan: Invalid, naming the preview', async (t) => {
-    await madeByHand(t, 'noplan', repo);
+    await madeByHand('noplan', repo);
     await nothingWritten(['factory', 'adopt', 'noplan', '--template', dir], refusedWith('Invalid', /nemia factory diff noplan/));
   });
   test("a plan gone stale since the factory's file changed: Conflict, naming the preview again", async (t) => {
-    await madeByHand(t, 'stale', repo);
+    await madeByHand('stale', repo);
     const plan = await planOf(t, 'stale');
-    await printedBy(t, 'factory', 'revisions', 'stale', 'follow');
+    await printedBy('factory', 'revisions', 'stale', 'follow');
     await nothingWritten(
       ['factory', 'adopt', 'stale', '--template', dir, '--plan', plan],
       refusedWith('Conflict', /nemia factory diff stale/),
     );
   });
   test('a factory made from a template already: Conflict, naming the upgrade', async (t) => {
-    await printedBy(t, 'factory', 'apply', 'made', '--template', dir, '--repo', repo, '--no-trust');
+    await printedBy('factory', 'apply', 'made', '--template', dir, '--repo', repo, '--no-trust');
     await nothingWritten(
       ['factory', 'adopt', 'made', '--template', dir, '--plan', 'sha256:0'],
       refusedWith('Conflict', /nemia factory upgrade made/),
@@ -237,17 +237,17 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
     await nothingWritten(['factory', 'adopt', 'nowhere', '--template', dir, '--plan', 'sha256:0'], refusedWith('Missing', /noplan/));
   });
   test('a card filed and not started for a workflow the template does not offer: Conflict, naming it', async (t) => {
-    await madeByHand(t, 'carded', repo);
-    await printedBy(t, 'factory', 'attach', 'carded', 'gone');
+    await madeByHand('carded', repo);
+    await printedBy('factory', 'attach', 'carded', 'gone');
     card('lost', 'carded', 'gone');
     const plan = await planOf(t, 'carded');
     await nothingWritten(['factory', 'adopt', 'carded', '--template', dir, '--plan', plan], refusedWith('Conflict', /lost/, /gone/));
     fs.rmSync(path.join(INBOX, 'lost.md'));
   });
   test('a schedule of a workflow the template does not offer: Conflict, naming the unschedule', async (t) => {
-    await madeByHand(t, 'timed', repo);
-    await printedBy(t, 'factory', 'attach', 'timed', 'gone');
-    await printedBy(t, 'factory', 'schedule', 'timed', 'gone', '--cron', '0 9 * * *', '--brief', 'b');
+    await madeByHand('timed', repo);
+    await printedBy('factory', 'attach', 'timed', 'gone');
+    await printedBy('factory', 'schedule', 'timed', 'gone', '--cron', '0 9 * * *', '--brief', 'b');
     const plan = await planOf(t, 'timed');
     await nothingWritten(
       ['factory', 'adopt', 'timed', '--template', dir, '--plan', plan],
@@ -255,7 +255,7 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
     );
   });
   test('a tree already there with other bytes: Conflict, naming the folder', async (t) => {
-    await madeByHand(t, 'leftover', repo);
+    await madeByHand('leftover', repo);
     fs.mkdirSync(path.join(FACTORIES, 'leftover', 'tree'), { recursive: true });
     fs.writeFileSync(path.join(FACTORIES, 'leftover', 'tree', 'mine.md'), 'mine\n');
     const plan = await planOf(t, 'leftover');
@@ -265,13 +265,13 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
     );
   });
   test('a template that does not pass its check: Invalid', async (t) => {
-    await madeByHand(t, 'broken', repo);
+    await madeByHand('broken', repo);
     const bad = path.join(scratch('wf-adopt-bad-'), 'bad');
     fs.mkdirSync(bad);
     await nothingWritten(['factory', 'adopt', 'broken', '--template', bad, '--plan', 'sha256:0'], refusedWith('Invalid'));
   });
   test('a --set of a parameter the template does not declare: Invalid, naming it', async (t) => {
-    await madeByHand(t, 'unset', repo);
+    await madeByHand('unset', repo);
     await nothingWritten(
       ['factory', 'adopt', 'unset', '--template', dir, '--set', 'nothing=1', '--plan', 'sha256:0'],
       refusedWith('Invalid', /nothing/),
@@ -288,7 +288,7 @@ describe('--template names a builtin template by its name: the takeover records 
     ({ repo, dir } = repoAndTemplate());
     builtins = scratch('wf-adopt-builtins-');
     fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
-    await madeByHand(t, 'named', repo);
+    await madeByHand('named', repo);
     return t.end;
   });
   const handled = <D extends object>(command: { handler: (...a: never[]) => unknown }, args: Record<string, unknown>) =>

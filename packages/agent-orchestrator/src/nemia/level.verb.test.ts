@@ -84,26 +84,28 @@ describe("`nemia level`'s reach: the attach line, then her web link off her task
   });
 });
 
-test("`nemia level` reads her task off the keeper's record, says a stop from outside apart from a rest, and a set names no task", async (t) => {
-  writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  fs.rmSync(sessionFile(ROOT), { force: true });
-  await t.test("an older store's level file names her task: it is hers, with no record of the keeper's", async () => {
+describe("`nemia level` reads her task off the keeper's record, says a stop from outside apart from a rest, and a set names no task", () => {
+  beforeAll(() => {
+    writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z', task: TASK });
+    fs.rmSync(sessionFile(ROOT), { force: true });
+  });
+  test("an older store's level file names her task: it is hers, with no record of the keeper's", async () => {
     assert.equal((await levelOver(undefined)).task, TASK);
   });
-  await t.test('open: neither stopped nor resting', async () => {
+  test('open: neither stopped nor resting', async () => {
     const open = await levelOver(undefined);
     assert.deepEqual([open.stopped, open.rests], [false, false]);
   });
-  await t.test("ended with no rest of the keeper's: stopped, at manual too, and resting, so a message starts her", async () => {
+  test("ended with no rest of the keeper's: stopped, at manual too, and resting, so a message starts her", async () => {
     const ended = await levelOver(undefined, 'stopped');
     assert.deepEqual([ended.stopped, ended.rests], [true, true]);
   });
-  await t.test('put to rest by the keeper: resting, never stopped', async () => {
+  test('put to rest by the keeper: resting, never stopped', async () => {
     writeSession(ROOT, { tasks: ['nemia-1', TASK], rested: '2026-10-06T09:00:00.000Z' });
     const rested = await levelOver(undefined, 'stopped');
     assert.deepEqual([rested.task, rested.stopped, rested.rests], [TASK, false, true]);
   });
-  await t.test('a level set writes when the person set it, and names no task of hers', async () => {
+  test('a level set writes when the person set it, and names no task of hers', async () => {
     fs.rmSync(sessionFile(ROOT), { force: true });
     writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
     await runWith(engineWith(undefined), LEVEL.handler({ level: 'semi-auto' }));

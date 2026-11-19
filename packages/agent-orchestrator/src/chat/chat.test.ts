@@ -588,10 +588,10 @@ const acrossTasks = (tasks = 2): ChatSources => {
   };
 };
 
-test('a chat across tasks: one history, a continued session drawn once, each task’s words and stops in their place', async (t) => {
+describe('a chat across tasks: one history, a continued session drawn once, each task’s words and stops in their place', () => {
   const drawn = (sources: ChatSources) =>
     projectChat(sources).map((e) => (e.kind === 'message' ? `${e.from}:${e.text}` : e.kind === 'session' ? '—' : e.kind));
-  await t.test('two tasks are drawn as one history, in order, the second after a session line', () => {
+  test('two tasks are drawn as one history, in order, the second after a session line', () => {
     assert.deepEqual(drawn(acrossTasks()), [
       'person:Hi',
       'agent:Hello.',
@@ -602,10 +602,10 @@ test('a chat across tasks: one history, a continued session drawn once, each tas
       'keeper:Stopped',
     ]);
   });
-  await t.test('a continued session’s copy of its parent’s lines, timed before it began, is drawn once', () => {
+  test('a continued session’s copy of its parent’s lines, timed before it began, is drawn once', () => {
     assert.equal(drawn(acrossTasks()).filter((w) => w === 'agent:Hello.').length, 1);
   });
-  await t.test('an earlier task’s delivered words are drawn where their said is, not at the end', () => {
+  test('an earlier task’s delivered words are drawn where their said is, not at the end', () => {
     const events = projectChat(acrossTasks());
     assert.equal(
       events.findIndex((e) => e.id === 'p:o1'),
@@ -618,12 +618,12 @@ test('a chat across tasks: one history, a continued session drawn once, each tas
       'claimed by the second task’s said, after her answer',
     );
   });
-  await t.test('the ids drawn are the same when a third task is appended', () => {
+  test('the ids drawn are the same when a third task is appended', () => {
     const two = projectChat(acrossTasks(2)).map((e) => e.id);
     const three = projectChat(acrossTasks(3)).map((e) => e.id);
     assert.deepEqual(three.slice(0, two.length), two);
   });
-  await t.test('a stop is numbered by the task it names; one that names none by the last task holding its attempt', () => {
+  test('a stop is numbered by the task it names; one that names none by the last task holding its attempt', () => {
     const first: TaskSpan = { task: 'nemia-1', offset: 0, attempts: [1, 2], said: [] };
     const second: TaskSpan = { task: 'nemia-2', offset: 2, attempts: [1], said: [] };
     const stops = spanned(

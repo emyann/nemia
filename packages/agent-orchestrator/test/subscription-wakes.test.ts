@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Clock, Effect, Fiber, Layer, Logger, ManagedRuntime, Metric, Schema } from 'effect';
-import { bell, until, WAITED } from 'agent-runtime/testing';
+import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import type { FeedLine, FeedWords } from '../src/feed/feed.ts';
 import type { FeedDoorShape } from '../src/feed/feed.store.ts';
 import type { SubscriptionDoorShape } from '../src/subscription/subscription.store.ts';
@@ -194,7 +194,7 @@ const gate = (run: string): object[] => {
  * `subscription` put under `name` on `w` for test `t`, and dropped once it ends, whatever its verdict, unless the test dropped it: a test
  * on the files that fails leaves no subscription for the next one's deliverer to follow.
  */
-const kept = (t: TestContext, w: World, name: string, subscription: Subscription): void => {
+const kept = (t: Finishes, w: World, name: string, subscription: Subscription): void => {
   done(w.subs.subscriptions.put(SubscriptionName.read(name), subscription));
   t.onTestFinished(() => {
     if (listedIn(w).includes(name)) done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
@@ -219,7 +219,7 @@ const digestChecks = (): number => Effect.runSync(Metric.value(SUBSCRIPTION_DIGE
  * run's factory there rather than off the files.
  */
 const delivering = (
-  t: Finishes,
+  t: Finishes & Partial<Waiter>,
   e: Parameters<typeof over>[0],
   w: World,
   rt?: ManagedRuntime.ManagedRuntime<never, never>,
@@ -248,7 +248,7 @@ const delivering = (
   const rests = () => clock.asked.length - clock.woken.length - stopped;
   const quiet = (n: number, what = `${n} rests asked`) =>
     until(
-      t,
+      { signal: t.signal ?? new AbortController().signal },
       () => rests() === n,
       () => `${what}; ${rests()} are`,
       { bell: clock.bell, everyMs: 10 },

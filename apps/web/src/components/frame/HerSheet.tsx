@@ -29,6 +29,8 @@ type HerSheetState = {
   open: boolean;
   /** Her face's press: closes her where the sheet shows her, else shows her in it, closing what the address's `?bar=` names. */
   toggle: () => void;
+  /** A page's press that opens her chat: shows her in the sheet whether or not she was shown, closing what the address's `?bar=` names. */
+  show: () => void;
   close: () => void;
 };
 
@@ -51,15 +53,18 @@ export function HerSheetProvider({ children }: { children?: ReactNode }) {
   const shown = open && !ownsChat && !barOpen;
   const closeBar = bar.close;
   const close = useCallback(() => setOpen(false), []);
+  const show = useCallback(() => {
+    setOpen(true);
+    if (barOpen) closeBar();
+  }, [barOpen, closeBar]);
   const toggle = useCallback(() => {
     if (shown) {
       close();
       return;
     }
-    setOpen(true);
-    if (barOpen) closeBar();
-  }, [shown, barOpen, close, closeBar]);
-  const value = useMemo(() => ({ open, toggle, close }), [open, toggle, close]);
+    show();
+  }, [shown, close, show]);
+  const value = useMemo(() => ({ open, toggle, show, close }), [open, toggle, show, close]);
   return <HerSheetContext.Provider value={value}>{children}</HerSheetContext.Provider>;
 }
 

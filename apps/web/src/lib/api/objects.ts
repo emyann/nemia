@@ -2,7 +2,7 @@
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
  * by `objects`' one constructor of its typed client (`apiClient`) from the one definition the api serves, over `FetchHttpClient` — the Run
  * and its sub-resources (`runs`), the inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction,
- * command lines and cost lines (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its
+ * command lines and cost lines (`factories`), filed empty or made from a template, and the templates Nemia ships (`templates`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its
  * schedules, hires and volumes; and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`);
  * and the proposals that change them and the delegations that may approve them (`proposals`, `delegations`); and the files a start hands
  * its run (`files`). Each is a promise, as TanStack Query's functions take one.
@@ -43,7 +43,11 @@ import {
   type CardStart,
   type CardWrite,
   Factory,
+  FactoryApplied,
+  type FactoryApplyWrite,
   FactoryCommands,
+  type FactoryCreate,
+  FactoryCreated,
   FactoryInstruction,
   type FactoryInstructionWrite,
   FactoryList,
@@ -87,6 +91,7 @@ import {
   StepTries,
   Skill,
   SkillFiles,
+  TemplateList,
   SkillList,
   type SkillWrite,
   Workflow,
@@ -523,11 +528,27 @@ export const cards = {
 /** What a write of a factory's rules, instruction or cost line may have done, and what to look at before writing again. */
 const SETTINGS_WRITTEN = "The factory's settings may be changed: read its settings again before changing them again.";
 
+/** What a filing of a factory may have done, and what to look at before filing it again. */
+const FACTORY_FILED = 'The factory may be filed: read the factories again before making it again.';
+
+/** The templates Nemia ships, which no namespace holds (`/api/templates`). */
+export const templates = {
+  /** Every template Nemia ships (`GET /api/templates`), every page. */
+  list: (): Promise<TemplateList> =>
+    everyPage((asked) => call((c) => c.templates.listAll({ query: asked }).pipe(Effect.flatMap(listed)), read(TemplateList))),
+};
+
 /** A factory, its rules, its instruction and the lines a person types for it (`/api/factories`). */
 export const factories = {
   /** Every factory, the default one among them (`GET /api/factories`), every page. */
   listAll: (): Promise<FactoryList> =>
     everyPage((asked) => call((c) => c.factories.listAll({ query: asked }).pipe(Effect.flatMap(listed)), read(FactoryList))),
+  /** A factory filed (`POST /api/factories`): by its name, with the volumes the body names, none where it names none. */
+  create: (body: FactoryCreate): Promise<FactoryCreated> =>
+    call((c) => c.factories.create({ payload: body }), write(FactoryCreated, FACTORY_FILED)),
+  /** The factory `name` made from the template the body names (`POST /api/factories/:name/apply`), its parameters at their defaults. */
+  apply: (name: string, body: FactoryApplyWrite): Promise<FactoryApplied> =>
+    call((c) => c.factories.apply({ params: { name }, payload: body }), write(FactoryApplied, FACTORY_FILED)),
   /** The factory `name`. */
   get: (name: string): Promise<Factory> => call((c) => c.factories.get({ params: { name } }), read(Factory)),
   /** The lines a person types for the factory `name`: attach, rm, add, schedule, trust, volume, and each unschedule and volume rm. */

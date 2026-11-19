@@ -4,7 +4,7 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Four workflows: intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing; quick lands once its review passes."
 spec:
-  version: 4.10.2
+  version: 4.11.0
   rules:
     path: RULES.md
   parameters:
@@ -47,7 +47,7 @@ spec:
       default: "true"
     pullRequestLabels:
       type: string
-      description: "The labels the implement step gives the run's pull request as it opens it, and its check again each round, from the run's own labels: rules apart by spaces, each <key>=<value>:<label>, so kind=bug:bug kind=chore:maintenance labels a run whose kind is bug with bug and one whose kind is chore with maintenance. The labels the rules give the run are added and any other a rule could give is removed; a label no rule gives is left alone, and each label a rule gives must exist in the repository. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) labels nothing. Read only where github is true."
+      description: "The labels the implement step gives the run's pull request as it opens it, and its check again each round, from the run's own labels: rules apart by spaces, each <key>=<value>:<label>, so kind=bug:bug kind=chore:maintenance labels a run whose kind is bug with bug and one whose kind is chore with maintenance. The labels the rules give the run are added and any other a rule could give is removed; a label no rule gives is left alone, and each label a rule gives must exist in the repository. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) labels nothing. Read by the pull request only where github is true; the janitor's check reads it either way, filing each card of the factory with labels at least one rule reads, and with none where it is empty."
       default: ""
     areas:
       type: string

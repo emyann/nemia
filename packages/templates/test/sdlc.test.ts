@@ -143,6 +143,20 @@ test('applied with no --set, each parameter takes its default', () => {
   assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
 });
 
+test("the factory's label rules reach the janitor's filing as its flag, and Argus's note, either way", () => {
+  for (const [name, rules] of [
+    ['set', 'work=fix:fix'],
+    ['plain', ''],
+  ] as const) {
+    const check = checkOf(treeOf(name), 'janitor', 'argus');
+    assert.ok(
+      check.includes(`/cards.ts" "\${WF_CLOSEOUT:-}" --labels "${rules}" && `),
+      `${name}: the janitor files by the rules:\n${check}`,
+    );
+  }
+  assert.ok(stepIn(treeOf('set'), 'janitor', 'argus').body.includes('\nwork=fix:fix\n'), "Argus's note quotes the rules");
+});
+
 test("the factory's landing refresh reaches land's merge as its two flags, and both reviews' notes name the paths it derives", () => {
   const tree = treeOf('set');
   for (const workflow of ['build', 'quick'])

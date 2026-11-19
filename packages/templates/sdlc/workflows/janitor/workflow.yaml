@@ -7,6 +7,6 @@ spec:
   steps:
     - name: argus
       place: git
-      check: "node \"${WF_WORKFLOW_FILES:?nemia check: cards.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/cards.ts\" \"${WF_CLOSEOUT:-}\" && node \"${WF_WORKFLOW_FILES:?nemia check: groom.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/groom.ts\" \"${WF_CLOSEOUT:-}\""
+      check: "node \"${WF_WORKFLOW_FILES:?nemia check: cards.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/cards.ts\" \"${WF_CLOSEOUT:-}\" --labels \"${{ parameters.pullRequestLabels }}\" && node \"${WF_WORKFLOW_FILES:?nemia check: groom.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/groom.ts\" \"${WF_CLOSEOUT:-}\""
       reads:
         - inbox

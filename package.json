@@ -37,7 +37,8 @@
     "board:serve": "npm run board:serve --workspace web",
     "board:stop": "npm run board:stop --workspace web",
     "storybook": "npm run storybook --workspace web",
-    "release:check": "npm run typecheck && npm test"
+    "release:check": "npm run typecheck && npm test",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@emyann/tsverify": "0.9.1",
@@ -46,7 +47,9 @@
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "5.1.0",
     "eslint-plugin-sonarjs": "4.2.2",
+    "husky": "9.1.7",
     "js-yaml": "^4.3.2",
+    "lint-staged": "17.6.0",
     "oxfmt": "^0.71.0",
     "oxlint": "^1.86.0",
     "oxlint-tsgolint": "^7.0.2003",
@@ -54,5 +57,9 @@
     "tsrs": "0.20.1-ts7.1.0-beta",
     "turbo": "^2.10.12",
     "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*": "oxfmt --no-error-on-unmatched-pattern",
+    "*.{ts,tsx,mts,cts,js,mjs,cjs}": "oxlint -c .oxlintrc.fast.json"
   }
 }

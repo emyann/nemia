@@ -6,10 +6,36 @@
  * Beneath the controllers, beside `branches.store.ts`: it asks the place it is handed and reads nothing else, and `runner.ts`
  * re-exports `changesOf`.
  */
+import { Option, Schema } from 'effect';
 import type { Changes, ChangedFile, PlaceRequests } from '../place/place.ts';
 import type { Place } from '../place/place.store.ts';
 import type { RepositoryRun } from '../record/record.ts';
-import { CHECK_AFFECTING, notKnown, radius, sensitivePaths, workspacesIn, type Radius } from './branches.ts';
+import { CHECK_AFFECTING, notKnown, radius, sensitivePaths, type Radius } from './branches.ts';
+
+/** A root `package.json`'s `workspaces`, as npm writes them: a list of globs, or an object holding them as `packages`. */
+const workspacesOf = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      workspaces: Schema.optional(
+        Schema.Union([Schema.Array(Schema.Unknown), Schema.Struct({ packages: Schema.optional(Schema.Array(Schema.Unknown)) })]),
+      ),
+    }),
+  ),
+);
+
+/** Whether `value` is a list: `Array.isArray`, which narrows no readonly array. */
+const isList = (value: unknown): value is readonly unknown[] => Array.isArray(value);
+
+/**
+ * The npm `workspaces` of a repository's root `package.json` text, as written — its list, or its `packages` — and none when there is no
+ * file or it does not read: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` (`workspaceGlob`, `deepWorkspaces`).
+ * @param packageJson The root `package.json`'s text; null or undefined where there is no file.
+ */
+export function workspacesIn(packageJson: string | null | undefined): string[] {
+  const workspaces = Option.getOrUndefined(workspacesOf(packageJson ?? '{}'))?.workspaces;
+  const globs: readonly unknown[] = workspaces === undefined ? [] : isList(workspaces) ? workspaces : (workspaces.packages ?? []);
+  return globs.filter((g): g is string => typeof g === 'string');
+}
 
 /** A top-level markdown file a branch added, and its text. */
 export type Note = { readonly file: string; readonly text: string };

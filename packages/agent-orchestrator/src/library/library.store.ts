@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { LIBRARY_KINDS } from 'objects';
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal } from '../record/record.store.ts';
@@ -57,12 +57,9 @@ function readJson<T>(file: string, decode: (raw: unknown) => Result.Result<T, Sc
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = decode(raw);
   if (Result.isFailure(read)) {
     const { path: at, words } = firstRefusal(raw, read.failure);

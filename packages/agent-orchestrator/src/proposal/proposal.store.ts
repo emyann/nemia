@@ -12,7 +12,7 @@
 import { valueVersion } from '../digest/digest.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Result, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 import { Proposal } from 'objects';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { factoryNameRefusal } from '../factory/factory.ts';
@@ -135,12 +135,9 @@ function readProposal(home: string, factory: string, name: string): Proposal | u
     throw err;
   }
   const fix = 'the machinery writes it alone: move it aside, and propose again';
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(Proposal)(raw);
   if (Result.isFailure(read)) {
     const { path: at, words } = firstRefusal(raw, read.failure);

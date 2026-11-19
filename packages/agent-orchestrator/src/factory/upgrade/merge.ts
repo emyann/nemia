@@ -148,11 +148,18 @@ function textParts(path: string, base: string, ours: string, theirs: string): Pa
   return ['---\n', ...headParts(path, b.head, o.head, t.head), '---\n', ...lineParts(path, b.body, o.body, t.body, b.lines)];
 }
 
+/**
+ * Whether `value` is a JSON object, a map of its keys.
+ * @param value A value parsed from JSON.
+ */
+export const isJsonObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /** A JSON object, or none where the text is not one. */
 function objectOf(text: string): Record<string, unknown> | undefined {
   try {
     const value: unknown = JSON.parse(text);
-    return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+    return isJsonObject(value) ? value : undefined;
   } catch {
     return undefined;
   }

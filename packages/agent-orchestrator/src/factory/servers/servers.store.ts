@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { MCP_TRANSPORTS } from 'objects';
 import { factoryNameRefusal } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
@@ -80,12 +80,9 @@ export function readServersAt(file: string, fix: string): FactoryServersFile | u
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(FactoryServersSchema)(raw);
   if (Result.isFailure(read)) {
     const { path: at, words } = firstRefusal(raw, read.failure);
@@ -162,13 +159,14 @@ export const builtinServers = (dir: string): readonly BuiltinServer[] => {
   return files.flatMap((file): BuiltinServer[] => {
     const name = file.slice(0, -'.json'.length);
     if (serverNameRefusal(name) !== undefined) return [];
-    let read: unknown;
+    let text: string;
     try {
-      read = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      text = fs.readFileSync(path.join(dir, file), 'utf8');
     } catch {
       return [];
     }
-    if (factoryServerRefusal(read) !== undefined) return [];
-    return [{ name, ...(read as FactoryServer) }];
+    const read = Schema.decodeUnknownOption(Schema.fromJsonString(FactoryServerSchema))(text);
+    if (Option.isNone(read) || factoryServerRefusal(read.value) !== undefined) return [];
+    return [{ name, ...read.value }];
   });
 };

@@ -8,7 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema, SchemaIssue } from 'effect';
+import { Option, Result, Schema, SchemaIssue } from 'effect';
 import { Actor } from 'objects';
 import {
   BY_CAP,
@@ -459,7 +459,9 @@ const readRecord = (home: string, id: string): Run => {
  */
 export const saidDir = (home: string, id: string): string => path.join(runsDir(home), `${id}.said`);
 
-const isKeptSaid = Schema.is(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String }));
+const keptSaidIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String })),
+);
 
 /** The number of each word kept in `dir`, in the order kept: none where the folder is not there. */
 function keptNumbers(dir: string): number[] {
@@ -509,20 +511,21 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
   const byStep: Record<string, SaidBefore[]> = {};
   for (const n of keptNumbers(dir)) {
     const file = path.join(dir, `${n}.json`);
-    let json: unknown;
+    let text = '';
     try {
-      json = JSON.parse(fs.readFileSync(file, 'utf8'));
+      text = fs.readFileSync(file, 'utf8');
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
     }
-    if (!isKeptSaid(json)) {
+    const kept = keptSaidIn(text);
+    if (Option.isNone(kept)) {
       sayOnce(
         `run ${id}: ${file} is no word kept for a step ({ step, at, text }), and is left out: remove the file, or say the words again with nemia say`,
       );
       continue;
     }
-    const { step, at, text } = json;
-    (byStep[step] ??= []).push({ at, text });
+    const { step, at, text: words } = kept.value;
+    (byStep[step] ??= []).push({ at, text: words });
   }
   return Object.keys(byStep).length ? byStep : undefined;
 }

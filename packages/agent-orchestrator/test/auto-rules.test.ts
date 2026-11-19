@@ -158,6 +158,10 @@ const decidedAtAuto = async (command: string) =>
     )
   )?.decision;
 
+/** Admission's decision for `given`, handed as JSON with no floor, or none. */
+const decidedOn = async (given: unknown) =>
+  (await stage.runWith(stage.board().e, Effect.provide(admitted(ROOT, JSON.stringify(given), TABLE), door())))?.decision;
+
 describe('Her floor: a call on a run or a factory left at manual is denied, one raised is hers, an unread run asked; the store raised raises every factory', () => {
   const s = story(test);
   s.test(
@@ -179,6 +183,11 @@ describe('Her floor: a call on a run or a factory left at manual is denied, one 
       assert.equal(await decided('nemia show r-pipao', 'none'), undefined, 'no floor, no scope');
     },
   );
+  s.test('REFUSED: a call with no cwd, or whose input is no map, is no call, and is asked', async () => {
+    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-pipao' }, cwd: '/w' }), undefined);
+    assert.equal(await decidedOn({ tool: 'Bash', input: { command: 'nemia show r-pipao' } }), 'ask');
+    assert.equal(await decidedOn({ tool: 'Bash', input: [], cwd: '/w' }), 'ask');
+  });
   s.test("the store's level raised raises the default factory, and every factory without its own", async () => {
     writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
     assert.equal(await decided('nemia show r-default'), undefined, "the store's level raises the default factory");

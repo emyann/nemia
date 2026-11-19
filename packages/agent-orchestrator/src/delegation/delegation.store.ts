@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Result, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 import { DelegationSpec } from 'objects';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { factoryNameRefusal } from '../factory/factory.ts';
@@ -106,12 +106,9 @@ export function readDelegation(home: string, factory: string, agent: string): De
     throw err;
   }
   const fix = `write it again with a PUT of /api/namespaces/${factory}/delegations/${agent}, or remove the file`;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(FileSchema)(raw);
   if (Result.isFailure(read)) {
     const { path: at, words } = firstRefusal(raw, read.failure);

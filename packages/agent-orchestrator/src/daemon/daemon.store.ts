@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
 import { reservedFor } from '../service/index.ts';
 import {
@@ -44,13 +44,7 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { alive } from '../process/alive.store.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const jsonOr = (text: string): unknown => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** A count as the meter writes one: a number, never below zero. */
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));

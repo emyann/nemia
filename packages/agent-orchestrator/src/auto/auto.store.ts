@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { firstRefusal, When } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
@@ -135,11 +135,9 @@ function jsonIn(file: string, fix: string): unknown {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
-  }
+  const raw = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(raw)) throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
+  return raw.value;
 }
 
 /** The refusal of `raw`, read from `file`, that its schema refused with `error`: its first wrong field, and `fix`. */

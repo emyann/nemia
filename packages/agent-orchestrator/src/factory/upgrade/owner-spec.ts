@@ -10,7 +10,7 @@
 import { Invalid } from '../../refusal/refusal.ts';
 import { textIn } from '../../folder/folder.ts';
 import { parseAgent, skillTurnCost } from '../../agents/agents.ts';
-import { AGENTS_FOLDER, SKILLS_FOLDER } from '../../step/step.ts';
+import { AGENTS_FOLDER, SKILLS_FOLDER, isObject } from '../../step/step.ts';
 import { agentSpecOf, skillSpecOf, workflowSpecOf } from '../../propose/index.ts';
 import { compose, type Choice, type TreeMerge } from './merge.ts';
 import { WIRING_FILE } from './resolution.ts';
@@ -108,8 +108,8 @@ function hireOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown 
   const cut = owner.name.indexOf('.');
   const [workflow, step] = [owner.name.slice(0, cut), owner.name.slice(cut + 1)];
   const wiring = readOrRefused(factory, owner, (): unknown => JSON.parse(texts.get(WIRING_FILE) ?? '{}'));
-  const hires = typeof wiring === 'object' && wiring !== null ? (wiring as { hires?: unknown }).hires : undefined;
-  const agent = typeof hires === 'object' && hires !== null ? (hires as Record<string, unknown>)[`${workflow}/${step}`] : undefined;
+  const hires = isObject(wiring) ? wiring.hires : undefined;
+  const agent = isObject(hires) ? hires[`${workflow}/${step}`] : undefined;
   return { workflow, step, ...(typeof agent === 'string' && { agent }) };
 }
 

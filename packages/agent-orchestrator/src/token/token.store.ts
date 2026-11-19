@@ -19,7 +19,7 @@ import { runNamespace } from '../run-list/index.ts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Layer, Result, Schema } from 'effect';
+import { Context, Layer, Option, Result, Schema } from 'effect';
 import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../workflow.ts';
@@ -95,14 +95,7 @@ export function readToken(home: string, token: string): TokenFiled | null {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const read = Schema.decodeUnknownResult(TokenFiledSchema)(raw);
-  return Result.isSuccess(read) ? read.success : null;
+  return Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(TokenFiledSchema))(text));
 }
 
 /**
@@ -151,13 +144,7 @@ const PERSON_TOKEN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
 
 /** The record a file of a person's token holds, or null where it does not read as one, which vouches for no one. */
 function personRecordOf(text: string): PersonTokenFiled | null {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const read = Schema.decodeUnknownResult(PersonTokenFiledSchema)(raw);
+  const read = Schema.decodeUnknownResult(Schema.fromJsonString(PersonTokenFiledSchema))(text);
   if (!Result.isSuccess(read)) return null;
   const { name, createdAt, holder } = read.success;
   return holder === undefined ? { name, createdAt } : { name, createdAt, holder };

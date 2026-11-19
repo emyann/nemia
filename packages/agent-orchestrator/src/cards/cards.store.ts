@@ -17,7 +17,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Schema } from 'effect';
 import { checked, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { inboxNameOf, parseInboxCard, type MissedStart } from '../inbox/index.ts';
@@ -144,7 +144,7 @@ export const inboxAt = (home: string): string => path.join(home, 'inbox');
 const queueAt = (home: string): string => path.join(home, 'queue');
 
 /** A try as the tick writes it; any key beside these is left unread. */
-const isMissedStart = Schema.is(MissedStartModel);
+const missedStartIn = Schema.decodeUnknownOption(Schema.fromJsonString(MissedStartModel));
 
 /**
  * The name of the card `given` is a path to, in the store `home` — any path under its inbox, `<inbox>/<name>.md` or `<inbox>/<name>`,
@@ -177,9 +177,11 @@ function triesAt(queue: string): CardLayer['tries'] {
       }
       for (const file of names.sort()) {
         try {
-          const r: unknown = JSON.parse(fs.readFileSync(path.join(queue, file), 'utf8'));
-          if (isMissedStart(r))
-            tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
+          const r = missedStartIn(fs.readFileSync(path.join(queue, file), 'utf8'));
+          if (Option.isSome(r)) {
+            const { at, text, repo, why, refused } = r.value;
+            tries.set(file.slice(0, -'.json'.length), { at, text, repo, why, refused });
+          }
         } catch {}
       }
       return tries;

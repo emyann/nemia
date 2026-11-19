@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { CONFIG_FOLDERS } from 'agent-runtime/vocabulary';
 import { parseAgent } from '../agents/agents.ts';
 import { stepFrom } from '../workflow/index.ts';
@@ -93,12 +93,9 @@ export function readLevel(home: string): LevelFile | undefined {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Invalid({ message: `${levelFile(home)} is not JSON: set the level again with nemia level manual.` });
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) throw new Invalid({ message: `${levelFile(home)} is not JSON: set the level again with nemia level manual.` });
+  const raw = json.value;
   const read = Schema.decodeUnknownResult(LevelSchema)(raw);
   if (Result.isSuccess(read)) return { ...read.success };
   const { path: at, words } = firstRefusal(raw, read.failure);
@@ -153,6 +150,13 @@ const realOf = (at: string): string | undefined => {
   }
 };
 
+/** A `package.json`'s `bin`, as `declaredNemia` reads it: one path, or the paths by name. */
+const binIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({ bin: Schema.optional(Schema.Union([Schema.String, Schema.Struct({ nemia: Schema.optional(Schema.String) })])) }),
+  ),
+);
+
 /** Whether `file`, a real path, is the `nemia` bin its own package's `package.json` declares, the package found from it up. */
 const declaredNemia = (file: string): boolean => {
   for (let dir = path.dirname(file); path.dirname(dir) !== dir; dir = path.dirname(dir)) {
@@ -162,8 +166,9 @@ const declaredNemia = (file: string): boolean => {
     } catch {
       continue;
     }
-    const named = (JSON.parse(text) as { bin?: { nemia?: unknown } }).bin?.nemia;
-    return typeof named === 'string' && realOf(path.join(dir, named)) === file;
+    const bin = Option.getOrUndefined(binIn(text))?.bin;
+    const named = typeof bin === 'object' ? bin.nemia : undefined;
+    return named !== undefined && realOf(path.join(dir, named)) === file;
   }
   return false;
 };
@@ -242,12 +247,8 @@ export function readSession(home: string): NemiaSession | undefined {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    const read = Schema.decodeUnknownResult(SessionSchema)(JSON.parse(text));
-    return Result.isSuccess(read) ? { ...read.success, tasks: [...read.success.tasks] } : undefined;
-  } catch {
-    return undefined;
-  }
+  const read = Schema.decodeUnknownResult(Schema.fromJsonString(SessionSchema))(text);
+  return Result.isSuccess(read) ? { ...read.success, tasks: [...read.success.tasks] } : undefined;
 }
 
 /**
@@ -320,12 +321,8 @@ export function readTold(home: string): ToldCustom | undefined {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    const read = Schema.decodeUnknownResult(ToldSchema)(JSON.parse(text));
-    return Result.isSuccess(read) ? { ...read.success } : undefined;
-  } catch {
-    return undefined;
-  }
+  const read = Schema.decodeUnknownResult(Schema.fromJsonString(ToldSchema))(text);
+  return Result.isSuccess(read) ? { ...read.success } : undefined;
 }
 
 /**
@@ -360,12 +357,8 @@ export function readUntrusted(home: string): string | undefined {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
-  try {
-    const read = Schema.decodeUnknownResult(UntrustedSchema)(JSON.parse(text));
-    return Result.isSuccess(read) ? read.success.refused : undefined;
-  } catch {
-    return undefined;
-  }
+  const read = Schema.decodeUnknownResult(Schema.fromJsonString(UntrustedSchema))(text);
+  return Result.isSuccess(read) ? read.success.refused : undefined;
 }
 
 /**
@@ -429,20 +422,27 @@ export function readFact(home: string, name: string): string {
   return fs.readFileSync(path.join(memoryDir(home), name), 'utf8');
 }
 
+/** A settings file's `permissions.allow`, as `promptAllows` reads it: a list, its rules the strings among it. */
+const allowsIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({ permissions: Schema.optional(Schema.Struct({ allow: Schema.optional(Schema.Array(Schema.Unknown)) })) }),
+  ),
+);
+
 /**
  * The allow rules a person gave her session at a prompt ("don't ask again"), written in her folder's local settings: what widens her
  * level beyond what is built in. None where the file is not there or holds none.
  * @param home The store's root folder.
  */
 export function promptAllows(home: string): string[] {
-  let raw: unknown;
+  let text: string;
   try {
     const [folder] = CONFIG_FOLDERS;
     if (folder === undefined) return [];
-    raw = JSON.parse(fs.readFileSync(path.join(nemiaDir(home), folder, 'settings.local.json'), 'utf8'));
+    text = fs.readFileSync(path.join(nemiaDir(home), folder, 'settings.local.json'), 'utf8');
   } catch {
     return [];
   }
-  const allow = (raw as { permissions?: { allow?: unknown } } | null)?.permissions?.allow;
-  return Array.isArray(allow) ? allow.filter((rule): rule is string => typeof rule === 'string') : [];
+  const allow = Option.getOrUndefined(allowsIn(text))?.permissions?.allow ?? [];
+  return allow.filter((rule): rule is string => typeof rule === 'string');
 }

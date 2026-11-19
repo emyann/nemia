@@ -11,8 +11,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type FolderReach = 'within' | 'store' | 'outside';
 
 /** Whether the absolute path `inner` is `outer` or a folder under it, by whole segments: `/home/a` is not under `/home/ab`. */
-const under = (inner: string, outer: string): boolean =>
-  inner === outer || inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
+const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
 
 const folderReachSpec = spec<(real: string, roots: readonly string[], stores: readonly string[]) => FolderReach>({
   requires: ({ input: [real, roots, stores] }) =>

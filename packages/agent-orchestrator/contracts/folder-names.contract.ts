@@ -25,8 +25,7 @@ const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: stri
   ensures: {
     onlyFoldersTyped: {
       description: 'Every name answered is a folder of the entries that begins with what was typed, never a file',
-      condition: ({ input: [entries, prefix], output }) =>
-        output.names.every((n) => entries.some((e) => e.name === n && named(e, prefix))),
+      condition: ({ input: [entries, prefix], output }) => output.names.every((n) => entries.some((e) => e.name === n && named(e, prefix))),
     },
     hiddenOnlyWhenAsked: {
       description: 'A hidden folder is named only when what was typed opens with a dot',

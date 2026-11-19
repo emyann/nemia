@@ -316,13 +316,24 @@ export const releaseCheck = (env: Env): boolean =>
  */
 export const folderRoots = (env: Env): readonly string[] => {
   const value = env.WF_FOLDER_ROOTS ?? '';
-  const roots = value.split(path.delimiter).map((root) => root.trim()).filter((root) => root !== '');
+  const roots = value
+    .split(path.delimiter)
+    .map((root) => root.trim())
+    .filter((root) => root !== '');
   if (roots.length === 0) return [os.homedir()];
   if (roots.every((root) => path.isAbsolute(root))) return roots.map((root) => path.resolve(root));
   throw new Invalid({
     message: `WF_FOLDER_ROOTS=${value} holds a path that is not absolute. It is the folders the board's folder field lists folder names under, separated by ${path.delimiter}: WF_FOLDER_ROOTS=/srv/code${path.delimiter}/home/me — or unset, for the home of the user the daemon runs as.`,
   });
 };
+
+/**
+ * `AE_ROOT`, the runtime's own store when it is run apart (`ae`): its path resolved, or `~/.agent-engine` when unset or blank. Read so
+ * that the person's folder listing names nothing inside it; Nemia's daemon keeps its engine under `WF_ROOT`.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
+export const engineStore = (env: Env): string =>
+  env.AE_ROOT?.trim() ? path.resolve(env.AE_ROOT.trim()) : path.join(os.homedir(), '.agent-engine');
 
 /**
  * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
@@ -421,6 +432,7 @@ export type Settings = {
   readonly servedNames: readonly string[];
   readonly releaseCheck: boolean;
   readonly folderRoots: readonly string[];
+  readonly engineStore: string;
 };
 
 /**
@@ -476,6 +488,9 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get folderRoots() {
     return folderRoots(env);
+  },
+  get engineStore() {
+    return engineStore(env);
   },
 });
 

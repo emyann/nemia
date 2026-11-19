@@ -40,6 +40,7 @@ export { readinessOf, liveFacts, type ReadinessFacts, type CommandRead } from '.
 export { startFix, fixOf, followFix, type FixFollowed } from './needs/fix.verb.ts';
 export { startTurn, turnOf } from './harness-turn/harness-turn.verb.ts';
 export { milestonesNow } from './milestones/milestones.verb.ts';
+export { foldersNamed, repositoryMade, repositoryNew, type FolderNamesRead, type RepositoryMadeRead } from './factory/folders/index.ts';
 export { startUpgrade, upgradeOf, followUpgrade, upgradesRead, RunningCode, type UpgradeFollowed } from './release/upgrade-job.verb.ts';
 export { NeedsMemory, needsMemoryLayer, type NeedsMemo } from './needs/needs.verb.ts';
 export { toolsDir } from './config/root.store.ts';

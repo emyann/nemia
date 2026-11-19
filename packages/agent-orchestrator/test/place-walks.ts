@@ -1412,7 +1412,7 @@ const INIT: readonly Walk[] = [
     },
   },
   {
-    name: "a folder holding files is made a repository whose first commit holds none of them, each left as it was and not committed",
+    name: 'a folder holding files is made a repository whose first commit holds none of them, each left as it was and not committed',
     walk: (side, area) => {
       const dir = path.join(area, 'held');
       fs.mkdirSync(dir);

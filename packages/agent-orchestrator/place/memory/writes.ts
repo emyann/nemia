@@ -1,6 +1,7 @@
 /**
  * The verbs of the test place that change a repository or a directory: `follow`, `make`, `handoff`, `land`, `remove`, `export`,
- * `seal`, `clone` and `init`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
+ * `seal`, `clone` and `init`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its
+ * own words.
  */
 import fs from 'node:fs';
 import path from 'node:path';

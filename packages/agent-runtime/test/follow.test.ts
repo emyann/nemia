@@ -77,12 +77,7 @@ const followFailure = async (ops: ReturnType<typeof detachedOps>, name: string) 
 
 describe('a job is followed live to its end, and followed again once settled', WAITED, () => {
   const outer = outlived();
-  let j!: {
-    ops: import('../src/index.ts').RunnerOps;
-    setState: (s: string) => void;
-    stdout: (s: string) => void;
-    transcript: (o: object) => void;
-  };
+  let j!: ReturnType<typeof job>;
   let ended!: ReturnType<typeof follow>;
   beforeAll(() => {
     const t = teardowns();

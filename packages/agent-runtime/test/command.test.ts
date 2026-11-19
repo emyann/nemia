@@ -45,20 +45,7 @@ describe(
     let cwd!: string;
     let engine!: import('../src/index.ts').EngineShape;
     let started!: string;
-    let ids!: {
-      seq: string;
-      split: string;
-      env: string;
-      nice: string;
-      plain: string;
-      held: string;
-      stopped: string;
-      printed: string;
-      said: string;
-      unsaid: string;
-      long: string;
-      folder: string;
-    };
+    let ids!: Record<string, Awaited<ReturnType<typeof file>>>;
     beforeAll(async () => {
       const t = teardowns();
       root = scratch('ae-command-');

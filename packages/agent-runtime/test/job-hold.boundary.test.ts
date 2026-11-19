@@ -130,24 +130,7 @@ describe(
   'a Claude Code job under the sessions’ drain: finishes its call, held at the next, cut past the grace, parked past its bound',
   WAITED,
   () => {
-    let a!: {
-      root: string;
-      dir: string;
-      child: import('child_process').ChildProcessWithoutNullStreams;
-      done: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
-      claudePid: () => number | undefined;
-      hold: () => {
-        readonly parked?:
-          | { readonly at: string; readonly calling?: { readonly tool: string; readonly since: string } | undefined }
-          | undefined;
-        readonly calling?: { readonly tool: string; readonly since: string } | undefined;
-        readonly heldBack?: { readonly since: string; readonly after?: { readonly tool: string } | undefined } | undefined;
-        readonly draining?: { readonly since: string } | undefined;
-      } | null;
-      out: () => string;
-      err: () => string;
-      release: (file: string) => void;
-    };
+    let a!: ReturnType<typeof job>;
     beforeAll(() => {
       const t = teardowns();
       a = job(t, { call: 'Bash', next: 'Edit' });

@@ -892,10 +892,7 @@ describe('broughtOf and chatItems: a step her words link to is brought, drawn un
 });
 
 describe('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', () => {
-  let reading!: (
-    { setState, tryAgain }: { setState: import('react').Dispatch<import('react').SetStateAction<ChatFollowed>>; tryAgain: () => void },
-    sharing?: import('../src/lib/sharedStream.ts').Sharing,
-  ) => () => void;
+  let reading!: (typeof import('../src/lib/useNemiaChat.ts'))['reading'];
   let fetchBefore!: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   let sourceBefore!: unknown;
   let state!: ChatFollowed;
@@ -960,49 +957,9 @@ describe('reading her chat: one stream opened after the first read, from its cur
 });
 
 describe('NemiaChatProvider: one holder of her chat for the frame, read by every consumer under it, and refused outside one', () => {
-  let createElement!: {
-    (
-      type: 'input',
-      props?: (import('react').InputHTMLAttributes<HTMLInputElement> & import('react').ClassAttributes<HTMLInputElement>) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').DetailedReactHTMLElement<import('react').InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>;
-    <P extends import('react').HTMLAttributes<T>, T extends HTMLElement>(
-      type: import('react').HTMLElementType,
-      props?: (import('react').ClassAttributes<T> & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').DetailedReactHTMLElement<P, T>;
-    <P extends import('react').SVGAttributes<T>, T extends SVGElement>(
-      type: import('react').SVGElementType,
-      props?: (import('react').ClassAttributes<T> & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').ReactSVGElement;
-    <P extends import('react').DOMAttributes<T>, T extends Element>(
-      type: string,
-      props?: (import('react').ClassAttributes<T> & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').DOMElement<P, T>;
-    <P extends {}>(
-      type: import('react').FunctionComponent<P>,
-      props?: (import('react').Attributes & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').FunctionComponentElement<P>;
-    <P extends {}, T extends import('react').Component<P, import('react').ComponentState>, C extends import('react').ComponentClass<P>>(
-      type: import('react').ClassType<P, T, C>,
-      props?: (import('react').ClassAttributes<T> & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').CElement<P, T>;
-    <P extends {}>(
-      type: import('react').FunctionComponent<P> | import('react').ComponentClass<P> | string,
-      props?: (import('react').Attributes & P) | null,
-      ...children: import('react').ReactNode[]
-    ): import('react').ReactElement<P>;
-  };
+  let createElement!: (typeof import('react'))['createElement'];
   let renderToStaticMarkup!: (element: import('react').ReactNode, options?: import('react-dom/server').ServerOptions) => string;
-  let NemiaChatProvider!: ({
-    children,
-  }: {
-    children?: import('react').ReactNode;
-  }) => import('react').FunctionComponentElement<import('react').ProviderProps<import('../src/lib/useNemiaChat.ts').NemiaChat | null>>;
+  let NemiaChatProvider!: (typeof import('../src/lib/useNemiaChat.ts'))['NemiaChatProvider'];
   let useNemiaChat!: () => import('../src/lib/useNemiaChat.ts').NemiaChat;
   beforeAll(async () => {
     await import('./tsx.ts');

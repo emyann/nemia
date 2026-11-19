@@ -102,15 +102,7 @@ describe("under this machine's context a person makes a factory from a template'
 });
 
 describe("under a remote context, a template folder is packed here and kept by the daemon; a repository is the daemon's path", () => {
-  let exposed!: {
-    root: string;
-    home: string;
-    env: NodeJS.ProcessEnv;
-    url: string;
-    nemia: (argv: readonly string[], stdin?: string) => Promise<Said>;
-    stop: () => Promise<void>;
-    said: () => string;
-  };
+  let exposed!: Awaited<ReturnType<typeof servedStore>>;
   let minted!: Said;
   let token!: string;
   let folder!: string;

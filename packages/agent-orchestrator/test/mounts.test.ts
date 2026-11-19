@@ -532,23 +532,7 @@ const stepsOf = (fronts: Record<string, string>) =>
 
 describe('the folders a step is filed, read by their pure functions and by the model a fence test holds a filing to', () => {
   let team!: import('../src/workflow.ts').StepSpec[];
-  let filed!: Map<
-    string,
-    {
-      env: Record<string, string>;
-      projectMcp?: string[];
-      mcp?: Record<string, import('../src/factory/servers/servers.ts').FactoryServer>;
-      mounts?: import('../src/record/record.ts').Mount[];
-      model: string | undefined;
-      effort: string | undefined;
-      contextTokens: number | undefined;
-      permissionMode: string | undefined;
-      tools: string[] | undefined;
-      disallowedTools: string[] | undefined;
-      allowedTools: string[] | undefined;
-      budgetUsd: number | undefined;
-    } & object
-  >;
+  let filed!: ReturnType<typeof filedOf>;
   beforeAll(() => {
     team = loadWorkflows(TEAM_DEV);
     filed = filedOf(team);

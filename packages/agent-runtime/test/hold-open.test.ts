@@ -251,12 +251,7 @@ const refuses = async (b: ReturnType<typeof board>, id: string, fn: () => Promis
 };
 
 describe('over a store in memory, through the engine: signed, it waits; answered with no configuration, it resumes; signed again and stopped, it settles stopped while it waits', () => {
-  let b!: {
-    engine: import('../src/index.ts').EngineShape;
-    sessions: Map<string, Sighting>;
-    tasks: Map<string, Event[]>;
-    write: (id: string, events: Event[], filed?: Partial<Extract<Event, { kind: 'filed' }>>) => Map<string, Event[]>;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     const t = teardowns();
     b = board();

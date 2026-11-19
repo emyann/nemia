@@ -217,26 +217,9 @@ describe("a templated factory moved to a store of a later install: its lineage, 
   let sourceTree!: string;
   let clone!: string;
   let before!: Record<string, string>;
-  let exp!: {
-    readonly name: string;
-    readonly cards: readonly { readonly name: string; readonly source: string }[];
-    readonly folder: { readonly archive: string };
-    readonly file: string;
-    readonly left: readonly { readonly name: string; readonly why: string }[];
-    readonly stays: readonly string[];
-    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
-  };
+  let exp!: FactoryExport;
   let key!: string;
-  let filed!: {
-    readonly name: string;
-    readonly file: string;
-    readonly repos: readonly string[];
-    readonly cloned: readonly string[];
-    readonly volumes: readonly { readonly name: string; readonly path: string }[];
-    readonly cards: readonly { readonly name: string; readonly was: string }[];
-    readonly untrusted: readonly string[];
-  };
+  let filed!: FactoryImported;
   beforeAll(async () => {
     const t = teardowns();
     ({ origin, originDir } = originOfMill());

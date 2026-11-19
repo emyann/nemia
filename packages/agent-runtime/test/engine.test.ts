@@ -767,12 +767,7 @@ describe('the ways an attempt fails: a spawn refused, a harness failure, a sessi
 });
 
 describe('a long-lived session beside a job: its spend counted as it grows, left open across a daemon restart, its respawn journalled, its death ended on its last reading', () => {
-  let r!: {
-    sessions: Map<string, Sighting>;
-    spawned: SpawnRequest[];
-    asked: string[];
-    daemon: () => <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Promise<A>;
-  };
+  let r!: ReturnType<typeof recording>;
   let run!: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Promise<A>;
   let name!: string;
   beforeAll(() => {

@@ -224,29 +224,10 @@ const listBoard = async () => {
 const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } }) + '\n';
 
 describe('the api lists some tasks: each journal read once, one look at the harness for those in flight, an unreadable task named once, and anything else refused', () => {
-  let b!: {
-    settled: string[];
-    flying: string[];
-    queued: string;
-    sessions: Map<string, Sighting>;
-    counts: { observe: number };
-    runner: {
-      spawn(r: { name: string }): Promise<void>;
-      observe(): Promise<Map<string, Sighting>>;
-      stop(): Promise<void>;
-      logs(sessionId: string): Promise<string>;
-    };
-    engine: import('../src/index.ts').EngineShape;
-    root: string;
-  };
+  let b!: Awaited<ReturnType<typeof listBoard>>;
   let engine!: import('../src/index.ts').EngineShape;
   let root!: string;
-  let runner!: {
-    spawn(r: { name: string }): Promise<void>;
-    observe(): Promise<Map<string, Sighting>>;
-    stop(): Promise<void>;
-    logs(sessionId: string): Promise<string>;
-  };
+  let runner!: Awaited<ReturnType<typeof listBoard>>['runner'];
   let counts!: { observe: number };
   let settled!: string[];
   let flying!: string[];

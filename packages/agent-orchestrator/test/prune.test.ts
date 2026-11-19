@@ -244,12 +244,7 @@ const inPlaceRun = async (b: Board) => {
 };
 
 describe('`nemia prune` of a run that landed: listed with its size until --yes, then its worktree removed and its files with --artifacts, its record, branch, asks and inputs kept, and a second prune with nothing to do', () => {
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    filings: string[];
-    forgets: { taskIds: string[]; yes: boolean }[];
-    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     const t = teardowns();
     b = board();
@@ -512,12 +507,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
 });
 
 describe('`nemia prune` refused, then let through: what holds it is named with the fix it names, nothing removed and no mark, and once that is dealt with, the run is pruned', () => {
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    filings: string[];
-    forgets: { taskIds: string[]; yes: boolean }[];
-    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     const t = teardowns();
     b = board();
@@ -693,12 +683,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
 });
 
 describe('after a prune: a retry, a round, an approval and an acceptance are refused — each would file work into a worktree that is gone — a step over its budget is offered no raise, and a pass files nothing on an ask written by hand', () => {
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    filings: string[];
-    forgets: { taskIds: string[]; yes: boolean }[];
-    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     const t = teardowns();
     b = board();
@@ -858,12 +843,7 @@ test('a script condition that answered a route no pass has copied yet: prune rea
 });
 
 describe('REFUSED before anything is read: what `nemia prune` does not take, and an id that is not a name — and the lines `pruneLines` and `sizeOf` say', () => {
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    filings: string[];
-    forgets: { taskIds: string[]; yes: boolean }[];
-    settle: (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => void;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     b = board();
   });

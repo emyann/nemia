@@ -1086,11 +1086,7 @@ describe("the queue's failures: a card whose start is refused — its workflow g
 
 describe('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no card, with no name, of a card with no workflow, of one already queued and of one a run was started from — and as shipped, of one that names no factory or default — writing nothing and starting nothing', () => {
   let repo!: string;
-  let bare!: {
-    card: import('../src/inbox/inbox.ts').InboxCard;
-    file: string;
-    labelsLeftOut?: readonly import('../src/labels/labels.ts').LeftOut[];
-  };
+  let bare!: ReturnType<typeof addToInbox>;
   let x!: Run;
   let before!: { [k: string]: string };
   let runs!: number;

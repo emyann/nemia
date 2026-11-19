@@ -153,16 +153,7 @@ const NOTHING = { factories: [], folder: [], cards: [] };
 
 describe('the export reads the source whole and writes nothing of it', () => {
   let src!: Side;
-  let exp!: {
-    readonly name: string;
-    readonly cards: readonly { readonly name: string; readonly source: string }[];
-    readonly folder: { readonly archive: string };
-    readonly file: string;
-    readonly left: readonly { readonly name: string; readonly why: string }[];
-    readonly stays: readonly string[];
-    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
-  };
+  let exp!: Awaited<ReturnType<typeof exported>>;
   beforeAll(async () => {
     src = side('wf-move-src-');
     planted(src);
@@ -212,26 +203,9 @@ describe('the export reads the source whole and writes nothing of it', () => {
 describe('the import files the factory on the target, clones its repositories, and trusts none of them', () => {
   let src!: Side;
   let origin!: string;
-  let exp!: {
-    readonly name: string;
-    readonly cards: readonly { readonly name: string; readonly source: string }[];
-    readonly folder: { readonly archive: string };
-    readonly file: string;
-    readonly left: readonly { readonly name: string; readonly why: string }[];
-    readonly stays: readonly string[];
-    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
-  };
+  let exp!: Awaited<ReturnType<typeof exported>>;
   let dst!: Side;
-  let answered!: {
-    name: string;
-    file: string;
-    repos: string[];
-    cloned: string[];
-    volumes: { name: string; path: string }[];
-    cards: { name: string; was: string }[];
-    untrusted: string[];
-  };
+  let answered!: import('objects').FactoryImported;
   let record!: Exclude<import('../factory.model.ts').FactoryRecord, import('../factory.model.ts').DefaultFactory>;
   beforeAll(async () => {
     src = side('wf-move-src-');
@@ -288,16 +262,7 @@ describe('the import files the factory on the target, clones its repositories, a
 
 describe('REFUSED: the import refuses before anything is written, and writes nothing', () => {
   let src!: Side;
-  let exp!: {
-    readonly name: string;
-    readonly cards: readonly { readonly name: string; readonly source: string }[];
-    readonly folder: { readonly archive: string };
-    readonly file: string;
-    readonly left: readonly { readonly name: string; readonly why: string }[];
-    readonly stays: readonly string[];
-    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
-    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
-  };
+  let exp!: Awaited<ReturnType<typeof exported>>;
   let local!: FactoryExport;
   beforeAll(async () => {
     src = side('wf-move-src-');

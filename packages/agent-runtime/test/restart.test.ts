@@ -91,13 +91,7 @@ const listing = {
 };
 
 describe('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', () => {
-  let w!: {
-    runtime: () => import('../src/index.ts').EngineShape;
-    client: () => import('@a2a-js/sdk/client').Client;
-    sessions: Map<string, Sighting>;
-    asked: [string, unknown][];
-    journal: AsyncJournal;
-  };
+  let w!: ReturnType<typeof world>;
   let a!: import('../src/index.ts').EngineShape;
   let b!: import('../src/index.ts').EngineShape;
   beforeAll(() => {

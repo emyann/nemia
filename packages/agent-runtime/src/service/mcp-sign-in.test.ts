@@ -70,22 +70,8 @@ const LINEAR: RemoteMcpServer = { ...GITHUB, url: 'https://mcp.linear.app/mcp' }
 
 describe('a person signs in with a secret, the server connects, and they sign out again', () => {
   let root!: string;
-  let s!: {
-    cli: (readonly string[])[];
-    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
-    run: McpCli;
-    ask: McpSignInAsk;
-  };
-  let v!: {
-    mcpSignIn: (
-      name: string,
-      server: RemoteMcpServer,
-      clientSecret?: string,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
-    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
-  };
+  let s!: ReturnType<typeof seams>;
+  let v!: ReturnType<typeof mcpSignInVerbsOf>;
   beforeAll(() => {
     const t = teardowns();
     root = scratch('ae-sign-in-');
@@ -124,22 +110,8 @@ describe('a person signs in with a secret, the server connects, and they sign ou
 });
 
 describe('a server signed in with no secret runs no CLI, connects, and is signed out by an add then a remove', () => {
-  let s!: {
-    cli: (readonly string[])[];
-    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
-    run: McpCli;
-    ask: McpSignInAsk;
-  };
-  let v!: {
-    mcpSignIn: (
-      name: string,
-      server: RemoteMcpServer,
-      clientSecret?: string,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
-    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
-  };
+  let s!: ReturnType<typeof seams>;
+  let v!: ReturnType<typeof mcpSignInVerbsOf>;
   beforeAll(() => {
     const t = teardowns();
     s = seams();
@@ -170,22 +142,8 @@ describe('a server signed in with no secret runs no CLI, connects, and is signed
 });
 
 describe('a second sign-in on a port a first one holds is refused until the first settles', () => {
-  let s!: {
-    cli: (readonly string[])[];
-    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
-    run: McpCli;
-    ask: McpSignInAsk;
-  };
-  let v!: {
-    mcpSignIn: (
-      name: string,
-      server: RemoteMcpServer,
-      clientSecret?: string,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
-    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
-  };
+  let s!: ReturnType<typeof seams>;
+  let v!: ReturnType<typeof mcpSignInVerbsOf>;
   beforeAll(async () => {
     const t = teardowns();
     s = seams();
@@ -274,22 +232,8 @@ describe('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', 
 });
 
 describe('a person whose browser runs elsewhere pastes back the address it landed on, and the sign-in completes', () => {
-  let s!: {
-    cli: (readonly string[])[];
-    sessions: { name: string; cwd: string; redirectUri: string; ended: boolean; submitted: string[]; settle: (s: SignInSettled) => void }[];
-    run: McpCli;
-    ask: McpSignInAsk;
-  };
-  let v!: {
-    mcpSignIn: (
-      name: string,
-      server: RemoteMcpServer,
-      clientSecret?: string,
-    ) => Effect.Effect<{ authUrl: string; until: string }, McpSignInRefused>;
-    mcpSignInState: (name: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState>;
-    mcpSignInCallback: (name: string, url: string) => Effect.Effect<import('./mcp-sign-in.ts').McpSignInState, McpSignInRefused>;
-    mcpSignOut: (name: string, server: RemoteMcpServer) => Effect.Effect<{ signedOut: true }, McpSignInRefused>;
-  };
+  let s!: ReturnType<typeof seams>;
+  let v!: ReturnType<typeof mcpSignInVerbsOf>;
   beforeAll(() => {
     const t = teardowns();
     s = seams();

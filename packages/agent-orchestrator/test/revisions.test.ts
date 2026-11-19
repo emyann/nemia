@@ -520,15 +520,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     );
   });
   describe("`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the ledger", () => {
-    let b!: {
-      e: import('agent-runtime').EngineShape;
-      tasks: Map<string, import('agent-runtime/testing').TestTask>;
-      settle: (
-        id: string,
-        phase: import('agent-runtime').TaskPhase,
-        end?: import('agent-runtime/testing').TestEnd,
-      ) => import('agent-runtime/testing').TestTask;
-    };
+    let b!: ReturnType<typeof board>;
     beforeAll(() => {
       b = board();
     });
@@ -852,15 +844,7 @@ describe('a step that ended is judged by the fields it was filed with: a run tha
   let repo!: string;
   let factory!: string;
   let run!: import('../src/start/start.verb.ts').StartedRun;
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    tasks: Map<string, import('agent-runtime/testing').TestTask>;
-    settle: (
-      id: string,
-      phase: import('agent-runtime').TaskPhase,
-      end?: import('agent-runtime/testing').TestEnd,
-    ) => import('agent-runtime/testing').TestTask;
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(async () => {
     const t = teardowns();
     team0 = team();

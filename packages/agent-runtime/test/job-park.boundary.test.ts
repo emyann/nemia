@@ -162,19 +162,9 @@ const crash = async (c: Waiter, root: string, dir: string, id: string, n: number
 };
 
 describe('a Claude Code job stopped by the sessions’ drain parks, is held while it stands, and is continued within its cap', WAITED, () => {
-  let a!: {
-    root: string;
-    engine: import('../src/index.ts').EngineShape;
-    file: (plan: object, budgetUsd: number) => Promise<{ id: string; dir: string }>;
-    dirs: Map<string, string>;
-  };
+  let a!: ReturnType<typeof stand>;
   let first!: { id: string; dir: string };
-  let b!: {
-    root: string;
-    engine: import('../src/index.ts').EngineShape;
-    file: (plan: object, budgetUsd: number) => Promise<{ id: string; dir: string }>;
-    dirs: Map<string, string>;
-  };
+  let b!: ReturnType<typeof stand>;
   beforeAll(async () => {
     const t = teardowns();
     a = stand(t, 1_000);

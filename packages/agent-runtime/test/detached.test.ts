@@ -995,38 +995,7 @@ describe('a composite of harnesses routes every verb to the harness that owns th
   let a!: Map<string, Sighting>;
   let b!: Map<string, Sighting>;
   let c!: Map<string, Sighting>;
-  let alpha!: {
-    release: (seen: Sighting) => Effect.Effect<void>;
-    observeFor: (expected: readonly { name: string }[]) => Effect.Effect<{ seen: Map<string, Sighting>; unread: Set<string> }>;
-    spawn: (r: import('../src/index.ts').SpawnRequest) => Effect.Effect<void, RunnerError>;
-    observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
-    find?: (name: string) => Effect.Effect<{ sessionId: string } | undefined, RunnerError>;
-    stop: (sessionId: string) => Effect.Effect<void, RunnerError>;
-    logs: (sessionId: string) => Effect.Effect<string, RunnerError>;
-    output?: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) => Effect.Effect<string | undefined, RunnerError>;
-    transcript?: (
-      sessionId: string,
-      after?: import('../src/index.ts').TranscriptCursor,
-    ) => Effect.Effect<import('../src/index.ts').Transcript, RunnerError>;
-    follow?: (sessionId: string) => import('effect/Stream').Stream<import('../src/index.ts').Followed, RunnerError>;
-    say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
-    interrupt?: (session: { name: string; sessionId: string }) => Effect.Effect<void, RunnerError>;
-    answer?: (
-      session: { name: string; sessionId: string },
-      answer: { id: string; answers: Record<string, string> },
-    ) => Effect.Effect<void, RunnerError>;
-    quota?: Effect.Effect<import('../src/index.ts').HarnessQuota, RunnerError>;
-    refuses?: (task: Omit<import('../src/index.ts').SpawnRequest, 'name'>) => string | undefined;
-    bridgeAsked?: (task: { readonly harness?: string; readonly config?: import('../src/index.ts').HarnessArgs }) => boolean;
-    forget?: (
-      session: { name: string; nativeId?: string },
-      options: { dry: boolean },
-    ) => Effect.Effect<import('../src/harness/seam.ts').SessionForgotten, RunnerError>;
-    kept?: (
-      sessions: readonly { name: string; nativeId?: string }[],
-    ) => Effect.Effect<Record<string, import('../src/harness/seam.ts').SessionKept>, RunnerError>;
-    compact?: (options: { dry: boolean }) => Effect.Effect<import('../src/harness/seam.ts').SessionsCompacted, RunnerError>;
-  };
+  let alpha!: ReturnType<typeof telling>;
   let ops!: import('../src/index.ts').RunnerOps;
   beforeAll(() => {
     const t = teardowns();

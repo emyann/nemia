@@ -153,13 +153,7 @@ test("with no factory filed, the page reads no repository whatever the api's own
 
 describe('an install unpacked from an archive, its source an address: the page reads no path built from it, and a factory once filed', () => {
   let release!: string;
-  let file!: Omit<
-    {
-      readonly kind: 'install';
-      readonly root: string;
-    } & import('../../../../node_modules/agent-orchestrator/src/release/release.ts').ReleaseFile,
-    'kind' | 'root'
-  >;
+  let file!: Omit<Extract<Running, { kind: 'install' }>, 'kind' | 'root'>;
   let running!: Running;
   let _noRepoOfItsOwn!: string | undefined;
   let _notExposed!: string | undefined;

@@ -270,10 +270,7 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
 });
 
 describe("REFUSED at shipped defaults, by a store verb's own words: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done", () => {
-  let b!: {
-    e: import('agent-runtime').EngineShape;
-    settle: (id: string, phase: TaskPhase, closeout?: unknown) => Map<string, { phase: TaskPhase; closeout?: unknown }>;
-  };
+  let b!: ReturnType<typeof board>;
   let run!: import('../start/start.verb.ts').StartedRun;
   beforeAll(async () => {
     b = board();

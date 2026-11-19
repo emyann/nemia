@@ -68,34 +68,7 @@ const RICH: SpawnRequest = {
 const withClaude = (claude: ClaudeFlags): SpawnRequest => ({ ...RICH, config: { ...RICH.config, claude } });
 
 describe('attachedOptions: a rich task is fenced on the SDK’s own options, each fact of it in its place', () => {
-  let given!: {
-    cwd?: string | undefined;
-    tools?: string[] | { type: 'preset'; preset: 'claude_code' } | undefined;
-    allowedTools?: string[] | undefined;
-    disallowedTools?: string[] | undefined;
-    additionalDirectories?: string[] | undefined;
-    permissionMode?: import('@anthropic-ai/claude-agent-sdk').PermissionMode | undefined;
-    settingSources?: import('@anthropic-ai/claude-agent-sdk').SettingSource[] | undefined;
-    settings?: (string | import('@anthropic-ai/claude-agent-sdk').Settings) | undefined;
-    systemPrompt?:
-      | string
-      | string[]
-      | { type: 'custom'; prompt: string | string[]; snapshot?: boolean }
-      | { type: 'preset'; preset: 'claude_code'; append?: string; excludeDynamicSections?: boolean; snapshot?: boolean }
-      | undefined;
-    mcpServers?: Record<string, import('@anthropic-ai/claude-agent-sdk').McpServerConfig> | undefined;
-    strictMcpConfig?: boolean | undefined;
-    model?: string | undefined;
-    effort?: import('@anthropic-ai/claude-agent-sdk').EffortLevel | undefined;
-    maxBudgetUsd?: number | undefined;
-    outputFormat?: import('@anthropic-ai/claude-agent-sdk').OutputFormat | undefined;
-    resume?: string | undefined;
-    plugins?: import('@anthropic-ai/claude-agent-sdk').SdkPluginConfig[] | undefined;
-    extraArgs?: Record<string, string | null> | undefined;
-    env?: { [envVar: string]: string | undefined } | undefined;
-    includePartialMessages?: boolean | undefined;
-    skills?: string[] | 'all' | undefined;
-  };
+  let given!: ReturnType<typeof attachedOptions>;
   beforeAll(() => {
     const t = teardowns();
     given = attachedOptions(RICH);

@@ -63,27 +63,9 @@ describe('taskSpend: what a task cost is the dollars on its attempts that are ov
 });
 
 describe("taskUsage: a step's usage counts the resumed attempts that rebuilt their cache", () => {
-  let cold!: {
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-    peakContextTokens: number;
-    firstContextTokens: number;
-    firstCacheWriteTokens: number;
-  };
-  let rewrote!: {
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-    peakContextTokens: number;
-    firstContextTokens: number;
-    firstCacheWriteTokens: number;
-  };
-  let read!: {
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-    peakContextTokens: number;
-    firstContextTokens: number;
-    firstCacheWriteTokens: number;
-  };
+  let cold!: ReturnType<typeof usage>;
+  let rewrote!: ReturnType<typeof usage>;
+  let read!: ReturnType<typeof usage>;
   beforeAll(() => {
     cold = usage(900_000, 180_000, 180_000, 20_000, 20_000);
     rewrote = usage(183_000, 184_500, 184_501, 183_006, 183_000);

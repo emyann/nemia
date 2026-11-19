@@ -135,42 +135,7 @@ describe('a long-lived attached session takes turns, is interrupted, parks betwe
   let prompt!: string;
   let root!: string;
   let dir!: string;
-  let request!: {
-    restartPolicy: 'Always';
-    config: {
-      model?: string;
-      permissionMode?: string;
-      worktree?: string | boolean;
-      tools?: string[];
-      disallowedTools?: string[];
-      allowedTools?: string[];
-      effort?: string;
-      mcp?: Record<string, import('../src/index.ts').McpServer>;
-      projectMcp?: string[];
-      contextTokens?: number;
-      budgetUsd?: number;
-      claude?: import('../src/index.ts').ClaudeFlags;
-      codex?: import('../src/index.ts').CodexArgs;
-      command?: string[];
-      env?: Record<string, string>;
-      niceness?: number;
-      terminationMessagePath?: string;
-      mounts?: import('../src/index.ts').Mount[];
-      callAdmission?: import('../src/index.ts').Admission;
-      mayAsk?: boolean;
-      enabledSkills?: string[] | 'default';
-    };
-    name: string;
-    brief: string;
-    cwd: string;
-    harness?: string;
-    resumeFrom?: string;
-    resources?: { limits?: { memory?: string } };
-    closeoutSchema?: object;
-    resource?: Record<string, string>;
-    traceparent?: string;
-    telemetry?: import('../src/harness/telemetry.ts').Telemetry;
-  };
+  let request!: ReturnType<typeof kept>['request'];
   let first!: { attached: Attached; said: string[]; close: () => Promise<void> };
   let firstHeld!: boolean;
   let second!: Awaited<ReturnType<typeof holder>> | undefined;
@@ -374,42 +339,7 @@ test(
 describe('a long-lived session asked for no bridge folds words said into its call’s turn, one result answering both', WAITED, () => {
   let root!: string;
   let dir!: string;
-  let request!: {
-    restartPolicy: 'Always';
-    config: {
-      model?: string;
-      permissionMode?: string;
-      worktree?: string | boolean;
-      tools?: string[];
-      disallowedTools?: string[];
-      allowedTools?: string[];
-      effort?: string;
-      mcp?: Record<string, import('../src/index.ts').McpServer>;
-      projectMcp?: string[];
-      contextTokens?: number;
-      budgetUsd?: number;
-      claude?: import('../src/index.ts').ClaudeFlags;
-      codex?: import('../src/index.ts').CodexArgs;
-      command?: string[];
-      env?: Record<string, string>;
-      niceness?: number;
-      terminationMessagePath?: string;
-      mounts?: import('../src/index.ts').Mount[];
-      callAdmission?: import('../src/index.ts').Admission;
-      mayAsk?: boolean;
-      enabledSkills?: string[] | 'default';
-    };
-    name: string;
-    brief: string;
-    cwd: string;
-    harness?: string;
-    resumeFrom?: string;
-    resources?: { limits?: { memory?: string } };
-    closeoutSchema?: object;
-    resource?: Record<string, string>;
-    traceparent?: string;
-    telemetry?: import('../src/harness/telemetry.ts').Telemetry;
-  };
+  let request!: ReturnType<typeof kept>['request'];
   let h!: { attached: Attached; said: string[]; close: () => Promise<void> };
   beforeAll(async () => {
     const t = teardowns();

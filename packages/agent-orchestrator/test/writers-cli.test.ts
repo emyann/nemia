@@ -345,11 +345,7 @@ describe('a person writes their library: an agent, a skill and a workflow, each 
 describe('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming the fix, and yours as it was', () => {
   let agentAt!: string;
   let sweepMade!: import('../src/skills/skills.store.ts').SkillWritten | import('../src/skills/skills.store.ts').SkillCopied;
-  let triage!: {
-    files?: { path: string; text: string }[] | undefined;
-    readme?: string | undefined;
-    draft: import('../src/workflow.ts').StepSpec[];
-  };
+  let triage!: Awaited<ReturnType<typeof workflowInput>>;
   let workflowAt!: string;
   beforeAll(async () => {
     agentAt = (await handled(AGENTS_WRITE.handler({ from: 'user', draft: archivist, schema: null }))).version;

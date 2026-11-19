@@ -177,63 +177,7 @@ test('REFUSED: a token whose session no longer runs is 401 session-ended', async
 describe('a proposal filed by a live session names its agent, run and step; the person approves it and it is applied into the tree', () => {
   let was!: string;
   let created!: Response;
-  let proposal!: {
-    readonly apiVersion: 'nemia/v1';
-    readonly kind: 'Proposal';
-    readonly metadata: {
-      readonly name: string;
-      readonly creationTimestamp: string;
-      readonly resourceVersion: string;
-      readonly labels?: { readonly [x: string]: string } | undefined;
-      readonly namespace?: string | undefined;
-      readonly generation?: number | undefined;
-    };
-    readonly spec: {
-      readonly objects: readonly {
-        readonly kind: 'Workflow' | 'Agent' | 'Skill' | 'Hire' | 'McpServer' | 'Factory' | 'LibraryAdd';
-        readonly metadata: {
-          readonly name: string;
-          readonly namespace?: string | undefined;
-          readonly resourceVersion?: string | undefined;
-        };
-        readonly apiVersion?: 'nemia/v1' | undefined;
-        readonly spec?: unknown;
-        readonly verb?: 'create' | 'update' | 'delete' | undefined;
-      }[];
-      readonly why?: string | undefined;
-      readonly applyAt?: 'approval' | 'run-end' | undefined;
-    };
-    readonly status: {
-      readonly widens: boolean;
-      readonly phase: 'failed' | 'waiting' | 'approved' | 'applied' | 'declined' | 'stale' | 'dropped';
-      readonly proposedBy: { readonly agent?: string | undefined; readonly run?: string | undefined; readonly step?: string | undefined };
-      readonly changes: readonly {
-        readonly resource: string;
-        readonly name: string;
-        readonly verb: 'create' | 'update' | 'delete';
-        readonly access: 'widens' | 'narrows' | 'same';
-      }[];
-      readonly message?: string | undefined;
-      readonly revisions?: readonly string[] | undefined;
-      readonly approvedBy?:
-        | { readonly at: string; readonly by: 'person' | 'rule'; readonly agent?: string | undefined; readonly rule?: string | undefined }
-        | undefined;
-      readonly before?:
-        | readonly {
-            readonly kind: 'Workflow' | 'Agent' | 'Skill' | 'Hire' | 'McpServer' | 'Factory' | 'LibraryAdd';
-            readonly metadata: {
-              readonly name: string;
-              readonly namespace?: string | undefined;
-              readonly resourceVersion?: string | undefined;
-            };
-            readonly apiVersion?: 'nemia/v1' | undefined;
-            readonly spec?: unknown;
-            readonly verb?: 'create' | 'update' | 'delete' | undefined;
-          }[]
-        | undefined;
-      readonly written?: readonly string[] | undefined;
-    };
-  };
+  let proposal!: Proposal;
   beforeAll(async () => {
     sessionRunning();
     was = planText();

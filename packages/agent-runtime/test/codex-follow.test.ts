@@ -85,45 +85,13 @@ describe(
   WAITED,
   () => {
     const outer = outlived();
-    let first!: {
-      id: string;
-      line: string;
-      record: {
-        timestamp: string;
-        type: string;
-        payload: { type: string; turn_id: string; item: { type: string; id: string; content: { type: string; text: string }[] } };
-      };
-    };
-    let second!: {
-      id: string;
-      line: string;
-      record: {
-        timestamp: string;
-        type: string;
-        payload: { type: string; turn_id: string; item: { type: string; id: string; content: { type: string; text: string }[] } };
-      };
-    };
-    let third!: {
-      id: string;
-      line: string;
-      record: {
-        timestamp: string;
-        type: string;
-        payload: { type: string; turn_id: string; item: { type: string; id: string; content: { type: string; text: string }[] } };
-      };
-    };
-    let c!: {
-      ops: import('../src/index.ts').RunnerOps;
-      setState: (s: string, named?: string) => void;
-      stdout: (s: string) => void;
-      rollout: (o: object) => void;
-    };
+    const first = message('msg_1', 'Reading the note.');
+    const second = message('msg_2', 'It is right.');
+    const third = message('msg_3', 'Done.');
+    let c!: ReturnType<typeof session>;
     let ended!: ReturnType<typeof follow>;
     beforeAll(() => {
       const t = teardowns();
-      first = message('msg_1', 'Reading the note.');
-      second = message('msg_2', 'It is right.');
-      third = message('msg_3', 'Done.');
       c = session('ae/c1/1', STARTED, 'working', THREAD);
       return t.end;
     });
@@ -181,21 +149,8 @@ describe(
   WAITED,
   () => {
     const outer = outlived();
-    let first!: {
-      id: string;
-      line: string;
-      record: {
-        timestamp: string;
-        type: string;
-        payload: { type: string; turn_id: string; item: { type: string; id: string; content: { type: string; text: string }[] } };
-      };
-    };
-    let c!: {
-      ops: import('../src/index.ts').RunnerOps;
-      setState: (s: string, named?: string) => void;
-      stdout: (s: string) => void;
-      rollout: (o: object) => void;
-    };
+    let first!: ReturnType<typeof message>;
+    let c!: ReturnType<typeof session>;
     let ended!: Promise<Exit.Exit<void, RunnerError>>;
     beforeAll(() => {
       const t = teardowns();

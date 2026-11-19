@@ -306,57 +306,8 @@ const HALF = FINISHED / 2;
 const PAGE = 9;
 
 describe('a big quiet store: forty finished runs beside three in flight cost a pass what the three cost', () => {
-  let s!: {
-    h: {
-      e: import('agent-runtime').EngineShape;
-      root: string;
-      on: (at: string) => import('agent-runtime').EngineShape;
-      journal: import('agent-runtime').BodiedJournalOps;
-      sessions: Map<string, Sighting>;
-      signAll: (keep?: readonly Run[], closeout?: (name: string) => object | undefined) => Promise<void>;
-      holdObserve: () => { waiting: Promise<void>; go: () => void };
-    };
-    memo: import('./tick.verb.ts').RestMemo;
-    inFlight: Run[];
-    verified: () => Promise<{
-      pause?:
-        | {
-            held: verbs.PauseHeld[];
-            staged: verbs.PauseStaged[];
-            pause: verbs.Pause;
-            finishing: verbs.Finishing[];
-            parked: import('../run.ts').Parked[];
-          }
-        | undefined;
-      forgetting?: import('../forget/forgetting/forgetting.verb.ts').ForgettingLine[];
-      scheduled?: import('../factory/schedule/schedule.ts').ScheduleStarted;
-      runs: verbs.Advanced[];
-      queue?: verbs.QueueStarted;
-      feedError?: string;
-      cost?: PassCost;
-      refused?: import('agent-runtime').RefusedMove[];
-      unreadable?: string[];
-      unobserved?: string[];
-    }>;
-    measured: (m?: import('./tick.verb.ts').RestMemo) => Promise<PassCost>;
-    finish: (blocking?: readonly string[]) => Promise<PassCost>;
-    steady: () => Promise<PassCost>;
-    started: (n: number, workflowDir?: string, repo?: string, isolate?: boolean) => Promise<Run[]>;
-    rested: () => Promise<number>;
-    answered: (id: string) => Promise<verbs.Advanced>;
-    touched: Set<string>;
-    aResting: (isolate?: boolean) => RepositoryRun;
-    evicts: (what: string, change: (run: Run) => unknown, run?: Run, afresh?: number, read?: number) => Promise<Run>;
-  };
-  let h!: {
-    e: import('agent-runtime').EngineShape;
-    root: string;
-    on: (at: string) => import('agent-runtime').EngineShape;
-    journal: import('agent-runtime').BodiedJournalOps;
-    sessions: Map<string, Sighting>;
-    signAll: (keep?: readonly Run[], closeout?: (name: string) => object | undefined) => Promise<void>;
-    holdObserve: () => { waiting: Promise<void>; go: () => void };
-  };
+  let s!: ReturnType<typeof storeOf>;
+  let h!: ReturnType<typeof storeOf>['h'];
   let inFlight!: Run[];
   let kept!: Kept;
   let warmBefore!: number | undefined;

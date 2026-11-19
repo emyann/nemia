@@ -475,15 +475,7 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
 ];
 
 describe("file: what only an engine refuses, in its harness's words or a brought harness's own — FileRefused, and nothing journalled", () => {
-  let doors!: {
-    shipped: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    flags: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    codexOnly: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    brought: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    own: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    windows: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    limited: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-  };
+  let doors!: ReturnType<typeof harnessDoors>;
   beforeAll(() => {
     doors = harnessDoors();
   });
@@ -697,15 +689,7 @@ const TAKEN: Array<{
 ];
 
 describe('file journals what it takes: on the record for the runner, under config and nowhere else, read back by view', () => {
-  let doors!: {
-    shipped: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    flags: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    codexOnly: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    brought: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    own: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    windows: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-    limited: { engine: import('../src/index.ts').EngineShape; journal: AsyncJournal };
-  };
+  let doors!: ReturnType<typeof harnessDoors>;
   beforeAll(() => {
     doors = harnessDoors();
   });

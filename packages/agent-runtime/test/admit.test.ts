@@ -153,13 +153,7 @@ const board = () => {
 };
 
 describe('a queued task waits for its word, then starts on the pass after it; a task filed with no `queued` starts at once; the word is given once', () => {
-  let b!: {
-    engine: import('../src/index.ts').EngineShape;
-    sessions: Map<string, Sighting>;
-    observes: { n: number };
-    reads: { n: number };
-    journal: AsyncJournal & { tasks: Map<string, Event[]> };
-  };
+  let b!: ReturnType<typeof board>;
   beforeAll(() => {
     const t = teardowns();
     b = board();

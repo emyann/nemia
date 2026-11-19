@@ -529,10 +529,7 @@ describe('a clone nobody installed is installed at its first cut, its worktree h
   let clone!: string;
   let first!: import('../src/start/start.verb.ts').StartedRun;
   let e!: import('agent-runtime').EngineShape;
-  let tasks!: Map<
-    string,
-    { spec: TaskSpec & { id: string }; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string | string[]; usage?: object }
-  >;
+  let tasks!: ReturnType<typeof board>['tasks'];
   let pass!: import('../src/runner.ts').Advanced;
   let wt!: string;
   beforeAll(async () => {
@@ -637,31 +634,8 @@ describe('a worktree whose branch moved to another lockfile is installed from it
   let third!: string;
   let run!: import('../src/start/start.verb.ts').StartedRun;
   let e!: import('agent-runtime').EngineShape;
-  let tasks!: Map<
-    string,
-    { spec: TaskSpec & { id: string }; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string | string[]; usage?: object }
-  >;
-  let settle!: (
-    id: string,
-    phase: TaskPhase,
-    closeout?: unknown,
-    exitCode?: number,
-    reason?: string | string[],
-    usage?: object,
-  ) => {
-    spec: TaskSpec & { id: string };
-    phase: TaskPhase;
-    closeout?: unknown;
-    exitCode?: number;
-    reason?: string | string[];
-    usage?: object;
-  } & {
-    phase: TaskPhase;
-    closeout: unknown;
-    exitCode: number | undefined;
-    reason: string | string[] | undefined;
-    usage: object | undefined;
-  };
+  let tasks!: ReturnType<typeof board>['tasks'];
+  let settle!: ReturnType<typeof board>['settle'];
   let wt!: string;
   beforeAll(async () => {
     repo = aNodeRepo();

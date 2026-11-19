@@ -418,9 +418,7 @@ describe(
   'REFUSED: GET /api/feed/stream before it opens — a cursor the feed never gave, a `from` that is not `end`, a selector the grammar refuses',
   WAITED,
   () => {
-    let pass!: ((runs: Record<string, FeedWords>) => Promise<FeedLine[]>) & {
-      elsewhere: (runs: Record<string, FeedWords>) => Promise<FeedLine[]>;
-    };
+    let pass!: ReturnType<typeof emptyFeed>;
     beforeAll(async () => {
       pass = emptyFeed();
       await pass({ 'r-1': planAt('running') });

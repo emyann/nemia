@@ -26,11 +26,15 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { claimsOf } from '../due.ts';
 import {
+  ALWAYS,
   BOUND,
   BUILD,
-  DUE_COMMAND,
+  dueCommand,
   DUE_IF,
+  DUE_KEY,
+  DUE_LEG_AXIS,
   DUE_STEP,
   E2E,
   E2E_COMMAND,
@@ -349,13 +353,14 @@ const ZONE_LOCAL = 'America/New_York';
 const LOCAL_LEG = 'web';
 
 /**
- * What a leg's suite is conditioned on: every leg but the floor's on a pull request, whose suites main's push runs. The one condition a
- * suite run may carry, written off the floor `engines.node` claims, so no other leg can be left out by it.
+ * What a leg's suite is conditioned on: a leg the change reaches (`due.ts`), but the floor's on a pull request, whose suites main's push
+ * runs. The one condition a suite run may carry, written off the floor `engines.node` claims, so no other leg can be left out by it.
  */
-const dueIf = (floor: string) => `matrix.node != '${floor}' || github.event_name != 'pull_request'`;
+const floorIf = (floor: string) => `matrix.node != '${floor}' || github.event_name != 'pull_request'`;
+const dueIf = (floor: string) => `${DUE_IF} && (${floorIf(floor)})`;
 
 /** What the second zone's run step must be conditioned on, so it runs for that leg and no other, where the leg's suite is due. */
-const localIf = (floor: string) => `matrix.workspace == '${LOCAL_LEG}' && (${dueIf(floor)})`;
+const localIf = (floor: string) => `${DUE_IF} && (matrix.workspace == '${LOCAL_LEG}' && (${floorIf(floor)}))`;
 
 /** The environment variable the orchestrator's `test` script reads its shard out of. */
 const SHARD_ENV = 'WF_TEST_SHARD';
@@ -837,7 +842,7 @@ function browserDrift(workflow: Workflow, job: string) {
       `the browsers' cache of the ${job} job in ${FILE} has restore-keys: take them off, since a near miss holds another Playwright's builds, which the install downloads past and the save then carries too`,
     );
   const install = installStep(steps);
-  const hit = `steps.${cache.id ?? '<id>'}.outputs.cache-hit != 'true'`;
+  const hit = `${DUE_IF} && (steps.${cache.id ?? '<id>'}.outputs.cache-hit != 'true')`;
   if (install === undefined || cache.id === undefined || install.if !== hit || steps.indexOf(install) < steps.indexOf(cache))
     sentences.push(
       `the ${job} job in ${FILE} does not install Chromium on a cache miss alone: give the cache step an id and the install, after it, if: ${hit}, or every shard runs apt on a hit`,
@@ -1081,13 +1086,13 @@ function guardsDrift(workflow: Workflow) {
   if (job === undefined)
     return [
       ...sentences,
-      `${FILE} has no ${OWN_JOB.job} job: add the job that runs \`${DUE_COMMAND}\` as step id ${DUE_STEP} and then the ${OWN_JOB.name} suite under if: ${DUE_IF}, or the ${OWN_JOB.folder} workspace's suite runs in no CI at all`,
+      `${FILE} has no ${OWN_JOB.job} job: add the job that runs \`${dueCommand(OWN_JOB.job)}\` as step id ${DUE_STEP} and then the ${OWN_JOB.name} suite under if: ${DUE_IF}, or the ${OWN_JOB.folder} workspace's suite runs in no CI at all`,
     ] satisfies string[];
   const steps = job.steps ?? [];
   const due = steps.find((step) => step.id === DUE_STEP);
-  if (due?.run?.trim() !== DUE_COMMAND)
+  if (due?.run?.trim() !== dueCommand(OWN_JOB.job))
     sentences.push(
-      `the ${OWN_JOB.job} job in ${FILE} has no step id ${DUE_STEP} that runs \`${DUE_COMMAND}\`: give the step that id and that command, since the suite step's if: reads its output and nothing else decides when the suite is due`,
+      `the ${OWN_JOB.job} job in ${FILE} has no step id ${DUE_STEP} that runs \`${dueCommand(OWN_JOB.job)}\`: give the step that id and that command, since the suite step's if: reads its output and nothing else decides when the suite is due`,
     );
   const suite = steps.find((step) => step.run?.includes('turbo run test') === true && step.run.includes(`--filter=${OWN_JOB.name}`));
   if (suite === undefined)
@@ -1096,12 +1101,126 @@ function guardsDrift(workflow: Workflow) {
     );
   else if (suite.if !== DUE_IF)
     sentences.push(
-      `the ${OWN_JOB.job} job's suite step in ${FILE} is conditioned on ${suite.if === undefined ? 'nothing' : `if: ${suite.if}`}: write if: ${DUE_IF}, so the suite runs exactly when ${DUE_COMMAND} says the event touched what the guards read`,
+      `the ${OWN_JOB.job} job's suite step in ${FILE} is conditioned on ${suite.if === undefined ? 'nothing' : `if: ${suite.if}`}: write if: ${DUE_IF}, so the suite runs exactly when ${dueCommand(OWN_JOB.job)} says the event touched what the guards read`,
     );
   if (steps.find((step) => step.uses?.startsWith('actions/checkout') === true)?.with?.['fetch-depth'] !== 0)
     sentences.push(
       `the ${OWN_JOB.job} job's checkout in ${FILE} does not pass fetch-depth: 0: the due step diffs the commit before this push, which the shallow default has not, so give the checkout fetch-depth: 0 or the suite runs on every event`,
     );
+  return sentences satisfies string[];
+}
+
+/** What the due step's env reads each sha from, as the gitleaks scan reads them: through env, never interpolated into a command. */
+const DUE_ENV: Readonly<Record<string, string>> = {
+  BASE: '${{ github.event.pull_request.base.sha }}',
+  HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+  BEFORE: '${{ github.event.before }}',
+};
+
+/** The one status condition a step after the due step may carry instead of the due condition: a failure's upload. */
+const ON_FAILURE = 'failure()';
+
+/**
+ * Whether a step after the due step runs only where the job is due: `if:` the due condition alone, or `<due condition> && (<rest>)`
+ * whose parenthesis closes at the end, so no `||` in the rest can reach past it, or `failure()` alone, which no job that ran nothing
+ * meets. Parentheses inside a quoted literal are not counted.
+ */
+const dueConditioned = (condition: string | undefined) => {
+  if (condition === DUE_IF || condition === ON_FAILURE) return true;
+  const head = `${DUE_IF} && (`;
+  if (condition === undefined || !condition.startsWith(head)) return false;
+  const rest = condition.slice(head.length);
+  let depth = 1;
+  let quoted = false;
+  for (let i = 0; i < rest.length; i += 1) {
+    const char = rest[i];
+    if (char === "'") quoted = !quoted;
+    else if (!quoted && char === '(') depth += 1;
+    else if (!quoted && char === ')') {
+      depth -= 1;
+      if (depth === 0) return i === rest.length - 1;
+    }
+  }
+  return false;
+};
+
+/** The keys the workflow asks `due.ts`, each by the job that asks it: a matrix job with a leg axis asks one per leg, its include's too. */
+const askedKeys = (workflow: Workflow) =>
+  Object.entries(workflow.jobs)
+    .filter(([name]) => name !== GATE && !ALWAYS.includes(name))
+    .flatMap(([name, job]) => {
+      const key = DUE_KEY[name] ?? name;
+      const axis = DUE_LEG_AXIS[name];
+      if (axis === undefined) return [{ job: name, key }];
+      const matrix = job.strategy?.matrix ?? {};
+      const includes = (matrix.include ?? []) as Record<string, unknown>[];
+      return [...new Set([...(matrix[axis] ?? []), ...includes.map((entry) => entry[axis])])].map((leg) => ({
+        job: name,
+        key: `${key} ${String(leg)}`,
+      }));
+    }) satisfies { job: string; key: string }[];
+
+/**
+ * A job of work that does not ask `due.ts` before it works, or asks it so that a step can run where the job is not due, and a key the
+ * workflow asks that `due.ts`'s claims do not hold, or one they hold that no job asks. Every job but the gate and `ALWAYS` checks out
+ * the whole history (the due step diffs from the commit before the push), sets up node, and asks `dueCommand(<its key>)`, with its leg
+ * as env `LEG` read off its axis alone, before anything else, `npm ci` included; every step after it is `dueConditioned`. A skipped step
+ * leaves the job `success`, so the gate's whitelist stands. `keys` is what `claimsOf` reads off the repository.
+ */
+function dueDrift(workflow: Workflow, keys: readonly string[]) {
+  const sentences: string[] = [];
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    if (name === GATE || ALWAYS.includes(name)) continue;
+    const steps = job.steps ?? [];
+    const command = dueCommand(DUE_KEY[name] ?? name);
+    const at = steps.findIndex((step) => step.id === DUE_STEP);
+    const due = steps[at];
+    if (due === undefined || due.run?.trim() !== command) {
+      sentences.push(
+        `the ${name} job in ${FILE} has no step id ${DUE_STEP} that runs \`${command}\`: give it that step after its checkout and setup-node, and every later step if: ${DUE_IF}, so the job runs its work exactly when the change reaches what it checks`,
+      );
+      continue;
+    }
+    if (steps[0]?.uses?.startsWith('actions/checkout') !== true || steps[0].with?.['fetch-depth'] !== 0)
+      sentences.push(
+        `the ${name} job's first step in ${FILE} is not a checkout with fetch-depth: 0: the due step diffs from the commit before this push, which the shallow default has not, and a range git cannot resolve runs every job on every event`,
+      );
+    if (steps.slice(0, at).some((step) => !/^actions\/(checkout|setup-node)@/.test(step.uses ?? '')))
+      sentences.push(
+        `the ${name} job in ${FILE} runs a step before its due step other than checkout and setup-node: move the due step up, so a job that is not due pays for nothing, npm ci included`,
+      );
+    const env = due.env ?? {};
+    if (Object.entries(DUE_ENV).some(([key, value]) => env[key] !== value))
+      sentences.push(
+        `the ${name} job's due step in ${FILE} does not read its shas as the guards' does: give it env ${Object.entries(DUE_ENV)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')}`,
+      );
+    const axis = DUE_LEG_AXIS[name];
+    const leg = axis === undefined ? undefined : `\${{ matrix.${axis} }}`;
+    if (env.LEG !== leg)
+      sentences.push(
+        leg === undefined
+          ? `the ${name} job's due step in ${FILE} sets LEG: take it off, since the job asks one key, ${DUE_KEY[name] ?? name}`
+          : `the ${name} job's due step in ${FILE} does not give LEG as ${leg}: write env LEG: ${leg}, so each leg asks its own key`,
+      );
+    for (const step of steps.slice(at + 1))
+      if (!dueConditioned(step.if))
+        sentences.push(
+          `the step "${step.name ?? step.uses ?? step.run ?? '?'}" of the ${name} job in ${FILE} is conditioned on ${step.if === undefined ? 'nothing' : `if: ${step.if}`}: write if: ${DUE_IF}, or ${DUE_IF} && (<its own condition>), or ${ON_FAILURE} alone, so it runs only where the job is due`,
+        );
+  }
+  const asked = askedKeys(workflow);
+  for (const { job, key } of asked)
+    if (!keys.includes(key))
+      sentences.push(
+        `the ${job} job in ${FILE} asks tools/guards/due.ts for ${key}, which its claimsOf holds not: give the key claims in due.ts, or ask one it holds`,
+      );
+  for (const key of keys)
+    if (!asked.some((each) => each.key === key))
+      sentences.push(
+        `tools/guards/due.ts's claimsOf holds ${key}, which no job of ${FILE} asks: ask it from the job that checks it, or take its claims off`,
+      );
   return sentences satisfies string[];
 }
 
@@ -1125,6 +1244,7 @@ const drift = (
     ...hiddenDrift(workflow),
     ...gateDrift(workflow),
     ...guardsDrift(workflow),
+    ...dueDrift(workflow, Object.keys(claimsOf(ROOT))),
     ...stallDrift(workflow),
     ...actionDrift(workflow),
     ...zoneDrift(workflow, engine),
@@ -1347,7 +1467,8 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   onezone.jobs[LEGS].steps = stepsOf(onezone).filter((step) => step.env?.TZ !== 'America/New_York');
   assert.equal(zoneDrift(onezone, engine).length, 1, "no second zone: the web's local-time code is tested in one zone alone");
 
-  const DUE_LEG = "matrix.node != '24.16.0' || github.event_name != 'pull_request'";
+  const FLOOR_LEG = "matrix.node != '24.16.0' || github.event_name != 'pull_request'";
+  const DUE_LEG = `${DUE_IF} && (${FLOOR_LEG})`;
   const nozone = structuredClone(shipped);
   nozone.jobs[LEGS].steps = stepsOf(nozone).filter((step) => step.env?.TZ !== 'UTC');
   assert.equal(zoneDrift(nozone, engine).length, 1, 'no run under UTC: a leg reports green having run no suite at all');
@@ -1362,7 +1483,7 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   );
 
   const otherleg = structuredClone(shipped);
-  runOf(otherleg, 'America/New_York').if = `matrix.workspace == 'api' && (${DUE_LEG})`;
+  runOf(otherleg, 'America/New_York').if = `${DUE_IF} && (matrix.workspace == 'api' && (${FLOOR_LEG}))`;
   assert.equal(zoneDrift(otherleg, engine).length, 1, 'the second zone on a leg that is not the web');
 
   const conditioned = structuredClone(shipped);
@@ -1374,7 +1495,7 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   assert.equal(zoneDrift(unconditioned, engine).length, 1, "the floor's legs back on every pull request, a third of a push's runner time");
 
   const everyevent = structuredClone(shipped);
-  runOf(everyevent, 'UTC').if = "matrix.node != '24.16.0'";
+  runOf(everyevent, 'UTC').if = `${DUE_IF} && (matrix.node != '24.16.0')`;
   assert.equal(
     zoneDrift(everyevent, engine).length,
     1,
@@ -1968,9 +2089,91 @@ test('REFUSED: the guards workspace with neither a leg nor a job of its own, a g
 
   const swapped = structuredClone(shipped);
   const due = (swapped.jobs[OWN_JOB.job].steps ?? []).find((step) => step.id === DUE_STEP);
-  assert.equal(due?.run, DUE_COMMAND, 'the due step runs due.ts today');
+  assert.equal(due?.run, dueCommand(OWN_JOB.job), 'the due step runs due.ts today');
   due.run = 'echo due=true >> "$GITHUB_OUTPUT"';
-  refused(guardsDrift(swapped), DUE_COMMAND, 'the due step swapped');
+  refused(guardsDrift(swapped), dueCommand(OWN_JOB.job), 'the due step swapped');
+});
+
+test('REFUSED: a job that works without asking due.ts, asks it late or shallow, asks the wrong key, or lets a step run where it is not due', () => {
+  const shipped = readWorkflow();
+  const keys = Object.keys(claimsOf(ROOT));
+  assert.deepEqual(dueDrift(shipped, keys), [], 'every job of work asks due.ts first today, and each key it asks is one due.ts holds');
+  const refused = (drift: string[], token: string, why: string) => {
+    assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
+    assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
+  };
+  const stepsOf = (workflow: Workflow, job: string) => {
+    const steps = workflow.jobs[job]?.steps;
+    assert.ok(steps !== undefined, `${FILE} has a ${job} job today`);
+    return steps satisfies Step[];
+  };
+  const dueOf = (workflow: Workflow, job: string) => {
+    const step = stepsOf(workflow, job).find((each) => each.id === DUE_STEP);
+    assert.ok(step?.env !== undefined, `the ${job} job asks due.ts today`);
+    return step satisfies Step;
+  };
+  const named = (workflow: Workflow, job: string, run: string) => {
+    const step = stepsOf(workflow, job).find((each) => each.run?.startsWith(run) === true);
+    assert.ok(step !== undefined, `the ${job} job runs ${run} today`);
+    return step satisfies Step;
+  };
+
+  const undecided = structuredClone(shipped);
+  undecided.jobs.lint.steps = stepsOf(undecided, 'lint').filter((step) => step.id !== DUE_STEP);
+  refused(dueDrift(undecided, keys), dueCommand('lint'), "the lint job's due step removed");
+
+  const unconditioned = structuredClone(shipped);
+  delete named(unconditioned, 'typecheck', 'npm run typecheck').if;
+  refused(dueDrift(unconditioned, keys), 'npm run typecheck', 'a step after the due step unconditioned');
+
+  const bypassed = structuredClone(shipped);
+  named(bypassed, 'build', 'npm run build').if = `${DUE_IF} && github.event_name == 'push' || true`;
+  refused(dueDrift(bypassed, keys), 'npm run build', 'an || that reaches past the due condition');
+
+  const reopened = structuredClone(shipped);
+  named(reopened, 'build', 'npm run build').if = `${DUE_IF} && (true) || (true)`;
+  refused(dueDrift(reopened, keys), 'npm run build', 'a parenthesis that closes before the end');
+
+  const late = structuredClone(shipped);
+  const lintSteps = stepsOf(late, 'lint');
+  const install = lintSteps.findIndex((step) => step.run === 'npm ci');
+  const at = lintSteps.findIndex((step) => step.id === DUE_STEP);
+  assert.ok(install > at, 'the lint job asks due.ts before npm ci today');
+  [lintSteps[at], lintSteps[install]] = [lintSteps[install], lintSteps[at]];
+  assert.ok(
+    dueDrift(late, keys).some((sentence) => sentence.includes('before its due step')),
+    'npm ci before the due step: a job that is not due pays for the install',
+  );
+
+  const shallow = structuredClone(shipped);
+  delete stepsOf(shallow, 'contracts')[0]?.with;
+  refused(dueDrift(shallow, keys), 'fetch-depth: 0', 'the checkout shallow');
+
+  const self = structuredClone(shipped);
+  dueOf(self, BOUND).run = dueCommand(BOUND);
+  refused(dueDrift(self, keys), dueCommand(E2E), 'the bound asking its own key rather than the shards');
+
+  const legless = structuredClone(shipped);
+  delete dueOf(legless, LEGS).env?.LEG;
+  refused(dueDrift(legless, keys), 'LEG', 'the test job asking with no leg');
+
+  const crossed = structuredClone(shipped);
+  const crossedEnv = dueOf(crossed, 'contracts').env ?? {};
+  crossedEnv.LEG = '${{ matrix.workspace }}';
+  refused(dueDrift(crossed, keys), 'LEG', 'the contracts leg read off another axis');
+
+  const unread = structuredClone(shipped);
+  const unreadEnv = dueOf(unread, 'lint').env ?? {};
+  unreadEnv.BEFORE = '${{ github.sha }}';
+  refused(dueDrift(unread, keys), 'BEFORE', 'a sha read from elsewhere');
+
+  const extra = structuredClone(shipped);
+  const contractLegs = extra.jobs.contracts.strategy?.matrix?.leg;
+  assert.ok(contractLegs !== undefined, 'the contracts job has legs today');
+  contractLegs.push('nowhere');
+  refused(dueDrift(extra, keys), 'contracts nowhere', 'a leg asking a key due.ts holds not');
+
+  refused(dueDrift(shipped, [...keys, 'contracts lost']), 'contracts lost', 'a key due.ts holds that no job asks');
 });
 
 test("REFUSED: a job with no bound, a step that reaches the network with none, and a step bounded at its job's bound", () => {

@@ -35,6 +35,16 @@ concurrency:
 # that stalls fails with GitHub's own line naming it, "has timed out after N minutes", and `gh run rerun --failed` answers it. A
 # step's bound stays under its job's, or the job's fires first and names no step. ci-workflow.test.ts refuses a job or a network step
 # without a bound.
+#
+# Every job but the gate and gitleaks runs its work only when the push or the pull request reached what it checks, which
+# tools/guards/due.ts decides from turbo's inputs and graph, or from its own table where a job runs no turbo task; a path every job runs
+# on (the lockfile, turbo.json, this file, due.ts), a path no job claims, a dispatch, a first push and a range git cannot resolve are
+# due everywhere. Measured on PR #1030 (2026-11-19): five docs files waited 44 minutes on three runs of every job. Each job checks out
+# the whole history (due.ts diffs from the commit before this push, or the pull request's base, which the shallow default has not, and
+# a range git cannot resolve runs everything), sets up node, and asks due.ts before npm ci, which a job that is not due never pays for.
+# Every later step is conditioned on that answer, or runs on failure() alone: a skipped step leaves the job success, so the gate's
+# whitelist below stands, and due.ts writes a line to the run's summary saying which ran and why. A workflow-level paths: would skip
+# the whole of ci, the gate with it, and its required context would never report; a job-level if: cannot reach a matrix leg.
 jobs:
   test:
     # The shard is empty on every leg but the orchestrator's, where it reads ' 1/2' or ' 2/2': two shards of one workspace on one node
@@ -72,14 +82,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         # No cache: npm — the lockfile's own install is part of what is under test, and a cache keyed across legs hides a broken one.
         with:
           node-version: ${{ matrix.node }}
+      - name: Decide whether this leg is due
+        id: due
+        # The leg's key is test <workspace>: both shards of the orchestrator ask the same one.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          LEG: ${{ matrix.workspace }}
+        run: node tools/guards/due.ts test
       - name: Give the runner a git identity
         # A runner has none, and its git init would default to master. Much of the suite makes scratch repositories; the ones that pass
         # -c user.email and -b main themselves do not need this, and the ones that do not need the runner to resemble a person's machine.
+        if: steps.due.outputs.due == 'true'
         run: |
           git config --global user.name 'nemia ci'
           git config --global user.email 'ci@nemia.invalid'
@@ -90,10 +112,10 @@ jobs:
       # wall time was its wait for a runner. A floor's leg on a pull request says so and runs nothing; main's ci, which the landing
       # waits on, is where a failure of the floor alone is read.
       - name: The floor's suite is main's to run
-        if: matrix.node == '24.16.0' && github.event_name == 'pull_request'
+        if: steps.due.outputs.due == 'true' && (matrix.node == '24.16.0' && github.event_name == 'pull_request')
         run: echo "node ${{ matrix.node }} is the floor engines.node claims. Its legs run on a push to main, not on a pull request - this leg ran no suite."
       - run: npm ci
-        if: matrix.node != '24.16.0' || github.event_name != 'pull_request'
+        if: steps.due.outputs.due == 'true' && (matrix.node != '24.16.0' || github.event_name != 'pull_request')
         timeout-minutes: 10
       # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it, WF_TEST_SHARD as
       # well as TZ), so without it the second run replays the first from the cache and the second timezone is never tested.
@@ -102,7 +124,7 @@ jobs:
       # one turbo command serves every leg, sharded or not. On the orchestrator's four legs it reads 1/2 or 2/2 and the hole expands
       # to --shard=<i>/2; on every other leg it is empty, the hole expands to nothing and that package's suite runs whole.
       - name: test under TZ=UTC
-        if: matrix.node != '24.16.0' || github.event_name != 'pull_request'
+        if: steps.due.outputs.due == 'true' && (matrix.node != '24.16.0' || github.event_name != 'pull_request')
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: UTC
@@ -113,7 +135,7 @@ jobs:
       # the eight that are not the web's came to 21 runner-minutes a push for a zone no code of theirs can read. A workspace that grows
       # a local-time read needs its second zone back here.
       - name: test under TZ=America/New_York
-        if: matrix.workspace == 'web' && (matrix.node != '24.16.0' || github.event_name != 'pull_request')
+        if: steps.due.outputs.due == 'true' && (matrix.workspace == 'web' && (matrix.node != '24.16.0' || github.event_name != 'pull_request'))
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: America/New_York
@@ -126,13 +148,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
+      - name: Decide whether the lint is due
+        id: due
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts lint
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       - run: npm run lint
+        if: steps.due.outputs.due == 'true'
 
   typecheck:
     # Whole, on the same floor: tsc reads the repository's own TypeScript, not the runtime's.
@@ -141,13 +174,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
+      - name: Decide whether the typecheck is due
+        id: due
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts typecheck
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       - run: npm run typecheck
+        if: steps.due.outputs.due == 'true'
 
   contracts:
     # The contracts under each package's contracts/, verified by tsverify (npm run contracts, tools/contracts/prove.ts): any law or
@@ -174,16 +218,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
+      - name: Decide whether this leg is due
+        id: due
+        # The leg's key is contracts <leg>: due when the change reaches a workspace holding a file the leg proves, or tools/contracts.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          LEG: ${{ matrix.leg }}
+        run: node tools/guards/due.ts contracts
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       # Each contract's verdict, kept from the runs before (tsverify's cache, keyed by the text of every file its program reads): a
       # contract whose files are unchanged is answered from it. One cache per leg, so the legs never overwrite each other's and a
       # change that touches one leg's files proves that leg again alone. Restored after npm ci, which empties node_modules.
       - uses: actions/cache@v6
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 5
         with:
           path: node_modules/.cache/tsverify
@@ -192,6 +249,7 @@ jobs:
       # The slowest leg, approval-refusal, took 878.2 s cold on CI: 30 minutes is twice that. A leg proves its files whole, never one
       # contract by tsverify's one-contract form, which asks too which ends its result reaches and took observe past 30 minutes here.
       - run: npm run contracts -- ${{ matrix.leg }}
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 30
 
   e2e:
@@ -208,15 +266,27 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         # No cache: npm, as the legs above.
         with:
           node-version: '24.16.0'
+      - name: Decide whether the e2e is due
+        id: due
+        # Every shard asks the one key e2e: the shards split the pages, not what they reach.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts e2e
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       - name: Read the Playwright the lockfile pins
         id: playwright
+        if: steps.due.outputs.due == 'true'
         # The browsers' cache key: the version of playwright package-lock.json pins, whose browsers.json names the builds it downloads,
         # and the runner's image (ImageOS, ubuntu24), since a build is made for one distribution. A lockfile change that moves no
         # Playwright keeps the key; either moved misses it. A missing version fails here rather than keying on "undefined".
@@ -231,6 +301,7 @@ jobs:
         # The browsers alone, never the build or the pages' results: nothing a shard decides is read from a cache. No restore-keys: a
         # near miss would hold another Playwright's builds, which the install would download past and the save would then carry too.
         # Saved at the job's end on a miss, when the job passed (actions/cache's post step); a red shard on a miss saves nothing.
+        if: steps.due.outputs.due == 'true'
         uses: actions/cache@v6
         timeout-minutes: 5
         with:
@@ -241,7 +312,7 @@ jobs:
         # elsewhere deletes the builds of every Playwright it does not see. --with-deps runs apt, which is where shards stalled: on hits
         # of the old lockfile-hashed key this step still ran it, and took 415 to 702 s on 8 of main's 48 shard-runs (2026-11-06) against
         # 10 to 36 s on the rest. A hit runs no apt: ubuntu-latest's image carries the libraries Chromium loads (it ships Chrome).
-        if: steps.browsers.outputs.cache-hit != 'true'
+        if: steps.due.outputs.due == 'true' && (steps.browsers.outputs.cache-hit != 'true')
         run: npx playwright install --with-deps chromium
         timeout-minutes: 15
         working-directory: apps/web
@@ -249,6 +320,7 @@ jobs:
         # The shard is the leg's own and the count is read back off the matrix: a literal here would leave a shard's pages unvisited the
         # day the matrix changes. A shard is a run of some pages, so it is held to no bound itself; the bound is the e2e-bound job's.
         # A shard runs none of the look's browser tests (apps/web/test/e2e/*.test.ts): the e2e-look job runs them, once per push.
+        if: steps.due.outputs.due == 'true'
         run: npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
         env:
           # The e2e writes its pictures and this shard's page times here (OUT, apps/web/test/e2e/world.ts).
@@ -256,8 +328,10 @@ jobs:
       - name: Upload this shard's page times
         # On a pass alone: run.ts writes the file after the pages passed, so a failing shard has none to upload — and the bound job
         # below then names that shard as failed or cancelled, rather than summing less than the whole silently. if-no-files-found:
-        # error — a shard that passed and wrote no times is a broken runner, not a quiet success.
-        if: success()
+        # error — a shard that passed and wrote no times is a broken runner, not a quiet success. The due condition holds success()
+        # in it, as every step's if: does that names no status function; a shard that is not due visits nothing and uploads nothing,
+        # and the bound job, asking the same key, sums nothing.
+        if: steps.due.outputs.due == 'true'
         uses: actions/upload-artifact@v7
         timeout-minutes: 5
         with:
@@ -292,15 +366,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         # No cache: npm, as the legs above.
         with:
           node-version: '24.16.0'
+      - name: Decide whether the look is due
+        id: due
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts e2e-look
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       - name: Read the Playwright the lockfile pins
         id: playwright
+        if: steps.due.outputs.due == 'true'
         # The browsers' cache key, as the shards read it: the same key restores the same builds.
         run: |
           node -e '
@@ -311,6 +396,7 @@ jobs:
       - name: Cache Playwright's browsers
         id: browsers
         # The browsers alone, keyed and saved as the shards' are, with no restore-keys.
+        if: steps.due.outputs.due == 'true'
         uses: actions/cache@v6
         timeout-minutes: 5
         with:
@@ -318,7 +404,7 @@ jobs:
           key: ${{ steps.playwright.outputs.key }}
       - name: Install Chromium
         # On a miss alone, from the checkout's own playwright, as the shards install it.
-        if: steps.browsers.outputs.cache-hit != 'true'
+        if: steps.due.outputs.due == 'true' && (steps.browsers.outputs.cache-hit != 'true')
         run: npx playwright install --with-deps chromium
         timeout-minutes: 15
         working-directory: apps/web
@@ -326,6 +412,7 @@ jobs:
         # --look alone: the look's tests and no page, which the shards visit; then every story, each compared against its approved
         # picture (apps/web/test/approved), the runner being the pinned place, Ubuntu 24.04 and the lockfile's Chromium
         # (apps/web/test/e2e/stories/pinned.ts), as on the server a step draws them on.
+        if: steps.due.outputs.due == 'true'
         run: npm run e2e -- --look
       - name: Upload the stories' differing pictures
         # A failure's alone: each story whose picture differs from its approved one leaves its reference, actual and diff here.
@@ -351,11 +438,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
+      - name: Decide whether the e2e is due
+        id: due
+        # The shards' own key, e2e: where they visited nothing, there is nothing to sum.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts e2e
       - name: Download every shard's page times
+        if: steps.due.outputs.due == 'true'
         uses: actions/download-artifact@v8
         timeout-minutes: 5
         with:
@@ -364,6 +462,7 @@ jobs:
           path: .e2e
       - name: Sum the shards' page time against the whole run's bound
         # No npm ci: the command imports node and the e2e's own files, nothing installed.
+        if: steps.due.outputs.due == 'true'
         run: node apps/web/test/e2e/pages-bound.ts .e2e
 
   build:
@@ -374,18 +473,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
+      - name: Decide whether the build is due
+        id: due
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: node tools/guards/due.ts build
       - run: npm ci
+        if: steps.due.outputs.due == 'true'
         timeout-minutes: 10
       # Writes apps/web/src/routeTree.gen.ts, which a new route file needs before typecheck passes.
       - run: npm run build
+        if: steps.due.outputs.due == 'true'
       # Writes apps/web/theme/, which is generated from DESIGN.md and never edited (the kit's generator, recorded in apps/web/package.json).
       - run: npm run theme:generate --workspace web
+        if: steps.due.outputs.due == 'true'
       - name: Refuse a stale generated file
         id: stale
+        if: steps.due.outputs.due == 'true'
         # Run, not read: ci-build.boundary.test.ts runs this very script in a scratch repository, since a git diff that forgets to fail
         # reads like one that does and differs exactly where a stale file would report green. The paths are GENERATED in ci-workflow.ts.
         #
@@ -576,33 +688,30 @@ jobs:
 
   guards:
     # The repository's own guards (tools/guards): tests of this file, the docs and the skills, run only when the push or the pull
-    # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — which due.ts decides.
-    # The job runs on every event and its suite step alone is skipped: a skipped step leaves the job success, so the gate's whitelist
-    # below stands. A workflow-level paths: would skip the whole of ci, the gate with it, and its required context would never report.
+    # request touched what they read — the guards#test inputs in turbo.json, or a workspace they depend on — as every job's work is.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
         with:
-          # The whole history: due.ts diffs the range from the commit before this push, or the pull request's base, which the shallow
-          # default has not, and a range git cannot resolve is read as due — the suite would run on every event.
           fetch-depth: 0
       - uses: actions/setup-node@v7
         timeout-minutes: 5
         with:
           node-version: '24.16.0'
-      - run: npm ci
-        timeout-minutes: 10
       - name: Decide whether the guards' suite is due
         id: due
         # The shas come through env, never interpolated into the command line, as the gitleaks scan takes them; GITHUB_EVENT_NAME,
-        # GITHUB_SHA and GITHUB_OUTPUT are GitHub's own.
+        # GITHUB_SHA, GITHUB_OUTPUT and GITHUB_STEP_SUMMARY are GitHub's own. Every job's due step takes them so.
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BEFORE: ${{ github.event.before }}
-        run: node tools/guards/due.ts
+        run: node tools/guards/due.ts guards
+      - run: npm ci
+        if: steps.due.outputs.due == 'true'
+        timeout-minutes: 10
       - name: test under TZ=UTC
         if: steps.due.outputs.due == 'true'
         run: npx turbo run test --force --filter=guards

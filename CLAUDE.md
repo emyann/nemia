@@ -55,7 +55,8 @@ holds what every change needs.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. It extends
   `@interfere/landmines`' recommended config, pinned exactly, which holds how a test is written (no double but a watching spy, MSW for
   the network, no fixed sleep, no retry or raised timeout) and refuses a declared return type in source and tests alike: pin a value
-  with a typed variable or `satisfies` at its return, and keep a recursive function's type under a disable that says why; its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
+  with a typed variable or `satisfies` at its return, and keep a recursive function's type under a disable that says why; no
+  `@returns` is asked, since the checker gives the type. Its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
   with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. A commit
   formats and lints its staged files (husky and lint-staged, `.husky/pre-commit`), and `npm run lint:fast` checks the whole tree.
@@ -97,47 +98,6 @@ holds what every change needs.
 
 ## Rules the code keeps
 
-- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
-  and stays a screen long. A knob on a workload is a field carried on the task and read by a runner, never a callback into `decide`,
-  and no `if` in `engine.ts` belongs in `decide`. What sits in which layer today, and what is a candidate to move, is in
-  `docs/architecture.md`, *Who owns what*.
-- **Each context says its words in its glossary table**: a `glossary.json` at its door (a term, its meaning, the closed type that
-  holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
-  (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
-  old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
-  paths except those its row lists as `kept`, each with why; a rename still in flight holds its counts in
-  `tools/guards/test/glossary.baseline.ts`, which only shrinks. A row cites each path from the repository's root
-  (`packages/agent-orchestrator/src/folder/folder.model.ts`, never `src/folder/folder.model.ts`), and a change to a table runs the
-  docs' tests, `npx vitest run` in `apps/docs`: they read every table by a glob, so grepping the tests for its path does
-  not find them.
-- **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
-  `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
-  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, with no exception.
-- **A thing with a lifecycle has one machine, and one writer** (`docs/architecture.md`, rule 5), and a contract imports nothing from the
-  code that implements it (`change-a-contract`). Each package's `CLAUDE.md` names its *Files to copy from* where it has one written so:
-  the orchestrator's (a written state, marks that combine, a state worked out), objects' (fields served together), the guards' (a guard
-  with a baseline). The runtime, the api, the board and the cli have none yet: the runtime's lifecycle (`core/lifecycle.ts`) is a table
-  its contract trusts and does not prove, so it is no example of the proof.
-- **What a thing is for is said where its reader finds it.** An exported function's doc names each of its parameters, `@param <name>`
-  and what it is for, in the signature's order, and no tag for a name it has not (`tools/guards/test/params.test.ts`); `@returns` is
-  asked of nobody: a function's type is inferred, and the checker gives it. A field of a served object says what it is on its Schema, `.annotate({ description
-  })`, since the document a client, the reference page and the MCP port's tools read holds no comment
-  (`packages/objects/test/described.test.ts`), and an endpoint says what it does on itself, `OpenApi.Description`
-  (`packages/objects/test/described-endpoints.test.ts`). Each has a baseline of what was written before, which only shrinks: a file you change
-  is left owing less. A comment inside a body is still refused (`comments/no-code-comments`).
-- **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
-  transition is wrong after a restart.
-- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
-- **Errors say what to do next.** A message names the fix — the command to type, the field to set — and not only what went wrong: what
-  a refusal is thrown as and the exit code it carries are refused when they are wrong, its words are nobody's to check, and a test
-  that asserts a whole sentence of them is refused (`tools/guards/test/test-rules.test.ts`), what still does being a
-  debt that only shrinks (`tools/guards/test/test-rules.baseline.ts`).
-- **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
-  package's docs whose begin line names the command; never a drawing. A diagram that has drifted from what its command prints is
-  another matter, and refused.
-- **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
-  env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
-  budget across tries — is not.
 The rules the code keeps, and those of a commit, are the nemia factory's home standards, not this file's: its home's
 `.claude/rules/` (`code.md`, `git.md` and `effect.md`), which a step's session loads at its start, and which a person reads in a
 session of their own opened by `nemia factory home nemia <this repository>`. This file and each folder's `CLAUDE.md` hold the facts.

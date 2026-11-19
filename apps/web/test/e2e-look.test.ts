@@ -14,11 +14,11 @@ import { placeVerdict, SYSTEM } from './e2e/stories/pinned.ts';
 import { WAITED } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
-const scripts = (): { test: string; e2e: string } =>
+const scripts = () =>
   (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string; e2e: string } }).scripts;
 
 /** The number a project of a Vitest config, by its name, gives `key`, or null for none: read from the project's `name` to the next. */
-const projected = (config: string, project: string, key: string): number | null => {
+const projected = (config: string, project: string, key: string) => {
   const at = config.indexOf(`name: '${project}'`);
   if (at < 0) return null;
   const next = config.indexOf("name: '", at + 1);
@@ -32,7 +32,7 @@ const projected = (config: string, project: string, key: string): number | null 
  *
  * @param config the text of the board's `vitest.config.ts`
  */
-const boundBreaks = (config: string): string[] => {
+const boundBreaks = (config: string) => {
   const breaks: string[] = [];
   if (projected(config, 'look', 'testTimeout') !== WAITED.timeout)
     breaks.push(`the look's tests give no testTimeout: ${WAITED.timeout}: add it to the look project (vitest.config.ts)`);
@@ -43,7 +43,7 @@ const boundBreaks = (config: string): string[] => {
 };
 
 /** What makes `--pages` not scope the e2e: a script that runs a test runner before the runner npm appends the arguments to. */
-const scriptBreaks = (e2e: string): string[] =>
+const scriptBreaks = (e2e: string) =>
   /\b(node\s+--test|vitest)\b/.test(e2e)
     ? ['the e2e script runs a test runner, past which npm appends --pages: run the look through --look']
     : [];
@@ -102,7 +102,7 @@ test("--look runs the stories' Vitest after the look's node tests, the stories s
  * The runner a job of a GitHub workflow's text runs on, by the job's key, or null where it names none: read from the key to the next
  * job.
  */
-const runnerOf = (workflow: string, job: string): string | null => {
+const runnerOf = (workflow: string, job: string) => {
   const at = workflow.indexOf(`\n  ${job}:\n`);
   if (at < 0) return null;
   const rest = workflow.slice(at + job.length + 4);

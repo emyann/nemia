@@ -37,6 +37,7 @@ const { STAND_IN } = await import('./attached-held.ts');
 const PLAN = { stream: true, transcript: true };
 
 /** Every file under `dir`, by its path from it: the store whole, journals, feed, run files and captures. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const filesUnder = (dir: string, at = ''): string[] =>
   fs
     .readdirSync(path.join(dir, at), { withFileTypes: true })
@@ -86,7 +87,7 @@ const viewer = (told: object, token: string, rung: ReturnType<typeof bell>) => {
 };
 
 /** What one `what` line of the viewer said, parsed; `undefined` where it said none. */
-const lineOf = (said: readonly string[], what: string): unknown => {
+const lineOf = (said: readonly string[], what: string) => {
   const line = said.find((l) => l.startsWith(`${what} `));
   return line === undefined ? undefined : (JSON.parse(line.slice(what.length + 1)) as unknown);
 };

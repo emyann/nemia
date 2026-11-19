@@ -14,7 +14,7 @@ const NAMES = ['build', 'review', 'implementer'];
 const VERBS: readonly ChangeVerb[] = ['create', 'update', 'delete'];
 
 /** A seeded generator, so a failure is the same input on every run. */
-function seeded(seed: number): () => number {
+function seeded(seed: number) {
   let s = seed;
   return () => {
     s = (s * 1103515245 + 12345) % 2147483648;
@@ -23,18 +23,18 @@ function seeded(seed: number): () => number {
 }
 
 /** Some of `all`, each kept with even odds, at least `least` of them. */
-const someOf = <T>(all: readonly T[], next: () => number, least: number): T[] => {
+const someOf = <T>(all: readonly T[], next: () => number, least: number) => {
   const kept = all.filter(() => next() < 0.5);
   return kept.length >= least ? kept : all.slice(0, least);
 };
 
-const grantOf = (next: () => number): Grant => ({
+const grantOf = (next: () => number) => ({
   resources: someOf(RESOURCES, next, 1),
   resourceNames: someOf(NAMES, next, 0),
   verbs: someOf(VERBS, next, 1),
 });
 
-const ruleOf = (next: () => number): ProposalRule => ({
+const ruleOf = (next: () => number) => ({
   id: 'r',
   ...grantOf(next),
   widens: next() < 0.5,
@@ -42,7 +42,7 @@ const ruleOf = (next: () => number): ProposalRule => ({
 });
 
 /** The contract's own reading of a grant covering a rule's pair, for every name the rule covers. */
-const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: string, verb: ChangeVerb): boolean =>
+const coveredFor = (grants: readonly Grant[], rule: ProposalRule, resource: string, verb: ChangeVerb) =>
   grants.some(
     (g) =>
       g.resources.includes(resource) &&

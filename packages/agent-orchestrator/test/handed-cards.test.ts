@@ -42,19 +42,21 @@ const ENV: Env = {
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
   return repo;
 };
 
 /** implement, then review after it. */
-const twoSteps = (): string => {
+const twoSteps = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
@@ -62,7 +64,7 @@ const twoSteps = (): string => {
 };
 
 /** Files the card `name` in the store's inbox with `text`. */
-const fileCard = (name: string, text: string): void => {
+const fileCard = (name: string, text: string) => {
   fs.mkdirSync(inboxAt(ROOT), { recursive: true });
   fs.writeFileSync(path.join(inboxAt(ROOT), `${name}.md`), text);
 };
@@ -73,7 +75,7 @@ const startedBy = async (argv: string[]) => factsOf((await stage.main(argv)) as 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The store's runs, by their directory: what a refused start must leave as it was. */
-const runsNow = (): string[] => fs.readdirSync(path.join(ROOT, 'runs')).sort();
+const runsNow = () => fs.readdirSync(path.join(ROOT, 'runs')).sort() satisfies string[];
 
 /** The refusal's kind and exit code, never its sentence. */
 const refusedAs = (tag: string) => (err: Error & { _tag?: string; exitCode?: number }) => {

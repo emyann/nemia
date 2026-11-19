@@ -34,12 +34,12 @@ fs.mkdirSync(HOME, { recursive: true });
 const DAEMON_PORT = 8787;
 
 /** Whether `port` on loopback is free to listen on. */
-const free = (port: number): Promise<boolean> =>
+const free = (port: number) =>
   new Promise((resolve) => {
     const server = net.createServer();
     server.once('error', () => resolve(false));
     server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
-  });
+  }) satisfies Promise<boolean>;
 
 /** The environment of the test's `nemia`: the store and home scratch ones, the start left on, and no collector. */
 const ENV: NodeJS.ProcessEnv = (() => {
@@ -48,7 +48,7 @@ const ENV: NodeJS.ProcessEnv = (() => {
 })();
 
 /** `nemia <argv>` on `env`, waited on for its exit: its code, and what it printed on each stream. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<{ code: number | null; stdout: string; stderr: string }> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV) {
   const child = spawn(process.execPath, [BIN, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
@@ -57,20 +57,22 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<{
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
+  }) satisfies Promise<{ code: number | null; stdout: string; stderr: string }>;
 }
 
 /** The store's lease, as the daemon wrote it, or undefined. */
-const lease = (): { pid?: unknown; url?: unknown; by?: unknown } | undefined => {
+const lease = () => {
   try {
-    return JSON.parse(fs.readFileSync(path.join(ROOT, 'daemon.json'), 'utf8')) as { pid?: unknown; url?: unknown; by?: unknown };
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'daemon.json'), 'utf8')) as { pid?: unknown; url?: unknown; by?: unknown } as
+      | { pid?: unknown; url?: unknown; by?: unknown }
+      | undefined;
   } catch {
-    return undefined;
+    return undefined satisfies { pid?: unknown; url?: unknown; by?: unknown } | undefined;
   }
 };
 
 /** Whether `pid` is a process that runs on this store: its environment names the scratch store's `WF_ROOT`. */
-const ofThisStore = (pid: number): boolean => {
+const ofThisStore = (pid: number) => {
   try {
     return fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').includes(`WF_ROOT=${ROOT}`);
   } catch {
@@ -79,7 +81,7 @@ const ofThisStore = (pid: number): boolean => {
 };
 
 /** Whether `pid` is still a process. */
-const alive = (pid: number): boolean => {
+const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
     return true;
@@ -89,7 +91,7 @@ const alive = (pid: number): boolean => {
 };
 
 /** Stops the daemon this test started, if it did, and waits for it to be gone, a beat at a time. */
-async function stopStarted(): Promise<void> {
+async function stopStarted() {
   const pid = lease()?.pid;
   if (typeof pid !== 'number' || !ofThisStore(pid)) return;
   process.kill(pid, 'SIGTERM');

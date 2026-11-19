@@ -114,7 +114,7 @@ const tryIt = (name: string, body: unknown, headers: Record<string, string> = js
 const remove = (id: string, headers: Record<string, string> = json) =>
   app().request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
 
-const records = (): string[] =>
+const records = () =>
   fs.existsSync(RUNS)
     ? fs
         .readdirSync(RUNS)
@@ -123,7 +123,7 @@ const records = (): string[] =>
     : [];
 
 /** A request refused with `status` and words `pattern` matches, with no run written and the tries as they were. */
-async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<string> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp) {
   const runs = records();
   const tries = fs.existsSync(TRIES) ? fs.readdirSync(TRIES).sort() : [];
   const answer = await res;
@@ -136,7 +136,7 @@ async function refused(res: Response | Promise<Response>, status: number, patter
 }
 
 /** A task filed in the step's folder on the engine, and signed off. */
-function signedOff(taskId: string, cwd: string): void {
+function signedOff(taskId: string, cwd: string) {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
   standIn().settle(taskId, 'succeeded', {
     exitCode: 0,
@@ -150,7 +150,7 @@ const listed = async () => (await listedRuns(app())).map((r) => ({ id: r.metadat
 let first = '';
 
 /** A try ended, as a tick and the engine leave it: its step filed, and signed off. */
-function ended(id: string): void {
+function ended(id: string) {
   const file = path.join(RUNS, `${id}.json`);
   const run = JSON.parse(fs.readFileSync(file, 'utf8'));
   const cwd = path.join(run.workspace, 'try');
@@ -160,7 +160,7 @@ function ended(id: string): void {
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-const idOf = async (res: Response): Promise<string> => {
+const idOf = async (res: Response) => {
   const body = (await res.json()) as { id: string; error?: string };
   assert.equal(res.status, 201, body.error);
   return body.id;

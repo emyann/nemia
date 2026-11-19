@@ -37,14 +37,15 @@ test('nemia version counts the sessions at work by the release and Claude Code v
 
 test('the newest release the check read is newer than an install below it, not newer than one at it, and none for a checkout', () => {
   const home = scratch('wf-version-latest-');
-  const install = (tag: string): Running => ({
-    kind: 'install',
-    root: `/r/${tag}`,
-    tag,
-    commit: 'c0ffee',
-    source: 'https://example.org',
-    builtAt: '',
-  });
+  const install = (tag: string) =>
+    ({
+      kind: 'install',
+      root: `/r/${tag}`,
+      tag,
+      commit: 'c0ffee',
+      source: 'https://example.org',
+      builtAt: '',
+    }) satisfies Running;
   assert.equal(latestRelease(home, install('v1.2.0')), undefined, 'none read yet');
   writeLatest(home, { tag: 'v1.3.0', version: '1.3.0' });
   assert.deepEqual(latestRelease(home, install('v1.2.0')), { version: '1.3.0', tag: 'v1.3.0', newer: true });

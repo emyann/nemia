@@ -60,9 +60,9 @@ export type ServedBoard = { pid: number; board: string; api: string; tree: strin
  * The tree of the repository `repo` as it is now, as one word: a digest of its commit, of every change to a tracked file since, and of
  * the name and content of each file git neither tracks nor ignores. Two trees that would build the same board say the same word.
  */
-export function treeOf(repo: string): string {
-  const git = (...args: string[]): Buffer =>
-    execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 2 ** 30 });
+export function treeOf(repo: string) {
+  const git = (...args: string[]) =>
+    execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 2 ** 30 }) satisfies Buffer;
   const digest = createHash('sha256').update(git('rev-parse', 'HEAD')).update(git('diff', 'HEAD'));
   const untracked = git('ls-files', '--others', '--exclude-standard', '-z').toString().split('\0').filter(Boolean);
   for (const file of untracked) {
@@ -74,25 +74,25 @@ export function treeOf(repo: string): string {
 }
 
 /** Whether the board `served` is one to open for the tree `tree`: served, and built from that tree. */
-export const standsFor = (served: ServedBoard | undefined, tree: string): boolean => served?.tree === tree;
+export const standsFor = (served: ServedBoard | undefined, tree: string) => served?.tree === tree;
 
 /**
  * Runs `run` and leaves the file `file` as it was before: put back, byte for byte, when `run` changed it, whether it returned or threw.
  *
  * @returns what `run` returned
  */
-export function keeping<T>(file: string, run: () => T): T {
+export function keeping<T>(file: string, run: () => T) {
   const kept = fs.readFileSync(file);
   try {
-    return run();
+    return run() satisfies T;
   } finally {
     if (!fs.readFileSync(file).equals(kept)) fs.writeFileSync(file, kept);
   }
 }
 
 /** What changed between two answers of `git status --porcelain`, a line each: those `after` has that `before` had not, then those gone. */
-export function changedOver(before: string, after: string): string[] {
-  const lines = (status: string): string[] => status.split('\n').filter(Boolean);
+export function changedOver(before: string, after: string) {
+  const lines = (status: string) => status.split('\n').filter(Boolean) satisfies string[];
   const had = new Set(lines(before));
   const has = new Set(lines(after));
   return [
@@ -100,15 +100,15 @@ export function changedOver(before: string, after: string): string[] {
     ...lines(before)
       .filter((line) => !has.has(line))
       .map((line) => `gone: ${line}`),
-  ];
+  ] satisfies string[];
 }
 
 /** The folder a workspace's served board lives in: under `tmp`, named for a digest of the workspace's path, one a workspace. */
-export const folderOf = (workspace: string, tmp: string): string =>
+export const folderOf = (workspace: string, tmp: string) =>
   path.join(tmp, `nemia-board-${createHash('sha256').update(path.resolve(workspace)).digest('hex').slice(0, 12)}`);
 
 /** Whether the process `pid` is there. */
-export function alive(pid: number): boolean {
+export function alive(pid: number) {
   try {
     process.kill(pid, 0);
     return true;
@@ -121,42 +121,40 @@ export function alive(pid: number): boolean {
  * The board served from `folder`, or undefined: for a folder with no `served.json`, one that does not read, one that says no token,
  * as a holder older than it wrote it, and one whose holder is gone.
  */
-export function servedIn(folder: string): ServedBoard | undefined {
+export function servedIn(folder: string) {
   let read: unknown;
   try {
     read = JSON.parse(fs.readFileSync(path.join(folder, 'served.json'), 'utf8'));
   } catch {
-    return undefined;
+    return undefined satisfies ServedBoard | undefined;
   }
   const { pid, board, api, tree, token } = (read ?? {}) as Partial<ServedBoard>;
-  if (typeof pid !== 'number' || ![board, api, tree, token].every((said) => typeof said === 'string')) return undefined;
-  return alive(pid) ? ({ pid, board, api, tree, token } as ServedBoard) : undefined;
+  if (typeof pid !== 'number' || ![board, api, tree, token].every((said) => typeof said === 'string'))
+    return undefined satisfies ServedBoard | undefined;
+  return (alive(pid) ? ({ pid, board, api, tree, token } as ServedBoard) : undefined) satisfies ServedBoard | undefined;
 }
 
 /**
  * Whether a served board may listen on `port`: not on one whose digits open with 8787 or 5173, which a step given the browser is refused
  * by address (`mcp__playwright__browser_navigate(url:*:8787*)`), the live board's and every port that reads as one to that rule.
  */
-export const usable = (port: string): boolean => /^\d+$/.test(port) && !/^(?:8787|5173)/.test(port);
+export const usable = (port: string) => /^\d+$/.test(port) && !/^(?:8787|5173)/.test(port);
 
 /**
  * The three lines `serve` prints: where the board listens, where its api does, and the token a browser pastes on the board's token
  * page to be read as the person.
  */
-export const linesOf = (served: Pick<ServedBoard, 'board' | 'api' | 'token'>): string[] => [
-  `board on ${served.board}`,
-  `api on ${served.api}`,
-  `token ${served.token}`,
-];
+export const linesOf = (served: Pick<ServedBoard, 'board' | 'api' | 'token'>) =>
+  [`board on ${served.board}`, `api on ${served.api}`, `token ${served.token}`] satisfies string[];
 
 /** A refusal: said on stderr, exit 1. */
 class Refusal extends Error {}
 
 /** This workspace's folder: `BOARD_SERVE_DIR` when it is set, else `folderOf` the repository under the machine's temp directory. */
-const folder = (): string => process.env.BOARD_SERVE_DIR || folderOf(REPO, os.tmpdir());
+const folder = () => process.env.BOARD_SERVE_DIR || folderOf(REPO, os.tmpdir());
 
 /** Resolves once `ok` answers truthy, asked every `PACE_MS`; rejects with `late()` when it has not within `ms`. */
-function awaited<T>(ok: () => T | undefined | false, ms: number, late: () => string): Promise<T> {
+function awaited<T>(ok: () => T | undefined | false, ms: number, late: () => string) {
   return new Promise((resolve, reject) => {
     const end = (settle: () => void) => {
       clearInterval(pace);
@@ -174,18 +172,17 @@ function awaited<T>(ok: () => T | undefined | false, ms: number, late: () => str
     const pace = setInterval(look, PACE_MS);
     const bound = setTimeout(() => end(() => reject(new Refusal(late()))), ms);
     look();
-  });
+  }) satisfies Promise<T>;
 }
 
 /** What `git status` says of the workspace, a line a file. */
-const status = (): string =>
-  execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const status = () => execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 /**
  * Builds the web app into `dist`, outside the workspace, and leaves the workspace as it was: the route tree the build regenerates is put
  * back (`keeping`), and a `git status` that changed over the build is refused, naming what changed (`changedOver`).
  */
-function build(dist: string): void {
+function build(dist: string) {
   const before = status();
   try {
     keeping(path.join(WEB, 'src', 'routeTree.gen.ts'), () =>
@@ -210,7 +207,7 @@ function build(dist: string): void {
  * `serve`: says where the board already served here listens when it was built from the tree as it is now; else ends the one built from
  * another tree, builds the board, starts its holder and says where that one listens.
  */
-async function serve(dir: string): Promise<void> {
+async function serve(dir: string) {
   const tree = treeOf(REPO);
   const already = servedIn(dir);
   if (already && standsFor(already, tree)) return console.log(linesOf(already).join('\n'));
@@ -229,7 +226,7 @@ async function serve(dir: string): Promise<void> {
  * Starts the holder of the board built in `dir` from the tree `tree`, detached, under the environment `env`, and resolves with where it
  * serves once it says so in `served.json`; rejects with why when it ends before that or says nothing within `ANSWER_MS`.
  */
-export async function startHolder(dir: string, tree: string, env: NodeJS.ProcessEnv = process.env): Promise<ServedBoard> {
+export async function startHolder(dir: string, tree: string, env: NodeJS.ProcessEnv = process.env) {
   const log = path.join(dir, 'hold.log');
   const out = fs.openSync(log, 'a');
   const holder = spawn(process.execPath, [import.meta.filename, 'hold'], {
@@ -242,7 +239,7 @@ export async function startHolder(dir: string, tree: string, env: NodeJS.Process
   holder.unref();
   let exited: string | undefined;
   holder.on('exit', (code, signal) => (exited = signal ?? `code ${code}`));
-  const said = (): string => {
+  const said = () => {
     const lines = (fs.existsSync(log) ? plain(fs.readFileSync(log, 'utf8')).trimEnd() : '').split('\n').slice(-SAID_LINES);
     if (lines.join('').trim()) return `the last lines of ${log}:\n${lines.join('\n')}`;
     return (
@@ -264,7 +261,7 @@ export async function startHolder(dir: string, tree: string, env: NodeJS.Process
 }
 
 /** `hold`: seeds and serves the folder's store, says where in `served.json`, and holds until it is asked to stop or its time is up. */
-async function hold(dir: string): Promise<void> {
+async function hold(dir: string) {
   let serving = false;
   process.on('exit', () => {
     if (serving) return fs.rmSync(dir, { recursive: true, force: true });
@@ -279,7 +276,7 @@ async function hold(dir: string): Promise<void> {
   const dist = path.join(dir, 'dist');
   const seat = {};
   let at = await serveStore(store, seat, dist);
-  const ports = (): string[] => [at.apiPort, new URL(at.base).port];
+  const ports = () => [at.apiPort, new URL(at.base).port] satisfies string[];
   for (let tried = 1; !ports().every(usable); tried++) {
     if (tried === TRIES) throw new Error(`no port a step may open in ${TRIES} starts: the last were ${ports().join(' and ')}`);
     await stopServers();
@@ -302,7 +299,7 @@ async function hold(dir: string): Promise<void> {
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
   serving = true;
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;
-  const gone = (): boolean => servers.some(({ child }) => child.exitCode !== null || child.signalCode !== null);
+  const gone = () => servers.some(({ child }) => child.exitCode !== null || child.signalCode !== null);
   await new Promise<void>((resolve) => {
     const end = () => {
       clearInterval(look);
@@ -316,7 +313,7 @@ async function hold(dir: string): Promise<void> {
 }
 
 /** Asks the holder of the board `served` from `dir` to end, by a file in the folder, and resolves once its pid is gone. */
-async function ended(dir: string, served: ServedBoard): Promise<void> {
+async function ended(dir: string, served: ServedBoard) {
   fs.writeFileSync(path.join(dir, 'stop'), '');
   await awaited(
     () => !alive(served.pid),
@@ -326,7 +323,7 @@ async function ended(dir: string, served: ServedBoard): Promise<void> {
 }
 
 /** `stop`: asks the holder of the board served here to end, and waits until it has; says so when none is served. */
-async function stop(dir: string): Promise<void> {
+async function stop(dir: string) {
   const served = servedIn(dir);
   if (!served) return console.log('no board is served from this workspace');
   await ended(dir, served);

@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { TaskPhase } from '../src/run.ts';
 import { inboxLines, queueLine, type InboxListing } from '../src/inbox/inbox.ts';
 import { typed } from './typed.ts';
 import { scratch } from 'test-kit/scratch';
@@ -40,7 +40,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_CONCURRENT: undefined,
 };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>) => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const readInbox = () => atRoot(readInboxVerb());
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
@@ -53,7 +53,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  * in minutes. `list` views the tasks it is handed that were filed.
  */
 /** Hands `e` a tick of its own, which the verbs of the engine then read. */
-const retick = (e: Engine, tick: Engine['tick']): void => void Object.assign(e, { tick });
+const retick = (e: Engine, tick: Engine['tick']) => void Object.assign(e, { tick });
 
 const board = () => {
   const tasks = new Map<
@@ -141,7 +141,7 @@ const emptyStore = (cap: string | undefined) => {
 };
 
 /** A repository with one commit, so a start has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -161,11 +161,7 @@ const oneStep = (() => {
  * `nemia start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the
  * record as the test's to say.
  */
-const started = async (
-  brief: string,
-  createdAt: string,
-  opts: { isolate?: boolean; after?: string[]; repo?: string } = {},
-): Promise<Run> => {
+const started = async (brief: string, createdAt: string, opts: { isolate?: boolean; after?: string[]; repo?: string } = {}) => {
   const run = await runPlaced(
     startRun({
       brief,
@@ -182,7 +178,7 @@ const started = async (
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 
 /** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry's handler as the api calls it (`typed`), over `e`. */
-const listedLines = async (e: Engine): Promise<string[]> => {
+const listedLines = async (e: Engine) => {
   const { cards, defaultStarts } = (await typed(['inbox'], e, undefined, builtinGitPlace, ENV)) as {
     cards: InboxListing[];
     defaultStarts: boolean;
@@ -191,7 +187,7 @@ const listedLines = async (e: Engine): Promise<string[]> => {
 };
 
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
-const aRepoWith = (...workflows: string[]): string => {
+const aRepoWith = (...workflows: string[]) => {
   const repo = aRepo();
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
@@ -201,7 +197,7 @@ const aRepoWith = (...workflows: string[]): string => {
 };
 
 /** A card written by hand, under a name of the test's: its keys as given, then its body. */
-const aCard = (name: string, keys: Record<string, string>, body: string): string => {
+const aCard = (name: string, keys: Record<string, string>, body: string) => {
   fs.mkdirSync(INBOX, { recursive: true });
   const file = path.join(INBOX, `${name}.md`);
   fs.writeFileSync(
@@ -251,12 +247,11 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
     return inner();
   });
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await assert.rejects(main(['up', '1'], up.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
   const named = printed.filter((l) => l.includes('odd-include-a1b2'));
@@ -307,19 +302,18 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
   t.onTestFinished(() => process.chdir(cwd));
   aCard('no-git-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
-  const said: string[] = [];
-  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
-    said.push(String(chunk));
-    return true;
-  });
+  const stderr = vi.spyOn(process.stderr, 'write');
+  let written: string[] = [];
+  const said = () => written;
   let pass: Effect.Success<ReturnType<typeof tickRun>>;
   try {
     pass = await runWith(b.e, tickRun());
   } finally {
+    written = stderr.mock.calls.flatMap(([chunk]) => [String(chunk)]);
     stderr.mockRestore();
   }
   assert.deepEqual(
-    said,
+    said(),
     [],
     "git writes `fatal:` on its stderr, and that stderr is not the daemon's: a pass every four seconds would print it every four seconds",
   );
@@ -359,12 +353,11 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     return inner();
   });
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await assert.rejects(main(['up', '1'], b.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
 

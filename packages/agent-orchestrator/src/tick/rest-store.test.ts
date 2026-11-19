@@ -64,7 +64,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: '10000', WF_MAX_RUNS: undefined };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>) => Effect.runSync(storeGiven(ROOT, ENV)(program)) satisfies A;
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
@@ -77,7 +77,7 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, {});
   return repo;
@@ -189,8 +189,8 @@ const storeOf = () => {
   const memo = freshRestMemo();
   const inFlight: Run[] = [];
   const verified = () => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: true }));
-  const measured = async (m = memo): Promise<PassCost> => (await runWith(h.e, tickRun({ repo: ROOT, memo: m, verifyRest: false }))).cost!;
-  const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
+  const measured = async (m = memo) => (await runWith(h.e, tickRun({ repo: ROOT, memo: m, verifyRest: false }))).cost! satisfies PassCost;
+  const finish = async (blocking: readonly string[] = []) => {
     for (let k = 0; k < 12; k++) {
       await verified();
       await h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
@@ -200,7 +200,7 @@ const storeOf = () => {
     }
     assert.fail('the store did not come to rest in twelve passes');
   };
-  const steady = async (): Promise<PassCost> => {
+  const steady = async () => {
     await finish();
     return measured();
   };
@@ -209,17 +209,17 @@ const storeOf = () => {
     for (let k = 0; k < n; k++) runs.push(await runPlaced(startRun({ brief: `run ${k}`, repo, workflowDir, isolate })));
     return runs;
   };
-  const rested = async (): Promise<number> => (await verified()).cost!.rested;
+  const rested = async () => (await verified()).cost!.rested;
   const answered = async (id: string) => (await verified()).runs.find((a) => a.run.id === id)!;
   const touched = new Set<string>();
-  const aResting = (isolate = false): RepositoryRun => {
+  const aResting = (isolate = false) => {
     const run = listRuns(ROOT).find(
       (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && memo.runs.has(r.id),
     );
     assert.ok(run, 'a run at rest is left to touch');
     assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
     touched.add(run.id);
-    return run;
+    return run satisfies RepositoryRun;
   };
   const evicts = async (what: string, change: (run: Run) => unknown, run: Run = aResting(), afresh = 1, read = 1) => {
     const before = await rested();
@@ -269,11 +269,11 @@ const reads = (c: PassCost) => ({
   records: c.records,
 });
 /** The names of `spans`, sorted: what a pass traced, whatever order its fibers ended in. */
-const namesOf = (spans: readonly Tracer.NativeSpan[]): string[] => spans.map((s) => s.name).sort();
+const namesOf = (spans: readonly Tracer.NativeSpan[]) => spans.map((s) => s.name).sort() satisfies string[];
 /** What a RunList keeps between requests: the informer. */
 type Kept = { runs: InformerMemo };
 /** A fresh memo, as a cold read has it. */
-const cold = (): Kept => ({ runs: informerMemo() });
+const cold = () => ({ runs: informerMemo() }) satisfies Kept;
 /** The RunList asked by `fieldSelector`, read through `kept`, verified as `env` says. */
 const byState = (e: Parameters<typeof runWith>[0], fieldSelector: string, kept = cold(), env: Env = ENV, more = {}) =>
   runWith(
@@ -343,7 +343,7 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
     return traced(false);
   };
   const unverified = { ...ENV, WF_VERIFY_REST: '0' };
-  const warm = async (): Promise<number | undefined> => {
+  const warm = async () => {
     await byState(h.e, 'status.state!=finished', kept, unverified);
     return (await metered(() => byState(h.e, 'status.state!=finished', kept, unverified))).tallies?.records;
   };
@@ -729,7 +729,7 @@ describe('a big quiet store: forty finished runs beside three in flight cost a p
 });
 
 /** An event the runtime appends to a task: what it cost. */
-const measuredEvent = (usage: object): Event => ({ kind: 'measured', at: new Date().toISOString(), attempt: 1, usage });
+const measuredEvent = (usage: object) => ({ kind: 'measured', at: new Date().toISOString(), attempt: 1, usage }) satisfies Event;
 /** A marker of `.pruned`, as `nemia prune` writes it. */
 const pruned = (run: Run) =>
   fs.writeFileSync(pruneFile(ROOT, run.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
@@ -751,7 +751,7 @@ const listMemo = () => {
         : Effect.succeed({ entries: lines.slice(after ?? 0), cursor: lines.length } as never),
   } as typeof s.h.e;
   const git = standingReader(NOTHING_READ);
-  const stored = (id: string): Run => {
+  const stored = (id: string) => {
     const run = {
       id,
       workspace: ROOT,
@@ -763,7 +763,7 @@ const listMemo = () => {
       steps: { work: { status: 'done', taskId: `${id}-work-1` } },
     } as unknown as Run;
     fs.writeFileSync(runFile(ROOT, id), JSON.stringify(run));
-    return run;
+    return run satisfies Run;
   };
   const read = (memo: ReturnType<typeof informerMemo<{ said: string }>>, verify = false) =>
     runWith(e, informerRead<{ said: string }>(e, memo, verify, git));

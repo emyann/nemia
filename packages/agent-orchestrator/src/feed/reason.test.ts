@@ -119,10 +119,13 @@ const FORMER_WORDS: readonly Case[] = [
 
 /** A run's own lines: its statuses, pruned and not, a hold, who it waits on, and the word of a run the store no longer has. */
 const RUN_LINES: readonly Case[] = [
-  ...Object.entries(RUN_STATUS).flatMap(([word, reason]): Case[] => [
-    { kind: 'Run', word, reason },
-    { kind: 'Run', word: `${word} (pruned)`, reason },
-  ]),
+  ...Object.entries(RUN_STATUS).flatMap(
+    ([word, reason]) =>
+      [
+        { kind: 'Run', word, reason },
+        { kind: 'Run', word: `${word} (pruned)`, reason },
+      ] satisfies Case[],
+  ),
   { kind: 'Run', word: REMOVED, reason: 'Removed' },
   { kind: 'Run', word: 'running', note: holdWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
   { kind: 'Run', word: 'running', note: holdWord([], { why: 'the base moved', by: 'operator' }), reason: 'Waiting', on: 'run' },
@@ -195,7 +198,7 @@ const PAUSED_WORDS: readonly Case[] = [
 /** Every word the package can write, each with the reason the table must name for it. */
 const CASES: readonly Case[] = [
   ...RUN_LINES,
-  ...Object.values(STEP_STATUS).map((codes): Case => ({ kind: 'Step', ...codes })),
+  ...Object.values(STEP_STATUS).map((codes) => ({ kind: 'Step', ...codes }) satisfies Case),
   ...PHASE_WORDS,
   ...SAID_WORDS,
   ...WAIT_WORDS,
@@ -213,15 +216,15 @@ const CASES: readonly Case[] = [
  * stored wake list (`selectorsOfWake`) is held equal to below; deleted as dead code, the old-versus-new equivalence goes with it and
  * nothing refuses a wrong table entry in `former-wake.ts`.
  */
-function wokenByFormerWake(line: FeedLine, wake: readonly string[]): boolean {
+function wokenByFormerWake(line: FeedLine, wake: readonly string[]) {
   const word = line.word.toLowerCase();
   const notes = (line.note ?? '').split(' · ').map((part) => part.trim().toLowerCase());
   return wake.map((w) => w.toLowerCase()).some((w) => word.includes(w) || notes.some((part) => part.startsWith(w)));
 }
 
 /** One fixture as the tick writes it to the feed: a signed line of its run, of its step, or of the store. */
-const lineOf = (c: Case): FeedLine =>
-  c.kind === 'Store'
+const lineOf = (c: Case) =>
+  (c.kind === 'Store'
     ? upgraded({
         at: '2026-10-16T04:00:00.000Z',
         store: 'store',
@@ -234,11 +237,10 @@ const lineOf = (c: Case): FeedLine =>
         ...(c.kind === 'Step' ? { step: 'plan' } : {}),
         word: c.word,
         ...(c.note !== undefined ? { note: c.note } : {}),
-      });
+      })) satisfies FeedLine;
 
 /** Whether the selectors a stored wake list converts to take `line`. */
-const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
-  selects(parseSelectors(selectorsOfWake(wake).selectors), line);
+const takenByConverted = (wake: readonly string[], line: FeedLine) => selects(parseSelectors(selectorsOfWake(wake).selectors), line);
 
 describe('reasonOf names a reason for every word the package writes, only of a kind the table gives it, and every entry is one some word reaches', () => {
   test('every word the package writes maps to a reason, and what qualifies it', () => {
@@ -290,7 +292,7 @@ const PERSON = [
 ];
 
 /** Whether `line` was woken by the retired wake words through its note alone: what no selector reads, and no code says. */
-const wokenByNoteAlone = (line: FeedLine): boolean =>
+const wokenByNoteAlone = (line: FeedLine) =>
   wokenByFormerWake(line, FORMER_DEFAULT_WAKE) && !wokenByFormerWake({ ...line, note: undefined }, FORMER_DEFAULT_WAKE);
 
 describe('waitsOf: the lines that wait on a person are those of the Awaiting reasons, the stops beside them and a step broke, never a note', () => {

@@ -15,7 +15,7 @@ import { givenSkills, skillDirIn, skillFolders, skillRead, skillText } from './s
 import { WorkflowError } from '../step/step.ts';
 
 /** A skill `name` written into the folder of skills `root`, its SKILL.md `text`; its folder. */
-function skillAt(root: string, name: string, text: string): string {
+function skillAt(root: string, name: string, text: string) {
   const dir = path.join(root, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'SKILL.md'), text);
@@ -25,7 +25,7 @@ function skillAt(root: string, name: string, text: string): string {
 const SKILL = '---\nname: tidy\ndescription: Tidy a change before it is reviewed.\n---\nTidy it.\n';
 
 /** A checkout holding the real skill `skills/x` and an empty `.claude/skills/`; the folder its given skill `x` goes in. */
-function checkoutSkill(): string {
+function checkoutSkill() {
   const repo = scratch('wf-skills-checkout-');
   skillAt(path.join(repo, 'skills'), 'x', SKILL);
   fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
@@ -33,7 +33,7 @@ function checkoutSkill(): string {
 }
 
 /** `read` refused unread for the link `link`: no entry and no cost, the link named and the fix — a folder of its own. */
-function refusedLink(read: ReturnType<typeof skillRead>, link: string): void {
+function refusedLink(read: ReturnType<typeof skillRead>, link: string) {
   assert.deepEqual({ ...read, error: null }, { entry: null, error: null, preload: false, cost: null });
   names(read.error, `${link} is a link`, 'a folder of its own');
 }

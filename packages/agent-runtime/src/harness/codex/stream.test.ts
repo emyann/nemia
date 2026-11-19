@@ -19,7 +19,7 @@ const item = (phase: 'started' | 'completed', value: unknown) => ({ type: `item.
 
 type Row = { name: string; holds: () => void };
 
-const wrong = (output: string): string => {
+const wrong = (output: string) => {
   const read = codexEventsOf(output);
   assert.ok('wrong' in read, `${output} was taken`);
   return read.wrong;

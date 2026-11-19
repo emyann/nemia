@@ -19,19 +19,20 @@ import { FactoryName } from '../src/factory/factory.model.ts';
 import { reconcileFactory } from '../src/factory/applied/applied.verb.ts';
 
 /** A clock that says the time is `ms` (epoch milliseconds) whenever it is asked, and sleeps no one: a controller's pass, seeded. */
-export const seededClock = (ms: number): Clock.Clock => ({
-  currentTimeMillisUnsafe: () => ms,
-  currentTimeMillis: Effect.succeed(ms),
-  currentTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
-  currentTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
-  monotonicTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
-  monotonicTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
-  sleep: () => Effect.die(new Error('seededClock: a seeded pass sleeps no one; steer a rest with steeredClock (test/steered.ts)')),
-});
+export const seededClock = (ms: number) =>
+  ({
+    currentTimeMillisUnsafe: () => ms,
+    currentTimeMillis: Effect.succeed(ms),
+    currentTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
+    currentTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
+    monotonicTimeNanosUnsafe: () => BigInt(ms) * 1_000_000n,
+    monotonicTimeNanos: Effect.succeed(BigInt(ms) * 1_000_000n),
+    sleep: () => Effect.die(new Error('seededClock: a seeded pass sleeps no one; steer a rest with steeredClock (test/steered.ts)')),
+  }) satisfies Clock.Clock;
 
 /** `program` given the builtin folder `builtins`, where one is named. */
-export const withBuiltins = <A, E, R>(program: Effect.Effect<A, E, R>, builtins?: string): Effect.Effect<A, E, R> =>
-  builtins === undefined ? program : Effect.provideService(program, BuiltinTemplates, builtins);
+export const withBuiltins = <A, E, R>(program: Effect.Effect<A, E, R>, builtins?: string) =>
+  (builtins === undefined ? program : Effect.provideService(program, BuiltinTemplates, builtins)) satisfies Effect.Effect<A, E, R>;
 
 /**
  * The factory `name`'s parts an export holds, read from the store through the Factory door, as the api answers them to the client, which
@@ -52,9 +53,9 @@ export const exportedWithFactory = (dir: string, from: string, factory: string |
 
 /** The programs at the store `root`, each answering what its program answers, or throwing the refusal it failed with. */
 export function templated(root: string, builtins?: string) {
-  const run = <A>(program: Effect.Effect<A, unknown, StoreRoot>): A => {
+  const run = <A>(program: Effect.Effect<A, unknown, StoreRoot>) => {
     const exit = Effect.runSyncExit(Effect.provideService(withBuiltins(program, builtins), StoreRoot, root));
-    if (Exit.isSuccess(exit)) return exit.value;
+    if (Exit.isSuccess(exit)) return exit.value satisfies A;
     throw Cause.squash(exit.cause);
   };
   const read = (source: string) =>

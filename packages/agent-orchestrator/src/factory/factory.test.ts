@@ -475,7 +475,7 @@ describe('factoryLines: `nemia factory ls`, the default first, then each factory
   test("its schedules under its hires, by workflow, with the zone, the repository, the brief's first line, the next fire and last run", () => {
     const since = '2026-10-01T00:00:00.000Z';
     const now = Date.parse('2026-10-08T12:00:00.000Z');
-    const listed = (workflow: string, over: Partial<ScheduleListed>): ScheduleListed => ({
+    const listed = (workflow: string, over: Partial<ScheduleListed>) => ({
       factory: 'nemia',
       workflow,
       cron: '',

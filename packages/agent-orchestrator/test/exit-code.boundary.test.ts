@@ -19,7 +19,7 @@ const BIN = scratch('wf-exit-code-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 
 /** `nemia <argv>` over the store at `root`, with the engine's store beside it, in `cwd`, the directory above the store unless given. */
-function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: number | null; stderr: string } {
+function wf(root: string, argv: string[], cwd = path.dirname(root)) {
   const dir = path.dirname(root);
   const { status, stderr } = spawnSync(process.execPath, [WF, ...argv], {
     cwd,

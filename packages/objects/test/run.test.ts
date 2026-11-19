@@ -11,7 +11,7 @@ import { Schema } from 'effect';
 import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, RunList, RunSaid, RunSay, StepTries, WAIT_ON } from 'objects';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
-const read = (name: string): string => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
+const read = (name: string) => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
 
 /** A run of two steps, `build` over its budget with a raise offered, `review` reading its output and looping back to it. */
 const judged: unknown = JSON.parse(read('run.json'));
@@ -148,7 +148,7 @@ test("words said to a step's session say who said them where an agent did; REFUS
   const framed = 'The agent operator writes, not the person: Cut it.';
   const said = { at: '2026-11-11T10:00:00.000Z', attempt: 1, text: framed, after: null, from: operator, words: 'Cut it.' };
   assert.deepEqual(Schema.encodeSync(RunSaid)(Schema.decodeUnknownSync(RunSaid)(said)), said, 'encoded back equal');
-  const withSaid = (entry: unknown): unknown => {
+  const withSaid = (entry: unknown) => {
     const run = structuredClone(judged) as { status: { steps: { said: unknown[] }[] } };
     const step = run.status.steps[0];
     assert.ok(step);
@@ -175,7 +175,7 @@ test('a step waiting on the checkout names the run whose ending holds it, and de
 test('REFUSED: a step, a try and a run served with codes nothing makes together, as decoded and as encoded', () => {
   const run = Schema.decodeUnknownSync(Run)(judged);
   const step = run.status.steps[0];
-  const planted = <T>(change: (r: typeof run) => T): unknown => {
+  const planted = <T>(change: (r: typeof run) => T) => {
     const copy = structuredClone(run);
     change(copy);
     return copy;

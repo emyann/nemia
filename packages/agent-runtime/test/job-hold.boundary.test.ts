@@ -33,7 +33,7 @@ const STAND_IN = path.join(HERE, 'fixtures', 'stand-in-claude.ts');
 const LONG_GRACE_MS = 600_000;
 
 /** Whether the process `pid` is still there, as a signal of 0 answers. */
-const alive = (pid: number): boolean => {
+const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
     return true;
@@ -43,7 +43,7 @@ const alive = (pid: number): boolean => {
 };
 
 /** The lines of the stand-in's `file`, each parsed; `[]` where it wrote none. */
-const wrote = (dir: string, file: string): unknown[] => {
+const wrote = (dir: string, file: string) => {
   try {
     return fs
       .readFileSync(path.join(dir, file), 'utf8')
@@ -60,7 +60,7 @@ const wrote = (dir: string, file: string): unknown[] => {
  * stand-in notes the answer only once the SDK has carried it back: so a test waits for the answer and reads the hold file after it,
  * never the hold file and then the answer.
  */
-const answered = (dir: string, event: string): number =>
+const answered = (dir: string, event: string) =>
   wrote(dir, 'answers.jsonl').filter((a) => (a as { event?: string }).event === event).length;
 
 /**
@@ -101,7 +101,7 @@ const job = (t: { onTestFinished: (f: () => void) => void }, plan: object, io: {
   const done = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) =>
     child.on('close', (code, signal) => resolve({ code, signal })),
   );
-  const claudePid = (): number | undefined => {
+  const claudePid = () => {
     try {
       return Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
     } catch {

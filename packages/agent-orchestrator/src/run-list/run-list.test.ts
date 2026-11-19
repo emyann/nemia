@@ -11,19 +11,19 @@ import { continueToken, continuedAfter, pageOf } from '../object/page.ts';
 import { byFinishedPlace, finishedAfter, finishedPageOf, finishedToken, type Finished } from './run-list.ts';
 
 /** A finished run's place: its name and when its work stopped, `m` minutes into the fixtures' hour. */
-const run = (name: string, m: number): Finished => ({ name, finishedAt: new Date(Date.UTC(2026, 10, 5, 10, m)).toISOString() });
+const run = (name: string, m: number) => ({ name, finishedAt: new Date(Date.UTC(2026, 10, 5, 10, m)).toISOString() });
 
 /** The runs in the finished order, newest first, two together by name as `<` compares them. */
-const ordered = (runs: readonly Finished[]): Finished[] => [...runs].sort(byFinishedPlace);
+const ordered = (runs: readonly Finished[]) => [...runs].sort(byFinishedPlace);
 
 /** What an answer holds, failing the test where it is a refusal. */
-const ok = <A>(answer: A | Invalid): A => {
+const ok = <A>(answer: A | Invalid) => {
   if (answer instanceof Invalid) assert.fail(`refused ${answer._tag}`);
   return answer;
 };
 
 /** Every page of `sorted` walked by `limit`, each page's names, with `between` run on the list before each next page. */
-const walk = (sorted: Finished[], limit: number, between: (list: Finished[]) => Finished[] = (l) => l): string[][] => {
+const walk = (sorted: Finished[], limit: number, between: (list: Finished[]) => Finished[] = (l) => l) => {
   const pages: string[][] = [];
   let list = sorted;
   let token: string | undefined;

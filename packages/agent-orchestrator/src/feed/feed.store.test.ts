@@ -16,7 +16,6 @@ import { FEED_WALKS } from '../../test/feed-walks.ts';
 import { FeedDoor, feedDoorFiles, feedPass } from './feed.store.ts';
 import { freshMemo } from './feed.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import type { RunLine } from './feed.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
@@ -31,7 +30,7 @@ const store = () => {
   const root = scratch('wf-feed-door-');
   return { root, door: doorFrom(FeedDoor, feedDoorFiles(root)), feed: path.join(root, 'feed.jsonl') };
 };
-const aLine = (word: string): RunLine => ({ at: '2026-11-01T00:00:00.000Z', run: 'r-1', word });
+const aLine = (word: string) => ({ at: '2026-11-01T00:00:00.000Z', run: 'r-1', word });
 
 test("a feed cut and put back is another generation: the end's generation is the file's inode, and changes with it", () => {
   const { door, feed } = store();
@@ -81,7 +80,7 @@ const OWN = ['src/feed/feed.store.ts', 'src/feed/memory.store.ts'];
 const SEAM_CALL = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g');
 
 /** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
+const inWords = ({ file, uses: n, owed, kind }: DebtBreak) =>
   kind === 'grown'
     ? `${file} calls the feed's module spellings ${n} time(s) where test/feed-door.baseline.ts names ${owed}: yield FeedDoor (src/feed/feed.store.ts) instead`
     : kind === 'fallen'

@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { type Gh, type Rule, bareOrigin, ghStub, gitIn, tip as tipIn } from './origin.ts';
+import { type Gh, bareOrigin, ghStub, gitIn, tip as tipIn } from './origin.ts';
 import { type Ran, asked, body, landIn, stands } from './land.ts';
 
 /** The run every fixture here lands, and the branch its result is on. */
@@ -54,7 +54,7 @@ type World = {
 };
 
 /** Commit `files` in `repo` with `subject`: its sha. */
-function commit(repo: string, files: Record<string, string>, subject: string): string {
+function commit(repo: string, files: Record<string, string>, subject: string) {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
     fs.writeFileSync(path.join(repo, file), text);
@@ -65,7 +65,7 @@ function commit(repo: string, files: Record<string, string>, subject: string): s
 }
 
 /** A checkout whose base moved after the run's branch forked from it, as `moved` says, the branch pushed and its worktree added. */
-function world(moved: Moved, { worktree = true }: { worktree?: boolean } = {}): World {
+function world(moved: Moved, { worktree = true }: { worktree?: boolean } = {}) {
   const repo = scratch('wf-refresh-repo-');
   gitIn(repo, 'init', '-q', '-b', 'main');
   const base = commit(
@@ -102,7 +102,7 @@ const commands = (w: World) => ({
 });
 
 /** One open pull request of this run at `head`, as `gh pr list --json` gives it, GitHub calling it `mergeable`. */
-const listed = (head: string, mergeable: string, more: Record<string, unknown> = {}): Record<string, unknown> => ({
+const listed = (head: string, mergeable: string, more: Record<string, unknown> = {}) => ({
   number: 7,
   url: 'https://github.com/o/r/pull/7',
   state: 'OPEN',
@@ -116,7 +116,7 @@ const listed = (head: string, mergeable: string, more: Record<string, unknown> =
 });
 
 /** The rules the merge verb reads: the base, the one open pull request at the reviewed tip, and `ci` green at it. */
-const opened = (w: World, mergeable = 'CONFLICTING'): Rule[] => [
+const opened = (w: World, mergeable = 'CONFLICTING') => [
   { when: 'auth status' },
   { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
   { when: 'pr list', out: JSON.stringify([listed(w.tip, mergeable)]) },
@@ -128,7 +128,7 @@ const opened = (w: World, mergeable = 'CONFLICTING'): Rule[] => [
 const SUBJECT = "Land a run's change through its pull request";
 
 /** The merge verb's arguments: the factory's refresh `refresh` and its derived paths `derives`. */
-const mergeArgs = (w: World, refresh: string, derives = DERIVED): string[] => [
+const mergeArgs = (w: World, refresh: string, derives = DERIVED) => [
   '--run',
   RUN,
   '--subject',
@@ -148,10 +148,10 @@ const land = (w: World, verb: string, args: string[], more: Record<string, strin
   landIn(w.repo, w.gh, verb, args, { WF_STEP_FILES: w.files, WF_ARTIFACTS: w.files, ...more });
 
 /** The parents of `sha` in `repo`. */
-const parents = (repo: string, sha: string): string[] => gitIn(repo, 'rev-list', '--parents', '-n', '1', sha).trim().split(' ').slice(1);
+const parents = (repo: string, sha: string) => gitIn(repo, 'rev-list', '--parents', '-n', '1', sha).trim().split(' ').slice(1);
 
 /** What a refusal must have left: nothing pushed, no merge call, and the run's worktree on the reviewed tip, clean, with no merge. */
-function untouched(w: World, r: Ran): void {
+function untouched(w: World, r: Ran) {
   assert.equal(r.code, 1, r.err);
   assert.equal(tipIn(w.bare, RESULT), w.tip, 'nothing is pushed');
   assert.equal(asked(r.calls, 'pr', 'merge').length, 0, 'nothing is merged');
@@ -244,7 +244,7 @@ test("REFUSED: a refresh and derived paths given empty are today's merge, refusi
  * parent is the base, put in the bare under a ref no fetch reads, and moved onto its `main` by a wrapper of the stub `gh` when it is
  * asked to merge. The stub's log is emptied, so the receipt's polls count from its first call.
  */
-function refreshed(): World & { head: string; merge: string } {
+function refreshed() {
   const w = world('derived');
   w.gh.answers(opened(w));
   assert.equal(land(w, 'merge', mergeArgs(w, commands(w).cut)).code, 0);
@@ -263,7 +263,7 @@ function refreshed(): World & { head: string; merge: string } {
 }
 
 /** The receipt's rules for a refreshed head: open at it, then merged as `merge`, its `ci` read over REST as `runs`, one poll each. */
-const receiptRules = (w: World & { head: string; merge: string }, runs: string[]): Rule[] => [
+const receiptRules = (w: World & { head: string; merge: string }, runs: string[]) => [
   { when: 'auth status' },
   { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
   {

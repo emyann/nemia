@@ -1,5 +1,5 @@
 /** The sign of `n` as a word: the test reaches the first branch alone. */
-export const sign = (n: number): string => {
+export const sign = (n: number) => {
   if (n >= 0) {
     return 'positive';
   }

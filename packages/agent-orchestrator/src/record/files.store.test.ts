@@ -28,7 +28,7 @@ const aRecord = (id: string) => ({
   createdAt: '2026-10-16T12:00:00.000Z',
 });
 
-const put = (id: string, record: unknown = aRecord(id)): void =>
+const put = (id: string, record: unknown = aRecord(id)) =>
   fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 beforeEach(() => {
@@ -67,14 +67,11 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.match(said[0], /^left out: run r-bad: its record, .*is not JSON/);
     assert.match(said[0], /Only the tick writes a record/);
 
-    const wrote: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
-      wrote.push(line);
-      return true;
-    }) as never);
+    const wroteSpy = vi.spyOn(process.stderr, 'write');
+    const wrote = () => wroteSpy.mock.calls.flatMap(([line]) => [String(line)]);
     assert.equal(files.runs.find('r-bad'), undefined);
     assert.equal(files.runs.find('r-bad'), undefined);
-    assert.equal(wrote.length, 1, `said once a process, not ${wrote.length} times`);
+    assert.equal(wrote().length, 1, `said once a process, not ${wrote().length} times`);
   });
 });
 
@@ -109,7 +106,7 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
 });
 
 /** What `body` wrote to stderr while it ran, line by line, and what it answered. */
-const stderrOf = <T>(body: () => T): { lines: string[]; value: T } => {
+const stderrOf = <T>(body: () => T) => {
   const lines: string[] = [];
   const write = process.stderr.write.bind(process.stderr);
   process.stderr.write = (chunk: string | Uint8Array) => {

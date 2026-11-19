@@ -7,7 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { envelopeRefusals, SUMMARY_MAX, summaryLine } from './envelope.ts';
-import { CLOSEOUT_SCHEMA, looseAt, parseCloseout, type Closeout } from './closeout.ts';
+import { CLOSEOUT_SCHEMA, looseAt, parseCloseout } from './closeout.ts';
 
 /** The cases every copy of the cut answers alike: the board's transcript (`apps/web/test/transcript.test.ts`) asks the same. */
 const CUTS: Array<[string, string]> = [
@@ -20,7 +20,7 @@ const CUTS: Array<[string, string]> = [
 ];
 
 /** A closeout read, failing where it does not decode. */
-const read = (value: unknown): Closeout => {
+const read = (value: unknown) => {
   const c = parseCloseout(value);
   assert.ok(!('error' in c), JSON.stringify(c));
   return c;

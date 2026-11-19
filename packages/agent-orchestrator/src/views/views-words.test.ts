@@ -12,7 +12,7 @@ const GI = 1024 ** 3;
 const KILLED: AttemptMemory = { limitBytes: 4 * GI, peakBytes: 4 * GI, oomKills: 1 };
 
 /** An ended attempt of turn `turn`, carrying `memory` where given. */
-const attempt = (memory?: AttemptMemory, turn = 0): WordAttempt =>
+const attempt = (memory?: AttemptMemory, turn = 0) =>
   ({
     spawnedAt: '2026-01-01T00:00:00Z',
     endedAt: '2026-01-01T00:01:00Z',
@@ -22,7 +22,7 @@ const attempt = (memory?: AttemptMemory, turn = 0): WordAttempt =>
   }) as WordAttempt;
 
 /** A task's view over `attempts`, held open with `inputs` answers where given. */
-const view = (attempts: WordAttempt[], inputs?: number): WordView =>
+const view = (attempts: WordAttempt[], inputs?: number) =>
   ({
     phase: 'failed',
     state: {
@@ -52,7 +52,7 @@ describe('memoryBytesWord prints a quantity memory: takes back', () => {
 });
 
 describe('outOfMemoryWords says the kill, the limit, the peak and what to raise', () => {
-  const said = (m: AttemptMemory, own: string | undefined, of?: 'session' | 'check'): string => {
+  const said = (m: AttemptMemory, own: string | undefined, of?: 'session' | 'check') => {
     const k = outOfMemory(m, own);
     assert.ok(k, 'a kill is said');
     return outOfMemoryWords(k, own, of);

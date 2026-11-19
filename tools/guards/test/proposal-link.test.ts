@@ -15,7 +15,7 @@ import { REPO } from 'test-kit/repo';
 const AGENT = 'packages/agent-orchestrator/nemia/agents/nemia.md';
 
 /** Every markdown link of `text` whose address names the placeholder `<name>`: the proposal templates the agent teaches. */
-const templatesIn = (text: string): string[] => [...text.matchAll(/\]\(([^()\s]*<name>[^()\s]*)\)/g)].map((m) => m[1]);
+const templatesIn = (text: string) => [...text.matchAll(/\]\(([^()\s]*<name>[^()\s]*)\)/g)].map((m) => m[1]);
 
 /** The factory and the proposal `text`'s templates name once filled, as the board reads each. */
 const readIn = (text: string) =>

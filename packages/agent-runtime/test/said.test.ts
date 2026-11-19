@@ -212,7 +212,7 @@ describe("a finished run's output is parsed once across processes: nothing kept 
 });
 
 /** What each shipped reader reads of its streams, each stream first given to `kept`, a refusal in its words, as one digest. */
-const digestOfReaders = (kept: (name: string, text: string) => string = (_, text) => text): string => {
+const digestOfReaders = (kept: (name: string, text: string) => string = (_, text) => text) => {
   const readers: Record<keyof typeof READER_STREAMS, (text: string) => HarnessOutput> = {
     claudeResultOutput,
     claudeStreamOutput,
@@ -232,7 +232,7 @@ const digestOfReaders = (kept: (name: string, text: string) => string = (_, text
 };
 
 /** A Claude stream as a finished job's capture keeps it (`claudeStreamKept`), or whole where the reader refuses it. */
-const keptOrWhole = (name: string, text: string): string => {
+const keptOrWhole = (name: string, text: string) => {
   if (name === 'codexOutput') return text;
   try {
     return claudeStreamKept(text);
@@ -242,7 +242,7 @@ const keptOrWhole = (name: string, text: string): string => {
 };
 
 /** The ids of the calls a capture says were denied: by a `permission_denied` line or its result's `permission_denials`. */
-const deniedIn = (capture: string): Set<string> => {
+const deniedIn = (capture: string) => {
   const ids = new Set<string>();
   for (const text of capture.split('\n')) {
     const kind = printedKindOf(text);
@@ -256,15 +256,15 @@ const deniedIn = (capture: string): Set<string> => {
  * What of the conversation a capture keeps that no reader reads, named: a JSON line of a kind no reader reads, an assistant's block
  * that is no call, an input key no reader reads of a call that was not denied, and a command kept past its first word.
  */
-const conversationIn = (capture: string): string[] => {
+const conversationIn = (capture: string) => {
   const denied = deniedIn(capture);
-  return capture.split('\n').flatMap((text, i): string[] => {
+  return capture.split('\n').flatMap((text, i) => {
     const kind = printedKindOf(text);
     if (kind === undefined) return [];
     if (kind === 'other' || !STREAM_KINDS.includes(kind)) return [`line ${i + 1}: a ${JSON.parse(text).type} line`];
     if (kind !== 'assistant') return [];
     const blocks: { type: string; id?: string; name?: string; input?: Record<string, unknown> }[] = JSON.parse(text).message.content;
-    return blocks.flatMap((b): string[] => {
+    return blocks.flatMap((b) => {
       if (b.type !== 'tool_use') return [`line ${i + 1}: a ${b.type} block`];
       if (denied.has(b.id ?? '')) return [];
       const keys = Object.keys(b.input ?? {}).filter((k) => k !== READ_INPUT_KEYS[b.name ?? '']);

@@ -39,11 +39,11 @@ const PATH = /^[\w.@-]+(?:\/[\w.@*-]+)*\/?(?::\d+)?$/;
 const ELSEWHERE = new Set<string>([]);
 
 /** Every backticked span of a page with its line, the fences' own delimiters left out. */
-const citedIn = (text: string): Array<{ line: number; span: string }> =>
+const citedIn = (text: string) =>
   text.split('\n').flatMap((line, i) => [...line.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)].map((m) => ({ line: i + 1, span: m[1] })));
 
 /** The workspace's package entries, as an import names them: `agent-runtime`, `agent-runtime/vocabulary`. */
-const entries = (): Set<string> =>
+const entries = () =>
   new Set(
     ['packages', 'apps'].flatMap((top) =>
       fs.readdirSync(path.join(ROOT, top)).flatMap((dir) => {
@@ -58,7 +58,7 @@ const entries = (): Set<string> =>
 type Known = { names: Set<string>; entries: Set<string>; exists: (file: string) => boolean };
 
 /** What a cited span is wrong about, or undefined: a path that is not there, or a name the code does not have. */
-const staleOf = (span: string, known: Known): string | undefined => {
+const staleOf = (span: string, known: Known) => {
   if (PATH.test(span) && (span.includes('/') || FILE_EXTENSIONS.test(span))) {
     const file = span.replace(/:\d+$/, '');
     return known.entries.has(file) || known.exists(file) ? undefined : 'a path that does not exist';
@@ -71,14 +71,14 @@ const staleOf = (span: string, known: Known): string | undefined => {
 };
 
 /** Each span a page cites that is a path not there or a name the code does not have, with its line. */
-const staleCitations = (file: string, text: string, known: Known): string[] =>
+const staleCitations = (file: string, text: string, known: Known) =>
   citedIn(text).flatMap(({ line, span }) => {
     const stale = staleOf(span, known);
     return stale ? [`${file}:${line} cites \`${span}\`, ${stale}`] : [];
   });
 
 /** Every name the TypeScript of `files`, by path from `root`, has: the docs' own tests left out, whose fixtures cite stale names. */
-const namesIn = (root: string, files: string[]): Set<string> =>
+const namesIn = (root: string, files: string[]) =>
   files
     .filter((f) => /\.tsx?$/.test(f) && !f.startsWith('apps/docs/test/') && fs.existsSync(path.join(root, f)))
     .reduce(
@@ -92,7 +92,7 @@ const namesIn = (root: string, files: string[]): Set<string> =>
 
 let known: Known | undefined;
 /** The names the repository's code has, read from the files git knows of under its four source tops, and its entries. */
-const knownOfRepo = (): Known =>
+const knownOfRepo = () =>
   (known ??= {
     names: namesIn(
       ROOT,
@@ -149,17 +149,17 @@ test('the code’s names are read: an identifier, a string’s word and a hyphen
 });
 
 /** The pages the scan reads: every `.mdx` or `.md` file under the site's content, sorted. */
-const scanned = (): string[] => (fs.readdirSync(PAGES, { recursive: true }) as string[]).filter((f) => /\.mdx?$/.test(f)).sort();
+const scanned = () => (fs.readdirSync(PAGES, { recursive: true }) as string[]).filter((f) => /\.mdx?$/.test(f)).sort();
 
 /** The texts of the glossary tables under `root` the Glossary page draws: each context's `about` and each term's `meaning`, named. */
-const tableTexts = (root: string): Array<{ file: string; text: string }> =>
+const tableTexts = (root: string) =>
   tablesIn(root).flatMap((table) => [
     { file: `${table.file} about`, text: table.about },
     ...table.terms.map((term) => ({ file: `${table.file} ${term.term}`, text: term.meaning })),
   ]);
 
 /** Every text the scan reads, by the name a fault gives it: the pages under the site's content, then the tables' texts under `root`. */
-const scannedTexts = (root: string): Array<{ file: string; text: string }> => [
+const scannedTexts = (root: string) => [
   ...scanned().map((p) => ({ file: path.join('src/content/docs', p), text: fs.readFileSync(path.join(PAGES, p), 'utf8') })),
   ...tableTexts(root),
 ];

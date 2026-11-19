@@ -15,23 +15,23 @@ const ASSIGNED = 'File an idea into a factory\n\nPicked from the list, with its 
 const HIDDEN = 'File an idea the filter hides';
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
+const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
 
 /** Open `route` of the board `page` shows, and wait for its reads. */
-async function open(page: Page, route: string): Promise<void> {
+async function open(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** A filing's body as it was sent, its factory read back from the namespace its path names (none for `default`), as the box chose it. */
-function sentOf(filed: Response): unknown {
+function sentOf(filed: Response) {
   const namespace = new URL(filed.url()).pathname.split('/')[3];
   const body = filed.request().postDataJSON() as Record<string, unknown>;
-  return namespace === 'default' ? body : { ...body, factory: namespace };
+  return (namespace === 'default' ? body : { ...body, factory: namespace }) satisfies unknown;
 }
 
 /** Type `idea` into the box and press File: the request's body as it was sent, and the card's name and file once the api took it. */
-async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; name: string; file: string }> {
+async function fileFrom(page: Page, idea: string) {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
@@ -42,18 +42,22 @@ async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; name
   const {
     metadata: { name },
   } = (await filed.json()) as { metadata: { name: string } };
-  return { sent: sentOf(filed), name, file: path.join(store!, 'inbox', `${name}.md`) };
+  return { sent: sentOf(filed), name, file: path.join(store!, 'inbox', `${name}.md`) } satisfies {
+    sent: unknown;
+    name: string;
+    file: string;
+  };
 }
 
 /** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key. */
-function expectSent(sent: unknown, expected: Record<string, string>, assertion: string): void {
+function expectSent(sent: unknown, expected: Record<string, string>, assertion: string) {
   const keyed = (o: object) => JSON.stringify(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
   if (typeof sent !== 'object' || sent === null || keyed(sent) !== keyed(expected))
     throw new Refused(`${assertion} — it sent ${JSON.stringify(sent)}, not ${JSON.stringify(expected)}`);
 }
 
 /** Refuses unless the card's file holds exactly `text`. */
-function expectFile(file: string, text: string, assertion: string): void {
+function expectFile(file: string, text: string, assertion: string) {
   const held = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
   if (held !== text) throw new Refused(`${assertion} — ${file} holds ${JSON.stringify(held)}`);
 }
@@ -63,7 +67,7 @@ function expectFile(file: string, text: string, assertion: string): void {
  * factory picked, its workflow preset or picked, Start sends the factory alone in the query of the card's start, the record names the
  * factory, the repository its wiring gives the workflow and the card, and the card stays in the inbox, started. The run is taken back.
  */
-async function startUnassigned(page: Page, name: string, theme: string): Promise<void> {
+async function startUnassigned(page: Page, name: string, theme: string) {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
   const runsDir = path.join(store!, 'runs');
@@ -109,7 +113,7 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
  * Refuses unless `started`, a start's answer, is a 201 whose query names `factory` and no repository, and whose record names it, `repo`
  * (the one its wiring gives the workflow) and `card`.
  */
-async function expectStartedIn(started: Response, { factory, repo, card }: { factory: string; repo: string; card: string }): Promise<void> {
+async function expectStartedIn(started: Response, { factory, repo, card }: { factory: string; repo: string; card: string }) {
   const sent = new URL(started.url()).searchParams;
   if (sent.get('factory') !== factory || sent.has('repo'))
     throw new Refused(`a card of no factory starts through its start, ?factory=${factory} and no repo — it was sent to ${started.url()}`);
@@ -131,7 +135,7 @@ async function expectStartedIn(started: Response, { factory, repo, card }: { fac
  * as the factory's file attaches it; the start of a seeded card of no factory, with the factory picked there, says it is left out and
  * why, and draws no start form. Nothing is written.
  */
-async function unreadSaid(page: Page, theme: string): Promise<void> {
+async function unreadSaid(page: Page, theme: string) {
   const factory = FACTORIES.hiring.name;
   const workflow = WORKFLOWS.good.name;
   const box = page.locator('form[aria-label="File a card"]');

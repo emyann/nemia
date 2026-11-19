@@ -6,21 +6,18 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { approvePairing, askPairing, claimLink, claimPairing } from '../src/lib/api/pairing.ts';
+import { apiAnswers } from './network.ts';
 
 /** What a request was sent as: its method, its path, and its body read as JSON. */
 type Sent = { method: string; path: string; body: unknown };
 
 /** Every request answered `body` as JSON, for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown): Sent[] {
-  const before = globalThis.fetch;
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown) {
   const sent: Sent[] = [];
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     const text = init?.body == null ? '' : await new Response(init.body).text();
     sent.push({ method: init?.method ?? 'GET', path: String(input), body: text === '' ? undefined : JSON.parse(text) });
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }

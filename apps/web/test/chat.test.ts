@@ -53,27 +53,30 @@ import type { StreamLike } from '../src/lib/follow.ts';
 import type { AskQuestion, ChatEvent, ChatPresence, PermissionFacts } from '../src/lib/api/chat.ts';
 import type { ChatKept } from '../src/lib/chatOutbox.ts';
 import type { FactoryLevel } from '../src/lib/api/nemia.ts';
+import { apiAnswers } from './network.ts';
 
-const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
+const at = (second: number) => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
 /** A message of hers, the person's or the keeper's. */
-const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper' | 'peer', text: string): ChatMessage => ({
-  kind: 'message',
-  id,
-  at: at(second),
-  from,
-  text,
-});
+const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper' | 'peer', text: string) =>
+  ({
+    kind: 'message',
+    id,
+    at: at(second),
+    from,
+    text,
+  }) satisfies ChatMessage;
 
 /** One tool call of hers. */
-const call = (id: string, second: number, state: ChatCall['state'], sentence = 'Read the inbox'): ChatCall => ({
-  kind: 'call',
-  id,
-  at: at(second),
-  tool: 'Read',
-  sentence,
-  state,
-});
+const call = (id: string, second: number, state: ChatCall['state'], sentence = 'Read the inbox') =>
+  ({
+    kind: 'call',
+    id,
+    at: at(second),
+    tool: 'Read',
+    sentence,
+    state,
+  }) satisfies ChatCall;
 
 const up: ChatPresence = { up: true, answering: false, waitsOnYou: 0, unread: 0, wakes: true };
 
@@ -81,7 +84,7 @@ const up: ChatPresence = { up: true, answering: false, waitsOnYou: 0, unread: 0,
 class Stream implements StreamLike {
   readyState = 1;
   readonly #target = new EventTarget();
-  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
     this.#target.addEventListener(type, listener as EventListener);
   }
   close() {
@@ -123,7 +126,7 @@ describe('mergeChatEvents and changedChat: an event of her chat is replaced by i
     assert.equal(twice.length, 2, 'the same words under two ids are two events');
   });
   test('REFUSED: a merge keyed by the kind beside the id, as a step transcript is, draws a call whose state moved twice', () => {
-    const keyed = (known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] => {
+    const keyed = (known: readonly ChatEvent[], incoming: readonly ChatEvent[]) => {
       const merged = [...known];
       const where = new Map(merged.map((e, i) => [`${e.kind}:${e.id}:${JSON.stringify(e)}`, i]));
       for (const e of incoming) {
@@ -132,7 +135,7 @@ describe('mergeChatEvents and changedChat: an event of her chat is replaced by i
         if (i === undefined) merged.push(e);
         else merged[i] = e;
       }
-      return merged;
+      return merged satisfies ChatEvent[];
     };
     const known = [call('t:1:a', 1, 'running')];
     assert.equal(keyed(known, [call('t:1:a', 1, 'done')]).length, 2, 'the mutant draws the call twice');
@@ -150,17 +153,18 @@ describe('mergeChatEvents and changedChat: an event of her chat is replaced by i
 });
 
 /** A storage of this process's own, or one that refuses every call. */
-function storage(refuses = false): { held: Map<string, string> } {
+function storage(refuses = false) {
   const held = new Map<string, string>();
   const refuse = () => {
     throw new Error('storage is refused');
   };
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
   Reflect.set(globalThis, 'localStorage', {
     getItem: (key: string) => (refuses ? refuse() : (held.get(key) ?? null)),
     setItem: (key: string, value: string) => (refuses ? refuse() : void held.set(key, value)),
     removeItem: (key: string) => (refuses ? refuse() : void held.delete(key)),
   });
-  return { held };
+  return { held } satisfies { held: Map<string, string> };
 }
 
 describe('chatOutbox: a message the api would not take is kept in this browser, and sent once', () => {
@@ -204,15 +208,14 @@ describe('chatOutbox: a message the api would not take is kept in this browser, 
         createElement(ChatKeptMessage, { kept, onAgain: () => undefined, onEdit: () => undefined, onDiscard: () => undefined }),
       );
     const WHY = 'The words came with no token: sign in on the token page.';
-    const before = globalThis.fetch;
     let requests = 0;
     let answer: () => Promise<Response> = async () => new Response(null, { status: 204 });
     let counted: (() => void) | undefined;
-    globalThis.fetch = async () => {
+    apiAnswers(async () => {
       requests += 1;
       counted?.();
       return answer();
-    };
+    });
     const json = { 'content-type': 'application/json' };
     const failureOf = (text: string) =>
       sendChat(text).then(
@@ -259,7 +262,6 @@ describe('chatOutbox: a message the api would not take is kept in this browser, 
         assert.equal(again.refused, undefined);
       }
     } finally {
-      globalThis.fetch = before;
       counted = undefined;
     }
   });
@@ -317,15 +319,16 @@ const EXPLAINED: AskQuestion = {
 const PLAIN: AskQuestion = { ...EXPLAINED, options: EXPLAINED.options.map((option) => ({ ...option, description: '  ' })) };
 
 /** An ask of hers in her chat, waiting on the person. */
-const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatAsk => ({
-  kind,
-  id: `q:${kind}`,
-  at: at(2),
-  call: kind,
-  text: 'The run waits at its gate until you answer.',
-  questions,
-  ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
-});
+const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>) =>
+  ({
+    kind,
+    id: `q:${kind}`,
+    at: at(2),
+    call: kind,
+    text: 'The run waits at its gate until you answer.',
+    questions,
+    ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
+  }) satisfies ChatAsk;
 
 describe('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answered, left open, and answered in words', () => {
   test('an ask is drawn by what its choices carry: the actions of a proposal, one question’s form, or the flow of several', () => {
@@ -402,16 +405,17 @@ const FACTS: PermissionFacts = {
 };
 
 /** A permission of hers waiting on the person, carrying `facts`, its choice on it where one was made. */
-const permission = (facts: PermissionFacts = FACTS, chose?: Record<string, string>): ChatAsk => ({
-  kind: 'permission',
-  id: 'q:permission',
-  at: at(2),
-  call: 'permission',
-  text: PERMISSION_QUESTION.question,
-  questions: [PERMISSION_QUESTION],
-  permission: facts,
-  ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
-});
+const permission = (facts: PermissionFacts = FACTS, chose?: Record<string, string>) =>
+  ({
+    kind: 'permission',
+    id: 'q:permission',
+    at: at(2),
+    call: 'permission',
+    text: PERMISSION_QUESTION.question,
+    questions: [PERMISSION_QUESTION],
+    permission: facts,
+    ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
+  }) satisfies ChatAsk;
 
 describe('a permission of hers is an ask: waiting, drawn as the form, answered in words, and tagged by what it asks', () => {
   test('it is an ask that waits on the person until they answer it, drawn as one question’s form', () => {
@@ -893,13 +897,11 @@ describe('broughtOf and chatItems: a step her words link to is brought, drawn un
 
 describe('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', () => {
   let reading!: (typeof import('../src/lib/useNemiaChat.ts'))['reading'];
-  let fetchBefore!: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   let sourceBefore!: unknown;
   let state!: ChatFollowed;
   beforeAll(async () => {
     const t = teardowns();
     ({ reading } = await import('../src/lib/useNemiaChat.ts'));
-    fetchBefore = globalThis.fetch;
     sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
     Object.assign(globalThis, {
       EventSource: class extends Stream {
@@ -911,7 +913,6 @@ describe('reading her chat: one stream opened after the first read, from its cur
       },
     });
     t.onTestFinished(() => {
-      globalThis.fetch = fetchBefore;
       Object.assign(globalThis, { EventSource: sourceBefore });
     });
     state = unreadChat(true);
@@ -929,11 +930,13 @@ describe('reading her chat: one stream opened after the first read, from its cur
   const told = story(test);
   let open = () => {};
   told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
-    globalThis.fetch = async () =>
-      new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+    apiAnswers(
+      async () =>
+        new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
     open = reading({ setState, tryAgain: () => {} });
     await until(() => state.live);
     for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
@@ -946,9 +949,9 @@ describe('reading her chat: one stream opened after the first read, from its cur
   told.test('a read made again that fails is the end, and leaves no retrying notice beside its error', async () => {
     open();
     assert.equal(streams[0]?.readyState, 2, 'what stops the reading closes its stream');
-    globalThis.fetch = async () => {
+    apiAnswers(async () => {
       throw new TypeError('fetch failed');
-    };
+    });
     const closed = reading({ setState, tryAgain: () => {} });
     await until(() => state.error !== null);
     closed();

@@ -334,7 +334,7 @@ test('every Runner refuses the shared checks before its own, and asks its own wh
 });
 
 test("a composite asks the task's own harness, as a spawn is sent", () => {
-  const said = (word: string): RunnerOps => ({ ...testOps(), refuses: () => word });
+  const said = (word: string) => ({ ...testOps(), refuses: () => word });
   const both = composite({ a: said('a refuses'), b: said('b refuses') }, 'a');
   assert.equal(both.refuses?.({ ...task, harness: 'b' }), 'b refuses');
   assert.equal(both.refuses?.(task), 'a refuses', 'and the fallback for a task that names none');

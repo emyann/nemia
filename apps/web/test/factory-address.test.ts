@@ -13,18 +13,18 @@ import { factoryRedirect, objectHome } from '../src/lib/factoryAddress.ts';
 const SRC = path.resolve(import.meta.dirname, '../src');
 
 /** Every full path of the board's routes, as the router's generated tree declares them, each parameter given a value. */
-function routePaths(): string[] {
+function routePaths() {
   const tree = fs.readFileSync(path.join(SRC, 'routeTree.gen.ts'), 'utf8');
   const start = tree.indexOf('export interface FileRoutesByFullPath');
   const end = tree.indexOf('export interface FileRoutesByTo', start);
   assert.ok(start !== -1 && end !== -1, 'the route tree declares FileRoutesByFullPath, then FileRoutesByTo');
-  return [...tree.slice(start, end).matchAll(/'([^']+)'\s*:/g)].map((match) => match[1].replace(/\$[A-Za-z]+/g, 'x'));
+  return [...tree.slice(start, end).matchAll(/'([^']+)'\s*:/g)].map((match) => match[1].replace(/\$[A-Za-z]+/g, 'x')) satisfies string[];
 }
 
 /** The path and the search of `href`, the search as an object of strings. */
-const split = (href: string): { path: string; search: Record<string, string> } => {
+const split = (href: string) => {
   const url = new URL(href, 'http://board');
-  return { path: url.pathname, search: Object.fromEntries(url.searchParams) };
+  return { path: url.pathname, search: Object.fromEntries(url.searchParams) } satisfies { path: string; search: Record<string, string> };
 };
 
 describe('factoryRedirect: each address of before the factory’s paths reaches its page under the factory’s path', () => {
@@ -97,13 +97,14 @@ test("objectHome: a run's, a step's or a card's page belongs where its object's 
 });
 
 /** Each line of `text` that reads a page's factory from its search or writes one into a board address, comments left out. */
-const factoryInAddress = (text: string): string[] =>
+const factoryInAddress = (text: string) =>
   text
     .split('\n')
     .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
-    .filter((line) => /search(?:\s*[=:]\s*\{\{?|\??\.)\s*factory\b|[?&]factory=/.test(line));
+    .filter((line) => /search(?:\s*[=:]\s*\{\{?|\??\.)\s*factory\b|[?&]factory=/.test(line)) satisfies string[];
 
 /** Every source file under `dir`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const sources = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const at = path.join(dir, entry.name);

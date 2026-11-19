@@ -44,7 +44,7 @@ const git = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one file committed on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'add.ts'), 'export const add = (a, b) => a + b;\n');
@@ -115,7 +115,7 @@ const board = () => {
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
  * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
  */
-const loopingFolder = (rounds = 3): string => {
+const loopingFolder = (rounds = 3) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
@@ -176,7 +176,7 @@ const STOPPED = {
 };
 
 /** main moves under the run: a commit on the base branch that gives add.ts a `sub` of its own, which the branch's conflicts with. */
-const mainMoves = (repo: string): string => {
+const mainMoves = (repo: string) => {
   fs.appendFileSync(path.join(repo, 'add.ts'), 'export const sub = (a, b) => b - a;\n');
   git(repo, 'commit', '-q', '-am', "main's sub");
   return git(repo, 'rev-parse', 'HEAD');

@@ -71,7 +71,7 @@ const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: stri
   });
 
 /** The event names of a server-sent stream's text, in order. */
-const eventsOf = (text: string): string[] => [...text.matchAll(/^event: ?(.*)$/gm)].map((m) => m[1] ?? '');
+const eventsOf = (text: string) => [...text.matchAll(/^event: ?(.*)$/gm)].map((m) => m[1] ?? '');
 
 test("GET /api/readiness lists its pieces, the place's need among them, missing", async () => {
   const res = await send('GET', '/api/readiness');
@@ -128,7 +128,7 @@ test("a session's token starts no fix: 403, and nothing is filed", async () => {
 });
 
 /** The status objects' error class `kind` answers with. */
-const statusOf = (kind: typeof Invalid | typeof Conflict): unknown => Schema.resolveAnnotations(kind)?.httpApiStatus;
+const statusOf = (kind: typeof Invalid | typeof Conflict) => Schema.resolveAnnotations(kind)?.httpApiStatus;
 
 test("REFUSED: a fix a person types is objects' Invalid, and a removal a run still needs its Conflict, nothing filed", async () => {
   const typed = await send('POST', '/api/readiness/fixes', { need: 'identity', index: 2 });

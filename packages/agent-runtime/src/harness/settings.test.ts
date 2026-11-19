@@ -6,7 +6,7 @@ import { projectAllows } from './settings.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A scratch directory holding `.claude/settings.json` with `settings` as its text (none when undefined), and its local file beside. */
-const dirWith = (settings: string | undefined, local?: string): string => {
+const dirWith = (settings: string | undefined, local?: string) => {
   const dir = scratch('ae-settings-');
   if (settings === undefined) return dir;
   fs.mkdirSync(path.join(dir, '.claude'), { recursive: true });

@@ -166,20 +166,22 @@ const spawn = (
     taskPushNotificationConfig: undefined,
     returnImmediately: true,
   },
-): SendMessageRequest => ({
-  tenant: '',
-  message: { ...messageOf({ name, brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' } }, 'm-1'), ...change },
-  configuration,
-  metadata: undefined,
-});
+) =>
+  ({
+    tenant: '',
+    message: { ...messageOf({ name, brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' } }, 'm-1'), ...change },
+    configuration,
+    metadata: undefined,
+  }) satisfies SendMessageRequest;
 
 /** Words said to a session, as a client sends them: a follow-up on its Task, returnImmediately. */
-const said = (name = 'ae/t-1/1', text = 'look at the tests again', change: Partial<Message> = {}): SendMessageRequest => ({
-  tenant: '',
-  message: { ...followUpOf(name, text, 'm-2'), ...change },
-  configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-  metadata: undefined,
-});
+const said = (name = 'ae/t-1/1', text = 'look at the tests again', change: Partial<Message> = {}) =>
+  ({
+    tenant: '',
+    message: { ...followUpOf(name, text, 'm-2'), ...change },
+    configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+    metadata: undefined,
+  }) satisfies SendMessageRequest;
 
 const listing = (
   change: { pageSize?: number; pageToken?: string; contextId?: string; status?: TaskState; statusTimestampAfter?: string } = {},
@@ -1142,22 +1144,23 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
 });
 
 /** A task held open whose first attempt signed: waiting on a person, `ae/t-h/1` its session. */
-const held = (after: Event[] = []): Event[] => [
-  { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', holdOpen: true },
-  { kind: 'starting', at: '2026-09-23T10:00:00.000Z', attempt: 1 },
-  { kind: 'spawned', at: '2026-09-23T10:00:01.000Z', attempt: 1 },
-  {
-    kind: 'ended',
-    at: '2026-09-23T10:05:00.000Z',
-    attempt: 1,
-    sessionId: 'job-1',
-    observed: 'succeeded',
-    reason: 'harness',
-    nativeId: 'conv-h',
-    closeout: { outcome: 'done' },
-  },
-  ...after,
-];
+const held = (after: Event[] = []) =>
+  [
+    { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', holdOpen: true },
+    { kind: 'starting', at: '2026-09-23T10:00:00.000Z', attempt: 1 },
+    { kind: 'spawned', at: '2026-09-23T10:00:01.000Z', attempt: 1 },
+    {
+      kind: 'ended',
+      at: '2026-09-23T10:05:00.000Z',
+      attempt: 1,
+      sessionId: 'job-1',
+      observed: 'succeeded',
+      reason: 'harness',
+      nativeId: 'conv-h',
+      closeout: { outcome: 'done' },
+    },
+    ...after,
+  ] satisfies Event[];
 
 describe('a running session told words and stopped: the harness asked once, with the id it lists, its failures in its words', () => {
   test('a stop: a live session is stopped and CANCELED, one already stopped is CANCELED again, and the harness asked once', async () => {

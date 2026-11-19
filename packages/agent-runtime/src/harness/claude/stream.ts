@@ -26,7 +26,7 @@ import { Option, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
 
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Count = Schema.Natural;
 
 const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 

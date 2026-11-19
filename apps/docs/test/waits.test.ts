@@ -18,7 +18,7 @@ import { WAITED } from './waits.ts';
 const PACKAGE = path.join(import.meta.dirname, '..');
 
 /** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
-const defaultTimeout = (config: string): number | null => {
+const defaultTimeout = (config: string) => {
   const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
   return m ? Number(m[1].replaceAll('_', '')) : null;
 };
@@ -30,7 +30,7 @@ const defaultTimeout = (config: string): number | null => {
  * @param config the text of the package's `vitest.config.ts`
  * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
  */
-const timeoutBreaks = (config: string): string[] =>
+const timeoutBreaks = (config: string) =>
   defaultTimeout(config) === WAITED.timeout
     ? []
     : [`the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
@@ -63,7 +63,7 @@ const BOUND = new RegExp(`\\b(?:${['time', 'kill'].map((w) => `${w}\\w*`).join('
  * @param from the index just after the call's opening parenthesis
  * @returns the call's arguments, as text
  */
-const callAt = (text: string, from: number): string => {
+const callAt = (text: string, from: number) => {
   let depth = 1;
   for (let i = from; i < text.length; i++) {
     if (text[i] === '(') depth++;
@@ -80,7 +80,7 @@ const callAt = (text: string, from: number): string => {
  * @param text its text
  * @returns one line per bound found, empty where the file hands none
  */
-const boundsIn = (file: string, text: string): string[] =>
+const boundsIn = (file: string, text: string) =>
   [...text.matchAll(STARTS)].flatMap((m) => {
     const call = callAt(text, m.index + m[0].length);
     if (!BOUND.test(call)) return [];
@@ -89,10 +89,10 @@ const boundsIn = (file: string, text: string): string[] =>
   });
 
 /** The package's test files and the helpers beside them, by their path from the package. */
-const testFiles = (): string[] => fs.globSync('test/**/*.ts', { cwd: PACKAGE }).sort();
+const testFiles = () => fs.globSync('test/**/*.ts', { cwd: PACKAGE }).sort();
 
 /** Every file that hands a spawn a bound, as they are on disk. */
-const measured = (): string[] => testFiles().flatMap((file) => boundsIn(file, fs.readFileSync(path.join(PACKAGE, file), 'utf8')));
+const measured = () => testFiles().flatMap((file) => boundsIn(file, fs.readFileSync(path.join(PACKAGE, file), 'utf8')));
 
 test('no test under test/ bounds a spawn by hand: the runner’s testTimeout is the one bound', () => {
   assert.ok(testFiles().includes('test/build.test.ts'), 'the scan read the package’s tests');

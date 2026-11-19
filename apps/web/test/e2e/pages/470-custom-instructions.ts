@@ -27,7 +27,7 @@ const answered = (page: Page, method: 'PUT' | 'DELETE', at = route) =>
  * write goes to the store's level with the repository the agent was read from (`?repo=`), since the default namespace reads none of its
  * own, and the api answers what the page says — saved, the file written; cleared, gone.
  */
-async function savedForRepoAgent(page: Page): Promise<void> {
+async function savedForRepoAgent(page: Page) {
   const { good } = WORKFLOWS;
   const agent = good.agent.name;
   const file = path.join(store!, 'custom-instructions', `${agent}.md`);
@@ -63,7 +63,7 @@ async function savedForRepoAgent(page: Page): Promise<void> {
  * On a second page, words opening with a frontmatter block are saved: the api answers 422 with the package's sentence, the panel shows it
  * word for word, nothing is written, and the page's watch sees that one refusal and nothing else.
  */
-async function refusedOn(page: Page, file: string): Promise<void> {
+async function refusedOn(page: Page, file: string) {
   const refused = await page.context().newPage();
   try {
     const { problems } = watch(refused);

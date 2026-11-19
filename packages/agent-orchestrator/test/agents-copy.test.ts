@@ -70,7 +70,7 @@ const refusedWith =
   };
 
 /** Every file under `dir`, by its path in it, with its inode and when it was last written: what a write would change. */
-function snapshot(dir: string): Record<string, string> {
+function snapshot(dir: string) {
   if (!fs.existsSync(dir)) return {};
   const files = (fs.readdirSync(dir, { recursive: true }) as string[]).sort();
   return Object.fromEntries(
@@ -82,7 +82,7 @@ function snapshot(dir: string): Record<string, string> {
 }
 
 /** Every file a copy writes in the store `home` set back a minute, so a write the same millisecond as the copy still moves its time. */
-function backdated(home: string): void {
+function backdated(home: string) {
   const past = new Date(Date.now() - 60_000);
   for (const dir of Object.values(libraryOf(home)).filter((d) => fs.existsSync(d)))
     for (const file of fs.readdirSync(dir, { recursive: true }) as string[]) fs.lutimesSync(path.join(dir, file), past, past);

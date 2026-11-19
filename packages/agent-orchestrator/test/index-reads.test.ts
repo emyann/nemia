@@ -32,7 +32,7 @@ type Lint = { overrides: Block[] };
 type Package = { dir: string; options: ts.CompilerOptions; fileNames: string[]; folders: string[]; source: string[] };
 
 /** Why each package is not held under the flag and the rule, one line a reason; none when every one is. */
-function refusals(packages: Package[], lint: Lint): string[] {
+function refusals(packages: Package[], lint: Lint) {
   return packages.flatMap((pkg) => {
     const out: string[] = [];
     if (pkg.options.noUncheckedIndexedAccess !== true)
@@ -54,20 +54,20 @@ function refusals(packages: Package[], lint: Lint): string[] {
 }
 
 /** `.oxlintrc.json`, read as oxlint reads it: JSON with comments. */
-function readLint(): Lint {
+function readLint() {
   const parsed = ts.parseConfigFileTextToJson('.oxlintrc.json', fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'));
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Lint;
 }
 
 /** A checked package as it is on disk, its paths from the repository's root. */
-function readPackage(dir: string): Package {
+function readPackage(dir: string) {
   const abs = path.join(ROOT, dir);
   const file = path.join(abs, 'tsconfig.json');
   const read = ts.readConfigFile(file, (f) => ts.sys.readFile(f));
   if (read.error) throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'));
   const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, abs);
-  const fromRoot = (f: string): string => path.relative(ROOT, path.resolve(abs, f)).split(path.sep).join('/');
+  const fromRoot = (f: string) => path.relative(ROOT, path.resolve(abs, f)).split(path.sep).join('/');
   const folders = SOURCE.filter((folder) => fs.existsSync(path.join(abs, folder)));
   const source = folders.flatMap((folder) =>
     (fs.readdirSync(path.join(abs, folder), { recursive: true }) as string[])
@@ -77,7 +77,7 @@ function readPackage(dir: string): Package {
   return { dir, options: parsed.options, fileNames: parsed.fileNames.map(fromRoot), folders, source };
 }
 
-const held = (): Package => readPackage('packages/agent-runtime');
+const held = () => readPackage('packages/agent-runtime');
 
 test('every checked package is under the flag and refuses a non-null assertion in its source', () => {
   const packages = CHECKED.map(readPackage);

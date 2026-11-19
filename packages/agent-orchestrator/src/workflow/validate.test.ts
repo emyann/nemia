@@ -11,7 +11,7 @@ import { parseFolder } from '../folder/folder.ts';
 import { sessionContext } from '../keys/index.ts';
 import { DEFAULT_ROUNDS, stepPlace, WorkflowError, type StepSpec } from '../step/step.ts';
 
-const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: 'do a thing' });
+const step = (name: string, after: string[] = []) => ({ name, after, body: 'do a thing' }) satisfies StepSpec;
 
 /** A strict output schema: `findings`, each a file, a line and what would go wrong. */
 const FINDINGS = {
@@ -35,18 +35,19 @@ const FINDINGS = {
 const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
 
 /** A step `loop:`-ing back to `target`, declaring `again`, as a folder would load it. */
-const looping = (name: string, after: string[], target: string): StepSpec => ({
-  ...step(name, after),
-  loop: target,
-  rounds: DEFAULT_ROUNDS,
-  output: { file: `${name}.json`, schema: LOOPING as never },
-});
+const looping = (name: string, after: string[], target: string) =>
+  ({
+    ...step(name, after),
+    loop: target,
+    rounds: DEFAULT_ROUNDS,
+    output: { file: `${name}.json`, schema: LOOPING as never },
+  }) satisfies StepSpec;
 
 /**
  * A folder read from its text: `implement`, then `review` declaring `output: review.schema.json` with `reviewKeys` beside it, then
  * whatever `files` add or replace — a step by its name and text, a schema by its file and object; `null` leaves a file out.
  */
-const folderOf = (reviewKeys: string | null, files: Record<string, string | object | null> = {}): StepSpec[] => {
+const folderOf = (reviewKeys: string | null, files: Record<string, string | object | null> = {}) => {
   const all: Record<string, string | object | null> = {
     implement: '---\nplace: git\n---\nimplement it\n',
     ...(reviewKeys === null
@@ -62,30 +63,33 @@ const folderOf = (reviewKeys: string | null, files: Record<string, string | obje
     const content = all[file];
     return content === undefined || content === null ? undefined : typeof content === 'string' ? content : JSON.stringify(content);
   };
-  return parseFolder(steps, read);
+  return parseFolder(steps, read) satisfies StepSpec[];
 };
 
 /** The text of a step file: its frontmatter `lines`, and a body. */
 const fileOf = (lines: string) => `---\n${lines}\n---\nDo the work.\n`;
 
 /** A team of steps in a line, each with the place `words` gives it: `base` is the ending's workspace, none is a step frozen before. */
-const team = (...words: Array<'folder' | 'git' | 'base' | undefined>): StepSpec[] =>
-  words.map((word, i) => ({
+const team = (...words: Array<'folder' | 'git' | 'base' | undefined>) => {
+  const made: StepSpec[] = words.map((word, i) => ({
     name: `s${i}`,
     after: i ? [`s${i - 1}`] : [],
     body: 'x',
     permissionMode: 'dontAsk',
     ...(word === 'base' ? { workspace: word } : word ? { place: word } : {}),
   }));
+  return made;
+};
 
 const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'base' } as StepSpec;
 const chain: StepSpec[] = [step('implement'), step('review', ['implement']), ship];
 /** implement → review (looping back when `loop`) → ship, in the base workspace with a check, gated when `gate`. */
-const ending = (loop: boolean, gate: boolean): StepSpec[] => [
-  step('implement'),
-  { ...step('review', ['implement']), ...(loop ? { loop: 'implement' } : {}) },
-  { ...ship, check: 'npm test', ...(gate ? { gate: true } : {}) },
-];
+const ending = (loop: boolean, gate: boolean) =>
+  [
+    step('implement'),
+    { ...step('review', ['implement']), ...(loop ? { loop: 'implement' } : {}) },
+    { ...ship, check: 'npm test', ...(gate ? { gate: true } : {}) },
+  ] satisfies StepSpec[];
 const watcher = { name: 'supervise', after: [], body: 'x', slot: 'none' } as StepSpec;
 const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
 const docs = { docs: '---\nafter: implement\nplace: git\n---\ndocument it\n' };
@@ -188,22 +192,28 @@ const ROWS: Row[] = [
     run: () => folderOf(null, { review: '---\nafter: implement\nplace: git\nloop: implement\n---\nreview it\n' }),
     naming: ['review: ', '`loop: implement`', 'declares no `output:`', '`again`'],
   },
-  ...(['string', ['boolean', 'null']] as const).map((type): Row => ({
-    row: `loop: REFUSED, \`again\` as ${JSON.stringify(type)}`,
-    run: () =>
-      folderOf('loop: implement', { 'review.schema.json': { ...LOOPING, properties: { ...LOOPING.properties, again: { type } } } }),
-    naming: ['review: ', 'declares `again` as', '`"type": "boolean"`'],
-  })),
+  ...(['string', ['boolean', 'null']] as const).map(
+    (type) =>
+      ({
+        row: `loop: REFUSED, \`again\` as ${JSON.stringify(type)}`,
+        run: () =>
+          folderOf('loop: implement', { 'review.schema.json': { ...LOOPING, properties: { ...LOOPING.properties, again: { type } } } }),
+        naming: ['review: ', 'declares `again` as', '`"type": "boolean"`'],
+      }) satisfies Row,
+  ),
   {
     row: 'rounds: REFUSED, on a step with no loop',
     run: () => folderOf('rounds: 2', { 'review.schema.json': FINDINGS }),
     naming: ['review: ', '`rounds: 2`', 'no `loop:`', 'Add `loop: <step>`', '`retries:`'],
   },
-  ...['0', 'three', '-1', '2.5'].map((bad): Row => ({
-    row: `rounds: REFUSED, ${bad}`,
-    run: () => folderOf(`loop: implement\nrounds: ${bad}`),
-    naming: ['review: ', `\`rounds: ${bad}\` is not a count`, 'above zero'],
-  })),
+  ...['0', 'three', '-1', '2.5'].map(
+    (bad) =>
+      ({
+        row: `rounds: REFUSED, ${bad}`,
+        run: () => folderOf(`loop: implement\nrounds: ${bad}`),
+        naming: ['review: ', `\`rounds: ${bad}\` is not a count`, 'above zero'],
+      }) satisfies Row,
+  ),
   {
     row: 'loop: REFUSED, a step in it that forks',
     run: () => folderOf('loop: implement', docs),
@@ -306,11 +316,12 @@ const ROWS: Row[] = [
     run: () => validate(ending(false, false).map((s) => (s.name === 'ship' ? { ...s, check: undefined } : s))),
   },
   ...['workspace: base\ngate: true\ncheck: npm test\nharness: codex', 'harness: codex\ncheck: npm test\ngate: true\nworkspace: base'].map(
-    (lines): Row => ({
-      row: `base: REFUSED, a gated check on codex — ${lines.split('\n')[0]} first`,
-      run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
-      naming: ['ship: ', '`workspace: base`', '`check: npm test`', '`denyWhileLanding`', 'delete `harness: codex`'],
-    }),
+    (lines) =>
+      ({
+        row: `base: REFUSED, a gated check on codex — ${lines.split('\n')[0]} first`,
+        run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
+        naming: ['ship: ', '`workspace: base`', '`check: npm test`', '`denyWhileLanding`', 'delete `harness: codex`'],
+      }) satisfies Row,
   ),
   {
     row: 'base: on codex with no check of its own, and on claude with one',
@@ -323,17 +334,18 @@ const ROWS: Row[] = [
     },
   },
   ...['workspace: base\ngate: true\ncheck: npm test\nretries: 1', 'retries: 1\nworkspace: base', 'workspace: base\nretries: 0'].map(
-    (lines): Row => ({
-      row: `base: REFUSED, retries — ${lines.replace(/\n/g, ', ')}`,
-      run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
-      naming: [
-        'ship: ',
-        '`workspace: base`',
-        `\`retries: ${/retries: (\d)/.exec(lines)?.[1]}\``,
-        'nemia retry <run> ship',
-        'Delete the `retries:` line',
-      ],
-    }),
+    (lines) =>
+      ({
+        row: `base: REFUSED, retries — ${lines.replace(/\n/g, ', ')}`,
+        run: () => parseWorkflow('ship', fileOf(`place: git\n${lines}`)),
+        naming: [
+          'ship: ',
+          '`workspace: base`',
+          `\`retries: ${/retries: (\d)/.exec(lines)?.[1]}\``,
+          'nemia retry <run> ship',
+          'Delete the `retries:` line',
+        ],
+      }) satisfies Row,
   ),
   { row: 'slot: a workflow of one step takes none', run: () => validate([watcher]) },
   {
@@ -413,11 +425,14 @@ const ROWS: Row[] = [
         { name: 'respond', after: [], resume: 'review', input: ['review'], body: 'x' },
       ]),
   },
-  ...['after: implement\ninput: review', 'input: review'].map((keys): Row => ({
-    row: `input: REFUSED, a step it does not wait on — ${keys.replace(/\n/g, ', ')}`,
-    run: () => folderOf('', respond(keys)),
-    naming: ['respond: ', '`input: review`', 'does not wait on review', 'Add review to `after:`', 'delete the line'],
-  })),
+  ...['after: implement\ninput: review', 'input: review'].map(
+    (keys) =>
+      ({
+        row: `input: REFUSED, a step it does not wait on — ${keys.replace(/\n/g, ', ')}`,
+        run: () => folderOf('', respond(keys)),
+        naming: ['respond: ', '`input: review`', 'does not wait on review', 'Add review to `after:`', 'delete the line'],
+      }) satisfies Row,
+  ),
   {
     row: 'input: REFUSED, a step not here',
     run: () => folderOf('', respond('after: review\ninput: reveiw')),

@@ -15,14 +15,15 @@ const LOOP: StepSpec[] = [step('implement'), { ...step('review', ['implement']),
 const LOOPING = run({ implement: 't1', review: 't2' });
 
 /** Reads where each step stands as `standing` says (its status and its own), and whether the loop goes round itself. */
-const reads = (standing: Record<string, StepStatus>, goesRound = false): MergeReads => ({
-  standingOf: (s) => ({ status: standing[s.name], own: standing[s.name] }),
-  stopped: () => false,
-  goesRound: () => goesRound,
-});
+const reads = (standing: Record<string, StepStatus>, goesRound = false) =>
+  ({
+    standingOf: (s) => ({ status: standing[s.name], own: standing[s.name] }),
+    stopped: () => false,
+    goesRound: () => goesRound,
+  }) satisfies MergeReads;
 
 /** What `nemia refresh r-1 --base` answers over `reads`: its refusal, or a failure naming the ask it made instead. */
-const refusalOf = (given: MergeReads): string => {
+const refusalOf = (given: MergeReads) => {
   const answer = mergeAsk(LOOP, LOOPING, undefined, given, [], () => assert.fail('no trial merge is made'), '2026-01-01T00:00:00Z');
   assert.ok('refusal' in answer, `refused, not asked: ${JSON.stringify(answer)}`);
   return answer.refusal;

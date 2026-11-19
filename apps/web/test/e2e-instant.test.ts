@@ -14,7 +14,7 @@ const ZONE = 'America/Montreal';
 const AT = '2026-10-16T02:58:00.000Z';
 
 /** A `<time>` as `expectInstant` reads one: its zone from the page, its `datetime`, its text and its title, all said here. */
-const drawn = (text: string, title = `When it was filed: ${instantWhole(new Date(AT), ZONE)}`): Locator =>
+const drawn = (text: string, title = `When it was filed: ${instantWhole(new Date(AT), ZONE)}`) =>
   ({
     page: () => ({ evaluate: async () => ZONE }) as unknown as Page,
     getAttribute: async (name: string) => (name === 'datetime' ? AT : title),
@@ -22,15 +22,17 @@ const drawn = (text: string, title = `When it was filed: ${instantWhole(new Date
   }) as unknown as Locator;
 
 /** Runs `body` with every `new Date()` of this process answering `iso`, and puts the real clock back. */
-async function atClock(iso: string, body: () => Promise<void>): Promise<void> {
+async function atClock(iso: string, body: () => Promise<void>) {
   const real = globalThis.Date;
   const fixed = new real(iso).getTime();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the clock: a fixed now put on Date, then taken back
   globalThis.Date = new Proxy(real, {
     construct: (target, args) => (args.length === 0 ? new target(fixed) : Reflect.construct(target, args)),
   });
   try {
     await body();
   } finally {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the clock: a fixed now put on Date, then taken back
     globalThis.Date = real;
   }
 }

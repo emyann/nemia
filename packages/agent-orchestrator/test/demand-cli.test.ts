@@ -48,7 +48,7 @@ const TICKING: Record<string, string[]> = {
 const READS = [['ls'], ['version'], ['show', 'no-run'], ['inbox'], ['logs', 'no-run', 'implement']];
 
 /** A host over the scratch store that keeps each spawn it is asked for and starts nothing; no service is found, and every program fails. */
-function hostOf(): { host: () => DemandHost; spawns: string[] } {
+function hostOf() {
   const spawns: string[] = [];
   const host: DemandHost = {
     ...liveDemandHost(ROOT),
@@ -67,9 +67,9 @@ function hostOf(): { host: () => DemandHost; spawns: string[] } {
 }
 
 /** `nemia <argv>` over `host`, its lines kept off the test's output and any refusal it ends with swallowed. */
-async function typed(t: TestContext, argv: string[], host: () => DemandHost): Promise<void> {
-  vi.spyOn(console, 'log').mockImplementation(() => undefined);
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+async function typed(t: TestContext, argv: string[], host: () => DemandHost) {
+  vi.spyOn(console, 'log');
+  vi.spyOn(console, 'error');
   try {
     await main(argv, noEngine(), host, undefined, ENV);
   } catch {

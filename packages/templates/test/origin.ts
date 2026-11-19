@@ -45,7 +45,7 @@ if (rule) {
 `;
 
 /** Run git in `dir`, as nobody in particular, with no configuration of the machine's read. */
-export const gitIn = (dir: string, ...args: string[]): string =>
+export const gitIn = (dir: string, ...args: string[]) =>
   execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     encoding: 'utf8',
     env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
@@ -63,10 +63,10 @@ export type Gh = {
 };
 
 /** A folder holding the stub `gh`, answering `rules`. */
-export const ghStub = (rules: readonly Rule[] = []): Gh => ghIn(scratch('wf-origin-bin-'), rules);
+export const ghStub = (rules: readonly Rule[] = []) => ghIn(scratch('wf-origin-bin-'), rules) satisfies Gh;
 
 /** The stub `gh` written into `bin`, a folder a test already puts first on the PATH, answering `rules`. */
-export function ghIn(bin: string, rules: readonly Rule[] = []): Gh {
+export function ghIn(bin: string, rules: readonly Rule[] = []) {
   fs.writeFileSync(path.join(bin, 'gh'), STUB, { mode: 0o755 });
   const rulesFile = path.join(bin, 'rules.json');
   const log = path.join(bin, 'calls.jsonl');
@@ -86,11 +86,11 @@ export function ghIn(bin: string, rules: readonly Rule[] = []): Gh {
     env: () => ({ GH_LOG: log, GH_RULES: rulesFile }),
   };
   handle.answers(rules);
-  return handle;
+  return handle satisfies Gh;
 }
 
 /** A bare repository added to `repo` as its `origin`, its default branch `main`: its path. */
-export function bareOrigin(repo: string): string {
+export function bareOrigin(repo: string) {
   const bare = scratch('wf-origin-bare-');
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { stdio: ['ignore', 'pipe', 'pipe'] });
   gitIn(repo, 'remote', 'add', 'origin', bare);
@@ -98,9 +98,9 @@ export function bareOrigin(repo: string): string {
 }
 
 /** The tip of `branch` in the bare repository `bare`, or null where it has none. */
-export function tip(bare: string, branch: string): string | null {
+export function tip(bare: string, branch: string) {
   const ran = spawnSync('git', ['-C', bare, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { encoding: 'utf8' });
-  return ran.status === 0 ? ran.stdout.trim() : null;
+  return (ran.status === 0 ? ran.stdout.trim() : null) satisfies string | null;
 }
 
 /** The pull request the rules below answer with. */
@@ -110,11 +110,11 @@ export const PR = { number: 7, url: 'https://github.com/o/r/pull/7' };
 export const CI_URL = 'https://github.com/o/r/actions/runs/1234/job/5678';
 
 /** One open, non-draft pull request based on `main`, whose head is `at`, as `gh pr list --json` gives it. */
-export const listed = (at: string, more: Record<string, unknown> = {}): string =>
+export const listed = (at: string, more: Record<string, unknown> = {}) =>
   JSON.stringify([{ number: PR.number, url: PR.url, isDraft: false, baseRefName: 'main', headRefOid: at, ...more }]);
 
 /** A head's checks holding one `ci` entry in the state `rest` says, as `gh pr view --json statusCheckRollup` gives them. */
-export const rollup = (rest: Record<string, unknown>, ...others: Record<string, unknown>[]): string =>
+export const rollup = (rest: Record<string, unknown>, ...others: Record<string, unknown>[]) =>
   JSON.stringify({
     statusCheckRollup: [{ name: 'ci', detailsUrl: CI_URL, ...rest }, ...others],
   });
@@ -123,11 +123,12 @@ export const rollup = (rest: Record<string, unknown>, ...others: Record<string, 
 export const GREEN = rollup({ status: 'COMPLETED', conclusion: 'SUCCESS' });
 
 /** The rules under which every verb of the script passes in `repo`: one open pull request at its HEAD, and a green `ci`. */
-export const passing = (repo: string): Rule[] => [
-  { when: 'auth status' },
-  { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
-  { when: 'pr list', out: listed(gitIn(repo, 'rev-parse', 'HEAD').trim()) },
-  { when: 'pr view', out: GREEN },
-  { when: 'pr create', out: PR.url },
-  { when: 'api -X PATCH', out: JSON.stringify({ number: 7, url: PR.url }) },
-];
+export const passing = (repo: string) =>
+  [
+    { when: 'auth status' },
+    { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
+    { when: 'pr list', out: listed(gitIn(repo, 'rev-parse', 'HEAD').trim()) },
+    { when: 'pr view', out: GREEN },
+    { when: 'pr create', out: PR.url },
+    { when: 'api -X PATCH', out: JSON.stringify({ number: 7, url: PR.url }) },
+  ] satisfies Rule[];

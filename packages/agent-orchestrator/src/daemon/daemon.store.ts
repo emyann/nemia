@@ -96,7 +96,7 @@ export const ceilings = (
 const tickFile = (home: string): string => path.join(home, 'tick.json');
 
 /** `tick.json` as the tick writes it: the sessions a pool admits, and the runs in flight at once, a whole number (0 for no cap). */
-const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }));
+const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Natural }));
 
 /**
  * The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them.
@@ -239,7 +239,7 @@ const DaemonFileSchema = Schema.Struct({
   passedMono: Schema.optionalKey(MonotonicSchema),
   beatAt: Schema.optionalKey(When),
   beatMono: Schema.optionalKey(MonotonicSchema),
-  procStart: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  procStart: Schema.optionalKey(Schema.Natural),
   stoppedAt: Schema.optionalKey(When),
   release: Schema.optionalKey(
     Schema.Struct({

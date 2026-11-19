@@ -147,7 +147,7 @@ const workdir = (fake: Fake = {}) => {
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify(fake));
   return cwd;
 };
-const argvOf = (cwd: string): string[][] => {
+const argvOf = (cwd: string) => {
   try {
     return fs
       .readFileSync(path.join(cwd, 'argv.jsonl'), 'utf8')
@@ -159,7 +159,7 @@ const argvOf = (cwd: string): string[][] => {
   }
 };
 /** Each `login` argv the fake codex was run with in `cwd`. */
-const loginsOf = (cwd: string): string[][] => {
+const loginsOf = (cwd: string) => {
   try {
     return fs
       .readFileSync(path.join(cwd, 'login.jsonl'), 'utf8')
@@ -213,7 +213,7 @@ const list = (client: Client, o: { contextId?: string; includeArtifacts?: boolea
   });
 const stateIs = async (client: Client, id: string, state: TaskState) => (await get(client, id)).status!.state === state;
 /** A spawn, then its session run to its end, waited for in test `t`: the Task as it ended. */
-const ran = async (t: Waiter, client: Client, r: SpawnRequest): Promise<Task> => {
+const ran = async (t: Waiter, client: Client, r: SpawnRequest) => {
   const started = (await send(client, r)) as Task;
   assert.equal(started.status!.state, TaskState.TASK_STATE_WORKING, 'the spawn is answered once the session starts');
   await holds(t, () => stateIs(client, r.name, TaskState.TASK_STATE_COMPLETED), `${r.name} completed`);

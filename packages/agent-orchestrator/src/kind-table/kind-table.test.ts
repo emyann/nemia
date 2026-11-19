@@ -27,69 +27,73 @@ const page = <K extends string, I>(kind: K, items: readonly I[], cont?: string) 
   items,
 });
 
-const agentOf = (name: string, more: { spec?: Partial<Agent['spec']>; status?: Partial<Agent['status']> } = {}): Agent => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Agent',
-  metadata: meta(name),
-  spec: { description: `Does ${name}.`, instructions: 'Long instructions\nthat a table leaves out.', ...more.spec },
-  status: {
-    origin: 'repo',
-    dir: '/d',
-    file: '/d/a.md',
-    source: '---\nname: a\n---\nthe whole file',
-    usedBy: [],
-    fills: [],
-    factories: [],
-    given: [],
-    copied: null,
-    untried: null,
-    card: null,
-    cardError: null,
-    error: null,
-    ...more.status,
-  },
-});
+const agentOf = (name: string, more: { spec?: Partial<Agent['spec']>; status?: Partial<Agent['status']> } = {}) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Agent',
+    metadata: meta(name),
+    spec: { description: `Does ${name}.`, instructions: 'Long instructions\nthat a table leaves out.', ...more.spec },
+    status: {
+      origin: 'repo',
+      dir: '/d',
+      file: '/d/a.md',
+      source: '---\nname: a\n---\nthe whole file',
+      usedBy: [],
+      fills: [],
+      factories: [],
+      given: [],
+      copied: null,
+      untried: null,
+      card: null,
+      cardError: null,
+      error: null,
+      ...more.status,
+    },
+  }) satisfies Agent;
 
-const skillOf = (name: string, more: { spec?: Partial<Skill['spec']>; status?: Partial<Skill['status']> } = {}): Skill => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Skill',
-  metadata: meta(name),
-  spec: { body: 'The whole body\nof the skill.', ...more.spec },
-  status: {
-    origin: 'user',
-    dir: '/s',
-    entry: null,
-    error: null,
-    preload: false,
-    cost: null,
-    usedBy: [],
-    found: null,
-    copyHint: null,
-    ...more.status,
-  },
-});
+const skillOf = (name: string, more: { spec?: Partial<Skill['spec']>; status?: Partial<Skill['status']> } = {}) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Skill',
+    metadata: meta(name),
+    spec: { body: 'The whole body\nof the skill.', ...more.spec },
+    status: {
+      origin: 'user',
+      dir: '/s',
+      entry: null,
+      error: null,
+      preload: false,
+      cost: null,
+      usedBy: [],
+      found: null,
+      copyHint: null,
+      ...more.status,
+    },
+  }) satisfies Skill;
 
-const factoryOf = (name: string, more: { spec?: Partial<Factory['spec']>; status?: Partial<Factory['status']> } = {}): Factory => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Factory',
-  metadata: meta(name),
-  spec: { hires: {}, volumes: [], ...more.spec },
-  status: { conditions: [], untrusted: [], ...more.status },
-});
+const factoryOf = (name: string, more: { spec?: Partial<Factory['spec']>; status?: Partial<Factory['status']> } = {}) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Factory',
+    metadata: meta(name),
+    spec: { hires: {}, volumes: [], ...more.spec },
+    status: { conditions: [], untrusted: [], ...more.status },
+  }) satisfies Factory;
 
-const serverOf = (name: string, spec: Partial<McpServer['spec']> = {}, status?: McpServer['status']): McpServer => ({
-  apiVersion: 'nemia/v1',
-  kind: 'McpServer',
-  metadata: meta(name),
-  spec: { type: 'http', url: `https://${name}.example/mcp`, ...spec },
-  ...(status === undefined ? {} : { status }),
-});
+const serverOf = (name: string, spec: Partial<McpServer['spec']> = {}, status?: McpServer['status']) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'McpServer',
+    metadata: meta(name),
+    spec: { type: 'http', url: `https://${name}.example/mcp`, ...spec },
+    ...(status === undefined ? {} : { status }),
+  }) satisfies McpServer;
 
 /** The cells of `table`'s row `at`, by column name. */
-const cellsOf = (table: Table, at: number): Record<string, unknown> => {
+const cellsOf = (table: Table, at: number) => {
   const row = table.rows[at];
   assert.ok(row, `the table has a row ${at}`);
-  return Object.fromEntries(table.columnDefinitions.map((c, i) => [c.name, row.cells[i]]));
+  return Object.fromEntries(table.columnDefinitions.map((c, i) => [c.name, row.cells[i]])) satisfies Record<string, unknown>;
 };
 
 /** Every cell of `table` is a string of one line. */

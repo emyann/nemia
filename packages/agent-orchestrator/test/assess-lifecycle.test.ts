@@ -38,18 +38,16 @@ import { aRead, listing, phases, run, signedOffOnce, step, STEPS } from './asses
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 /** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
-const shown =
-  (m: Record<string, ListedPhase>) =>
-  (id: string): ListedPhase =>
-    m[id] ?? 'unknown';
+const shown = (m: Record<string, ListedPhase>) => (id: string) => (m[id] ?? ('unknown' as const)) satisfies ListedPhase;
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
-const said = (outcome: Closeout['outcome']): Closeout => ({
-  outcome,
-  summary: 'rewrote the parser\nand the three tests that pinned it',
-  artifacts: [],
-  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
-});
+const said = (outcome: Closeout['outcome']) =>
+  ({
+    outcome,
+    summary: 'rewrote the parser\nand the three tests that pinned it',
+    artifacts: [],
+    needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
+  }) satisfies Closeout;
 const nothingShipped = () => false;
 /** `implement` declares a check; `review` waits on it. */
 const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
@@ -69,21 +67,18 @@ const withCheck = (checkId: string | null, extra: Partial<RepositoryRun> = {}) =
  * What the engine measured of each task's sessions, by id — dollars on its ended attempts — and the tasks its harness ended at their
  * budget.
  */
-const spends =
-  (usd: Record<string, number>, budgetEnded: string[] = []): SpendOf =>
-  (id) =>
+const spends = (usd: Record<string, number>, budgetEnded: string[] = []) =>
+  ((id) =>
     id in usd || budgetEnded.includes(id)
       ? { usd: usd[id] ?? 0, measured: id in usd ? 1 : 0, unmeasured: id in usd ? 0 : 1, budgetEnded: budgetEnded.includes(id) }
-      : undefined;
-const deniedSpend =
-  (denied: Record<string, string[]>): SpendOf =>
-  (id) =>
-    id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id] } : undefined;
+      : undefined) satisfies SpendOf;
+const deniedSpend = (denied: Record<string, string[]>) =>
+  ((id) => (id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id] } : undefined)) satisfies SpendOf;
 /** implement signed off blocked, and review never filed: a failed run with nothing in flight that waits on a person. */
 const blockedRun = (rest: Partial<RepositoryRun> = {}) => run({ implement: 't1', review: null }, rest);
 const BLOCKED_SAID = signedOff({ implement: said('blocked') });
 /** `step`'s brief in `r`, told the test place's words for reading the work (`say`). */
-const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]): string =>
+const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]) =>
   composeBrief(
     s,
     r,
@@ -436,11 +431,12 @@ describe('composeBrief: what a step is told of the request, the work before it a
     }
   });
   test("a folder run is briefed on folders, never on git: a chain continues its parent's folder, a fork and a fan-in are told where the steps before them worked, and a new session is told what it left is still here", () => {
-    const f = (name: string, after: string[] = [], rest: Partial<StepSpec> = {}): StepSpec => ({
-      ...step(name, after),
-      place: 'folder',
-      ...rest,
-    });
+    const f = (name: string, after: string[] = [], rest: Partial<StepSpec> = {}) =>
+      ({
+        ...step(name, after),
+        place: 'folder',
+        ...rest,
+      }) satisfies StepSpec;
     const write = f('write');
     const review = f('review', ['write']);
     const a = f('a', ['write']);
@@ -448,17 +444,18 @@ describe('composeBrief: what a step is told of the request, the work before it a
     const join = f('join', ['a', 'b']);
     const loopTarget = f('draft');
     const looper = f('critic', ['draft'], { loop: 'draft' });
-    const folder = (steps: Record<string, string | null>): Run => ({
-      id: 'n-1',
-      place: { kind: 'folder' },
-      workspace: '/store/runs/n-1/work',
-      brief: 'a note on tides',
-      workflowDir: '/wf',
-      createdAt: '2026-01-01T00:00:00Z',
-      steps: Object.fromEntries(
-        Object.entries(steps).map(([k, v]) => [k, { taskId: v, ...(v ? { workspace: `/store/runs/n-1/work/${k}` } : {}) }]),
-      ),
-    });
+    const folder = (steps: Record<string, string | null>) =>
+      ({
+        id: 'n-1',
+        place: { kind: 'folder' },
+        workspace: '/store/runs/n-1/work',
+        brief: 'a note on tides',
+        workflowDir: '/wf',
+        createdAt: '2026-01-01T00:00:00Z',
+        steps: Object.fromEntries(
+          Object.entries(steps).map(([k, v]) => [k, { taskId: v, ...(v ? { workspace: `/store/runs/n-1/work/${k}` } : {}) }]),
+        ),
+      }) satisfies Run;
     const briefs = [
       composeBrief(write, folder({ write: null, review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/write'),
       composeBrief(review, folder({ write: 't1', review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/review'),
@@ -520,10 +517,11 @@ describe('composeBrief: what a step is told of the request, the work before it a
       );
     }
 
-    const continued = (r: Run, from: string, to: string): Run => ({
-      ...r,
-      steps: { ...r.steps, [to]: { ...r.steps[to], workspace: r.steps[from].workspace } },
-    });
+    const continued = (r: Run, from: string, to: string) =>
+      ({
+        ...r,
+        steps: { ...r.steps, [to]: { ...r.steps[to], workspace: r.steps[from].workspace } },
+      }) satisfies Run;
     const again = [
       composeBrief(
         write,

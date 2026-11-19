@@ -44,7 +44,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '0', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>) => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const readInbox = () => atRoot(verbs.readInbox());
 const dropFromInbox = (name: string) => atRoot(verbs.dropFromInbox(name));
@@ -57,7 +57,7 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
  * inbox named by its file or its name sent as the card it is (`card`), as the client sends a card it names, answering what the handler
  * answered with the facts the client words (`factsOf`); `decide`, the old path's screen.
  */
-const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<StartedAnswer | void> => {
+const main = async (argv: string[], e?: Parameters<typeof cli>[1]) => {
   if (argv[0] !== 'start') return cli(argv, e, undefined, stand().place, ENV);
   const [, given = '', ...rest] = argv;
   const named = !given.includes('/') && fs.existsSync(path.join(INBOX, given.endsWith('.md') ? given : `${given}.md`));
@@ -75,7 +75,7 @@ const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<Star
 
 /** The flags of a `start` read by its words, beside a card's name: what the handler takes of them (`--brief` its `instead`, a file's
  * text where it names one here, as the client reads it; `--repo`). */
-const startFlags = (rest: readonly string[]): StartInput => {
+const startFlags = (rest: readonly string[]) => {
   const args = parseArgv(START.spec, ['card', ...rest]) ?? {};
   const { brief: _card, instead, ...flags } = Schema.decodeUnknownSync(StartInput)(args);
   if (instead === undefined) return flags;
@@ -98,7 +98,7 @@ const verb = (...argv: string[]) => typed(argv, noEngine(), undefined, stand().p
 const added = (input: InboxAddInput) => handled(INBOX_ADD, input, { e: noEngine(), place: stand().place, env: ENV });
 
 /** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry (`typed`), `-l`, `--show-labels` and `-L` as given. */
-const listedLines = async (argv: readonly string[] = [], show: { showLabels?: boolean; columns?: string[] } = {}): Promise<string[]> => {
+const listedLines = async (argv: readonly string[] = [], show: { showLabels?: boolean; columns?: string[] } = {}) => {
   const { cards, defaultStarts } = (await verb('inbox', ...argv)) as { cards: InboxListing[]; defaultStarts: boolean };
   return inboxLines(cards, defaultStarts, show);
 };
@@ -121,7 +121,7 @@ const refusedWith =
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 /** What `nemia start <argv>` typed in `cwd` answered, with the facts the client words. */
-const startedIn = async (cwd: string, ...argv: string[]): Promise<StartedAnswer> => {
+const startedIn = async (cwd: string, ...argv: string[]) => {
   const was = process.cwd();
   process.chdir(cwd);
   try {
@@ -136,7 +136,7 @@ const inInbox = () => (fs.existsSync(INBOX) ? fs.readdirSync(INBOX).sort() : [])
 const emptyInbox = () => fs.rmSync(INBOX, { recursive: true, force: true });
 
 /** A repository with one commit, so a start has a base to record — and a workflow of one step under its workflows/ for each name. */
-const aRepoWith = (...workflows: string[]): string => {
+const aRepoWith = (...workflows: string[]) => {
   const repo = fs.realpathSync(fs.mkdtempSync(path.join(ROOT, 'repo-')));
   stand().world.repository(repo, {});
   for (const name of workflows) {
@@ -743,6 +743,7 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   fs.mkdirSync(INBOX, { recursive: true });
   fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
   const write = fs.writeFileSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the card removed as the run is made: a race no seam gives
   vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
     write.apply(this, args);
     const created = typeof args[0] === 'string' && path.dirname(args[0]) === path.join(ROOT, 'runs') && args[0].endsWith('.json');

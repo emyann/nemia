@@ -27,7 +27,7 @@ import { builtEngine } from './engine.ts';
 import { story } from 'test-kit/checkpoints';
 
 /** A store in memory, which both engines are handed. */
-const memoryJournal = (): AsyncJournal => {
+const memoryJournal = () => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -44,46 +44,47 @@ const memoryJournal = (): AsyncJournal => {
     async feed(after = 0) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /**
  * A harness whose sessions are a map, that hears words, keeps a transcript of them and each stream apart; `observe` rejects while
  * `unreadable` is set.
  */
-const fakeHarness = (sessions: Map<string, Sighting>, heard: string[], unreadable = { now: false }): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
-  },
-  async observe() {
-    if (unreadable.now) throw new Error('the registry is not there');
-    return new Map(sessions);
-  },
-  async stop(id) {
-    for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
-  },
-  async logs(id) {
-    return `logs of ${id}`;
-  },
-  async output(name, stream, lastBytes) {
-    return `${stream} of ${name}${lastBytes === undefined ? '' : `, its last ${lastBytes} bytes`}`;
-  },
-  async transcript() {
-    return {
-      events: heard.map((text, i) => ({
-        id: String(i),
-        at: '2026-09-28T00:00:00.000Z',
-        role: 'user' as const,
-        kind: 'text' as const,
-        text,
-      })),
-      cursor: String(heard.length),
-    };
-  },
-  async say(_session, text) {
-    heard.push(text);
-  },
-});
+const fakeHarness = (sessions: Map<string, Sighting>, heard: string[], unreadable = { now: false }) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
+    },
+    async observe() {
+      if (unreadable.now) throw new Error('the registry is not there');
+      return new Map(sessions);
+    },
+    async stop(id) {
+      for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
+    },
+    async logs(id) {
+      return `logs of ${id}`;
+    },
+    async output(name, stream, lastBytes) {
+      return `${stream} of ${name}${lastBytes === undefined ? '' : `, its last ${lastBytes} bytes`}`;
+    },
+    async transcript() {
+      return {
+        events: heard.map((text, i) => ({
+          id: String(i),
+          at: '2026-09-28T00:00:00.000Z',
+          role: 'user' as const,
+          kind: 'text' as const,
+          text,
+        })),
+        cursor: String(heard.length),
+      };
+    },
+    async say(_session, text) {
+      heard.push(text);
+    },
+  }) satisfies AsyncRunner;
 
 /** One store and one harness, and two engines over them: one built once, and one provided its layer for each call. */
 const engines = () => {
@@ -97,17 +98,17 @@ const engines = () => {
     defaultHarness: 'fake',
   };
   const layer = Engine.layer(options);
-  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
-    Effect.runPromise(Engine.use(f).pipe(Effect.provide(layer)));
+  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>) =>
+    Effect.runPromise(Engine.use(f).pipe(Effect.provide(layer))) satisfies Promise<A>;
   return { effect, built: builtEngine(Engine.layer(options)), sessions, heard, unreadable, options };
 };
 
 /** What a call rejected with; a call that resolved fails the test. */
-const failure = (p: Promise<unknown>): Promise<Error & { _tag?: string; exitCode?: number; cause?: unknown }> =>
+const failure = (p: Promise<unknown>) =>
   p.then(
     (v) => assert.fail(`resolved with ${JSON.stringify(v)}`),
     (e) => e,
-  );
+  ) satisfies Promise<Error & { _tag?: string; exitCode?: number; cause?: unknown }>;
 
 /** The verbs the `Engine` service has: a verb added or dropped is a change to the runtime's face, and to this list. */
 const VERBS = [
@@ -178,7 +179,7 @@ describe('one store, two engines — one built once, one provided its layer for 
   });
   s.test('watch and up run through either engine, and each stops', async () => {
     type Handle = { stop: () => void };
-    const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
+    const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>) => {
       const got: A[] = [];
       let heardOne!: () => void;
       let failed!: (e: unknown) => void;
@@ -268,8 +269,8 @@ test('a brief filed in parts is kept once, read back whole, and a body its journ
     harnesses: { fake: asyncOps(fakeHarness(sessions, [])) },
     defaultHarness: 'fake',
   };
-  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
-    Effect.runPromise(Engine.use(f).pipe(Effect.provide(Engine.layer(options))));
+  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>) =>
+    Effect.runPromise(Engine.use(f).pipe(Effect.provide(Engine.layer(options)))) satisfies Promise<A>;
   const shared = `## Context\n${'the same context, said again. '.repeat(60)}\n`;
   const briefParts = [`## Task\nthe first, ${'its own words. '.repeat(80)}\n`, shared];
   await effect((e) => e.file({ brief: briefParts.join(''), briefParts, cwd: '/r', id: 'one', queued: true }));
@@ -396,12 +397,15 @@ describe('each refusal is a tagged error, and refusalWords words it behind the v
       () => effect((e) => e.output('one', 'both' as never)),
       /^`both` is not a stream: ask for `stdout` or `stderr`\.$/,
     ],
-    ...[0, -1, 1.5, Number.NaN, '5'].map((lastBytes): [string, string, () => Promise<unknown>, RegExp] => [
-      'output',
-      'OutputRefused',
-      () => effect((e) => e.output('one', 'stdout', lastBytes as never)),
-      new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
-    ]),
+    ...[0, -1, 1.5, Number.NaN, '5'].map(
+      (lastBytes) =>
+        [
+          'output',
+          'OutputRefused',
+          () => effect((e) => e.output('one', 'stdout', lastBytes as never)),
+          new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
+        ] satisfies [string, string, () => Promise<unknown>, RegExp],
+    ),
     [
       'file',
       'FileRefused',
@@ -452,17 +456,18 @@ describe('each refusal is a tagged error, and refusalWords words it behind the v
       /^takes the ids of settled tasks, a list of one or more strings/,
     ],
     ...[[[]], [['one'], { yes: 'y' }], [['one'], { yes: true, all: true }]].map(
-      (args): [string, string, () => Promise<unknown>, RegExp] => [
-        'forget',
-        'ForgetRefused',
-        () => effect((e) => untyped(e.forget)(...args)),
-        new RegExp(
-          `it was handed ${args
-            .map((a) => JSON.stringify(a))
-            .join(', ')
-            .replace(/[[\]{}]/g, '\\$&')}: nothing was forgotten\\.$`,
-        ),
-      ],
+      (args) =>
+        [
+          'forget',
+          'ForgetRefused',
+          () => effect((e) => untyped(e.forget)(...args)),
+          new RegExp(
+            `it was handed ${args
+              .map((a) => JSON.stringify(a))
+              .join(', ')
+              .replace(/[[\]{}]/g, '\\$&')}: nothing was forgotten\\.$`,
+          ),
+        ] satisfies [string, string, () => Promise<unknown>, RegExp],
     ),
     [
       'forget',
@@ -477,25 +482,27 @@ describe('each refusal is a tagged error, and refusalWords words it behind the v
       /^takes nothing, and measures every task the store lists; it was handed \{"yes":true\}: nothing was measured\.$/,
     ],
     ...[[{ yes: 'y' }], [{ other: 1 }], [{ yes: true }, { yes: true }], ['--yes']].map(
-      (args): [string, string, () => Promise<unknown>, RegExp] => [
-        'compact',
-        'CompactRefused',
-        () => effect((e) => untyped(e.compact)(...args)),
-        new RegExp(
-          `^takes nothing to count .* or \`\\{ yes: true \\}\` to rewrite them; it was handed ${args
-            .map((a) => JSON.stringify(a))
-            .join(', ')
-            .replace(/[[\]{}]/g, '\\$&')}: nothing was written\\.$`,
-        ),
-      ],
+      (args) =>
+        [
+          'compact',
+          'CompactRefused',
+          () => effect((e) => untyped(e.compact)(...args)),
+          new RegExp(
+            `^takes nothing to count .* or \`\\{ yes: true \\}\` to rewrite them; it was handed ${args
+              .map((a) => JSON.stringify(a))
+              .join(', ')
+              .replace(/[[\]{}]/g, '\\$&')}: nothing was written\\.$`,
+          ),
+        ] satisfies [string, string, () => Promise<unknown>, RegExp],
     ),
     ...[[-1], [{ graceMs: -1 }], [{ graceMs: 0.5 }], [{ graceMs: 1, holder: 4242 }], [], [{ graceMs: 1 }, null]].map(
-      (args): [string, string, () => Promise<unknown>, RegExp] => [
-        'drainSessions',
-        'DrainRefused',
-        () => effect((e) => untyped(e.drainSessions)(...args)),
-        /./,
-      ],
+      (args) =>
+        ['drainSessions', 'DrainRefused', () => effect((e) => untyped(e.drainSessions)(...args)), /./] satisfies [
+          string,
+          string,
+          () => Promise<unknown>,
+          RegExp,
+        ],
     ),
   ];
   for (const [verb, tag, refused, words] of cases) {
@@ -584,7 +591,7 @@ describe("refusalWords and the failures beside the refusals: say's failure that 
 });
 
 /** Each tagged error of the runtime's source named `*Refused` or `*Unsent`: its name, and the module that exports it. */
-const taggedFailures = (): { name: string; file: string }[] => {
+const taggedFailures = () => {
   const src = path.join(import.meta.dirname, '..', 'src');
   return fs
     .readdirSync(src, { recursive: true, encoding: 'utf8' })
@@ -593,7 +600,7 @@ const taggedFailures = (): { name: string; file: string }[] => {
       [...fs.readFileSync(path.join(src, f), 'utf8').matchAll(/^export class (\w+(?:Refused|Unsent)) extends Schema\.TaggedError/gm)].map(
         (m) => ({ name: m[1] ?? '', file: path.join(src, f) }),
       ),
-    );
+    ) satisfies { name: string; file: string }[];
 };
 
 describe('every refusal class of the source is worded as a refusal, exit code 2, and every unsent as a failure that may pass, with no exit code', () => {

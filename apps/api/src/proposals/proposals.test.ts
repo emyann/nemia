@@ -17,7 +17,7 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import type { Delegation, Proposal, ProposedObject } from 'objects';
+import type { Delegation, Proposal } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 
 const stand = eachTest(testPlace);
@@ -124,7 +124,7 @@ const ask = (url: string, method: string, body?: unknown, bearer?: string) =>
   });
 
 /** The `dev` workflow as the namespace serves it, its plan step's body replaced by `body`, at the version it was read. */
-async function devChanged(body: string): Promise<ProposedObject> {
+async function devChanged(body: string) {
   const res = await app().request(`${ns}/workflows/dev`);
   assert.equal(res.status, 200, 'the workflow reads');
   const now = (await res.json()) as {
@@ -145,7 +145,7 @@ type ServedStep = { name: string; keys: Record<string, unknown>; body: string };
  * The `fenced` workflow as the namespace serves it (`nemia get workflow fenced -o json`), each step changed by `change`, at the version
  * it was read.
  */
-async function fencedChanged(change: (step: ServedStep) => ServedStep): Promise<ProposedObject> {
+async function fencedChanged(change: (step: ServedStep) => ServedStep) {
   const res = await app().request(`${ns}/workflows/fenced`);
   assert.equal(res.status, 200, 'the workflow reads');
   const now = (await res.json()) as { metadata: { resourceVersion?: string }; spec: { steps: ServedStep[] } };
@@ -271,7 +271,7 @@ describe("a Workflow proposed as the namespace serves it reports the access of i
 });
 
 /** Every file of the workflow `name`'s folder in the tree, by name, with its bytes. */
-const folderBytes = (name: string): Record<string, string> => {
+const folderBytes = (name: string) => {
   const dir = path.join(TREE, 'workflows', name);
   return Object.fromEntries(
     fs

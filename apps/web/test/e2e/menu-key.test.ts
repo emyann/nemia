@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 /** The entries of the run's menu once it is open on the page. */
-async function entriesOf(page: Page): Promise<string[]> {
+async function entriesOf(page: Page) {
   const menu = page.getByRole('menu', { name: 'Actions on the run' });
   await menu.waitFor();
   return menu.getByRole('menuitem').allTextContents();

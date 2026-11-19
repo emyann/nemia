@@ -31,7 +31,7 @@ const PLACEHOLDER = `sha256:${'0'.repeat(64)}`;
 const ENV: NodeJS.ProcessEnv = { ...runnerless(process.env), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
 
 /** `git <args>` in `dir` as nobody in particular: its exit and its streams. */
-const git = (dir: string, ...args: string[]): { code: number | null; out: string; err: string } => {
+const git = (dir: string, ...args: string[]) => {
   const ran = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     cwd: dir,
     env: ENV,
@@ -41,7 +41,7 @@ const git = (dir: string, ...args: string[]): { code: number | null; out: string
 };
 
 /** `git <args>` in `dir`, which must succeed: its standard output. */
-const ok = (dir: string, ...args: string[]): string => {
+const ok = (dir: string, ...args: string[]) => {
   const ran = git(dir, ...args);
   assert.equal(ran.code, 0, `git ${args.join(' ')}: ${ran.err}`);
   return ran.out;
@@ -51,14 +51,14 @@ const ok = (dir: string, ...args: string[]): string => {
 type Version = [number, number, number];
 
 /** The version `text` says. */
-const parts = (text: string): Version => text.split('.').map(Number) as Version;
+const parts = (text: string) => text.split('.').map(Number) as Version;
 
 /**
  * A scratch repository on `main`, its one commit holding a copy of this workspace: its root, and the version sdlc is at there. The
  * repository's `node_modules` is this one's, so the copy of `released.ts` resolves the orchestrator's CLI from where it sits, as the one
  * in a run's worktree does.
  */
-function world(): { root: string; ws: string; at: Version } {
+function world() {
   const root = scratch('nemia-released-cut-');
   const ws = path.join(root, WS);
   fs.mkdirSync(ws, { recursive: true });
@@ -80,10 +80,10 @@ function world(): { root: string; ws: string; at: Version } {
 }
 
 /** The record of the workspace `ws` as its file holds it. */
-const record = (ws: string): Records => JSON.parse(fs.readFileSync(path.join(ws, RELEASED), 'utf8')) as Records;
+const record = (ws: string) => JSON.parse(fs.readFileSync(path.join(ws, RELEASED), 'utf8')) as Records;
 
 /** sdlc's `spec.version` in the workspace `ws`. */
-const versionOf = (ws: string): string => /^ {2}version: (\S+)$/m.exec(fs.readFileSync(path.join(ws, 'sdlc', 'nemia.yaml'), 'utf8'))![1];
+const versionOf = (ws: string) => /^ {2}version: (\S+)$/m.exec(fs.readFileSync(path.join(ws, 'sdlc', 'nemia.yaml'), 'utf8'))![1];
 
 /** `text` with a line appended: a change of a template's content. */
 const appended = (line: string) => (text: string) => `${text}${line}\n`;
@@ -92,7 +92,7 @@ const appended = (line: string) => (text: string) => `${text}${line}\n`;
  * On the branch checked out, each file of `edit` (from the workspace) changed by its function, sdlc's version set to `to` where given,
  * and recorded with the real digest where `digest` says so, else with the placeholder; then committed.
  */
-function change(at: { root: string; ws: string }, edit: { [file: string]: (text: string) => string }, to?: Version, digest = false): void {
+function change(at: { root: string; ws: string }, edit: { [file: string]: (text: string) => string }, to?: Version, digest = false) {
   for (const [file, by] of Object.entries(edit))
     fs.writeFileSync(path.join(at.ws, file), by(fs.readFileSync(path.join(at.ws, file), 'utf8')));
   if (to !== undefined) {
@@ -110,16 +110,16 @@ function change(at: { root: string; ws: string }, edit: { [file: string]: (text:
 }
 
 /** A change of a file outside every template. */
-const elsewhere = (root: string, line: string): void => {
+const elsewhere = (root: string, line: string) => {
   fs.appendFileSync(path.join(root, 'notes.txt'), `${line}\n`);
   ok(root, 'commit', '-q', '-am', 'elsewhere');
 };
 
 /** `main` merged into the branch checked out with no commit, as the landing leaves it: git's exit. */
-const mergeBase = (root: string): number | null => git(root, 'merge', '--no-ff', '--no-commit', 'main').code;
+const mergeBase = (root: string) => git(root, 'merge', '--no-ff', '--no-commit', 'main').code;
 
 /** `node <ws>/released.ts cut` from the root: its exit and its streams. */
-function cut(root: string): { code: number | null; out: string; err: string } {
+function cut(root: string) {
   const ran = spawnSync(process.execPath, [path.join(root, WS, 'released.ts'), 'cut'], {
     cwd: root,
     env: ENV,
@@ -130,10 +130,10 @@ function cut(root: string): { code: number | null; out: string; err: string } {
 }
 
 /** The paths the merge leaves unmerged. */
-const unmerged = (root: string): string[] => ok(root, 'diff', '--name-only', '--diff-filter=U').split('\n').filter(Boolean);
+const unmerged = (root: string) => ok(root, 'diff', '--name-only', '--diff-filter=U').split('\n').filter(Boolean);
 
 /** Each template of the workspace `ws` whose version or digest is not the one its record holds: none where the record is sound. */
-const apart = (ws: string): string[] =>
+const apart = (ws: string) =>
   templatesIn(ws).filter((t) => record(ws)[t]?.version !== versionOf(ws) || record(ws)[t]?.digest !== digestOf(ws, t, modesOf(ws)));
 
 test('two siblings that bumped the same minor both land: the second takes the minor above the first', () => {

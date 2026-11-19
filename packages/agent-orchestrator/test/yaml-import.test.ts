@@ -19,7 +19,7 @@ const IMPORTERS = ['src/frontmatter/frontmatter.ts', 'src/template/template.stor
 const IMPORTER = IMPORTERS[1];
 
 /** Every `.ts` file under `dir`'s `src` and `bin` but a test, by path from `dir`. */
-function sourcesOf(dir: string): string[] {
+function sourcesOf(dir: string) {
   return ['src', 'bin'].flatMap((top) =>
     fs.existsSync(path.join(dir, top))
       ? fs
@@ -31,7 +31,7 @@ function sourcesOf(dir: string): string[] {
 }
 
 /** The files of `dir`'s `src` and `bin` that import `yaml`, or a path inside it, by path from `dir`, sorted. */
-function yamlImporters(dir: string): string[] {
+function yamlImporters(dir: string) {
   return sourcesOf(dir)
     .filter((file) =>
       ts
@@ -48,7 +48,7 @@ test('yaml is imported by src/template/template.store.ts and src/frontmatter/fro
 
 test('REFUSED: a yaml import outside the store, broken over lines, re-exported, by a subpath or dynamic, in src or bin', () => {
   const dir = scratch('wf-yaml-import-');
-  const plant = (file: string, text: string): void => {
+  const plant = (file: string, text: string) => {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), text);
   };

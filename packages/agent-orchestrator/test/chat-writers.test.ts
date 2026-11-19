@@ -23,7 +23,7 @@ const WRITERS: Readonly<Record<string, string>> = {
 const STORE = 'packages/agent-orchestrator/src/chat/chat.store.ts';
 
 /** The source the rule reads: every `.ts` file of the package's `src` and the api's, tests beside them left out. */
-const sources = (): Record<string, string> => {
+const sources = () => {
   const out: Record<string, string> = {};
   for (const root of ['packages/agent-orchestrator/src', 'apps/api/src'])
     for (const f of fs.readdirSync(path.join(REPO, root), { recursive: true, encoding: 'utf8' }))
@@ -33,7 +33,7 @@ const sources = (): Record<string, string> => {
 };
 
 /** Each call of a writer in a file that is not its one writer. */
-function strayWriters(files: Readonly<Record<string, string>>): string[] {
+function strayWriters(files: Readonly<Record<string, string>>) {
   const out: string[] = [];
   for (const [file, text] of Object.entries(files)) {
     if (file === STORE) continue;

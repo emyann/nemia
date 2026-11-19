@@ -44,7 +44,7 @@ function storeOf() {
   return { root, pass, size };
 }
 
-const planAt = (word: string, note?: string): FeedWords => ({
+const planAt = (word: string, note?: string) => ({
   run: { word: 'running' },
   steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
 });
@@ -66,7 +66,7 @@ function child(t: TestContext, proc: ChildProcess) {
   let done = false;
   void ended.then(() => (done = true));
   t.onTestFinished(() => void proc.kill('SIGKILL'));
-  const said = <T>(holds: (out: string, err: string) => T | undefined | false): Promise<T> =>
+  const said = <T>(holds: (out: string, err: string) => T | undefined | false) =>
     new Promise((resolve, reject) => {
       const check = () => {
         const got = holds(out, err);
@@ -115,14 +115,14 @@ const whole = async (t: TestContext, root: string) =>
   json((await ran(t, root, ['watch', '--once', '--json'])).out).filter((l) => 'at' in l);
 
 /** The JSON lines of `out`. */
-const json = (out: string): Array<Record<string, unknown>> =>
+const json = (out: string) =>
   out
     .split('\n')
     .filter((l) => l.trim())
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 
 /** `words` of the run `id` stamped with the label a person put on it, `team=core`, as the tick stamps a run's lines with its labels. */
-const teamCore = (id: string, words: FeedWords): FeedWords => ({
+const teamCore = (id: string, words: FeedWords) => ({
   ...words,
   labels: { run: id, team: 'core' },
   steps: words.steps.map((s) => ({ ...s, labels: { run: id, step: s.name, team: 'core' } })),

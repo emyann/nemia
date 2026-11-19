@@ -43,7 +43,7 @@ const landedOnly = (...ids: string[]) => {
 };
 
 /** Another run's record, as a parent's. */
-const record = (id: string, rest: Partial<RepositoryRun> = {}): Run => run({ implement: 'x' }, { id, ...rest });
+const record = (id: string, rest: Partial<RepositoryRun> = {}) => run({ implement: 'x' }, { id, ...rest });
 
 describe('readiness under `after`: a run is ready once every parent landed, and a run that started, or was called off, reads none', () => {
   test('a record from before there was an `after` reads as ready, and so does one started without one — no parent read', () => {
@@ -192,7 +192,7 @@ describe('`listing` puts `waiting on <run>` on each root of a waiting run, where
 
 describe("a pass records the tips of a finished run's result branches — `tipBranches` and `tipsSeen`", () => {
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
-  const branched = (rest: Partial<RepositoryRun> = {}): Run => {
+  const branched = (rest: Partial<RepositoryRun> = {}) => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
     return { ...r, steps: Object.fromEntries(Object.entries(r.steps).map(([name, s]) => [name, { ...s, branch: `wf/r-1/${name}` }])) };
   };
@@ -246,7 +246,7 @@ describe('REFUSED by name at `nemia start --after` (`afterRefusal`), read from t
     'g-6': { record: record('g-6'), gone: ['wf/g-6/implement'] },
     'n-1': { record: folderRun },
   };
-  const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
+  const parentOf = (id: string) => parents[id] ?? {};
   const onRepo = { repo: '/repo', branch: 'main' };
   const folderChild = { place: { kind: 'folder' as const } };
   const rows: Array<[string, readonly string[], Parameters<typeof afterRefusal>[1], string[]]> = [

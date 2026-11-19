@@ -32,7 +32,7 @@ const write = (file: string, text: string) => {
  * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a request costs whether
  * or not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
  */
-async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+async function journalsAsked<T>(f: () => Promise<T>) {
   const { view, list } = e;
   let asked = 0;
   Object.assign(e, {
@@ -286,7 +286,7 @@ describe('GET /api/stats: what it counts over a store of several factories, null
 });
 
 /** With the memo's check off: what the memo alone answers, and reads. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   process.env.WF_VERIFY_REST = '0';
   try {
     return await f();

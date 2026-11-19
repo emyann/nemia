@@ -20,14 +20,13 @@ import {
   shardPages,
   shardsMissing,
   type PageTiming,
-  type ShardPages,
 } from './e2e/timing.ts';
 
 /** The names of `pages`, sorted, for a comparison that does not care which shard dealt which. */
-const orderOfNames = (pages: readonly PageTiming[]): string[] => pages.map((p) => p.name).sort();
+const orderOfNames = (pages: readonly PageTiming[]) => pages.map((p) => p.name).sort();
 
 /** A page's timing whose phases are its whole time, split evenly. */
-const timed = (name: string, ms: number, worker = 0): PageTiming => ({
+const timed = (name: string, ms: number, worker = 0) => ({
   name,
   theme: 'dark',
   worker,
@@ -47,7 +46,7 @@ const SEVEN = [
 ];
 
 /** The pages a whole run draws today, 106 of them, unequal, summing to 676.0 s: every one drawn by `worker`. */
-const today = (worker: (i: number) => number, times = 1): PageTiming[] =>
+const today = (worker: (i: number) => number, times = 1) =>
   Array.from({ length: 106 }, (_, i) => timed(`page${String(i).padStart(3, '0')}`, (4_000 + (i % 7) * 800) * times, worker(i)));
 
 /** Today's pages, all drawn by one worker. */
@@ -56,10 +55,10 @@ const TODAY = today(() => 0);
 /** Today's pages each three times slower, drawn by four workers. */
 const SLOW = today((i) => i % 4, 3);
 
-const sumOf = (timings: readonly PageTiming[]): number => timings.reduce((sum, t) => sum + t.ms, 0);
+const sumOf = (timings: readonly PageTiming[]) => timings.reduce((sum, t) => sum + t.ms, 0);
 
 /** `ms` in the seconds a refusal says them in: one decimal, then ` s`. */
-const secondsOf = (ms: number): string => `${(ms / 1000).toFixed(1)} s`;
+const secondsOf = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 
 test("the shipped bound is what four workers draw inside the time that keeps a whole run under a step's tool", () => {
   const full = Array.from({ length: BOUND_WORKERS }, (_, i) => timed(`page${i}`, E2E_BOUND_MS, i));
@@ -152,7 +151,7 @@ test('the slowest pages are ranked slowest first, the list given left as it was'
  * and a shard of its own is not held to it (`planOf`, pages.ts). What is missing, doubled, out of range or of another run is refused by
  * a sentence naming the fix, since each of those silently holds the e2e to less than the whole.
  */
-const shardsOf = (of: number, pages: readonly PageTiming[]): ShardPages[] =>
+const shardsOf = (of: number, pages: readonly PageTiming[]) =>
   Array.from({ length: of }, (_, i) => ({ shard: i + 1, of, pages: pages.filter((_p, at) => at % of === i) }));
 
 test('the shards sum to the sum of their pages, however they were dealt', () => {

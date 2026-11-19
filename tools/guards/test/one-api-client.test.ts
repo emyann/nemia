@@ -22,7 +22,7 @@ const TYPESCRIPT = /\.(?:ts|tsx|mts|cts)$/;
  * The names `text` calls `HttpApiClient` by: its own, each `as` it is renamed to where it is imported from `effect/http-api`, and each
  * namespace its module is imported as.
  */
-function clientNames(text: string): string[] {
+function clientNames(text: string) {
   const names = ['HttpApiClient'];
   for (const m of text.matchAll(/\bHttpApiClient\s+as\s+([A-Za-z_$][\w$]*)/g)) names.push(m[1] ?? '');
   for (const m of text.matchAll(/import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['"]effect\/http-api\/HttpApiClient['"]/g))
@@ -31,7 +31,7 @@ function clientNames(text: string): string[] {
 }
 
 /** Each line of `text` that calls a constructor of `HttpApiClient`, as `<line>: <text>`. */
-function clientsMade(text: string): string[] {
+function clientsMade(text: string) {
   const names = clientNames(text)
     .map((n) => n.replace(/\$/g, '\\$'))
     .join('|');
@@ -53,7 +53,7 @@ test('no file but objects’ own builds a typed client of the Api: every consume
 });
 
 /** A word of a planted line: joined at run time, so this file, which the rule reads too, holds no call it refuses. */
-const joined = (...words: readonly string[]): string => words.join('');
+const joined = (...words: readonly string[]) => words.join('');
 
 test('REFUSED: a typed client built by HttpApiClient under a name it is imported as', () => {
   const renamed = joined('HttpApiClient', ' as ', 'Made');

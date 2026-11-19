@@ -16,7 +16,7 @@
  * The value `flag` carries on `args`, from `--flag=value` or from the argument after `--flag`. Throws, naming the whole argv, where
  * the flag is not there: a flag the SDK stopped passing is a fact to see, never a value read off the wrong index.
  */
-export const sdkArgValue = (args: readonly string[], flag: string): string => {
+export const sdkArgValue = (args: readonly string[], flag: string) => {
   const joined = args.find((a) => a.startsWith(`${flag}=`));
   if (joined !== undefined) return joined.slice(flag.length + 1);
   const at = args.indexOf(flag);

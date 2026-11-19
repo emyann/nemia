@@ -6,7 +6,7 @@
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one, so every component
  * below is imported after it, dynamically.
  */
-import { coded, EXIT_1, PASSED, triedAs, type Word } from './run-fixtures.ts';
+import { coded, EXIT_1, PASSED, triedAs, type Word } from './run.fixture.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -37,7 +37,7 @@ export const UNMEASURED: StepUsed = {
 };
 
 /** A run of one looping step out of rounds, as GET /api/runs/:id gives it, with `note` on its step. */
-export function runWith(note: string | null): RunDetail {
+export function runWith(note: string | null) {
   return {
     id: 'r-1',
     factory: null,
@@ -155,16 +155,22 @@ export function runWith(note: string | null): RunDetail {
         cost: null,
       },
     },
-  };
+  } satisfies RunDetail;
 }
 
 /** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
 export function runOf(
   status: Word,
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
-): RunDetail {
+) {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, waitingOnYouWords: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
+  return {
+    ...run,
+    cancelledAt,
+    waitingOnYou,
+    waitingOnYouWords: waitingOnYou,
+    steps: [{ ...run.steps[0], ...coded(status) }],
+  } satisfies RunDetail;
 }
 
 export const unescaped = (text: string) =>
@@ -174,18 +180,18 @@ export const unescaped = (text: string) =>
  * The class tokens of the first tag in `html` that carries `mark` (a data mark as the markup writes it, `data-unread="dev"`), and none
  * where no tag does: a test reads one class that carries a meaning as a token, never the whole string of classes beside it.
  */
-export const classesAt = (html: string, mark: string): string[] =>
-  new RegExp(`<[^>]*${mark}[^>]*>`)
+export const classesAt = (html: string, mark: string) =>
+  (new RegExp(`<[^>]*${mark}[^>]*>`)
     .exec(html)?.[0]
     .match(/\bclass="([^"]*)"/)?.[1]
-    .split(/\s+/) ?? [];
+    .split(/\s+/) ?? []) satisfies string[];
 
 /** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
-export const textsOf = (html: string): string[] =>
+export const textsOf = (html: string) =>
   html
     .split(/<[^>]+>/)
     .map((text) => unescaped(text).trim())
-    .filter(Boolean);
+    .filter(Boolean) satisfies string[];
 
 export const tookAt = '2026-09-13T00:12:30.000Z';
 
@@ -194,23 +200,24 @@ export const ranOnce: StepAttempts = {
   latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness', release: null, harness: null },
 };
 
-export const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
-  outcome: 'done',
-  summary,
-  needs: null,
-  apiVersion: null,
-  body: null,
-  values: [],
-  refused: [],
-  artifacts: [],
-  output: {},
-  missing: [],
-  replies: null,
-  schema: {},
-  questions: [],
-  raw: { outcome: 'done', summary },
-  ...more,
-});
+export const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}) =>
+  ({
+    outcome: 'done',
+    summary,
+    needs: null,
+    apiVersion: null,
+    body: null,
+    values: [],
+    refused: [],
+    artifacts: [],
+    output: {},
+    missing: [],
+    replies: null,
+    schema: {},
+    questions: [],
+    raw: { outcome: 'done', summary },
+    ...more,
+  }) satisfies StepCloseout;
 
 /**
  * implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by
@@ -313,7 +320,7 @@ export function needing(
   status: Word,
   needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
-): RunDetail {
+) {
   const run = runOf(status, over);
   return {
     ...run,
@@ -329,7 +336,7 @@ export function needing(
         ...needs,
       },
     ],
-  };
+  } satisfies RunDetail;
 }
 
 /** Each step's three commands, as the api answers them on a run `r-1`. */
@@ -349,7 +356,7 @@ export const offersMarkup = (offers: Answer[], asked: Array<{ step: string; try:
   );
 
 /** The run of one step, `review`, waiting at its gate on you — as the api gives it: its word, the need, and its gate. */
-export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}): RunDetail => {
+export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}) => {
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
@@ -369,7 +376,7 @@ export const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Part
         ...over,
       },
     ],
-  };
+  } satisfies RunDetail;
 };
 
 /** A component rendered inside the query client its writes are made with. */
@@ -396,7 +403,7 @@ export const toShip = {
  * unfiled and `awaiting approval`, and the run carries what there is to decide. Ship's `spec`, off the workflow the run froze, is what the
  * board tells an ending's gate from another gate by.
  */
-export function endingRun(over: Partial<RunDetail> = {}): RunDetail {
+export function endingRun(over: Partial<RunDetail> = {}) {
   const run = runWith(null);
   const base = run.steps[0];
   const implement = {
@@ -439,17 +446,20 @@ export function endingRun(over: Partial<RunDetail> = {}): RunDetail {
       rounds: null,
     },
   };
-  return {
-    ...run,
-    status: 'failed',
-    waitingOnYou: ['ship'],
-    waitingOnYouWords: ['approve ship'],
-    toDecide: toShip,
-    gates: [{ step: 'ship', at: 'before' }],
-    graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
-    steps: [implement, ship],
-    ...over,
-  };
+  {
+    const made: RunDetail = {
+      ...run,
+      status: 'failed',
+      waitingOnYou: ['ship'],
+      waitingOnYouWords: ['approve ship'],
+      toDecide: toShip,
+      gates: [{ step: 'ship', at: 'before' }],
+      graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
+      steps: [implement, ship],
+      ...over,
+    };
+    return made;
+  }
 }
 
 /** A plan's closeout as the api gives it, its fields in the order its schema declares them: files long enough to fold, risks not. */
@@ -481,10 +491,7 @@ export const planCloseout: StepCloseout = {
 };
 
 /** A page's piece inside a router, with the queries it reads already answered: a route link needs the router. */
-export async function routedWith(
-  element: ReturnType<typeof createElement>,
-  data: Array<[readonly unknown[], unknown]> = [],
-): Promise<string> {
+export async function routedWith(element: ReturnType<typeof createElement>, data: Array<[readonly unknown[], unknown]> = []) {
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const client = new QueryClient();
@@ -496,10 +503,7 @@ export async function routedWith(
 }
 
 /** A piece that reads the address (`useBar`), drawn as a loaded root route's page, with the queries it reads already answered. */
-export async function pagedWith(
-  element: ReturnType<typeof createElement>,
-  data: Array<[readonly unknown[], unknown]> = [],
-): Promise<string> {
+export async function pagedWith(element: ReturnType<typeof createElement>, data: Array<[readonly unknown[], unknown]> = []) {
   const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import('@tanstack/react-router');
   const router = createRouter({ routeTree: createRootRoute({ component: () => element }), history: createMemoryHistory() });
   await router.load();
@@ -509,32 +513,30 @@ export async function pagedWith(
 }
 
 /** A factory as the api lists it, for the switcher: on one repository, offering one workflow; `extra` puts keys over it. */
-export const filed = (
-  name: string,
-  extra: Partial<import('../src/lib/api/factories.ts').Factory> = {},
-): import('../src/lib/api/factories.ts').Factory => ({
-  name,
-  default: false,
-  worksOn: ['/code/nemia'],
-  workflows: ['build'],
-  hires: {},
-  error: null,
-  schedules: [],
-  commands: {
-    attach: `nemia factory attach ${name} <workflow>`,
-    rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --volume <path|url>:rw`,
-    schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
-    trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
-  },
-  untrusted: [],
-  volumes: [],
-  costLines: {},
-  workflowRepos: {},
-  template: null,
-  ...extra,
-});
+export const filed = (name: string, extra: Partial<import('../src/lib/api/factories.ts').Factory> = {}) =>
+  ({
+    name,
+    default: false,
+    worksOn: ['/code/nemia'],
+    workflows: ['build'],
+    hires: {},
+    error: null,
+    schedules: [],
+    commands: {
+      attach: `nemia factory attach ${name} <workflow>`,
+      rm: `nemia factory rm ${name}`,
+      add: `nemia factory add ${name} --volume <path|url>:rw`,
+      schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+      trust: `nemia factory trust ${name}`,
+      volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
+    },
+    untrusted: [],
+    volumes: [],
+    costLines: {},
+    workflowRepos: {},
+    template: null,
+    ...extra,
+  }) satisfies import('../src/lib/api/factories.ts').Factory;
 
 /** Her session up and reached, on Semi-auto. */
 export const nemiaUp = {
@@ -551,7 +553,7 @@ export const nemiaUp = {
  * The line of `html` that says why her folder could not be trusted, its markup whole, or empty where there is none.
  * @param html A page's markup.
  */
-export const trustLineOf = (html: string): string => /<p data-nemia-trust[^>]*>[\s\S]*?<\/p>/.exec(html)?.[0] ?? '';
+export const trustLineOf = (html: string) => /<p data-nemia-trust[^>]*>[\s\S]*?<\/p>/.exec(html)?.[0] ?? '';
 
 /** Why the keeper could not trust her folder, as the api answers it: the refusal's words, naming the fix. */
 export const UNTRUSTED =
@@ -599,25 +601,23 @@ export const STORE_ANSWER: [readonly unknown[], unknown] = [
 export const LISTED = [listedFactory('default', ['/code/app']), listedFactory('solo', ['/r/a']), listedFactory('pair', ['/r/a', '/r/b'])];
 
 /** A proposal of `acme` named `nemia-ab12c` in `phase`, changing one hire to widen access where `widens`. */
-export const proposalIn = (phase: import('objects').ProposalPhase, widens: boolean, applyAt?: 'run-end'): import('objects').Proposal => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Proposal',
-  metadata: { name: 'nemia-ab12c', namespace: 'acme', resourceVersion: '3', creationTimestamp: '2026-11-06T10:00:00Z' },
-  spec: { objects: [], why: 'the planner reads more', ...(applyAt ? { applyAt } : {}) },
-  status: {
-    phase,
-    proposedBy: { agent: 'nemia' },
-    changes: [{ resource: 'hires', name: 'build.plan', verb: 'update', access: widens ? 'widens' : 'same' }],
-    widens,
-    ...(phase === 'applied' ? { approvedBy: { by: 'person' as const, at: '2026-11-06T10:05:00Z' } } : {}),
-  },
-});
+export const proposalIn = (phase: import('objects').ProposalPhase, widens: boolean, applyAt?: 'run-end') =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Proposal',
+    metadata: { name: 'nemia-ab12c', namespace: 'acme', resourceVersion: '3', creationTimestamp: '2026-11-06T10:00:00Z' },
+    spec: { objects: [], why: 'the planner reads more', ...(applyAt ? { applyAt } : {}) },
+    status: {
+      phase,
+      proposedBy: { agent: 'nemia' },
+      changes: [{ resource: 'hires', name: 'build.plan', verb: 'update', access: widens ? 'widens' : 'same' }],
+      widens,
+      ...(phase === 'applied' ? { approvedBy: { by: 'person' as const, at: '2026-11-06T10:05:00Z' } } : {}),
+    },
+  }) satisfies import('objects').Proposal;
 
 /** `element` rendered with the proposal `proposal` read already, as the page's loader leaves it. */
-export async function withProposal(
-  proposal: import('objects').Proposal,
-  element: Parameters<typeof renderToStaticMarkup>[0],
-): Promise<string> {
+export async function withProposal(proposal: import('objects').Proposal, element: Parameters<typeof renderToStaticMarkup>[0]) {
   const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
   const client = new QueryClient();
   client.setQueryData(['proposal', 'acme', 'nemia-ab12c'], proposal);
@@ -628,12 +628,12 @@ export async function withProposal(
  * Each of the ds kit's Buttons in `html`, in order: its type, whether it is disabled, and its words.
  * @param html The markup the buttons are rendered in.
  */
-export const kitButtons = (html: string): [string, boolean, string][] =>
+export const kitButtons = (html: string) =>
   [...html.matchAll(/<button data-slot="button"([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => [
     /\btype="(\w+)"/.exec(m[1])?.[1] ?? '',
     /\bdisabled=""/.test(m[1]),
     /data-slot="button-label"[^>]*>([^<]*)</.exec(m[2])?.[1] ?? '',
-  ]);
+  ]) satisfies [string, boolean, string][];
 
 /**
  * Each choice of the ds kit's radios and checkboxes in `html`, in order: its value, its kind, and whether it is chosen; those of the
@@ -641,24 +641,31 @@ export const kitButtons = (html: string): [string, boolean, string][] =>
  * @param html The markup the choices are rendered in.
  * @param name What the name of the group read must match.
  */
-export const kitChoices = (html: string, name?: RegExp): [string, 'radio' | 'checkbox', boolean][] =>
+export const kitChoices = (html: string, name?: RegExp) =>
   [...html.matchAll(/<input [^>]*type="(radio|checkbox)"[^>]*>/g)]
     .filter((m) => name === undefined || name.test(/\bname="([^"]*)"/.exec(m[0])?.[1] ?? ''))
-    .map((m) => [/\bvalue="([^"]*)"/.exec(m[0])?.[1] ?? '', m[1] as 'radio' | 'checkbox', /\bchecked=""/.test(m[0])]);
+    .map((m) => [/\bvalue="([^"]*)"/.exec(m[0])?.[1] ?? '', m[1] as 'radio' | 'checkbox', /\bchecked=""/.test(m[0])]) satisfies [
+    string,
+    'radio' | 'checkbox',
+    boolean,
+  ][];
 
 /**
  * Each of the ds kit's radios in `html`, in order: its value and whether it is chosen.
  * @param html The markup the radios are rendered in.
  * @param name What the name of the group read must match, where only one group is read.
  */
-export const kitRadios = (html: string, name?: RegExp): [string, boolean][] =>
+export const kitRadios = (html: string, name?: RegExp) =>
   kitChoices(html, name)
     .filter(([, kind]) => kind === 'radio')
-    .map(([value, , checked]) => [value, checked]);
+    .map(([value, , checked]) => [value, checked]) satisfies [string, boolean][];
 
 /**
  * Each box to write in of the ds kit's text fields in `html`, in order: the name it is read by, and whether it is closed.
  * @param html The markup the boxes are rendered in.
  */
-export const kitBoxes = (html: string): [string, boolean][] =>
-  [...html.matchAll(/<textarea aria-label="([^"]*)"([^>]*)>/g)].map((m) => [unescaped(m[1]), /\bdisabled=""/.test(m[2])]);
+export const kitBoxes = (html: string) =>
+  [...html.matchAll(/<textarea aria-label="([^"]*)"([^>]*)>/g)].map((m) => [unescaped(m[1]), /\bdisabled=""/.test(m[2])]) satisfies [
+    string,
+    boolean,
+  ][];

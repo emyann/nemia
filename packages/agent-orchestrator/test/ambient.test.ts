@@ -34,7 +34,7 @@ const SEAT = (suiteOf(PACKAGE)?.setupFiles ?? []).map((f) => path.join(PACKAGE, 
  * first setup file is `./test/ambient.ts`.
  * @param config the text of the package's `vitest.config.ts`
  */
-function configUnguarded(config: string): string | null {
+function configUnguarded(config: string) {
   const first = /\bsetupFiles:\s*\[\s*['"]([^'"]+)['"]/.exec(config)?.[1];
   if (first === './test/ambient.ts') return null;
   return `the Vitest config runs its test files with the ceilings of the shell that runs it. Make its first setup file \`./test/ambient.ts\`: \`setupFiles: ['./test/ambient.ts', …]\`.`;
@@ -174,7 +174,7 @@ test("REFUSED under the daemon's per-session and serving variables: a test file 
     '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, ...DAEMONS };
-  const seen = (seated: boolean): unknown => {
+  const seen = (seated: boolean) => {
     const ran = probed(dir, text, env, seated);
     assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
     return JSON.parse(fs.readFileSync(out, 'utf8'));

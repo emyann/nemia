@@ -21,27 +21,28 @@ import { exportedTemplate, packedTemplate } from '../src/template/template.verb.
 const ROOT = scratch('wf-template-tar-');
 
 /** `program` run at the store's root: what it answers, or the refusal it failed with, thrown. */
-function run<A>(program: Effect.Effect<A, unknown, Root>): A {
+function run<A>(program: Effect.Effect<A, unknown, Root>) {
   const exit = Effect.runSyncExit(Effect.provideService(program, StoreRoot, ROOT));
-  if (Exit.isSuccess(exit)) return exit.value;
+  if (Exit.isSuccess(exit)) return exit.value satisfies A;
   throw Cause.squash(exit.cause);
 }
 
 /** The files under `dir`, each with its mode and its bytes in hex, by path from it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function filesOf(dir: string, under = ''): Array<[string, number, string]> {
   return fs
     .readdirSync(path.join(dir, under), { withFileTypes: true })
     .sort((a, b) => (a.name < b.name ? -1 : 1))
-    .flatMap((entry): Array<[string, number, string]> => {
+    .flatMap((entry) => {
       const file = under ? `${under}/${entry.name}` : entry.name;
       const at = path.join(dir, file);
-      if (entry.isDirectory()) return filesOf(dir, file);
-      return [[file, fs.statSync(at).mode & 0o777, fs.readFileSync(at).toString('hex')]];
+      if (entry.isDirectory()) return filesOf(dir, file) satisfies Array<[string, number, string]>;
+      return [[file, fs.statSync(at).mode & 0o777, fs.readFileSync(at).toString('hex')]] satisfies Array<[string, number, string]>;
     });
 }
 
 /** The tests' team exported to a folder named `team`, with a script of mode 0755 and a file of all 256 bytes. */
-function exported(): string {
+function exported() {
   const repo = scratch('wf-template-tar-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   const skill = path.join(repo, 'workflows', 'skills', 'review-a-change');

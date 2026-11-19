@@ -75,7 +75,7 @@ const refusedNaming =
     err._tag === tag && err.exitCode === 2 && tokens.every((token) => err.message.includes(token));
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, so a start has a base to record. */
-function repoWithTeam(): string {
+function repoWithTeam() {
   const repo = scratch('wf-applied-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stand().world.repository(repo, {});
@@ -84,7 +84,7 @@ function repoWithTeam(): string {
 }
 
 /** The tests' team exported as a template, `budget` a parameter of the review step with no default, and `model` one with a default. */
-function template(): { dir: string; repo: string } {
+function template() {
   const repo = repoWithTeam();
   const dir = path.join(scratch('wf-applied-template-'), 'team');
   exportTemplate({ dir, from: repo });
@@ -104,14 +104,14 @@ function template(): { dir: string; repo: string } {
 }
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** Every file under the factories folder, by its path in it, so a refusal is seen to have written nothing. */
-const filed = (): string[] => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
+const filed = () => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
 
 /** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
 const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
@@ -123,7 +123,7 @@ const templated = (name: string) =>
 
 describe('what apply and a start of a templated factory refuse, by kind and exit 2, writing nothing', () => {
   test('apply refuses a key not declared, a value of the wrong type and a required one not given, every one at once, and writes nothing', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     const before = filed();
     await assert.rejects(
@@ -191,7 +191,7 @@ test(
   'REFUSED at shipped defaults: a factory applied after a pass is not rendered before five seconds, and is at the next pass',
   WAITED,
   async (t) => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const clock = steeredClock();
     const loop = Effect.runFork(reconcile().pipe(Effect.provide(clock.layer), Effect.provideService(StoreRoot, ROOT)));
     t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(loop)));
@@ -209,7 +209,7 @@ test(
 
 describe('what the controller says of a template or parameters moved since the render, its base and tree kept', () => {
   test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drifted', dir, repo, '--set', 'budget=7');
     const first = reconciled(templated('drifted'));
@@ -233,7 +233,7 @@ describe('what the controller says of a template or parameters moved since the r
     assert.equal(reconciled(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
   });
   test("parameters changed in the factory's file alone are merged at its version; changed with the template's files under it, said by Applied, base and tree kept", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('moved', dir, repo, '--set', 'budget=7');
     const first = reconciled(templated('moved'));
@@ -292,7 +292,7 @@ describe("the controller stamps each condition with when its status last moved, 
   let file!: string;
   beforeAll(async () => {
     const t = teardowns();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     ({ repo, dir } = template());
     await apply('stamped', dir, repo, '--set', 'budget=7');
     file = path.join(FACTORIES, 'stamped.json');
@@ -345,7 +345,7 @@ describe("the controller stamps each condition with when its status last moved, 
 });
 
 /** The status of `name` rewritten as the controller wrote it before it named templates: with no `template`, changed by `change`. */
-function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}): void {
+function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}) {
   const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, name), 'utf8'));
   change(status);
   fs.writeFileSync(statusFile(ROOT, name), JSON.stringify(status));
@@ -353,13 +353,13 @@ function unnamed(name: string, change: (status: Record<string, unknown>) => void
 
 describe('the controller names the template a base holds, even where the base is no longer the render, so a switch from it can be told', () => {
   test('a base that is the render is named after its template', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('as-rendered', dir, repo, '--set', 'budget=7');
     assert.equal(reconciled(templated('as-rendered')).template, 'team');
   });
   test("the template's files changed under its version (ContentChanged): the base is named after the template the file names", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('content', dir, repo, '--set', 'budget=7');
     reconciled(templated('content'));
@@ -372,7 +372,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.equal(readStatus(ROOT, 'content')?.template, 'team', 'and written');
   });
   test('the template moved to another version (VersionDrift): named', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drift', dir, repo, '--set', 'budget=7');
     reconciled(templated('drift'));
@@ -384,7 +384,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.deepEqual([status.conditions[0].reason, status.template], ['VersionDrift', 'team']);
   });
   test("the parameters in the factory's file changed with the template's files under its version (ParamsChanged): named", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('params', dir, repo, '--set', 'budget=7');
     reconciled(templated('params'));
@@ -400,7 +400,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
   });
   test("an upgrade under way: the factory's file names the template wanted, not the base's, so no name is written", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('under-way', dir, repo, '--set', 'budget=7');
     reconciled(templated('under-way'));
@@ -416,7 +416,7 @@ describe('the controller names the template a base holds, even where the base is
 
 describe("what a templated factory's verbs read and write: its tree's wiring, instruction and parts, and the places apply trusts", () => {
   test("a templated factory reads its tree's wiring, and attach, hire, fire, detach and revisions write the tree; none while it is not rendered", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('wired', dir, repo, '--set', 'budget=7');
     await assert.rejects(
@@ -471,7 +471,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     assert.deepEqual(readFactoryAt(ROOT, 'wired').volumes.at(-1), volume);
   });
   test("a templated factory's instruction is its tree's NEMIA.md, written by instruct; and rm removes it all, its read-only base included", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('told', dir, repo, '--set', 'budget=7');
     const words = path.join(scratch('wf-applied-words-'), 'words.md');
@@ -492,7 +492,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     );
   });
   test("the writers' place factory writes a templated factory's tree through each writer's handler; refused without a factory, for an untemplated one, and before its render", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('written', dir, repo, '--set', 'budget=7');
     await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());
@@ -564,7 +564,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
 });
 
 /** The folders the harness's file in `dir` says are trusted, in order. */
-const trustedIn = (dir: string): string[] => {
+const trustedIn = (dir: string) => {
   const file = path.join(dir, '.claude.json');
   if (!fs.existsSync(file)) return [];
   const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
@@ -654,7 +654,7 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
 });
 
 /** The tests' team as a template whose `follow` defaults true and follows example.org, so a volume given by its path sets it false. */
-function following(): { dir: string; repo: string } {
+function following() {
   const made = template();
   edit(made.dir, 'nemia.yaml', (spec) => {
     spec.parameters.follow = { type: 'boolean', description: 'whether it lands on the host', default: true, whenOrigin: 'example.org' };

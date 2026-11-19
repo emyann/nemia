@@ -26,21 +26,18 @@ type Manifest = {
 };
 
 /** The commands of a manifest that run with the frozen folders: each step's check, and each need's check and its fixes' commands. */
-const commandsOf = (manifest: Manifest | null): Array<{ step: string; check: unknown }> => [
+const commandsOf = (manifest: Manifest | null) => [
   ...(manifest?.spec?.steps ?? []).map((step) => ({ step: String(step.name), check: step.check })),
   ...(manifest?.spec?.needs ?? []).flatMap((need) =>
     [need.check, ...(need.fixes ?? []).map((fix) => fix.command)].map((check) => ({ step: `needs/${String(need.name)}`, check })),
   ),
 ];
 
-/** A script a check names: the folder its variable names, relative to the template's root, and its file there. */
-type Named = { folder: string; name: string };
-
 /**
  * Each step of the template `root` that has a check, and each command of a need (`needs/<need>`): its workflow, its name, and the
  * scripts its check names under a frozen folder.
  */
-function checksOf(root: string): Array<{ workflow: string; step: string; scripts: Named[] }> {
+function checksOf(root: string) {
   const workflows = path.join(root, 'workflows');
   const defaults = defaultsOf(root);
   return fs
@@ -67,7 +64,7 @@ function checksOf(root: string): Array<{ workflow: string; step: string; scripts
 }
 
 /** The default of each parameter the template `root` declares, by name, as its manifest writes it. */
-function defaultsOf(root: string): Record<string, string> {
+function defaultsOf(root: string) {
   const manifest = yaml.load(fs.readFileSync(path.join(root, 'nemia.yaml'), 'utf8')) as {
     spec?: { parameters?: Record<string, { default?: unknown }> };
   } | null;
@@ -75,11 +72,11 @@ function defaultsOf(root: string): Record<string, string> {
 }
 
 /** `check` with each `${{ parameters.<name> }}` written as its default, so a script a default names is read as the check's. */
-const withDefaults = (check: string, defaults: Record<string, string>): string =>
+const withDefaults = (check: string, defaults: Record<string, string>) =>
   check.replace(/\$\{\{\s*parameters\.(\w+)\s*\}\}/g, (_, name: string) => defaults[name] ?? '');
 
 /** Each script a check of the template `root` names that its folder does not hold: `<workflow>/<step>: <folder>/<name>`. */
-function strays(root: string): string[] {
+function strays(root: string) {
   return checksOf(root).flatMap(({ workflow, step, scripts }) =>
     scripts
       .filter(({ folder, name }) => !fs.existsSync(path.join(root, folder, name)))
@@ -88,11 +85,11 @@ function strays(root: string): string[] {
 }
 
 /** The sibling scripts `file` imports (`from './<name>.ts'`), as files of its own folder. */
-const siblingsOf = (file: string): string[] =>
+const siblingsOf = (file: string) =>
   [...fs.readFileSync(file, 'utf8').matchAll(/from '\.\/([\w.-]+\.ts)'/g)].map(([, name]) => path.join(path.dirname(file), name ?? ''));
 
 /** Every file a check of `root` reaches: each script it names, and each sibling those import, followed through. */
-function reached(root: string): Set<string> {
+function reached(root: string) {
   const seen = new Set<string>();
   const next = checksOf(root).flatMap(({ scripts }) => scripts.map(({ folder, name }) => path.join(root, folder, name)));
   for (let file = next.pop(); file !== undefined; file = next.pop()) {
@@ -104,7 +101,7 @@ function reached(root: string): Set<string> {
 }
 
 /** The scripts of the folders of `root` a check may read from: the carried folder and each workflow's, every `.ts` directly in it. */
-function scriptsOf(root: string): string[] {
+function scriptsOf(root: string) {
   const folders = ['carried', ...fs.readdirSync(path.join(root, 'workflows')).map((workflow) => path.join('workflows', workflow))];
   return folders
     .map((folder) => path.join(root, folder))
@@ -142,8 +139,7 @@ test('REFUSED: a script of the carried folder that no check runs and no script a
 
 test("sdlc's checks run only scripts their folders hold, and every script there is run, or imported by one that is", () => {
   const checks = checksOf(SDLC);
-  const named = (carried: boolean): boolean =>
-    checks.some(({ scripts }) => scripts.some(({ folder }) => (folder === 'carried') === carried));
+  const named = (carried: boolean) => checks.some(({ scripts }) => scripts.some(({ folder }) => (folder === 'carried') === carried));
   assert.ok(named(true) && named(false), "sdlc's checks name scripts of both frozen folders: a guard that reads none holds nothing");
   assert.deepEqual(strays(SDLC), []);
   const reach = reached(SDLC);

@@ -50,7 +50,7 @@ const send = (method: string, url: string, body: unknown, headers: Record<string
   });
 
 /** What the store's custom-instructions folder holds: each file's text by its name, `{}` when there is no folder. */
-const held = (): Record<string, string> =>
+const held = () =>
   fs.existsSync(CUSTOM)
     ? Object.fromEntries(
         fs
@@ -61,7 +61,7 @@ const held = (): Record<string, string> =>
     : {};
 
 /** A request refused with `status`, its words, and the folder as it was. */
-async function refused(res: () => Response | Promise<Response>, status: number): Promise<string> {
+async function refused(res: () => Response | Promise<Response>, status: number) {
   const before = held();
   const answer = await res();
   const body = (await answer.json()) as { error: string };

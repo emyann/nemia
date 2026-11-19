@@ -14,7 +14,7 @@ import { HARNESSES as STEP_HARNESSES } from '../src/harness/harness.ts';
 const PACKAGE = path.resolve(import.meta.dirname, '..');
 
 /** Each source file of the package's `src` and `place`, tests left out, by its path from the package. */
-const sources = (): string[] =>
+const sources = () =>
   ['src', 'place'].flatMap((dir) =>
     fs
       .readdirSync(path.join(PACKAGE, dir), { recursive: true, encoding: 'utf8' })
@@ -26,7 +26,7 @@ const sources = (): string[] =>
 const LITERAL_FILING = /e\.file\(\{[^}]*?\bharness:\s*'([^']+)'/g;
 
 /** Each harness named as a literal by a filing, with the file that names it. */
-const literalFilings = (): { file: string; harness: string }[] =>
+const literalFilings = () =>
   sources().flatMap((file) =>
     [...fs.readFileSync(path.join(PACKAGE, file), 'utf8').matchAll(LITERAL_FILING)].map((m) => ({ file, harness: m[1] ?? '' })),
   );

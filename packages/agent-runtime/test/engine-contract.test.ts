@@ -15,10 +15,13 @@ import { APART, apartOn, failing, UNKEPT, unwalked, WALKS, walksOn, type Kept, t
  * A new stand-in as a side: its verbs, and its own `settle`, which leaves a task held open whose session completed waiting on a person
  * (`input-required`), as the engine does, since a test of the stand-in says by hand the phase it leaves a task in.
  */
-function standIn(): Side {
+function standIn() {
   const made = testEngine();
   const phaseOf = (id: string, moved: Moved) => (moved === 'succeeded' && made.tasks.get(id)?.spec.holdOpen ? 'input-required' : moved);
-  return { engine: builtEngine(made.layer), settle: async (id, moved, end) => void made.settle(id, phaseOf(id, moved), end) };
+  return {
+    engine: builtEngine(made.layer),
+    settle: async (id, moved, end) => void made.settle(id, phaseOf(id, moved), end),
+  } satisfies Side;
 }
 
 for (const [name, walk] of walksOn(standIn)) test(name, walk);
@@ -57,10 +60,10 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
 };
 
 /** A new stand-in whose `verb` does what it does and answers `lie` of its true answer. */
-function lying(verb: Kept, lie: (answer: Answer) => Answer): Side {
+function lying(verb: Kept, lie: (answer: Answer) => Answer) {
   const side = standIn();
   const truly = side.engine[verb] as (...args: unknown[]) => Answer;
-  return { ...side, engine: { ...side.engine, [verb]: (...args: unknown[]) => lie(truly(...args)) } };
+  return { ...side, engine: { ...side.engine, [verb]: (...args: unknown[]) => lie(truly(...args)) } } satisfies Side;
 }
 
 for (const verb of Object.keys(WALKS) as Kept[])
@@ -195,8 +198,7 @@ test('a transcript planted for each attempt reads by its cursor, a restart start
 
 /** The verb rows of `verb-harness.boundary.test.ts`, on the stand-in told the same declarations: the same refusals by the same tags. */
 /** The tag a call failed with; one that succeeded fails the test. */
-const verbTagOf = async (asked: Effect.Effect<unknown, { _tag: string }>): Promise<string> =>
-  (await Effect.runPromise(Effect.flip(asked)))._tag;
+const verbTagOf = async (asked: Effect.Effect<unknown, { _tag: string }>) => (await Effect.runPromise(Effect.flip(asked)))._tag;
 
 test('a verb only some harnesses answer: unknown, undeclared and none refused in its own error, on the stand-in', async () => {
   {

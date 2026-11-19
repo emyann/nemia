@@ -18,6 +18,7 @@ import type { ApplyOf } from '../../contracts/apply.contract.ts';
 import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
 import { type Applied, KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
+import { isObject } from 'effect/Predicate';
 
 /**
  * What apply does with one object, by what its read found and what its kind takes (`contracts/apply.contract.ts`).
@@ -56,16 +57,9 @@ export const canonical = (value: unknown): string =>
       : v,
   );
 
-/**
- * Whether `value` is a plain object.
- * @param value The value asked of.
- */
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /** A record of strings, or undefined where `value` is none. */
 const stringsOf = (value: unknown): Record<string, string> | undefined =>
-  isRecord(value) && Object.values(value).every((v) => typeof v === 'string')
+  isObject(value) && Object.values(value).every((v) => typeof v === 'string')
     ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, String(v)]))
     : undefined;
 
@@ -87,7 +81,7 @@ export function objectsOf(text: string, file: string, verb = 'apply'): unknown[]
       );
     const value: unknown = doc.toJS();
     if (value === null || value === undefined) continue;
-    if (isRecord(value) && typeof value.kind === 'string' && value.kind.endsWith('List') && Array.isArray(value.items))
+    if (isObject(value) && typeof value.kind === 'string' && value.kind.endsWith('List') && Array.isArray(value.items))
       objects.push(...value.items);
     else objects.push(value);
   }
@@ -140,7 +134,7 @@ export type Read = {
  * @param verb The verb that reads it, named in a refusal: `apply` where it is left out.
  */
 export function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined, verb = 'apply'): Read {
-  if (!isRecord(object)) throw new Refused(`nemia ${verb}: a document is no object: each holds apiVersion, kind, metadata and spec`);
+  if (!isObject(object)) throw new Refused(`nemia ${verb}: a document is no object: each holds apiVersion, kind, metadata and spec`);
   const { apiVersion, kind, metadata, spec } = object;
   if (apiVersion !== API_VERSION)
     throw new Refused(
@@ -151,7 +145,7 @@ export function readOf(object: unknown, resources: readonly APIResource[], names
     throw new Refused(
       `nemia ${verb}: the api serves no kind ${String(kind)}. It serves ${kindsOf(resources)}: see one with \`nemia explain <resource>\``,
     );
-  const meta = isRecord(metadata) ? metadata : {};
+  const meta = isObject(metadata) ? metadata : {};
   const name = meta.name;
   if (typeof name !== 'string' || name === '')
     throw new Refused(

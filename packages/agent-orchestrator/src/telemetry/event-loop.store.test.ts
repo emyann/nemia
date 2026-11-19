@@ -12,7 +12,7 @@ import { delaysOf, EVENT_LOOP_DELAY, eventLoopWatched } from './event-loop.store
 type Logged = { level: string; annotations: Record<string, unknown> };
 
 /** Holds the event loop for `ms`, as a synchronous read does: the thread waits on a cell nobody writes. */
-const held = (ms: number): void => {
+const held = (ms: number) => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 };
 

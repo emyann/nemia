@@ -57,7 +57,7 @@ beforeEachTest(() => {
 });
 
 /** The run's lines as the route answers them. */
-const linesOf = async (id: string): Promise<RunLinesAnswer> => {
+const linesOf = async (id: string) => {
   const res = await app().request(`/api/runs/${id}/lines`);
   assert.equal(res.status, 200);
   return (await res.json()) as RunLinesAnswer;

@@ -24,7 +24,7 @@ import { loadWorkflows } from 'agent-orchestrator';
 import { CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/run';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
-import { CI_URL, GREEN, type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
+import { CI_URL, GREEN, type Called, type Rule, bareOrigin, ghStub, gitIn, listed, passing, rollup, tip } from './origin.ts';
 
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
@@ -55,7 +55,7 @@ function stepsOf(at: Rendered, workflow: string) {
  * GitHub with the label rules alone; and in the checkout with a stub's name for its local check.
  */
 let rendering: Promise<Record<'round' | 'labelled' | 'local', Rendered>> | undefined;
-const renders = (): Promise<Record<'round' | 'labelled' | 'local', Rendered>> =>
+const renders = () =>
   (rendering ??= (async () => {
     const all = await rendered([
       {
@@ -66,7 +66,7 @@ const renders = (): Promise<Record<'round' | 'labelled' | 'local', Rendered>> =>
       { name: 'labelled', template: copyOf(SDLC), sets: ['github=true', `pullRequestLabels=${RULES}`] },
       { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check'] },
     ]);
-    const treeOf = (name: 'round' | 'labelled' | 'local'): Rendered => {
+    const treeOf = (name: 'round' | 'labelled' | 'local') => {
       const at = all[name];
       assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
       return { tree: at.tree, store: at.store };
@@ -91,7 +91,7 @@ const PERSONS = 78;
 const TAGGED = /not the work/;
 
 /** A place to push from: a scratch repository on `branch`, its `origin` a bare repository, and a stub `gh` answering `rules`. */
-function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
+function placed({ branch = 'wf/r-1/run', remote = true } = {}) {
   const repo = scratch('wf-pr-repo-');
   gitIn(repo, 'init', '-q', '-b', branch);
   fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
@@ -101,10 +101,8 @@ function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; 
   return { repo, bare, branch, gh: ghStub(passing(repo)) };
 }
 
-type Ran = { code: number | null; out: string; err: string; calls: Called[] };
-
 /** Run the script's `verb` in `at` with `args`, bounded; its exit, its streams and the calls the stub `gh` was given. */
-function pr(at: ReturnType<typeof placed>, verb: string, args: string[] = [], more: Record<string, string> = {}): Ran {
+function pr(at: ReturnType<typeof placed>, verb: string, args: string[] = [], more: Record<string, string> = {}) {
   const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
     cwd: at.repo,
     env: {
@@ -126,11 +124,10 @@ function pr(at: ReturnType<typeof placed>, verb: string, args: string[] = [], mo
 }
 
 /** The calls of the stub `gh` that begin with `words`. */
-const asked = (calls: readonly Called[], ...words: string[]): Called[] =>
-  calls.filter((call) => words.every((word, i) => call.argv[i] === word));
+const asked = (calls: readonly Called[], ...words: string[]) => calls.filter((call) => words.every((word, i) => call.argv[i] === word));
 
 /** A file written and committed in `repo`: the commit it made. */
-function commit(repo: string, name: string): string {
+function commit(repo: string, name: string) {
   fs.writeFileSync(path.join(repo, name), `export const ${name.replace(/\W/g, '')} = 1;\n`);
   gitIn(repo, 'add', '-A');
   gitIn(repo, 'commit', '-qm', name);
@@ -138,7 +135,7 @@ function commit(repo: string, name: string): string {
 }
 
 /** A body file to open the pull request with: its path. */
-function body(text = 'What this round changed.\n'): string {
+function body(text = 'What this round changed.\n') {
   const file = path.join(scratch('wf-pr-files-'), 'pr-body.md');
   fs.writeFileSync(file, text);
   return file;
@@ -389,8 +386,7 @@ function labelled(labels: string[], repo: Rule = REPO_LABELS) {
 }
 
 /** The calls that add or remove a label of the pull request, through REST. */
-const labelCalls = (calls: readonly Called[]): Called[] =>
-  calls.filter((call) => call.argv.some((arg) => /\/issues\/\d+\/labels/.test(arg)));
+const labelCalls = (calls: readonly Called[]) => calls.filter((call) => call.argv.some((arg) => /\/issues\/\d+\/labels/.test(arg)));
 
 test("push --labels adds the label the rules give the run's labels, through REST and never gh pr edit, and says what it set", () => {
   const at = labelled([]);
@@ -515,7 +511,7 @@ function unopened() {
 }
 
 /** The arguments of `open`, its title and a body file, with `more` after them. */
-const opening = (...more: string[]): string[] => ['--title', 'The card', '--body-file', body(), ...more];
+const opening = (...more: string[]) => ['--title', 'The card', '--body-file', body(), ...more];
 
 test("open --labels creates the pull request, then labels it by the rules from the run's labels in the same call, through REST", () => {
   const at = unopened();
@@ -597,7 +593,7 @@ test('REFUSED, before anything is pushed or created: open with no --labels, a ma
 test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
   const at = placed();
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
-  const computing = (then: string): Rule => ({
+  const computing = (then: string) => ({
     when: 'pr list',
     outs: [listed(head, { mergeable: 'UNKNOWN' }), listed(head, { mergeable: then })],
   });
@@ -624,7 +620,7 @@ test('wait reads mergeable again while GitHub computes it, polls the ci context 
 });
 
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
-const stamped = (lines: string[]): string => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
+const stamped = (lines: string[]) => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
 
 test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that failed each job, and the retry line', () => {
   const at = placed();
@@ -779,8 +775,7 @@ test("a red job's failing lines reach the step, without their colour codes, on a
 });
 
 /** The calls of the stub `gh` that ask GitHub how a head stands to the base (`compare/<base>...<head>`). */
-const compared = (calls: readonly Called[]): Called[] =>
-  asked(calls, 'api').filter((call) => call.argv.some((arg) => arg.includes('/compare/')));
+const compared = (calls: readonly Called[]) => asked(calls, 'api').filter((call) => call.argv.some((arg) => arg.includes('/compare/')));
 
 /** The commit the base held when the head was cut, as `compare` answers it. */
 const BASE_AT = 'b'.repeat(40);
@@ -1005,7 +1000,7 @@ test("wait reads a GitHub read that fails as not yet read: once, then answering,
   const at = placed();
   const others = passing(at.repo).filter((rule) => rule.when !== 'pr view' && rule.when !== 'pr list');
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
-  const once = (when: string, then: string): Rule => ({ when, outs: ['', then], err: timedOut, statuses: [1, 0] });
+  const once = (when: string, then: string) => ({ when, outs: ['', then], err: timedOut, statuses: [1, 0] });
   at.gh.answers([...others, once('pr list', listed(head)), once('pr view', GREEN)]);
   const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
   assert.equal(r.code, 0, r.err);
@@ -1032,7 +1027,7 @@ const job = (name: string, id: number, startedAt: string, rest: Record<string, u
 });
 
 /** The head's checks as `gh pr view --json statusCheckRollup` gives them. */
-const checks = (...entries: Record<string, unknown>[]): string => JSON.stringify({ statusCheckRollup: entries });
+const checks = (...entries: Record<string, unknown>[]) => JSON.stringify({ statusCheckRollup: entries });
 
 const FAILED = { status: 'COMPLETED', conclusion: 'FAILURE' };
 const PASSED_RUN = { status: 'COMPLETED', conclusion: 'SUCCESS' };
@@ -1045,7 +1040,7 @@ const FIRST = [job('test x', 5677, T1, FAILED), job('ci', 5678, T1, FAILED)];
 const second = (rest: Record<string, unknown>, at = T2) => [job('test x', 6677, at, rest), job('ci', 6678, at, rest)];
 
 /** The calls that re-ran run 1234's failed jobs. */
-const reruns = (calls: readonly Called[]): Called[] => asked(calls, 'run', 'rerun');
+const reruns = (calls: readonly Called[]) => asked(calls, 'run', 'rerun');
 
 /**
  * The wait in a place whose rollup reads `outs` (one per poll, the last repeating) and whose run 1234 answers `attempt` (a rule, or a
@@ -1188,7 +1183,7 @@ function cutOffThen(outs: string[], notes: Record<number, string>) {
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
     { when: 'pr view', outs },
-    ...Object.entries(notes).map(([id, out]): Rule => ({ when: `check-runs/${id}/annotations`, out })),
+    ...Object.entries(notes).map(([id, out]) => ({ when: `check-runs/${id}/annotations`, out })),
     { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: 1 }) },
     { when: 'run rerun' },
     { when: 'actions/jobs', out: stamped(['Error: a test hung', 'The operation was canceled.']) },
@@ -1382,7 +1377,7 @@ test("REFUSED at shipped defaults, in the checkout: build's implement check runs
  * The clause of the frozen check `frozen` that runs the pull-request script's `verb`: from the `node` that opens it to the ` && ` or the
  * `; else` after it, so what the clause holds is read against that verb alone and not against another's.
  */
-function clauseOf(frozen: string, verb: string): string {
+function clauseOf(frozen: string, verb: string) {
   const named = frozen.indexOf(`/pull-request.ts" ${verb}`);
   assert.ok(named > 0, `the check runs the script's ${verb}:\n${frozen}`);
   const opens = frozen.lastIndexOf('node "', named);
@@ -1422,7 +1417,7 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
 });
 
 /** The number the shared constant `name` holds, read from `exec.ts`'s shipped text, where the script takes it; it must be there. */
-function shippedSeconds(name: 'START_SECONDS' | 'WHOLE_SECONDS'): number {
+function shippedSeconds(name: 'START_SECONDS' | 'WHOLE_SECONDS') {
   assert.match(fs.readFileSync(SCRIPT, 'utf8'), new RegExp(`\\b${name}\\b[^;]*from '\\./exec\\.ts'`), `pull-request.ts takes ${name}`);
   const found = new RegExp(`export const\\s+${name}\\s*=\\s*(\\d+);`).exec(fs.readFileSync(path.join(CARRIED, 'exec.ts'), 'utf8'));
   assert.ok(found, `exec.ts declares ${name}`);
@@ -1479,7 +1474,7 @@ function stuckThen(outs: string[], { runs = HEAD_RUNS, jobs = [] as unknown[], r
 }
 
 /** The calls that dispatched a workflow. */
-const dispatches = (calls: readonly Called[]): Called[] => asked(calls, 'workflow', 'run');
+const dispatches = (calls: readonly Called[]) => asked(calls, 'workflow', 'run');
 
 test('a run GitHub queued and never started is dispatched once on the branch, and the check passes on the dispatched run', () => {
   const r = stuckThen([checks(), checks(), checks(), checks(dispatched(PASSED_RUN))]);

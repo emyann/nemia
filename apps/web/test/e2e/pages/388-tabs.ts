@@ -12,21 +12,21 @@ const PLACE = 'Settings';
 const tabOf = (page: Page, name: string) => frameTabsOf(page).getByRole('tab', { name, exact: true });
 
 /** Refuses unless the address is `pathname`, with no `?bar=`. */
-function expectAt(page: Page, pathname: string, assertion: string): void {
+function expectAt(page: Page, pathname: string, assertion: string) {
   const url = new URL(page.url());
   if (url.pathname !== pathname || url.searchParams.has('bar'))
     throw new Refused(`${assertion}: the address is ${pathname} — it is ${page.url()}`);
 }
 
 /** Refuses unless the strip selects `name` alone, and the rail lights the place alone. */
-async function expectTab(page: Page, name: string, assertion: string): Promise<void> {
+async function expectTab(page: Page, name: string, assertion: string) {
   await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), [name], assertion);
   await expectVisible(railPlace(page, PLACE).and(litOf(page)), `${assertion}: the rail lights ${PLACE}`);
   await expectCount(litOf(page), 1, `${assertion}: and no other place`);
 }
 
 /** The strip sits under the header and above the page, across the page's width, the header naming the place. */
-async function underHeader(page: Page): Promise<void> {
+async function underHeader(page: Page) {
   const header = page.locator('header[data-frame-header]');
   await expectVisible(header.locator('[data-page-name]').getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
   await expectTexts(
@@ -47,7 +47,7 @@ async function underHeader(page: Page): Promise<void> {
 }
 
 /** A click on a tab opens its own address, the side sheet closed; a next visit to it opens the same tab. */
-async function clicks(page: Page): Promise<void> {
+async function clicks(page: Page) {
   await page.goto(new URL('/settings?bar=gauges', page.url()).href);
   await idle(page);
   await expectVisible(page.locator('aside[data-bar="gauges"]'), "the machine's gauges are shown in the frame's side sheet");
@@ -64,7 +64,7 @@ async function clicks(page: Page): Promise<void> {
 }
 
 /** The arrow keys move between the tabs without opening one; Enter opens the one in focus, once. */
-async function keys(page: Page): Promise<void> {
+async function keys(page: Page) {
   await tabOf(page, 'Capabilities').focus();
   await page.keyboard.press('ArrowLeft');
   const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
@@ -85,7 +85,7 @@ async function keys(page: Page): Promise<void> {
 }
 
 /** On a phone's screen the strip fits the page's width, its tabs whole, and the header names the place whole. */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expectUncut(frameTabsOf(page).getByRole('tab'), 'on a phone each tab is read whole');

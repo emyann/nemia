@@ -36,14 +36,14 @@ const RUN = JSON.stringify({
 });
 
 /** A store with the run `r-ctx` on it, where a card that names no factory may start in the default one. */
-const seeded = (root: string): void => write(path.join(root, 'runs', 'r-ctx.json'), RUN);
+const seeded = (root: string) => write(path.join(root, 'runs', 'r-ctx.json'), RUN);
 const STARTS = { WF_DEFAULT_FACTORY_STARTS: '1' };
 
 const store = await servedStore('nemia-inbox-', seeded, STARTS);
 afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -52,23 +52,23 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** The card's name, the first word of what `nemia inbox add` printed. */
-const nameIn = (out: string): string => /^(\S+) {2}/.exec(out)?.[1] ?? assert.fail(`no card in: ${out}`);
+const nameIn = (out: string) => /^(\S+) {2}/.exec(out)?.[1] ?? assert.fail(`no card in: ${out}`);
 
 /** The text of the card `name` on the store at `root`, or null where it has none. */
-const cardOn = (root: string, name: string): string | null => {
+const cardOn = (root: string, name: string) => {
   const file = path.join(root, 'inbox', `${name}.md`);
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  return (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null) satisfies string | null;
 };
 
 /** `said` exited 0, with nothing on stderr to say why not. */
-const ok = (said: Said, what: string): void => assert.equal(said.code, 0, `${what}: ${said.err}`);
+const ok = (said: Said, what: string) => assert.equal(said.code, 0, `${what}: ${said.err}`);
 
 /** The card's life through every write, typed by `run` on the store at `root`: what each prints and leaves on the store. */
-async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root: string, idea: string): Promise<void> {
+async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root: string, idea: string) {
   const added = await run(['inbox', 'add', idea, '--label', 'team=core']);
   ok(added, 'inbox add');
   const name = nameIn(added.out);
@@ -144,7 +144,7 @@ async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root
 }
 
 /** An idea in a file of its own, on the machine the command is typed on. */
-const ideaFile = (name: string): string => {
+const ideaFile = (name: string) => {
   const file = path.join(IDEAS, name);
   write(file, 'Cache the engine views\n\nBetween passes.\n');
   return file;

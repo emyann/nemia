@@ -24,23 +24,26 @@ export type Side = { readonly journal: JournalShape };
 export type Walk = { readonly name: string; readonly walk: (side: Side) => Promise<unknown>; readonly says: unknown };
 
 /** What a method answers: its answer, `null` for none, or `{ refused, reason }` naming the tag it failed with and its reason. */
-export async function asked<A, E>(verb: Effect.Effect<A, E>): Promise<A | null | { refused: string; reason?: string }> {
+export async function asked<A, E>(verb: Effect.Effect<A, E>) {
   const exit = await Effect.runPromiseExit(verb);
-  if (Exit.isSuccess(exit)) return exit.value ?? null;
+  if (Exit.isSuccess(exit)) return (exit.value ?? null) satisfies A | null | { refused: string; reason?: string };
   const failed = Cause.squash(exit.cause) as { _tag?: string; message?: string; reason?: string };
   if (failed._tag === undefined) throw new Error(`a method died: ${failed.message}`);
-  return { refused: failed._tag, ...(failed.reason === undefined ? {} : { reason: failed.reason }) };
+  return { refused: failed._tag, ...(failed.reason === undefined ? {} : { reason: failed.reason }) } satisfies
+    | A
+    | null
+    | { refused: string; reason?: string };
 }
 
 /** What a walk answered, as every side says it: its JSON. */
-export const told = (value: unknown): unknown => (value === undefined ? null : JSON.parse(JSON.stringify(value)));
+export const told = (value: unknown) => (value === undefined ? null : JSON.parse(JSON.stringify(value))) as unknown;
 
 const AT = '2026-10-01T00:00:00.000Z';
 const id = (name: string) => TaskId.read(name);
 /** A task's filing, its brief long enough that a store keeping bodies keeps it apart. */
-const filing = (name: string): Event => ({ kind: 'filed', at: AT, brief: `do ${name} `.repeat(40), cwd: '/r', queued: false });
-const start = (attempt: number): Event => ({ kind: 'starting', at: AT, attempt });
-const spawned = (attempt: number): Event => ({ kind: 'spawned', at: AT, attempt });
+const filing = (name: string) => ({ kind: 'filed', at: AT, brief: `do ${name} `.repeat(40), cwd: '/r', queued: false }) satisfies Event;
+const start = (attempt: number) => ({ kind: 'starting', at: AT, attempt }) satisfies Event;
+const spawned = (attempt: number) => ({ kind: 'spawned', at: AT, attempt }) satisfies Event;
 
 /** `name` filed, through the door, its brief cut in two. */
 const file = ({ journal }: Side, name: string) => {
@@ -264,13 +267,13 @@ export const unwalked = (
   methods: readonly string[],
   walks: Readonly<Record<string, readonly Walk[] | undefined>> = JOURNAL_WALKS,
   layerOnly: readonly string[] = LAYER_ONLY,
-): string[] => methods.filter((method) => !walks[method]?.length && !layerOnly.includes(method));
+) => methods.filter((method) => !walks[method]?.length && !layerOnly.includes(method)) satisfies string[];
 
 /** What `walk` answers on `side`, as every side says it. */
-export const walked = async (walk: Walk, side: Side): Promise<unknown> => told(await walk.walk(side));
+export const walked = async (walk: Walk, side: Side) => told(await walk.walk(side));
 
 /** The walks a side `sideOf` makes, a new one for each, does not answer as the contract says, by `<method>: <walk>`. */
-export async function failing(sideOf: () => Side): Promise<string[]> {
+export async function failing(sideOf: () => Side) {
   const failed: string[] = [];
   for (const [method, walks] of Object.entries(JOURNAL_WALKS)) {
     for (const walk of walks) {
@@ -285,7 +288,7 @@ export async function failing(sideOf: () => Side): Promise<string[]> {
 }
 
 /** Every walk of the contract as a test of the side `sideOf` makes, a new one for each: its name, `<method>: <walk>`, and its body. */
-export const walksOn = (sideOf: () => Side): (readonly [name: string, body: () => Promise<void>])[] =>
+export const walksOn = (sideOf: () => Side) =>
   Object.entries(JOURNAL_WALKS).flatMap(([method, walks]) =>
     walks.map((walk) => [`${method}: ${walk.name}`, async () => assert.deepStrictEqual(await walked(walk, sideOf()), walk.says)] as const),
-  );
+  ) satisfies (readonly [name: string, body: () => Promise<void>])[];

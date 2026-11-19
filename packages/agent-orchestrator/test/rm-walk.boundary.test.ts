@@ -34,24 +34,25 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
-const aRun = (id: string, steps: Run['steps']): Run => ({
-  id,
-  repo: '/repo',
-  workspace: '/repo',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: false,
-  brief: 'add a flag',
-  workflowDir: WORKFLOW,
-  steps,
-  createdAt: '2026-01-01T00:00:00Z',
-});
+const aRun = (id: string, steps: Run['steps']) =>
+  ({
+    id,
+    repo: '/repo',
+    workspace: '/repo',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: false,
+    brief: 'add a flag',
+    workflowDir: WORKFLOW,
+    steps,
+    createdAt: '2026-01-01T00:00:00Z',
+  }) satisfies Run;
 
 /** What the daemon does to the run's json, and the only thing it does to it. */
 const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -203,7 +204,7 @@ const gitIn = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository whose `.gitignore` names what a worktree is given and what a check leaves: not work, and never committed. */
-const anIgnoringRepo = (): string => {
+const anIgnoringRepo = () => {
   const repo = aRepo();
   fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n.e2e/\n');
   gitIn(repo, 'add', '-A');

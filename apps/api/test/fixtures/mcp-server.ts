@@ -27,7 +27,7 @@ if (process.env.HKB_TEST_MODE === 'crash') {
 }
 
 /** The server `make` builds, served on stdio in both eras, or in the modern era alone where `HKB_TEST_ERA=modern`. */
-function served(make: () => McpServer): void {
+function served(make: () => McpServer) {
   serveStdio(make, { legacy: process.env.HKB_TEST_ERA === 'modern' ? 'reject' : 'serve' });
 }
 

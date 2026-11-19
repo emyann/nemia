@@ -33,8 +33,8 @@ const FAMILY = path.join(import.meta.dirname, '..', 'src', 'components', 'conver
  * every mark through `mark` under the prefix its caller hands over, so either is the rule broken. A mark that is no conversation's —
  * the band's bare `data-band`, the look's `data-cut-ring` — is none, and neither is `mark(marks, …)`, whose prefix is the caller's.
  */
-export const namedMarks = (source: string): string[] =>
-  source.match(/data-(?:chat|session)-[\w-]*|\bmark\(\s*(?:'[^']*'|"[^"]*"|`[^`]*`)/g) ?? [];
+export const namedMarks = (source: string) =>
+  (source.match(/data-(?:chat|session)-[\w-]*|\bmark\(\s*(?:'[^']*'|"[^"]*"|`[^`]*`)/g) ?? []) satisfies string[];
 
 test('REFUSED: a family part that names a conversation itself; a mark built from the caller’s prefix, and one of neither, are not', () => {
   assert.deepEqual(namedMarks('<div data-chat-talk="latest" />'), ['data-chat-talk']);
@@ -107,24 +107,26 @@ describe("the family's pure rules: a mark under its caller's prefix, a line's tr
     assert.equal(newWords(1), '1 new');
   });
   test('a talk follows its latest by how much is drawn, which a turn grows a line at a time without growing the items', () => {
-    const said = (id: string): ConversationItem => ({
-      kind: 'said',
-      id,
-      who: 'You',
-      at: '',
-      text: '',
-      markdown: false,
-      yours: true,
-      links: [],
-    });
-    const work = (lines: number): ConversationItem => ({
-      kind: 'work',
-      id: 'w:1',
-      running: true,
-      ms: 0,
-      counts: 'call',
-      lines: Array.from({ length: lines }, (_, i) => ({ id: `l:${i}`, tool: 'Read', sentence: '', state: 'done' as const })),
-    });
+    const said = (id: string) =>
+      ({
+        kind: 'said',
+        id,
+        who: 'You',
+        at: '',
+        text: '',
+        markdown: false,
+        yours: true,
+        links: [],
+      }) satisfies ConversationItem;
+    const work = (lines: number) =>
+      ({
+        kind: 'work',
+        id: 'w:1',
+        running: true,
+        ms: 0,
+        counts: 'call',
+        lines: Array.from({ length: lines }, (_, i) => ({ id: `l:${i}`, tool: 'Read', sentence: '', state: 'done' as const })),
+      }) satisfies ConversationItem;
     const [before, after] = [
       [said('p:1'), work(1)],
       [said('p:1'), work(9)],

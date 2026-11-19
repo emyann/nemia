@@ -11,11 +11,11 @@ import { Effect } from 'effect';
 import { Engine, nameFor, testOps, type RunnerOps, type Sighting } from '../src/index.ts';
 import { noTranscript } from '../src/harness/transcript.ts';
 import { builtEngine } from './engine.ts';
-import { APART, apartOn, UNKEPT, unwalked, walksOn, type End, type Moved, type Side } from './engine-walks.ts';
+import { APART, apartOn, UNKEPT, unwalked, walksOn, type End, type Moved } from './engine-walks.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A stream's text as a harness keeps it: whole, or its last `lastBytes` bytes, and `undefined` for none. */
-const tailOf = (text: string | undefined, lastBytes?: number): string | undefined =>
+const tailOf = (text: string | undefined, lastBytes?: number) =>
   text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString();
 
 /**
@@ -23,7 +23,7 @@ const tailOf = (text: string | undefined, lastBytes?: number): string | undefine
  * — a task's first attempt, or the next turn of one a person answered — ended as asked and read by the pass after, and stopped by the
  * two passes that stop a session and record its end.
  */
-function realSide(): Side {
+function realSide() {
   const sessions = new Map<string, Sighting>();
   const printed = new Map<string, NonNullable<End['printed']>>();
   const harness: RunnerOps = {
@@ -34,7 +34,7 @@ function realSide(): Side {
   };
   const engine = builtEngine(Engine.layer({ root: scratch('ae-engine-walks-'), harnesses: { test: harness }, defaultHarness: 'test' }));
   const pass = () => Effect.runPromise(engine.tick());
-  const settle = async (id: string, moved: Moved, end: End = {}): Promise<void> => {
+  const settle = async (id: string, moved: Moved, end: End = {}) => {
     if (moved === 'stopped') {
       await pass();
       await pass();

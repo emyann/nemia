@@ -95,7 +95,7 @@ const writeRun = (id: string, createdAt: string, scheduled?: { factory: string; 
 };
 
 /** With the memo's check off: what the memo alone answers, and reads. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   process.env.WF_VERIFY_REST = '0';
   try {
     return await f();

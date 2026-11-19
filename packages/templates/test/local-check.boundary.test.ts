@@ -28,7 +28,7 @@ describe('the scripts a local check runs: lint, typecheck and test, each where d
 });
 
 /** The script run in `dir` with `args`, by default naming npm as its runner: its exit. */
-const ran = (dir: string, args: readonly string[] = ['--runner', 'npm']): number | null =>
+const ran = (dir: string, args: readonly string[] = ['--runner', 'npm']) =>
   spawnSync(process.execPath, [SCRIPT, ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 }).status;
 
 test('a folder with no package.json, and one whose only test is the placeholder, pass; a lint that fails refuses', () => {

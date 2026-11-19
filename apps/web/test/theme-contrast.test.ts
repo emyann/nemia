@@ -19,7 +19,7 @@ const THEME = path.join(import.meta.dirname, '..', 'theme', 'theme.css');
 const DARK = '@media (prefers-color-scheme: dark)';
 
 /** A colour the theme writes as `hsl(<h> <s>% <l>%)`, in sRGB's channels. */
-const rgbOf = (hsl: string): Rgb => {
+const rgbOf = (hsl: string) => {
   const parts = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(hsl.trim());
   if (!parts) throw new Error(`${hsl} is no hsl(h s% l%): read theme/theme.css as the kit's generator writes it, npm run theme:generate`);
   const [h, s, l] = [Number(parts[1]), Number(parts[2]) / 100, Number(parts[3]) / 100];
@@ -28,11 +28,11 @@ const rgbOf = (hsl: string): Rgb => {
     const k = (n + h / 30) % 12;
     return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
   };
-  return [channel(0), channel(8), channel(4)];
+  return [channel(0), channel(8), channel(4)] satisfies Rgb;
 };
 
 /** The colour roles a block of the theme writes, by their name after `--md-sys-color-`. */
-const rolesIn = (css: string): Map<string, Rgb> =>
+const rolesIn = (css: string) =>
   new Map([...css.matchAll(/--md-sys-color-([a-z-]+):\s*(hsl\([^)]*\))\s*;/g)].map((m) => [m[1], rgbOf(m[2])]));
 
 const css = fs.readFileSync(THEME, 'utf8');

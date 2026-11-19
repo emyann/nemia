@@ -11,25 +11,28 @@ import type { ListingInput } from '../src/list/list.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 
 /** A step of a workflow, waiting on `after`. */
-export const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: `do ${name}` });
+export const step = (name: string, after: string[] = []) => ({ name, after, body: `do ${name}` }) satisfies StepSpec;
 
 /** `implement → review`, the workflow most rows read. */
 export const STEPS = [step('implement'), step('review', ['implement'])];
 
 /** A run record whose steps are filed as `steps` says (a task id, or `null` for not yet filed), with `rest` over it. */
-export const run = (steps: Record<string, string | null>, rest: Partial<RepositoryRun> = {}): RepositoryRun => ({
-  id: 'r-1',
-  repo: '/repo',
-  workspace: '/wt',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/wf',
-  createdAt: '2026-01-01T00:00:00Z',
-  steps: Object.fromEntries(Object.entries(steps).map(([k, v]) => [k, { taskId: v }])),
-  ...rest,
-});
+export const run = (steps: Record<string, string | null>, rest: Partial<RepositoryRun> = {}) => {
+  const made: RepositoryRun = {
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: '/wf',
+    createdAt: '2026-01-01T00:00:00Z',
+    steps: Object.fromEntries(Object.entries(steps).map(([k, v]) => [k, { taskId: v }])),
+    ...rest,
+  };
+  return made;
+};
 
 /**
  * The one read of a run `assess` and its readers take (`AssessRead`), as the tables build it: `steps` and `run`, with `partial` over the
@@ -39,25 +42,26 @@ export const run = (steps: Record<string, string | null>, rest: Partial<Reposito
  * left out (`undefined`) — and a reader given as `undefined` is left out: on an empty view `exitVerdicts` reads every check on the
  * record as `unfinished`, which no table means by leaving it out.
  */
-export const aRead = (steps: readonly StepSpec[], r: Run, partial: Partial<Omit<AssessRead, 'steps' | 'run'>> = {}): AssessRead => ({
-  steps,
-  run: r,
-  ...EMPTY_VIEW,
-  asks: [],
-  roundAsks: [],
-  standings: [],
-  checkout: undefined,
-  ...given(partial),
-});
+export const aRead = (steps: readonly StepSpec[], r: Run, partial: Partial<Omit<AssessRead, 'steps' | 'run'>> = {}) =>
+  ({
+    steps,
+    run: r,
+    ...EMPTY_VIEW,
+    asks: [],
+    roundAsks: [],
+    standings: [],
+    checkout: undefined,
+    ...given(partial),
+  }) satisfies AssessRead;
 
 /** `partial` with every key given as `undefined` left out, so a table's left-out reader is the default, as a positional one was. */
-const given = <T extends object>(partial: T): Partial<T> =>
+const given = <T extends object>(partial: T) =>
   Object.fromEntries(Object.entries(partial).filter(([, v]) => v !== undefined)) as Partial<T>;
 
 /** What `readersOf` reads of a run off an empty view, every task unknown to it (`aRead`'s defaults). */
 export const EMPTY_VIEW = {
-  phaseOf: (): TaskPhase => 'unknown',
-  signedOff: (): Closeout | undefined => undefined,
+  phaseOf: () => 'unknown' as const satisfies TaskPhase,
+  signedOff: () => undefined satisfies Closeout | undefined,
   asked: () => false as const,
   verdictOf: () => undefined,
   checkKillOf: () => undefined,
@@ -66,40 +70,43 @@ export const EMPTY_VIEW = {
 } satisfies Pick<AssessRead, 'phaseOf' | 'signedOff' | 'asked' | 'verdictOf' | 'checkKillOf' | 'sessionBlocked' | 'spendOf'>;
 
 /** The engine's phase of each task id, `unknown` for one it does not hold. */
-export const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unknown';
+export const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? ('unknown' as const);
 
 /**
  * That the code said something — a refusal, a line — and that it names each of `facts`: the command, flag or field its fix names,
  * and the ids, steps and counts the behaviour turns on. Never its sentence, whose words are nobody's to check.
  */
-export const namesFor = (why: string, said: string | null | undefined, ...facts: string[]): void => {
+export const namesFor = (why: string, said: string | null | undefined, ...facts: string[]) => {
   assert.equal(typeof said, 'string', `${why}: the code said nothing`);
   for (const fact of facts) assert.ok(said!.includes(fact), `${why}: ${JSON.stringify(said)} does not name ${JSON.stringify(fact)}`);
 };
 
 /** `namesFor`, where the test's title says why. */
-export const names = (said: string | null | undefined, ...facts: string[]): void => namesFor('refused', said, ...facts);
+export const names = (said: string | null | undefined, ...facts: string[]) => namesFor('refused', said, ...facts);
 
 /**
  * A run whose implement is on the try after the run's one sign-off nudge, spent: what `retriesDue` leaves an unsigned step to a person
  * on.
  */
-export const signedOffOnce = (r: Run): Run => ({
-  ...r,
-  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', cause: 'signoff' }] } },
-});
+export const signedOffOnce = (r: Run) => {
+  const made: Run = {
+    ...r,
+    steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', cause: 'signoff' }] } },
+  };
+  return made;
+};
 
 /**
  * The engine's word as a step's standing reads it: a session that stopped to ask is still at work, and what is not settled runs. What the
  * tables' engine words come to as the one read's phase (`phaseOfView` reads the same off a view).
  */
-export const settledWord =
-  (phaseOf: (taskId: string) => string) =>
-  (taskId: string): TaskPhase => {
-    const word = phaseOf(taskId);
-    if (word === 'input-required') return 'succeeded';
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
-  };
+export const settledWord = (phaseOf: (taskId: string) => string) => (taskId: string) => {
+  const word = phaseOf(taskId);
+  if (word === 'input-required') return 'succeeded' as const satisfies TaskPhase;
+  return (
+    word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : ('running' as const)
+  ) satisfies TaskPhase;
+};
 
 /** What the tables hand a listing: its words, and the readers and asks its one read is built of (`listingInput`). */
 export type ListedInput = Omit<ListingInput, 'read' | 'assessed'> &
@@ -112,11 +119,11 @@ export type ListedInput = Omit<ListingInput, 'read' | 'assessed'> &
  * A listing's input off a table's (`ListedInput`): its one read built by `aRead` from the engine's words (`settledWord`), the closeouts
  * read as the routing reads them (one nobody can read is none), and the session `needs-human` blocked, as `harnessBlocked` reads a view.
  */
-export const listingInput = (input: ListedInput): ListingInput => {
+export const listingInput = (input: ListedInput) => {
   const { run: r, askedCloseout, verdictOf, asks, roundAsks, spendOf, standings, checkout, sessionBlocked, ...rest } = input;
-  const signedOff = (name: string): Closeout | undefined => {
+  const signedOff = (name: string) => {
     const c = input.closeoutOf(name);
-    return c && !('error' in c) ? c : undefined;
+    return (c && !('error' in c) ? c : undefined) satisfies Closeout | undefined;
   };
   const read = aRead(input.steps, r, {
     phaseOf: settledWord(input.phaseOf),
@@ -130,11 +137,11 @@ export const listingInput = (input: ListedInput): ListingInput => {
     ...(checkout ? { checkout } : {}),
     sessionBlocked: sessionBlocked ?? ((taskId) => input.phaseOf(taskId) === 'needs-human'),
   });
-  return { ...rest, read };
+  return { ...rest, read } satisfies ListingInput;
 };
 
 /** The engine's word as the feed keeps it (`feedPhase`), as the pass hands it to the listing it words for the feed (`wordFeed`). */
-const fedWord = (word: ListedPhase): ListedPhase => (word === 'running' ? word : feedPhase(word));
+const fedWord = (word: ListedPhase) => (word === 'running' ? word : feedPhase(word)) satisfies ListedPhase;
 
 /**
  * `listing`, holding each row's codes to the feed's word for it: a row's `reason` is the reason `reasonOf` reads off the word the feed
@@ -142,7 +149,7 @@ const fedWord = (word: ListedPhase): ListedPhase => (word === 'running' ? word :
  * phase of that reason (`PHASE_OF`). So a reason carried where the listing judges the step means what the feed's word meant before it was
  * carried, for every row the tables of `assess` list. The listing `nemia ls` prints is what it answers.
  */
-export const listing = (input: ListedInput): ReturnType<typeof listed> => {
+export const listing = (input: ListedInput) => {
   const l = listed(listingInput(input));
   const fed = listed({ ...listingInput(input), phaseOf: (id) => fedWord(input.phaseOf(id)) });
   const words = feedWords(fed, input.run, { status: 'running' }, input.closeoutOf);
@@ -156,5 +163,5 @@ export const listing = (input: ListedInput): ReturnType<typeof listed> => {
     assert.equal(l.steps[i].reason, row.reason, `${row.name}: the engine's live words come to the reason the feed's word does`);
     assert.equal(row.phase, PHASE_OF[row.reason], `${row.name}: its phase is its reason's`);
   });
-  return l;
+  return l satisfies ReturnType<typeof listed>;
 };

@@ -86,7 +86,7 @@ const OWN = ['src/revisions/revisions.store.ts', 'src/revisions/memory.store.ts'
 const SEAM_USE = new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})(?![\\w$])`, 'g');
 
 /** What a break of the baseline says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const inWords = ({ file, uses: n, owed, kind }: DebtBreak): string =>
+const inWords = ({ file, uses: n, owed, kind }: DebtBreak) =>
   kind === 'grown'
     ? `${file} uses the ledger's synchronous spellings ${n} time(s) where test/ledger-door.baseline.ts names ${owed}: yield LedgerDoor (src/revisions/revisions.store.ts) instead`
     : kind === 'fallen'

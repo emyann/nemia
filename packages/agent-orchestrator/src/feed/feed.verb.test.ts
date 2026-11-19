@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Fiber, Layer, Logger, ManagedRuntime, Metric, PubSub, References, Stream, type Duration } from 'effect';
-import { isRunLine, type FeedWords } from './feed.ts';
+import { isRunLine } from './feed.ts';
 import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 import { StoreRoot } from '../config/root.store.ts';
@@ -37,8 +37,7 @@ const rooted = StoreRoot.layer(ROOT);
 type Followed = Stream.Success<ReturnType<typeof followFeed>>;
 
 /** What a pass judged of the one run, `r-1`: the run at `word`, and `step` at `word` where it is given. */
-const judged = (word: string, step?: string): ReadonlyMap<string, FeedWords> =>
-  new Map([['r-1', { run: { word }, steps: step ? [{ name: step, word }] : [] }]]);
+const judged = (word: string, step?: string) => new Map([['r-1', { run: { word }, steps: step ? [{ name: step, word }] : [] }]]);
 
 /** A runtime with a hub of `capacity` lines and no logger, the process a reader and a writer share: let go once the test `t` ends. */
 function hubbed(t: TestContext, capacity?: number) {

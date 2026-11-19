@@ -13,7 +13,7 @@ import { routeAsk } from '../route/index.ts';
 
 const ROOT = scratch('wf-record-read-');
 /** A person's route file for a condition's try, where `nemia route` writes it. */
-const routeFile = (id: string, step: string, n: number): string => path.join(store.asksDir(ROOT, id), routeAsk(step, n));
+const routeFile = (id: string, step: string, n: number) => path.join(store.asksDir(ROOT, id), routeAsk(step, n));
 const {
   UnreadableRecord,
   acceptanceIn,
@@ -32,28 +32,29 @@ const {
 fs.mkdirSync(runsDir(ROOT), { recursive: true });
 
 /** A repository run's record as the tick writes one today, frozen steps and all. */
-const aRecord = (id: string): Record<string, unknown> => ({
-  id,
-  repo: '/repo',
-  workspace: '/repo',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/repo/workflows/dev',
-  workflow: [
-    { name: 'implement', after: [], body: 'do it', harness: 'claude' },
-    { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
-  ],
-  steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
-  createdAt: '2026-09-01T00:00:00.000Z',
-});
+const aRecord = (id: string) =>
+  ({
+    id,
+    repo: '/repo',
+    workspace: '/repo',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: '/repo/workflows/dev',
+    workflow: [
+      { name: 'implement', after: [], body: 'do it', harness: 'claude' },
+      { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
+    ],
+    steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
+    createdAt: '2026-09-01T00:00:00.000Z',
+  }) satisfies Record<string, unknown>;
 
-const put = (id: string, record: unknown): void =>
+const put = (id: string, record: unknown) =>
   fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 /** What `runRecord` is refused with, as its message — exit code 2, and an `UnreadableRecord`. */
-const refusalOf = (id: string): string => {
+const refusalOf = (id: string) => {
   try {
     runRecord(ROOT, id);
   } catch (err) {
@@ -67,7 +68,7 @@ const refusalOf = (id: string): string => {
 const FIX = 'Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it';
 
 /** A frozen step with the agent it names, as the parser resolves one: what each refusal below breaks one field of. */
-const withAgent = (id: string): Record<string, unknown> => {
+const withAgent = (id: string) => {
   const record = aRecord(id);
   (record.workflow as Array<Record<string, unknown>>)[1] = {
     name: 'review',
@@ -84,7 +85,7 @@ const withAgent = (id: string): Record<string, unknown> => {
     },
     agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], harnessPrompt: 'keep' },
   };
-  return record;
+  return record satisfies Record<string, unknown>;
 };
 
 /** Each frozen step key the parser types, broken as a person's edit would break it: where it is, and what `runRecord` says is there. */
@@ -110,17 +111,17 @@ const BROKEN: ReadonlyArray<[string, (step: Record<string, unknown>) => void, st
 ];
 
 /** A record with one try on `implement` whose cause is `cause`, or none. */
-const withTry = (id: string, cause?: string): Record<string, unknown> => {
+const withTry = (id: string, cause?: string) => {
   const record = aRecord(id);
   (record.steps as Record<string, Record<string, unknown>>).implement.tries = [{ taskId: `${id}-implement`, ...(cause ? { cause } : {}) }];
-  return record;
+  return record satisfies Record<string, unknown>;
 };
 
 /** A record whose first frozen step is changed by `edit`. */
-const firstStep = (id: string, edit: (step: Record<string, unknown>) => void): Record<string, unknown> => {
+const firstStep = (id: string, edit: (step: Record<string, unknown>) => void) => {
   const record = aRecord(id);
   edit((record.workflow as Array<Record<string, unknown>>)[0]);
-  return record;
+  return record satisfies Record<string, unknown>;
 };
 
 const { repo: _r, baseRef: _b, branch: _br, isolate: _i, ...folderRun } = aRecord('r-place');
@@ -165,11 +166,11 @@ const REFUSED: ReadonlyArray<[row: string, id: string, record: unknown, says: st
   ],
   ['no JSON', 'r-half', '{"id": "r-half", "repo"', 'is not JSON ('],
   ['no object', 'r-list', '[]', 'is no run record: it holds no object'],
-  ...BROKEN.map(([key, breaks, says]): [string, string, unknown, string] => {
+  ...BROKEN.map(([key, breaks, says]) => {
     const id = `r-bad-${key.replace('.', '-')}`;
     const record = withAgent(id);
     breaks((record.workflow as Array<Record<string, unknown>>)[1]);
-    return [`a frozen step's \`${key}\` of the wrong type`, id, record, says];
+    return [`a frozen step's \`${key}\` of the wrong type`, id, record, says] satisfies [string, string, unknown, string];
   }),
 ];
 
@@ -307,7 +308,7 @@ test('a marker that does not read still holds its run: a prune marker is pruned,
 });
 
 /** An ask file with `body`, as a person might have written it by hand. */
-const ask = (name: string, body: unknown): string => {
+const ask = (name: string, body: unknown) => {
   const dir = path.join(ROOT, 'asks');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, name);
@@ -366,7 +367,7 @@ describe("an ask a verb would not write is refused in that verb's words, reason 
     assert.deepEqual(roundAskIn(ask('r5', { at: 12, budget: 2.5 }), 'implement', 4), { step: 'implement', round: 4, budget: 2.5, at: '' });
   });
   test('a retry ask, held to `nemia retry`’s word; the former `nudge` read as `continue`', () => {
-    const said = (body: unknown): unknown => askIn(ask('t', body), 'implement', 2);
+    const said = (body: unknown) => askIn(ask('t', body), 'implement', 2) satisfies unknown;
     assert.equal(said({ mode: 'again' }), 'it asks for no mode nemia retry knows ("again")');
     assert.equal(said({}), 'it asks for no mode nemia retry knows (undefined)');
     assert.equal(said({ mode: 'fresh', model: '' }), 'its model is not a name');

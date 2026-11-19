@@ -58,8 +58,9 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
     },
   );
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'continue'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
-const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
+const askFor = (n: number, mode: RetryMode = 'continue') =>
+  ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' }) satisfies RetryAsk;
+const roundAskFor = (round: number) => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' }) satisfies RoundAsk;
 /** Where an ask's file is, as the store says it. */
 /** The file each ask is named by, as the store names it: a try's `retry-…`, a round's `round-…`, a merge of the base's `merge-…`. */
 const FILE_OF = { try: 'retry', round: 'round', base: 'merge' } as const;
@@ -87,13 +88,13 @@ const LOOP: StepSpec[] = [
   step('ship', ['review']),
 ];
 /** The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it; ship unfiled. */
-const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
-  const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}) => {
+  const earlier = (prefix: string, checked: boolean) =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
       cause: 'round' as const,
-    }));
+    })) satisfies EarlierTry[];
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   return run(
     {},
@@ -105,36 +106,35 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
       },
       ...extra,
     },
-  );
+  ) satisfies Run;
 };
-const ALL_SUCCEEDED = (): TaskPhase => 'succeeded';
+const ALL_SUCCEEDED = () => 'succeeded' as const satisfies TaskPhase;
 /** implement's closeout and review's, saying `again`. */
-const saidIn =
-  (n: number, again: unknown) =>
-  (name: string): Closeout | undefined =>
-    name === 'review'
-      ? { outcome: 'done', summary: 'REVIEWER-SUMMARY', artifacts: [], needs: undefined, output: { findings: [], again } }
-      : name === 'implement'
-        ? n > 1
-          ? { outcome: 'done', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: undefined, output: { replies: [] } }
-          : signedDone()
-        : undefined;
+const saidIn = (n: number, again: unknown) => (name: string) =>
+  (name === 'review'
+    ? { outcome: 'done', summary: 'REVIEWER-SUMMARY', artifacts: [], needs: undefined, output: { findings: [], again } }
+    : name === 'implement'
+      ? n > 1
+        ? { outcome: 'done', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: undefined, output: { replies: [] } }
+        : signedDone()
+      : undefined) satisfies Closeout | undefined;
 
 /** `implement → ship`, the ending gated, in the repository's checkout, with a check (`landsOnCheck`). */
 const SHIP: StepSpec = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
 const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
-const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
-  ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
-  steps: {
-    implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
-    ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
-  },
-});
+const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) =>
+  ({
+    ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
+    steps: {
+      implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
+      ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
+    },
+  }) satisfies Run;
 
 /** That `said` names each of `facts`, each after the one before it: the order a refusal says its reasons, then its fixes, in. */
-const inOrder = (said: string | null | undefined, ...facts: string[]): void => {
+const inOrder = (said: string | null | undefined, ...facts: string[]) => {
   names(said, ...facts);
   let from = 0;
   for (const fact of facts) {
@@ -144,7 +144,7 @@ const inOrder = (said: string | null | undefined, ...facts: string[]): void => {
   }
 };
 /** That `said` names none of `facts`. */
-const lacks = (said: string | null | undefined, ...facts: string[]): void => {
+const lacks = (said: string | null | undefined, ...facts: string[]) => {
   for (const fact of facts) assert.ok(!said?.includes(fact), `${JSON.stringify(said)} names ${JSON.stringify(fact)}`);
 };
 
@@ -411,7 +411,7 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
     inOrder(cancelled, 'h-1 and h-2 are held until it lands', 'nemia hold h-1 --off, nemia hold h-2 --off');
     lacks(cancelled, 'nemia decide');
   });
-  const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
+  const closeoutOf = () => ({ ...signedDone(), output: { message: 'Add a flag' } }) satisfies Closeout;
   const forget = (steps: readonly StepSpec[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
     forgetRefusal(steps, r, landed, others, closeoutOf, () => false, none, asks, [], none, at, [], 'rm', 'ours');
   test('a merge staged and not landed before an ask, a child and a hold, and its fix before theirs', () => {
@@ -498,14 +498,15 @@ describe('`forgetRefusal` says its reasons in one order — in flight, a merge s
 });
 
 describe("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which a removal leaves, and what becomes of each branch", () => {
-  const atHeld = (p: string, more: Partial<Held> = {}): Held => ({
-    path: p,
-    tip: 'def',
-    removable: 'yes',
-    clean: true,
-    onBranch: true,
-    ...more,
-  });
+  const atHeld = (p: string, more: Partial<Held> = {}) =>
+    ({
+      path: p,
+      tip: 'def',
+      removable: 'yes',
+      clean: true,
+      onBranch: true,
+      ...more,
+    }) satisfies Held;
   test("a run's worktrees are those its place lists inside its own directory — never the repository, nor a run's whose id starts with this one's — each with its step", () => {
     const listed: Held[] = [
       atHeld('/repo', { branch: 'main' }),
@@ -732,7 +733,7 @@ describe('`notForgottenLine` says in one line what kept a run `nemia rm` did not
 });
 
 test('leftWhy: a path gone or not empty is expected and says nothing; any other failure keeps its reason, naming the path', () => {
-  const err = (code: string): NodeJS.ErrnoException => Object.assign(new Error(`${code}: what the system said`), { code });
+  const err = (code: string) => Object.assign(new Error(`${code}: what the system said`), { code }) satisfies NodeJS.ErrnoException;
   assert.equal(leftWhy('/store/checks', err('ENOENT'), ['ENOENT']), null);
   assert.equal(leftWhy('/store/worktrees/r-1', err('ENOTEMPTY'), ['ENOENT', 'ENOTEMPTY']), null);
   const why = leftWhy('/store/checks', err('EACCES'), ['ENOENT']);

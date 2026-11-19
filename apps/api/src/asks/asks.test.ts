@@ -140,7 +140,7 @@ const ask = (step: string, body: unknown, headers: Record<string, string> = BOAR
   });
 
 /** Every file under the run's asks directory, waiting or consumed. */
-const asked = (run = R): string[] => {
+const asked = (run = R) => {
   const dir = path.join(root, 'runs', `${run}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
@@ -157,7 +157,7 @@ const object = async (id = R) => objectOf(app(), id);
 const summary = async (id = R) => (await listedOf(app(), id)).status;
 
 /** The error a refused ask answered with, its status `status`. */
-const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
+const refusedWith = async (res: Response, status: number, said: string) => {
   assert.equal(res.status, status, said);
   return ((await res.json()) as { error: string }).error;
 };

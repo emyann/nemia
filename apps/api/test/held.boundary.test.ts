@@ -44,7 +44,7 @@ const DONE = { outcome: 'done', summary: 'The plan.', needs: null, artifacts: []
 const BLOCKED = { outcome: 'blocked', summary: 'Two ways to go.', needs: 'Warm colours, or cool ones?', artifacts: [] };
 
 /** `plan → implement`, plan's task waiting; gated at plan when `gates` says so. */
-function writeRun(id: string, gates?: string[]): void {
+function writeRun(id: string, gates?: string[]) {
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify({

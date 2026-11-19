@@ -43,7 +43,7 @@ const ALL = { ...JOURNALS, ...OWN };
 const inOrder = (states: Iterable<LifecycleState>) => STATES.filter((s) => new Set(states).has(s)).join(', ');
 
 /** What one verb breaks over the journals, once its writer and guard are known to exist. */
-const breachesOf = (v: Verb, guard: (state: State) => boolean, writer: Writer, journals: Record<string, Event[]>): string[] => {
+const breachesOf = (v: Verb, guard: (state: State) => boolean, writer: Writer, journals: Record<string, Event[]>) => {
   const out: string[] = [];
   const outside = new Set<LifecycleState>();
   const accepted = new Set<LifecycleState>();
@@ -73,19 +73,14 @@ const breachesOf = (v: Verb, guard: (state: State) => boolean, writer: Writer, j
   if (reads.size) out.push(`${v.verb} journalled: the next pass reads ${inOrder(reads)}, not ${v.to}`);
   const never = v.from.filter((s) => !accepted.has(s));
   if (never.length) out.push(`${v.verb} is never accepted in ${inOrder(never)}, which its data lists`);
-  return out;
+  return out satisfies string[];
 };
 
 /**
  * Where a person's verbs and their data disagree, over the journals given: each breach a sentence naming the verb, the state and what
  * the data says of it. None, at shipped defaults.
  */
-const verbBreaches = (
-  verbs: readonly Verb[],
-  guards: Guards,
-  writes: Record<string, Writer>,
-  journals: Record<string, Event[]>,
-): string[] =>
+const verbBreaches = (verbs: readonly Verb[], guards: Guards, writes: Record<string, Writer>, journals: Record<string, Event[]>) =>
   verbs.flatMap((v) => {
     const writer = writes[v.verb];
     if (!writer) return [`${v.verb} has no writer: nothing journals it`];
@@ -93,10 +88,10 @@ const verbBreaches = (
     const guard = guards[v.guard];
     if (!guard) return [`${v.verb}'s guard \`${v.guard}\` has no predicate`];
     return breachesOf(v, guard, writer, journals);
-  });
+  }) satisfies string[];
 
-const copy = (): Verb[] => VERBS.map((v) => ({ ...v, from: [...v.from] }));
-const planted = (verb: string, change: Partial<Verb>): Verb[] => copy().map((v) => (v.verb === verb ? { ...v, ...change } : v));
+const copy = () => VERBS.map((v) => ({ ...v, from: [...v.from] })) satisfies Verb[];
+const planted = (verb: string, change: Partial<Verb>) => copy().map((v) => (v.verb === verb ? { ...v, ...change } : v)) satisfies Verb[];
 
 test('at shipped defaults, every verb is taken exactly from the states its data lists, under its guard, and leads where its data says', () => {
   assert.deepEqual(verbBreaches(VERBS, VERB_GUARDS, WRITES, ALL), []);

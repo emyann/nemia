@@ -25,12 +25,12 @@ import { MOUNT } from '../src/objects/index.ts';
 const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js', 'ALL /mcp', `GET ${BOARD_ROUTE}`] as const;
 
 /** Each route Hono serves as `METHOD path`, once, but the middleware (`ALL /*`) and the mount, which serve none of their own. */
-const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [
+const routesOf = (routes: readonly { method: string; path: string }[]) => [
   ...new Set(routes.filter((r) => !(r.method === 'ALL' && (r.path === '/*' || r.path === MOUNT))).map((r) => `${r.method} ${r.path}`)),
 ];
 
 /** Where the routes Hono serves and those `listed` (`META`) disagree, a sentence each naming the fix. */
-function outsideBreaks(routes: readonly { method: string; path: string }[], listed: readonly string[] = META): string[] {
+function outsideBreaks(routes: readonly { method: string; path: string }[], listed: readonly string[] = META) {
   const served = routesOf(routes);
   const named = new Set<string>(listed);
   return [
@@ -52,13 +52,13 @@ const ENDPOINTS = Object.values(Api.groups).flatMap((group) =>
 );
 
 /** `path` with every name filled in by one no object has, so a read finds nothing and a write refuses. */
-const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
+const filled = (path: string) => path.replace(/:[A-Za-z]+/g, 'nothing-here');
 
 /** The query an endpoint is asked with, by its path, where its default would hold the request open: a long poll's bound, cut to 1ms. */
 const ASKED: Readonly<Record<string, string>> = { '/api/feed/wait': '?for=1ms' };
 
 /** Whether `body` is the api's 404 for a path no route serves (`noRoute`), by the words it says that in. */
-const saysNoRoute = (body: unknown): boolean =>
+const saysNoRoute = (body: unknown) =>
   typeof body === 'object' && body !== null && 'error' in body && String(body.error).includes('is no route of this api');
 
 test('every endpoint of the Api is served by the mount: neither the 404 for no route nor a 500 with no words', async () => {

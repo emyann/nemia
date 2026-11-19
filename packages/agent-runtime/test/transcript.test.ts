@@ -57,7 +57,7 @@ const writeClaude = (sessionId: string, text: string) => {
  * per content block — thinking, text, a Bash call and its failed result, the StructuredOutput call and its
  * result — and a system line. Chained by `parentUuid`, as the SDK's reader (`logs`) follows them.
  */
-const claudeLines = (sessionId: string): object[] => {
+const claudeLines = (sessionId: string) => {
   const line = {
     sessionId,
     isSidechain: false,
@@ -164,7 +164,7 @@ const claudeLines = (sessionId: string): object[] => {
       timestamp: at(8),
       isMeta: false,
     },
-  ];
+  ] satisfies object[];
 };
 
 /** What that transcript says, as events. */
@@ -260,134 +260,142 @@ const runFile = (root: string, harness: string, name: string, run: object) => {
  * (`event_msg` / `item_completed`) — the prompt, reasoning, a message, a command that failed, a file
  * change, an item of a type the reader does not know (`NotMeasuredYet`), the final answer — and the task's end.
  */
-const rolloutLines = (thread: string): object[] => [
-  {
-    timestamp: at(0),
-    type: 'session_meta',
-    payload: { id: thread, session_id: thread, cwd: '/repo', cli_version: '0.154.0', base_instructions: { text: 'You are Codex.' } },
-  },
-  { timestamp: at(0), type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
-  {
-    timestamp: at(1),
-    type: 'response_item',
-    payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions>' }] },
-  },
-  {
-    timestamp: at(1),
-    type: 'response_item',
-    payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>' }] },
-  },
-  {
-    timestamp: at(1),
-    type: 'response_item',
-    payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Review the change.' }] },
-  },
-  {
-    timestamp: at(1),
-    type: 'event_msg',
-    payload: {
-      type: 'item_completed',
-      thread_id: thread,
-      turn_id: 'turn-1',
-      item: { type: 'UserMessage', id: 'user-1', content: [{ type: 'text', text: 'Review the change.', text_elements: [] }] },
+const rolloutLines = (thread: string) => {
+  const made: object[] = [
+    {
+      timestamp: at(0),
+      type: 'session_meta',
+      payload: { id: thread, session_id: thread, cwd: '/repo', cli_version: '0.154.0', base_instructions: { text: 'You are Codex.' } },
     },
-  },
-  {
-    timestamp: at(2),
-    type: 'event_msg',
-    payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'Reasoning', id: 'rs_1', summary_text: [], raw_content: [] } },
-  },
-  { timestamp: at(2), type: 'response_item', payload: { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'gAAAA' } },
-  {
-    timestamp: at(3),
-    type: 'event_msg',
-    payload: {
-      type: 'item_completed',
-      turn_id: 'turn-1',
-      item: { type: 'AgentMessage', id: 'msg_1', content: [{ type: 'Text', text: 'I will run the tests.' }], phase: 'commentary' },
+    { timestamp: at(0), type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
+    {
+      timestamp: at(1),
+      type: 'response_item',
+      payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions>' }] },
     },
-  },
-  {
-    timestamp: at(3),
-    type: 'response_item',
-    payload: { type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text: 'I will run the tests.' }] },
-  },
-  {
-    timestamp: at(4),
-    type: 'response_item',
-    payload: {
-      type: 'custom_tool_call',
-      call_id: 'call_1',
-      name: 'exec',
-      input: 'text((await tools.exec_command({cmd:"npm test"})).output)',
+    {
+      timestamp: at(1),
+      type: 'response_item',
+      payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>' }] },
     },
-  },
-  {
-    timestamp: at(9),
-    type: 'event_msg',
-    payload: {
-      type: 'item_completed',
-      turn_id: 'turn-1',
-      item: {
-        type: 'CommandExecution',
-        id: 'exec-1',
-        command: ['/bin/bash', '-lc', 'npm test'],
-        cwd: 'file:///repo',
-        status: 'failed',
-        exit_code: 1,
-        aggregated_output: '1 failing',
-        stdout: '1 failing',
-        stderr: '',
+    {
+      timestamp: at(1),
+      type: 'response_item',
+      payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Review the change.' }] },
+    },
+    {
+      timestamp: at(1),
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        thread_id: thread,
+        turn_id: 'turn-1',
+        item: { type: 'UserMessage', id: 'user-1', content: [{ type: 'text', text: 'Review the change.', text_elements: [] }] },
       },
     },
-  },
-  {
-    timestamp: at(9),
-    type: 'response_item',
-    payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: [{ type: 'input_text', text: 'Script completed\n' }] },
-  },
-  { timestamp: at(10), type: 'event_msg', payload: { type: 'token_count', info: null } },
-  {
-    timestamp: at(11),
-    type: 'event_msg',
-    payload: {
-      type: 'item_completed',
-      turn_id: 'turn-1',
-      item: {
-        type: 'FileChange',
-        id: 'exec-2',
-        changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } },
-        status: 'completed',
-        stdout: 'Success. Updated the following files:\nA /repo/REVIEW.md',
-        stderr: '',
+    {
+      timestamp: at(2),
+      type: 'event_msg',
+      payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'Reasoning', id: 'rs_1', summary_text: [], raw_content: [] } },
+    },
+    { timestamp: at(2), type: 'response_item', payload: { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'gAAAA' } },
+    {
+      timestamp: at(3),
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        turn_id: 'turn-1',
+        item: { type: 'AgentMessage', id: 'msg_1', content: [{ type: 'Text', text: 'I will run the tests.' }], phase: 'commentary' },
       },
     },
-  },
-  {
-    timestamp: at(12),
-    type: 'event_msg',
-    payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'NotMeasuredYet', id: 'item-9' } },
-  },
-  {
-    timestamp: at(13),
-    type: 'event_msg',
-    payload: {
-      type: 'item_completed',
-      turn_id: 'turn-1',
-      item: {
-        type: 'AgentMessage',
-        id: 'msg_2',
-        content: [{ type: 'Text', text: '{"outcome":"done","summary":"one finding"}' }],
-        phase: 'final_answer',
+    {
+      timestamp: at(3),
+      type: 'response_item',
+      payload: {
+        type: 'message',
+        role: 'assistant',
+        phase: 'commentary',
+        content: [{ type: 'output_text', text: 'I will run the tests.' }],
       },
     },
-  },
-  {
-    timestamp: at(14),
-    type: 'event_msg',
-    payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: '{"outcome":"done","summary":"one finding"}', error: null },
-  },
-];
+    {
+      timestamp: at(4),
+      type: 'response_item',
+      payload: {
+        type: 'custom_tool_call',
+        call_id: 'call_1',
+        name: 'exec',
+        input: 'text((await tools.exec_command({cmd:"npm test"})).output)',
+      },
+    },
+    {
+      timestamp: at(9),
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        turn_id: 'turn-1',
+        item: {
+          type: 'CommandExecution',
+          id: 'exec-1',
+          command: ['/bin/bash', '-lc', 'npm test'],
+          cwd: 'file:///repo',
+          status: 'failed',
+          exit_code: 1,
+          aggregated_output: '1 failing',
+          stdout: '1 failing',
+          stderr: '',
+        },
+      },
+    },
+    {
+      timestamp: at(9),
+      type: 'response_item',
+      payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: [{ type: 'input_text', text: 'Script completed\n' }] },
+    },
+    { timestamp: at(10), type: 'event_msg', payload: { type: 'token_count', info: null } },
+    {
+      timestamp: at(11),
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        turn_id: 'turn-1',
+        item: {
+          type: 'FileChange',
+          id: 'exec-2',
+          changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } },
+          status: 'completed',
+          stdout: 'Success. Updated the following files:\nA /repo/REVIEW.md',
+          stderr: '',
+        },
+      },
+    },
+    {
+      timestamp: at(12),
+      type: 'event_msg',
+      payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'NotMeasuredYet', id: 'item-9' } },
+    },
+    {
+      timestamp: at(13),
+      type: 'event_msg',
+      payload: {
+        type: 'item_completed',
+        turn_id: 'turn-1',
+        item: {
+          type: 'AgentMessage',
+          id: 'msg_2',
+          content: [{ type: 'Text', text: '{"outcome":"done","summary":"one finding"}' }],
+          phase: 'final_answer',
+        },
+      },
+    },
+    {
+      timestamp: at(14),
+      type: 'event_msg',
+      payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: '{"outcome":"done","summary":"one finding"}', error: null },
+    },
+  ];
+  return made;
+};
 
 /** What that rollout says, as events: the same shape as Claude Code's, as far as the records allow. */
 const CODEX_EVENTS: TranscriptEvent[] = [
@@ -493,10 +501,13 @@ describe('read in two pieces, cut anywhere, a transcript gives what it gives rea
 });
 
 /** A record of the kind `payload.type` names, at `at(0)`, carrying `payload`. */
-const eventMsg = (payload: object): object => ({ timestamp: at(0), type: 'event_msg', payload });
+const eventMsg = (payload: object) => {
+  const made: object = { timestamp: at(0), type: 'event_msg', payload };
+  return made;
+};
 
 /** The words `codexRolloutEvents` refuses `record` with, read alone as the line at byte 9 of `/r.jsonl`. */
-const refusedWith = (record: object): string => {
+const refusedWith = (record: object) => {
   try {
     codexRolloutEvents(record, 9, '/r.jsonl');
   } catch (e) {
@@ -681,11 +692,11 @@ const { Engine } = await import('../src/index.ts');
 const { builtEngine } = await import('./engine.ts');
 type Sighting = import('../src/index.ts').Sighting;
 
-const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
+const onPath = async <T>(bin: string, f: () => Promise<T>) => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
   try {
-    return await f();
+    return (await f()) satisfies T;
   } finally {
     process.env.PATH = prev;
   }

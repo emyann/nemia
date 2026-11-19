@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 type Keys = Readonly<Record<string, string>>;
 
 /** The frontmatter of `keys` and a line of body, as a step file or an agent file is written. */
-const fileOf = (keys: Keys, body: string): string =>
+const fileOf = (keys: Keys, body: string) =>
   `---\n${Object.entries(keys)
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n')}\n---\n\n${body}\n`;

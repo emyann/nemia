@@ -91,7 +91,7 @@ describe('passLine, passTitle and seenWords: what a pass took and saw', () => {
  * the package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or
  * moved.
  */
-function packagePhases(pass: PassCost): string[] {
+function packagePhases(pass: PassCost) {
   const store = scratch('web-pass-');
   fs.writeFileSync(path.join(store, 'tick-stats.json'), JSON.stringify(pass));
   const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'up', '--stats'], {

@@ -11,7 +11,8 @@ import { OUT, store } from '../world.ts';
 const SOURCES = ['you', 'step', 'check', 'other-run'];
 
 /** The line of `got` from `source`, opened to what it said. */
-const opened = (got: Locator, source: string): Promise<Locator> => openFold(got.locator(`li[data-got="${source}"]`), `got-${source}`);
+const opened = (got: Locator, source: string) =>
+  openFold(got.locator(`li[data-got="${source}"]`), `got-${source}`) satisfies Promise<Locator>;
 
 export default {
   /**

@@ -29,7 +29,7 @@ import { LANDING_CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/ru
 import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
 import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './origin.ts';
-import { CARRIED, type Ran, SCRIPT, asked, body, landIn, stands } from './land.ts';
+import { CARRIED, SCRIPT, asked, body, landIn, stands } from './land.ts';
 
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
@@ -52,14 +52,14 @@ function stepsOf(at: Rendered, workflow: string) {
  * for its local check.
  */
 let rendering: Promise<Record<'github' | 'unwaited' | 'local', Rendered>> | undefined;
-const renders = (): Promise<Record<'github' | 'unwaited' | 'local', Rendered>> =>
+const renders = () =>
   (rendering ??= (async () => {
     const all = await rendered([
       { name: 'github', template: copyOf(SDLC), sets: ['github=true'] },
       { name: 'unwaited', template: copyOf(SDLC), sets: ['github=true', 'landingWaitsOnCi=false'] },
       { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check'] },
     ]);
-    const treeOf = (name: 'github' | 'unwaited' | 'local'): Rendered => {
+    const treeOf = (name: 'github' | 'unwaited' | 'local') => {
       const at = all[name];
       assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
       return { tree: at.tree, store: at.store };
@@ -85,7 +85,7 @@ type World = { repo: string; bare: string; base: string; tip: string; merged: st
  * Built once for each `extra` (`builtWorld`), then copied for each call, checkout and origin both, the copy's `origin` set to the
  * copied bare repository: every test has a world of its own to change, with the same commits.
  */
-function world({ extra, ci = true }: { extra?: string; ci?: boolean } = {}): World {
+function world({ extra, ci = true }: { extra?: string; ci?: boolean } = {}) {
   const key = `${extra ?? ''}|${String(ci)}`;
   const built = builtWorlds.get(key) ?? builtWorld(extra, ci);
   builtWorlds.set(key, built);
@@ -104,7 +104,7 @@ const builtWorlds = new Map<string, Omit<World, 'gh'>>();
  * The world `world` copies, built in git: `extra`, where given, a branch off the base of one commit of its own; its base declares a CI
  * workflow (`.github/workflows/ci.yml`) where `ci`, and none otherwise.
  */
-function builtWorld(extra: string | undefined, ci: boolean): Omit<World, 'gh'> {
+function builtWorld(extra: string | undefined, ci: boolean) {
   const repo = scratch('wf-land-repo-');
   gitIn(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
@@ -141,7 +141,7 @@ function builtWorld(extra: string | undefined, ci: boolean): Omit<World, 'gh'> {
  * A part branch `wf/r-1/part-a` off the base, whose one commit is the result's own patch taken again as a commit of its own
  * (`cherry-pick -x`, so its sha differs) — as a lead takes a part into the run's branch — and never an ancestor of the head.
  */
-function takenPart(w: World): string {
+function takenPart(w: World) {
   const at = gitIn(w.repo, 'symbolic-ref', '--short', 'HEAD').trim();
   gitIn(w.repo, 'switch', '-q', '-c', `wf/${RUN}/part-a`, w.base);
   gitIn(w.repo, 'cherry-pick', '-x', w.tip);
@@ -153,7 +153,7 @@ function takenPart(w: World): string {
 }
 
 /** One pull request of this run, as `gh pr list --json` gives it; `more` overrides any field of it. */
-const listed = (w: World, more: Record<string, unknown> = {}): string =>
+const listed = (w: World, more: Record<string, unknown> = {}) =>
   JSON.stringify([
     {
       number: 7,
@@ -170,14 +170,14 @@ const listed = (w: World, more: Record<string, unknown> = {}): string =>
   ]);
 
 /** A head's checks holding one `ci` entry in the state `rest` says. */
-const checks = (rest: Record<string, unknown>, ...others: Record<string, unknown>[]): string =>
+const checks = (rest: Record<string, unknown>, ...others: Record<string, unknown>[]) =>
   JSON.stringify({ statusCheckRollup: [{ name: 'ci', ...rest }, ...others] });
 
 /** A `ci` that passed. */
 const GREEN = checks({ status: 'COMPLETED', conclusion: 'SUCCESS' });
 
 /** The rules under which the merge verb passes: one open, green, mergeable pull request at the result branch's tip. */
-const mergeable = (w: World, more: Record<string, unknown> = {}): Rule[] => [
+const mergeable = (w: World, more: Record<string, unknown> = {}) => [
   { when: 'auth status' },
   { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
   { when: 'pr list', out: listed(w, more) },
@@ -189,7 +189,7 @@ const mergeable = (w: World, more: Record<string, unknown> = {}): Rule[] => [
 const JOB_URL = 'https://github.com/o/r/actions/runs/1/job/2';
 
 /** A check run named `name` as GitHub's REST API gives one, lower-case: completed with `conclusion`, or `status` where it is not over. */
-const checkRun = (name: string, conclusion: string | null, status = 'completed', url = JOB_URL): Record<string, unknown> => ({
+const checkRun = (name: string, conclusion: string | null, status = 'completed', url = JOB_URL) => ({
   name,
   status,
   conclusion,
@@ -202,7 +202,7 @@ const checkRun = (name: string, conclusion: string | null, status = 'completed',
 const NO_STATUSES = JSON.stringify({ state: 'pending', total_count: 0, statuses: [] });
 
 /** The rules answering the CI of commit `sha`: its check runs `runs` (one answer, or `outs` for a poll) and its combined status. */
-const ciAt = (sha: string, runs: Record<string, unknown>[] | Record<string, unknown>[][], status = NO_STATUSES): Rule[] => [
+const ciAt = (sha: string, runs: Record<string, unknown>[] | Record<string, unknown>[][], status = NO_STATUSES) => [
   Array.isArray(runs[0])
     ? { when: `commits/${sha}/check-runs`, outs: (runs as Record<string, unknown>[][]).map((r) => JSON.stringify({ check_runs: r })) }
     : { when: `commits/${sha}/check-runs`, out: JSON.stringify({ total_count: runs.length, check_runs: runs }) },
@@ -210,10 +210,10 @@ const ciAt = (sha: string, runs: Record<string, unknown>[] | Record<string, unkn
 ];
 
 /** The base's tip as `gh api repos/{owner}/{repo}/commits/main` gives it. */
-const tipIs = (sha: string): Rule => ({ when: 'commits/main', out: JSON.stringify({ sha }) });
+const tipIs = (sha: string) => ({ when: 'commits/main', out: JSON.stringify({ sha }) });
 
 /** The rules under which the receipt passes: the same pull request, merged as the commit origin's main holds, `ci` green on it. */
-const landed = (w: World, more: Record<string, unknown> = {}): Rule[] => [
+const landed = (w: World, more: Record<string, unknown> = {}) => [
   { when: 'auth status' },
   { when: 'repo view', out: JSON.stringify({ defaultBranchRef: { name: 'main' } }) },
   { when: 'pr list', out: listed(w, { state: 'MERGED', mergeCommit: { oid: w.merged }, ...more }) },
@@ -221,20 +221,19 @@ const landed = (w: World, more: Record<string, unknown> = {}): Rule[] => [
 ];
 
 /** `landed`, its merge commit's CI answered by `first` instead: rules put first win. */
-const landedWith = (w: World, ...first: Rule[]): Rule[] => [...first, ...landed(w)];
+const landedWith = (w: World, ...first: Rule[]) => [...first, ...landed(w)];
 
 /** The receipt's arguments: the run, the CI context `ci`, and whether it waits on it at the merge commit. */
-const receiptArgs = (wait = 'true', check = 'ci'): string[] => ['--run', RUN, '--check', check, '--wait-on-ci', wait];
+const receiptArgs = (wait = 'true', check = 'ci') => ['--run', RUN, '--check', check, '--wait-on-ci', wait];
 
 /** The calls that read a commit's check runs: the wait on CI at the merge, or at the base's tip. */
-const waited = (calls: readonly Called[], at = ''): Called[] =>
-  calls.filter((call) => call.argv.some((word) => word.includes(`${at}/check-runs`)));
+const waited = (calls: readonly Called[], at = '') => calls.filter((call) => call.argv.some((word) => word.includes(`${at}/check-runs`)));
 
 /** The wait's knobs at nothing: every bound of the receipt's wait at nothing, so a pending or an absent `ci` is refused at once. */
 const NO_WAIT = { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' };
 
 /** A checkout the merge verb has landed on, its receipt's answers still to write. */
-function afterMerge(): World {
+function afterMerge() {
   const w = world();
   w.gh.answers(mergeable(w));
   assert.equal(land(w, 'merge', args()).code, 0);
@@ -242,11 +241,10 @@ function afterMerge(): World {
 }
 
 /** Run the script's `verb` in `w` with `args`, bounded; its exit, its streams and the calls the stub `gh` was given. */
-const land = (w: World, verb: string, args: string[] = [], more: Record<string, string> = {}): Ran =>
-  landIn(w.repo, w.gh, verb, args, more);
+const land = (w: World, verb: string, args: string[] = [], more: Record<string, string> = {}) => landIn(w.repo, w.gh, verb, args, more);
 
 /** The merge verb's arguments, with the body in a file of its own, reading the CI context `check`. */
-const args = (file = body(), subject = "Land a run's change through its pull request", check = 'ci'): string[] => [
+const args = (file = body(), subject = "Land a run's change through its pull request", check = 'ci') => [
   '--run',
   RUN,
   '--subject',
@@ -852,7 +850,7 @@ test('REFUSED: a receipt whose ci is never reported at the merge commit names la
 test('a ci that waits on other jobs has the whole bound while one runs: red when it comes, and past the bound it names what still runs', () => {
   const w = afterMerge();
   const SLOW_URL = 'https://github.com/o/r/actions/runs/1/job/5';
-  const slow = (conclusion: string | null, status = 'completed'): Record<string, unknown> => checkRun('slow', conclusion, status, SLOW_URL);
+  const slow = (conclusion: string | null, status = 'completed') => checkRun('slow', conclusion, status, SLOW_URL);
   w.gh.answers(
     landedWith(w, ...ciAt(w.merged, [[slow(null, 'in_progress')], [slow('failure'), checkRun('ci', 'failure')]]), tipIs(w.merged)),
   );
@@ -872,7 +870,7 @@ test('a ci that waits on other jobs has the whole bound while one runs: red when
 });
 
 test('the receipt reads a status context as it reads a check run: a red one is refused, a green one passes', () => {
-  const statuses = (state: string): string =>
+  const statuses = (state: string) =>
     JSON.stringify({ state, statuses: [{ context: 'ci', state, target_url: 'https://ci.example/build/3' }] });
   const w = afterMerge();
   w.gh.answers(landedWith(w, ...ciAt(w.merged, [], statuses('failure')), tipIs(w.merged)));
@@ -888,7 +886,7 @@ test('the receipt reads a status context as it reads a check run: a red one is r
 
 test("a receipt red at the merge passes where the base's tip holds it and is green there; a tip red, running or diverged is refused", () => {
   const TIP = 'f'.repeat(40);
-  const fixed = (w: World, compared: string, ...atTip: Record<string, unknown>[]): Rule[] =>
+  const fixed = (w: World, compared: string, ...atTip: Record<string, unknown>[]) =>
     landedWith(
       w,
       ...ciAt(w.merged, [checkRun('ci', 'failure')]),
@@ -923,7 +921,7 @@ test("a receipt red at the merge passes where the base's tip holds it and is gre
 
 test("a receipt whose merge's own ci was cancelled or never reported reads the base's tip that holds it: green passes, saying which and why", () => {
   const TIP = 'e'.repeat(40);
-  const later = (w: World, atMerge: Record<string, unknown>[], compared: string, ...atTip: Record<string, unknown>[]): Rule[] =>
+  const later = (w: World, atMerge: Record<string, unknown>[], compared: string, ...atTip: Record<string, unknown>[]) =>
     landedWith(
       w,
       ...ciAt(w.merged, atMerge),
@@ -999,7 +997,7 @@ test("a receipt whose merge's own ci was cancelled waits for a later commit that
 });
 
 /** A job of the merge commit's workflow run 1, as REST gives it, by name and job id: the run's link is what its re-run is asked by. */
-const ranJob = (name: string, job: number, conclusion: string | null, status = 'completed'): Record<string, unknown> =>
+const ranJob = (name: string, job: number, conclusion: string | null, status = 'completed') =>
   checkRun(name, conclusion, status, `https://github.com/o/r/actions/runs/1/job/${job}`);
 
 /** The merge's first attempt of run 1: `test x` red, and the gate `ci` that needs it red with it. */
@@ -1015,7 +1013,7 @@ const secondAtMerge = (conclusion: string | null, status = 'completed') => [
  * A receipt at a merge whose `ci` reads `polls` (one per read, the last repeating), its run 1 on attempt `attempt`, `gh run rerun`
  * answered; its run, and the re-runs it asked.
  */
-function redAtMerge(polls: Record<string, unknown>[][], attempt = 1): { r: Ran; reruns: Called[]; w: World } {
+function redAtMerge(polls: Record<string, unknown>[][], attempt = 1) {
   const w = afterMerge();
   w.gh.answers(
     landedWith(
@@ -1090,7 +1088,7 @@ test("the receipt's wait fits the landing check's deadline: the start bound unde
     'landing.ts waits by the shared bounds',
   );
   const head = fs.readFileSync(path.join(CARRIED, 'exec.ts'), 'utf8');
-  const bound = (name: string): number => {
+  const bound = (name: string) => {
     const found = new RegExp(`export const ${name} = ([\\d_]+);`).exec(head);
     assert.ok(found, `exec.ts declares ${name}`);
     return Number(found[1].replaceAll('_', ''));
@@ -1164,7 +1162,7 @@ test("both land steps' checks, rendered on GitHub, are the receipt alone, run fr
 });
 
 /** A `local-check` in `bin` that logs to `log`, refuses a tree that lacks the result branch's file, and otherwise exits `exit`. */
-function localCheckStub(bin: string, log: string, exit: number): void {
+function localCheckStub(bin: string, log: string, exit: number) {
   fs.writeFileSync(
     path.join(bin, 'local-check'),
     `#!/bin/sh\nprintf 'local-check\\n' >> '${log}'\n[ -f from-branch.ts ] || exit 9\nexit ${exit}\n`,
@@ -1189,9 +1187,9 @@ test("REFUSED at shipped defaults: both land steps' checks run the local check o
     gitIn(repo, 'switch', '-q', 'main');
     const bin = scratch('wf-land-local-bin-');
     const log = path.join(bin, 'said.log');
-    const stub = (exit: number): void => localCheckStub(bin, log, exit);
+    const stub = (exit: number) => localCheckStub(bin, log, exit);
     fs.writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> '${log}'\nexit 1\n`, { mode: 0o755 });
-    const said = (): string[] => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : []);
+    const said = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : []);
     const run = () => {
       fs.rmSync(log, { force: true });
       const [cmd, ...argv] = checkArgv(check!);

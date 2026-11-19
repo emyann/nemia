@@ -14,7 +14,7 @@ import { cycles, depthBreaks, namelessBreaks, valueGraph } from 'test-kit/layout
 const PKG = path.join(import.meta.dirname, '..');
 
 /** The package's source under `src/`, tests beside the code left out, by path from the package. */
-const sourceFiles = (): string[] =>
+const sourceFiles = () =>
   fs
     .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)

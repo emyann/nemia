@@ -23,15 +23,16 @@ import { parseDaemonFile } from './daemon.store.ts';
 
 const NOW = Date.parse('2026-09-22T12:00:00.000Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
-const holder = (over: Partial<DaemonFile> = {}): DaemonFile => ({
-  pid: 4242,
-  by: 'up',
-  startedAt: ago(60),
-  cwd: '/home/me/repo',
-  every: 4000,
-  passedAt: ago(0.05),
-  ...over,
-});
+const holder = (over: Partial<DaemonFile> = {}) =>
+  ({
+    pid: 4242,
+    by: 'up',
+    startedAt: ago(60),
+    cwd: '/home/me/repo',
+    every: 4000,
+    passedAt: ago(0.05),
+    ...over,
+  }) satisfies DaemonFile;
 const text = (file: DaemonFile | Record<string, unknown>) => JSON.stringify(file);
 const as = (identity: Identity, now: Instant = { at: NOW }) => ({ now, identify: () => identity });
 const live = as('same');

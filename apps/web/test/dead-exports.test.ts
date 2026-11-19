@@ -44,7 +44,7 @@ const GLOSSARY_TYPES = new Set(
 );
 
 /** Whether an export of `file` named `name` is spared the guard (the module's comment says why for each). */
-const exempt = (file: string, name: string): boolean =>
+const exempt = (file: string, name: string) =>
   GLOSSARY_TYPES.has(name) ||
   file.startsWith('src/components/ui/') ||
   file.startsWith('src/components/ai-elements/') ||
@@ -54,25 +54,27 @@ const exempt = (file: string, name: string): boolean =>
   (file.startsWith('src/routes/') && name === 'Route');
 
 /** Every `.ts` and `.tsx` file under the importers, by its path from `apps/web`, with its text. */
-function treeTexts(): Map<string, string> {
+function treeTexts() {
   const files = IMPORTERS.flatMap((dir) =>
     fs.readdirSync(path.join(WEB, dir), { recursive: true, encoding: 'utf8' }).map((f) => `${dir}/${f.split(path.sep).join('/')}`),
   )
     .filter((f) => /\.tsx?$/.test(f))
     .concat(CONFIG)
     .sort();
-  return new Map(files.map((f) => [f, fs.readFileSync(path.join(WEB, f), 'utf8')]));
+  return new Map(files.map((f) => [f, fs.readFileSync(path.join(WEB, f), 'utf8')])) satisfies Map<string, string>;
 }
 
 /** The file of `texts` a specifier in `file` names: `@/` is `src/`, a relative path is read from `file`, an extension may be left off. */
-function target(texts: ReadonlyMap<string, string>, file: string, spec: string): string | undefined {
+function target(texts: ReadonlyMap<string, string>, file: string, spec: string) {
   const base = spec.startsWith('@/') ? `src/${spec.slice(2)}` : resolved(file, spec);
-  if (base === undefined) return undefined;
-  return [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`].find((f) => texts.has(f));
+  if (base === undefined) return undefined satisfies string | undefined;
+  return [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`].find((f) => texts.has(f)) satisfies
+    | string
+    | undefined;
 }
 
 /** Whether a node carries the `export` keyword. */
-const exported = (node: ts.Node): boolean =>
+const exported = (node: ts.Node) =>
   ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
 /** A name read off a module: `'*'` stands for every name it has, `'*type'` for every type it declares. */
@@ -91,13 +93,14 @@ type Facts = {
 };
 
 /** Every name bound by a declaration's name, a destructured `const` included. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const boundNames = (name: ts.BindingName): string[] =>
   ts.isIdentifier(name) ? [name.text] : name.elements.flatMap((e) => (ts.isOmittedExpression(e) ? [] : boundNames(e.name)));
 
 /** The names `binding` reads off a namespace in `sf`: each `binding.name`, or every name when the binding is read whole. */
-function namespaceReads(sf: ts.SourceFile, binding: ts.Identifier): string[] {
+function namespaceReads(sf: ts.SourceFile, binding: ts.Identifier) {
   const names: string[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isIdentifier(node) && node !== binding && node.text === binding.text) {
       const parent = node.parent;
       if (ts.isPropertyAccessExpression(parent) && parent.expression === node) names.push(parent.name.text);
@@ -107,11 +110,11 @@ function namespaceReads(sf: ts.SourceFile, binding: ts.Identifier): string[] {
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return names;
+  return names satisfies string[];
 }
 
 /** What `file` declares, re-exports and imports, read by TypeScript's parser; a specifier outside `texts` is a package and is let be. */
-function factsOf(texts: ReadonlyMap<string, string>, file: string): Facts {
+function factsOf(texts: ReadonlyMap<string, string>, file: string) {
   const sf = ts.createSourceFile(
     file,
     texts.get(file) ?? '',
@@ -120,9 +123,9 @@ function factsOf(texts: ReadonlyMap<string, string>, file: string): Facts {
     file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const facts: Facts = { declared: [], types: [], forwarded: [], stars: [], uses: [] };
-  const to = (spec: ts.Expression | undefined): string | undefined =>
-    spec !== undefined && ts.isStringLiteral(spec) ? target(texts, file, spec.text) : undefined;
-  const use = (from: string | undefined, names: string[]): void => {
+  const to = (spec: ts.Expression | undefined) =>
+    (spec !== undefined && ts.isStringLiteral(spec) ? target(texts, file, spec.text) : undefined) satisfies string | undefined;
+  const use = (from: string | undefined, names: string[]) => {
     if (from !== undefined) for (const name of names) facts.uses.push({ file: from, name });
   };
   for (const statement of sf.statements) {
@@ -158,7 +161,7 @@ function factsOf(texts: ReadonlyMap<string, string>, file: string): Facts {
       }
     }
   }
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
       const from = to(node.argument.literal);
       const qualifier = node.qualifier;
@@ -169,32 +172,33 @@ function factsOf(texts: ReadonlyMap<string, string>, file: string): Facts {
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return facts;
+  return facts satisfies Facts;
 }
 
 /** The first name of a qualified name: `A` of `A.B.C`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const leftmost = (name: ts.QualifiedName): string => (ts.isIdentifier(name.left) ? name.left.text : leftmost(name.left));
 
 /** The names a dynamic `import()` is read for: an object pattern's, a binding's reads, a member read at once, else every name. */
-function dynamicReads(sf: ts.SourceFile, call: ts.CallExpression): string[] {
+function dynamicReads(sf: ts.SourceFile, call: ts.CallExpression) {
   const awaited = ts.isAwaitExpression(call.parent) ? call.parent : undefined;
   const holder = awaited?.parent;
   if (holder && ts.isVariableDeclaration(holder)) {
     if (ts.isObjectBindingPattern(holder.name))
       return holder.name.elements
         .map((e) => (e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName : e.name))
-        .map((n) => (ts.isIdentifier(n) ? n.text : '*'));
-    if (ts.isIdentifier(holder.name)) return namespaceReads(sf, holder.name);
+        .map((n) => (ts.isIdentifier(n) ? n.text : '*')) satisfies string[];
+    if (ts.isIdentifier(holder.name)) return namespaceReads(sf, holder.name) satisfies string[];
   }
   const paren = awaited && ts.isParenthesizedExpression(awaited.parent) ? awaited.parent : undefined;
-  if (paren && ts.isPropertyAccessExpression(paren.parent)) return [paren.parent.name.text];
-  return ['*'];
+  if (paren && ts.isPropertyAccessExpression(paren.parent)) return [paren.parent.name.text] satisfies string[];
+  return ['*'] satisfies string[];
 }
 
 /** Each export of `src` that no other file imports, as `<file>: <name>`, read from `texts` (paths from `apps/web`). */
-function deadExports(texts: ReadonlyMap<string, string>): string[] {
+function deadExports(texts: ReadonlyMap<string, string>) {
   const facts = new Map([...texts.keys()].map((file) => [file, factsOf(texts, file)]));
-  const key = (file: string, name: string): string => `${file}\0${name}`;
+  const key = (file: string, name: string) => `${file}\0${name}`;
   const used = new Set<string>();
   const pending: Use[] = [...facts].flatMap(([file, f]) => f.uses.filter((u) => u.file !== file));
   pending.push(...OFFERED.filter((door) => facts.has(door)).map((door) => ({ file: door, name: '*' })));
@@ -219,7 +223,7 @@ function deadExports(texts: ReadonlyMap<string, string>): string[] {
         .filter((name) => !exempt(file, name) && !used.has(key(file, '*')) && !used.has(key(file, name)))
         .map((name) => `${file}: ${name}`),
     )
-    .sort();
+    .sort() satisfies string[];
 }
 
 test('every export of src is imported by another file of src, test, .storybook or contracts', () => {

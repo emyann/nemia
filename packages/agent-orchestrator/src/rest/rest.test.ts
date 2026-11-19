@@ -99,11 +99,11 @@ test('a task on the feed takes out the run whose id and a dash begin it — a st
 const STORES = ['../record/record.store.ts', '../record/files.store.ts'];
 
 /** Each suffix a store names a run's file by, `runsDir(home)` joined with `${id}.<suffix>`, across `texts`. */
-const namedSuffixes = (texts: readonly string[]): string[] =>
+const namedSuffixes = (texts: readonly string[]) =>
   [...new Set(texts.flatMap((text) => [...text.matchAll(/runsDir\(\w+\),\s*`\$\{id\}\.(\w+)`/g)].map((m) => m[1] ?? '')))].sort();
 
 /** What breaks the list against `texts`: a file the stores name that is no stamped input, and a stamped input no store names. */
-const listBreaks = (texts: readonly string[]): string[] => {
+const listBreaks = (texts: readonly string[]) => {
   const named = namedSuffixes(texts);
   const declared = Object.values(STAMPED_FILES).sort();
   return [
@@ -112,7 +112,7 @@ const listBreaks = (texts: readonly string[]): string[] => {
   ];
 };
 
-const storeTexts = (): string[] => STORES.map((file) => fs.readFileSync(path.join(import.meta.dirname, file), 'utf8'));
+const storeTexts = () => STORES.map((file) => fs.readFileSync(path.join(import.meta.dirname, file), 'utf8'));
 
 test('every file the store names for a run is a stamped input of RUN_INPUTS, and every stamped input a file it names', () => {
   assert.deepEqual(listBreaks(storeTexts()), []);

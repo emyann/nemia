@@ -50,14 +50,14 @@ const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
 
 /** A run made in the store under `id`. */
-const made = (id: string): Run => {
+const made = (id: string) => {
   const run = aRun(id);
   filesStore.runs.create(run);
-  return run;
+  return run satisfies Run;
 };
 
 /** A prune marker, as `nemia prune` writes one. */
-const pruned = (id: string): void => fs.writeFileSync(pruneFile(ROOT, id), JSON.stringify({ at, worktrees: [] }, null, 2));
+const pruned = (id: string) => fs.writeFileSync(pruneFile(ROOT, id), JSON.stringify({ at, worktrees: [] }, null, 2));
 
 /** The Run door over the files of this file's store. */
 const door = doorFrom(RunDoor, runDoorFiles(ROOT));
@@ -178,28 +178,31 @@ describe('whether a person called a run off: a pause, a hold and a record gone, 
 });
 
 /** One ask of each kind a person writes, with the path the tick reads it at and its reader's words for a file there that is not one. */
-const asksOfEachKind = (id: string): Array<{ asked: PersonRequest; file: string; stray: (file: string) => unknown }> => [
-  {
-    asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
-    file: askFile(ROOT, id, 'implement', 2),
-    stray: (file) => askIn(file, 'implement', 2),
-  },
-  {
-    asked: { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at } },
-    file: roundAskFile(ROOT, id, 'review', 3),
-    stray: (file) => roundAskIn(file, 'review', 3),
-  },
-  {
-    asked: { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } },
-    file: approvalFile(ROOT, id, 'implement', 1),
-    stray: (file) => approvalIn(file, 'implement', 1),
-  },
-  {
-    asked: { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough' } },
-    file: acceptFile(ROOT, id, 'review', 1),
-    stray: (file) => acceptanceIn(file, 'review', 1),
-  },
-];
+const asksOfEachKind = (id: string) => {
+  const made: Array<{ asked: PersonRequest; file: string; stray: (file: string) => unknown }> = [
+    {
+      asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
+      file: askFile(ROOT, id, 'implement', 2),
+      stray: (file) => askIn(file, 'implement', 2),
+    },
+    {
+      asked: { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at } },
+      file: roundAskFile(ROOT, id, 'review', 3),
+      stray: (file) => roundAskIn(file, 'review', 3),
+    },
+    {
+      asked: { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } },
+      file: approvalFile(ROOT, id, 'implement', 1),
+      stray: (file) => approvalIn(file, 'implement', 1),
+    },
+    {
+      asked: { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough' } },
+      file: acceptFile(ROOT, id, 'review', 1),
+      stray: (file) => acceptanceIn(file, 'review', 1),
+    },
+  ];
+  return made;
+};
 
 test('an ask of each kind is written at the name the tick reads it by, holding the ask alone, and answered where it is', () => {
   const run = made('r-write-asks');
@@ -306,15 +309,15 @@ const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
 const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
 
 /** The module a store import names, as a refusal says it: `record.store.ts` or `runner.ts`. */
-const moduleOf = (spec: string): string => (/(?:^|\/)runner(?:\.ts)?$/.test(spec) ? 'runner.ts' : 'record.store.ts');
+const moduleOf = (spec: string) => (/(?:^|\/)runner(?:\.ts)?$/.test(spec) ? 'runner.ts' : 'record.store.ts');
 
 /**
  * The guarded functions a source text imports or re-exports from `record.store.ts` or through `runner.ts`, by name across line breaks,
  * each by the module it came from; `*` for a namespace or a dynamic import of either, which reaches every one.
  */
-function importsFrom(text: string): Map<string, string[]> {
+function importsFrom(text: string) {
   const found = new Map<string, Set<string>>();
-  const add = (spec: string, name: string): void => {
+  const add = (spec: string, name: string) => {
     const from = moduleOf(spec);
     found.set(from, (found.get(from) ?? new Set()).add(name));
   };
@@ -330,14 +333,17 @@ function importsFrom(text: string): Map<string, string[]> {
   }
   for (const m of text.matchAll(/\bimport\s*\*\s*as\s+\w+\s+from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g))
     if (STORE_MODULE.test(m[1] ?? m[2])) add(m[1] ?? m[2], '*');
-  return new Map([...found].sort(([a], [b]) => a.localeCompare(b)).map(([from, names]) => [from, [...names].sort()]));
+  return new Map([...found].sort(([a], [b]) => a.localeCompare(b)).map(([from, names]) => [from, [...names].sort()])) satisfies Map<
+    string,
+    string[]
+  >;
 }
 
 /** The guarded functions a source text imports, whichever module they came from (`importsFrom`). */
-const directImports = (text: string): string[] => [...new Set([...importsFrom(text).values()].flat())].sort();
+const directImports = (text: string) => [...new Set([...importsFrom(text).values()].flat())].sort() satisfies string[];
 
 /** A line for each file among `sources` that imports a guarded function directly, naming the module each import came from. */
-function refusals(sources: Record<string, string>): string[] {
+function refusals(sources: Record<string, string>) {
   const out: string[] = [];
   for (const [file, text] of Object.entries(sources)) {
     for (const [from, names] of importsFrom(text))
@@ -346,12 +352,12 @@ function refusals(sources: Record<string, string>): string[] {
           'the method to RunStore (src/record/record.ts)',
       );
   }
-  return out;
+  return out satisfies string[];
 }
 
 describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", () => {
   test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
-    const listed = (): string[] => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-'));
+    const listed = () => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-')) satisfies string[];
     made('r-ids-read');
     fs.writeFileSync(runFile(ROOT, 'r-ids-torn'), '{ "id": ');
     markCancelled(ROOT, 'r-ids-cancelled');
@@ -370,7 +376,7 @@ describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each 
     }
   });
   test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
-    const files = (id: string): string => path.join(runsDir(ROOT), id, 'artifacts');
+    const files = (id: string) => path.join(runsDir(ROOT), id, 'artifacts');
     fs.mkdirSync(files('r-files-there'), { recursive: true });
     assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
     assert.equal(filesStore.runs.filesAt('r-files-never'), undefined);
@@ -402,7 +408,7 @@ describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each 
 });
 
 /** `said` refuses each of `imported` in turn, naming the file, the function and its module, and the fix: a method on RunStore. */
-function refusedFor(said: readonly string[], ...imported: Array<[fn: string, from: string]>): void {
+function refusedFor(said: readonly string[], ...imported: Array<[fn: string, from: string]>) {
   assert.equal(said.length, imported.length, said.join('\n'));
   imported.forEach(([fn, from], i) => {
     assert.ok(said[i].startsWith(`src/new/new.verb.ts imports ${fn} from ${from}: `), said[i]);
@@ -453,11 +459,11 @@ const PAST_THE_DOOR = /\bfilesStore(?:At)?\b|\brunStore\s*\.\s*(?:runs|asks|hold
 const DOOR_AND_FILES = ['src/record/files.store.ts', 'src/runs/runs.store.ts'];
 
 /** What a read past the door says: the file, how many uses, and the fix. */
-const pastTheDoor = (sources: Record<string, string>): string[] =>
+const pastTheDoor = (sources: Record<string, string>) =>
   [...seamUses(sources, PAST_THE_DOOR)].map(
     ([file, n]) =>
       `${file} reads the run store past the Run door ${n} time(s): yield RunDoor in a program, or read runsAtOnce (src/runs/runs.store.ts) in a plain function`,
-  );
+  ) satisfies string[];
 
 test('no file of src but the Run door reads the run store: every other reads RunDoor or runsAtOnce', () => {
   assert.deepEqual(pastTheDoor(sourcesUnder(PKG, 'src', DOOR_AND_FILES)), []);
@@ -480,7 +486,7 @@ test('REFUSED: a file of src that reads the files store, or the run store by its
 const UNROOTED_READ = /\brunsAtOnce\s*\(|\bkeptRuns\s*\(/g;
 
 /** What a break of the count says: a file it does not name or a count grown, a count fallen, a file with none left. */
-const unrootedInWords = ({ file, uses: n, kind, owed }: DebtBreak): string =>
+const unrootedInWords = ({ file, uses: n, kind, owed }: DebtBreak) =>
   kind === 'grown'
     ? `${file} reads runs past the door it is given ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor instead`
     : kind === 'fallen'
@@ -529,13 +535,13 @@ test('REFUSED: a runsAtOnce(home).runs.read(id) in a file the count does not nam
 });
 
 /** A run under `id` started out of the inbox's card `card`. */
-const fromCard = (id: string, card: string): Run => ({ ...aRun(id), from: { inbox: card } });
+const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: card } }) satisfies Run;
 
 /** Where the claim of the card `card` is: `<root>/started/<card>.json`. */
-const claimOf = (card: string): string => path.join(ROOT, 'started', `${card}.json`);
+const claimOf = (card: string) => path.join(ROOT, 'started', `${card}.json`);
 
 /** A claim of the card `card` planted for the run `run`, as a crash or a forgotten run leaves one. */
-const plantClaim = (card: string, run: string): void => {
+const plantClaim = (card: string, run: string) => {
   fs.mkdirSync(path.dirname(claimOf(card)), { recursive: true });
   fs.writeFileSync(claimOf(card), JSON.stringify({ run }));
 };

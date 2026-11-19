@@ -12,7 +12,7 @@ import { storeFree, storeRoots } from './disk.store.ts';
 const ROOT = path.join(scratch('wf-disk-store-'), 'store');
 
 /** A file at `at`, under the store. */
-const file = (...at: string[]): void => {
+const file = (...at: string[]) => {
   fs.mkdirSync(path.dirname(path.join(ROOT, ...at)), { recursive: true });
   fs.writeFileSync(path.join(ROOT, ...at), 'x');
 };

@@ -18,27 +18,27 @@ const CRON = '0 9 1 1 *';
 const BRIEF = 'Sweep the year: what the factory left behind.';
 
 /** The next fire of CRON after `now`, as the api answers it. */
-function nextFire(now: number): string {
+function nextFire(now: number) {
   const year = new Date(now).getUTCFullYear();
   const thisYear = Date.UTC(year, 0, 1, 9);
   return new Date(thisYear > now ? thisYear : Date.UTC(year + 1, 0, 1, 9)).toISOString();
 }
 
 /** The latest fire of CRON at or before `now`: the one the listing says a kept refusal of is still standing. */
-function latestFire(now: number): string {
+function latestFire(now: number) {
   const year = new Date(now).getUTCFullYear();
   const thisYear = Date.UTC(year, 0, 1, 9);
   return new Date(thisYear <= now ? thisYear : Date.UTC(year - 1, 0, 1, 9)).toISOString();
 }
 
 /** Go to `factory`'s settings page and wait for it to settle. */
-async function settingsOf(page: Page, factory: string): Promise<void> {
+async function settingsOf(page: Page, factory: string) {
   await page.goto(new URL(`/factories/${factory}/settings`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** The line the api answers for scheduling a workflow of `factory`. */
-async function scheduleLine(page: Page, factory: string): Promise<string> {
+async function scheduleLine(page: Page, factory: string) {
   const line = (await factoriesAnswered(page)).find((f) => f.name === factory)?.commands.schedule;
   if (!line) throw new Refused(`GET /api/factories/${factory}/commands answers the line that schedules one — it answers none`);
   return line;
@@ -52,7 +52,7 @@ const ENLARGED = 3;
  * `ENLARGED` times their size by a transform on their list, which lays no text out again, with the room it takes under it, and
  * taken back after the shot. Only when the page is pictured: nothing is touched otherwise.
  */
-async function photographNext(page: Page, next: Locator): Promise<void> {
+async function photographNext(page: Page, next: Locator) {
   if (!photographing) return;
   const list = next.locator('xpath=..');
   await list.scrollIntoViewIfNeeded();
@@ -81,7 +81,7 @@ async function photographNext(page: Page, next: Locator): Promise<void> {
  * The card of the scheduled factory: its workflow, cron and time zone, brief, the next fire as the api answers it and as `fireWord`
  * writes it, and the last run, a link to the run's page; no refusal, since the kept try started its run.
  */
-async function expectScheduled(page: Page): Promise<void> {
+async function expectScheduled(page: Page) {
   const card = page.locator(`[data-factory-schedules="${FACTORY}"]`);
   await expectVisible(card.getByText('Schedules', { exact: true }), 'the settings page draws the Schedules card');
   const row = card.locator(`[data-factory-schedule="${WORKFLOW}"]`);
@@ -111,7 +111,7 @@ async function expectScheduled(page: Page): Promise<void> {
 }
 
 /** The card of a factory with no schedule: an empty state that shows the api's line to schedule one. */
-async function expectNone(page: Page): Promise<void> {
+async function expectNone(page: Page) {
   const line = await scheduleLine(page, NONE);
   await settingsOf(page, NONE);
   const empty = page.locator(`[data-factory-schedules="${NONE}"] [data-no-schedules]`);
@@ -125,7 +125,7 @@ async function expectNone(page: Page): Promise<void> {
  * The card of a schedule whose latest fire the package refused, its workflow detached by hand from the factory's file: the refusal, in
  * the package's words, under a destructive alert, and no last run, since the fire started none.
  */
-async function expectRefused(page: Page, why: string): Promise<void> {
+async function expectRefused(page: Page, why: string) {
   await settingsOf(page, FACTORY);
   const row = page.locator(`[data-factory-schedules="${FACTORY}"] [data-factory-schedule="${WORKFLOW}"]`);
   const alert = row.locator('[data-schedule-refused]');
@@ -140,7 +140,7 @@ async function expectRefused(page: Page, why: string): Promise<void> {
  * Detach WORKFLOW from FACTORY by hand, keeping its schedule, and keep the tick's refusal of the cron's latest fire, in the words the
  * package refuses such a start with. Returns those words.
  */
-function refuseLatest(factoryFile: string, factory: Record<string, unknown>, schedule: object, tries: string): string {
+function refuseLatest(factoryFile: string, factory: Record<string, unknown>, schedule: object, tries: string) {
   const workflows = (factory.workflows as string[]).filter((w) => w !== WORKFLOW).sort();
   const offers = workflows.length ? `it offers: ${workflows.join(', ')}` : 'it offers none yet';
   const attach = `nemia factory attach ${FACTORY} ${WORKFLOW}`;

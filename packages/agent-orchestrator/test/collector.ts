@@ -47,7 +47,7 @@ type Posted = {
  * What a body posted to `/v1/metrics` says of the series whose attributes `which` keeps: each by its metric's name, and by
  * `name{key=value,…}` where it has attributes, with its value, a histogram's with its count.
  */
-export const seriesOf = (body: string, which: (attributes: Attributes) => boolean, named = false): Record<string, number> =>
+export const seriesOf = (body: string, which: (attributes: Attributes) => boolean, named = false) =>
   Object.fromEntries(
     (JSON.parse(body) as Posted).resourceMetrics
       .flatMap((r) => r.scopeMetrics.flatMap((s) => s.metrics))
@@ -56,8 +56,8 @@ export const seriesOf = (body: string, which: (attributes: Attributes) => boolea
           .filter((p) => which(p.attributes))
           .map((p) => [named ? nameOf(m.name, p.attributes) : m.name, Number(p.asDouble ?? p.asInt ?? p.count)] as const),
       ),
-  );
+  ) satisfies Record<string, number>;
 
 /** A series' name, `name{key=value,…}` where it has attributes. */
-const nameOf = (name: string, attributes: Attributes): string =>
+const nameOf = (name: string, attributes: Attributes) =>
   attributes.length ? `${name}{${attributes.map((a) => `${a.key}=${a.value.stringValue ?? ''}`).join(',')}}` : name;

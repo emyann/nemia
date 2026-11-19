@@ -51,11 +51,15 @@ const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 
 /** A program of the pin pass run to its end at this file's store, which the doors read the files of. */
-const rooted = <A, E>(program: Effect.Effect<A, E, Root>): A => Effect.runSync(program.pipe(Effect.provideService(StoreRoot, ROOT)));
+const rooted = <A, E>(program: Effect.Effect<A, E, Root>) =>
+  Effect.runSync(program.pipe(Effect.provideService(StoreRoot, ROOT))) satisfies A;
 /** A pass's reader of what a resolve reads, made at this file's store: one per pass, shared by every resolve handed it. */
 const aPass = () => rooted(passRevisions());
 /** What `resolvedNow` answers a run, at this file's store, read as the verb's own three answers. */
-const resolve = (...args: Parameters<typeof resolvedNow>): Resolved | Kept | undefined => rooted(resolvedNow(...args));
+const resolve = (...args: Parameters<typeof resolvedNow>) => {
+  const made: Resolved | Kept | undefined = rooted(resolvedNow(...args));
+  return made;
+};
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -71,7 +75,7 @@ type Team = { dir: string; name: string; agent: string; skill: string; agentFile
 let teams = 0;
 
 /** A team of one step `build` on `place: git`, with an agent of its own given one skill of its own. */
-function team(note = "The step's own note."): Team {
+function team(note = "The step's own note.") {
   teams += 1;
   const name = `team-${teams}`;
   const [agent, skill] = [`builder-${teams}`, `build-a-thing-${teams}`];
@@ -87,49 +91,52 @@ function team(note = "The step's own note."): Team {
     path.join(root, 'workflows', 'skills', skill, 'SKILL.md'),
     `---\nname: ${skill}\ndescription: Use this when a thing is to be built.\n---\nHow to build a thing.\n`,
   );
-  return { dir, name, agent, skill, agentFile, stepFile };
+  {
+    const made: Team = { dir, name, agent, skill, agentFile, stepFile };
+    return made;
+  }
 }
 
 /** A repository with one commit, so `nemia start` has a base to record and `--after` a branch to wait for. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
 };
 
 /** The step's rendered prompt, as the session is given it. */
-const promptOf = (id: string, step: string): string => fs.readFileSync(path.join(agentFilesDir(ROOT, { id }, step), 'prompt.md'), 'utf8');
+const promptOf = (id: string, step: string) => fs.readFileSync(path.join(agentFilesDir(ROOT, { id }, step), 'prompt.md'), 'utf8');
 
 /** The pin of one kind and name on a record. */
-const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: string): Pin | undefined =>
-  (pinned ?? []).find((p) => p.kind === kind && p.name === name);
+const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: string) =>
+  (pinned ?? []).find((p) => p.kind === kind && p.name === name) satisfies Pin | undefined;
 
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
 /** A script a check runs: it prints `word`. */
-const helperSaying = (word: string): string => `console.log(${JSON.stringify(word)});\n`;
+const helperSaying = (word: string) => `console.log(${JSON.stringify(word)});\n`;
 
 /** The team's step given the check `line`, and a `helper.ts` beside it printing `word`: the team, edited in place. */
-function checked(t: Team, line: string, word: string): Team {
+function checked(t: Team, line: string, word: string) {
   fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\ncheck: ${line}\n---\nBuild it.\n`);
   fs.writeFileSync(path.join(t.dir, 'helper.ts'), helperSaying(word));
-  return t;
+  return t satisfies Team;
 }
 
 /** The run's copy of its workflow folder, as its record names it now. */
-const frozenOf = (id: string): string => path.join(ROOT, 'runs', id, 'workflow', String(runRecord(ROOT, id).workflowFiles));
+const frozenOf = (id: string) => path.join(ROOT, 'runs', id, 'workflow', String(runRecord(ROOT, id).workflowFiles));
 
 /** The environment the run's `build` check is filed with, once `build` is filed and has signed off. */
-async function checkEnvAfterBuild(b: ReturnType<typeof board>, id: string): Promise<Record<string, string>> {
+async function checkEnvAfterBuild(b: ReturnType<typeof board>, id: string) {
   await runWith(b.e, advanceRun(runRecord(ROOT, id)));
   b.settle(`${id}-build`, 'succeeded', { closeout: SIGNED });
   await runWith(b.e, advanceRun(runRecord(ROOT, id)));
-  return b.tasks.get(`${id}-build-check`)!.spec.config?.env ?? {};
+  return (b.tasks.get(`${id}-build-check`)!.spec.config?.env ?? {}) satisfies Record<string, string>;
 }
 
 /** `branch` merged into `repo`'s checkout and committed, as a person lands a result by hand: what `--after` waits for. */
-const shippedByHand = (repo: string, branch: string): void => {
+const shippedByHand = (repo: string, branch: string) => {
   stage.place().world.stage(repo, branch);
   stage.place().world.commit(repo, `merge ${branch}`);
 };
@@ -707,12 +714,13 @@ test('a run that has filed nothing keeps the step set it froze where the folder 
 const ANSWERED = [{ finding: 'build.md:1', answer: 'fixed', why: 'built it again' }];
 
 /** A closeout schema of one required field, as a step's `output:` names one beside the folder. */
-const schemaOf = (field: string): object => ({
-  type: 'object',
-  properties: { [field]: { type: 'string' } },
-  required: [field],
-  additionalProperties: false,
-});
+const schemaOf = (field: string) =>
+  ({
+    type: 'object',
+    properties: { [field]: { type: 'string' } },
+    required: [field],
+    additionalProperties: false,
+  }) satisfies object;
 
 test("a step that continues another step's session is judged by its own closeout schema, never by the schema of the step it resumes", async () => {
   const t = team();
@@ -755,7 +763,7 @@ test('a round files its target on the closeout schema the folder declares now: c
   const run = await started(t.dir, aRepo());
   const b = board();
 
-  const filed = async (step: string): Promise<string> => {
+  const filed = async (step: string) => {
     for (let passes = 0; passes < 6; passes += 1) {
       const taskId = runRecord(ROOT, run.id).steps[step]?.taskId;
       if (taskId) return taskId;
@@ -916,7 +924,7 @@ describe('a step that ended is judged by the fields it was filed with: a run tha
 });
 
 /** What the `revisions` phase counted while `f` ran as one metered pass: the reads of the world a resolve made. */
-const resolveCalls = async (f: () => void): Promise<number> => {
+const resolveCalls = async (f: () => void) => {
   const { tallies } = await metered(async () => f());
   assert.ok(tallies, 'the work was metered');
   return tallies.kinds.revisions.calls;

@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { RunDecision, Run as RunAnswer } from 'objects';
+import type { RunDecision } from 'objects';
 import { appOf, liveOf } from '../src/app.ts';
 import {
   decideRun,
@@ -42,8 +42,6 @@ import {
 import { Effect } from 'effect';
 import { listedRuns, objectOf } from './run-reads.ts';
 
-type Wait = import('agent-orchestrator').Wait;
-
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const { app } = appOf(liveOf(ENV));
@@ -51,7 +49,7 @@ const { app } = appOf(liveOf(ENV));
 const runWith = <A, E>(
   e: Parameters<typeof runEngine>[0],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-): Promise<A> => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
+) => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
 const git = (...args: string[]) =>
   execFileSync(
     'git',
@@ -66,7 +64,7 @@ git('commit', '-q', '-m', 'base');
 const base = git('rev-parse', 'HEAD').trim();
 
 /** A result branch off main with a file of its own committed; merged back into main with `--no-ff` when `merge` says so. */
-function branch(name: string, merge: boolean): void {
+function branch(name: string, merge: boolean) {
   git('checkout', '-q', '-b', name);
   fs.writeFileSync(path.join(repo, `${name.replaceAll('/', '-')}.txt`), `${name}\n`);
   git('add', '-A');
@@ -113,7 +111,7 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
 /**
  * A run's record, as `nemia start` writes it with its workflow frozen on it; cancelled as `nemia cancel` marks one, with a file of its own.
  */
-function writeRun(id: string, workflow: object[], steps: object, more: { after?: string[]; cancelledAt?: string } = {}): void {
+function writeRun(id: string, workflow: object[], steps: object, more: { after?: string[]; cancelledAt?: string } = {}) {
   const { cancelledAt, ...rest } = more;
   write(
     path.join(root, 'runs', `${id}.json`),
@@ -253,10 +251,9 @@ const BOARD = {
 const post = (route: string, body: unknown) => app.request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 /** What the RunList (`GET /api/runs`) says of each run (`status`), by name. */
-const listed = async (): Promise<Map<string, RunAnswer['status']>> =>
-  new Map((await listedRuns(app)).map((r) => [r.metadata.name, r.status]));
+const listed = async () => new Map((await listedRuns(app)).map((r) => [r.metadata.name, r.status]));
 /** The run object's `status` (`GET /api/runs/:id`, a 200 or it throws): its hold, its steps and what waits on you. */
-const detail = async (id: string): Promise<RunAnswer['status']> => (await objectOf(app, id)).status;
+const detail = async (id: string) => (await objectOf(app, id)).status;
 const decisionOf = async (id: string) => {
   const res = await app.request(`/api/runs/${id}/decision`);
   assert.equal(res.status, 200);
@@ -264,7 +261,7 @@ const decisionOf = async (id: string) => {
 };
 
 /** The holds as the api gives them, back in the package's shape. */
-const asWaits = (holding: RunHolding | null | undefined): Wait[] =>
+const asWaits = (holding: RunHolding | null | undefined) =>
   (holding?.runs ?? []).map((w) => ({
     run: w.run,
     ...(w.missing ? { missing: true as const } : {}),
@@ -278,7 +275,7 @@ const VERBS = /nemia (approve|retry) /;
 const HELD = [GATE, LOOP, BUDGET, BLOCKS, ...Object.keys(ON).map((kind) => `h-on-${kind}`), AFTER];
 
 /** What the package refuses, word for word: what the verb prints at the command line. */
-const refusal = async (act: () => Promise<unknown>): Promise<string> => {
+const refusal = async (act: () => Promise<unknown>) => {
   try {
     await act();
   } catch (err) {
@@ -288,7 +285,7 @@ const refusal = async (act: () => Promise<unknown>): Promise<string> => {
 };
 
 /** Every file under a run's asks directory, waiting or consumed. */
-const asked = (id: string): string[] => {
+const asked = (id: string) => {
   const dir = path.join(root, 'runs', `${id}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
@@ -541,7 +538,7 @@ const lift = (id: string, headers: Record<string, string> = BOARD) =>
   app.request(`/api/namespaces/default/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
 
 /** Every file of a run in the store's `runs/`, and what each holds: what a refusal must leave as it was. */
-const filesOf = (id: string): Record<string, string> =>
+const filesOf = (id: string) =>
   Object.fromEntries(
     fs
       .readdirSync(path.join(root, 'runs'))

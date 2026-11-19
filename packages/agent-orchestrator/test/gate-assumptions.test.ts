@@ -26,12 +26,13 @@ const TRIAGE: StepSpec[] = [
 const PLANNED: StepSpec[] = [step('plan'), step('implement', ['plan'])];
 const ENDING: StepSpec[] = [step('implement'), { ...step('land', ['implement']), workspace: 'base', gate: true }];
 
-const done = (surface?: string): Closeout => ({
-  outcome: 'done',
-  summary: 's',
-  artifacts: [],
-  ...(surface === undefined ? {} : { output: { surface } }),
-});
+const done = (surface?: string) =>
+  ({
+    outcome: 'done',
+    summary: 's',
+    artifacts: [],
+    ...(surface === undefined ? {} : { output: { surface } }),
+  }) satisfies Closeout;
 const said = (surface: string) => (name: string) => (name === 'plan' ? done(surface) : undefined);
 const approval = (name: string) => ({ step: name, try: 1, at: '2026-11-05T17:00:00.000Z' });
 const asked = () => true;
@@ -45,15 +46,8 @@ type Input = [
   () => undefined,
   () => undefined,
 ];
-const input = (steps: StepSpec[], r: Run, p: (id: string) => TaskPhase, c: (s: string) => Closeout | undefined): Input => [
-  steps,
-  r,
-  p,
-  c,
-  asked,
-  () => undefined,
-  () => undefined,
-];
+const input = (steps: StepSpec[], r: Run, p: (id: string) => TaskPhase, c: (s: string) => Closeout | undefined) =>
+  [steps, r, p, c, asked, () => undefined, () => undefined] satisfies Input;
 
 test("the run's words read awaiting approval only at a gate, and only while its try is unapproved", () => {
   const triage = (extra: Partial<RepositoryRun> = {}) =>

@@ -21,7 +21,7 @@ const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
 const WHY = 'merging by hand on main';
 
 /** Refuses unless the machine bar's pause stands at its end, after the gauges button. */
-async function afterTheGauges(page: Page): Promise<void> {
+async function afterTheGauges(page: Page) {
   const order = await page
     .locator('footer[data-machine-bar]')
     .locator('[data-pause], [data-gauges-button]')
@@ -61,12 +61,13 @@ const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
  * the pause holds; refuses unless the step's chip is drawn waiting, in those words; photographs its graph, wide and on a phone's screen;
  * and goes back to the Factory.
  */
-async function heldRun(page: Page, theme: string): Promise<void> {
+async function heldRun(page: Page, theme: string) {
   const size = page.viewportSize();
   await page.route(fakeRead, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const read = (await (await route.fetch()).json()) as RunObject.Run;
     const steps = read.status.steps.map((s) => (s.name === FAKE.refused ? { ...s, ...HELD_WORDS } : s));
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- held words on the api's own read: no seeded run holds them
     return route.fulfill({ json: { ...read, status: { ...read.status, steps } } });
   });
   try {
@@ -94,7 +95,7 @@ async function heldRun(page: Page, theme: string): Promise<void> {
 }
 
 /** Opens the popover and photographs the machine bar's corner with it, as `<what>`. */
-async function opened(page: Page, what: string): Promise<void> {
+async function opened(page: Page, what: string) {
   await pauseOf(page).click();
   await expectVisible(popoverOf(page), 'the button opens its popover');
   await settled(page);

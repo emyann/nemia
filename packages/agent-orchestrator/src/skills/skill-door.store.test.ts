@@ -33,7 +33,7 @@ const store = () => {
 };
 
 /** Every entry under `dir`, by its path from it, hidden ones too: what a write that failed part-way would leave. */
-const entries = (dir: string): string[] => (fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : []);
+const entries = (dir: string) => (fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : []);
 
 test('the default door reads the files at the store root the program is given, and refuses Invalid where it was given none', () => {
   const { root, library, door } = store();

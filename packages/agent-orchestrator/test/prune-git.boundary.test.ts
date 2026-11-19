@@ -40,7 +40,7 @@ const git = (cwd: string, ...args: string[]) =>
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 
 /** A repository with one commit, whose `.gitignore` names what a worktree is given: `node_modules`. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n');

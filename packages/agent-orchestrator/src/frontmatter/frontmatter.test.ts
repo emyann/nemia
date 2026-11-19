@@ -8,25 +8,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import jsyaml from 'js-yaml';
 import { WorkflowError } from '../step/step.ts';
-import {
-  commentTails,
-  flatValue,
-  inFormerForm,
-  readFrontmatter,
-  renderFrontmatter,
-  rewriteFormer,
-  withKey,
-  type FrontmatterValue,
-} from './frontmatter.ts';
+import { commentTails, flatValue, inFormerForm, readFrontmatter, renderFrontmatter, rewriteFormer, withKey } from './frontmatter.ts';
 
 const FORMER = path.join(import.meta.dirname, '../../test/fixtures/former-frontmatter');
 
 /** A block's keys as key → value. */
-const valuesOf = (block: string): Record<string, FrontmatterValue> =>
-  Object.fromEntries(readFrontmatter('t', block).entries.map(({ key, value }) => [key, value]));
+const valuesOf = (block: string) => Object.fromEntries(readFrontmatter('t', block).entries.map(({ key, value }) => [key, value]));
 
 /** The former reader's reading of a block: each line trimmed, split at its first colon. */
-const formerReading = (block: string): [string, string][] =>
+const formerReading = (block: string) =>
   block
     .split('\n')
     .map((l) => l.trim())
@@ -34,7 +24,7 @@ const formerReading = (block: string): [string, string][] =>
     .map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]);
 
 /** A file's block, between its two `---`. */
-const blockOf = (text: string): string => /^---\n([\s\S]*?\n)---\n/.exec(text)![1];
+const blockOf = (text: string) => /^---\n([\s\S]*?\n)---\n/.exec(text)![1];
 
 describe('a value written reads back the same, to this reader and to js-yaml (but a word its core schema reads as a number or null, which Nemia reads as text), and a plain one is written plain', () => {
   const long = `{ if [ -n "\${WF_BASE_REF:-}" ]; then echo "a: b" # not a comment; fi; } && ${'x'.repeat(260)}`;

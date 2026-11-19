@@ -7,11 +7,11 @@ import { testEngine, type TestEngine } from 'agent-runtime/testing';
 import { unasked } from './unasked.ts';
 
 /** `use` run over the stand-in `made`'s engine. */
-const over = <A, E>(made: TestEngine, use: (engine: typeof Engine.Service) => Effect.Effect<A, E>): Promise<A> =>
+const over = <A, E>(made: TestEngine, use: (engine: typeof Engine.Service) => Effect.Effect<A, E>) =>
   Effect.runPromise(Engine.use(use).pipe(Effect.provide(made.layer)));
 
 /** A stand-in with one task filed and settled `running`. */
-async function atWork(): Promise<TestEngine> {
+async function atWork() {
   const made = testEngine();
   await over(made, (engine) => engine.file({ id: 't', brief: 'work', cwd: '/' }));
   made.settle('t', 'working');

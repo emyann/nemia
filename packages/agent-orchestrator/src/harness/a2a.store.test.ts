@@ -18,7 +18,7 @@ import { STEP_KEYS, WorkflowError } from '../step/step.ts';
 import { REMOTE_REFUSED_KEYS } from './harness.ts';
 import { parseWorkflow } from '../workflow/index.ts';
 import { parseFolder } from '../folder/folder.ts';
-import { parseAgent, type Agents } from '../agents/agents.ts';
+import { parseAgent } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
@@ -47,10 +47,10 @@ const board = () => {
 const credentials = credentialsAt(ROOT);
 
 const FILE = path.join(ROOT, 'a2a-agents.json');
-const declare = (agents: unknown): void => fs.writeFileSync(FILE, typeof agents === 'string' ? agents : JSON.stringify(agents));
+const declare = (agents: unknown) => fs.writeFileSync(FILE, typeof agents === 'string' ? agents : JSON.stringify(agents));
 
 /** What `fn` is refused with — exit code 2, a person's to fix — as its message. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -61,7 +61,7 @@ function refusal(fn: () => unknown): string {
 }
 
 /** What `fn`, which returns a Promise, is refused with — exit code 2, a person's to fix — as its message. */
-async function rejection(fn: () => Promise<unknown>): Promise<string> {
+async function rejection(fn: () => Promise<unknown>) {
   try {
     await fn();
   } catch (err) {
@@ -72,7 +72,7 @@ async function rejection(fn: () => Promise<unknown>): Promise<string> {
 }
 
 /** What `fn` is refused with at load, as a `WorkflowError`'s message. */
-function loadRefusal(fn: () => unknown): string {
+function loadRefusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -105,10 +105,9 @@ const LOCAL_ONLY: Record<string, string> = {
   reads: 'inbox',
 };
 
-const agentsOf = (files: Record<string, string>): Agents =>
-  new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
+const agentsOf = (files: Record<string, string>) => new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
-function team(name: string, steps: Record<string, string>): string {
+function team(name: string, steps: Record<string, string>) {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
   for (const [step, text] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${step}.md`), text);

@@ -30,7 +30,7 @@ import {
 type Row = { name: string; check: () => void };
 
 /** A pass kept at `at`, of `ms`, with what it saw. */
-const pass = (at: string, ms = 10, over: Partial<RecentPass> = {}): RecentPass => ({
+const pass = (at: string, ms = 10, over: Partial<RecentPass> = {}) => ({
   at,
   ms,
   runs: 40,
@@ -47,7 +47,7 @@ const pass = (at: string, ms = 10, over: Partial<RecentPass> = {}): RecentPass =
 const lineOf = (lines: readonly RollupLine[], s: string, t?: string) => lines.find((x) => x.s === s && (t === undefined || x.t === t))!;
 
 /** The `pass.ms` line of the minute `m` of 13:00, rolled from `values`, a pass a second. */
-const minute = (m: number, values: number[]): RollupLine =>
+const minute = (m: number, values: number[]) =>
   rollMinutes(
     values.map((ms, k) => pass(`2026-10-05T13:${String(m).padStart(2, '0')}:${String(k).padStart(2, '0')}.000Z`, ms)),
     [`2026-10-05T13:${String(m).padStart(2, '0')}:00.000Z`],
@@ -327,7 +327,7 @@ describe('`daysPast`, `memoDays` and `daysOfRange`: the days a retention, a memo
 });
 
 /** A `store.runs` line at `t` of one sample `v`. */
-const runsLine = (t: string, v: number): RollupLine => ({ t, s: 'store.runs', l: {}, n: 1, sum: v, min: v, max: v, last: v });
+const runsLine = (t: string, v: number) => ({ t, s: 'store.runs', l: {}, n: 1, sum: v, min: v, max: v, last: v });
 
 /** Three hour lines over two days, read at noon of the day after. */
 const LINES = [runsLine('2026-10-03T10:00:00.000Z', 3), runsLine('2026-10-04T10:00:00.000Z', 5), runsLine('2026-10-04T11:00:00.000Z', 9)];

@@ -67,7 +67,7 @@ const files = filesStoreAt(ROOT);
  * What the run object says of run `id`'s prune under its line, as its decision read it (`status.pruned.said`, `prunedOf` in
  * object/run.verb.ts): refused where the run is not pruned.
  */
-const prunedSaid = async (id: string): Promise<string> => {
+const prunedSaid = async (id: string) => {
   const { run } = await decisionOn(stage, id);
   assert.ok(run.pruned, `${id} is pruned`);
   return `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}`;
@@ -82,7 +82,7 @@ const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 const hasBranch = (repo: string, branch: string) => world().tip(repo, branch) !== null;
 
 /** A repository of the stage's place with one commit on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
@@ -158,45 +158,46 @@ const aFinished = async (
  * `nemia <verb>` as a person types it: `rm` and `prune` as the client runs them over the api (`forgetTyped`), any other through the CLI;
  * the lines it printed, and the error it ended with, if it did.
  */
-const typed = async (e: Engine, ...argv: string[]): Promise<Typed> => {
+const typed = async (e: Engine, ...argv: string[]) => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e, effect), ROOT, argv);
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv, e);
-    return { printed, forgot: [], error: undefined };
+    return { printed, forgot: [], error: undefined } satisfies Typed;
   } catch (err) {
-    return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } };
+    return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } } satisfies Typed;
   } finally {
+    printed.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
     log.mockRestore();
   }
 };
 
 /** `nemia ls <id>` over `e`: what it answers (`RunsListed`), run `id`'s row in it, and its listing (`listedRow`). */
-const listedOf = async (e: Engine, id: string): Promise<{ row: RunsListed['runs'][number]; listing: Listing }> => {
+const listedOf = async (e: Engine, id: string) => {
   const listed = (await stage.main(['ls', id], e)) as RunsListed;
   const listing = listedRow(listed, id);
-  return { row: listed.runs.find((r) => r.run.id === id)!, listing };
+  return { row: listed.runs.find((r) => r.run.id === id)!, listing } satisfies { row: RunsListed['runs'][number]; listing: Listing };
 };
 
 /**
  * Whether a listing says the run waits on a person anywhere: a step it names (`waitingOnYou`), a run its roots wait on that is missing,
  * cancelled or gone (`waiting`), or a step's own word (`message`), as an over-budget step's is.
  */
-const waitsOnYou = (l: Listing): boolean =>
+const waitsOnYou = (l: Listing) =>
   l.waitingOnYou.length > 0 ||
   l.waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length) ||
   l.steps.some((s) => /waiting on you/.test(s.message));
 
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
-const worktreesOf = (repo: string): string[] => {
+const worktreesOf = (repo: string) => {
   const outcome = placeNow().askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in outcome, `the inventory of ${repo}`);
-  return outcome.answer.workspaces.map((w) => w.path);
+  return outcome.answer.workspaces.map((w) => w.path) satisfies string[];
 };
 
 /** A file in a run's files directory, as a step's check leaves one: its absolute path. */
-const aShot = (id: string, name = 'shot.png', bytes = 32 * 1024): string => {
+const aShot = (id: string, name = 'shot.png', bytes = 32 * 1024) => {
   const at = path.join(ROOT, 'runs', id, 'artifacts', 'implement', name);
   fs.mkdirSync(path.dirname(at), { recursive: true });
   fs.writeFileSync(at, 'p'.repeat(bytes));
@@ -441,6 +442,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       aShot(run.id);
       const rm = fs.rmSync;
       let seen: unknown;
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- reads the mark as the files go: no seam shows it
       const mocked = vi.spyOn(fs, 'rmSync').mockImplementation((at: fs.PathLike, opts?: fs.RmOptions) => {
         if (String(at).endsWith(path.join(run.id, 'artifacts')))
           seen = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.pruned`), 'utf8'));
@@ -977,25 +979,26 @@ const finishedIn = async (b: Board, repos: readonly string[], count: number) => 
 type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb] }>;
 
 /** `place`, every question noted in `asked` before it is answered. */
-const counting = (place: Place, asked: Asked): Place => ({
-  declared: place.declared,
-  ask: (verb, request, options) => {
-    asked.push({ verb, request });
-    return place.ask(verb, request, options);
-  },
-  askNow: (verb, request, options) => {
-    asked.push({ verb, request });
-    return place.askNow(verb, request, options);
-  },
-});
+const counting = (place: Place, asked: Asked) =>
+  ({
+    declared: place.declared,
+    ask: (verb, request, options) => {
+      asked.push({ verb, request });
+      return place.ask(verb, request, options);
+    },
+    askNow: (verb, request, options) => {
+      asked.push({ verb, request });
+      return place.askNow(verb, request, options);
+    },
+  }) satisfies Place;
 
 /** The run each `inventory` in `asked` was asked of, by the folder of worktrees it named. */
-const inventoried = (asked: Asked): string[] =>
-  asked.flatMap((a) => (a.verb === 'inventory' ? [path.basename((a.request as PlaceRequests['inventory']).under)] : []));
+const inventoried = (asked: Asked) =>
+  asked.flatMap((a) => (a.verb === 'inventory' ? [path.basename((a.request as PlaceRequests['inventory']).under)] : [])) satisfies string[];
 
 /** Each `remove` in `asked`, as it was asked. */
-const removes = (asked: Asked): PlaceRequests['remove'][] =>
-  asked.flatMap((a) => (a.verb === 'remove' ? [a.request as PlaceRequests['remove']] : []));
+const removes = (asked: Asked) =>
+  asked.flatMap((a) => (a.verb === 'remove' ? [a.request as PlaceRequests['remove']] : [])) satisfies PlaceRequests['remove'][];
 
 const kindsOf = (turned: readonly Turned[]) => turned.map((d) => ('failed' in d ? 'failed' : d.pruning.kind));
 

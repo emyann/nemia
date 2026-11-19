@@ -98,7 +98,7 @@ const started = (brief: string, dir = FOLDER, more: { after?: string[]; isolate?
   stage.runPlaced(startRun({ brief, repo: REPO, workflowDir: dir, isolate: false, ...more }));
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
-const unfrozen = (id: string, dir: string): void => {
+const unfrozen = (id: string, dir: string) => {
   const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
   fs.writeFileSync(runFile(ROOT, id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
 };
@@ -110,29 +110,31 @@ const JOURNAL_OUT = (id: string) => `${id} is not advanced while a task it reads
 const printedBy = async (t: unknown, argv: string[], engine: Parameters<typeof stage.main>[1]) => {
   const out: string[] = [];
   const err: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void out.push(...a.map(String).join(' ').split('\n')));
-  const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => void err.push(a.map(String).join(' ')));
+  const log = vi.spyOn(console, 'log');
+  const error = vi.spyOn(console, 'error');
   let threw: unknown;
   try {
     await stage.main(argv, engine);
   } catch (caught) {
     threw = caught;
   } finally {
+    out.push(...log.mock.calls.flatMap((a) => a.map(String).join(' ').split('\n')));
     log.mockRestore();
+    err.push(...error.mock.calls.flatMap((a) => [a.map(String).join(' ')]));
     error.mockRestore();
   }
   return { out, err, threw };
 };
 
 /** What `nemia ls` reads of `id` among `listed`: its listing, or why nobody judged it. */
-const listingOf = (listed: RunsListed, id: string): RunsListed['runs'][number]['listed'] => {
+const listingOf = (listed: RunsListed, id: string) => {
   const one = listed.runs.find((r) => r.run.id === id);
   assert.ok(one, `nemia ls lists ${id}: ${listed.runs.map((r) => r.run.id).join(', ')}`);
   return one.listed;
 };
 
 /** Why nobody judged the run `listed` lists, or undefined where it was judged. */
-const unreadableOf = (listed: RunsListed['runs'][number]['listed']): string | undefined => ('said' in listed ? listed.said : undefined);
+const unreadableOf = (listed: RunsListed['runs'][number]['listed']) => ('said' in listed ? listed.said : undefined);
 
 /** Whether the feed says `id` was removed. */
 const saidRemoved = (id: string) => readFeed(ROOT).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
@@ -200,12 +202,13 @@ describe('one broken run does not stop the others: each left out and said once, 
       fs.writeFileSync(runFile(ROOT, 'torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
 
-      const wrote: string[] = [];
-      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
-        wrote.push(String(line));
-        return true;
-      }) as never);
-      const now = await pass().finally(() => stderr.mockRestore());
+      const stderr = vi.spyOn(process.stderr, 'write');
+      let written: string[] = [];
+      const now = await pass().finally(() => {
+        written = stderr.mock.calls.flatMap(([line]) => [String(line)]);
+        stderr.mockRestore();
+      });
+      const wrote = () => written;
 
       assert.deepEqual(now.runs.find((a) => a.run.id === runs.good)?.filed, ['work'], 'the good run filed its step');
       for (const id of [runs.journal, runs.gone, runs.unplaced])
@@ -228,7 +231,7 @@ describe('one broken run does not stop the others: each left out and said once, 
         now.unreadable?.some((w) => w.startsWith(LEFT_OUT(runs.gone)) && w.includes('no workflow folder at')),
         JSON.stringify(now.unreadable),
       );
-      assert.equal(wrote.filter((l) => l.startsWith('left out: run torn: its record, ')).length, 1, wrote.join(''));
+      assert.equal(wrote().filter((l) => l.startsWith('left out: run torn: its record, ')).length, 1, wrote().join(''));
       for (const id of [runs.journal, runs.gone, runs.unplaced])
         assert.equal(saidRemoved(id), false, `the feed does not say ${id} removed`);
     },

@@ -29,14 +29,14 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   return repo;
 };
 
 /** A folder of steps written from their frontmatter and a one-line body. */
-const folderOf = (steps: Record<string, string>): string => {
+const folderOf = (steps: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, front] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
@@ -163,7 +163,7 @@ test('a pass over a step answered again and again reads what it is working on, n
   const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: FOLDER }));
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
 
-  const passReads = async (): Promise<string[]> => {
+  const passReads = async () => {
     reads.length = 0;
     await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     return [...reads];

@@ -50,7 +50,7 @@ const where: Question = {
 };
 
 /** What `questionsOf` gives `value` when it refuses it, or a failure when it decodes. */
-const decodeFails = (value: unknown): string => {
+const decodeFails = (value: unknown) => {
   const read = questionsOf(value);
   assert.ok(!Array.isArray(read), `${JSON.stringify(value)} decoded`);
   return read.error;

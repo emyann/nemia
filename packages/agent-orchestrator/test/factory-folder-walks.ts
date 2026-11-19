@@ -12,12 +12,12 @@ import type { TreeFile } from '../src/archive/archive.ts';
 
 type Walk = DoorWalk<FactoryDoorShape>;
 
-const nameOf = (name: string): FactoryName => FactoryName.read(name);
+const nameOf = (name: string) => FactoryName.read(name) satisfies FactoryName;
 
 const since = '2026-11-01T00:00:00.000Z';
 
 /** A file of a factory's folder, at `path`, holding `text`. */
-const aFile = (path: string, text: string): TreeFile => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
+const aFile = (path: string, text: string) => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) }) satisfies TreeFile;
 
 /**
  * A factory's folder as a store keeps one: its tree and its base, its level, servers and rules, and what stays with the store — a
@@ -34,12 +34,12 @@ const AFOLDER: readonly TreeFile[] = [
 ];
 
 /** The paths of a folder read, sorted. */
-const pathsOf = (files: readonly TreeFile[]): string[] => files.map((f) => f.path).sort();
+const pathsOf = (files: readonly TreeFile[]) => files.map((f) => f.path).sort() satisfies string[];
 
 /** The text of the file at `path` of a folder read, or none. */
-const textAt = (files: readonly TreeFile[], path: string): string | undefined => {
+const textAt = (files: readonly TreeFile[], path: string) => {
   const file = files.find((f) => f.path === path);
-  return file === undefined ? undefined : new TextDecoder().decode(file.bytes);
+  return (file === undefined ? undefined : new TextDecoder().decode(file.bytes)) satisfies string | undefined;
 };
 
 /** The walks of the folder's three methods. */

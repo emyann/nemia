@@ -29,7 +29,7 @@ export const NAMES = 'NAMES';
 const PAGE_FILE = /^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
 
 /** The order the pages are visited in: their file names, compared as plain strings. */
-export const orderOf = (names: readonly string[]): string[] => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+export const orderOf = (names: readonly string[]) => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)) satisfies string[];
 
 /**
  * The pages shard `i` of `of` visits, `i` 1-based: dealt round-robin in the pages' own order, so neighbouring pages — which a number in
@@ -37,13 +37,13 @@ export const orderOf = (names: readonly string[]): string[] => [...names].sort((
  * the pages, each once, in their order, and no two differ by more than one page. Pure: `e2e-pages.test.ts` holds it over the pages there
  * are.
  */
-export const shardOf = <P>(pages: readonly P[], i: number, of: number): P[] => pages.filter((_, at) => at % of === i - 1);
+export const shardOf = <P>(pages: readonly P[], i: number, of: number) => pages.filter((_, at) => at % of === i - 1) satisfies P[];
 
 /** The page a file is: its name without its number. */
-const nameOf = (file: string): string => PAGE_FILE.exec(file)![2];
+const nameOf = (file: string) => PAGE_FILE.exec(file)![2];
 
 /** The pages `dir`'s NAMES says there are: its lines, trimmed, the blank ones left out. */
-export function namesIn(dir = PAGES_DIR): Set<string> {
+export function namesIn(dir = PAGES_DIR) {
   const file = path.join(dir, NAMES);
   if (!fs.existsSync(file))
     throw new Error(`${file} is not there, and it says which pages the e2e visits: write it, the name of each page on a line of its own.`);
@@ -53,7 +53,7 @@ export function namesIn(dir = PAGES_DIR): Set<string> {
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean),
-  );
+  ) satisfies Set<string>;
 }
 
 /**
@@ -62,10 +62,7 @@ export function namesIn(dir = PAGES_DIR): Set<string> {
  * refuses when the pages and NAMES differ either way. `list` is how the directory is read, for a test to hand it one that lists its files
  * in an order of its own.
  */
-export function pageFiles(
-  dir = PAGES_DIR,
-  list: (dir: string) => fs.Dirent[] = (d) => fs.readdirSync(d, { withFileTypes: true }),
-): string[] {
+export function pageFiles(dir = PAGES_DIR, list: (dir: string) => fs.Dirent[] = (d) => fs.readdirSync(d, { withFileTypes: true })) {
   const entries = list(dir).filter((entry) => !(entry.name === NAMES && entry.isFile()));
   const strays = entries.filter((entry) => !entry.isFile() || !PAGE_FILE.test(entry.name)).map((entry) => entry.name);
   if (strays.length) {
@@ -91,7 +88,7 @@ export function pageFiles(
         'so the e2e would not visit it: restore the file (NNN-<name>.ts, from git), or, if the page was deleted on purpose, delete its line from NAMES.',
     );
   }
-  return files;
+  return files satisfies string[];
 }
 
 const isPageSpec = (spec: unknown): spec is PageSpec =>
@@ -102,7 +99,7 @@ const isPageSpec = (spec: unknown): spec is PageSpec =>
   typeof (spec as PageSpec).expect === 'function';
 
 /** Every page in `dir`, in the order they are visited, each once. */
-export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
+export async function loadPages(dir = PAGES_DIR) {
   const pages: PageSpec[] = [];
   const from = new Map<string, string>();
   for (const file of pageFiles(dir)) {
@@ -131,6 +128,20 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
  */
 export const themesOf: ThemesOf = (asked) => (asked.light || asked.contrast ? ['light', 'dark'] : ['dark']);
 
+/** What `planOf` plans: the pages to visit, the themes, which pages are pictured, and how the run is cut. */
+type Plan<P> = {
+  visit: P[];
+  themes: Theme[];
+  pictured: (name: string) => boolean;
+  photos: boolean;
+  light: boolean;
+  measured: boolean;
+  workers?: number;
+  shard?: { i: number; of: number };
+  whole: boolean;
+  look: boolean;
+};
+
 /**
  * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; whether a
  * page is `pictured`; whether it asked for `photos` and for `light`, which run.ts hands its workers; how many `workers` it asks for, if
@@ -152,21 +163,7 @@ export const themesOf: ThemesOf = (asked) => (asked.light || asked.contrast ? ['
  * --pages <name,…>` runs both. Refuses `--look` with `--shard`, since the look runs once per push (CI's `e2e-look` job) and not once per
  * shard, and `--look` with no `--pages` beside `--photos`, `--contrast` or `--workers`, which are about pages it would not visit.
  */
-export function planOf<P extends { name: string }>(
-  argv: readonly string[],
-  pages: readonly P[],
-): {
-  visit: P[];
-  themes: Theme[];
-  pictured: (name: string) => boolean;
-  photos: boolean;
-  light: boolean;
-  measured: boolean;
-  workers?: number;
-  shard?: { i: number; of: number };
-  whole: boolean;
-  look: boolean;
-} {
+export function planOf<P extends { name: string }>(argv: readonly string[], pages: readonly P[]) {
   let look = false;
   let photos = false;
   let light = false;
@@ -234,10 +231,22 @@ export function planOf<P extends { name: string }>(
       shard: { i: shard, of },
       whole: false,
       look: false,
-    };
+    } satisfies Plan<P>;
   }
-  if (look && !named) return { visit: [], themes, pictured: () => false, photos, light, measured, workers, whole: false, look };
-  if (!named) return { visit: [...pages], themes, pictured: () => photos, photos, light, measured, workers, whole: !photos, look: true };
+  if (look && !named)
+    return { visit: [], themes, pictured: () => false, photos, light, measured, workers, whole: false, look } satisfies Plan<P>;
+  if (!named)
+    return {
+      visit: [...pages],
+      themes,
+      pictured: () => photos,
+      photos,
+      light,
+      measured,
+      workers,
+      whole: !photos,
+      look: true,
+    } satisfies Plan<P>;
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
   if (unknown.length)
@@ -253,11 +262,11 @@ export function planOf<P extends { name: string }>(
     workers,
     whole: false,
     look,
-  };
+  } satisfies Plan<P>;
 }
 
 /** The number `--workers` is given: a whole number, one or more; refuses anything else, and a flag in its place. */
-function workersAfter(arg: string | undefined): number {
+function workersAfter(arg: string | undefined) {
   const n = Number(arg);
   if (!arg || !/^\d+$/.test(arg) || n < 1)
     throw new Error(`--workers takes a whole number of workers, one or more (--workers 4), not ${arg ?? 'nothing'}`);
@@ -265,7 +274,7 @@ function workersAfter(arg: string | undefined): number {
 }
 
 /** The whole number of one or more a flag is given; refuses anything else, and a flag in its place. `what` names what the number is. */
-function wholeAfter(flag: string, what: string, arg: string | undefined): number {
+function wholeAfter(flag: string, what: string, arg: string | undefined) {
   const n = Number(arg);
   if (!arg || !/^\d+$/.test(arg) || n < 1)
     throw new Error(`${flag} takes ${what}, one or more (--shard 1 --of 4), not ${arg ?? 'nothing'}`);
@@ -273,11 +282,11 @@ function wholeAfter(flag: string, what: string, arg: string | undefined): number
 }
 
 /** The page names `--pages` is given, comma-separated; refuses none, and a flag in their place. */
-function namesAfter(arg: string | undefined): string[] {
+function namesAfter(arg: string | undefined) {
   const names = (arg?.startsWith('--') ? '' : (arg ?? ''))
     .split(',')
     .map((name) => name.trim())
     .filter(Boolean);
   if (!names.length) throw new Error('--pages names no page: give it the pages to visit, separated by commas (--pages factory,runs)');
-  return names;
+  return names satisfies string[];
 }

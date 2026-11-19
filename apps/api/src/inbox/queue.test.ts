@@ -49,13 +49,13 @@ const ENV: NodeJS.ProcessEnv = { ...process.env, WF_ROOT: root, WF_MAX_RUNS: und
 const { app } = appOf(liveOf(ENV));
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`) and its settings: its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A =>
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>) =>
   Effect.runSync(Effect.provide(program, storeConfigLayer(ENV)));
 /** `program` run over the engine `e`, given the package's git place and the store and settings `ENV` names. */
 const runWith = <A, E>(
   e: Parameters<typeof runEngine>[0],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-): Promise<A> => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
+) => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
 const git = (...args: string[]) =>
   execFileSync(
     'git',
@@ -72,13 +72,13 @@ const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** Every card, try, record, journal and the tick's ceilings gone, so each test starts from an empty store. */
-const clear = (): void => {
+const clear = () => {
   for (const dir of ['inbox', 'queue', 'runs', 'engine']) fs.rmSync(path.join(root, dir), { recursive: true, force: true });
   for (const file of ['tick.json', 'tick-stats.json']) fs.rmSync(path.join(root, file), { force: true });
 };
 
 /** The inbox folder as it is: each file's name and text, to show a refusal wrote nothing. */
-const inboxAsIs = (): Array<[string, string]> =>
+const inboxAsIs = () =>
   (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []).map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
 
 /** The Card's `queue` (or, `off`, its `unqueue`) of the card `name` in `namespace`, `body` sent where given. */
@@ -98,14 +98,14 @@ const queuedOn = (name: string, workflow: string) =>
     headers: JSON_TYPE,
   });
 const unqueue = verb(true);
-const listed = async (): Promise<Card[]> => {
+const listed = async () => {
   const res = await app.request('/api/cards');
   assert.equal(res.status, 200);
   return ((await res.json()) as CardList).items.slice();
 };
 
 /** The names of the cards queued and not started, in the order the tick starts them, read off the Cards: the place each is in. */
-const inLine = (cards: readonly Card[]): string[] =>
+const inLine = (cards: readonly Card[]) =>
   cards
     .filter((c) => c.spec.queued !== undefined && !c.status.runs.length)
     .sort((a, b) => (a.spec.queued ?? '').localeCompare(b.spec.queued ?? '') || a.metadata.name.localeCompare(b.metadata.name))
@@ -143,7 +143,7 @@ const packageListed = (l: Omit<InboxListing, 'state'>) => ({
 });
 
 /** What the package refuses a queue of `name` with — or its taking back — asked of it directly, which writes nothing when it refuses. */
-const refusalOf = (name: string, off = false): string => {
+const refusalOf = (name: string, off = false) => {
   try {
     onStore(queueInInbox(name, { off }));
   } catch (err) {
@@ -153,7 +153,7 @@ const refusalOf = (name: string, off = false): string => {
 };
 
 /** A record of a run started from `card`, as `nemia start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
-const startedFrom = (id: string, card: string): string =>
+const startedFrom = (id: string, card: string) =>
   JSON.stringify({
     id,
     place: { kind: 'folder' },
@@ -165,7 +165,7 @@ const startedFrom = (id: string, card: string): string =>
     from: { inbox: card },
   });
 
-const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
+const cardText = (name: string) => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
 describe("a person queues cards, reads their order and the tick's tries, and takes them back", () => {
   const s = story(test);
@@ -431,7 +431,7 @@ const pending = (taskId: string) => {
 };
 
 /** A run of one step, frozen on the record as `nemia start` freezes it. */
-function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}): void {
+function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'runs', `${id}.json`),
@@ -456,21 +456,21 @@ function writeRun(id: string, minute: number, fields: { after?: string[]; taskId
 /** The daemon's last pass's ceilings, as the tick writes them. */
 const tickWrote = (c: { sessions: number; runs: number }) => fs.writeFileSync(path.join(root, 'tick.json'), JSON.stringify(c, null, 2));
 
-const ceilings = async (): Promise<Ceilings> => {
+const ceilings = async () => {
   const res = await app.request('/api/ceilings');
   assert.equal(res.status, 200, await res.clone().text());
   return (await res.json()) as Ceilings;
 };
 
 /** The runs the package's own `runSlots` holds, on the same store, the runs waited on read off `standing.json`, as the api answers them. */
-const packageHeld = async (): Promise<Ceilings['held']> => {
+const packageHeld = async () => {
   const git = standingReader(await runWith(engine(ENV), standingSnapshot()));
   const held = await runWith(engine(ENV), runSlots(engine(ENV), runsAtOnce(root).runs.list(), settingsOf(ENV), { git, read: new Map() }));
   return [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) }));
 };
 
 /** One run in flight, two wanting a slot, one waiting on the run in flight, one called off. */
-function seedRuns(): void {
+function seedRuns() {
   pending('t-flying');
   writeRun('a-flying', 0, { taskId: 't-flying' });
   writeRun('b-wants', 1);

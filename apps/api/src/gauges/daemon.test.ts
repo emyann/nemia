@@ -29,7 +29,7 @@ const ago = (ms: number, now = Date.now()) => new Date(now - ms).toISOString();
  * A file as `nemia up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago — each stamp
  * off one reading of the clock, so a step between two readings cannot set the pass after the beat.
  */
-const written = (quiet: number, over: Partial<DaemonFile> = {}): OnDisk => {
+const written = (quiet: number, over: Partial<DaemonFile> = {}) => {
   const procStart = procStartOf(process.pid);
   const now = Date.now();
   return {
@@ -47,7 +47,7 @@ const written = (quiet: number, over: Partial<DaemonFile> = {}): OnDisk => {
 const put = (file: OnDisk | string) => fs.writeFileSync(FILE, typeof file === 'string' ? file : `${JSON.stringify(file, null, 2)}\n`);
 
 /** GET /api/daemon, and the file as it stood before and after: the api writes nothing, whatever it reads. */
-async function get(): Promise<Daemon> {
+async function get() {
   const before = fs.existsSync(FILE) ? { text: fs.readFileSync(FILE, 'utf8'), mtimeMs: fs.statSync(FILE).mtimeMs } : undefined;
   const res = await app.request('/api/daemon');
   assert.equal(res.status, 200, await res.clone().text());
@@ -57,7 +57,7 @@ async function get(): Promise<Daemon> {
 }
 
 /** What a pass cost as the tick writes it (`recordPassCost`), at `at`, with what it could not read of a harness. */
-const passAt = (at: string, unobserved?: string[]): PassCostRead => ({
+const passAt = (at: string, unobserved?: string[]) => ({
   at,
   ms: 212,
   records: 12,

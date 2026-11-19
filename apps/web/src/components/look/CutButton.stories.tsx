@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { expect, fireEvent, within } from 'storybook/test';
 import { atRest, tabStops, tabTo } from '../../../.storybook/play';
 import { CutButton, CutPress } from './CutButton';
-import { ON_CARD } from './stories.fixtures';
+import { ON_CARD } from './stories.fixture';
 
 /**
  * The look's filled button with two cut corners: a link to a route, quiet, a button that is pressed, a press that is disabled, and a

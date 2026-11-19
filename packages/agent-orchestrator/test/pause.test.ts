@@ -75,7 +75,7 @@ const world = () => stage.place().world;
  * The stage's engine with a pass of its own that does nothing, and no tally: what a whole-store pass asks of the engine first. Its list
  * says each task of `parked` held at its hook, as the runtime says a session the sessions' drain parked, which the stand-in does not.
  */
-const ticking = (parked: ReadonlySet<string> = new Set()): Board => {
+const ticking = (parked: ReadonlySet<string> = new Set()) => {
   const b = stage.board();
   const list = b.e.list;
   Object.assign(b.e, {
@@ -87,10 +87,10 @@ const ticking = (parked: ReadonlySet<string> = new Set()): Board => {
         views: r.views.map((v) => (parked.has(v.id) ? { ...v, heldBack: { since: new Date().toISOString() } } : v)),
       })),
   });
-  return b;
+  return b satisfies Board;
 };
 /** A repository with one commit, and the tests' team under `workflows/`. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, {});
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
@@ -108,7 +108,7 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
 const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
 const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSync(askFile(ROOT, id, step, n), 'utf8'));
 /** The runs a schedule started: the fire each was started for. */
-const scheduledDues = (): string[] => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
+const scheduledDues = () => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : [])) satisfies string[];
 
 describe("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", () => {
   let parked!: Set<string>;

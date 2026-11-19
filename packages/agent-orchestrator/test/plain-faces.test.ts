@@ -21,7 +21,7 @@ const ENTRIES = ['src/runner.ts', 'src/run.ts', 'src/workflow.ts'];
 const PROMISED = new Set(['runWith', 'runMain', 'provisionDeps']);
 
 /** The names of the functions each entry in `files` exports whose call answers a Promise, or methods that do, as `entry: name`. */
-const promisedExports = (files: string[]): string[] => {
+const promisedExports = (files: string[]) => {
   const roots = files.map((f) => path.join(PACKAGE, f));
   const program = ts.createProgram(roots, {
     allowImportingTsExtensions: true,
@@ -33,7 +33,7 @@ const promisedExports = (files: string[]): string[] => {
     skipLibCheck: true,
   });
   const checker = program.getTypeChecker();
-  const answers = (type: ts.Type): ts.Type[] => type.getCallSignatures().map((s) => s.getReturnType());
+  const answers = (type: ts.Type) => type.getCallSignatures().map((s) => s.getReturnType());
   const promise = (type: ts.Type) => checker.typeToString(type).startsWith('Promise<');
   const methods = (type: ts.Type) => type.getProperties().flatMap((p) => answers(checker.getTypeOfSymbol(p)));
   return roots.flatMap((root) => {

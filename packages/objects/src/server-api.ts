@@ -6,7 +6,7 @@
  * None of them is a kind, so discovery lists none (`resourcesOf` skips a group no kind has).
  *
  * Each answer is a plain Schema of JSON here. Where an answer holds a deep part another reader owns — a pass's phases, a group of the flow
- * numbers, a step's reach — the part is said as JSON (`Schema.Unknown`) and its own reader types it; every key at the top is declared,
+ * numbers — the part is said as JSON (`Schema.Unknown`) and its own reader types it; every key at the top is declared,
  * since a key a Schema does not declare is not encoded.
  */
 import { Schema } from 'effect';
@@ -19,6 +19,7 @@ import { FEED_LINE_EVENTS, type FeedStreamEventName, FINISHING_KINDS, INTERRUPT_
 import { SubscriptionScope } from './subscription.ts';
 import { SessionReleaseSchema } from './run.ts';
 import { Event } from './event.ts';
+import { CapabilityDescribed, CapabilityRule, CapabilityServer, MeasuredTools, ReadOnlyCommands, StepReach } from './capabilities.ts';
 
 export {
   Ceilings,
@@ -131,33 +132,35 @@ export const CapabilitiesUnread = Schema.Struct({
 export type CapabilitiesUnread = typeof CapabilitiesUnread.Type;
 
 /**
- * `GET /api/capabilities`: what the repository offers a step — its skills, agents, MCP servers and permission rules, each a list read by
- * the Capabilities page — the measured set and the read-only commands, and what each step of each workflow gets. Where no repository is
- * read, `repo` is left out, every list is empty and `unread` says why and what to do.
+ * `GET /api/capabilities`: what the repository offers a step — its skills, agents, MCP servers and permission rules — the measured set and
+ * the read-only commands, and what each step of each workflow gets, each list served with its shape (`capabilities.ts`). Where no
+ * repository is read, `repo` is left out, every list is empty and `unread` says why and what to do.
  */
 export const CapabilitiesWithSteps = Schema.Struct({
   repo: Schema.optionalKey(Schema.String.annotate({ description: 'The repository read; left out where none is read.' })),
   unread: Schema.optionalKey(CapabilitiesUnread),
-  skills: Schema.Array(Schema.Unknown).annotate({
-    description: 'The skills the repository offers a step, each as the Capabilities page reads it.',
+  skills: Schema.Array(CapabilityDescribed).annotate({
+    description: 'The skills the repository offers a step: `.claude/skills/*/SKILL.md`, by folder.',
   }),
-  agents: Schema.Array(Schema.Unknown).annotate({
-    description: 'The agents the repository offers, each as the Capabilities page reads it.',
+  agents: Schema.Array(CapabilityDescribed).annotate({
+    description: 'The agents the repository offers: `.claude/agents/*.md`, by file.',
   }),
-  mcp: Schema.Array(Schema.Unknown).annotate({
-    description: 'The MCP servers the repository offers, each as the Capabilities page reads it.',
+  mcp: Schema.Array(CapabilityServer).annotate({
+    description: "The MCP servers the checkout's `.mcp.json` declares, each with the tools it listed or why not.",
   }),
-  denied: Schema.Array(Schema.Unknown).annotate({ description: 'The permission rules that deny, each as the Capabilities page reads it.' }),
-  asked: Schema.Array(Schema.Unknown).annotate({ description: 'The permission rules that ask, each as the Capabilities page reads it.' }),
-  allowed: Schema.Array(Schema.Unknown).annotate({
-    description: 'The permission rules that allow, each as the Capabilities page reads it.',
+  denied: Schema.Array(CapabilityRule).annotate({ description: '`permissions.deny` in the settings, in its order.' }),
+  asked: Schema.Array(CapabilityRule).annotate({
+    description:
+      '`permissions.ask` in the settings, in its order: what asks whatever an allow rule says, read after the deny rules and before the allow rules; in `dontAsk`, what they match is denied.',
+  }),
+  allowed: Schema.Array(CapabilityRule).annotate({
+    description:
+      '`permissions.allow` in the settings, in its order: what a session runs without asking, beside what asks for no rule; in `dontAsk`, all it runs of what asks.',
   }),
   warnings: Schema.Array(Schema.String).annotate({ description: 'What the read warned of, each a sentence; empty where nothing.' }),
-  measured: Json('The measured set: what the repository offers that a step is measured by, as the Capabilities page reads it.'),
-  readOnly: Json('The read-only commands a step is allowed, as the Capabilities page reads them.'),
-  steps: Schema.Array(Schema.Unknown).annotate({
-    description: 'What each step of each workflow gets, each as the Capabilities page reads it.',
-  }),
+  measured: MeasuredTools,
+  readOnly: ReadOnlyCommands,
+  steps: Schema.Array(StepReach).annotate({ description: 'What each step of each workflow that reads gets.' }),
 });
 export type CapabilitiesWithSteps = typeof CapabilitiesWithSteps.Type;
 

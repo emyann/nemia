@@ -63,10 +63,17 @@ const ProposedSchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
-/** The person's confirmed list, as read. */
+/**
+ * The person's confirmed list, as read. A type of its own, not `ConfirmedSchema`'s on purpose: its `rules` are mapped by `ruleOf` into
+ * the package's `PolicyRule`, their lists copied and an optional key left out where absent, and the keys the file has besides are read
+ * past, not carried.
+ */
 export type Confirmed = { since: string; rules: PolicyRule[] };
 
-/** What an agent proposed, as read. */
+/**
+ * What an agent proposed, as read. A type of its own, not `ProposedSchema`'s on purpose, as `Confirmed` is: its `rules` mapped by
+ * `ruleOf` into `PolicyRule`, and the file's other keys read past.
+ */
 export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; digest: string | null };
 
 /**

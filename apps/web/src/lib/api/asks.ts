@@ -24,18 +24,16 @@ export type QuestionAnswer = NonNullable<RunApprove['answers']>[number];
  */
 export type { RetryMode } from 'objects';
 
-/** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
-type AskedTry = { try: number; file: string; stopFirst: boolean };
-
-/** What an ask for a round answers: the looping step, the round asked for, and its ask file. */
-type AskedRound = { step: string; round: number; file: string };
-
 /**
- * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones; and
- * of a round's.
+ * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones: the
+ * try asked for, its ask file, and whether the tick stops the step's blocked session first.
  */
 const AskedTrySchema = Schema.Struct({ try: Schema.Number, file: Schema.String, stopFirst: Schema.Boolean });
+type AskedTry = typeof AskedTrySchema.Type;
+
+/** What an ask of a round must answer of `RunAsked`: the looping step, the round asked for, and its ask file. */
 const AskedRoundSchema = Schema.Struct({ step: Schema.String, round: Schema.Number, file: Schema.String });
+type AskedRound = typeof AskedRoundSchema.Type;
 
 /** The route an ask of `step` of the run `runId` is sent to, as an answer it does not read names it. */
 const retryRoute = (namespace: string, runId: string, step: string): string =>
@@ -69,8 +67,7 @@ export async function askTry(
   how: { mode: RetryMode; model?: string; message?: string; budget?: number; answers?: readonly QuestionAnswer[] },
 ): Promise<AskedTry> {
   const asked = await runs.retry(namespace, runId, step, how, TRY_MAY);
-  const { try: n, file, stopFirst } = decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
-  return { try: n, file, stopFirst };
+  return decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
 }
 
 /**
@@ -88,8 +85,7 @@ export async function askTry(
  */
 export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }): Promise<AskedRound> {
   const asked = await runs.retry(namespace, runId, step, { mode: 'continue', round: true, ...how }, ROUND_MAY);
-  const { step: looping, round, file } = decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
-  return { step: looping, round, file };
+  return decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
 }
 
 /**

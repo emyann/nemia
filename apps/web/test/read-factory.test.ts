@@ -97,6 +97,11 @@ describe("get, the Factory's and the inbox's reads: each decodes what the api gi
     assert.equal(Object.hasOwn(offered.steps[0], 'colour'), false);
     assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
   });
+  test("REFUSED: a step's reach that leaves out what the settings allow it is an answer unread, decoded by objects' shape", async (t) => {
+    const { allowed: _, ...unallowed } = stepReach();
+    answering(t, capabilities({ steps: [unallowed as never] }));
+    await assert.rejects(readCapabilities(), (err: unknown) => err instanceof UnreadAnswer);
+  });
   test('the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined', async () => {
     const asked: string[] = [];
     apiAnswers(async (input) => {

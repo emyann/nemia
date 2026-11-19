@@ -36,6 +36,7 @@ import {
   type Turn,
 } from './remote-server.ts';
 import { scratch } from 'test-kit/scratch';
+import { readEntry } from '../src/a2a/entry.ts';
 import { stepClock } from './clock.ts';
 import { builtEngine } from './engine.ts';
 import { story } from 'test-kit/checkpoints';
@@ -1339,4 +1340,20 @@ test('a session let go already is released again as nothing: no request, and its
   await Effect.runPromise(ops.release!(session, {}));
   assert.equal(fs.readFileSync(doneFile, 'utf8'), record, 'the record let go of is not moved nor rewritten');
   assert.deepEqual(fs.readdirSync(path.join(root, 'remote')).sort(), ['done'], 'and no open record is made');
+});
+
+test('REFUSED: a registry entry that does not read as one is refused, naming its file and its first wrong field', () => {
+  const root = scratch('ae-entry-');
+  const file = path.join(root, 'entry.json');
+  fs.writeFileSync(file, JSON.stringify({ name: 'ae/t/1', agent: 'reviewer', sentAt: '2026-11-19T00:00:00.000Z' }));
+  assert.throws(
+    () => readEntry(file),
+    (e: Error) => e.message.includes(file) && e.message.includes('messageId'),
+  );
+  fs.writeFileSync(file, '{ "name": ');
+  assert.throws(
+    () => readEntry(file),
+    (e: Error) => e.message.includes(file),
+  );
+  assert.equal(readEntry(path.join(root, 'none.json')), undefined, 'no file is no entry');
 });

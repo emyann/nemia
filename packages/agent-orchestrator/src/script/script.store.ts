@@ -43,13 +43,7 @@ const AnswerSchema = Schema.Struct({
  */
 export function scriptAnswerOf(text: string | undefined): ScriptAnswer | undefined {
   if (text === undefined) return undefined;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  const decoded = Schema.decodeUnknownResult(AnswerSchema)(raw);
+  const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(AnswerSchema))(text);
   if (Result.isFailure(decoded)) return undefined;
   const { route, why, unsure } = decoded.success;
   if (route !== undefined && unsure === undefined) return { kind: 'route', route, ...(why === undefined ? {} : { why }) };

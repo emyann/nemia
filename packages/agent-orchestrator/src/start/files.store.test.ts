@@ -41,6 +41,13 @@ test('a file kept is found by its id in its own namespace, its bytes as they wer
   assert.equal(fileAt(home, 'default', file.id), undefined);
 });
 
+test('REFUSED: a kept file whose record does not read as a file is found nowhere', () => {
+  const home = scratch('nemia-files-');
+  const file = uploaded(home, 'acme', Buffer.from([0x89, 0x50]));
+  fs.writeFileSync(path.join(filesDir(home, 'acme'), `${file.id}.json`), JSON.stringify({ id: 5 }));
+  assert.equal(fileAt(home, 'acme', file.id), undefined);
+});
+
 test('two files begun in one namespace have two ids', () => {
   const home = scratch('nemia-files-');
   const a = uploaded(home, 'acme', Buffer.from('a'));

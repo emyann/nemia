@@ -40,11 +40,12 @@ const keyOf = (spelled: string) => {
 
 /** `text` read as JSON, or `Invalid` naming how to quote it. */
 const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
-  Effect.try({
-    try: (): unknown => JSON.parse(text),
-    catch: () =>
-      new Invalid({ message: `${text} is not JSON: quote it, as '{"commit":"","pr":""}', '"french"' or false. Nothing was changed.` }),
-  });
+  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+    Effect.mapError(
+      () =>
+        new Invalid({ message: `${text} is not JSON: quote it, as '{"commit":"","pr":""}', '"french"' or false. Nothing was changed.` }),
+    ),
+  );
 
 /**
  * `nemia factory setting set`: a harness setting given to every session on its harness of the factory's runs started after, a second of

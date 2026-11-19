@@ -3,6 +3,7 @@
  * (`projectAllows`), for a caller that judges what a session it is about to ask for can call. Beside `trust.ts`, which reads the
  * harness's trust of a folder off its own file the same way, and answers `undefined` for a harness that keeps none.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_CONFIG_FOLDERS } from './claude/vocabulary.ts';
@@ -17,6 +18,11 @@ const claudeProjectFile = (dir: string): string => path.join(dir, CLAUDE_CONFIG_
 const readsProject = (harness: string): boolean => harness === 'claude';
 
 /** The strings of `value` where it is an array, `[]` for anything else: a file's own JSON, which arrives as it is. */
+/** A project configuration's `permissions.allow`, as `projectAllows` reads it: anything there, its strings the rules. */
+const allowsIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ permissions: Schema.optional(Schema.Struct({ allow: Schema.optional(Schema.Unknown) })) })),
+);
+
 const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((rule) => typeof rule === 'string') : []);
 
 /**
@@ -35,13 +41,11 @@ const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.fi
  */
 export function projectAllows(harness: string, dir: string): readonly string[] | undefined {
   if (!readsProject(harness)) return undefined;
-  let parsed: unknown;
+  let text: string;
   try {
-    parsed = JSON.parse(fs.readFileSync(claudeProjectFile(dir), 'utf8'));
+    text = fs.readFileSync(claudeProjectFile(dir), 'utf8');
   } catch {
     return [];
   }
-  const permissions = typeof parsed === 'object' && parsed !== null ? (parsed as { permissions?: unknown }).permissions : undefined;
-  if (typeof permissions !== 'object' || permissions === null) return [];
-  return stringsOf((permissions as { allow?: unknown }).allow);
+  return stringsOf(Option.getOrUndefined(allowsIn(text))?.permissions?.allow);
 }

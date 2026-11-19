@@ -24,7 +24,7 @@
  */
 import http from 'node:http';
 import type { Socket } from 'node:net';
-import { Effect, type Scope } from 'effect';
+import { Effect, Option, Schema, type Scope } from 'effect';
 import { JsonRpcTransportHandler, ServerCallContext, STATE_HEADERS_KEY } from '@a2a-js/sdk/server';
 import { firstPiece, type Event } from '../core/index.ts';
 import type { RunnerOps } from '../harness/index.ts';
@@ -87,14 +87,12 @@ const bodyOf = async (req: http.IncomingMessage): Promise<string | undefined> =>
 };
 
 /** The `id` of a JSON-RPC request body, for the error answered before a stream has said anything; `null` where there is none. */
-const idOf = (body: string): string | number | null => {
-  try {
-    const parsed = JSON.parse(body) as { id?: unknown };
-    return typeof parsed.id === 'string' || typeof parsed.id === 'number' ? parsed.id : null;
-  } catch {
-    return null;
-  }
-};
+const idOf = (body: string): string | number | null => Option.getOrUndefined(idIn(body))?.id ?? null;
+
+/** A JSON-RPC request body, as `idOf` reads it: its `id`, a string or a number, where it has one. */
+const idIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ id: Schema.optional(Schema.Union([Schema.String, Schema.Number])) })),
+);
 
 /**
  * `answers` written as an event stream: the first answer is awaited before any header, so a subscription that fails at once is

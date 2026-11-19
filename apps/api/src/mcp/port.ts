@@ -22,7 +22,7 @@
  * pending, a client that gave a progress token is told progress at once, so its answer streams from its start, and then every 30 s
  * (`PROGRESS_EVERY_MS`), so a host that ends a silent call (`nemia wait`, up to four minutes and a half) hears it is alive.
  */
-import { Effect, Predicate, Schedule } from 'effect';
+import { Effect, Option, Predicate, Schedule, Schema } from 'effect';
 import type { Context } from 'hono';
 import {
   type CallToolResult,
@@ -74,13 +74,7 @@ const failed = (text: string, body?: Readonly<Record<string, unknown>>): CallToo
 });
 
 /** `text` read as JSON, or none where it is not. */
-const jsonOf = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const jsonOf = (text: string): unknown => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /**
  * The request a call of `tool` with `args` makes of the api, from the request `from` that carried it: the path's names filled in and

@@ -23,7 +23,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
+import { Cause, Context, Effect, Exit, Layer, Option, Schema } from 'effect';
 import { countRead, within } from '../meter/tally.store.ts';
 import { brokenBy, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import {
@@ -533,12 +533,8 @@ const isFeedLine = Schema.is(FeedLineSchema);
  */
 function parseLine(text: string): FeedLine[] {
   if (!text) return [];
-  try {
-    const line: unknown = JSON.parse(text);
-    return isFeedLine(line) ? [lineAsRead(line)] : [];
-  } catch {
-    return [];
-  }
+  const line = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
+  return isFeedLine(line) ? [lineAsRead(line)] : [];
 }
 
 const refused = (message: string): Invalid => new Invalid({ message });

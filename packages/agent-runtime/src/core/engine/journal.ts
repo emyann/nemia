@@ -7,7 +7,7 @@
  *
  * It is a service (not an import) so tests run against memory and spend no filesystem.
  */
-import { Context, Effect, Layer, Result, Schema } from 'effect';
+import { Context, Effect, Layer, Option, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Event } from '../domain.ts';
@@ -400,13 +400,10 @@ const formerArgsOut = (config: Record<string, unknown>, claude: object | undefin
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
-const parsed = (line: string): unknown => {
-  try {
-    return JSON.parse(line);
-  } catch {
-    return line;
-  }
-};
+const parsed = (line: string): unknown => Option.getOrElse(jsonOf(line), () => line);
+
+/** A line's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** The bytes of `file` from `from` to `to`, in one positioned read, counted. */
 const span = (file: string, from: number, to: number): Buffer => {

@@ -7,6 +7,7 @@
  * The install's root is found as the orchestrator finds the code it runs (`runningRelease`), never by importing it: the first folder
  * above this file whose `package.json` names the daemon (`"nemia": { "daemon": … }`), an install where a `release.json` sits there.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ReleaseMet } from '../contracts/release.contract.ts';
@@ -21,21 +22,25 @@ export const releaseMet: ReleaseMet = (client, daemon) => {
   return client === daemon ? 'met' : 'differs';
 };
 
-/** The JSON of `file`, or undefined where it is not there or does not read. */
-const jsonOf = (file: string): unknown => {
+/** The text of `file`, or undefined where it is not there or does not read. */
+const textOf = (file: string): string | undefined => {
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    return fs.readFileSync(file, 'utf8');
   } catch {
     return undefined;
   }
 };
 
+/** A `package.json` that names the daemon, `nemia.daemon`. */
+const NamesDaemon = Schema.fromJsonString(Schema.Struct({ nemia: Schema.Struct({ daemon: Schema.String }) }));
+
+/** A `release.json`'s tag. */
+const ReleaseFile = Schema.fromJsonString(Schema.Struct({ tag: Schema.String }));
+
 /** Whether `dir`'s `package.json` names the daemon: the root of a checkout or an install. */
 const namesTheDaemon = (dir: string): boolean => {
-  const read = jsonOf(path.join(dir, 'package.json'));
-  if (typeof read !== 'object' || read === null || !('nemia' in read)) return false;
-  const { nemia } = read;
-  return typeof nemia === 'object' && nemia !== null && 'daemon' in nemia && typeof nemia.daemon === 'string';
+  const text = textOf(path.join(dir, 'package.json'));
+  return text !== undefined && Option.isSome(Schema.decodeUnknownOption(NamesDaemon)(text));
 };
 
 /**
@@ -52,9 +57,9 @@ export function releaseAt(from: string): string | null {
   }
   for (;;) {
     if (namesTheDaemon(at)) {
-      const file = jsonOf(path.join(at, 'release.json'));
-      if (typeof file !== 'object' || file === null || !('tag' in file)) return null;
-      return typeof file.tag === 'string' && file.tag !== '' ? file.tag : null;
+      const text = textOf(path.join(at, 'release.json'));
+      const tag = text === undefined ? undefined : Option.getOrUndefined(Schema.decodeUnknownOption(ReleaseFile)(text))?.tag;
+      return tag !== undefined && tag !== '' ? tag : null;
     }
     const up = path.dirname(at);
     if (up === at) return null;

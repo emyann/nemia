@@ -67,12 +67,11 @@ export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Opti
   } catch {
     return null;
   }
-  try {
-    return Option.getOrNull(decode(JSON.parse(text)));
-  } catch {
-    return null;
-  }
+  return Option.getOrNull(Option.flatMap(jsonOf(text), decode));
 };
+
+/** A file's text decoded as JSON, or none where it is not. */
+const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /**
  * Writes `value` whole on `file` as JSON (`replaceFile`), its folder made first, so a reader never reads half of it.

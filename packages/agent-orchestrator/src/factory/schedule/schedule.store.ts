@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cron, Result, Schema } from 'effect';
+import { Cron, Option, Result, Schema } from 'effect';
 import type { Schedule } from '../factory.ts';
 import type { ScheduleTry } from './schedule.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
@@ -38,8 +38,8 @@ const ScheduleTrySchema = Schema.StructWithRest(
  */
 export function readScheduleTry(home: string, factory: string, workflow: string): ScheduleTry | undefined {
   try {
-    const decoded = Schema.decodeUnknownResult(ScheduleTrySchema)(JSON.parse(fs.readFileSync(tryFile(home, factory, workflow), 'utf8')));
-    return Result.isSuccess(decoded) ? decoded.success : undefined;
+    const text = fs.readFileSync(tryFile(home, factory, workflow), 'utf8');
+    return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(ScheduleTrySchema))(text));
   } catch {
     return undefined;
   }

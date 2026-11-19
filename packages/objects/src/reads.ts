@@ -168,6 +168,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'readiness.fixOutput': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },
   'readiness.turnOf': ONE,
   'readiness.milestones': { shape: 'one', why: 'four milestones, one line each' },
+  'folders.list': { shape: 'one', why: 'at most 50 folder names of one folder (FOLDER_NAMES_MOST)' },
   'upgrades.read': { shape: 'one', why: "the release going back goes to and the store's last upgrade, its output a tail" },
   'upgrades.upgradeOf': { shape: 'one', why: 'its output is the tail the orchestrator keeps of it, never the whole' },
   'upgrades.output': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },

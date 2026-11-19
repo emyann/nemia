@@ -20,6 +20,7 @@ import {
   metricsHourDays,
   metricsMinuteDays,
   releaseCheck,
+  folderRoots,
   servedNames,
   servedNamesOf,
   settingsOf,
@@ -97,6 +98,7 @@ describe('REFUSED at shipped defaults: each WF_ variable set to what it does not
       ['http://nemia.example.ts.net', 'nemia.example.ts.net:8787', '*.ts.net', 'nemia.example/board', 'a_b.example', 'fd7a::1'],
       'WF_SERVED_NAMES=nemia.example.ts.net',
     ],
+    'WF_FOLDER_ROOTS with a relative entry': [folderRoots, 'WF_FOLDER_ROOTS', ['code', '/srv:code', './x'], 'WF_FOLDER_ROOTS=/srv/code'],
     'NEMIA_RELEASE_CHECK neither on nor off': [releaseCheck, 'NEMIA_RELEASE_CHECK', ['0', 'no', 'OFF', ' off'], 'NEMIA_RELEASE_CHECK=off'],
   };
   for (const [name, [read, variable, values, fix]] of Object.entries(rows))
@@ -173,6 +175,11 @@ describe('each WF_ variable reads its default unset, empty or blank, and the val
       () =>
         [{ NEMIA_RELEASE_CHECK: 'off' }, { NEMIA_RELEASE_CHECK: 'on' }, { NEMIA_RELEASE_CHECK: '' }, {}].map((env) => releaseCheck(env)),
       [false, true, true, true],
+    ],
+    [
+      'WF_FOLDER_ROOTS: each absolute path of the list; the home of the user when unset or blank',
+      () => [folderRoots({ WF_FOLDER_ROOTS: '/a:/b/' }), folderRoots({ WF_FOLDER_ROOTS: ' ' }), settingsOf({}).folderRoots],
+      [['/a', '/b'], [os.homedir()], [os.homedir()]],
     ],
     [
       'the settings carry the release check',

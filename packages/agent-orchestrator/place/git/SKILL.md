@@ -121,6 +121,10 @@ and no process between, and you need not ask any of them. What each takes and an
 - `clone` — a repository named by its URL made into a folder, with the machine's own credentials and no prompt for one:
   `{ "url", "into" }` answers `{ "repo", "made" }`, `made` false when `into` holds a repository already, and nothing fetched then. It
   refuses an `into` holding anything else, and a clone git will not make, naming the setup the URL needs, nothing left behind.
+- `init` — a folder made a repository a run can cut a worktree from: `{ "dir" }` answers `{ "repo", "made" }`. The folder is made
+  where it is missing, `git init` where it is no repository's top, and one empty first commit where it has none, adding none of its
+  files; `made` false for a repository with a commit already, nothing touched. It refuses a relative `dir`, a file, and a commit git
+  will not make, naming `git config --global user.name` and `user.email` where git has no identity.
 
 A verb that will not act answers `{ "refused": "<why>" }`; one git did not answer within its deadline, or that failed before it
 answered, is not heard, and the run asks again on its next pass.

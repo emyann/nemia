@@ -53,6 +53,7 @@ import { templatesHandlers } from '../template-objects/templates.ts';
 import { serverHandlers, sessionHandlers } from '../server/index.ts';
 import { nemiaHandlers } from '../nemia/index.ts';
 import { readinessHandlers } from '../readiness/readiness.ts';
+import { foldersHandlers } from '../folders/folders.ts';
 import { upgradesHandlers } from '../upgrades/index.ts';
 import { linksHandlers, pairingsHandlers } from '../pairing/pairing.ts';
 import { tokensHandlers } from '../tokens/tokens.ts';
@@ -202,6 +203,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         serverHandlers,
         nemiaHandlers,
         readinessHandlers,
+        foldersHandlers,
         upgradesHandlers,
         pairingsHandlers,
         linksHandlers,

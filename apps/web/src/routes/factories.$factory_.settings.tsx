@@ -10,6 +10,7 @@ import { FactorySchedules } from '@/components/factory/FactorySchedules';
 import { FactoryServers } from '@/components/factory/FactoryServers';
 import { FactoryVolumes } from '@/components/factory/FactoryVolumes';
 import { LibraryAdds } from '@/components/library/LibraryAdds';
+import { TextLink } from '@/components/look';
 import { factoryLevel, Trail } from '@/components/nav/Trail';
 import { delegationsQuery } from '@/lib/api/proposals';
 import { factoriesQuery, factoryInstructionQuery, factoryRulesQuery, factoryServersQuery } from '@/lib/api/factories';
@@ -85,6 +86,11 @@ function SettingsPage() {
           {factory.template ? <TemplateCard template={factory.template} /> : null}
           <FactoryTrust factory={factory} />
           <FactoryVolumes factory={factory} />
+          <p data-volume-again className="-mt-4 text-body-medium">
+            <TextLink to="/factories/$factory/volume" params={{ factory: name }}>
+              Add the work: a folder, a repository, a new one
+            </TextLink>
+          </p>
           <FactoryCostLines factory={factory} />
           <FactoryRules name={name} />
           <FactoryDelegations name={name} />

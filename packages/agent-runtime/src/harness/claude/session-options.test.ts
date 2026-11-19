@@ -120,7 +120,7 @@ describe('attachedOptions: a rich task is fenced on the SDK’s own options, eac
     );
     assert.deepEqual(
       given.settings,
-      { env: {}, autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'], autoCompactWindow: 200_000 },
+      { env: {}, autoMemoryEnabled: false, autoCompactWindow: 200_000 },
       "the task's settings, on the SDK's own option, auto-memory off and the window in them",
     );
     assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, 'plug') }]);

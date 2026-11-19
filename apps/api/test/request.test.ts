@@ -19,7 +19,7 @@ import { scratch } from 'test-kit/scratch';
 type Said = { level: string; text: string; annotations: Record<string, unknown> };
 
 /** An app over the live layer whose lines are kept in `said` rather than printed, its runtime, and the lines it has said so far. */
-function appSaying(): { app: ReturnType<typeof appOf>['app']; runtime: ReturnType<typeof appOf>['runtime']; said: Said[] } {
+function appSaying() {
   const said: Said[] = [];
   const keeper = Logger.make<unknown, void>(({ message, logLevel, fiber }) =>
     said.push({
@@ -32,12 +32,12 @@ function appSaying(): { app: ReturnType<typeof appOf>['app']; runtime: ReturnTyp
 }
 
 /** The event loop's pending turns drained, so a rejection Node has not yet reported as unhandled has been. */
-const drained = async (): Promise<void> => {
+const drained = async () => {
   for (let turn = 0; turn < 3; turn++) await new Promise((done) => setImmediate(done));
 };
 
 /** The one line `path` was answered with, the test failing where it said none or more than one. */
-async function oneLine(path: string): Promise<Said> {
+async function oneLine(path: string) {
   const { app, said } = appSaying();
   await app.request(path);
   assert.equal(said.length, 1, `one line for ${path}: ${JSON.stringify(said)}`);
@@ -111,7 +111,7 @@ test("a stream whose relay settles once the runtime is disposed drops its closin
   const res = await app.request('/api/feed/stream');
   assert.equal(said.length, 1, `the opening line: ${JSON.stringify(said)}`);
   const unhandled: unknown[] = [];
-  const caught = (err: unknown): void => void unhandled.push(err);
+  const caught = (err: unknown) => void unhandled.push(err);
   process.on('unhandledRejection', caught);
   t.onTestFinished(() => {
     process.off('unhandledRejection', caught);
@@ -128,7 +128,7 @@ test("a stream whose relay settles once the runtime is disposed drops its closin
 type Traced = { name: string; spanId: string; traceId: string; parent: string | undefined };
 
 /** An app over the live layer whose spans are kept in `spans` rather than exported: its tracer the test's own, given last. */
-function appTracing(): { app: ReturnType<typeof appOf>['app']; spans: Traced[] } {
+function appTracing() {
   const spans: Traced[] = [];
   const recording = Tracer.make({
     span(options) {
@@ -146,7 +146,7 @@ function appTracing(): { app: ReturnType<typeof appOf>['app']; spans: Traced[] }
 }
 
 /** The spans one request to `url` exported, on a fresh app (so nothing a request kept is read warm), the request a 200. */
-async function spansOf(url: string): Promise<Traced[]> {
+async function spansOf(url: string) {
   const { app, spans } = appTracing();
   const res = await app.request(url);
   assert.equal(res.status, 200, `${url}: ${await res.text()}`);
@@ -161,7 +161,7 @@ attachWorkflow({ factory: 'traced', workflow: 'make' });
 
 const at = '2026-09-25T09:00:00.000Z';
 /** A run of one step that signed off, its card beside it in the inbox: what a store holds by the hundred. */
-function aFinishedRun(id: string): void {
+function aFinishedRun(id: string) {
   const taskId = `${id}-implement`;
   const journal = path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
   fs.mkdirSync(path.dirname(journal), { recursive: true });
@@ -202,12 +202,12 @@ function aFinishedRun(id: string): void {
   fs.writeFileSync(path.join(root, 'inbox', `card-${id}.md`), `Do ${id}.\n`);
 }
 /** Runs `r-<from>` to `r-<to - 1>` planted. */
-const planted = (from: number, to: number): void => {
+const planted = (from: number, to: number) => {
   for (let n = from; n < to; n++) aFinishedRun(`r-${String(n).padStart(3, '0')}`);
 };
 
 /** How many spans of each name `spans` holds, the most first. */
-const countsOf = (spans: Traced[]): Record<string, number> => {
+const countsOf = (spans: Traced[]) => {
   const counts = new Map<string, number>();
   for (const { name } of spans) counts.set(name, (counts.get(name) ?? 0) + 1);
   return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]));

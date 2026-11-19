@@ -5,14 +5,13 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { compareVersions, compose, conflictCut, diff3Lines, linesOf, mergeTrees, planLines, switchTrees, type TreeFile } from './index.ts';
+import { compareVersions, compose, conflictCut, diff3Lines, linesOf, mergeTrees, planLines, switchTrees } from './index.ts';
 
 /** A tree of text files, by path. */
-const tree = (files: Record<string, string>): TreeFile[] =>
-  Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
+const tree = (files: Record<string, string>) => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 
 /** The tree a merge composes, by path and text; refused where a conflict is left pending. */
-function composed(...args: Parameters<typeof compose>): Record<string, string> {
+function composed(...args: Parameters<typeof compose>) {
   const out = compose(...args);
   assert.ok('entries' in out, `composed: ${JSON.stringify(out)}`);
   return Object.fromEntries(out.entries.map((e) => [e.path, e.bytes.toString()]));

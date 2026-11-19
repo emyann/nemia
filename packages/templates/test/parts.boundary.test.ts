@@ -15,21 +15,21 @@ import { scratch } from 'test-kit/scratch';
 const SCRIPT = path.join(import.meta.dirname, '..', 'sdlc', 'carried', 'parts.ts');
 
 /** Run git in `dir`, as nobody in particular. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 
 /** Write `file` in `dir` and commit it as `message`. */
-const commit = (dir: string, file: string, text: string, message: string): void => {
+const commit = (dir: string, file: string, text: string, message: string) => {
   fs.writeFileSync(path.join(dir, file), text);
   git(dir, 'add', '-A');
   git(dir, 'commit', '-qm', message);
 };
 
 /** A scratch repository on `main` with one commit, and the run's branch `wf/r-1/run` checked out on it. */
-function repo(): string {
+function repo() {
   const dir = scratch('wf-parts-repo-');
   git(dir, 'init', '-q', '-b', 'main');
   commit(dir, 'README.md', 'base\n', 'base');
@@ -38,7 +38,7 @@ function repo(): string {
 }
 
 /** A part branch `wf/r-1/<part>` cut from `main`, one commit writing `file`; HEAD is left where it was. */
-function part(dir: string, name: string, file: string, text: string): string {
+function part(dir: string, name: string, file: string, text: string) {
   const here = git(dir, 'symbolic-ref', '--short', 'HEAD');
   git(dir, 'checkout', '-q', '-b', `wf/r-1/${name}`, 'main');
   commit(dir, file, text, `${name}: ${file}`);
@@ -47,10 +47,8 @@ function part(dir: string, name: string, file: string, text: string): string {
   return tip;
 }
 
-type Ran = { code: number | null; out: string; err: string };
-
 /** Run the script's `verb` in `dir`, bounded. */
-function parts(dir: string, ...args: string[]): Ran {
+function parts(dir: string, ...args: string[]) {
   const ran = spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd: dir,
     env: { PATH: process.env.PATH ?? '', HOME: dir },
@@ -61,7 +59,7 @@ function parts(dir: string, ...args: string[]): Ran {
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 }
 
-const branches = (dir: string): string[] =>
+const branches = (dir: string) =>
   git(dir, 'for-each-ref', '--format=%(refname)', 'refs/heads/wf/', 'refs/backup/').split('\n').filter(Boolean);
 
 test('a run whose parts are each taken, as a commit of its own, passes, and so does a run with no part', () => {

@@ -9,7 +9,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, parseWorkflow, WorkflowError, type Agents, type StepSpec } from '../src/workflow.ts';
+import { parseAgent, parseWorkflow, WorkflowError, type Agents } from '../src/workflow.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
@@ -20,15 +20,14 @@ import { writeWorkflow } from '../src/runner.ts';
 const ROOT = scratch('wf-fence-');
 
 /** The agents of `files`, by name, each parsed from its file's text. */
-const agentsOf = (files: Record<string, string>): Agents =>
-  new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
+const agentsOf = (files: Record<string, string>) => new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
 /** The step `name` written with `lines` as its frontmatter, resolved with `agents`. */
-const stepOf = (agents: Agents, lines: string, name = 'build'): StepSpec =>
+const stepOf = (agents: Agents, lines: string, name = 'build') =>
   parseWorkflow(name, `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -39,7 +38,7 @@ function refusal(fn: () => unknown): string {
 }
 
 /** Holds a refusal to its parts: the step and its line first, what it would add, the rule, and a fix naming the agent's file. */
-function holds(said: string, line: string, added: string, agent: string): void {
+function holds(said: string, line: string, added: string, agent: string) {
   assert.ok(said.startsWith(`build: \`${line}\``), said);
   names(said, added, "a step may only tighten its agent's fence", `agents/${agent}.md`);
 }

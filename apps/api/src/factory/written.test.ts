@@ -34,7 +34,7 @@ const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown = {}) => app.request(url, { method, headers: json, body: JSON.stringify(body) });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, 200, JSON.stringify(body));

@@ -19,14 +19,16 @@ const WAITING = 'wait-on-the-plan-e2e0';
 const WAITING_RUN = 'wait-on-the-plan-run-e2e0';
 
 /** A card on the Inbox page, by its name. */
-const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
+const cardIn = (page: Page, name: string) => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`) satisfies Locator;
 
 /** The segment of the Inbox page's In play / Ended switch, by its label's first word. */
-const segment = (page: Page, which: 'In play' | 'Ended'): Locator =>
-  page.locator('section[aria-label="Cards"] [data-slot="segmented-button"]').getByRole('radio', { name: new RegExp(`^${which}`) });
+const segment = (page: Page, which: 'In play' | 'Ended') =>
+  page
+    .locator('section[aria-label="Cards"] [data-slot="segmented-button"]')
+    .getByRole('radio', { name: new RegExp(`^${which}`) }) satisfies Locator;
 
 /** The count a segment says (`In play · 4`), read off its `data-cards-count`. */
-async function countOf(page: Page, which: 'in play' | 'ended'): Promise<number> {
+async function countOf(page: Page, which: 'in play' | 'ended') {
   const text = (await page.locator(`[data-cards-count="${which}"]`).textContent()) ?? '';
   const n = /·\s*(\d+)/.exec(text)?.[1];
   if (n === undefined) throw new Refused(`the ${which} segment says how many cards it holds, as "· N" — it says ${JSON.stringify(text)}`);
@@ -34,13 +36,13 @@ async function countOf(page: Page, which: 'in play' | 'ended'): Promise<number> 
 }
 
 /** Refuses unless both segments say `inPlay` and `ended`. */
-async function expectCounts(page: Page, inPlay: number, ended: number, why: string): Promise<void> {
+async function expectCounts(page: Page, inPlay: number, ended: number, why: string) {
   const got = [await countOf(page, 'in play'), await countOf(page, 'ended')];
   if (got[0] !== inPlay || got[1] !== ended)
     throw new Refused(`${why}: In play · ${inPlay} and Ended · ${ended} — they say In play · ${got[0]} and Ended · ${got[1]}`);
 }
 
-async function load(page: Page, route: string): Promise<void> {
+async function load(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }

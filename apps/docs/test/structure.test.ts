@@ -11,7 +11,7 @@ const APP = path.join(import.meta.dirname, '..');
 const ROOT = path.join(APP, '..', '..');
 
 /** The names of the workspace's packages and apps, the docs' own but. */
-const workspaceNames = (): string[] =>
+const workspaceNames = () =>
   ['packages', 'apps']
     .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((dir) => path.join(ROOT, top, dir, 'package.json')))
     .filter((file) => fs.existsSync(file) && path.dirname(file) !== APP)
@@ -20,13 +20,13 @@ const workspaceNames = (): string[] =>
 type Manifest = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
 
 /** Each workspace package a manifest depends on, worded with the fix. */
-const dependedOn = (manifest: Manifest, names: string[]): string[] =>
+const dependedOn = (manifest: Manifest, names: string[]) =>
   [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})]
     .filter((dep) => names.includes(dep))
     .map((dep) => `apps/docs/package.json depends on ${dep}: the docs import no package, they read its docs as text at build`);
 
 /** Each module a piece of code names that is a workspace package, or a relative path out of `apps/docs`, with its file. */
-const reachedFrom = (file: string, text: string, names: string[]): string[] =>
+const reachedFrom = (file: string, text: string, names: string[]) =>
   [...text.matchAll(/\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)]
     .map((m) => m[1])
     .filter((spec) =>
@@ -37,7 +37,7 @@ const reachedFrom = (file: string, text: string, names: string[]): string[] =>
     .map((spec) => `${file} imports ${spec}: the docs import no package, they read its docs as text at build`);
 
 /** The docs' own code, by path from `apps/docs`: its configs at the root and every source under `src/`. */
-const docsCode = (): string[] => [
+const docsCode = () => [
   ...fs.readdirSync(APP).filter((f) => /\.(?:mjs|js|ts)$/.test(f)),
   ...(fs.readdirSync(path.join(APP, 'src'), { recursive: true }) as string[])
     .filter((f) => /\.(?:mjs|js|ts|tsx|astro|mdx)$/.test(f))

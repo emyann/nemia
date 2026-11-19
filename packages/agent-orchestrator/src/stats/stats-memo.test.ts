@@ -35,7 +35,7 @@ type Event = Parameters<AsyncJournal['append']>[1];
 const spoiled = new Set<string>();
 
 /** The engine's store, in memory: every append reaches the feed; a task in `spoiled` does not read. */
-const memoryJournal = (): AsyncJournal => {
+const memoryJournal = () => {
   const tasks = new Map<string, Event[]>();
   const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
@@ -53,7 +53,7 @@ const memoryJournal = (): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** A harness no task here reaches: every task is journalled by hand. */
@@ -97,10 +97,10 @@ const e = {
 };
 
 /** The runs whose tasks were viewed since the last call, by run id, sorted. */
-const viewedRuns = (): string[] => {
+const viewedRuns = () => {
   const runs = [...new Set(viewed.map((taskId) => taskId.slice(0, taskId.lastIndexOf('-'))))].sort();
   viewed = [];
-  return runs;
+  return runs satisfies string[];
 };
 
 const at = '2026-09-28T09:00:00.000Z';
@@ -108,7 +108,7 @@ const ended = '2026-09-28T10:00:00.000Z';
 const NOW = new Date('2026-10-02T12:00:00.000Z');
 
 /** A task filed, and where `settled`, run for an hour, signed off, measured at `costUsd` and settled. */
-async function journalled(taskId: string, costUsd: number, settled: boolean): Promise<void> {
+async function journalled(taskId: string, costUsd: number, settled: boolean) {
   const events: object[] = [{ kind: 'filed', at, brief: 'Do it.', cwd: ROOT, maxAttempts: 1, harness: 'codex' }];
   if (settled)
     events.push(
@@ -135,7 +135,7 @@ const recordFile = (id: string) => path.join(ROOT, 'runs', `${id}.json`);
  * A run of one step, its workflow frozen on its record unless `unfrozen` names the folder it reads, its step's task journalled as
  * `journalled` says, its step's note `body`.
  */
-async function aRun(id: string, costUsd: number, settled = true, unfrozen?: string, body = 'Implement it.'): Promise<void> {
+async function aRun(id: string, costUsd: number, settled = true, unfrozen?: string, body = 'Implement it.') {
   await journalled(`${id}-implement`, costUsd, settled);
   const workflow = [{ name: 'implement', after: [], body, harness: 'codex' }];
   fs.writeFileSync(

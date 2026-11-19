@@ -11,7 +11,7 @@ import { scratch } from 'test-kit/scratch';
 import { codexSignIn } from '../src/index.ts';
 
 /** A folder holding a `codex` whose body is `script`, and the environment that finds it first. */
-const stubbed = (script: string): NodeJS.ProcessEnv => {
+const stubbed = (script: string) => {
   const bin = scratch('ae-codex-sign-in-');
   fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
   return { PATH: `${bin}:/usr/bin:/bin` };

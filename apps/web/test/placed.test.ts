@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import type { Factory } from 'objects';
 import { loadWorkflowsIn, rereadWorkflows } from '../src/lib/placed.ts';
-import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory-fixtures.ts';
+import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** A factory as the objects list it, on `repos`. */
 const factory = (name: string, repos: string[]) =>
@@ -17,10 +18,9 @@ const factory = (name: string, repos: string[]) =>
  * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, a namespace's workflows with
  * none; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
  */
-function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]) {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     const url = String(input);
     const workflows = /^\/api\/namespaces\/[^/]+\/workflows(\?|$)/.test(url);
     const body = url.startsWith('/api/factories/')
@@ -34,11 +34,8 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, factories: F
             : [];
     if (workflows || (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/'))) asked.push(url);
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies string[];
 }
 
 test("REFUSED: a write of a folder of yours reads again the list read with no factory and every factory's — never a step's page keyed under it", async () => {

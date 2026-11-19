@@ -63,7 +63,7 @@ const write = (file: string, text: string) => {
  * Writes the run, its folder and its two tasks into the store at `root`, each task ended once with the closeout it gave, flat as a
  * harness writes it; answers every path written, to take back.
  */
-function writeRun(root: string): string[] {
+function writeRun(root: string) {
   const { id } = QUESTIONS;
   const now = Date.now();
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -130,17 +130,17 @@ function writeRun(root: string): string[] {
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task('design'), task('spec')];
+  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task('design'), task('spec')] satisfies string[];
 }
 
 /** Every option of the form's questions that is chosen: none until the person chooses. */
 const chosen = (form: ReturnType<Page['locator']>) => form.locator('fieldset[data-question] input:checked');
 
 /** The labels chosen on the question titled `title`. */
-const chosenOn = (form: ReturnType<Page['locator']>, title: string): Promise<string[]> =>
+const chosenOn = (form: ReturnType<Page['locator']>, title: string) =>
   form
     .locator(`fieldset[data-question="${title}"] input:checked`)
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)) satisfies Promise<string[]>;
 
 export default {
   /**

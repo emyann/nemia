@@ -12,20 +12,21 @@ export const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
 export const TASK = 't-1';
 export const S = 1_000;
 
-export const filed = (extra: object = {}): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra });
-export const starting = (n: number, ms = 0, extra: object = {}): Event => ({ kind: 'starting', at: at(ms), attempt: n, ...extra });
-export const spawned = (n: number, ms = S): Event => ({ kind: 'spawned', at: at(ms), attempt: n });
+export const filed = (extra: object = {}) => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra }) satisfies Event;
+export const starting = (n: number, ms = 0, extra: object = {}) => ({ kind: 'starting', at: at(ms), attempt: n, ...extra }) satisfies Event;
+export const spawned = (n: number, ms = S) => ({ kind: 'spawned', at: at(ms), attempt: n }) satisfies Event;
 export const ended = (
   n: number,
   observed: Outcome,
   reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' = 'harness',
   nativeId?: string,
-): Event => ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
+) =>
+  ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) }) satisfies Event;
 export const signed = (n: number) => ended(n, 'succeeded', 'harness', `native-${n}`);
 /** A long-lived attempt's session first listed with no process, its harness respawning it. */
-export const gap = (n: number, ms = S): Event => ({ kind: 'gap', at: at(ms), attempt: n });
+export const gap = (n: number, ms = S) => ({ kind: 'gap', at: at(ms), attempt: n }) satisfies Event;
 /** A long-lived attempt's session listed held in process `pid`. */
-export const held = (n: number, pid: number, ms = S): Event => ({ kind: 'process', at: at(ms), attempt: n, pid });
+export const held = (n: number, pid: number, ms = S) => ({ kind: 'process', at: at(ms), attempt: n, pid }) satisfies Event;
 
 /** Journal shapes, by name: what a task's record can say. */
 export const JOURNALS: Record<string, Event[]> = {
@@ -116,19 +117,20 @@ export const JOURNALS: Record<string, Event[]> = {
 };
 
 /** A job parked under a sessions' drain, its end saying so (`Attempt.parked`): in a call, or between two. */
-const parkedEnd = (n: number, calling?: boolean): Event => ({
-  kind: 'ended',
-  at: at(2 * S),
-  attempt: n,
-  sessionId: `s${n}`,
-  observed: 'failed',
-  reason: 'harness',
-  nativeId: `native-${n}`,
-  parked: calling ? { calling: { tool: 'Bash', since: at(S) } } : {},
-});
+const parkedEnd = (n: number, calling?: boolean) =>
+  ({
+    kind: 'ended',
+    at: at(2 * S),
+    attempt: n,
+    sessionId: `s${n}`,
+    observed: 'failed',
+    reason: 'harness',
+    nativeId: `native-${n}`,
+    parked: calling ? { calling: { tool: 'Bash', since: at(S) } } : {},
+  }) satisfies Event;
 /** A job's attempt seen held back at its hook (`held`), and seen going on again (`released`). */
-const hold = (n: number, ms = S): Event => ({ kind: 'held', at: at(ms), attempt: n });
-const release = (n: number, ms = 2 * S): Event => ({ kind: 'released', at: at(ms), attempt: n });
+const hold = (n: number, ms = S) => ({ kind: 'held', at: at(ms), attempt: n }) satisfies Event;
+const release = (n: number, ms = 2 * S) => ({ kind: 'released', at: at(ms), attempt: n }) satisfies Event;
 /**
  * Journal shapes of a parked job, and of a job held at its hook and released, asked for by `lifecycle.test.ts` alone (`parked`), as
  * `unread` is.
@@ -167,7 +169,7 @@ export type Case = {
 export const corpusOf = (
   SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>,
   options: { unread?: boolean; late?: boolean; parked?: boolean } = {},
-): Case[] =>
+) =>
   Object.entries({ ...JOURNALS, ...(options.parked ? PARKED : {}) }).flatMap(([j, base]) =>
     Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) =>
       [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) =>
@@ -185,4 +187,4 @@ export const corpusOf = (
         }),
       ),
     ),
-  );
+  ) satisfies Case[];

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
@@ -22,19 +22,19 @@ const factoryBar = (page: Page, name: string) => page.locator(`aside[data-bar="f
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Refuses unless no bar is drawn and the address names none. */
-async function expectNoBar(page: Page, assertion: string): Promise<void> {
+async function expectNoBar(page: Page, assertion: string) {
   await expectCount(page.locator('aside[data-bar]'), 0, assertion);
   if (barInUrl(page) !== null) throw new Refused(`${assertion}: the address names no bar — it is ${page.url()}`);
 }
 
 /** Refuses unless the bar shows the factory `name`, the address names it, and its block alone is marked as inspected. */
-async function expectFactory(page: Page, name: string, assertion: string): Promise<Locator> {
+async function expectFactory(page: Page, name: string, assertion: string) {
   const bar = factoryBar(page, name);
   await expectVisible(bar, assertion);
   if (barInUrl(page) !== `factory:${name}`) throw new Refused(`${assertion}: the address names bar=factory:${name} — it is ${page.url()}`);
@@ -44,7 +44,7 @@ async function expectFactory(page: Page, name: string, assertion: string): Promi
 }
 
 /** Refuses unless the page reaches `pathname` within the wait. */
-async function expectAt(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectAt(page: Page, pathname: string, assertion: string) {
   try {
     await page.waitForURL((url) => url.pathname === pathname, { timeout: WAIT_MS });
   } catch {
@@ -53,7 +53,7 @@ async function expectAt(page: Page, pathname: string, assertion: string): Promis
 }
 
 /** Clicks a point of the canvas with nothing drawn on it, where the click lands on the empty pane. */
-async function clickPane(page: Page): Promise<void> {
+async function clickPane(page: Page) {
   const spot = await canvasOf(page).evaluate((canvas) => {
     const box = canvas.getBoundingClientRect();
     for (let y = box.top + box.height - 24; y > box.top + 24; y -= 24)
@@ -69,7 +69,7 @@ async function clickPane(page: Page): Promise<void> {
  * A click on a block shows its factory, the block brought whole onto the canvas, which narrows beside the sheet, and it and the canvas's
  * controls left of the bar; again closes it; another switches it.
  */
-async function presses(page: Page): Promise<void> {
+async function presses(page: Page) {
   await blockOf(page, LAST).click();
   const bar = await expectFactory(page, LAST, `a click on ${LAST}'s block shows the factory in the bar`);
   await settled(page);
@@ -101,7 +101,7 @@ async function presses(page: Page): Promise<void> {
  * The bar says what the block says: the factory's repositories, what its runs are doing and what it offers, or why its file does not
  * read.
  */
-async function contents(page: Page): Promise<void> {
+async function contents(page: Page) {
   await canvasOf(page).locator(`.react-flow__node[data-id="${HIRING}"]`).focus();
   await page.keyboard.press('Enter');
   const bar = await expectFactory(page, HIRING, `Enter on ${HIRING}'s block shows it in the bar`);
@@ -129,7 +129,7 @@ async function contents(page: Page): Promise<void> {
 }
 
 /** The bar's Open and a double click on a block each open the factory's floor, with no bar. */
-async function opens(page: Page): Promise<void> {
+async function opens(page: Page) {
   await blockOf(page, HIRING).click();
   const bar = await expectFactory(page, HIRING, `a click on ${HIRING}'s block shows it`);
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
@@ -142,7 +142,7 @@ async function opens(page: Page): Promise<void> {
 }
 
 /** The start of a run in the bar survives a click on the empty canvas, and its Close closes it. */
-async function start(page: Page): Promise<void> {
+async function start(page: Page) {
   const value = `start:${HIRING}`;
   await visit(page, `/?bar=${value}`);
   const bar = page.locator(`aside[data-bar="${value}"]`);

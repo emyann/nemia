@@ -66,7 +66,7 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
 
 test('the matcher reads a rule on a browser tool by the address it opens, as written, and throws on a parameter it does not model', () => {
   const live = 'mcp__playwright__browser_navigate(url:*:8787*)';
-  const to = (url?: string): Call => ({ tool: 'mcp__playwright__browser_navigate', url });
+  const to = (url?: string) => ({ tool: 'mcp__playwright__browser_navigate', url });
   for (const url of ['http://127.0.0.1:8787/', 'localhost:8787', 'http://[::1]:8787/runs', 'http://localhost:8787'])
     assert.equal(reaches(live, to(url)), true, url);
   assert.equal(reaches(live, to('http://127.0.0.1:41234/')), false, 'another port');
@@ -83,7 +83,7 @@ test('the matcher reads a rule on a browser tool by the address it opens, as wri
       rule,
     );
   const named = 'mcp__playwright__browser_take_screenshot(filename:*)';
-  const shot = (filename?: string): Call => ({ tool: 'mcp__playwright__browser_take_screenshot', filename });
+  const shot = (filename?: string) => ({ tool: 'mcp__playwright__browser_take_screenshot', filename });
   for (const filename of ['x.png', 'a/x.png', '/tmp/playwright-mcp/x.png']) assert.equal(reaches(named, shot(filename)), true, filename);
   assert.equal(reaches(named, shot()), false, 'a picture given no name is matched by no rule on its name');
   assert.equal(reaches(named, { tool: 'mcp__playwright__browser_snapshot', filename: 'x.yml' }), false);

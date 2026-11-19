@@ -23,10 +23,9 @@ const MANY = LIST_PAGE.most + 7;
  * workflow, an agent or a skill loaded, about 16 ms each), which planted past the most would make this file minutes long.
  */
 const SOME = LIST_PAGE.byDefault + 7;
-const names = (prefix: string, count = MANY): string[] =>
-  Array.from({ length: count }, (_, i) => `${prefix}-${String(i).padStart(4, '0')}`);
+const names = (prefix: string, count = MANY) => Array.from({ length: count }, (_, i) => `${prefix}-${String(i).padStart(4, '0')}`);
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -66,7 +65,7 @@ const STEPS = WORKFLOWS.map((wf) => `${wf}/implement`);
 for (const wf of WORKFLOWS) write(path.join(repo, 'workflows', wf, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
 const AGENTS = names('agent-paged', SOME);
 /** Your agents, planted once your skills are read and taken away: see `SKILLS`. */
-const agentsPlanted = (): void => {
+const agentsPlanted = () => {
   for (const name of AGENTS) write(path.join(root, 'workflows', 'agents', `${name}.md`), `---\nharness: claude\n---\nYou are ${name}.\n`);
 };
 const SKILLS = names('skill-paged', SOME);
@@ -75,11 +74,11 @@ const SKILLS = names('skill-paged', SOME);
  * yours for each skill, so a hundred of each together cost a page eighteen seconds.
  */
 const skillsDir = path.join(root, 'workflows', 'skills');
-const skillsPlanted = (): void => {
+const skillsPlanted = () => {
   for (const name of SKILLS)
     write(path.join(skillsDir, name, 'SKILL.md'), `---\nname: ${name}\ndescription: The skill ${name}.\n---\nDo it.\n`);
 };
-const skillsGone = (): void => {
+const skillsGone = () => {
   for (const name of SKILLS) fs.rmSync(path.join(skillsDir, name), { recursive: true, force: true });
 };
 
@@ -140,7 +139,7 @@ write(
  * The delegations, each cloned from one the api wrote (`PUT …/delegations/:name`), its file the store's own format with its name in
  * place of the first's.
  */
-async function delegationsPlanted(): Promise<void> {
+async function delegationsPlanted() {
   const dir = path.join(root, 'factories', FACTORY, 'delegations');
   const [first = '', ...rest] = DELEGATIONS;
   const put = await app.request(`/api/namespaces/${FACTORY}/delegations/${first}`, {
@@ -193,14 +192,14 @@ type Page = {
 };
 
 /** The page `url` answers with `query`, which must be a 200. */
-async function pageOf(url: string, query = ''): Promise<Page> {
+async function pageOf(url: string, query = '') {
   const res = await app.request(`${url}${query === '' ? '' : `${url.includes('?') ? '&' : '?'}${query}`}`);
   assert.equal(res.status, 200, `${url}?${query}: ${res.status}`);
   return (await res.json()) as Page;
 }
 
 /** The name an item of a list is planted by: an event's, the object it is about. */
-const nameOf = (item: Page['items'][number]): string => item.involved?.name ?? item.metadata.name;
+const nameOf = (item: Page['items'][number]) => item.involved?.name ?? item.metadata.name;
 
 test('every page read of READS is read here', () => {
   const pages = Object.entries(READS)

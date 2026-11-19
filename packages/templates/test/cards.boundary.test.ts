@@ -32,14 +32,14 @@ const card = (title: string, over: Record<string, string> = {}) => ({
 const PERIOD = { period: { from: '2026-09-15', to: '2026-09-28' }, against: { from: '2026-09-01', to: '2026-09-14' } };
 
 /** A closeout as the check is handed it (`WF_CLOSEOUT`), written to a scratch file: its path. */
-function closeoutFile(fields: Record<string, unknown>): string {
+function closeoutFile(fields: Record<string, unknown>) {
   const file = path.join(scratch('nemia-janitor-closeout-'), 'closeout.json');
   fs.writeFileSync(file, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], report: '# r', ...PERIOD, ...fields }));
   return file;
 }
 
 /** Run the script over the closeout `args` names in the world `env`, bounded; its exit and streams. */
-function run(env: NodeJS.ProcessEnv, args: string[]): { code: number | null; out: string; err: string } {
+function run(env: NodeJS.ProcessEnv, args: string[]) {
   const tmp = scratch('nemia-janitor-tmp-');
   const cwd = path.dirname(env.HOME!);
   const ran = spawnSync(process.execPath, [SCRIPT, ...args], {

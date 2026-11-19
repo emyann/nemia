@@ -68,16 +68,14 @@ type Matcher = {
 };
 
 /** A matcher of calls alone. */
-const ofCall =
-  (matches: (call: ts.CallExpression, facts: FileFacts) => boolean): Matcher['matches'] =>
-  (node, facts) =>
-    ts.isCallExpression(node) && matches(node, facts);
+const ofCall = (matches: (call: ts.CallExpression, facts: FileFacts) => boolean) =>
+  ((node, facts) => ts.isCallExpression(node) && matches(node, facts)) satisfies Matcher['matches'];
 
 /** Whether a piece of text ends in the `wf/` a run's branch opens with, as a whole segment. */
-const endsInRunPrefix = (text: string): boolean => /(^|[^\w])wf\/$/.test(text);
+const endsInRunPrefix = (text: string) => /(^|[^\w])wf\/$/.test(text);
 
 /** Whether `node` builds the name of a run's branch: see the file's head. */
-function buildsBranch(node: ts.Node, facts: FileFacts): boolean {
+function buildsBranch(node: ts.Node, facts: FileFacts) {
   if (ts.isTemplateExpression(node))
     return [node.head.text, ...node.templateSpans.slice(0, -1).map((span) => span.literal.text)].some(endsInRunPrefix);
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken)
@@ -90,10 +88,10 @@ function buildsBranch(node: ts.Node, facts: FileFacts): boolean {
 }
 
 /** Whether a string holds one of git's own files as a whole `/`-separated segment. */
-const namesGitFile = (text: string): boolean => text.split('/').some((segment) => GIT_SEGMENTS.includes(segment));
+const namesGitFile = (text: string) => text.split('/').some((segment) => GIT_SEGMENTS.includes(segment));
 
 /** Whether a string holds the folder of a place's scripts as a whole `/`-separated segment. */
-const namesScript = (text: string): boolean => text.split('/').some((segment) => SCRIPT_SEGMENTS.includes(segment));
+const namesScript = (text: string) => text.split('/').some((segment) => SCRIPT_SEGMENTS.includes(segment));
 
 const MATCHERS: readonly Matcher[] = [
   {
@@ -131,25 +129,25 @@ type Site = { line: number; matcher: Matcher['name'] };
  * Each node of `text` that runs git, reads git's files or builds a run's branch, by its line and the first of `matchers` that holds: a
  * node counts once.
  */
-function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATCHERS): Site[] {
+function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATCHERS) {
   const { source, facts } = parsed(file, text);
   const sites: Site[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     const matcher = matchers.find((m) => m.matches(node, facts));
     if (matcher) sites.push({ line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, matcher: matcher.name });
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return sites;
+  return sites satisfies Site[];
 }
 
 /** Each file's syntax tree and facts, by its path, for the one text it was parsed from: a repository file is parsed once. */
 const trees = new Map<string, { text: string; source: ts.SourceFile; facts: FileFacts }>();
 
 /** `text` parsed as `file`, kept until the same file is given another text. */
-function parsed(file: string, text: string): { source: ts.SourceFile; facts: FileFacts } {
+function parsed(file: string, text: string) {
   const kept = trees.get(file);
-  if (kept?.text === text) return kept;
+  if (kept?.text === text) return kept satisfies { source: ts.SourceFile; facts: FileFacts };
   const source = ts.createSourceFile(
     file,
     text,
@@ -159,14 +157,14 @@ function parsed(file: string, text: string): { source: ts.SourceFile; facts: Fil
   );
   const tree = { text, source, facts: factsOf(source) };
   trees.set(file, tree);
-  return tree;
+  return tree satisfies { source: ts.SourceFile; facts: FileFacts };
 }
 
 /** Each file's sites under a list of matchers, for the one text they were measured in. */
 const siteCounts = new WeakMap<readonly Matcher[], Map<string, { text: string; count: number }>>();
 
 /** How many sites `matchers` find in `text`, kept per list and file: a repository file is measured once per list. */
-function siteCount(file: string, text: string, matchers: readonly Matcher[]): number {
+function siteCount(file: string, text: string, matchers: readonly Matcher[]) {
   let byFile = siteCounts.get(matchers);
   if (!byFile) siteCounts.set(matchers, (byFile = new Map()));
   const kept = byFile.get(file);
@@ -177,13 +175,13 @@ function siteCount(file: string, text: string, matchers: readonly Matcher[]): nu
 }
 
 /** Whether a file of a `src` is left out: a test, beside its code or in a `test` folder. */
-const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.split('/').includes('test');
+const isTest = (file: string) => /\.test\.tsx?$/.test(file) || file.split('/').includes('test');
 
 /**
  * Every `.ts` and `.tsx` under the `src` of each workspace the root package.json of `root` names, by its path from `root`, but the tests.
  * A workspace with no `src`, as `tools/guards` (a CI tool, which asks git as the sdlc template's `landing.ts` does), has none.
  */
-function sourcesOf(root: string): string[] {
+function sourcesOf(root: string) {
   const srcs = workspaces(root).map((dir) => `${dir}/src`);
   return srcs
     .filter((src) => fs.existsSync(path.join(root, src)))
@@ -191,36 +189,50 @@ function sourcesOf(root: string): string[] {
       fs.readdirSync(path.join(root, src), { recursive: true, encoding: 'utf8' }).map((f) => `${src}/${f.split(path.sep).join('/')}`),
     )
     .filter((f) => /\.tsx?$/.test(f) && !isTest(f))
-    .sort();
+    .sort() satisfies string[];
 }
 
 /** Each file's count of sites, for the files that hold one at least. */
-const measured = (texts: ReadonlyMap<string, string>, matchers: readonly Matcher[] = GIT_MATCHERS): Record<string, number> =>
-  Object.fromEntries([...texts].map(([file, text]) => [file, siteCount(file, text, matchers)]).filter(([, count]) => count !== 0));
+const measured = (texts: ReadonlyMap<string, string>, matchers: readonly Matcher[] = GIT_MATCHERS) =>
+  Object.fromEntries(
+    [...texts].map(([file, text]) => [file, siteCount(file, text, matchers)]).filter(([, count]) => count !== 0),
+  ) satisfies Record<string, number>;
 
 /** What an entry fails to name: one card at least, each one `CARDS` knows. */
-function namingBreak(file: string, entry: Entry): string | undefined {
-  if (!entry.cards.length) return `${file}'s entry for git calls names no card: name the cards that remove them`;
+function namingBreak(file: string, entry: Entry) {
+  if (!entry.cards.length)
+    return `${file}'s entry for git calls names no card: name the cards that remove them` satisfies string | undefined;
   const unknown = entry.cards.filter((card) => !(card in CARDS));
-  if (unknown.length) return `${file}'s entry for git calls names ${unknown.join(', ')}, which CARDS does not know: name a filed card`;
-  return undefined;
+  if (unknown.length)
+    return `${file}'s entry for git calls names ${unknown.join(', ')}, which CARDS does not know: name a filed card` satisfies
+      | string
+      | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** What an entry's count and its file's measure disagree on, as a sentence naming the fix. */
-function countBreak(file: string, count: number, allowed: number, exists: (file: string) => boolean): string | undefined {
+function countBreak(file: string, count: number, allowed: number, exists: (file: string) => boolean) {
   if (!exists(file))
-    return `${file} holds git calls in the baseline but is not on disk: where it moved, rename its entry; else take it off`;
-  if (count === 0) return `${file} holds no git call left: take its entry off the baseline`;
-  if (count > allowed) return `${file} holds ${count} git calls, more than the ${allowed} the baseline allows: never add them here`;
-  if (count < allowed) return `${file} holds ${count} git calls, fewer than the baseline's ${allowed}: lower its count to ${count}`;
-  return undefined;
+    return `${file} holds git calls in the baseline but is not on disk: where it moved, rename its entry; else take it off` satisfies
+      | string
+      | undefined;
+  if (count === 0) return `${file} holds no git call left: take its entry off the baseline` satisfies string | undefined;
+  if (count > allowed)
+    return `${file} holds ${count} git calls, more than the ${allowed} the baseline allows: never add them here` satisfies
+      | string
+      | undefined;
+  if (count < allowed)
+    return `${file} holds ${count} git calls, fewer than the baseline's ${allowed}: lower its count to ${count}` satisfies
+      | string
+      | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /**
  * What a measure and its baseline disagree on, each a sentence naming the fix: a file no entry holds, a count above or below the
  * measure, an entry for a file gone or clean, and an entry that names no card it can be held to.
  */
-function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exists: (file: string) => boolean): string[] {
+function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exists: (file: string) => boolean) {
   const out: string[] = [];
   for (const [file, count] of Object.entries(counts))
     if (!(file in baseline))
@@ -231,25 +243,25 @@ function ratchetBreaks(counts: Record<string, number>, baseline: Baseline, exist
     if (naming) out.push(naming);
     if (counted) out.push(counted);
   }
-  return out;
+  return out satisfies string[];
 }
 
-const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
+const onDisk = (file: string) => fs.existsSync(path.join(ROOT, file));
 
 let sources: ReadonlyMap<string, string> | undefined;
 /** Every src file's text, read once for the whole file: a test plants a file into a copy, never into this. */
-const repository = (): ReadonlyMap<string, string> =>
-  (sources ??= new Map(sourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')])));
+const repository = () =>
+  (sources ??= new Map(sourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]))) satisfies ReadonlyMap<string, string>;
 
 /** Every `.ts` under the package's `place/` but in a folder that names a run's branches (`BRANCH_NAMERS`), by its path from `root`. */
-function placeSourcesOf(root: string): string[] {
+function placeSourcesOf(root: string) {
   const place = 'packages/agent-orchestrator/place';
-  if (!fs.existsSync(path.join(root, place))) return [];
+  if (!fs.existsSync(path.join(root, place))) return [] satisfies string[];
   return fs
     .readdirSync(path.join(root, place), { recursive: true, encoding: 'utf8' })
     .map((f) => `${place}/${f.split(path.sep).join('/')}`)
     .filter((f) => /\.tsx?$/.test(f) && !isTest(f) && !BRANCH_NAMERS.some((namer) => f.startsWith(namer)))
-    .sort();
+    .sort() satisfies string[];
 }
 
 /** The plants each matcher must refuse, each one call over one or more lines. */
@@ -386,7 +398,8 @@ test('the git calls of every src are held to their baseline, each entry naming i
 test('REFUSED: a new file with a git call, in each layer, and a count raised by one', () => {
   const texts = repository();
   const fix = "a git call belongs to the place's code, asked as a service; never add them here";
-  const planted = (file: string, text: string): string[] => ratchetBreaks(measured(new Map([...texts, [file, text]])), GIT_SITES, onDisk);
+  const planted = (file: string, text: string) =>
+    ratchetBreaks(measured(new Map([...texts, [file, text]])), GIT_SITES, onDisk) satisfies string[];
   for (const [file, plant] of [
     ['packages/agent-orchestrator/src/x/x.store.ts', PLANTS.spawn[0]],
     ['packages/agent-runtime/src/x.ts', PLANTS.path[0]],
@@ -410,8 +423,8 @@ test('REFUSED: a new file with a git call, in each layer, and a count raised by 
 });
 
 test('REFUSED: a count above or below the baseline, an entry gone or clean, one with no card, an unknown card', () => {
-  const exists = (file: string): boolean => file !== 'src/gone.ts';
-  const breaks = (counts: Record<string, number>, entry: Entry): string[] => ratchetBreaks(counts, { 'src/a.ts': entry }, exists);
+  const exists = (file: string) => file !== 'src/gone.ts';
+  const breaks = (counts: Record<string, number>, entry: Entry) => ratchetBreaks(counts, { 'src/a.ts': entry }, exists) satisfies string[];
   const held: Entry = { count: 2, cards: ['F', 'J'] };
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, held), [], 'the measure the baseline holds is let through');
   assert.deepEqual(breaks({ 'src/a.ts': 3 }, held), [

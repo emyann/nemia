@@ -47,7 +47,7 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 
-const file = (name: string): string => path.join(root, 'subscriptions', `${name}.json`);
+const file = (name: string) => path.join(root, 'subscriptions', `${name}.json`);
 
 describe('A person subscribes a long-lived task: given by its words or the defaults, an empty selectors list as the default, each refusal writing nothing, and a floor stored with the level it takes', () => {
   const s = story(test);

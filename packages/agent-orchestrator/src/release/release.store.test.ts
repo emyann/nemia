@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import type { ReleaseFile } from './release.ts';
 import {
   asideLeftover,
   buildLogs,
@@ -29,10 +28,10 @@ import {
 } from './release.store.ts';
 
 /** What a release of `tag` says, built from `/src`. */
-const fileOf = (tag: string): ReleaseFile => ({ tag, commit: `${tag}0000000000`, source: '/src', builtAt: '2026-10-06T07:00:00.000Z' });
+const fileOf = (tag: string) => ({ tag, commit: `${tag}0000000000`, source: '/src', builtAt: '2026-10-06T07:00:00.000Z' });
 
 /** A store with a built release of each tag, and no pointer. */
-function storeWith(...tags: string[]): string {
+function storeWith(...tags: string[]) {
   const root = scratch('wf-release-store-');
   for (const tag of tags) {
     fs.mkdirSync(releaseDir(tag, root), { recursive: true });
@@ -103,7 +102,7 @@ test('the installed releases are the folders under releases/ with a release.json
 
 /** The pids a test says are live processes. */
 const LIVE = 4242;
-const live = (pid: number): boolean => pid === LIVE;
+const live = (pid: number) => pid === LIVE;
 
 test('a build is under way while the process its folder names lives, and not once it has exited', () => {
   const root = storeWith('v1');

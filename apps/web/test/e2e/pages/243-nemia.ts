@@ -10,22 +10,18 @@ import { OUT, store } from '../world.ts';
 const FACTS = { 'owner.md': 'The owner reads in Montreal time.\n', 'style.md': 'Short sentences; evidence first.\n' } as const;
 
 /** Pick `word` as her level, wait for the api's answer to the level's write, and refuse any but a 200: the level it wrote. */
-async function switched(
-  page: Page,
-  section: Locator,
-  word: 'Manual' | 'Semi-auto' | 'Auto',
-): Promise<{ level: string; task: string | null }> {
+async function switched(page: Page, section: Locator, word: 'Manual' | 'Semi-auto' | 'Auto') {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
     pickLevel(page, section.locator('[data-nemia-pick]'), word),
   ]);
   if (answer.status() !== 200) throw new Refused(`a pick writes her level — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
-  return (await answer.json()) as { level: string; task: string | null };
+  return (await answer.json()) as { level: string; task: string | null } satisfies { level: string; task: string | null };
 }
 
 /** Her memory lists the seeded facts, each folded; one opened shows its words, and the prune words say to ask her. */
-async function expectMemory(section: Locator): Promise<void> {
+async function expectMemory(section: Locator) {
   const memory = section.locator('[data-nemia-memory]');
   for (const name of Object.keys(FACTS)) await expectVisible(memory.locator(`[data-nemia-fact="${name}"]`), `her memory lists ${name}`);
   if (await memory.locator('[data-nemia-fact-text]').count()) throw new Refused("a fact's words are drawn only once it is opened");
@@ -41,7 +37,7 @@ async function expectMemory(section: Locator): Promise<void> {
 }
 
 /** The page pictured as a phone shows it, its whole length, then put back to its size. */
-async function photographPhone(page: Page): Promise<void> {
+async function photographPhone(page: Page) {
   const size = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
   await settled(page);

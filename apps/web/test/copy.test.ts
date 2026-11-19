@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { COPY_REST_MS, copyAndSay, type CopySaid } from '../src/lib/useCopy.ts';
 
 /** While the test runs, a clipboard that takes every write, refuses every write, or (`undefined`) none at all. */
-function withClipboard(t: { onTestFinished: (fn: () => void) => void }, takes: boolean | undefined): string[] {
+function withClipboard(t: { onTestFinished: (fn: () => void) => void }, takes: boolean | undefined) {
   const written: string[] = [];
   const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
   const clipboard =
@@ -15,9 +15,12 @@ function withClipboard(t: { onTestFinished: (fn: () => void) => void }, takes: b
       : {
           writeText: (text: string) => (takes ? (written.push(text), Promise.resolve()) : Promise.reject(new Error('NotAllowedError'))),
         };
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no clipboard: the browser's global, put and taken back
   Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true });
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no clipboard: the browser's global, put and taken back
     if (before) Object.defineProperty(navigator, 'clipboard', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no clipboard: the browser's global, put and taken back
     else Reflect.deleteProperty(navigator, 'clipboard');
   });
   return written;

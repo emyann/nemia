@@ -68,7 +68,7 @@ beforeEachTest(() => {
   standIn().settle(`t-${AT_WORK}`, 'working');
 });
 
-const object = async (id: string, on = app()): Promise<RunAnswer> => {
+const object = async (id: string, on = app()) => {
   const res = await on.request(`/api/runs/${id}`);
   assert.equal(res.status, 200, `the run ${id} answers`);
   return (await res.json()) as RunAnswer;
@@ -137,7 +137,7 @@ test("a run's labels set through the api are its object's on the very next reque
 });
 
 /** The runs as a list of objects (`GET /api/runs`, the `RunList`), a 200. */
-const runList = async (on = app()): Promise<RunList> => {
+const runList = async (on = app()) => {
   const res = await on.request('/api/runs');
   assert.equal(res.status, 200, 'the runs list answers');
   return (await res.json()) as RunList;
@@ -187,12 +187,12 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     closeout: { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] },
   });
   const aPass = () => runOver(() => stand().layer)(engine(), passStanding(runsAtOnce(root).runs.list()));
-  const decision = async (): Promise<RunDecision> => {
+  const decision = async () => {
     const res = await app().request(`/api/runs/${id}/decision`);
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as RunDecision;
   };
-  const saidBoth = async (): Promise<{ decision: boolean; object: boolean }> => {
+  const saidBoth = async () => {
     const answer = await decision();
     const { status } = await object(id);
     return { decision: 'standings' in answer, object: status.toDecide !== null };

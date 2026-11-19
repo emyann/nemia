@@ -64,10 +64,11 @@ const CHECK = (exit: number) =>
  * The scripts of a fixture tag: a build that writes `built.txt` and puts the tag's `nemia.sh` as the tree's npm bin `nemia`, as a
  * release's build links the CLI, and a check, each exiting as said.
  */
-const scripts = ({ build = 0, check = 0 }: { build?: number; check?: number | null } = {}): Record<string, string> => ({
-  build: `node -e "const fs = require('fs'); fs.writeFileSync('built.txt', 'built'); fs.mkdirSync('node_modules/.bin', { recursive: true }); fs.copyFileSync('nemia.sh', 'node_modules/.bin/nemia'); fs.chmodSync('node_modules/.bin/nemia', 0o755); process.exit(${build})"`,
-  ...(check === null ? {} : { 'release:check': CHECK(check) }),
-});
+const scripts = ({ build = 0, check = 0 }: { build?: number; check?: number | null } = {}) =>
+  ({
+    build: `node -e "const fs = require('fs'); fs.writeFileSync('built.txt', 'built'); fs.mkdirSync('node_modules/.bin', { recursive: true }); fs.copyFileSync('nemia.sh', 'node_modules/.bin/nemia'); fs.chmodSync('node_modules/.bin/nemia', 0o755); process.exit(${build})"`,
+    ...(check === null ? {} : { 'release:check': CHECK(check) }),
+  }) satisfies Record<string, string>;
 
 /** The fixture repository: a package with no dependency, committed on main. */
 const REPO = (() => {
@@ -95,7 +96,7 @@ const CARRIED = path.join(scratch('wf-upgrade-carried-'), 'carried.txt');
 const CARRY_FAILED = 'Claude Code 9.9.9 did not install (exit 1)';
 
 const READ = path.join(scratch('wf-upgrade-read-'), 'readiness.json');
-const readAs = (read: Readiness): void => fs.writeFileSync(READ, JSON.stringify(read));
+const readAs = (read: Readiness) => fs.writeFileSync(READ, JSON.stringify(read));
 readAs({ ready: true, pieces: [] });
 
 /**
@@ -103,7 +104,7 @@ readAs({ ready: true, pieces: [] });
  * refuses `--local` with exit 2 on every verb as a release's cli does, and exits `carry`, its last line `CARRY_FAILED` where not 0 — or,
  * asked `doctor --json`, prints `READ` and exits 1, as `nemia doctor` exits while a run waits —, tags it `tag`, and answers the commit.
  */
-function tagged(tag: string, marker: string, given: Record<string, string> = scripts(), carry = 0): string {
+function tagged(tag: string, marker: string, given: Record<string, string> = scripts(), carry = 0) {
   fs.writeFileSync(
     path.join(REPO, 'package.json'),
     `${JSON.stringify({ name: 'fx', version: '1.0.0', private: true, scripts: given }, null, 2)}\n`,
@@ -131,23 +132,24 @@ type World = {
 };
 
 /** A lease written by the api of `pid`, standing as `kind`, its pid confirmed, its first pass completed when `passed`. */
-const lease = (pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false): DaemonStanding => ({
-  kind,
-  file: {
-    pid,
-    by: 'api',
-    startedAt: new Date().toISOString(),
-    cwd: '/',
-    every: 4000,
-    passedAt: passed ? new Date().toISOString() : null,
-  },
-  last: Date.now(),
-  quiet: 0,
-  identity: 'same',
-});
+const lease = (pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false) =>
+  ({
+    kind,
+    file: {
+      pid,
+      by: 'api',
+      startedAt: new Date().toISOString(),
+      cwd: '/',
+      every: 4000,
+      passedAt: passed ? new Date().toISOString() : null,
+    },
+    last: Date.now(),
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 /** A host over `world` that logs, in order, every program it calls, the pause, the signal and what it says. */
-function hostOf(world: World): { host: ServiceHost; events: string[] } {
+function hostOf(world: World) {
   const events: string[] = [];
   const host: ServiceHost = {
     machine: () => ({ platform: 'linux', wsl: true, systemd: true }),
@@ -193,14 +195,14 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     timeoutMs: 200,
     stopMs: 200,
   };
-  return { host, events };
+  return { host, events } satisfies { host: ServiceHost; events: string[] };
 }
 
 /** No daemon ticks the store. */
 const idle = () => hostOf({ lease: { kind: 'none' }, unitPid: null });
 
 /** Writes the service's unit, running the daemon at `checkout`. */
-function unitOn(checkout: string): void {
+function unitOn(checkout: string) {
   fs.mkdirSync(path.dirname(UNIT), { recursive: true });
   fs.writeFileSync(
     UNIT,
@@ -223,17 +225,17 @@ const DEAD = 4_194_305;
 const run = (args: Args, host: ServiceHost, env: NodeJS.ProcessEnv = ENV) => runWith(engineOf(engine().layer), upgrade(args, host, env));
 
 /** The refusal an upgrade fails with: its tag and message. */
-async function refusalOf(args: Args, host: ServiceHost, env?: NodeJS.ProcessEnv): Promise<{ tag: string; message: string }> {
+async function refusalOf(args: Args, host: ServiceHost, env?: NodeJS.ProcessEnv) {
   const err = await run(args, host, env).then(
     () => assert.fail('the upgrade was expected to be refused'),
     (e: Error & { _tag?: string; exitCode?: number }) => e,
   );
   assert.equal(err.exitCode, 2, err.message);
-  return { tag: err._tag ?? '', message: err.message };
+  return { tag: err._tag ?? '', message: err.message } satisfies { tag: string; message: string };
 }
 
 /** What is left under `releases/` beside the releases: no build folder, no hidden link. */
-const leftovers = (): string[] => fs.readdirSync(releasesDir(ROOT)).filter((f) => f.startsWith('.') && f !== '.logs');
+const leftovers = () => fs.readdirSync(releasesDir(ROOT)).filter((f) => f.startsWith('.') && f !== '.logs') satisfies string[];
 
 const V1 = tagged('v1', 'one');
 const V2 = tagged('v2', 'two');
@@ -552,16 +554,17 @@ describe('an upgrade onto a release whose read is not ready says each missing pi
     world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
     return hostOf(world).host;
   };
-  const piece = (name: string): ReadinessPiece => ({
-    name,
-    area: 'workflow',
-    state: 'missing',
-    message: `${name} is not installed`,
-    fixes: [{ message: `install ${name}`, command: `nemia doctor fix ${name} --factory nemia --workflow quick`, startable: true }],
-    factory: 'nemia',
-    workflow: 'quick',
-    cost: 'run',
-  });
+  const piece = (name: string) =>
+    ({
+      name,
+      area: 'workflow',
+      state: 'missing',
+      message: `${name} is not installed`,
+      fixes: [{ message: `install ${name}`, command: `nemia doctor fix ${name} --factory nemia --workflow quick`, startable: true }],
+      factory: 'nemia',
+      workflow: 'quick',
+      cost: 'run',
+    }) satisfies ReadinessPiece;
   const linger: ReadinessPiece = {
     name: 'linger',
     area: 'service',
@@ -656,14 +659,15 @@ describe('an upgrade onto a release whose read is not ready says each missing pi
   s.test(
     "a read the server refused, the client's token missing, says no run is held: one line naming the token's fix, and it succeeds",
     async () => {
-      const client = (name: string, cost: ReadinessPiece['cost'], command?: string): ReadinessPiece => ({
-        name,
-        area: 'client',
-        state: 'missing',
-        message: `${name} is missing`,
-        fixes: command === undefined ? [] : [{ message: `${name} is missing`, command, startable: false }],
-        cost,
-      });
+      const client = (name: string, cost: ReadinessPiece['cost'], command?: string) =>
+        ({
+          name,
+          area: 'client',
+          state: 'missing',
+          message: `${name} is missing`,
+          fixes: command === undefined ? [] : [{ message: `${name} is missing`, command, startable: false }],
+          cost,
+        }) satisfies ReadinessPiece;
       readAs({
         ready: false,
         pieces: [

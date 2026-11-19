@@ -61,7 +61,7 @@ test('HttpApi StreamSse({ data }) frames the watch events byte for byte as the H
 });
 
 test('an abort of the HttpApi stream ends its fiber', async () => {
-  let end = (): void => undefined;
+  let end: () => void = () => undefined;
   const ended = new Promise<void>((resolve) => (end = resolve));
   const { web } = sseApi(() =>
     Stream.concat(Stream.fromIterable(events.slice(0, 1)), Stream.never).pipe(Stream.ensuring(Effect.sync(() => end()))),

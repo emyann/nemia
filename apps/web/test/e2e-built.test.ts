@@ -10,7 +10,7 @@ import { scratch } from 'test-kit/scratch';
 import { current, inputsOf, stamp } from './e2e/built.ts';
 
 /** A repository with a board, built, and `objects`: its root and the board's folder. */
-function repository(): { repo: string; web: string } {
+function repository() {
   const repo = scratch('nemia-e2e-built-');
   const web = path.join(repo, 'apps', 'web');
   for (const [file, text] of [

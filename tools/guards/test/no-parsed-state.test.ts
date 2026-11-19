@@ -28,7 +28,7 @@ const FIX = 'carry the state as a code (its reason, its phase, a verdict.result)
  * What `counts`, today's measure, and `baseline` disagree on, each a sentence naming the fix, by the file it is about: a file the
  * baseline does not hold, a count above the baseline's, an entry above today's count or for a file clean or gone, and one with no card.
  */
-export const breaks = (counts: Readonly<Record<string, number>>, baseline: Baseline): Array<{ file: string; why: string }> => {
+export const breaks = (counts: Readonly<Record<string, number>>, baseline: Baseline) => {
   const out: Array<{ file: string; why: string }> = [];
   for (const [file, count] of Object.entries(counts)) {
     const held = baseline[file];
@@ -52,7 +52,7 @@ export const breaks = (counts: Readonly<Record<string, number>>, baseline: Basel
 };
 
 /** The files `breaks` refuses, in order. */
-const refused = (counts: Record<string, number>, baseline: Baseline): string[] => breaks(counts, baseline).map(({ file }) => file);
+const refused = (counts: Record<string, number>, baseline: Baseline) => breaks(counts, baseline).map(({ file }) => file);
 
 const CARD = 'a card';
 

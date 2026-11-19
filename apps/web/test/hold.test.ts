@@ -8,18 +8,19 @@ type Run = Parameters<typeof holdCandidates>[1][number] & Parameters<typeof hold
 const PRUNED: NonNullable<Run['pruned']> = { at: '2026-09-30T06:00:00.000Z', worktrees: [], artifacts: null, said: 'pruned' };
 
 /** A repository run of `/code/app` in flight, held by nobody: what the page offers a hold of, and what a hold may wait on. */
-const run = (extra: Partial<Run> = {}): Run => ({
-  id: 'r-1',
-  place: 'git',
-  repo: '/code/app',
-  cancelledAt: null,
-  pruned: null,
-  holding: null,
-  holdUntil: [],
-  status: 'running',
-  toDecide: null,
-  ...extra,
-});
+const run = (extra: Partial<Run> = {}) =>
+  ({
+    id: 'r-1',
+    place: 'git',
+    repo: '/code/app',
+    cancelledAt: null,
+    pruned: null,
+    holding: null,
+    holdUntil: [],
+    status: 'running',
+    toDecide: null,
+    ...extra,
+  }) satisfies Run;
 
 describe('holdable, holdCandidates: which run is offered a hold, and which runs a hold may wait on', () => {
   test('a repository run in flight, or stopped on something, held by nobody, is offered a hold', () => {

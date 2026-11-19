@@ -19,14 +19,14 @@ const DOOR_FILES = ['src/testing.ts', 'src/service/test-engine.ts', 'src/waits/i
  * What a door file may import for a value: Effect, a file of the engine's service, the face of the core's engine, and a file of the
  * wait's own folder.
  */
-const allowed = (target: string): boolean =>
+const allowed = (target: string) =>
   target === 'effect' ||
   /^src\/service\/[^/]+\.ts$/.test(target) ||
   target === 'src/core/engine/index.ts' ||
   /^src\/waits\/[^/]+\.ts$/.test(target);
 
 /** Every module `text` imports for a value: a type-only import, or braces of `type` names only, is erased and left out. */
-function valueImports(text: string): string[] {
+function valueImports(text: string) {
   const out: string[] = [];
   for (const m of text.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
     const braces = /^\{([\s\S]*)\}$/.exec(m[2].trim());
@@ -44,7 +44,7 @@ function valueImports(text: string): string[] {
 }
 
 /** Where a door file, read through `read`, imports for a value what it may not, each worded with what to do instead. */
-const doorBreaches = (read: (file: string) => string): string[] =>
+const doorBreaches = (read: (file: string) => string) =>
   DOOR_FILES.flatMap((file) =>
     valueImports(read(file))
       .map((spec) => (spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : spec))
@@ -56,7 +56,7 @@ const doorBreaches = (read: (file: string) => string): string[] =>
       ),
   );
 
-const onDisk = (file: string): string => fs.readFileSync(path.join(PKG, file), 'utf8');
+const onDisk = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
 test('REFUSED: a door file that imports a module of node, a harness, A2A or another package', () => {
   const planting = (file: string, line: string) => (f: string) => (f === file ? `${line}\n${onDisk(f)}` : onDisk(f));

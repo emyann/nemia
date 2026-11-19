@@ -33,7 +33,7 @@ import {
   seriesRead,
   tierDir,
 } from './series.store.ts';
-import { RANGES, seriesMemo, type RollupLine } from './series.ts';
+import { RANGES, seriesMemo } from './series.ts';
 import { engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-series-store-');
@@ -57,7 +57,7 @@ const fresh = () => {
 };
 
 /** A `store.runs` line at `t` of one sample `v`, labelled `l`. */
-const line = (t: string, v: number, l: Record<string, string> = {}): RollupLine => ({
+const line = (t: string, v: number, l: Record<string, string> = {}) => ({
   t,
   s: 'store.runs',
   l,
@@ -68,7 +68,7 @@ const line = (t: string, v: number, l: Record<string, string> = {}): RollupLine 
   last: v,
 });
 
-const pass = (at: string, ms: number): RecentPass => ({
+const pass = (at: string, ms: number) => ({
   at,
   ms,
   runs: 40,
@@ -101,13 +101,11 @@ const filesNow = () =>
 const typed = (argv: readonly string[]) => handledArgv(argv, noEngine(), undefined, undefined, ENV);
 
 /** That `err` is a refusal of kind `tag` with exit 2. */
-const refusedAs =
-  (tag: string) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
-    assert.equal(err._tag, tag, err.message);
-    assert.equal(err.exitCode, 2, err.message);
-    return true;
-  };
+const refusedAs = (tag: string) => (err: Error & { exitCode?: number; _tag?: string }) => {
+  assert.equal(err._tag, tag, err.message);
+  assert.equal(err.exitCode, 2, err.message);
+  return true;
+};
 
 /** Four passes rolled into the minutes 13:57 to 14:00, and those of 13:00 into its hour, by three passes of the tick. */
 const fourMinutes = () => {
@@ -141,14 +139,14 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       assert.deepEqual(days(ROOT, 'minute'), ['2026-10-04', '2026-10-05']);
       fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
       appendLines(ROOT, 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
-      const said: string[] = [];
-      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
+      const saidSpy = vi.spyOn(process.stderr, 'write');
+      const said = () => saidSpy.mock.calls.flatMap(([text]) => [String(text)]);
       assert.deepEqual(
         readDay(ROOT, 'minute', '2026-10-05').map((x) => x.sum),
         [2, 3],
       );
-      assert.equal(said.length, 1, said.join(''));
-      assert.ok(said[0].startsWith(`${dayFile(ROOT, 'minute', '2026-10-05')}: 2 `), said[0]);
+      assert.equal(said().length, 1, said().join(''));
+      assert.ok(said()[0].startsWith(`${dayFile(ROOT, 'minute', '2026-10-05')}: 2 `), said()[0]);
     },
   },
   {
@@ -166,8 +164,8 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
           stored(5, { part: 'runs', kind: 'records' }),
         ].join(''),
       );
-      const said: string[] = [];
-      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
+      const saidSpy = vi.spyOn(process.stderr, 'write');
+      const said = () => saidSpy.mock.calls.flatMap(([text]) => [String(text)]);
       assert.deepEqual(
         readDay(ROOT, 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
         [
@@ -175,7 +173,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
           [5, { part: 'runs', kind: 'records' }],
         ],
       );
-      assert.equal(said.length, 1, 'the three lines of no set are said once, with their file');
+      assert.equal(said().length, 1, 'the three lines of no set are said once, with their file');
     },
   },
   { name: 'no file, no lines', check: () => assert.deepEqual(readDay(ROOT, 'minute', '2026-01-01'), []) },

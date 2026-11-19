@@ -118,8 +118,8 @@ const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-orig
 const ask = (step: string, body: unknown) =>
   app().request(`/api/namespaces/default/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 const asksDir = path.join(root, 'runs', `${R}.asks`);
-const asked = (): string[] => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
-const refused = async (res: Response, status: number): Promise<{ error: string; field?: string }> => {
+const asked = () => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
+const refused = async (res: Response, status: number) => {
   assert.equal(res.status, status, await res.clone().text());
   return (await res.json()) as { error: string; field?: string };
 };

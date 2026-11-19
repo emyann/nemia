@@ -21,17 +21,23 @@ const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-local-');
 
 /** A store of its own, its home beside it, so no `nemia` here reads the person's store, service or engine. */
-function aStore(name: string): { root: string; env: NodeJS.ProcessEnv } {
+function aStore(name: string) {
   const root = path.join(SCRATCH, name, 'store');
   const home = path.join(SCRATCH, name, 'home');
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(home, { recursive: true });
   const rest = ambient('NEMIA_DAEMON_START', 'AE_ROOT', 'WF_ROOT', 'XDG_CONFIG_HOME');
-  return { root, env: { ...rest, WF_ROOT: root, HOME: home, NEMIA_DAEMON_START: 'off', WF_VERIFY_REST: '1' } };
+  {
+    const made: { root: string; env: NodeJS.ProcessEnv } = {
+      root,
+      env: { ...rest, WF_ROOT: root, HOME: home, NEMIA_DAEMON_START: 'off', WF_VERIFY_REST: '1' },
+    };
+    return made;
+  }
 }
 
 /** `nemia <argv>` on `env`, waited on for its exit: its code, and what it printed on each stream. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<{ code: number | null; stdout: string; stderr: string }> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [BIN, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
@@ -40,7 +46,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<{ code:
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
+  }) satisfies Promise<{ code: number | null; stdout: string; stderr: string }>;
 }
 
 const GATED = { id: 'read-the-plan-first-local1', step: 'plan' };
@@ -49,7 +55,7 @@ const GATED = { id: 'read-the-plan-first-local1', step: 'plan' };
  * A run waiting on a person at its gate, written as `nemia start --gate plan` and the engine leave one: `plan → implement`, plan signed
  * off done, its task settled, and nothing after it filed.
  */
-function seedGated(root: string): void {
+function seedGated(root: string) {
   const at = new Date(Date.now() - 60_000).toISOString();
   const folder = path.join(root, 'workflow-gate');
   fs.mkdirSync(folder, { recursive: true });

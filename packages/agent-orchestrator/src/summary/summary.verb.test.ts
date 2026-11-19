@@ -57,7 +57,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 const AT = '2026-10-14T09:30:00.000Z';
 
 /** A team of two side-by-side steps, `build` given the agent `ada` from the team's agents and `notes` given none. */
-const team = (): string => {
+const team = () => {
   const root = scratch('wf-summary-team-');
   fs.mkdirSync(path.join(root, 'agents'));
   fs.writeFileSync(path.join(root, 'agents', 'ada.md'), '---\ndescription: Use this when a change is to be built.\n---\nBuild it.\n');
@@ -69,7 +69,7 @@ const team = (): string => {
 };
 
 /** The run started on `team`, from the card `card` where one is given, and advanced one pass, so both its steps are filed. */
-const started = async (card?: string): Promise<string> => {
+const started = async (card?: string) => {
   const repo = scratch('wf-summary-repo-');
   stand().world.repository(repo, {});
   const from = card === undefined ? {} : { from: { inbox: card } };
@@ -79,7 +79,7 @@ const started = async (card?: string): Promise<string> => {
 };
 
 /** The step `name` of the run `id`, as the whole list answers it. */
-const stepOf = async (id: string, name: string): Promise<RunSummary['steps'][number]> => {
+const stepOf = async (id: string, name: string) => {
   const list: RunSummary[] = await runWith(e(), RUNS.handler({}));
   const step = list.find((run) => run.id === id)?.steps.find((s) => s.name === name);
   assert.ok(step, `the run ${id} has a step ${name}`);
@@ -154,7 +154,7 @@ test('`cardRuns`: each run started from a card with its phase as the list judges
 test("a run's start and its queue time are each task's filing as its view says it (`State.filedAt`), on an engine whose feed holds no filing", async () => {
   const id = await started();
   rewriteRun(ROOT, { ...runRecord(ROOT, id), createdAt: '2026-10-14T08:00:00.000Z' });
-  const filedAt = async (step: string): Promise<string> => {
+  const filedAt = async (step: string) => {
     const at = (await RunsEffect.runPromise(e().view(`${id}-${step}`))).state.filedAt;
     assert.ok(at, `the stand-in filed ${step}, and its view says when`);
     return at;

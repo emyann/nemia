@@ -70,7 +70,7 @@ test("REFUSED to run unasked: a factory's level set, raised or its raise ended, 
 });
 
 /** Whether the rule `rule`, `Bash(<pattern>)`, reaches the shell line `line`: `<prefix>:*` a prefix, else a glob whose `*` is any text. */
-const reaches = (rule: string, line: string): boolean => {
+const reaches = (rule: string, line: string) => {
   const pattern = rule.slice('Bash('.length, -1);
   if (pattern.endsWith(':*')) return line === pattern.slice(0, -2) || line.startsWith(`${pattern.slice(0, -2)} `);
   const glob = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
@@ -78,7 +78,7 @@ const reaches = (rule: string, line: string): boolean => {
 };
 
 /** A line as an allow reads it: its leading assignments stripped, as Claude Code strips them before it matches an allow. */
-const unassigned = (line: string): string => line.replace(/^(\w+=\S*\s+)+/, '');
+const unassigned = (line: string) => line.replace(/^(\w+=\S*\s+)+/, '');
 
 test("REFUSED for an agent: a factory's definition written by hand is out of her reach, and she proposes it instead", () => {
   const fence = nemiaFence(COMMANDS);

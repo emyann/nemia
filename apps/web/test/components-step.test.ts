@@ -13,7 +13,7 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { coded, type Word } from './run-fixtures.ts';
+import { coded, type Word } from './run.fixture.ts';
 import './tsx.ts';
 import {
   at,
@@ -43,7 +43,7 @@ import {
   kitBoxes,
   kitButtons,
   kitRadios,
-} from './markup-fixtures.ts';
+} from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -53,21 +53,22 @@ const { afterEdges, readEdges, stepData, stepEdges } = await import('../src/comp
 type StepGraphFacts = import('../src/components/step/stepGraph.ts').StepGraphFacts;
 
 /** Of a run, exactly what its graph's edges are drawn from (`StepGraphFacts`): a test of `stepEdges` gives it no more. */
-const factsOf = (run: RunDetail): StepGraphFacts => ({
-  cancelledAt: run.cancelledAt,
-  holding: run.holding,
-  graph: run.graph,
-  steps: run.steps.map(({ name, phase, reason, on, via, note, roundDue, message }) => ({
-    name,
-    phase,
-    reason,
-    on,
-    via,
-    note,
-    roundDue,
-    message,
-  })),
-});
+const factsOf = (run: RunDetail) =>
+  ({
+    cancelledAt: run.cancelledAt,
+    holding: run.holding,
+    graph: run.graph,
+    steps: run.steps.map(({ name, phase, reason, on, via, note, roundDue, message }) => ({
+      name,
+      phase,
+      reason,
+      on,
+      via,
+      note,
+      roundDue,
+      message,
+    })),
+  }) satisfies StepGraphFacts;
 const { StateEdge } = await import('../src/components/step/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/step/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
@@ -106,13 +107,14 @@ const { FieldWidgetView } = await import('../src/components/field/widgets/FieldW
 const { stepPartOf } = await import('../src/lib/stepPart.ts');
 
 /** The run `run` with `step` in place of its step of that name, or its one step where it has none of that name. */
-const withStep = (run: RunDetail, step: RunDetail['steps'][number]): RunDetail => ({
-  ...run,
-  steps: run.steps.some((s) => s.name === step.name) ? run.steps.map((s) => (s.name === step.name ? step : s)) : [step],
-});
+const withStep = (run: RunDetail, step: RunDetail['steps'][number]) =>
+  ({
+    ...run,
+    steps: run.steps.some((s) => s.name === step.name) ? run.steps.map((s) => (s.name === step.name ? step : s)) : [step],
+  }) satisfies RunDetail;
 
 /** The detail of `step` of `run`, opened with every fold in it, as its part draws it. */
-async function detailOf(run: RunDetail, step: RunDetail['steps'][number] = run.steps[0]): Promise<string> {
+async function detailOf(run: RunDetail, step: RunDetail['steps'][number] = run.steps[0]) {
   const view = withStep(run, step);
   const { detail } = stepPartOf(view, step.name, new Date(at));
   assert.notEqual(detail, 'none', 'a step of the view has a detail');
@@ -121,12 +123,14 @@ async function detailOf(run: RunDetail, step: RunDetail['steps'][number] = run.s
 }
 
 /** The part of the step `name` of `run`, whole, as the bar, the ledger and the step's page draw it. */
-const partOf = (run: RunDetail, name: string = run.steps[0].name): Promise<string> =>
-  routedWith(createElement(StepPart, { view: run, step: name, size: 'L', now: new Date(at) }));
+const partOf = (run: RunDetail, name: string = run.steps[0].name) =>
+  routedWith(createElement(StepPart, { view: run, step: name, size: 'L', now: new Date(at) })) satisfies Promise<string>;
 
 /** The rows of a list of facts: each label and its value's text. */
-const rowsOf = (html: string): Array<[string, string]> =>
-  [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
+const rowsOf = (html: string) =>
+  [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]) satisfies Array<
+    [string, string]
+  >;
 const { raiseBody } = await import('../src/components/gate/Raise.tsx');
 const { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceTitle } =
   await import('../src/components/look/Trace.tsx');
@@ -134,14 +138,14 @@ const { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigge
 const exhaustedNote = 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round';
 
 /** The one element's `title`, unescaped as a browser reads it. */
-const titleOf = (html: string): string | undefined =>
+const titleOf = (html: string) =>
   /title="([^"]*)"/
     .exec(html)?.[1]
     ?.replaceAll('&quot;', '"')
     .replaceAll('&#x27;', "'")
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
-    .replaceAll('&amp;', '&');
+    .replaceAll('&amp;', '&') satisfies string | undefined;
 
 /** The codes of a loop out of rounds. */
 const ROUND = { phase: 'waiting', reason: 'AwaitingRound', on: null, via: null } as const;
@@ -216,7 +220,7 @@ test("a step's detail shows its note as `wf ls` prints it, and none for a step w
  * both read it — inside the provider its handles read. A server render of the whole canvas draws no node: React Flow puts
  * its nodes in its store in an effect.
  */
-function nodeMarkup(run: RunDetail): string {
+function nodeMarkup(run: RunDetail) {
   const props = {
     id: 'review',
     type: 'step' as const,
@@ -283,25 +287,28 @@ test('a step a person has sent round or asked to retry is no gate from the momen
  * `reviewDue` says. Neither step has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a
  * step's spec says.
  */
-function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
+function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false) {
   const base = runWith(null);
   const step = { ...base.steps[0], ...coded('unverified · done'), spec: null };
-  return {
-    ...base,
-    status: 'running',
-    waitingOnYou: [],
-    graph: {
-      roots: ['implement'],
-      edges: [
-        { from: 'implement', to: 'review', kind: 'after' },
-        { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+  {
+    const made: RunDetail = {
+      ...base,
+      status: 'running',
+      waitingOnYou: [],
+      graph: {
+        roots: ['implement'],
+        edges: [
+          { from: 'implement', to: 'review', kind: 'after' },
+          { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+        ],
+      },
+      steps: [
+        { ...step, name: 'implement', note: notes.implement },
+        { ...step, name: 'review', note: notes.review, roundDue: reviewDue },
       ],
-    },
-    steps: [
-      { ...step, name: 'implement', note: notes.implement },
-      { ...step, name: 'review', note: notes.review, roundDue: reviewDue },
-    ],
-  };
+    };
+    return made;
+  }
 }
 
 test("the loop's edge goes back to its target, whatever the steps' specs lack", () => {
@@ -363,7 +370,7 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
  * While `render` runs, a browser whose person has asked for reduced motion, or has not — or, for `undefined`, no browser to
  * ask: `matchMedia`, which is all `useReducedMotion` reads.
  */
-function withMotion<T>(reduce: boolean | undefined, render: () => T): T {
+function withMotion<T>(reduce: boolean | undefined, render: () => T) {
   const before = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
   const matchMedia = (media: string) => ({
     media,
@@ -371,12 +378,16 @@ function withMotion<T>(reduce: boolean | undefined, render: () => T): T {
     addEventListener() {},
     removeEventListener() {},
   });
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
   if (reduce === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
   else Object.defineProperty(globalThis, 'matchMedia', { value: matchMedia, configurable: true, writable: true });
   try {
-    return render();
+    return render() satisfies T;
   } finally {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     if (before) Object.defineProperty(globalThis, 'matchMedia', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     else Reflect.deleteProperty(globalThis, 'matchMedia');
   }
 }
@@ -387,7 +398,7 @@ const SIDES = { sourceX: 336, sourceY: 60, targetX: 412, targetY: 60, sourcePosi
 const UNDER = { sourceX: 524, sourceY: 110, targetX: 112, targetY: 110, sourcePosition: 'bottom', targetPosition: 'bottom' };
 
 /** An edge `stepEdges` made, as React Flow hands it to `StateEdge` — its arrow a url by then — drawn inside an svg. */
-function edgeMarkup(edge: StateFlowEdge): string {
+function edgeMarkup(edge: StateFlowEdge) {
   const props = { ...edge, ...(edge.data?.loop ? UNDER : SIDES), markerEnd: "url('#arrow')", deletable: false } as unknown as Parameters<
     typeof StateEdge
   >[0];
@@ -395,11 +406,11 @@ function edgeMarkup(edge: StateFlowEdge): string {
 }
 
 /** The travelling dots' `animateMotion`s in some markup, and the edge's own path. */
-const travelling = (html: string): string[] => [...html.matchAll(/<animateMotion [^>]*>/g)].map((m) => m[0]);
+const travelling = (html: string) => [...html.matchAll(/<animateMotion [^>]*>/g)].map((m) => m[0]) satisfies string[];
 
-const pathOf = (html: string): string | undefined => /<path [^>]*\bd="([^"]+)"[^>]*class="react-flow__edge-path"/.exec(html)?.[1];
+const pathOf = (html: string) => /<path [^>]*\bd="([^"]+)"[^>]*class="react-flow__edge-path"/.exec(html)?.[1] satisfies string | undefined;
 
-const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend)));
+const legendMarkup = () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend)));
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
   const [, back] = stepEdges(
@@ -431,16 +442,16 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
 });
 
 /** A run of steps, each its name, the word `wf ls` gives it, and the step it comes after, if any: the roots are the rest. */
-function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunDetail {
+function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>) {
   const base = runWith(null);
-  const edges = steps.flatMap(([name, , from]): GraphEdge[] => (from ? [{ from, to: name, kind: 'after' }] : []));
+  const edges = steps.flatMap(([name, , from]) => (from ? [{ from, to: name, kind: 'after' }] : []) satisfies GraphEdge[]);
   return {
     ...base,
     status: 'running',
     waitingOnYou: [],
     graph: { roots: steps.filter(([, , from]) => !from).map(([name]) => name), edges },
     steps: steps.map(([name, status]) => ({ ...base.steps[0], name, ...coded(status), note: null })),
-  };
+  } satisfies RunDetail;
 }
 
 test('a running edge carries a dot travelling its own path; an edge done, to come, into a human gate or into a refused check does not', () => {
@@ -497,7 +508,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * The Factory's fake run as `GET /api/runs` lists it: implement → review → respond, implement → respond, tokens → theme; review at work,
  * theme waiting at its gate, an ending, on you.
  */
-function summaryRun(): RunView {
+function summaryRun() {
   const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null };
   const step = (name: string, status: Word, extra = {}) => ({
     name,
@@ -508,7 +519,7 @@ function summaryRun(): RunView {
     ...none,
     ...extra,
   });
-  const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
+  const after = (from: string, to: string) => ({ from, to, kind: 'after' }) satisfies GraphEdge;
   return {
     id: 'r-1',
     repo: '/code/app',
@@ -547,7 +558,7 @@ function summaryRun(): RunView {
 /**
  * The run's panel, the floor's card opened (`Run` at xl), each node of its graph a button that shows its step, `selected` the one shown.
  */
-const panelMarkup = async (run: RunView, selected: string | null = null): Promise<string> => {
+const panelMarkup = async (run: RunView, selected: string | null = null) => {
   const { Run } = await import('../src/components/look/Run.tsx');
   return routedWith(
     createElement(Run, {
@@ -888,11 +899,7 @@ test('the message being written is drawn after the turns, until the whole of it 
 });
 
 /** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode — on the builder, with `build`. */
-async function specMarkup(
-  spec: WorkflowStepSpec,
-  build?: { unsaved: boolean; refused: boolean; selected: boolean },
-  inspected?: boolean,
-): Promise<string> {
+async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; refused: boolean; selected: boolean }, inspected?: boolean) {
   const { SpecNode } = await import('../src/components/step/StepNode.tsx');
   const props = {
     id: 'review',
@@ -1671,18 +1678,19 @@ test("a step filed bridged has a reach row: its session's web link to open in a 
     loop: null,
     rounds: null,
   };
-  const filed = (bridge: StepFiled['bridge']): StepFiled => ({
-    model: null,
-    askedModel: null,
-    effort: null,
-    contextTokens: null,
-    fence: null,
-    runsIn: null,
-    tools: null,
-    deadlineSeconds: null,
-    remote: null,
-    bridge,
-  });
+  const filed = (bridge: StepFiled['bridge']) =>
+    ({
+      model: null,
+      askedModel: null,
+      effort: null,
+      contextTokens: null,
+      fence: null,
+      runsIn: null,
+      tools: null,
+      deadlineSeconds: null,
+      remote: null,
+      bridge,
+    }) satisfies StepFiled;
   const html = (bridge: StepFiled['bridge']) => renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed(bridge)) }));
   const link = 'https://example.test/code/session_01StepLink';
 
@@ -1795,7 +1803,7 @@ test('the part says `your answer` above the closeout of the try shown, where a p
 });
 
 test('a prose field is drawn as markdown; a number as it is', () => {
-  const field = (widget: 'prose' | 'number', value: unknown): string =>
+  const field = (widget: 'prose' | 'number', value: unknown) =>
     renderToStaticMarkup(createElement(FieldWidgetView, { name: 'next', widget, value, given: true }));
   assert.match(
     field('prose', 'Run `npm test`.'),
@@ -1902,10 +1910,10 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 });
 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
-const waitingOnRuns = (runs: string[]): RunView['waiting'] =>
-  runs.length
+const waitingOnRuns = (runs: string[]) =>
+  (runs.length
     ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false }
-    : null;
+    : null) satisfies RunView['waiting'];
 
 test('the edges between cards are drawn only for live waits: dashed, out of one handle into the other, never moving — and a line of what the focused card reads, faint and dotted, with no arrow', () => {
   const card = (id: string, waits: string[], context: string[] = []) => ({ id, waiting: waitingOnRuns(waits), context });
@@ -1954,14 +1962,9 @@ const priced = (spent: number | null, cap: number | null, over = false) => ({
 });
 
 /** `run`, its one step priced as `cost` says, with the word and who waits on it. */
-const pricedRun = (
-  status: Word,
-  cost: ReturnType<typeof priced>,
-  waitingOnYou: string[] = [],
-  cancelledAt: string | null = null,
-): RunDetail => {
+const pricedRun = (status: Word, cost: ReturnType<typeof priced>, waitingOnYou: string[] = [], cancelledAt: string | null = null) => {
   const run = runOf(status, { waitingOnYou, cancelledAt });
-  return { ...run, steps: [{ ...run.steps[0], ...cost }] };
+  return { ...run, steps: [{ ...run.steps[0], ...cost }] } satisfies RunDetail;
 };
 
 test("a step's node says what its tries cost, of its cap where it has one — in money's amber once they cost it or more — and a step past its budget is a human gate", () => {
@@ -2187,34 +2190,31 @@ const READ_ONLY: ReadOnlyCommands = {
 };
 
 /** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not — and what denies what asks there: dontAsk, a job, or nothing. */
-const allowedTo = (dontAsk: boolean, askDenier: StepReach['allowed']['askDenier'] = dontAsk ? 'dontAsk' : null): StepReach['allowed'] => ({
-  rules: ['Bash(npm test)'],
-  takenBack: [],
-  asked: [],
-  unused: [],
-  bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }],
-  exceptions: [],
-  dontAsk,
-  askDenier,
-  why: null,
-});
+const allowedTo = (dontAsk: boolean, askDenier: StepReach['allowed']['askDenier'] = dontAsk ? 'dontAsk' : null) =>
+  ({
+    rules: ['Bash(npm test)'],
+    takenBack: [],
+    asked: [],
+    unused: [],
+    bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }],
+    exceptions: [],
+    dontAsk,
+    askDenier,
+    why: null,
+  }) satisfies StepReach['allowed'];
 
 /**
  * The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api
  * gives as the rule that denies it too.
  */
-const readOnlyReach = (
-  denied: Record<string, string> = {},
-  asks: Record<string, string> = {},
-  dontAsk = false,
-): NonNullable<StepReach['readOnly']> =>
+const readOnlyReach = (denied: Record<string, string> = {}, asks: Record<string, string> = {}, dontAsk = false) =>
   [
     ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
     ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
   ].map((c) => {
     const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command], source: '.claude/settings.json' } : null);
     return { ...c, denied: rule(denied) ?? (dontAsk ? rule(asks) : null), asks: rule(asks) };
-  });
+  }) satisfies NonNullable<StepReach['readOnly']>;
 
 const allowedMarkup = (allowed: StepReach['allowed'], readOnly: StepReach['readOnly']) =>
   renderToStaticMarkup(createElement(AllowedReach, { allowed, readOnly, commands: READ_ONLY }));
@@ -2333,23 +2333,24 @@ test('REFUSED: a read-only command an ask rule covers is drawn asking, with the 
 
 test('REFUSED: an allow an ask rule takes back is drawn apart, with the rule — struck in dontAsk — and a narrower ask rule is said beside the allow it falls in', () => {
   const settings = (rule: string) => ({ rule, source: '.claude/settings.json' });
-  const allowed = (dontAsk: boolean): StepReach['allowed'] => ({
-    ...allowedTo(dontAsk),
-    rules: ['Bash(npm test)', 'Bash(npx turbo run test:*)'],
-    asked: [{ rule: 'Bash(git diff:*)', by: settings('Bash(git:*)') }],
-    bash: [
-      { rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] },
-      {
-        rule: 'Bash(npx turbo run test:*)',
-        command: 'npx turbo run test:*',
-        except: ['Bash(npx turbo run test e2e)'],
-        asks: ['Bash(npx turbo run test build)'],
-      },
-    ],
-    exceptions: [
-      { rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] },
-    ],
-  });
+  const allowed = (dontAsk: boolean) =>
+    ({
+      ...allowedTo(dontAsk),
+      rules: ['Bash(npm test)', 'Bash(npx turbo run test:*)'],
+      asked: [{ rule: 'Bash(git diff:*)', by: settings('Bash(git:*)') }],
+      bash: [
+        { rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] },
+        {
+          rule: 'Bash(npx turbo run test:*)',
+          command: 'npx turbo run test:*',
+          except: ['Bash(npx turbo run test e2e)'],
+          asks: ['Bash(npx turbo run test build)'],
+        },
+      ],
+      exceptions: [
+        { rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] },
+      ],
+    }) satisfies StepReach['allowed'];
   const shut = allowedMarkup(allowed(true), readOnlyReach());
   assert.ok(
     textsOf(shut).includes('Taken back by an ask rule, which beats an allow, and dontAsk denies what asks:'),
@@ -2445,7 +2446,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
 });
 
 /** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */
-function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunDetail {
+function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval') {
   const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
   const [step] = run.steps;
   return {
@@ -2458,13 +2459,13 @@ function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approv
         tries: [{ ...step.tries[0], closeout }],
       },
     ],
-  };
+  } satisfies RunDetail;
 }
 
 /** `gatedRun`, its step's gate awaiting the approval: what a step's part asks of a person at its gate. */
-const atItsGate = (closeout: StepCloseout): RunDetail => {
+const atItsGate = (closeout: StepCloseout) => {
   const run = gatedRun(closeout);
-  return { ...run, steps: [{ ...run.steps[0], gate: { awaiting: true, approval: null } }] };
+  return { ...run, steps: [{ ...run.steps[0], gate: { awaiting: true, approval: null } }] } satisfies RunDetail;
 };
 
 test('a closeout whose body opens with its summary draws the body alone, its line said once: a heading, and a cut line up to its ellipsis', () => {
@@ -2669,13 +2670,13 @@ test("a workflow's step is marked as inspected only while the bar shows it, and 
 });
 
 /** The bar's body for the step `step` of `listing`, as the bar for a workflow's step draws it. */
-async function specBodyMarkup(listing: import('../src/lib/api/workflows.ts').WorkflowListing, step: string): Promise<string> {
+async function specBodyMarkup(listing: import('../src/lib/api/workflows.ts').WorkflowListing, step: string) {
   const { SpecBody } = await import('../src/components/step/SpecBar.tsx');
   return renderToStaticMarkup(createElement(SpecBody, { listing, step }));
 }
 
 test("the bar for a workflow's step says what it runs on, its keys as its node lists them, and the steps it waits on in the workflow's order", async () => {
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const { specLines } = await import('../src/components/step/StepNode.tsx');
   const step = (name: string, extra: Partial<WorkflowStepSpec> = {}) => ({
     name,
@@ -2746,12 +2747,12 @@ const LAYERS: StepLayers = {
 };
 
 /** `Told` drawn as a server draws it, the fold open as a person opens it. */
-const toldMarkup = (props: { told: string | null; layers: StepLayers | null; filed: boolean }): string =>
+const toldMarkup = (props: { told: string | null; layers: StepLayers | null; filed: boolean }) =>
   renderToStaticMarkup(createElement(Told, props));
 
 test('what a step was told is drawn by layer, in the order it reads them, each skill under the layer that gives it, and the brief whole never', () => {
   const html = toldMarkup({ told: 'Write the note.\n\n## What was asked for\n\nA note.', layers: LAYERS, filed: true });
-  const at = (needle: string): number => {
+  const at = (needle: string) => {
     const i = html.indexOf(needle);
     assert.ok(i >= 0, `${needle} in ${html}`);
     return i;
@@ -2774,7 +2775,7 @@ test('what a step was told is drawn by layer, in the order it reads them, each s
 
 test("the factory's rules are a layer of their own, between your custom instructions and the step's policy, drawn only where the run froze some", () => {
   const html = toldMarkup({ told: null, layers: { ...LAYERS, factory: 'Never push on a **Friday**.' }, filed: true });
-  const at = (needle: string): number => {
+  const at = (needle: string) => {
     const i = html.indexOf(needle);
     assert.ok(i >= 0, `${needle} in ${html}`);
     return i;
@@ -2798,7 +2799,7 @@ test("the factory's rules are a layer of their own, between your custom instruct
 
 test("the folder's files are a layer of their own, third, numbered as the session is told them, and drawn only where the step reads a folder", () => {
   const html = toldMarkup({ told: null, layers: { ...LAYERS, factory: 'Never push on a Friday.' }, filed: true });
-  const at = (needle: string): number => {
+  const at = (needle: string) => {
     const i = html.indexOf(needle);
     assert.ok(i >= 0, `${needle} in ${html}`);
     return i;
@@ -2874,11 +2875,11 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
 });
 
 /** Each heading's level, in the order the markup draws them. */
-const headingLevels = (html: string): number[] => [...html.matchAll(/<h([1-6])[\s>]/g)].map(([, level]) => Number(level));
+const headingLevels = (html: string) => [...html.matchAll(/<h([1-6])[\s>]/g)].map(([, level]) => Number(level)) satisfies number[];
 
 /** Where a heading goes more than one level deeper than the one before it: none, in an outline kept in order. */
-const skipped = (levels: number[]): string[] =>
-  levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : []));
+const skipped = (levels: number[]) =>
+  levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : [])) satisfies string[];
 
 /** Layers whose words write their headings at every depth a step's file does: `##`, `###`, and a run handed in a `## From run` block. */
 const HEADED: StepLayers = {
@@ -2911,7 +2912,7 @@ test('what a step was told keeps its headings in order under the heading it sits
 
 /** A step of yours, `w/review`, read in the factory `hiring`, which hires `writer` into it: what its page draws. */
 const hiredPage = async (extra: Record<string, unknown> = {}) => {
-  const { stepPage } = await import('./library-fixtures.ts');
+  const { stepPage } = await import('./library.fixture.ts');
   return stepPage({
     workflow: 'w',
     from: 'user',
@@ -2939,7 +2940,7 @@ test("on a step's page, a skill named with its folder is drawn as written, the r
     ],
   });
   const html = await routedWith(createElement(StepTold, { page, place: { factory: 'hiring' } }));
-  const chip = (name: string): string =>
+  const chip = (name: string) =>
     new RegExp(`data-skill="${name}"[^>]*>[^]*?</span>(?=\\s*(<span[^>]*data-skill=|</))`).exec(html)?.[0] ?? '';
   assert.match(chip('alpha'), /<a[^>]*href="\/agents\/skills\/user\/alpha"/, 'one with a page stays linked');
   const folder = chip('apps/site:set-type');
@@ -2959,13 +2960,13 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   assert.match(html, /<details open=""[^>]*data-will-be-told[^>]*><summary[^>]*>What it will be told<\/summary>/);
   assert.match(html, /data-read-now[^>]*>Read now from the files, and frozen when a run starts/);
   assert.match(html, /<details data-instructions-fold="true">[^]*You are the writer\./, "the agent's words folded, closed");
-  const home = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
+  const home = (name: string) => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
   assert.match(home('instructions'), /href="\/agents\/user\/writer"/);
   assert.match(home('custom'), /href="\/agents\/user\/writer#custom-instructions"/);
   const theirs = await routedWith(
     createElement(StepTold, { page: { ...(await hiredPage()), from: 'repo' }, place: { factory: 'hiring' } }),
   );
-  const theirHome = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
+  const theirHome = (name: string) => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
   assert.match(
     theirHome('custom'),
     /href="\/factories\/hiring\/agents\/writer\?from=repo#custom-instructions"/,
@@ -3051,7 +3052,7 @@ const hireOn = async (
   page: Record<string, unknown> | null,
   where: 'page' | 'row' = 'page',
   place: { factory?: string } = { factory: 'hiring' },
-): Promise<string> => {
+) => {
   const { StepHire } = await import('../src/components/step/StepHire.tsx');
   const { stepQuery } = await import('../src/lib/api/workflows.ts');
   const read = await hiredPage(page ?? {});
@@ -3128,11 +3129,7 @@ test("hiring into one of the repository's steps: no New agent; its page says one
 });
 
 /** `element` drawn as the root route's page at the address `at`, loaded, so it reads the address, with its queries already answered. */
-async function routedAt(
-  at: string,
-  element: ReturnType<typeof createElement>,
-  data: Array<[readonly unknown[], unknown]>,
-): Promise<string> {
+async function routedAt(at: string, element: ReturnType<typeof createElement>, data: Array<[readonly unknown[], unknown]>) {
   const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import('@tanstack/react-router');
   const client = new QueryClient();
   for (const [key, value] of data) client.setQueryData(key, value);
@@ -3144,7 +3141,7 @@ async function routedAt(
 
 test("REFUSED: the step's bar reads in the address's factory — its folder there, never the list read with none; and a factory that lists nowhere is said in the bar", async () => {
   const { SpecBar } = await import('../src/components/step/SpecBar.tsx');
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null, mcp: [] });
   const listing = (steps: string[]) => workflow({ name: 'dev', from: 'repo', steps: steps.map(step), error: null });
   const bar = createElement(SpecBar, { from: 'repo', workflow: 'dev', step: 'draft' });
@@ -3253,7 +3250,7 @@ test("an agent's custom instructions say a run keeps the words it froze; the sto
 });
 
 /** `StepPolicy` drawn as a server draws it. */
-const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
+const policyMarkup = (layers: StepLayers) => renderToStaticMarkup(createElement(StepPolicy, { layers }));
 
 /** The layers of `LAYERS`, its step tightening the agent's fence with a deny of its own. */
 const FENCED: StepLayers = { ...LAYERS, fence: [{ key: 'disallowedTools', value: 'Bash(git push:*)' }] };
@@ -3274,7 +3271,7 @@ test("each layer is drawn as the markdown it is: its source's line breaks joined
     task: 'A line\nwrapped.',
   };
   const html = toldMarkup({ told: null, layers, filed: true });
-  const layer = (name: string): string => new RegExp(`<section data-layer="${name}"[^]*?</section>`).exec(html)![0];
+  const layer = (name: string) => new RegExp(`<section data-layer="${name}"[^]*?</section>`).exec(html)![0];
   assert.match(layer('policy'), /<strong>this<\/strong>[^]*<ul[^>]*>\s*<li[^>]*>one<\/li>/);
   assert.doesNotMatch(layer('policy'), /\*\*/);
   assert.match(layer('task'), /<div data-markdown="true"[^>]*><p[^>]*>A line\nwrapped\.<\/p><\/div>/, 'one paragraph, its break a space');
@@ -3313,8 +3310,7 @@ test("at a gate, the step's policy is drawn open: its words, the skills it adds,
 });
 
 /** `StepBody` drawn as a server draws it. */
-const bodyMarkup = (body: string | null, layers: StepLayers | null): string =>
-  renderToStaticMarkup(createElement(StepBody, { body, layers }));
+const bodyMarkup = (body: string | null, layers: StepLayers | null) => renderToStaticMarkup(createElement(StepBody, { body, layers }));
 
 test("REFUSED: a step whose run froze its layers draws no body above its fold, which says each of the body's words by layer", () => {
   assert.equal(bodyMarkup('You are the writer.\n\nBe terse.\n\nWrite the note.', LAYERS), '', "an agent's step");
@@ -3328,9 +3324,9 @@ test('a step whose run froze no layers draws its body, all the record says of it
 });
 
 /** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */
-async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer'): Promise<string> {
+async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer') {
   const { StepForm } = await import('../src/components/step/StepForm.tsx');
-  const { keyForm, stepSpec } = await import('./library-fixtures.ts');
+  const { keyForm, stepSpec } = await import('./library.fixture.ts');
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const form = keyForm({
@@ -3363,7 +3359,7 @@ async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 
 
 test("a step with an agent is read by layer on the builder: its agent, the agent's instructions folded, your custom instructions, then the step's policy holding its words and its fence keys, then its wiring", async () => {
   const html = await stepFormMarkup(LAYERS);
-  const at = (mark: string): number => {
+  const at = (mark: string) => {
     const index = html.indexOf(mark);
     assert.ok(index >= 0, `${mark} in ${html}`);
     return index;
@@ -3417,7 +3413,7 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
 
 test("a workflow's steps, a row each: an agent's step by its policy, its agent linked and its skills; one without by its body and its own skills; each linked to its page", async () => {
   const { StepRows } = await import('../src/components/step/StepRows.tsx');
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const layers = {
     agent: 'ada',
     instructions: 'Build what was asked.',

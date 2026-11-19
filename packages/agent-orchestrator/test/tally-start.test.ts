@@ -20,7 +20,7 @@ process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
 
 /** A folder of one step `triage`, closing out the issues it sorted, that declares `tally`. */
-function triage(name: string, tally: string): string {
+function triage(name: string, tally: string) {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
@@ -45,7 +45,7 @@ function triage(name: string, tally: string): string {
 }
 
 /** `nemia start` of `dir`, on the store's own folder, as the api runs it (`typed`): the run's id. */
-async function started(dir: string): Promise<string> {
+async function started(dir: string) {
   const { id } = (await typed(['start', 'sort the issues', '--workflows', dir, '--repo', ROOT], undefined, undefined, undefined, ENV)) as {
     id: string;
   };

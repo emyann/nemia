@@ -108,7 +108,7 @@ fs.writeFileSync(
   { mode: 0o755 },
 );
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT_ASKED, 'utf8').trim().split('\n') : []);
+const gitAsked = () => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT_ASKED, 'utf8').trim().split('\n') : []);
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
@@ -119,7 +119,7 @@ const forgetOffered = (id: string) => [
   { label: 'forget it', command: `nemia rm ${id}`, said: 'forgets the run with its folders and files', step: null },
 ];
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>) => Effect.runSync(storeGiven(ROOT, ENV)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
@@ -197,7 +197,7 @@ const board = () => {
   return { e, tasks, settle };
 };
 
-const rejection = async (fn: () => Promise<unknown>): Promise<{ message: string; exitCode: unknown }> => {
+const rejection = async (fn: () => Promise<unknown>) => {
   try {
     await fn();
   } catch (err) {
@@ -433,7 +433,7 @@ test("a queued old card of a folder team, started by a tick: its retired repo: i
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
-    const card = (name: string, lines: string): string => {
+    const card = (name: string, lines: string) => {
       const file = path.join(ROOT, 'inbox', `${name}.md`);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `---\nworkflow: note\n${lines}---\na note on tides\n`);
@@ -467,7 +467,7 @@ test("a queued old card of a folder team, started by a tick: its retired repo: i
  * a key, but those in a folder the step is filed with (`mounted`). A folder step is fenced to its own directory (`dontAsk`) and reads a
  * mounted folder alone outside it, so each of them has to be inside it and on disk.
  */
-const pathsNamed = (brief: string, mounted: readonly string[] = []): string[] =>
+const pathsNamed = (brief: string, mounted: readonly string[] = []) =>
   [...brief.matchAll(/`([^`\n]+)`/g)]
     .map((m) => m[1])
     .filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'))

@@ -39,13 +39,19 @@ const SELF = path
   .join('/');
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
-type Config = { jsPlugins: { name: string; specifier: string }[]; overrides: Block[]; ignorePatterns?: string[]; [key: string]: unknown };
+type Config = {
+  jsPlugins: { name: string; specifier: string }[];
+  extends?: string[];
+  overrides: Block[];
+  ignorePatterns?: string[];
+  [key: string]: unknown;
+};
 
 /**
  * Whether the config's ignore pattern `glob` skips `file`, a path from the root: as a glob from the root, a folder and all under it, and
  * a pattern with no `/` at any depth, as both tools read a `.gitignore`'s.
  */
-const skips = (file: string, glob: string): boolean =>
+const skips = (file: string, glob: string) =>
   path.matchesGlob(file, glob) || path.matchesGlob(file, `${glob}/**`) || (!glob.includes('/') && path.matchesGlob(file, `**/${glob}`));
 
 /** The files the linter reads: code, in each spelling of JavaScript and TypeScript. The formatter reads every kind not skipped. */
@@ -60,34 +66,34 @@ const unskipped = (
   config: Pick<Config, 'ignorePatterns'>,
   reads: (file: string) => boolean = () => true,
   root = REPO,
-): string[] => {
+) => {
   const read = listed.filter(reads);
   const marked = notOurs(read, root);
   return read.filter((file) => marked.has(file) && !(config.ignorePatterns ?? []).some((glob) => skips(file, glob)));
 };
 
 /** The ignore patterns of `config` that skip a file of `listed` that is ours at `root`, in the order the config lists them. */
-const strayIgnores = (listed: readonly string[], config: Pick<Config, 'ignorePatterns'>, root = REPO): string[] => {
+const strayIgnores = (listed: readonly string[], config: Pick<Config, 'ignorePatterns'>, root = REPO) => {
   const marked = notOurs(listed, root);
   const own = listed.filter((file) => !marked.has(file));
   return (config.ignorePatterns ?? []).filter((glob) => own.some((file) => skips(file, glob)));
 };
 
 /** `.oxlintrc.json`, or the config `name` names, read as both tools read it: JSON with comments. */
-function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'), name = '.oxlintrc.json'): Config {
+function readConfig(text = fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'), name = '.oxlintrc.json') {
   const parsed = ts.parseConfigFileTextToJson(name, text);
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Config;
 }
 
 /** The override blocks that carry the comment guards, in the order the config lists them. */
-const guardBlocks = (config: Config): Block[] => config.overrides.filter((block) => 'comments/no-code-comments' in block.rules);
+const guardBlocks = (config: Config) => config.overrides.filter((block) => 'comments/no-code-comments' in block.rules);
 
 /** The package a block covers, from its first `files` glob. */
-const packageOf = (block: Block): string => block.files[0].replace(/\/\*\*$/, '');
+const packageOf = (block: Block) => block.files[0].replace(/\/\*\*$/, '');
 
 /** The package of each guard block that has an `"excludeFiles"`, in the order the config lists them: each takes files back out. */
-const excludedBlocks = (config: Config): string[] =>
+const excludedBlocks = (config: Config) =>
   guardBlocks(config)
     .filter((block) => block.excludeFiles !== undefined)
     .map(packageOf);
@@ -96,28 +102,28 @@ const excludedBlocks = (config: Config): string[] =>
 const BESIDE = ['lint/**', 'tools/**'];
 
 /** Whether a workspace, from the root, lies under a folder beside the packages, whose glob guards it: `tools/guards` does. */
-const besideHolds = (dir: string): boolean => BESIDE.some((glob) => path.matchesGlob(`${dir}/package.json`, glob));
+const besideHolds = (dir: string) => BESIDE.some((glob) => path.matchesGlob(`${dir}/package.json`, glob));
 
 /** Every workspace package with a guard block of its own: each workspace the root package.json names but one `BESIDE` holds, sorted. */
-const workspacePackages = (): string[] =>
+const workspacePackages = () =>
   workspaces()
     .filter((dir) => !besideHolds(dir))
     .sort();
 
 /** A jsPlugins specifier made absolute, as a config in another folder needs it: a path from the root, or a package the root installs. */
-const resolvePlugin = (specifier: string): string =>
+const resolvePlugin = (specifier: string) =>
   specifier.startsWith('.') ? path.join(ROOT, specifier) : createRequire(path.join(ROOT, 'package.json')).resolve(specifier);
 
 type Diagnostic = { file: string; line: number; rule: string };
 
 /** A rule as the config names it, from the code oxlint reports: `comments(no-code-comments)` or `eslint(no-inline-comments)`. */
-const ruleOf = (code: string): string => code.replace(/^eslint\((.*)\)$/, '$1').replace(/^(\w[\w-]*)\((.*)\)$/, '$1/$2');
+const ruleOf = (code: string) => code.replace(/^eslint\((.*)\)$/, '$1').replace(/^(\w[\w-]*)\((.*)\)$/, '$1/$2');
 
 /**
  * Oxlint run on `fixtures`, each written under `on/`, with the repository's config and its first guard block, for `on/**`. Type-aware
  * linting is left out: a fixture has no tsconfig.
  */
-function lint(fixtures: Record<string, string>): Diagnostic[] {
+function lint(fixtures: Record<string, string>) {
   const dir = scratch('comments-');
   const config = readConfig();
   const block = guardBlocks(config)[0];
@@ -125,6 +131,7 @@ function lint(fixtures: Record<string, string>): Diagnostic[] {
   const used = {
     ...rest,
     jsPlugins: config.jsPlugins.map((entry) => ({ ...entry, specifier: resolvePlugin(entry.specifier) })),
+    extends: config.extends?.map((entry) => path.join(ROOT, entry)),
     overrides: [{ ...block, files: ['on/**'] }],
   };
   fs.writeFileSync(path.join(dir, '.oxlintrc.json'), JSON.stringify(used));
@@ -138,7 +145,7 @@ function lint(fixtures: Record<string, string>): Diagnostic[] {
 }
 
 /** The 1-based line of `text` that holds the needle it is given, which must be on exactly one line. */
-function lineOf(text: string, needle: string): number {
+function lineOf(text: string, needle: string) {
   const lines = text.split('\n').flatMap((line, i) => (line.includes(needle) ? [i + 1] : []));
   assert.equal(lines.length, 1, `${needle} is on ${lines.length} lines of the fixture`);
   return lines[0];
@@ -259,7 +266,7 @@ const INLINE = [
 ].join('\n');
 
 /** A line `width` code points wide: `head`, then as many `x` as it takes, then `tail`. */
-const widened = (head: string, tail: string, width: number): string => `${head}${'x'.repeat(width - head.length - tail.length)}${tail}`;
+const widened = (head: string, tail: string, width: number) => `${head}${'x'.repeat(width - head.length - tail.length)}${tail}`;
 
 const WIDTH = [
   widened('/** a one-line JSDoc ', ' */', COMMENT_WIDTH + 1),
@@ -296,10 +303,10 @@ const FIXTURES: Record<string, string> = {
 
 let linted: Diagnostic[] | undefined;
 /** One oxlint run over every fixture, shared by the tests that read it. */
-const fixtureRun = (): Diagnostic[] => (linted ??= lint(FIXTURES));
+const fixtureRun = () => (linted ??= lint(FIXTURES));
 
 /** The guard rules, each with the lines it refused in `file` under `on/`, sorted. */
-function refusals(file: string): Record<string, number[]> {
+function refusals(file: string) {
   const rules = new Set(Object.keys(guardBlocks(readConfig())[0].rules));
   const out: Record<string, number[]> = {};
   for (const d of fixtureRun().filter((d) => d.file === `on/${file}` && rules.has(d.rule))) (out[d.rule] ??= []).push(d.line);
@@ -399,7 +406,7 @@ test("the plugin's width is oxfmt's print width", () => {
 });
 
 /** Where the guard blocks do not cover the folders beside the packages in one block, after its package's glob, as the fix to make. */
-function besideUnguarded(blocks: Block[]): string[] {
+function besideUnguarded(blocks: Block[]) {
   const holding = blocks.filter((block) => BESIDE.some((glob) => block.files.includes(glob)));
   if (holding.length !== 1)
     return [`${BESIDE.join(' and ')} are in ${holding.length} guard blocks: list them all in one, after its package's glob`];
@@ -444,7 +451,7 @@ test('REFUSED: a guard block with an excludeFiles is found', () => {
 });
 
 /** `.oxfmtrc.json`, read as oxfmt reads it. */
-const formatConfig = (): Config => readConfig(fs.readFileSync(path.join(ROOT, '.oxfmtrc.json'), 'utf8'), '.oxfmtrc.json');
+const formatConfig = () => readConfig(fs.readFileSync(path.join(ROOT, '.oxfmtrc.json'), 'utf8'), '.oxfmtrc.json');
 
 test('the linter and the formatter skip each file .gitattributes marks not ours, and the linter no file of ours', () => {
   const listed = files();
@@ -498,7 +505,7 @@ test('a file of ours beside the vendored folders is ours, and a file in them is 
  * Every source file of ours git lists under each workspace, lint/ and tools/, tracked or not yet added, that is on disk, from the root:
  * nothing `.gitattributes` marks vendored or generated.
  */
-const sourceFiles = (): string[] => {
+const sourceFiles = () => {
   const dirs = [...workspaces(), 'lint', 'tools'];
   return files().filter(
     (file) => /\.tsx?$/.test(file) && dirs.some((dir) => file.startsWith(`${dir}/`)) && ours(file) && fs.existsSync(path.join(ROOT, file)),
@@ -506,16 +513,16 @@ const sourceFiles = (): string[] => {
 };
 
 /** `text` parsed as TypeScript, or as TSX where the file name says so. */
-const parse = (file: string, text: string): ts.SourceFile =>
+const parse = (file: string, text: string) =>
   ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 
 type Found = { line: number; text: string };
 
 /** Every comment of a file, each once: the leading and trailing comments of every node and token of its syntax tree. */
-const commentsOf = (file: string, text: string): Found[] => commentsIn(parse(file, text), text);
+const commentsOf = (file: string, text: string) => commentsIn(parse(file, text), text);
 
 /** Every comment of a parsed file, as `commentsOf` reads them. */
-function commentsIn(source: ts.SourceFile, text: string): Found[] {
+function commentsIn(source: ts.SourceFile, text: string) {
   const found = new Map<number, Found>();
   const add = (ranges: ts.CommentRange[] | undefined) => {
     for (const range of ranges ?? []) {
@@ -540,7 +547,7 @@ const NAME = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;
 const FILE_EXTENSIONS = /\.(?:ts|tsx|js|mjs|cjs|json|jsonc|md|yaml|yml|html|css|sh|txt|log|png|lock)$/;
 
 /** The names a comment quotes in backticks, each split into the identifiers it is made of. */
-function quotedNames(comment: string): string[][] {
+function quotedNames(comment: string) {
   return [...comment.matchAll(/`([^`\n]+)`/g)]
     .map((match) => match[1])
     .filter((quoted) => NAME.test(quoted) && !FILE_EXTENSIONS.test(quoted))
@@ -554,7 +561,7 @@ let scanned: Scanned | undefined;
  * The repository's source read once for the whole file, each file parsed once: the names its code has, from each source file but
  * this one, whose fixtures quote stale names, and every file's comments. No test writes into it.
  */
-const repository = (): Scanned => {
+const repository = () => {
   if (scanned) return scanned;
   const names = new Set<string>();
   const comments = new Map<string, readonly Found[]>();
@@ -571,7 +578,7 @@ const repository = (): Scanned => {
  * Every name the repository's code has, from each source file under packages/, apps/, lint/ and tools/ but this one, whose fixtures
  * quote stale names.
  */
-const knownNames = (): ReadonlySet<string> => repository().names;
+const knownNames = () => repository().names;
 
 /**
  * Other programs' words a comment may quote though the code never spells them, kept short: A2A's states, fields and SDK names; Claude
@@ -591,10 +598,10 @@ const OTHER_PROGRAMS = new Set([
 ]);
 
 /** Each quoted name in `file`'s comments that the code does not have, with its line. */
-const staleNames = (file: string, text: string, names: ReadonlySet<string>): string[] => staleIn(file, commentsOf(file, text), names);
+const staleNames = (file: string, text: string, names: ReadonlySet<string>) => staleIn(file, commentsOf(file, text), names);
 
 /** Each quoted name in `comments`, `file`'s, that the code does not have, with its line. */
-function staleIn(file: string, comments: readonly Found[], names: ReadonlySet<string>): string[] {
+function staleIn(file: string, comments: readonly Found[], names: ReadonlySet<string>) {
   return comments.flatMap(({ line, text: comment }) =>
     quotedNames(comment)
       .filter((parts) => parts.some((part) => !names.has(part) && !OTHER_PROGRAMS.has(part)))

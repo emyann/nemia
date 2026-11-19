@@ -47,21 +47,21 @@ const TREES = await rendered([
 ]);
 
 /** The tree of the factory `name`, which the controller seeded. */
-const treeOf = (name: string): string => {
+const treeOf = (name: string) => {
   const tree = TREES[name]?.tree;
   assert.ok(tree, `${name} was rendered: ${JSON.stringify(TREES[name]?.conditions)}`);
   return tree;
 };
 
 /** The step `workflow/step` of the tree `tree`: its frontmatter, read, and its body. */
-function stepIn(tree: string, workflow: string, step: string): { front: Record<string, unknown>; body: string } {
+function stepIn(tree: string, workflow: string, step: string) {
   const file = `workflows/${workflow}/${step}.md`;
   const { block, body } = splitFrontmatter(file, fs.readFileSync(path.join(tree, file), 'utf8'));
   return { front: (yaml.load(block ?? '') ?? {}) as Record<string, unknown>, body };
 }
 
 /** The check of the step `workflow/step` of `tree`. */
-const checkOf = (tree: string, workflow: string, step: string): string => String(stepIn(tree, workflow, step).front.check ?? '');
+const checkOf = (tree: string, workflow: string, step: string) => String(stepIn(tree, workflow, step).front.check ?? '');
 
 /** The steps whose check and note differ by way. */
 const WAYS = [
@@ -72,13 +72,13 @@ const WAYS = [
 ] as const;
 
 /** The opening of a check's branch on the rendered way `github`. */
-const branchOn = (github: boolean): string => `if [ "${github}" = true ]; then `;
+const branchOn = (github: boolean) => `if [ "${github}" = true ]; then `;
 
 /** The answer a way's note opens with. */
-const answer = (github: boolean): RegExp => new RegExp(`^Does this factory judge and land its work on GitHub\\? \\*\\*${github}\\*\\*\\.`);
+const answer = (github: boolean) => new RegExp(`^Does this factory judge and land its work on GitHub\\? \\*\\*${github}\\*\\*\\.`);
 
 /** `--check` with the CI context `name`, quoted or bare. */
-const ciCheck = (name: string): RegExp => new RegExp(`--check "?${name}"?(?=[\\s;]|$)`, 'm');
+const ciCheck = (name: string) => new RegExp(`--check "?${name}"?(?=[\\s;]|$)`, 'm');
 
 test('nemia template lint passes sdlc and prints its digest', () => {
   const env = storeEnv(scratch('nemia-sdlc-lint-'));
@@ -178,7 +178,7 @@ function loaded(name: string, workflow: string) {
 }
 
 /** The code `change.ts` exits with, read from its shipped text: it imports nothing, so it keeps its own copy of `PERSONS_EXIT`. */
-const changeExit = (): number => {
+const changeExit = () => {
   const found = /^const PERSONS_EXIT = (\d+);$/m.exec(fs.readFileSync(path.join(SDLC, 'workflows', 'quick', 'change.ts'), 'utf8'));
   assert.ok(found, 'change.ts declares its PERSONS_EXIT');
   return Number(found[1]);
@@ -203,10 +203,10 @@ test("build's and quick's implement load with a policy that fails the step on 78
 const PARTS_END = '/parts.ts" check && ';
 
 /** The factory's own check, `command`, as the implement check runs it: a clause of its own, between sdlc's scripts and the way's `if`. */
-const ownClause = (command: string, github: boolean): string => `${PARTS_END}{ ${command}; } && ${branchOn(github)}`;
+const ownClause = (command: string, github: boolean) => `${PARTS_END}{ ${command}; } && ${branchOn(github)}`;
 
 /** How many times `part` is in `text`. */
-const count = (text: string, part: string): number => text.split(part).length - 1;
+const count = (text: string, part: string) => text.split(part).length - 1;
 
 test("the factory's own check runs in build's and quick's implement check, either way, after sdlc's scripts and before the way's branch", () => {
   for (const [name, github] of [
@@ -386,7 +386,7 @@ test('the team is six agents, and Ada is none of them', () => {
 test("build's design, read with Seldon, declares the later steps' budgets as data: the budgets shape, expanded and required", () => {
   const tree = treeOf('set');
   const agents = path.join(tree, 'workflows', 'agents');
-  const readAgents = (file: string): string | undefined =>
+  const readAgents = (file: string) =>
     fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
   const seldon = parseAgent('seldon', fs.readFileSync(path.join(agents, 'seldon.md'), 'utf8'), readAgents);
   const design = parseWorkflow(
@@ -408,7 +408,7 @@ test("build's design, read with Seldon, declares the later steps' budgets as dat
 test("build's design, read with Seldon, hands the review the outside pages its spec rests on: sources, required and strict, read by the review", () => {
   const tree = treeOf('set');
   const agents = path.join(tree, 'workflows', 'agents');
-  const readAgents = (file: string): string | undefined =>
+  const readAgents = (file: string) =>
     fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
   const seldon = parseAgent('seldon', fs.readFileSync(path.join(agents, 'seldon.md'), 'utf8'), readAgents);
   const design = parseWorkflow(
@@ -436,7 +436,7 @@ test("build's design, read with Seldon, hands the review the outside pages its s
 const FROZEN_FOLDERS = ['WF_CARRIED_FILES', 'WF_WORKFLOW_FILES'] as const;
 
 /** The script names `check` gives under any path: what a working folder would answer if the check read the script from there. */
-const scriptsIn = (check: string): string[] => [...new Set([...check.matchAll(/\/([\w-]+\.ts)"/g)].map(([, name]) => name ?? ''))];
+const scriptsIn = (check: string) => [...new Set([...check.matchAll(/\/([\w-]+\.ts)"/g)].map(([, name]) => name ?? ''))];
 
 /**
  * How `check` fails each variable it reads a frozen folder by, run as the run runs a check, by `sh -c`, in a working folder that holds
@@ -444,7 +444,7 @@ const scriptsIn = (check: string): string[] => [...new Set([...check.matchAll(/\
  * scripts do nothing: each case where it exits 0, says nothing of the variable on stderr, or ran a script of the working folder. Then
  * once with every variable set, where a clause that reads the working folder after one that is guarded is seen too.
  */
-function unguarded(check: string): string[] {
+function unguarded(check: string) {
   const root = scratch('nemia-sdlc-unset-');
   const work = path.join(root, 'work');
   const quiet = path.join(root, 'quiet');
@@ -455,7 +455,7 @@ function unguarded(check: string): string[] {
   }
   const read = FROZEN_FOLDERS.filter((name) => check.includes(name));
   if (read.length === 0) return ['it reads no frozen folder'];
-  const runs = (unset: string | undefined): { status: number | null; stderr: string; markers: string[] } => {
+  const runs = (unset: string | undefined) => {
     const env: NodeJS.ProcessEnv = { ...storeEnv(root), WF_RUN: 'r' };
     for (const name of FROZEN_FOLDERS) env[name] = quiet;
     if (unset !== undefined) delete env[unset];
@@ -478,7 +478,7 @@ function unguarded(check: string): string[] {
 }
 
 /** What of `check` runs in the tree `name`: in the checkout (`plain`), what is before its GitHub branch, which is never taken there. */
-const takenIn = (name: string, check: string): string => (name === 'set' ? check : (check.split(branchOn(false))[0] ?? ''));
+const takenIn = (name: string, check: string) => (name === 'set' ? check : (check.split(branchOn(false))[0] ?? ''));
 
 test("REFUSED: a check that reads a script from the working folder where its frozen folder's variable is unset", () => {
   assert.deepEqual(unguarded('node "./probe.ts" check && node "${WF_CARRIED_FILES:?run it in a run}/parts.ts" check'), [
@@ -531,7 +531,7 @@ test("build's review loop ships its numbers: five rounds, the review's budget si
  * What leaves the review loop of `workflow` without a bound: no positive whole `rounds` on its looping step, or a step of the loop
  * (the step it loops to, and itself) with no `budget`. Empty when the loop stops on its own: at its rounds, and at each step's cap.
  */
-function unbounded(fronts: Record<string, Record<string, unknown>>): string[] {
+function unbounded(fronts: Record<string, Record<string, unknown>>) {
   const missing: string[] = [];
   for (const [step, front] of Object.entries(fronts)) {
     if (typeof front.loop !== 'string') continue;
@@ -544,7 +544,7 @@ function unbounded(fronts: Record<string, Record<string, unknown>>): string[] {
   return missing;
 }
 
-const loopFronts = (tree: string, workflow: string): Record<string, Record<string, unknown>> =>
+const loopFronts = (tree: string, workflow: string) =>
   Object.fromEntries(['implement', 'review'].map((step) => [step, stepIn(tree, workflow, step).front]));
 
 test("build's and quick's review loops stop on their own: at review's rounds, and at implement's and review's budgets", () => {
@@ -564,10 +564,10 @@ test('REFUSED: a loop with a step of it that has no budget, or a looping step wi
 });
 
 /** Agora's closeout schema, as build's review reads it, rendered. */
-function agoraSchema(): { required: string[]; properties: Record<string, unknown> } {
+function agoraSchema() {
   const tree = treeOf('set');
   const agents = path.join(tree, 'workflows', 'agents');
-  const readAgents = (file: string): string | undefined =>
+  const readAgents = (file: string) =>
     fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
   const agora = parseAgent('agora', fs.readFileSync(path.join(agents, 'agora.md'), 'utf8'), readAgents);
   const review = parseWorkflow(
@@ -607,7 +607,7 @@ test('review-a-change names what Agora requires a round to say it read and misse
 });
 
 /** The paragraph of a review note that opens with `**Say whether the branch holds the base**`, up to the blank line that ends it. */
-const baseParagraph = (workflow: string): string => {
+const baseParagraph = (workflow: string) => {
   const note = fs.readFileSync(path.join(SDLC, 'workflows', workflow, 'review.md'), 'utf8');
   const start = note.indexOf('**Say whether the branch holds the base**');
   assert.ok(start >= 0, `${workflow}'s review says whether the branch holds the base`);
@@ -626,7 +626,7 @@ test("build's and quick's review weigh a moved base alike, by the reads that say
 const GATES_AFTER = '## Gates after you';
 
 /** Quick's review brief, composed by the orchestrator as a run composes it, on a run started with the gates `gates`. */
-const quickReviewBrief = (gates: string[]): string => {
+const quickReviewBrief = (gates: string[]) => {
   const steps = [
     { name: 'implement', after: [], body: 'build it' },
     { name: 'review', after: ['implement'], body: 'judge it' },

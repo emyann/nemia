@@ -23,7 +23,7 @@ export type Asked = { request: (url: string) => Response | Promise<Response> };
 export type ObjectStep = RunAnswer['status']['steps'][number];
 
 /** The body `url` answers, which must be a 200. */
-async function ok(app: Asked, url: string): Promise<unknown> {
+async function ok(app: Asked, url: string) {
   const res = await app.request(url);
   if (res.status !== 200) throw new Error(`GET ${url} answered ${res.status}: ${await res.text()}`);
   return res.json();
@@ -32,67 +32,63 @@ async function ok(app: Asked, url: string): Promise<unknown> {
 const at = (id: string, step: string) => `/api/runs/${encodeURIComponent(id)}/steps/${encodeURIComponent(step)}`;
 
 /** The run object of the run `id`. */
-export const objectOf = async (app: Asked, id: string): Promise<RunAnswer> =>
-  (await ok(app, `/api/runs/${encodeURIComponent(id)}`)) as RunAnswer;
+export const objectOf = async (app: Asked, id: string) => (await ok(app, `/api/runs/${encodeURIComponent(id)}`)) as RunAnswer;
 
 /** The step `name` of the run object, thrown for where the object has none. */
-export function stepOf(run: RunAnswer, name: string): ObjectStep {
+export function stepOf(run: RunAnswer, name: string) {
   const step = run.status.steps.find((s) => s.name === name);
   if (!step) throw new Error(`run ${run.metadata.name} has no step '${name}': it has ${run.status.steps.map((s) => s.name).join(', ')}`);
-  return step;
+  return step satisfies ObjectStep;
 }
 
 /** The frozen spec of the step `name` (`spec.steps`), or undefined where the run froze none of it. */
-export const specOf = (run: RunAnswer, name: string): RunAnswer['spec']['steps'][number] | undefined =>
-  run.spec.steps.find((s) => s.name === name);
+export const specOf = (run: RunAnswer, name: string) =>
+  run.spec.steps.find((s) => s.name === name) satisfies RunAnswer['spec']['steps'][number] | undefined;
 
 /** The step's tries, earliest first, the current one last (`…/steps/:step/tries`). */
-export const triesOf = async (app: Asked, id: string, step: string): Promise<RunObject.StepTry[]> => [
-  ...((await ok(app, `${at(id, step)}/tries`)) as RunObject.StepTries).tries,
-];
+export const triesOf = async (app: Asked, id: string, step: string) =>
+  [...((await ok(app, `${at(id, step)}/tries`)) as RunObject.StepTries).tries] satisfies RunObject.StepTry[];
 
 /** One try of the step (`…/tries/:try`). */
-export const tryOf = async (app: Asked, id: string, step: string, n: number): Promise<RunObject.StepTry> =>
+export const tryOf = async (app: Asked, id: string, step: string, n: number) =>
   (await ok(app, `${at(id, step)}/tries/${n}`)) as RunObject.StepTry;
 
 /**
  * What the step's try `n` signed off with, or why it does not read (`…/tries/:try/closeout`); with no `n`, its current try's, as the
  * board's step shows it — null where the step has no try yet.
  */
-export async function closeoutOf(app: Asked, id: string, step: string, n?: number): Promise<RunObject.TryCloseout | null> {
+export async function closeoutOf(app: Asked, id: string, step: string, n?: number) {
   const which = n ?? (await triesOf(app, id, step)).find((t) => t.current)?.try;
-  if (which === undefined) return null;
-  return (await ok(app, `${at(id, step)}/tries/${which}/closeout`)) as RunObject.TryCloseout;
+  if (which === undefined) return null satisfies RunObject.TryCloseout | null;
+  return (await ok(app, `${at(id, step)}/tries/${which}/closeout`)) as RunObject.TryCloseout satisfies RunObject.TryCloseout | null;
 }
 
 /** What the step was told: its body, the told text, its layers and its task's parts (`…/steps/:step/told`). */
-export const toldOf = async (app: Asked, id: string, step: string): Promise<RunObject.StepTold> =>
-  (await ok(app, `${at(id, step)}/told`)) as RunObject.StepTold;
+export const toldOf = async (app: Asked, id: string, step: string) => (await ok(app, `${at(id, step)}/told`)) as RunObject.StepTold;
 
 /** The lines read beside the run object (`…/lines`): what the object leaves out on purpose (this file's head). */
-export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =>
-  (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
+export const linesOf = async (app: Asked, id: string) => (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
 /**
  * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first
  * page, `LIST_PAGE.byDefault` runs, where it says no limit.
  */
-export const runListOf = async (app: Asked, query = ''): Promise<RunList> =>
+export const runListOf = async (app: Asked, query = '') =>
   (await ok(app, `/api/runs${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as RunList;
 
 /** `query` asking a page of the most a list answers (`LIST_PAGE.most`) where it asks no `limit` of its own: every run of a test's store. */
-const everyRun = (query: string): string =>
+const everyRun = (query: string) =>
   /(^|[?&])limit=/.test(query) ? query : [query.replace(/^\?/, ''), `limit=${LIST_PAGE.most}`].filter(Boolean).join('&');
 
 /** Every run the plain RunList judges (`items`), in its order, on a page of the most a list answers: none of those it leaves unjudged. */
-export const listedRuns = async (app: Asked, query = ''): Promise<Run[]> => [...(await runListOf(app, everyRun(query))).items];
+export const listedRuns = async (app: Asked, query = '') => [...(await runListOf(app, everyRun(query))).items] satisfies Run[];
 
 /** Why the plain RunList leaves the run `name` unjudged (its `unjudged` entry's `error`); null where it has no such entry. */
-export const unjudgedOf = async (app: Asked, name: string): Promise<string | null> =>
-  (await runListOf(app, everyRun(''))).unjudged?.find((entry) => entry.name === name)?.error ?? null;
+export const unjudgedOf = async (app: Asked, name: string) =>
+  ((await runListOf(app, everyRun(''))).unjudged?.find((entry) => entry.name === name)?.error ?? null) satisfies string | null;
 
 /** The run `name` as the plain RunList judges it, thrown where the list does not hold it judged. */
-export async function listedOf(app: Asked, name: string): Promise<Run> {
+export async function listedOf(app: Asked, name: string) {
   const list = await runListOf(app, everyRun(''));
   const run = list.items.find((item) => item.metadata.name === name);
   if (run) return run;
@@ -104,7 +100,7 @@ export async function listedOf(app: Asked, name: string): Promise<Run> {
  * The run `name` as a list asked by state has it (`fieldSelector=status.state!=finished`, then `=finished`), with the board's frame parts
  * on its status, thrown where neither holds it judged.
  */
-export async function framedOf(app: Asked, name: string): Promise<Run> {
+export async function framedOf(app: Asked, name: string) {
   for (const selector of ['status.state!%3Dfinished', 'status.state%3Dfinished']) {
     const run = (await runListOf(app, `fieldSelector=${selector}`)).items.find((item) => item.metadata.name === name);
     if (run) return run;

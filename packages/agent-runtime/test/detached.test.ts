@@ -87,7 +87,7 @@ import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const root = () => scratch('ae-detached-');
-const sh = (script: string): HarnessSpec => ({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', script] }) });
+const sh = (script: string) => ({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', script] }) }) satisfies HarnessSpec;
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 /** The file a run `name` of the spec `spec` keeps under `dir`. */
 const runFileOf = (dir: string, spec: string, name: string) => path.join(dir, 'runs', spec, `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
@@ -554,6 +554,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
   const pid = await spawnFrozenBeforePublish(t, ops, dir, 'ae/t4/4');
   const write = fs.writeFileSync;
   let held = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the child ends as the stop is written: a race
   (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = (f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
     if (typeof f === 'string' && f.endsWith('.stop') && !held) {
       held = true;
@@ -707,7 +708,7 @@ test(
  * stdin ended, it writes `EOF` and exits. Nothing ending its stdin, it exits after two minutes all the same: a test killed
  * before its hooks run leaves nobody to stop it.
  */
-const listener = (dir: string): HarnessSpec => {
+const listener = (dir: string) => {
   const script = path.join(dir, 'listener.cjs');
   fs.writeFileSync(
     script,
@@ -737,7 +738,7 @@ process.stdin.on('end', () => { fs.appendFileSync('heard', 'EOF\\n'); setTimeout
     can: [],
     command: () => ({ cmd: process.execPath, args: [script] }),
     input: { line: (text) => JSON.stringify({ said: text }), closesOn: { key: 'kind', value: 'end' } },
-  };
+  } satisfies HarnessSpec;
 };
 
 const heardIn = (cwd: string) => {
@@ -1130,7 +1131,7 @@ const codexRun = (dir: string, name: string, lines: object[]) => {
 const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
 
 /** The words `read` throws, or a failure of the test when it reads the output instead. */
-const refusedWith = (read: () => HarnessOutput): string => {
+const refusedWith = (read: () => HarnessOutput) => {
   try {
     assert.fail(`read as ${JSON.stringify(read())}, never refused`);
   } catch (e) {
@@ -1564,14 +1565,14 @@ const repoWithWorktree = (trust: boolean) => {
  * `f` run under the Codex home `home`, with a `codex` first on PATH that answers `login status` signed in, as `prepare` asks before
  * it reads the home: a Codex installed on the machine, asked under a home with no sign-in, would refuse every spawn.
  */
-const inCodexHome = <T>(home: string, f: () => T): T => {
+const inCodexHome = <T>(home: string, f: () => T) => {
   const prev = { CODEX_HOME: process.env.CODEX_HOME, PATH: process.env.PATH };
   const bin = scratch('ae-codex-signed-in-');
   fs.writeFileSync(path.join(bin, 'codex'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   process.env.CODEX_HOME = home;
   process.env.PATH = `${bin}:${prev.PATH}`;
   try {
-    return f();
+    return f() satisfies T;
   } finally {
     process.env.PATH = prev.PATH;
     if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
@@ -1975,16 +1976,17 @@ describe(
     });
     s.test('a spec that needs the spawn request is written one, and a spec that does not is written none', async () => {
       const given: (HarnessIO | undefined)[] = [];
-      const spy = (needsRequest?: true): HarnessSpec => ({
-        name: 'sh',
-        can: [],
-        ...(needsRequest ? { needsRequest } : {}),
-        prepare: () => ({ trustedDirs: ['/somewhere'] }),
-        command: (_r, io) => {
-          given.push(io);
-          return { cmd: 'sh', args: ['-c', 'exit 0'] };
-        },
-      });
+      const spy = (needsRequest?: true) =>
+        ({
+          name: 'sh',
+          can: [],
+          ...(needsRequest ? { needsRequest } : {}),
+          prepare: () => ({ trustedDirs: ['/somewhere'] }),
+          command: (_r, io) => {
+            given.push(io);
+            return { cmd: 'sh', args: ['-c', 'exit 0'] };
+          },
+        }) satisfies HarnessSpec;
       const request = { name: 'ae/t-req/1', brief: 'the brief', cwd: dir, closeoutSchema: { type: 'object' } };
       await Effect.runPromise(detachedOps(spy(true), dir).spawn(request));
       const at = given[0]?.requestFile;
@@ -2005,15 +2007,16 @@ describe(
     });
     s.test('a spec that reads its own spawn request is given its servers in it, and no MCP config file is written for it', async () => {
       const given: (HarnessIO | undefined)[] = [];
-      const spec = (needsRequest?: true): HarnessSpec => ({
-        name: 'sh',
-        can: [],
-        ...(needsRequest ? { needsRequest } : {}),
-        command: (_r, io) => {
-          given.push(io);
-          return { cmd: 'sh', args: ['-c', 'exit 0'] };
-        },
-      });
+      const spec = (needsRequest?: true) =>
+        ({
+          name: 'sh',
+          can: [],
+          ...(needsRequest ? { needsRequest } : {}),
+          command: (_r, io) => {
+            given.push(io);
+            return { cmd: 'sh', args: ['-c', 'exit 0'] };
+          },
+        }) satisfies HarnessSpec;
       const config = { mcp: { a: { command: 'a-server' } } };
       await Effect.runPromise(detachedOps(spec(true), dir).spawn({ name: 'ae/t-mcp/1', brief: 'x', cwd: dir, config }));
       assert.equal(given[0]?.mcpConfigFile, undefined, 'no config file is named for it');
@@ -2704,11 +2707,12 @@ describe(
     });
     const s = story(test);
     const OTHER = '11111111-2222-3333-4444-555555555555';
-    const printing = (result: object): HarnessSpec => ({
-      ...sh(`echo '${resultLine(result)}'`),
-      readOutput: claudeResultOutput,
-      resumeCostCarried: true,
-    });
+    const printing = (result: object) =>
+      ({
+        ...sh(`echo '${resultLine(result)}'`),
+        readOutput: claudeResultOutput,
+        resumeCostCarried: true,
+      }) satisfies HarnessSpec;
     const runOn = (name: string) => JSON.parse(fs.readFileSync(runFileOf(dir, 'sh', name), 'utf8'));
     s.test("the id a run resumed is kept on its run file only by a spec whose totals carry the parent's", async () => {
       const own = root();

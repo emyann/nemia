@@ -49,7 +49,7 @@ const DRAFT: SkillDraft = {
 };
 
 /** Every file under `dir`, by its path in it, with what it holds. */
-function snapshot(dir: string): Record<string, string> {
+function snapshot(dir: string) {
   if (!fs.existsSync(dir)) return {};
   return Object.fromEntries(
     fs
@@ -63,11 +63,11 @@ function snapshot(dir: string): Record<string, string> {
 }
 
 /** Every hidden file or folder anywhere under `dir`: what a write that failed part-way would leave. */
-const hidden = (dir: string): string[] =>
+const hidden = (dir: string) =>
   fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).filter((p) => path.basename(p).startsWith('.')) : [];
 
 /** `fn` refused as the kind `tag`, naming each of `facts`, and the library as it was, no half-written file left. */
-function refuses(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]): void {
+function refuses(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]) {
   const before = snapshot(LIBRARY);
   assert.throws(fn, (err: unknown) => {
     assert.ok(isRefusal(err), `a refusal, not ${String(err)}`);
@@ -80,7 +80,7 @@ function refuses(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]): v
 }
 
 /** A folder of skills of the test's own, outside the library, holding `skills`: each a name and its SKILL.md. */
-function source(skills: Record<string, string>): string {
+function source(skills: Record<string, string>) {
   const dir = path.join(scratch('wf-skill-life-source-'), 'skills');
   for (const [name, text] of Object.entries(skills)) {
     fs.mkdirSync(path.join(dir, name), { recursive: true });
@@ -89,11 +89,10 @@ function source(skills: Record<string, string>): string {
   return dir;
 }
 
-const read = (name: string): string => fs.readFileSync(path.join(LIBRARY, name, 'SKILL.md'), 'utf8');
+const read = (name: string) => fs.readFileSync(path.join(LIBRARY, name, 'SKILL.md'), 'utf8');
 
 /** The version of each of the store's agents that `names` lists. */
-const versions = (...agents: string[]): Record<string, string | null> =>
-  Object.fromEntries(agents.map((name) => [name, agentVersion(AGENTS, name)]));
+const versions = (...agents: string[]) => Object.fromEntries(agents.map((name) => [name, agentVersion(AGENTS, name)]));
 
 describe("a library skill's life: written as Nemia ships one, given, switched, mended, moving its agents, and copied in", () => {
   let dir!: string;

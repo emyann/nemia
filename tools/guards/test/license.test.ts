@@ -17,7 +17,7 @@ const LICENSE = 'MIT';
 type Pkg = { readonly name: string; readonly license?: string };
 
 /** Each package of `pkgs` whose `license` is not `MIT`, as a sentence naming the fix. */
-const misLicensed = (pkgs: readonly Pkg[]): string[] =>
+const misLicensed = (pkgs: readonly Pkg[]) =>
   pkgs
     .filter((pkg) => pkg.license !== LICENSE)
     .map(
@@ -25,7 +25,7 @@ const misLicensed = (pkgs: readonly Pkg[]): string[] =>
     );
 
 /** The root's `package.json` and each workspace's, read as a `Pkg` named by its path from the root. */
-const packages = (): Pkg[] =>
+const packages = () =>
   [ROOT, ...workspaces().map((dir) => path.join(ROOT, dir))].map((dir) => {
     const read = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as Pkg;
     return { ...read, name: path.join(path.relative(ROOT, dir), 'package.json') };

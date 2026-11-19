@@ -52,7 +52,7 @@ const plantRun = (id: string, taskId: string | null, tries: { taskId: string; ca
 };
 
 type Event = { id: string; at: string; kind: string; text: string };
-const said = (id: string): Event => ({ id, at: '2026-10-07T12:00:00.000Z', kind: 'text', text: id });
+const said = (id: string) => ({ id, at: '2026-10-07T12:00:00.000Z', kind: 'text', text: id });
 
 /**
  * A task on the test's engine: its attempts' moments, by number, how many of them have ended, its settle, and the history a read from its

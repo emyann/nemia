@@ -23,7 +23,7 @@ const ROOT = path.join(API, '..', '..');
 const isTest = (file: string) => file.endsWith('.test.ts') || file.startsWith('test/');
 
 /** The api's source under `src/`, tests beside the code left out, by path from the package. */
-const sourceFiles = (): string[] =>
+const sourceFiles = () =>
   fs
     .readdirSync(path.join(API, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)
@@ -32,7 +32,7 @@ const sourceFiles = (): string[] =>
 const read = (file: string) => fs.readFileSync(path.join(API, file), 'utf8');
 
 /** Every path under `apps/api/` an override of the lint config names by file, a glob left out, from the config's text. */
-function apiPathsIn(config: string): string[] {
+function apiPathsIn(config: string) {
   const parsed = ts.parseConfigFileTextToJson('.oxlintrc.json', config);
   assert.equal(parsed.error, undefined, '.oxlintrc.json reads');
   const overrides = (parsed.config as { overrides?: Array<{ files?: string[]; excludeFiles?: string[] }> }).overrides ?? [];
@@ -42,7 +42,7 @@ function apiPathsIn(config: string): string[] {
 }
 
 /** Where the lint config names an api file that is not there: its rules then read nothing, and lint still passes. */
-const missingPaths = (config: string, exists: (file: string) => boolean): string[] =>
+const missingPaths = (config: string, exists: (file: string) => boolean) =>
   apiPathsIn(config)
     .filter((f) => !exists(f))
     .map((f) => `.oxlintrc.json names ${f}, which is not there: move its entry with the file`);
@@ -114,12 +114,12 @@ test('every api path .oxlintrc.json names is there', () => {
 const ROOT_FILES = ['src/app.ts', 'src/guard.ts', 'src/layer.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
 
 /** The folder of `src` a file sits in, or undefined for a file at the root. */
-const folderOf = (file: string): string | undefined => /^src\/([^/]+)\//.exec(file)?.[1];
+const folderOf = (file: string) => /^src\/([^/]+)\//.exec(file)?.[1];
 
 /**
  * Where the tree breaks the layout: a stray file at the root, a folder with a face it needs not or without one it needs.
  */
-function layoutBreaches(files: string[]): string[] {
+function layoutBreaches(files: string[]) {
   const out = files
     .filter((f) => folderOf(f) === undefined && !ROOT_FILES.includes(f))
     .map((f) => `${f} sits at the root of src, which holds ${ROOT_FILES.join(', ')}: move it into its feature's folder`);
@@ -137,7 +137,7 @@ function layoutBreaches(files: string[]): string[] {
 }
 
 /** Where `app.ts` mounts a folder past its face: a folder with an `index.ts` is reached through it. */
-const pastFaces = (file: string, imports: Import[], files: string[]): string[] =>
+const pastFaces = (file: string, imports: Import[], files: string[]) =>
   imports.flatMap(({ spec }) => {
     const target = resolved(file, spec);
     const folder = target === undefined ? undefined : folderOf(target);
@@ -146,7 +146,7 @@ const pastFaces = (file: string, imports: Import[], files: string[]): string[] =
   });
 
 /** Where a face holds more than re-exports by name: a face is a door, and what it does lives in the folder's files. */
-const faceBody = (file: string, text: string): string[] =>
+const faceBody = (file: string, text: string) =>
   withoutComments(text)
     .split(/;\s*/)
     .map((s) => s.trim())

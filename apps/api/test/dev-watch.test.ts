@@ -24,7 +24,7 @@ const ROOT = path.join(API, '..', '..');
 type Package = { name: string; dir: string; exports: Record<string, string> };
 
 /** Every workspace package of this repository, by the name an import names it with, with the files its `exports` give. */
-function workspacePackages(): Package[] {
+function workspacePackages() {
   const out: Package[] = [];
   for (const group of ['packages', 'apps'])
     for (const entry of fs.readdirSync(path.join(ROOT, group), { withFileTypes: true })) {
@@ -39,7 +39,7 @@ function workspacePackages(): Package[] {
 }
 
 /** The file a bare import names, through the workspace package it names and that package's `exports`, or `undefined` for anyone else's. */
-function workspaceFile(spec: string, packages: Package[]): string | undefined {
+function workspaceFile(spec: string, packages: Package[]) {
   for (const pkg of packages) {
     if (spec !== pkg.name && !spec.startsWith(`${pkg.name}/`)) continue;
     const subpath = spec === pkg.name ? '.' : `.${spec.slice(pkg.name.length)}`;
@@ -50,14 +50,14 @@ function workspaceFile(spec: string, packages: Package[]): string | undefined {
 }
 
 /** The imports a source file names, relative and bare alike, as TypeScript reads them. */
-const importsOf = (file: string): string[] =>
+const importsOf = (file: string) =>
   ts.preProcessFile(fs.readFileSync(file, 'utf8'), true, true).importedFiles.map((found) => found.fileName);
 
 /**
  * Every file of this repository the process started at `entry` loads, `entry` included; a dependency under `node_modules` is no
  * file of ours.
  */
-function loaded(entry: string, packages: Package[]): string[] {
+function loaded(entry: string, packages: Package[]) {
   const seen = new Set<string>();
   const queue = [entry];
   while (queue.length > 0) {
@@ -74,7 +74,7 @@ function loaded(entry: string, packages: Package[]): string[] {
 }
 
 /** The `--watch-path` values of the api's `dev` script, as absolute paths from `apps/api`, where the script runs. */
-function watched(): { script: string; paths: string[] } {
+function watched() {
   const read = JSON.parse(fs.readFileSync(path.join(API, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
   const script = read.scripts.dev;
   const paths = [...script.matchAll(/--watch-path[= ]([^\s]+)/g)].map((found) => path.resolve(API, found[1]));
@@ -82,7 +82,7 @@ function watched(): { script: string; paths: string[] } {
 }
 
 /** Whether `file` sits under one of `paths`. */
-const under = (file: string, paths: string[]): boolean => paths.some((dir) => file === dir || file.startsWith(`${dir}${path.sep}`));
+const under = (file: string, paths: string[]) => paths.some((dir) => file === dir || file.startsWith(`${dir}${path.sep}`));
 
 test('the dev script watches the sources it loads, and nothing else', () => {
   const { script, paths } = watched();

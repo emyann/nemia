@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 
 /** That `said` is text naming each of `facts`. */
-export const names = (said: unknown, ...facts: string[]): void => {
+export const names = (said: unknown, ...facts: string[]) => {
   assert.equal(typeof said, 'string', `the api said nothing: ${JSON.stringify(said)}`);
   for (const fact of facts) assert.ok((said as string).includes(fact), `${JSON.stringify(said)} does not name ${JSON.stringify(fact)}`);
 };

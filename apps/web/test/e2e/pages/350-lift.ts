@@ -85,7 +85,7 @@ export default {
 } satisfies PageSpec;
 
 /** Whatever hold the page left, taken back as `wf hold --off` does and said on the feed, so every page after reads the store as seeded. */
-async function takeBack(page: Page, hold: string, id: string, gated: string): Promise<void> {
+async function takeBack(page: Page, hold: string, id: string, gated: string) {
   const left = fs.existsSync(hold);
   fs.rmSync(hold, { force: true });
   fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });

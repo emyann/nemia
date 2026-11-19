@@ -40,7 +40,7 @@ const QUICK: Readonly<Record<string, string>> = {
 };
 
 /** A copy of the tests' team with `quick/` planted beside its `dev/`, which `edit` may change: its `quick` folder. */
-function quickFolder(edit: (dir: string) => void = () => {}): string {
+function quickFolder(edit: (dir: string) => void = () => {}) {
   const quick = path.join(teamCopy('wf-quick-team-'), 'quick');
   fs.mkdirSync(quick);
   for (const [file, text] of Object.entries(QUICK)) fs.writeFileSync(path.join(quick, file), text);
@@ -49,7 +49,7 @@ function quickFolder(edit: (dir: string) => void = () => {}): string {
 }
 
 /** A repository of the test place, with one file to change. */
-function repository(): string {
+function repository() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, { 'a.ts': 'export const a = 1;\n' });
   return repo;

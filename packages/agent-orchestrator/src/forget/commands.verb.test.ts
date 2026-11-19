@@ -30,7 +30,7 @@ test('the runs a command line names are read in the order given, each once, besi
 });
 
 /** What `forget` answers of one run, with nothing done but what `more` says. */
-const forgot = (more: Partial<Forgot> & Pick<Forgot, 'kind'>): Forgot => ({
+const forgot = (more: Partial<Forgot> & Pick<Forgot, 'kind'>) => ({
   id: 'r-1',
   removed: [],
   handedOff: [],
@@ -58,7 +58,7 @@ test('REFUSED on the api (`refuses`): a removal that removed nothing is thrown i
 });
 
 /** What `prune` answers of one run, with nothing found but what `more` says. */
-const pruning = (more: Partial<Pruning> & Pick<Pruning, 'kind'>): Pruning => ({ id: 'r-1', worktrees: [], left: [], ...more });
+const pruning = (more: Partial<Pruning> & Pick<Pruning, 'kind'>) => ({ id: 'r-1', worktrees: [], left: [], ...more });
 
 test('REFUSED on the api (`refuses`): a prune that removed nothing is thrown as a Conflict, in nemia prune’s words', () => {
   const refusalOf = (p: Pruning) => thrown(pruneRefusal(p));

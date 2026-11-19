@@ -12,30 +12,33 @@ const T0 = Date.parse('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0 + ms).toISOString();
 const TASK = 't-1';
 
-const inFlight = (...more: Event[]): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-  ...more,
-];
+const inFlight = (...more: Event[]) =>
+  [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    ...more,
+  ] satisfies Event[];
 const LS: Denial = { tool: 'Bash', what: 'ls' };
 const GLOB: Denial = { tool: 'Glob' };
 const WRITE: Denial = { tool: 'Write', what: '/x' };
-const denied = (d: Denial, n = 1): Event => ({ kind: 'denied', at: at(10), attempt: n, ...d });
-const seen = (denials?: Denial[], state: SessionState = 'working'): Sighting => ({
-  sessionId: 's1',
-  state,
-  ...(denials ? { denials } : {}),
-});
-const ended = (denials?: Denial[]): Event => ({
-  kind: 'ended',
-  at: at(30),
-  attempt: 1,
-  sessionId: 's1',
-  observed: 'succeeded',
-  reason: 'harness',
-  ...(denials ? { denials } : {}),
-});
+const denied = (d: Denial, n = 1) => ({ kind: 'denied', at: at(10), attempt: n, ...d }) satisfies Event;
+const seen = (denials?: Denial[], state: SessionState = 'working') =>
+  ({
+    sessionId: 's1',
+    state,
+    ...(denials ? { denials } : {}),
+  }) satisfies Sighting;
+const ended = (denials?: Denial[]) =>
+  ({
+    kind: 'ended',
+    at: at(30),
+    attempt: 1,
+    sessionId: 's1',
+    observed: 'succeeded',
+    reason: 'harness',
+    ...(denials ? { denials } : {}),
+  }) satisfies Event;
 
 describe("deniedFacts: what the harness denied an attempt in flight, journalled once as it reports it, and nothing where it is not this attempt's to say", () => {
   test('DENIED: a working attempt whose sighting names two denials the record has not is written one denied entry for each, in order', () => {

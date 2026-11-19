@@ -21,33 +21,34 @@ const SKILL = path.join(WEB, '..', '..', '.claude', 'skills', 'change-the-board'
  * Each part among `names`, the files of the look's folder, that has no stories beside it, by its name: the board's rule
  * (`storyless`, `stories.ts`) on the look's folder, with no baseline.
  */
-const lookStoryless = (names: readonly string[]): string[] =>
-  storyless(names.map((name) => `${LOOK_FROM_ROOT}/${name}`)).map((file) => path.posix.basename(file, '.tsx'));
+const lookStoryless = (names: readonly string[]) =>
+  storyless(names.map((name) => `${LOOK_FROM_ROOT}/${name}`)).map((file) => path.posix.basename(file, '.tsx')) satisfies string[];
 
 /**
  * Each import in `source`, the text of `file` of `src`, that reaches a file of the look's folder other than its door, by the module
  * it names; none for a file of the folder itself.
  */
-export function pastDoor(file: string, source: string): string[] {
-  if (file.startsWith('components/look/')) return [];
+export function pastDoor(file: string, source: string) {
+  if (file.startsWith('components/look/')) return [] satisfies string[];
   const modules = [...source.matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1] ?? m[2]);
   return modules.filter((mod) => {
     const at = mod.startsWith('@/') ? mod.slice(2) : mod.startsWith('.') ? path.posix.join(path.posix.dirname(file), mod) : '';
     return /^components\/look\/(?!index(?:\.ts)?$)./.test(at);
-  });
+  }) satisfies string[];
 }
 
 /** The parts a door's text exports: each name written with a capital then a small letter, a type left out. */
-export const partsOf = (door: string): string[] =>
+export const partsOf = (door: string) =>
   [...door.matchAll(/export\s*\{([^}]*)\}/g)]
     .flatMap(([, names]) => names.split(','))
     .map((name) => name.trim())
-    .filter((name) => /^[A-Z][a-z]\w*$/.test(name));
+    .filter((name) => /^[A-Z][a-z]\w*$/.test(name)) satisfies string[];
 
 /** Each part of `door` that `skill` does not name in backticks. */
-export const untold = (door: string, skill: string): string[] => partsOf(door).filter((part) => !skill.includes(`\`${part}\``));
+export const untold = (door: string, skill: string) => partsOf(door).filter((part) => !skill.includes(`\`${part}\``)) satisfies string[];
 
 /** Every file under `dir`, by its path from `dir`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function filesUnder(dir: string, from = dir): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const at = path.join(dir, entry.name);
@@ -104,23 +105,24 @@ describe("the look's door: every part with its stories, no import past the door,
  * its own edge in that shape instead (`CutField`, `CutFrame`), or draws a band beside it (`cutRing`). A ground named `bg-ring` is
  * none, and the word in a doc comment is none: a ring is read behind its state alone.
  */
-export const ringedCut = (source: string): string[] => [
-  ...(source.match(/(?<![\w-])(?:[\w/[\]-]+-)?focus(?:-visible|-within)?(?:\/[\w-]+)?:ring[\w[\]/.-]*/g) ?? []),
-  ...(source.match(/\bfocusRing\(/g) ?? []),
-];
+export const ringedCut = (source: string) =>
+  [
+    ...(source.match(/(?<![\w-])(?:[\w/[\]-]+-)?focus(?:-visible|-within)?(?:\/[\w-]+)?:ring[\w[\]/.-]*/g) ?? []),
+    ...(source.match(/\bfocusRing\(/g) ?? []),
+  ] satisfies string[];
 
 /** The one file that writes a grain's tile, by its path from `src`. */
 const GRAIN = 'components/look/grain.css';
 
 /** Each file of `sources`, texts by their path from `src`, that writes a noise tile and is not the look's grain. */
-export const tilesOutside = (sources: Readonly<Record<string, string>>): string[] =>
-  Object.keys(sources).filter((file) => file !== GRAIN && sources[file]?.includes('feTurbulence'));
+export const tilesOutside = (sources: Readonly<Record<string, string>>) =>
+  Object.keys(sources).filter((file) => file !== GRAIN && sources[file]?.includes('feTurbulence')) satisfies string[];
 
 /**
  * Whether `css`, an entry stylesheet, reads the look's grain: it imports it, above its first at-rule that is no import, under which
  * the build drops an import without a word.
  */
-export function readsGrain(css: string): boolean {
+export function readsGrain(css: string) {
   const at = css.search(/@import\s*['"]\.\/components\/look\/grain\.css['"]\s*;/);
   const other = css.search(/^@(?!import\b)[a-z-]+/m);
   return at !== -1 && (other === -1 || at < other);
@@ -130,7 +132,7 @@ export function readsGrain(css: string): boolean {
 const SPECKS: Readonly<Record<string, string>> = { '0,0,0': 'ink', '1,1,1': 'white' };
 
 /** The specks of the surface tile `rules` writes, `ink` or `white`; `unread` where it writes none, or one of another colour. */
-const specksOf = (rules: string): string => {
+const specksOf = (rules: string) => {
   const tile = /--grain-surface\s*:\s*url\(\s*['"]([^'"]+)['"]\s*\)/.exec(rules)?.[1] ?? '';
   const values = /<feColorMatrix[^>]*\svalues="([^"]+)"/.exec(decodeURIComponent(tile))?.[1]?.trim().split(/\s+/) ?? [];
   return SPECKS[[values[4], values[9], values[14]].join(',')] ?? 'unread';
@@ -141,11 +143,11 @@ const specksOf = (rules: string): string => {
  * scheme's media rule, the dark one's inside it, which ends above the rule that draws the surface. `unread` for both where either
  * mark is missing.
  */
-export function surfaceSpecks(css: string): { light: string; dark: string } {
+export function surfaceSpecks(css: string) {
   const dark = css.search(/@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/);
   const drawn = css.search(/\[data-grain\s*=\s*['"]surface['"]\s*\]/);
-  if (dark === -1 || drawn < dark) return { light: 'unread', dark: 'unread' };
-  return { light: specksOf(css.slice(0, dark)), dark: specksOf(css.slice(dark, drawn)) };
+  if (dark === -1 || drawn < dark) return { light: 'unread', dark: 'unread' } satisfies { light: string; dark: string };
+  return { light: specksOf(css.slice(0, dark)), dark: specksOf(css.slice(dark, drawn)) } satisfies { light: string; dark: string };
 }
 
 describe("the cut and the grain in the board's source: no ring a clip breaks, the composer's cut field, the grain's tiles, its import and its specks", () => {

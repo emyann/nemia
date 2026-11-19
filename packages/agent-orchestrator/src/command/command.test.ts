@@ -31,38 +31,38 @@ const SPEC: Spec = {
 };
 
 /** The refusal's words `parseArgv` throws on `argv`, or none. */
-function refusalOf(argv: readonly string[], spec: Spec = SPEC): string | undefined {
+function refusalOf(argv: readonly string[], spec: Spec = SPEC) {
   try {
     parseArgv(spec, argv);
-    return undefined;
+    return undefined satisfies string | undefined;
   } catch (err) {
     assert.equal((err as { _tag?: string })._tag, 'Invalid');
     assert.equal((err as { exitCode?: number }).exitCode, 2);
-    return (err as Error).message;
+    return (err as Error).message satisfies string | undefined;
   }
 }
 
 /** That `words` are a refusal, and name each of `fixes`: the command, the flag, the value or the form its fix turns on. */
-function names(words: string | null | undefined, ...fixes: string[]): void {
+function names(words: string | null | undefined, ...fixes: string[]) {
   assert.ok(words, 'refused');
   for (const fix of fixes) assert.ok(words.includes(fix), `${words} names ${fix}`);
 }
 
 /** A handler, as `commandBreaks` asks only whether an entry has one. */
-const handler = (): undefined => undefined;
+const handler = () => undefined;
 
 const entry = (name: string) => TABLE.find((c) => c.name === name)!;
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
-function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]): string | null {
+function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]) {
   try {
     const args = parseArgv(command.spec, argv);
     assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
-    return command.check?.(args) ?? null;
+    return (command.check?.(args) ?? null) satisfies string | null;
   } catch (err) {
     assert.equal((err as { _tag?: string })._tag, 'Invalid');
     assert.equal((err as { exitCode?: number }).exitCode, 2);
-    return (err as Error).message;
+    return (err as Error).message satisfies string | null;
   }
 }
 
@@ -472,18 +472,24 @@ const REFUSALS: readonly Refused[] = [
   ...[
     ['--stats', '20'],
     ['20', '--stats'],
-  ].map((argv): Refused => [
-    `up, --stats with an interval: ${argv.join(' ')}`,
-    'up',
-    argv,
-    ['nemia up --stats', 'takes no 20', 'nemia up --stats alone', 'nemia up 20 to tick'],
-  ]),
-  ...['soon', '--x'].map((given): Refused => [
-    `up, an interval that is none: ${given}`,
-    'up',
-    [given],
-    ['nemia up takes', 'whole milliseconds', `"${given}" is not one`, 'from 1 to '],
-  ]),
+  ].map(
+    (argv) =>
+      [
+        `up, --stats with an interval: ${argv.join(' ')}`,
+        'up',
+        argv,
+        ['nemia up --stats', 'takes no 20', 'nemia up --stats alone', 'nemia up 20 to tick'],
+      ] satisfies Refused,
+  ),
+  ...['soon', '--x'].map(
+    (given) =>
+      [
+        `up, an interval that is none: ${given}`,
+        'up',
+        [given],
+        ['nemia up takes', 'whole milliseconds', `"${given}" is not one`, 'from 1 to '],
+      ] satisfies Refused,
+  ),
   ['up, two intervals', 'up', ['10', '20'], ['one pass interval at most', 'given 20', 'nemia up [ms]']],
   ['up, an interval', 'up', ['10'], null],
 ];

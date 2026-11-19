@@ -7,16 +7,18 @@ import assert from 'node:assert/strict';
 import type { StepArtifact } from '../src/lib/api/tries.ts';
 import { folderTreeOf, type FolderTreeNode } from '../src/lib/folderTree.ts';
 
-const served = (rel: string): StepArtifact => ({
-  path: `/wf/a/${rel}`,
-  relativePath: rel,
-  name: rel,
-  url: `/f/${rel}`,
-  kind: 'text',
-  size: 1,
-});
+const served = (rel: string) =>
+  ({
+    path: `/wf/a/${rel}`,
+    relativePath: rel,
+    name: rel,
+    url: `/f/${rel}`,
+    kind: 'text',
+    size: 1,
+  }) satisfies StepArtifact;
 
 /** A tree as its keys, a folder's children under it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const shape = (nodes: readonly FolderTreeNode[]): unknown[] =>
   nodes.map((n) => (n.kind === 'file' ? n.key : { [n.key]: shape(n.children), files: n.files }));
 

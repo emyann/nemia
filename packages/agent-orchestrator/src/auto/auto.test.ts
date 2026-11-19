@@ -98,7 +98,7 @@ test('a confirmed list replaces the default; the default is in force only while 
 
 describe('`ruleRefusal`: a rule with no id, the default id, an answer or condition that is none, a condition twice, steps or a line that are none', () => {
   const good = { id: 'gate', answer: 'approve', when: ['checked'] };
-  const refused = (rule: unknown): string | undefined => ruleRefusal(rule, 'rule 1');
+  const refused = (rule: unknown) => ruleRefusal(rule, 'rule 1');
   test('a rule, with steps and a line or without', () => {
     assert.equal(refused(good), undefined);
     assert.equal(refused({ ...good, steps: ['design'], under: 5 }), undefined);

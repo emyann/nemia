@@ -14,7 +14,7 @@ const STORE = 'src/standing/standing.store.ts';
 const WRITER = 'src/standing/standing.verb.ts';
 
 /** The files among `sources` that name `writeStanding`, sorted. */
-const writersIn = (sources: Record<string, string>): string[] =>
+const writersIn = (sources: Record<string, string>) =>
   Object.entries(sources)
     .filter(([, text]) => /\bwriteStanding\b/.test(text))
     .map(([file]) => file)

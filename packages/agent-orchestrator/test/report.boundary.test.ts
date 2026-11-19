@@ -25,11 +25,11 @@ const ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** `file` of `dir` written with `text`, its directories made. */
-const write = (dir: string, file: string, text: string | Uint8Array): void => {
+const write = (dir: string, file: string, text: string | Uint8Array) => {
   fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
   fs.writeFileSync(path.join(dir, file), text);
 };
@@ -38,7 +38,7 @@ const write = (dir: string, file: string, text: string | Uint8Array): void => {
  * A repository on `main` with a `package.json`, `src/a.ts`, `docs/old.md`, `dropped.txt` and `link`, and a branch `wf/x/a` that changes
  * each way git counts: adds, modifies, renames, removes `dropped.txt` and turns `link` into a symbolic link.
  */
-function repository(): string {
+function repository() {
   const dir = scratch('wf-report-');
   git(dir, 'init', '-q', '-b', 'main');
   write(dir, 'package.json', '{ "workspaces": ["packages/*"] }\n');
@@ -77,7 +77,7 @@ const request = (dir: string, asked: Partial<Record<'branches' | 'diffOf' | 'pre
 });
 
 /** `report` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const report = (asked: object): PlaceOutcome<'report'> => gitPlace({ env: ENV }).askNow('report', asked as never);
+const report = (asked: object) => gitPlace({ env: ENV }).askNow('report', asked as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
 function answerOf(outcome: PlaceOutcome<'report'>) {
@@ -110,7 +110,7 @@ test("report answers the files a branch changed in the place's words: added, mod
  * A `git` that is the real one but for `--name-status`, whose first record's letter it prints as `X`, a change the place has no word
  * for: the files git names are the same, so its two readings still agree.
  */
-function gitSayingX(): string {
+function gitSayingX() {
   const bin = scratch('wf-report-x-git-');
   const real = execFileSync('sh', ['-c', 'command -v git'], { env: ENV, encoding: 'utf8' }).trim();
   const script = `#!/bin/sh\ncase " $* " in\n  *" --name-status "*) "${real}" "$@" | sed '1s/^./X/' ;;\n  *) exec "${real}" "$@" ;;\nesac\n`;

@@ -15,27 +15,27 @@ const MADE = { name: 'minute-taker-e2e', description: 'Use this when a plan need
 
 const PHONE = { width: 390, height: 844 };
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
 
 /** Writes FACTORY's file; returns what takes it back, with MADE's file if the page made it. */
-function written(): () => void {
+function written() {
   const factoryFile = path.join(store!, 'factories', `${FACTORY}.json`);
   const madeFile = path.join(store!, 'workflows', 'agents', `${MADE.name}.md`);
   fs.writeFileSync(
     factoryFile,
     JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name, WORKFLOWS.good.name] }, null, 2),
   );
-  return () => {
+  return (() => {
     fs.rmSync(madeFile, { force: true });
     fs.rmSync(factoryFile, { force: true });
-  };
+  }) satisfies () => void;
 }
 
 /** Picks `agent` in the hire's picker on the step's page, and hires it; refuses unless FACTORY then hires it, with Fire. */
-async function hire(page: Page, agent: string): Promise<void> {
+async function hire(page: Page, agent: string) {
   await page.locator('[data-hire-picker] [data-slot="select-trigger"]').click();
   await page.getByRole('option', { name: new RegExp(`^${agent}`) }).click();
   await page.locator('[data-hire]').click();
@@ -46,14 +46,14 @@ async function hire(page: Page, agent: string): Promise<void> {
 }
 
 /** Fires the agent hired, and refuses unless the picker is back. */
-async function fire(page: Page, agent: string): Promise<void> {
+async function fire(page: Page, agent: string) {
   await page.locator(`[data-fire="${agent}"]`).click();
   await expectVisible(page.locator('[data-hire-picker]'), `${agent} fired, the picker is back`);
   await expectCount(page.locator('[data-fire]'), 0, 'and nothing is hired');
 }
 
 /** On a phone, the step's page is photographed and no wider than the phone; then the window is put back. */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   const was = page.viewportSize();
   await page.setViewportSize(PHONE);
   try {

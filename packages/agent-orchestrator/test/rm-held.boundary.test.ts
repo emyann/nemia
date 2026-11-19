@@ -22,9 +22,9 @@ import { forgetRefusal } from '../src/forget/commands.verb.ts';
 import type { Forgot } from '../src/run.ts';
 
 /** What the api refuses a removal that removed nothing with, in its words (`forgetRefusal`): its kind, and its message. */
-const refusedWith = (f: Forgot): [string | undefined, string | undefined] => {
+const refusedWith = (f: Forgot) => {
   const refusal = forgetRefusal(f);
-  return [refusal?._tag, refusal?.message];
+  return [refusal?._tag, refusal?.message] satisfies [string | undefined, string | undefined];
 };
 import { markCancelled, runRecord } from '../src/record/record.store.ts';
 import { forgetTyped } from './forgetting.ts';
@@ -42,7 +42,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -180,9 +180,9 @@ const board = () => {
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
 /** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
-  return run;
+  return run satisfies RepositoryRun;
 };
 
 /** Git in a checkout, as a person types it there. */

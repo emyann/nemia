@@ -16,7 +16,7 @@ const AT = '2026-10-04T15:40:00.000Z';
 const PAUSE = { at: AT, by: 'ann', why: 'merging by hand' };
 
 /** What `GET /api/pause` answers, with `extra` over a pause and nothing at work. */
-const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [], ...extra });
+const paused = (extra: Partial<Paused> = {}) => ({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [], ...extra });
 
 describe('pauseWords: what the pause says, from none to Pausing to Paused', () => {
   test('no pause: all factories run, with no short form, and the button pauses them all', () => {

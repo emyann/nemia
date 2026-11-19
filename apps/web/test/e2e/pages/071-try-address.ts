@@ -9,7 +9,7 @@ import { OUT } from '../world.ts';
 const { target, exhausted } = LOOPING;
 
 /** Refuses unless what `target`'s part draws is its first try's, and `exhausted`'s is still its current try's. */
-async function onTryOne(page: Page, when: string): Promise<void> {
+async function onTryOne(page: Page, when: string) {
   const part = partOf(page.locator(LEDGER), target);
   const picker = part.locator(`[data-try-picker="${target}"]`);
   await expectVisible(picker.locator('[data-try="1"][data-selected]'), `${when}: try 1 is the one picked`);

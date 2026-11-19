@@ -23,19 +23,20 @@ const task = (
   attempts: Array<[string, string | null, string | null]>,
   settled: 'succeeded' | 'failed' | 'stopped' | null,
   usage: object | null = null,
-): TaskClock => ({
-  state: {
-    brief: 'filed',
-    settled,
-    attempts: attempts.map(([startedAt, spawnedAt, endedAt], i) => ({
-      startedAt,
-      spawnedAt,
-      endedAt,
-      reason: endedAt ? 'harness' : null,
-      usage: i === attempts.length - 1 ? usage : null,
-    })),
-  },
-});
+) =>
+  ({
+    state: {
+      brief: 'filed',
+      settled,
+      attempts: attempts.map(([startedAt, spawnedAt, endedAt], i) => ({
+        startedAt,
+        spawnedAt,
+        endedAt,
+        reason: endedAt ? 'harness' : null,
+        usage: i === attempts.length - 1 ? usage : null,
+      })),
+    },
+  }) satisfies TaskClock;
 
 /** A run of implement alone: its check refused try 1, and `retries: 1` filed try 2, which passed; with each task's view and filing. */
 const B4 = () => {
@@ -221,7 +222,7 @@ describe("`timeline`: a run's tries on the clock, each filed, spawned and ended,
       usage: null,
       ended: 'succeeded' as const,
     };
-    const held = (phase: string, extra: object = {}, attempts: object[] = [signedTurn]): TaskClock =>
+    const held = (phase: string, extra: object = {}, attempts: object[] = [signedTurn]) =>
       ({ phase, state: { brief: 'filed', settled: null, attempts, ...extra } }) as TaskClock;
     for (const [said, view] of [
       ['waiting', held('input-required')],

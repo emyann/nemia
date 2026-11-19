@@ -43,22 +43,23 @@ test('REFUSED: a GET the Api gains with no entry in READS, a page whose query ta
 });
 
 /** A closeout with a short output field, a long one and a body of `body` characters. */
-const closeoutOf = (body: number): StepCloseout => ({
-  apiVersion: 'nemia/v1',
-  outcome: 'done',
-  summary: 's',
-  body: 'b'.repeat(body),
-  needs: null,
-  artifacts: [],
-  values: [],
-  refused: [],
-  output: { short: 'x'.repeat(30), long: 'y'.repeat(SHORT_FIELD + 1) },
-  missing: [],
-  replies: null,
-  schema: { short: {}, long: {} },
-  questions: [],
-  raw: { whole: true },
-});
+const closeoutOf = (body: number) =>
+  ({
+    apiVersion: 'nemia/v1',
+    outcome: 'done',
+    summary: 's',
+    body: 'b'.repeat(body),
+    needs: null,
+    artifacts: [],
+    values: [],
+    refused: [],
+    output: { short: 'x'.repeat(30), long: 'y'.repeat(SHORT_FIELD + 1) },
+    missing: [],
+    replies: null,
+    schema: { short: {}, long: {} },
+    questions: [],
+    raw: { whole: true },
+  }) satisfies StepCloseout;
 
 test('a closeout read with no fields keeps its short output fields and names the long ones; * keeps every one', () => {
   const narrowed = closeoutNarrowed(closeoutOf(10), undefined);
@@ -113,7 +114,7 @@ test('a closeout’s body is read by page: the default page, then on from bodyNe
 });
 
 /** A decidable run's decision holding one branch's diff of two files. */
-const decisionOf = (): RunDecision =>
+const decisionOf = () =>
   ({
     standings: [],
     touched: [],

@@ -44,7 +44,7 @@ const noEngine = () => engineOf(engine().layer);
 /** Refused by kind, exit 2, and the facts its words name — never its sentence. */
 const refused =
   (tag: 'Missing' | 'Conflict' | 'Invalid', ...facts: string[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
+  (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
     names(err.message, ...facts);
     return true;
@@ -54,7 +54,7 @@ const recordOf = (name: string) => path.join(FACTORIES, `${name}.json`);
 const storeFolder = (name: string) => path.join(FACTORIES, name);
 
 /** A fresh store with the factory `pipao` filed on a new folder, its record holding `extra` beside its repository: the folder. */
-function filed(extra: Record<string, unknown> = {}): string {
+function filed(extra: Record<string, unknown> = {}) {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.mkdirSync(FACTORIES, { recursive: true });

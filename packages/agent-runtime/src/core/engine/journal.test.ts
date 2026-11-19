@@ -31,9 +31,9 @@ const run = <A, E>(dir: string, e: Effect.Effect<A, E, Journal>) => Effect.runPr
 const readOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)));
 const feedFrom = (after: number) => Effect.flatMap(Journal, (j) => j.feed(after));
 
-const ev = (kind: Event['kind'], at: string, attempt = 1): Event => ({ kind, at, attempt }) as Event;
+const ev = (kind: Event['kind'], at: string, attempt = 1) => ({ kind, at, attempt }) as Event;
 /** A task's `filed`, at `at`: what an append to a task with no journal must be. */
-const filedAt = (at: string): Event => ({ ...TODAY, at }) as Event;
+const filedAt = (at: string) => ({ ...TODAY, at }) as Event;
 /** Each of `ids` filed, at the start of 2026, so the events a test appends after have a journal to go to. */
 const fileEach = (ids: readonly string[]) =>
   Effect.flatMap(Journal, (j) =>

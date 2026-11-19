@@ -59,18 +59,16 @@ import { aRead, listing, names, phases, run, signedOffOnce, step, STEPS } from '
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const nothingShipped = () => false;
 /** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
-const shown =
-  (m: Record<string, ListedPhase>) =>
-  (id: string): ListedPhase =>
-    m[id] ?? 'unknown';
+const shown = (m: Record<string, ListedPhase>) => (id: string) => (m[id] ?? ('unknown' as const)) satisfies ListedPhase;
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
-const said = (outcome: Closeout['outcome']): Closeout => ({
-  outcome,
-  summary: 'rewrote the parser\nand the three tests that pinned it',
-  artifacts: [],
-  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
-});
+const said = (outcome: Closeout['outcome']) =>
+  ({
+    outcome,
+    summary: 'rewrote the parser\nand the three tests that pinned it',
+    artifacts: [],
+    needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
+  }) satisfies Closeout;
 const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);
 /** A run whose two steps are done and whose result sits on a branch. */
 const finished = (extra: Partial<RepositoryRun> = {}) =>
@@ -118,27 +116,25 @@ const SPENT: EarlierTry[] = [
 /** The JSON a brief carries in a fenced block, however long its fence. */
 const dataIn = (brief: string) => JSON.parse(/\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]);
 /** What each task cost, and which its harness cut at its cap. */
-const spends =
-  (usd: Record<string, number>, budgetEnded: string[] = []): SpendOf =>
-  (id) =>
+const spends = (usd: Record<string, number>, budgetEnded: string[] = []) =>
+  ((id) =>
     id in usd || budgetEnded.includes(id)
       ? { usd: usd[id] ?? 0, measured: id in usd ? 1 : 0, unmeasured: id in usd ? 0 : 1, budgetEnded: budgetEnded.includes(id) }
-      : undefined;
+      : undefined) satisfies SpendOf;
 /** Nothing signed off. */
 const nothingSigned = () => undefined;
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'continue', model?: string): RetryAsk => ({
-  step: 'implement',
-  try: n,
-  mode,
-  ...(model ? { model } : {}),
-  at: '2026-09-13T10:00:00.000Z',
-});
+const askFor = (n: number, mode: RetryMode = 'continue', model?: string) =>
+  ({
+    step: 'implement',
+    try: n,
+    mode,
+    ...(model ? { model } : {}),
+    at: '2026-09-13T10:00:00.000Z',
+  }) satisfies RetryAsk;
 /** What each task was denied, as the spend it reads off. */
-const deniedSpend =
-  (denied: Record<string, string[]>): SpendOf =>
-  (id) =>
-    id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id] } : undefined;
+const deniedSpend = (denied: Record<string, string[]>) =>
+  ((id) => (id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id] } : undefined)) satisfies SpendOf;
 /** `listing` asked everything a pass reads, each given as none unless `over` says otherwise. */
 const fullListing = (over: Partial<Parameters<typeof listing>[0]> & Pick<Parameters<typeof listing>[0], 'steps' | 'run' | 'phaseOf'>) =>
   listing({
@@ -947,7 +943,8 @@ describe("composeBrief of a step's check and of its tries", () => {
       ].join('\n'),
     );
     const r = run({ implement: 't1', review: null });
-    const briefing = (resumed: boolean): RetryBriefing => ({ try: 2, by: 'signoff', mode: 'continue', resumed, status: 'unsigned' });
+    const briefing = (resumed: boolean) =>
+      ({ try: 2, by: 'signoff', mode: 'continue', resumed, status: 'unsigned' }) satisfies RetryBriefing;
     const brief = composeBrief(STEPS[0], r, STEPS, undefined, undefined, undefined, briefing(true));
     assert.ok(brief.startsWith(`## Try 2\n\n${SIGNOFF}\n`), brief);
     assert.match(brief, /## When you are finished/, 'with the closeout contract after it, as on every try');
@@ -1436,7 +1433,7 @@ describe("a person's answer (`--message`): on the ask, in the brief, and on `nem
  * The `## ` headings a markdown reader sees: those outside every fenced block, a fence closed only by a bare run of at least its
  * backticks.
  */
-const headingsOf = (brief: string): string[] => {
+const headingsOf = (brief: string) => {
   const seen: string[] = [];
   let open = 0;
   for (const line of brief.split('\n')) {
@@ -1446,7 +1443,7 @@ const headingsOf = (brief: string): string[] => {
     } else if (ticks) open = ticks;
     else if (line.startsWith('## ')) seen.push(line);
   }
-  return seen;
+  return seen satisfies string[];
 };
 
 describe("composeBrief of an answer: `## Your answer`, the person's text untouched in a fence", () => {
@@ -1532,13 +1529,14 @@ describe("composeBrief after an answered step: `## Answered`, a person's answer 
   });
   const steps: StepSpec[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
   const cut = 'Cut the board out of this build: it is a card of its own.';
-  const answer = (n: number, message: string, at: string, mode: RetryMode = 'continue'): RetryAsk => ({
-    step: 'implement',
-    try: n,
-    mode,
-    message,
-    at,
-  });
+  const answer = (n: number, message: string, at: string, mode: RetryMode = 'continue') =>
+    ({
+      step: 'implement',
+      try: n,
+      mode,
+      message,
+      at,
+    }) satisfies RetryAsk;
   const briefHandedAnswers = (s: StepSpec, r: Run, answers: readonly RetryAsk[]) =>
     composeBrief(
       s,
@@ -1955,7 +1953,7 @@ describe("a blocked step's failed check run again (`blockedRecheck`): only on th
   });
   const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
   const BRANCH = 'wf/r-1/implement';
-  const blockedAfter = (o: { handedOff?: boolean; tip?: string | null; tries?: EarlierTry[] } = {}): RepositoryRun =>
+  const blockedAfter = (o: { handedOff?: boolean; tip?: string | null; tries?: EarlierTry[] } = {}) =>
     run(
       {},
       {
@@ -1971,7 +1969,7 @@ describe("a blocked step's failed check run again (`blockedRecheck`): only on th
           review: { taskId: null },
         },
       },
-    );
+    ) satisfies RepositoryRun;
   const settled = { t1: 'succeeded', c1: 'failed', t2: 'succeeded' } as const;
   const blocked = () => said('blocked');
   const at = (tip: string | undefined) => (branch: string) => (branch === BRANCH ? tip : undefined);
@@ -2085,10 +2083,11 @@ describe("a blocked step's failed check run again (`blockedRecheck`): only on th
     assert.doesNotMatch(told('blocked'), /files the check again/);
   });
   test('rechecked, the blocked try stands on its check: checking, then verified or failed (check), and retries: continue it', () => {
-    const rechecked = (check?: string): Run => {
+    const rechecked = (check?: string) => {
       const r = blockedAfter();
       const record = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
-      return { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
+      const due: Run = { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
+      return due;
     };
     const status = (r: Run, p: Record<string, TaskPhase>, closeout = blocked) =>
       stepStatus(implement, r, phases(p), closeout, () => true, CHECKED);

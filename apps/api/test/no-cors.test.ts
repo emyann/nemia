@@ -21,7 +21,7 @@ const ENDPOINTS = Object.values(Api.groups).flatMap((group) =>
 const ORIGIN = 'http://127.0.0.1:9999';
 
 /** The `Access-Control-*` headers an answer carries, each `name: value`. */
-const corsOf = (res: Response): string[] =>
+const corsOf = (res: Response) =>
   [...res.headers.entries()].filter(([name]) => name.toLowerCase().startsWith('access-control-')).map(([n, v]) => `${n}: ${v}`);
 
 test(`REFUSED: no preflight is granted and no answer allows another origin, on which ${SCRIPTED_HEADER} (SCRIPTED_HEADER) letting the board's cookie upload a form relies`, async () => {

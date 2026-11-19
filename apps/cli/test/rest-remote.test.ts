@@ -16,7 +16,7 @@ import { type Said, servedStore, write } from './served.ts';
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -25,7 +25,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 const exposed = await servedStore('nemia-rest-remote-', (root) => write(path.join(root, 'nemia', 'memory', 'feed-cursor'), '42\n'), {
@@ -34,7 +34,7 @@ const exposed = await servedStore('nemia-rest-remote-', (root) => write(path.joi
 afterAll(exposed.stop);
 
 /** A laptop with no store of its own, its config naming the exposed store's api with a token of the person's. */
-async function laptop(): Promise<NodeJS.ProcessEnv> {
+async function laptop() {
   const minted = await nemia(['token', 'add', 'laptop'], exposed.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

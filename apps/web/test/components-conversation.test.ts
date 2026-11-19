@@ -24,14 +24,15 @@ type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
 type ChatEvent = import('../src/lib/api/chat.ts').ChatEvent;
 
 /** One tool call of hers. */
-const chatCall = (id: string, state: 'done' | 'running' | 'waits', second: number): Extract<ChatEvent, { kind: 'call' }> => ({
-  kind: 'call',
-  id,
-  at: new Date(Date.UTC(2026, 9, 15, 21, 40, second)).toISOString(),
-  tool: 'Read',
-  sentence: 'Read the inbox',
-  state,
-});
+const chatCall = (id: string, state: 'done' | 'running' | 'waits', second: number) =>
+  ({
+    kind: 'call',
+    id,
+    at: new Date(Date.UTC(2026, 9, 15, 21, 40, second)).toISOString(),
+    tool: 'Read',
+    sentence: 'Read the inbox',
+    state,
+  }) satisfies Extract<ChatEvent, { kind: 'call' }>;
 
 /** The family's turn over `calls` of hers, through her adapter onto the one shape it draws. */
 const workOf = (calls: Extract<ChatEvent, { kind: 'call' }>[]) => {
@@ -65,14 +66,15 @@ test('REFUSED: a family part that writes one conversation’s marks: the prefix 
 });
 
 /** One line of a turn, as a conversation's adapter gives it. */
-const line = (over: Partial<ConversationLine> = {}): ConversationLine => ({
-  id: 'l:1',
-  tool: 'Grep',
-  sentence: 'Searched for drainsThis',
-  fact: '3 matches',
-  state: 'done',
-  ...over,
-});
+const line = (over: Partial<ConversationLine> = {}) =>
+  ({
+    id: 'l:1',
+    tool: 'Grep',
+    sentence: 'Searched for drainsThis',
+    fact: '3 matches',
+    state: 'done',
+    ...over,
+  }) satisfies ConversationLine;
 
 test('a line opens to what it asked and what came back where it has either, and a line with neither has nothing to open', () => {
   const plain = renderToStaticMarkup(createElement(WorkedLine, { line: line(), marks: 'chat' }));

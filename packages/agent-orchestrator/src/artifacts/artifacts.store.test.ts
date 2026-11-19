@@ -22,16 +22,16 @@ import type { StepSpec } from '../step/step.ts';
 import { names } from '../../test/assessed.ts';
 
 /** A run whose step `build` works in `workspace`, with its files directory made: the run, and that directory. */
-function aRun(workspace: string | undefined): { run: Run; dir: string } {
+function aRun(workspace: string | undefined) {
   const id = path.basename(scratch('wf-lacked-'));
   const dir = path.join(ROOT, 'runs', id, 'artifacts', 'build');
   fs.mkdirSync(dir, { recursive: true });
   const run = { id, steps: { build: { taskId: 't1', ...(workspace ? { workspace } : {}) } } } as unknown as Run;
-  return { run, dir };
+  return { run, dir } satisfies { run: Run; dir: string };
 }
 
 /** A closeout that names `artifacts`. */
-const naming = (...artifacts: string[]): Closeout => ({ outcome: 'done', summary: 'done', artifacts });
+const naming = (...artifacts: string[]) => ({ outcome: 'done', summary: 'done', artifacts }) satisfies Closeout;
 
 const FILES = '/wf/runs/r-1/artifacts/implement';
 
@@ -194,11 +194,15 @@ const STEPS = [
 ] as unknown as StepSpec[];
 
 /** A run whose `implement` is on task `t1`, with `settlesCounted` as given (none for `null`). */
-const runOf = (record: Partial<StepRecord> = {}, counted: string[] | null = []): Run =>
-  ({ id: 'r-1', steps: { implement: { taskId: 't1', ...record } }, ...(counted ? { settlesCounted: counted } : {}) }) as unknown as Run;
+const runOf = (record: Partial<StepRecord> = {}, counted: string[] | null = []) =>
+  ({
+    id: 'r-1',
+    steps: { implement: { taskId: 't1', ...record } },
+    ...(counted ? { settlesCounted: counted } : {}),
+  }) as unknown as Run;
 
 const NAMING = () => ({ artifacts: ['a.md'] });
-const SUCCEEDED = (): 'succeeded' => 'succeeded';
+const SUCCEEDED = () => 'succeeded' as const satisfies 'succeeded';
 
 describe('filesDue: the files of a task are read once, on the pass that first reads it signed, and never of one an earlier tick left unread', () => {
   const rows: Array<[string, StepSpec[], Run, (id: string) => string, () => { artifacts: string[] } | undefined, string[]]> = [

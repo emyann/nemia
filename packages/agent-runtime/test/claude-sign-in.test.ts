@@ -28,7 +28,7 @@ const { claudeCodeOps } = await import('../src/harness/claude/code.ts');
 const { authStatusOf, claudeLaunch } = await import('../src/harness/claude/sign-in.ts');
 
 /** The lines of `file` in `dir`, each parsed; none where it is absent. */
-const lines = (dir: string, file: string): unknown[] => {
+const lines = (dir: string, file: string) => {
   const at = path.join(dir, file);
   return fs.existsSync(at)
     ? fs

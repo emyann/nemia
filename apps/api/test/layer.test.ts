@@ -19,7 +19,7 @@ import { engine, Informer } from 'agent-orchestrator';
 const OPEN = '/api/runs?fieldSelector=status.state!%3Dfinished';
 
 /** The names of the workflows `GET /api/namespaces/default/workflows?origin=user` lists as yours, through `on`. */
-const yoursOn = async (on: typeof app): Promise<string[]> =>
+const yoursOn = async (on: typeof app) =>
   (await listedIn<{ from: string; name: string }>(on, 'workflows', 'origin=user')).filter((w) => w.from === 'user').map((w) => w.name);
 
 describe("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", () => {

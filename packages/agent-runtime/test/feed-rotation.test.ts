@@ -165,6 +165,7 @@ test('a reader that opened the head before an append and a rotation, and the sea
   const sealed = path.join(root, 'feed.sealed.jsonl');
   const open = fs.openSync;
   let between = true;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- writes between the seal and its open: a race
   fs.openSync = (...args: Parameters<typeof fs.openSync>) => {
     if (between && args[0] === sealed) {
       between = false;
@@ -191,6 +192,7 @@ test('a rotation stopped between its renames leaves every reader right, and the 
   const at7 = cursorAfter(head, 7);
   const was = await read(ops, at7);
   const rename = fs.renameSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- stops before the head's rename, as a crash
   fs.renameSync = (from: fs.PathLike, to: fs.PathLike) => {
     if (String(to) === head) throw new Error('stopped before the head was renamed');
     rename(from, to);
@@ -231,6 +233,7 @@ test('two rotations racing: the one that meets the other done starts again, and 
   const was = await read(ops, at7);
   const link = fs.linkSync;
   let other: { linesForgotten: number } | undefined;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a second rotation before the link: a race
   fs.linkSync = (from: fs.PathLike, to: fs.PathLike) => {
     fs.linkSync = link;
     other = rotateFeed(root, new Set(['c']), () => {});

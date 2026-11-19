@@ -21,7 +21,7 @@ const SECOND = /^.+_\d+$/;
  * @param names The names of the document's components.
  * @param kept The second components the list allows, by name.
  */
-export const breaks = (names: readonly string[], kept: readonly string[]): string[] => [
+export const breaks = (names: readonly string[], kept: readonly string[]) => [
   ...names
     .filter((name) => SECOND.test(name) && !kept.includes(name))
     .map(

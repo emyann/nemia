@@ -16,4 +16,4 @@ const BOARD = path
  * Whether `file`, a path from a board's root — this board's, or a copy a test plants under a scratch root — is ours: judged as git would
  * judge it at the same place in this board, so a planted kit file is left out as the real one is.
  */
-export const ours = (file: string): boolean => oursInRepo(`${BOARD}/${file}`);
+export const ours = (file: string) => oursInRepo(`${BOARD}/${file}`);

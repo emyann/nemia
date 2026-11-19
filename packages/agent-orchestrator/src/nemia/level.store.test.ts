@@ -27,7 +27,7 @@ import {
 } from './level.store.ts';
 
 /** A package at `dir` whose `package.json` says its `nemia` is `bin/nemia.ts`, as the client in `apps/cli` does. */
-const pkg = (dir: string): string => {
+const pkg = (dir: string) => {
   fs.mkdirSync(path.join(dir, 'bin'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'cli', bin: { nemia: 'bin/nemia.ts' } }));
   fs.writeFileSync(path.join(dir, 'bin', 'nemia.ts'), '');
@@ -35,7 +35,7 @@ const pkg = (dir: string): string => {
 };
 
 /** A `nemia` in the folder `bin`, linked to `target` by a relative path, as npm links one. */
-const linked = (bin: string, target: string): void => {
+const linked = (bin: string, target: string) => {
   fs.mkdirSync(bin, { recursive: true });
   fs.symlinkSync(path.relative(bin, target), path.join(bin, 'nemia'));
 };

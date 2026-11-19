@@ -18,15 +18,15 @@ type Walk = DoorWalk<FeedDoorShape>;
 type Door = FeedDoorShape;
 
 /** A run's line as a pass writes one. */
-const aLine = (word: string, run = 'r-1'): RunLine => ({ at: '2026-11-01T00:00:00.000Z', run, word });
+const aLine = (word: string, run = 'r-1') => ({ at: '2026-11-01T00:00:00.000Z', run, word }) satisfies RunLine;
 
 /** The bytes `lines` take on the feed, one JSON line each. */
-const bytesOf = (lines: readonly FeedLine[]): number => Buffer.byteLength(lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
+const bytesOf = (lines: readonly FeedLine[]) => Buffer.byteLength(lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
 
 const TWO = [aLine('running'), aLine('done · a note with a dash — in it')];
 
 /** `TWO` appended on `door`, and where they ended. */
-const appended = (door: Door): number => done(door.lines.append(TWO)).after;
+const appended = (door: Door) => done(door.lines.append(TWO)).after;
 
 export const FEED_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   'lines.end': [

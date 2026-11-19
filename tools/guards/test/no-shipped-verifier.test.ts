@@ -29,7 +29,7 @@ const FIX =
   `or restate it so a helper's spec carries it`;
 
 /** Each field of `manifest`, read at `file`, that ships the verifier, as a sentence naming the fix. */
-const shippedIn = (file: string, manifest: Manifest): string[] =>
+const shippedIn = (file: string, manifest: Manifest) =>
   SHIPPED_FIELDS.filter((field) => {
     const deps = manifest[field];
     return typeof deps === 'object' && deps !== null && Object.hasOwn(deps, VERIFIER);
@@ -39,11 +39,11 @@ const shippedIn = (file: string, manifest: Manifest): string[] =>
 const IMPORT = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"`]@emyann\/tsverify(?:\/[^'"`]*)?['"`]/;
 
 /** `file`, holding `text`, as a sentence naming the fix when it imports the verifier; nothing when it does not. */
-const importedIn = (file: string, text: string): string[] =>
+const importedIn = (file: string, text: string) =>
   IMPORT.test(text) ? [`${file} imports ${VERIFIER}, which ships it with its package: ${FIX}`] : [];
 
 /** Every `.ts`, `.tsx`, `.js`, `.mjs`, `.cjs` and `.jsx` file under `dir`, by path from the root, `node_modules` left out. */
-const sources = (dir: string): string[] => {
+const sources = (dir: string) => {
   const at = path.join(REPO, dir);
   if (!fs.existsSync(at)) return [];
   return fs

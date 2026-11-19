@@ -4,7 +4,7 @@
 export type Entry = { name: string; type?: string; body?: string; mode?: number; prefix?: string; checksum?: number; magic?: string };
 
 /** A ustar header of `entry`, written as no packer would refuse to. */
-function rawHeader(entry: Entry): Buffer {
+function rawHeader(entry: Entry) {
   const block = Buffer.alloc(512);
   const body = Buffer.from(entry.body ?? '');
   block.write(entry.name, 0, 100, 'utf8');
@@ -19,15 +19,15 @@ function rawHeader(entry: Entry): Buffer {
   let sum = 0;
   for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 0x20 : block[i];
   block.write(`${(entry.checksum ?? sum).toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii');
-  return block;
+  return block satisfies Buffer;
 }
 
 /** A tar of `entries`, each body padded to its block, ended by two zero blocks unless `cut` drops the bytes after it. */
-export function rawTar(entries: Entry[], cut?: number): Buffer {
+export function rawTar(entries: Entry[], cut?: number) {
   const parts = entries.flatMap((entry) => {
     const body = Buffer.from(entry.body ?? '');
     return [rawHeader(entry), body, Buffer.alloc((512 - (body.length % 512)) % 512)];
   });
   const tar = Buffer.concat([...parts, Buffer.alloc(1024)]);
-  return cut === undefined ? tar : tar.subarray(0, cut);
+  return (cut === undefined ? tar : tar.subarray(0, cut)) satisfies Buffer;
 }

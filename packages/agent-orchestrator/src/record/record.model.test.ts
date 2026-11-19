@@ -11,7 +11,7 @@ import { Landing, Run, RunId, StepName } from './record.model.ts';
 import { runId } from './record.store.ts';
 import { run } from '../../test/assessed.ts';
 
-const decodes = (value: unknown): boolean => Schema.is(Run)(value);
+const decodes = (value: unknown) => Schema.is(Run)(value);
 
 describe("each id is checked on create by its writer's rule, and any string reads", () => {
   const minted = runId('Add a flag to nemia ls');

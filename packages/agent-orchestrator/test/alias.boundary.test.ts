@@ -11,7 +11,7 @@ import { scratch } from 'test-kit/scratch';
 import { WF_HINT } from '../src/cli/flags.ts';
 
 /** `bin/<bin>.ts <argv>` over a store of its own, as a process: its exit code, both streams, and the store. */
-function run(bin: 'nemia' | 'wf', argv: string[]): { status: number | null; stdout: string; stderr: string; store: string } {
+function run(bin: 'nemia' | 'wf', argv: string[]) {
   const dir = scratch(`wf-alias-${bin}-`);
   const { status, stdout, stderr } = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'bin', `${bin}.ts`), ...argv], {
     cwd: dir,

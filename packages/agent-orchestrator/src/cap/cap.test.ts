@@ -202,10 +202,7 @@ describe('`ceilingLines`: sessions at work per pool, and runs in flight — `no 
 describe('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', () => {
   const fresh = run({ implement: null, review: null });
   const slot = { inFlight: 2, cap: 2 };
-  const shown =
-    (m: Record<string, ListedPhase>) =>
-    (id: string): ListedPhase =>
-      m[id] ?? 'unknown';
+  const shown = (m: Record<string, ListedPhase>) => (id: string) => m[id] ?? 'unknown';
   const listed = (r: Run, p: Record<string, ListedPhase>, waits: Array<{ run: string }> = [], given = true) =>
     listing(
       listingInput({

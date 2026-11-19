@@ -23,7 +23,7 @@ type Texts = Record<typeof NODE | typeof UPGRADE | typeof README | typeof LOCK, 
 const SDK = 'node_modules/@anthropic-ai/claude-agent-sdk';
 
 /** The sentence naming what `file`'s list `found` lacks or adds against `PLATFORMS`, or nothing where they agree. */
-const differs = (file: string, what: string, found: readonly string[] | undefined): string[] => {
+const differs = (file: string, what: string, found: readonly string[] | undefined) => {
   if (found === undefined) return [`${file}: no ${what} found to read: keep it where this guard reads it, or change the guard with it`];
   const missing = PLATFORMS.filter((p) => !found.includes(p));
   const extra = [...new Set(found)].filter((p) => !(PLATFORMS as readonly string[]).includes(p));
@@ -34,25 +34,25 @@ const differs = (file: string, what: string, found: readonly string[] | undefine
 };
 
 /** The keys of node.json's `sha256`, or undefined where it holds none. */
-const nodeSums = (text: string): string[] | undefined => {
+const nodeSums = (text: string) => {
   const sums = (JSON.parse(text) as { sha256?: Record<string, string> }).sha256;
   return sums === undefined ? undefined : Object.keys(sums);
 };
 
 /** The words of the `RELEASE_PLATFORMS = [...] as const` literal, across line breaks, or undefined where there is none. */
-const upgradePlatforms = (text: string): string[] | undefined => {
+const upgradePlatforms = (text: string) => {
   const literal = /export const RELEASE_PLATFORMS\s*=\s*\[([^\]]*)\]\s*as const/.exec(text)?.[1];
   return literal === undefined ? undefined : [...literal.matchAll(/'([^']+)'/g)].map((m) => m[1] ?? '');
 };
 
 /** The platform of each archive row of the README's asset table, or undefined where it lists none. */
-const readmeAssets = (text: string): string[] | undefined => {
+const readmeAssets = (text: string) => {
   const rows = [...text.matchAll(/^\|\s*`nemia-<tag>-([a-z0-9-]+)\.tar\.gz`/gm)].map((m) => m[1] ?? '');
   return rows.length === 0 ? undefined : rows;
 };
 
 /** The platforms of the SDK's platform packages in the lockfile, the musl builds left aside, or undefined where it has no SDK. */
-const sdkPlatforms = (text: string): string[] | undefined => {
+const sdkPlatforms = (text: string) => {
   const sdk = (JSON.parse(text) as { packages?: Record<string, { optionalDependencies?: Record<string, string> }> }).packages?.[SDK];
   if (sdk === undefined) return undefined;
   const prefix = `@anthropic-ai/${SDK_PLATFORM_PREFIX}`;
@@ -68,7 +68,7 @@ const sdkPlatforms = (text: string): string[] | undefined => {
  *
  * @param texts The text of each file the guard reads, by its path from the root.
  */
-export const platformDrift = (texts: Texts): string[] => {
+export const platformDrift = (texts: Texts) => {
   const sdk = sdkPlatforms(texts[LOCK]);
   return [
     ...differs(NODE, 'pinned Node sums', nodeSums(texts[NODE])),
@@ -83,8 +83,8 @@ export const platformDrift = (texts: Texts): string[] => {
 };
 
 /** The shipped texts. */
-const shipped = (): Texts => {
-  const read = (file: string): string => {
+const shipped = () => {
+  const read = (file: string) => {
     const text = textOf(file);
     assert.ok(text !== undefined, `${file} is not in the repository`);
     return text;
@@ -93,7 +93,7 @@ const shipped = (): Texts => {
 };
 
 /** `text` with `from` replaced by `to`, asserting `from` is there, so a plant that no longer matches fails loudly. */
-const planted = (text: string, from: string | RegExp, to: string): string => {
+const planted = (text: string, from: string | RegExp, to: string) => {
   const out = text.replace(from, to);
   assert.notEqual(out, text, `the plant ${String(from)} matches nothing`);
   return out;

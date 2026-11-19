@@ -76,7 +76,7 @@ fs.writeFileSync(path.join(BIN, 'systemctl'), STUB, { mode: 0o755 });
 /** The unit as the stub keeps it. */
 type Unit = { ACTIVE: string; PID: string; SIGNALLED: string; LINGER: string; START: string };
 
-const unitNow = (): Unit =>
+const unitNow = () =>
   Object.fromEntries(
     fs
       .readFileSync(path.join(UNIT, 'state'), 'utf8')
@@ -85,7 +85,7 @@ const unitNow = (): Unit =>
       .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
   ) as Unit;
 
-const unitSet = (unit: Partial<Unit>): void => {
+const unitSet = (unit: Partial<Unit>) => {
   const next = { ...unitNow(), ...unit };
   fs.writeFileSync(
     path.join(UNIT, 'state'),
@@ -95,24 +95,25 @@ const unitSet = (unit: Partial<Unit>): void => {
   );
 };
 
-const stubLog = (): string[] => fs.readFileSync(path.join(UNIT, 'log'), 'utf8').split('\n').filter(Boolean);
+const stubLog = () => fs.readFileSync(path.join(UNIT, 'log'), 'utf8').split('\n').filter(Boolean) satisfies string[];
 
 /** A lease written by the api of `pid`, standing as `kind`, with a pass completed when `passed`. */
-const lease = (pid: number, kind: 'ticking' | 'stopped', passed = false): DaemonStanding => ({
-  kind,
-  file: {
-    pid,
-    by: 'api',
-    url: 'http://127.0.0.1:8790',
-    startedAt: new Date().toISOString(),
-    cwd: '/',
-    every: 4000,
-    passedAt: passed ? new Date().toISOString() : null,
-  },
-  last: Date.now(),
-  quiet: 0,
-  identity: 'same',
-});
+const lease = (pid: number, kind: 'ticking' | 'stopped', passed = false) =>
+  ({
+    kind,
+    file: {
+      pid,
+      by: 'api',
+      url: 'http://127.0.0.1:8790',
+      startedAt: new Date().toISOString(),
+      cwd: '/',
+      every: 4000,
+      passedAt: passed ? new Date().toISOString() : null,
+    },
+    last: Date.now(),
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 /**
  * The live host, its `systemctl` the stub's, over a scratch home, with the lease read off the stub's state: the old pid ticking until
@@ -128,9 +129,9 @@ function hostOf(start: string, linger: number) {
     machine: () => ({ platform: 'linux', wsl: false, systemd: true }),
     dirs: () => ({ home: HOME, configHome: path.join(HOME, '.config') }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
-    lease: (): DaemonStanding => {
-      if (unitNow().PID === String(NEW)) return lease(NEW, 'ticking', newReads++ > 0);
-      return lease(OLD, signalled ? 'stopped' : 'ticking');
+    lease: () => {
+      if (unitNow().PID === String(NEW)) return lease(NEW, 'ticking', newReads++ > 0) satisfies DaemonStanding;
+      return lease(OLD, signalled ? 'stopped' : 'ticking') satisfies DaemonStanding;
     },
     signal: (pid: number) => {
       assert.equal(pid, OLD);

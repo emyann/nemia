@@ -51,13 +51,13 @@ export const JUDGED: Readonly<Record<(typeof PACKAGES)[number], readonly Kind[]>
 export const BOUNDARY = '.boundary.test.ts';
 
 /** Whether `file` says by its name that it is a boundary test: `<what>.boundary.test.ts`. */
-export const isBoundary = (file: string): boolean => {
+export const isBoundary = (file: string) => {
   const name = path.posix.basename(file);
   return name.endsWith(BOUNDARY) && name.length > BOUNDARY.length;
 };
 
 /** The package of `PACKAGES` a file is in. */
-export const packageOf = (file: string): (typeof PACKAGES)[number] | undefined => PACKAGES.find((p) => file.startsWith(`${p}/`));
+export const packageOf = (file: string) => PACKAGES.find((p) => file.startsWith(`${p}/`)) satisfies (typeof PACKAGES)[number] | undefined;
 
 /** The modules that start a process or a thread. */
 export const STARTS = ['node:child_process', 'child_process', 'node:worker_threads', 'worker_threads', 'node:cluster', 'cluster'];
@@ -123,64 +123,76 @@ export type Import = { readonly module: string; readonly names: readonly Named[]
 export type Bound = { readonly module: string; readonly name: string; readonly typeOnly: boolean };
 
 /** `spec` as imported by `file`: a package's name as it is, a relative path as a path from the repository root. */
-export const moduleOf = (file: string, spec: string): string =>
-  spec.startsWith('.') ? path.posix.join(path.posix.dirname(file), spec) : spec;
+export const moduleOf = (file: string, spec: string) => (spec.startsWith('.') ? path.posix.join(path.posix.dirname(file), spec) : spec);
 
 /** The name of a binding or specifier element, where it is a plain one. */
-const textOf = (node: ts.Node | undefined): string | undefined =>
-  node && (ts.isIdentifier(node) || ts.isStringLiteral(node)) ? node.text : undefined;
+const textOf = (node: ts.Node | undefined) =>
+  (node && (ts.isIdentifier(node) || ts.isStringLiteral(node)) ? node.text : undefined) satisfies string | undefined;
 
 /** The names an import clause binds. */
-function clauseNames(clause: ts.ImportClause | undefined): Named[] {
-  if (!clause) return [];
+function clauseNames(clause: ts.ImportClause | undefined) {
+  if (!clause) return [] satisfies Named[];
   const names: Named[] = clause.name ? [{ name: 'default', local: clause.name.text, typeOnly: false }] : [];
   const bindings = clause.namedBindings;
   if (bindings && ts.isNamespaceImport(bindings)) names.push({ name: '*', local: bindings.name.text, typeOnly: false });
   if (bindings && ts.isNamedImports(bindings))
     for (const e of bindings.elements)
       names.push({ name: textOf(e.propertyName) ?? e.name.text, local: e.name.text, typeOnly: e.isTypeOnly });
-  return names;
+  return names satisfies Named[];
 }
 
 /** The names an `export … from` hands on: none of them local. */
-function exportNames(clause: ts.NamedExportBindings | undefined): Named[] {
-  if (!clause) return [];
-  if (ts.isNamespaceExport(clause)) return [{ name: '*', local: undefined, typeOnly: false }];
-  return clause.elements.map((e) => ({ name: textOf(e.propertyName) ?? textOf(e.name) ?? '', local: undefined, typeOnly: e.isTypeOnly }));
+function exportNames(clause: ts.NamedExportBindings | undefined) {
+  if (!clause) return [] satisfies Named[];
+  if (ts.isNamespaceExport(clause)) return [{ name: '*', local: undefined, typeOnly: false }] satisfies Named[];
+  return clause.elements.map((e) => ({
+    name: textOf(e.propertyName) ?? textOf(e.name) ?? '',
+    local: undefined,
+    typeOnly: e.isTypeOnly,
+  })) satisfies Named[];
 }
 
 /** The names a dynamic import binds where its answer is declared: a destructuring's, or the whole module under one name. */
-function dynamicNames(call: ts.CallExpression): Named[] {
+function dynamicNames(call: ts.CallExpression) {
   let at: ts.Node = call;
   while (ts.isAwaitExpression(at.parent) || ts.isParenthesizedExpression(at.parent)) at = at.parent;
   const declared = at.parent;
-  if (!ts.isVariableDeclaration(declared) || declared.initializer !== at) return [];
-  if (ts.isIdentifier(declared.name)) return [{ name: '*', local: declared.name.text, typeOnly: false }];
-  if (!ts.isObjectBindingPattern(declared.name)) return [];
+  if (!ts.isVariableDeclaration(declared) || declared.initializer !== at) return [] satisfies Named[];
+  if (ts.isIdentifier(declared.name)) return [{ name: '*', local: declared.name.text, typeOnly: false }] satisfies Named[];
+  if (!ts.isObjectBindingPattern(declared.name)) return [] satisfies Named[];
   return declared.name.elements.map((e) => ({
     name: textOf(e.propertyName) ?? textOf(e.name) ?? '',
     local: textOf(e.name),
     typeOnly: false,
-  }));
+  })) satisfies Named[];
 }
 
 /** The import `node` is, in `file`: a static one, an `export … from`, or a dynamic one of a module written there. */
-function importOf(node: ts.Node, file: string): Import | undefined {
+function importOf(node: ts.Node, file: string) {
   if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
     const clause = node.importClause;
-    return { module: moduleOf(file, node.moduleSpecifier.text), names: clauseNames(clause), typeOnly: clause?.isTypeOnly ?? false };
+    return {
+      module: moduleOf(file, node.moduleSpecifier.text),
+      names: clauseNames(clause),
+      typeOnly: clause?.isTypeOnly ?? false,
+    } satisfies Import | undefined;
   }
   if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier))
-    return { module: moduleOf(file, node.moduleSpecifier.text), names: exportNames(node.exportClause), typeOnly: node.isTypeOnly };
+    return {
+      module: moduleOf(file, node.moduleSpecifier.text),
+      names: exportNames(node.exportClause),
+      typeOnly: node.isTypeOnly,
+    } satisfies Import | undefined;
   if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
     const spec = node.arguments[0];
-    if (spec && ts.isStringLiteralLike(spec)) return { module: moduleOf(file, spec.text), names: dynamicNames(node), typeOnly: false };
+    if (spec && ts.isStringLiteralLike(spec))
+      return { module: moduleOf(file, spec.text), names: dynamicNames(node), typeOnly: false } satisfies Import | undefined;
   }
-  return undefined;
+  return undefined satisfies Import | undefined;
 }
 
 /** Whether an import loads its module when the file runs: it is no type's alone. */
-const loads = (one: Import): boolean => !one.typeOnly && (one.names.length === 0 || one.names.some((n) => !n.typeOnly));
+const loads = (one: Import) => !one.typeOnly && (one.names.length === 0 || one.names.some((n) => !n.typeOnly));
 
 /** What a clause reads of a file beside a node: its imports by their node, its bindings, and its string `const`s. */
 export type Read = {
@@ -191,63 +203,63 @@ export type Read = {
 };
 
 /** `text` parsed as the TypeScript of `file`. */
-const parsed = (file: string, text: string): ts.SourceFile =>
-  ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+const parsed = (file: string, text: string) =>
+  ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) satisfies ts.SourceFile;
 
 /** Every import of `source`, by its node. */
-function importsOf(file: string, source: ts.SourceFile): Map<ts.Node, Import> {
+function importsOf(file: string, source: ts.SourceFile) {
   const imports = new Map<ts.Node, Import>();
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     const one = importOf(node, file);
     if (one) imports.set(node, one);
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return imports;
+  return imports satisfies Map<ts.Node, Import>;
 }
 
 /** What each local name `text` imports is bound to, in `file`. */
-export function bindingsOf(file: string, text: string): Map<string, Bound> {
-  return boundBy(importsOf(file, parsed(file, text)).values());
+export function bindingsOf(file: string, text: string) {
+  return boundBy(importsOf(file, parsed(file, text)).values()) satisfies Map<string, Bound>;
 }
 
 /** The bindings `imports` make. */
-function boundBy(imports: Iterable<Import>): Map<string, Bound> {
+function boundBy(imports: Iterable<Import>) {
   const bindings = new Map<string, Bound>();
   for (const one of imports)
     for (const n of one.names)
       if (n.local !== undefined) bindings.set(n.local, { module: one.module, name: n.name, typeOnly: one.typeOnly || n.typeOnly });
-  return bindings;
+  return bindings satisfies Map<string, Bound>;
 }
 
 /** What a value expression names: an identifier's binding, or a member of a module bound whole. */
-function refOf(node: ts.Expression, read: Read): Bound | undefined {
+function refOf(node: ts.Expression, read: Read) {
   const at = unwrapped(node);
-  if (ts.isIdentifier(at)) return read.bindings.get(at.text);
-  if (!ts.isPropertyAccessExpression(at)) return undefined;
+  if (ts.isIdentifier(at)) return read.bindings.get(at.text) satisfies Bound | undefined;
+  if (!ts.isPropertyAccessExpression(at)) return undefined satisfies Bound | undefined;
   const whole = unwrapped(at.expression);
   const bound = ts.isIdentifier(whole) ? read.bindings.get(whole.text) : undefined;
-  return bound?.name === '*' ? { ...bound, name: at.name.text } : undefined;
+  return (bound?.name === '*' ? { ...bound, name: at.name.text } : undefined) satisfies Bound | undefined;
 }
 
 /** What a type names: a reference's binding, or a member of a module bound whole. */
-function typeRefOf(node: ts.TypeNode | undefined, read: Read): Bound | undefined {
-  if (!node || !ts.isTypeReferenceNode(node)) return undefined;
+function typeRefOf(node: ts.TypeNode | undefined, read: Read) {
+  if (!node || !ts.isTypeReferenceNode(node)) return undefined satisfies Bound | undefined;
   const name = node.typeName;
-  if (ts.isIdentifier(name)) return read.bindings.get(name.text);
+  if (ts.isIdentifier(name)) return read.bindings.get(name.text) satisfies Bound | undefined;
   const bound = ts.isIdentifier(name.left) ? read.bindings.get(name.left.text) : undefined;
-  return bound?.name === '*' ? { ...bound, name: name.right.text } : undefined;
+  return (bound?.name === '*' ? { ...bound, name: name.right.text } : undefined) satisfies Bound | undefined;
 }
 
 /** Whether `bound` is one of `watched`'s names from one of its modules. */
-const isOf = (bound: Bound | undefined, watched: Names): boolean =>
+const isOf = (bound: Bound | undefined, watched: Names) =>
   bound !== undefined && watched.modules.includes(bound.module) && watched.names.includes(bound.name);
 
 /** Whether `bound` is a value of `watched`. */
-const valueOf = (bound: Bound | undefined, watched: Names): boolean => isOf(bound, watched) && !bound?.typeOnly;
+const valueOf = (bound: Bound | undefined, watched: Names) => isOf(bound, watched) && !bound?.typeOnly;
 
 /** Whether `node` binds a value of `watched`: an import that names one, or a member read of its module bound whole. */
-function bindsValue(node: ts.Node, read: Read, watched: Names): boolean {
+function bindsValue(node: ts.Node, read: Read, watched: Names) {
   const one = read.imports.get(node);
   if (one)
     return !one.typeOnly && watched.modules.includes(one.module) && one.names.some((n) => !n.typeOnly && watched.names.includes(n.name));
@@ -255,14 +267,16 @@ function bindsValue(node: ts.Node, read: Read, watched: Names): boolean {
 }
 
 /** The service `call` is called on by the member `member`: `X` of `X.member(…)`. */
-function calledOn(call: ts.Node, member: string, read: Read): Bound | undefined {
-  if (!ts.isCallExpression(call)) return undefined;
+function calledOn(call: ts.Node, member: string, read: Read) {
+  if (!ts.isCallExpression(call)) return undefined satisfies Bound | undefined;
   const callee = unwrapped(call.expression);
-  return ts.isPropertyAccessExpression(callee) && callee.name.text === member ? refOf(callee.expression, read) : undefined;
+  return (ts.isPropertyAccessExpression(callee) && callee.name.text === member ? refOf(callee.expression, read) : undefined) satisfies
+    | Bound
+    | undefined;
 }
 
 /** Whether `call` gives a service its implementation: a layer of `GIVERS`, or `provideService`. */
-function gives(call: ts.CallExpression, read: Read): boolean {
+function gives(call: ts.CallExpression, read: Read) {
   const name = calleeName(call) ?? '';
   if (name === 'provideService') return true;
   const root = calleeRoot(call);
@@ -273,33 +287,36 @@ function gives(call: ts.CallExpression, read: Read): boolean {
 type Typed = { readonly value: ts.Expression; readonly type: ts.TypeNode };
 
 /** What a function's body returns: an arrow's expression, or the value of each `return` of its block, a function inside it left out. */
-function returnedBy(body: ts.Node): ts.Expression[] {
-  if (!ts.isBlock(body)) return ts.isExpression(body) ? [body] : [];
+function returnedBy(body: ts.Node) {
+  if (!ts.isBlock(body)) return (ts.isExpression(body) ? [body] : []) satisfies ts.Expression[];
   const values: ts.Expression[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isFunctionLike(node)) return;
     if (ts.isReturnStatement(node) && node.expression) values.push(node.expression);
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(body, visit);
-  return values;
+  return values satisfies ts.Expression[];
 }
 
 /**
  * The values `node` says are of a type, each with that type: an assertion's, a declaration's under its annotation, and what a function
  * returns under its return type.
  */
-function typed(node: ts.Node): Typed[] {
-  if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return [{ value: node.expression, type: node.type }];
-  if (ts.isVariableDeclaration(node) && node.type && node.initializer) return [{ value: node.initializer, type: node.type }];
+function typed(node: ts.Node) {
+  if (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return [{ value: node.expression, type: node.type }] satisfies Typed[];
+  if (ts.isVariableDeclaration(node) && node.type && node.initializer)
+    return [{ value: node.initializer, type: node.type }] satisfies Typed[];
   const type = ts.isFunctionLike(node) ? node.type : undefined;
   const body = ts.isFunctionLike(node) && 'body' in node ? node.body : undefined;
-  return type && body ? returnedBy(body).map((value) => ({ value, type })) : [];
+  return (type && body ? returnedBy(body).map((value) => ({ value, type })) : []) satisfies Typed[];
 }
 
 /** The argument of a call that gives a service which names the service: the first, or the second where the program comes first. */
-const tagGiven = (call: ts.CallExpression): ts.Expression | undefined =>
-  calleeName(call) === 'provideService' && call.arguments.length === 3 ? call.arguments[1] : call.arguments[0];
+const tagGiven = (call: ts.CallExpression) =>
+  (calleeName(call) === 'provideService' && call.arguments.length === 3 ? call.arguments[1] : call.arguments[0]) satisfies
+    | ts.Expression
+    | undefined;
 
 /** One clause of the rule: its name, the kind it measures, and whether a node of a file is a site of it. */
 export type Clause = { readonly name: string; readonly kind: Kind; readonly matches: (node: ts.Node, read: Read) => boolean };
@@ -359,26 +376,27 @@ export type Site = { readonly kind: Kind; readonly clause: string; readonly line
 type Own = { readonly sites: readonly Site[]; readonly loaded: readonly string[] };
 
 /** A file's own sites under `clauses`, and the modules it loads when it runs. */
-function ownOf(file: string, text: string, clauses: readonly Clause[]): Own {
+function ownOf(file: string, text: string, clauses: readonly Clause[]) {
   const source = parsed(file, text);
   const imports = importsOf(file, source);
   const read: Read = { file, imports, bindings: boundBy(imports.values()), facts: factsOf(source) };
   const sites: Site[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     for (const clause of clauses)
       if (clause.matches(node, read))
         sites.push({ kind: clause.kind, clause: clause.name, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { sites, loaded: [...imports.values()].filter(loads).map((one) => one.module) };
+  return { sites, loaded: [...imports.values()].filter(loads).map((one) => one.module) } satisfies Own;
 }
 
 /** Each site of `text` itself, the file `file`, under `clauses`: its helpers are not read. */
-export const reachIn = (file: string, text: string, clauses: readonly Clause[] = CLAUSES): Site[] => [...ownOf(file, text, clauses).sites];
+export const reachIn = (file: string, text: string, clauses: readonly Clause[] = CLAUSES) =>
+  [...ownOf(file, text, clauses).sites] satisfies Site[];
 
 /** Whether a module is a helper a test inherits from. */
-const isHelper = (module: string): boolean => HELPER.test(module) && !module.endsWith('.test.ts');
+const isHelper = (module: string) => HELPER.test(module) && !module.endsWith('.test.ts');
 
 /** A site, with the file that holds it. */
 export type Located = Site & { readonly file: string };
@@ -398,18 +416,18 @@ export type Measuring = { readonly clauses?: readonly Clause[]; readonly follow?
  */
 export function reachOver(read: (file: string) => string | undefined, { clauses = CLAUSES, follow = true }: Measuring = {}) {
   const known = new Map<string, Own | undefined>();
-  const own = (file: string): Own | undefined => {
+  const own = (file: string) => {
     if (!known.has(file)) {
       const text = read(file);
       known.set(file, text === undefined ? undefined : ownOf(file, text, clauses));
     }
-    return known.get(file);
+    return known.get(file) satisfies Own | undefined;
   };
-  return (file: string): Reach => {
+  return (file: string) => {
     const judged = JUDGED[packageOf(file) ?? O];
     const seen = new Set<string>();
     const every: Located[] = [];
-    const visit = (at: string): void => {
+    const visit = (at: string) => {
       if (seen.has(at)) return;
       seen.add(at);
       const one = own(at);
@@ -419,27 +437,28 @@ export function reachOver(read: (file: string) => string | undefined, { clauses 
     };
     visit(file);
     const sites = every.filter((s) => judged.includes(s.kind));
-    const kindsIn = (found: readonly Located[]): Kind[] => KINDS.filter((kind) => found.some((s) => s.kind === kind));
-    return { kinds: kindsIn(sites), sites, named: kindsIn(every) };
+    const kindsIn = (found: readonly Located[]) => KINDS.filter((kind) => found.some((s) => s.kind === kind)) satisfies Kind[];
+    return { kinds: kindsIn(sites), sites, named: kindsIn(every) } satisfies Reach;
   };
 }
 
 /** What `file` reaches, its helpers followed: see `reachOver`. */
-export const reachOf = (file: string, read: (file: string) => string | undefined, how: Measuring = {}): Reach => reachOver(read, how)(file);
+export const reachOf = (file: string, read: (file: string) => string | undefined, how: Measuring = {}) =>
+  reachOver(read, how)(file) satisfies Reach;
 
 /** The `.test.ts` files under `dir` of `root`, in its folders too where `deep`, by their path from `root`. */
-function testsIn(root: string, dir: string, deep: boolean): string[] {
+function testsIn(root: string, dir: string, deep: boolean) {
   const at = path.join(root, dir);
-  if (!fs.existsSync(at)) return [];
+  if (!fs.existsSync(at)) return [] satisfies string[];
   return fs
     .readdirSync(at, { recursive: deep, encoding: 'utf8' })
     .map((f) => `${dir}/${f.split(path.sep).join('/')}`)
-    .filter((f) => f.endsWith('.test.ts'));
+    .filter((f) => f.endsWith('.test.ts')) satisfies string[];
 }
 
 /** Every test file the three packages' `test` scripts load, under `root`: `test/*.test.ts` and `src/**\/*.test.ts`, by path, sorted. */
-export const testFilesOf = (root: string): string[] =>
-  PACKAGES.flatMap((pkg) => [...testsIn(root, `${pkg}/test`, false), ...testsIn(root, `${pkg}/src`, true)]).sort();
+export const testFilesOf = (root: string) =>
+  PACKAGES.flatMap((pkg) => [...testsIn(root, `${pkg}/test`, false), ...testsIn(root, `${pkg}/src`, true)]).sort() satisfies string[];
 
 /** Each listed test file, by its path from the repository root, with the kinds it reaches. */
 export type Baseline = Readonly<Record<string, readonly Kind[]>>;
@@ -452,33 +471,35 @@ export const FIX =
   'test/stand-ins.baseline.ts, which only shrinks';
 
 /** Where `reach` reaches `kind` first, as `file:line`. */
-const whereOf = (reach: Reach, kind: Kind): string => {
+const whereOf = (reach: Reach, kind: Kind) => {
   const site = reach.sites.find((s) => s.kind === kind);
   return site ? `${site.file}:${site.line}` : 'nowhere';
 };
 
 /** What a file that is no boundary test reaches past its entry, each a sentence. */
-function newReach(file: string, reach: Reach, listed: readonly Kind[] | undefined): string[] {
+function newReach(file: string, reach: Reach, listed: readonly Kind[] | undefined) {
   return reach.kinds
     .filter((kind) => !listed?.includes(kind))
     .map((kind) =>
       listed
         ? `${file} reaches ${kind} (${whereOf(reach, kind)}), which its entry does not list: an entry gains no kind; ${FIX}`
         : `${file} reaches ${kind} (${whereOf(reach, kind)}) and is no boundary test: ${FIX}`,
-    );
+    ) satisfies string[];
 }
 
 /** What an entry of the baseline holds that the measure does not, as a sentence naming the fix. */
-function looseEntry(file: string, listed: readonly Kind[], reach: Reach | undefined, exists: (file: string) => boolean): string[] {
-  if (!reach || !exists(file)) return [`${file} is on the baseline but is not on disk: where it moved, rename its entry; else take it off`];
-  if (isBoundary(file)) return [`${file} is a boundary test, which is refused nothing: delete its entry from the baseline`];
-  if (!reach.kinds.length) return [`${file} reaches nothing real any more: delete its entry from the baseline`];
+function looseEntry(file: string, listed: readonly Kind[], reach: Reach | undefined, exists: (file: string) => boolean) {
+  if (!reach || !exists(file))
+    return [`${file} is on the baseline but is not on disk: where it moved, rename its entry; else take it off`] satisfies string[];
+  if (isBoundary(file))
+    return [`${file} is a boundary test, which is refused nothing: delete its entry from the baseline`] satisfies string[];
+  if (!reach.kinds.length) return [`${file} reaches nothing real any more: delete its entry from the baseline`] satisfies string[];
   const unknown = listed.filter((kind) => !KINDS.includes(kind));
   const gone = listed.filter((kind) => KINDS.includes(kind) && !reach.kinds.includes(kind));
   return [
     ...unknown.map((kind) => `${file}'s entry lists ${kind}, which is no kind: one of ${KINDS.join(', ')}`),
     ...gone.map((kind) => `${file} no longer reaches ${kind}: take ${kind} off its entry`),
-  ];
+  ] satisfies string[];
 }
 
 /**
@@ -486,7 +507,7 @@ function looseEntry(file: string, listed: readonly Kind[], reach: Reach | undefi
  * kind its entry lacks, a listed kind no longer measured, an entry for a file gone, clean or carrying the boundary name, and a
  * boundary test that reaches nothing real.
  */
-export function reachBreaks(measured: ReadonlyMap<string, Reach>, baseline: Baseline, exists: (file: string) => boolean): string[] {
+export function reachBreaks(measured: ReadonlyMap<string, Reach>, baseline: Baseline, exists: (file: string) => boolean) {
   const out: string[] = [];
   for (const [file, reach] of measured) {
     if (!isBoundary(file)) out.push(...newReach(file, reach, baseline[file]));
@@ -494,7 +515,7 @@ export function reachBreaks(measured: ReadonlyMap<string, Reach>, baseline: Base
       out.push(`${file} is named a boundary test and reaches nothing real: drop ${BOUNDARY.slice(0, -8)} from its name`);
   }
   for (const [file, listed] of Object.entries(baseline)) out.push(...looseEntry(file, listed, measured.get(file), exists));
-  return out;
+  return out satisfies string[];
 }
 
 /** How many entries and kinds a baseline holds, by package and by kind. */
@@ -507,11 +528,11 @@ export type Sizes = {
 };
 
 /** The sizes of `baseline`: its entries by package, its listed kinds by kind, and both together. */
-export function sizes(baseline: Baseline): Sizes {
-  const count = <A>(items: readonly A[], keyOf: (item: A) => string): Record<string, number> => {
+export function sizes(baseline: Baseline) {
+  const count = <A>(items: readonly A[], keyOf: (item: A) => string) => {
     const counts: Record<string, number> = {};
     for (const item of items) counts[keyOf(item)] = (counts[keyOf(item)] ?? 0) + 1;
-    return counts;
+    return counts satisfies Record<string, number>;
   };
   const entries = Object.entries(baseline);
   const listed = entries.flatMap(([file, kinds]) => kinds.map((kind) => ({ pkg: packageOf(file) ?? 'elsewhere', kind })));
@@ -529,17 +550,17 @@ export function sizes(baseline: Baseline): Sizes {
         ),
       ]),
     ),
-  };
+  } satisfies Sizes;
 }
 
 /** The baseline a measure writes: each file that is no boundary test and reaches a kind, sorted by path. */
-export const baselineOf = (measured: ReadonlyMap<string, Reach>): Baseline =>
+export const baselineOf = (measured: ReadonlyMap<string, Reach>) =>
   Object.fromEntries(
     [...measured]
       .filter(([file, reach]) => !isBoundary(file) && reach.kinds.length)
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([file, reach]) => [file, reach.kinds]),
-  );
+  ) satisfies Baseline;
 
 /**
  * A stand-in the packages hold, and the contract it owes: the folder of its code, the name that makes one and the modules a test
@@ -588,11 +609,11 @@ export const STAND_INS: readonly StandIn[] = [
 export const PLACES = { folder: `${O}/place`, real: 'git' };
 
 /** The folders of `folders`, each a place's under `PLACES.folder`, that are neither the real one nor a stand-in of `standIns`. */
-export const unlisted = (folders: readonly string[], standIns: readonly StandIn[] = STAND_INS): string[] =>
-  folders.filter((name) => name !== PLACES.real && !standIns.some((s) => s.folder === `${PLACES.folder}/${name}`));
+export const unlisted = (folders: readonly string[], standIns: readonly StandIn[] = STAND_INS) =>
+  folders.filter((name) => name !== PLACES.real && !standIns.some((s) => s.folder === `${PLACES.folder}/${name}`)) satisfies string[];
 
 /** Whether a statement declares one test for every walk told: `for (const [name, walk] of told(…)) test(name, walk);`. */
-function walksAll(statement: ts.Statement, told: ts.CallExpression, read: Read): boolean {
+function walksAll(statement: ts.Statement, told: ts.CallExpression, read: Read) {
   if (!ts.isForOfStatement(statement) || unwrapped(statement.expression) !== told) return false;
   const declared = ts.isVariableDeclarationList(statement.initializer) ? statement.initializer.declarations[0]?.name : undefined;
   if (!declared || !ts.isArrayBindingPattern(declared) || declared.elements.length !== 2) return false;
@@ -613,23 +634,27 @@ function walksAll(statement: ts.Statement, told: ts.CallExpression, read: Read):
 }
 
 /** Why the file `file` does not run every walk of `standIn`, as a sentence; `undefined` where it does. */
-function sideBreak(standIn: StandIn, file: string, text: string): string | undefined {
+function sideBreak(standIn: StandIn, file: string, text: string) {
   const source = parsed(file, text);
   const imports = importsOf(file, source);
   const read: Read = { file, imports, bindings: boundBy(imports.values()), facts: factsOf(source) };
   const walks: Names = { modules: [standIn.walks.file], names: [standIn.walks.told] };
   const tellings: ts.CallExpression[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && valueOf(refOf(node.expression, read), walks)) tellings.push(node);
     ts.forEachChild(node, visit);
   };
   visit(source);
   const how = `for (const [name, walk] of ${standIn.walks.told}(…)) test(name, walk);`;
   if (tellings.length !== 1)
-    return `${file} asks ${standIn.walks.told} of ${standIn.walks.file} ${tellings.length} times, not once: ${how}`;
+    return `${file} asks ${standIn.walks.told} of ${standIn.walks.file} ${tellings.length} times, not once: ${how}` satisfies
+      | string
+      | undefined;
   if (!source.statements.some((statement) => walksAll(statement, tellings[0], read)))
-    return `${file} walks a subset of ${standIn.walks.file}: every walk is a test, declared at the file's top by \`${how}\``;
-  return undefined;
+    return `${file} walks a subset of ${standIn.walks.file}: every walk is a test, declared at the file's top by \`${how}\`` satisfies
+      | string
+      | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /**
@@ -637,13 +662,13 @@ function sideBreak(standIn: StandIn, file: string, text: string): string | undef
  * side that is missing, a real side whose name is no boundary name or that does not reach the real thing, a side of its own that
  * does not make the stand-in, and a side that walks a subset.
  */
-export function contractBreaks(standIn: StandIn, read: (file: string) => string | undefined): string[] {
+export function contractBreaks(standIn: StandIn, read: (file: string) => string | undefined) {
   const out: string[] = [];
-  const side = (file: string, what: string): string | undefined => {
+  const side = (file: string, what: string) => {
     const text = read(file);
     if (text === undefined) out.push(`${standIn.name} has no ${what}: ${file} is missing, and a stand-in without its contract is refused`);
     else out.push(...[sideBreak(standIn, file, text)].filter((said) => said !== undefined));
-    return text;
+    return text satisfies string | undefined;
   };
   const own = side(standIn.own, 'walk of its contract on the stand-in');
   const real = side(standIn.real, 'walk of its contract on the real thing');
@@ -654,18 +679,18 @@ export function contractBreaks(standIn: StandIn, read: (file: string) => string 
     out.push(
       `${standIn.own} is ${standIn.name}'s own side and does not import ${standIn.made} of ${standIn.folder}: walk the stand-in there`,
     );
-  return out;
+  return out satisfies string[];
 }
 
 /** Whether the text `text` of `file` binds the value that makes `standIn`, from one of the modules a test imports it from. */
-const takes = (standIn: StandIn, file: string, text: string): boolean =>
+const takes = (standIn: StandIn, file: string, text: string) =>
   [...bindingsOf(file, text).values()].some((bound) => valueOf(bound, { modules: standIn.from, names: [standIn.made] }));
 
 /**
  * Why `file`, a test or a helper of tests, may not take a stand-in it takes, each a sentence naming the fix: a file of the package
  * that builds the real thing (`home`) tests the real one, and only the files of the stand-in's contract name it there.
  */
-export function takenBreaks(file: string, text: string, standIns: readonly StandIn[] = STAND_INS): string[] {
+export function takenBreaks(file: string, text: string, standIns: readonly StandIn[] = STAND_INS) {
   return standIns
     .filter((s) => s.home !== undefined && file.startsWith(`${s.home.package}/`) && ![s.own, s.real, s.walks.file].includes(file))
     .filter((s) => takes(s, file, text))
@@ -673,11 +698,11 @@ export function takenBreaks(file: string, text: string, standIns: readonly Stand
       (s) =>
         `${file} takes ${s.made}, the stand-in of what ${s.home?.package} builds itself: build the real one there, ${s.home?.build}; ` +
         `only its contract names ${s.made} (${s.own}, ${s.real})`,
-    );
+    ) satisfies string[];
 }
 
 /** Every file of tests under `root` that `takenBreaks` reads: each test file, and each helper flat in a package's `test/`. */
-export const testAndHelperFilesOf = (root: string): string[] =>
+export const testAndHelperFilesOf = (root: string) =>
   [
     ...testFilesOf(root),
     ...PACKAGES.flatMap((pkg) =>
@@ -688,22 +713,22 @@ export const testAndHelperFilesOf = (root: string): string[] =>
             .map((f) => `${pkg}/test/${f}`)
         : [],
     ),
-  ].sort();
+  ].sort() satisfies string[];
 
 /** The measure of every test file under `root`, by its path. */
-export function measureOf(root: string): Map<string, Reach> {
+export function measureOf(root: string) {
   const texts = new Map<string, string | undefined>();
-  const read = (file: string): string | undefined => {
+  const read = (file: string) => {
     if (!texts.has(file))
       texts.set(file, fs.existsSync(path.join(root, file)) ? fs.readFileSync(path.join(root, file), 'utf8') : undefined);
-    return texts.get(file);
+    return texts.get(file) satisfies string | undefined;
   };
   const reach = reachOver(read);
-  return new Map(testFilesOf(root).map((file) => [file, reach(file)]));
+  return new Map(testFilesOf(root).map((file) => [file, reach(file)])) satisfies Map<string, Reach>;
 }
 
 /** The source of the baseline file a measure writes, one line a test file. */
-export const baselineSource = (baseline: Baseline): string =>
+export const baselineSource = (baseline: Baseline) =>
   [
     '/**',
     ' * The test files that reach the real thing and are no boundary test, each by its path from the repository root with the kinds it',

@@ -33,7 +33,7 @@ const TYPED = path.join(import.meta.dirname, 'typed.ts');
 const RUNNER = path.join(import.meta.dirname, '..', 'src', 'runner.ts');
 
 /** A workflow folder of `implement`, and, when `landing`, an ending `ship` that lands on its check once approved. */
-function workflow(name: string, landing: boolean): string {
+function workflow(name: string, landing: boolean) {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\neffort: high\n---\nBuild it.\n');
@@ -49,7 +49,7 @@ const LANDING = workflow('landing', true);
 const PLAIN = workflow('plain', false);
 
 /** A repository with one commit on `trunk`, so a run has a base and a branch to record. */
-function aRepo(): string {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -59,7 +59,7 @@ function aRepo(): string {
 }
 
 /** The run ids the store holds, and the directories under its `runs/`. */
-const written = (): { runs: string[]; dirs: string[] } => {
+const written = () => {
   const runs = path.join(ROOT, 'runs');
   return {
     runs: rooted.runs.list().map((r) => r.id),
@@ -79,7 +79,7 @@ function started(workflowDir: string, repo: string, layer = gitPlaceLayer) {
 }
 
 /** What `started` is refused with, as `Invalid` with exit 2. */
-function refusedWith(workflowDir: string, repo: string, layer = gitPlaceLayer): string {
+function refusedWith(workflowDir: string, repo: string, layer = gitPlaceLayer) {
   try {
     started(workflowDir, repo, layer);
   } catch (err) {
@@ -139,14 +139,14 @@ test('REFUSED: a start whose place refuses its open is refused in the words of t
 });
 
 /** The processes of the group `pgid` leads, by pid, as `ps` lists them now. */
-const groupOf = (pgid: number): string[] =>
+const groupOf = (pgid: number) =>
   spawnSync('ps', ['-o', 'pid=', '-g', String(pgid)], { encoding: 'utf8' })
     .stdout.split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 
 /** Kill the group `pgid` leads: false when it has no process left. */
-function killGroup(pgid: number): boolean {
+function killGroup(pgid: number) {
   try {
     process.kill(-pgid, 'SIGKILL');
     return true;

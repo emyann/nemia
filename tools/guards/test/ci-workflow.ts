@@ -109,29 +109,30 @@ export type Workflow = {
 };
 
 /** The workflow's own text, which two clauses read rather than its parse: a word in a comment is in the file all the same. */
-export const workflowText = (): string => fs.readFileSync(path.join(ROOT, FILE), 'utf8');
+export const workflowText = () => fs.readFileSync(path.join(ROOT, FILE), 'utf8');
 
-export const readWorkflow = (text = workflowText()): Workflow => yaml.load(text) as Workflow;
+export const readWorkflow = (text = workflowText()) => yaml.load(text) as Workflow;
 
 /** The steps of `job` that run a command. */
-export const runSteps = (workflow: Workflow, job: string): Step[] =>
-  (workflow.jobs[job]?.steps ?? []).filter((step) => step.run !== undefined);
+export const runSteps = (workflow: Workflow, job: string) =>
+  (workflow.jobs[job]?.steps ?? []).filter((step) => step.run !== undefined) satisfies Step[];
 
 /** The e2e job's step that runs the e2e itself, which must hand it the leg's shard and the matrix's count. */
-export const shardRunStep = (workflow: Workflow): Step | undefined =>
-  runSteps(workflow, E2E).find((step) => step.run?.includes(E2E_COMMAND) === true);
+export const shardRunStep = (workflow: Workflow) =>
+  runSteps(workflow, E2E).find((step) => step.run?.includes(E2E_COMMAND) === true) satisfies Step | undefined;
 
 /**
  * The build job's staleness step, by its id: what it decides is run rather than matched (`ci-build.boundary.test.ts`), since a
  * `git diff --exit-code` and a `git diff --name-only` that forgets to fail read alike to a pattern.
  */
-export const staleStep = (workflow: Workflow): Step | undefined => runSteps(workflow, BUILD).find((step) => step.id === STALE_STEP);
+export const staleStep = (workflow: Workflow) =>
+  runSteps(workflow, BUILD).find((step) => step.id === STALE_STEP) satisfies Step | undefined;
 
 /**
  * The gate's steps that run a command and decide: the one that turns the needed jobs' results into the `ci` context. The steps that post
  * that context as a commit status on a dispatched run (`statusDrift`) decide nothing, and are not among them.
  */
-export const gateSteps = (workflow: Workflow): Step[] => runSteps(workflow, GATE).filter((step) => !step.run?.includes(STATUSES));
+export const gateSteps = (workflow: Workflow) => runSteps(workflow, GATE).filter((step) => !step.run?.includes(STATUSES)) satisfies Step[];
 
 /** The id of the gate's deciding step, whose outcome a dispatched run posts as the `ci` status. */
 export const VERDICT = 'verdict';
@@ -152,10 +153,11 @@ export const ALLOWLIST_STEP = 'allowlist';
 export const SCAN_STEP = 'scan';
 
 /** The scan job's step that scans the push's own commits, by its id. */
-export const scanStep = (workflow: Workflow): Step | undefined => runSteps(workflow, SCAN).find((step) => step.id === SCAN_STEP);
+export const scanStep = (workflow: Workflow) => runSteps(workflow, SCAN).find((step) => step.id === SCAN_STEP) satisfies Step | undefined;
 
 /** The scan job's step that proves its allowlist, by its id. */
-export const allowlistStep = (workflow: Workflow): Step | undefined => runSteps(workflow, SCAN).find((step) => step.id === ALLOWLIST_STEP);
+export const allowlistStep = (workflow: Workflow) =>
+  runSteps(workflow, SCAN).find((step) => step.id === ALLOWLIST_STEP) satisfies Step | undefined;
 
 /**
  * GitHub's own action, taken by major tag: the pointer floats to its latest release, and a third party's never matches. This clause and
@@ -164,7 +166,7 @@ export const allowlistStep = (workflow: Workflow): Step | undefined => runSteps(
 export const OWN_ACTION = /^actions\/[a-z][a-z\d-]*@v\d+$/;
 
 /** A step that takes an action this workflow may not take. */
-export function actionDrift(workflow: Workflow, file: string = FILE): string[] {
+export function actionDrift(workflow: Workflow, file: string = FILE) {
   return Object.entries(workflow.jobs).flatMap(([name, job]) =>
     (job.steps ?? [])
       .filter((step) => step.uses !== undefined && !OWN_ACTION.test(step.uses))
@@ -172,17 +174,19 @@ export function actionDrift(workflow: Workflow, file: string = FILE): string[] {
         (step) =>
           `the ${name} job in ${file} takes ${String(step.uses)}: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead`,
       ),
-  );
+  ) satisfies string[];
 }
 
 /** The trigger that would run a fork's code with a token that can write, read from the file's own text. */
-export function targetDrift(text: string, file: string = FILE): string[] {
+export function targetDrift(text: string, file: string = FILE) {
   const trigger = ['pull', 'request', 'target'].join('_');
-  return text.includes(trigger)
-    ? [
-        `${file} names ${trigger}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
-      ]
-    : [];
+  return (
+    text.includes(trigger)
+      ? [
+          `${file} names ${trigger}: a fork's code must not run with a token that can write, so trigger on pull_request instead and read nothing of the fork's with write access`,
+        ]
+      : []
+  ) satisfies string[];
 }
 
 /**
@@ -192,7 +196,7 @@ export function targetDrift(text: string, file: string = FILE): string[] {
 export const NETWORK = /\bnpm ci\b|playwright install|\bcurl\b|(?:^|[\s;&|(])gh\s|\bgit (?:push|fetch)\b|tools\/release\/release\.ts/;
 
 /** Whether a step reaches the network, and so must end at a bound of its own rather than at its job's. */
-export const reachesNetwork = (step: Step): boolean => step.uses !== undefined || NETWORK.test(step.run ?? '');
+export const reachesNetwork = (step: Step) => step.uses !== undefined || NETWORK.test(step.run ?? '');
 
 /** A bound as GitHub takes it: a whole number of minutes above zero. */
 export const bounded = (minutes: unknown): minutes is number => typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0;
@@ -202,7 +206,7 @@ export const bounded = (minutes: unknown): minutes is number => typeof minutes =
  * one GitHub waits 360 minutes on a stalled download, and the run's own wait on `ci` gives up long before; a step's bound at or past its
  * job's lets the job's fire first, and the red then names no step.
  */
-export function stallDrift(workflow: Workflow, file: string = FILE): string[] {
+export function stallDrift(workflow: Workflow, file: string = FILE) {
   return Object.entries(workflow.jobs).flatMap(([name, job]) => {
     const minutes = job['timeout-minutes'];
     if (!bounded(minutes))
@@ -223,7 +227,7 @@ export function stallDrift(workflow: Workflow, file: string = FILE): string[] {
         ];
       return [];
     });
-  });
+  }) satisfies string[];
 }
 
 /**
@@ -238,14 +242,15 @@ export const STATUSES = '/statuses/';
 export const DISPATCHED = "github.event_name == 'workflow_dispatch'";
 
 /** The steps of `job` that post a commit status. */
-export const statusSteps = (job: Job | undefined): Step[] => (job?.steps ?? []).filter((step) => step.run?.includes(STATUSES) === true);
+export const statusSteps = (job: Job | undefined) =>
+  (job?.steps ?? []).filter((step) => step.run?.includes(STATUSES) === true) satisfies Step[];
 
 /**
  * A required context a dispatched run does not post as a status, posted on another event, under another name, on another commit, by a
  * job other than the one whose result it is, or with an expression in its command line. `job` is the job whose result is the context,
  * and `verdict` the id of its step whose outcome the result posts.
  */
-export function statusDrift(workflow: Workflow, name: string, context: string, verdict: string, file: string = FILE): string[] {
+export function statusDrift(workflow: Workflow, name: string, context: string, verdict: string, file: string = FILE) {
   const sentences: string[] = [];
   const job = workflow.jobs[name];
   const steps = job?.steps ?? [];
@@ -290,5 +295,5 @@ export function statusDrift(workflow: Workflow, name: string, context: string, v
       sentences.push(`the ${other} job in ${file} is granted statuses: take it off: only the ${name} job posts a status`);
   if (workflow.permissions?.statuses !== undefined)
     sentences.push(`${file}'s top-level permissions grant statuses: take it off, and grant statuses: write to the ${name} job alone`);
-  return sentences;
+  return sentences satisfies string[];
 }

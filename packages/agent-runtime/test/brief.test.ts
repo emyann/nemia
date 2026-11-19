@@ -139,23 +139,32 @@ const SCHEMAS = (() => {
  */
 const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
   ['an unknown key, by name', brief('afer: implement'), /`afer` is not a key a brief has/],
-  ...['yes', 'True', '1', 'held'].map((bad): [string, string, RegExp] => [
-    `queued: ${bad}`,
-    brief(`queued: ${bad}`),
-    /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/,
-  ]),
-  ...['yes', 'True', '1'].map((bad): [string, string, RegExp] => [
-    `holdOpen: ${bad}`,
-    brief(`holdOpen: ${bad}`),
-    /^brief: `holdOpen: .*` is not true or false\. Write `holdOpen: true`/,
-  ]),
-  ...['always', 'Never', 'OnFailure', 'true'].map((bad): [string, string, RegExp] => [
-    `restartPolicy: ${bad}`,
-    brief(`restartPolicy: ${bad}`),
-    new RegExp(
-      `^brief: \`restartPolicy: ${bad}\` is not a restart policy\\. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end\\.$`,
-    ),
-  ]),
+  ...['yes', 'True', '1', 'held'].map(
+    (bad) =>
+      [
+        `queued: ${bad}`,
+        brief(`queued: ${bad}`),
+        /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/,
+      ] satisfies [string, string, RegExp],
+  ),
+  ...['yes', 'True', '1'].map(
+    (bad) =>
+      [`holdOpen: ${bad}`, brief(`holdOpen: ${bad}`), /^brief: `holdOpen: .*` is not true or false\. Write `holdOpen: true`/] satisfies [
+        string,
+        string,
+        RegExp,
+      ],
+  ),
+  ...['always', 'Never', 'OnFailure', 'true'].map(
+    (bad) =>
+      [
+        `restartPolicy: ${bad}`,
+        brief(`restartPolicy: ${bad}`),
+        new RegExp(
+          `^brief: \`restartPolicy: ${bad}\` is not a restart policy\\. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end\\.$`,
+        ),
+      ] satisfies [string, string, RegExp],
+  ),
   [
     'queued: yes, in its own whole sentence',
     brief('queued: yes'),
@@ -166,27 +175,36 @@ const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
     brief('holdOpen: yes'),
     /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt ends, or leave it out to settle it then\.$/,
   ],
-  ...['5m', '0', '-30', 'Infinity', 'soon', '1e400'].map((bad): [string, string, RegExp] => [
-    `deadlineSeconds: ${bad}, which would be NaN and stop the task on its first pass`,
-    brief(`deadlineSeconds: ${bad}`),
-    /is not a number of seconds.*deadlineSeconds: 900/,
-  ]),
-  ...['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)].map((bad): [string, string, RegExp] => [
-    `budgetUsd: ${bad.slice(0, 12)}`,
-    brief(`budgetUsd: ${bad}`),
-    /is not an amount of dollars.*budgetUsd: 5/,
-  ]),
+  ...['5m', '0', '-30', 'Infinity', 'soon', '1e400'].map(
+    (bad) =>
+      [
+        `deadlineSeconds: ${bad}, which would be NaN and stop the task on its first pass`,
+        brief(`deadlineSeconds: ${bad}`),
+        /is not a number of seconds.*deadlineSeconds: 900/,
+      ] satisfies [string, string, RegExp],
+  ),
+  ...['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)].map(
+    (bad) =>
+      [`budgetUsd: ${bad.slice(0, 12)}`, brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/] satisfies [
+        string,
+        string,
+        RegExp,
+      ],
+  ),
   [
     'contextTokens: 200k, written back as its digits',
     brief('contextTokens: 200k'),
     /`contextTokens: 200k` is not a number of tokens\. Write a whole number in digits — `contextTokens: 200000`/,
   ],
   ['contextTokens: 1M, written back as its digits', brief('contextTokens: 1M'), /`contextTokens: 1000000`/],
-  ...['0', '-1', '1e5', '200000.5', 'lots', '9'.repeat(400)].map((bad): [string, string, RegExp] => [
-    `contextTokens: ${bad.slice(0, 12)}`,
-    brief(`contextTokens: ${bad}`),
-    /is not a number of tokens.*like `contextTokens: 200000`/,
-  ]),
+  ...['0', '-1', '1e5', '200000.5', 'lots', '9'.repeat(400)].map(
+    (bad) =>
+      [
+        `contextTokens: ${bad.slice(0, 12)}`,
+        brief(`contextTokens: ${bad}`),
+        /is not a number of tokens.*like `contextTokens: 200000`/,
+      ] satisfies [string, string, RegExp],
+  ),
   [
     'maxAttempts, retired at what was its default, pointing at filing again, and naming no command of a layer above',
     brief('maxAttempts: 1'),

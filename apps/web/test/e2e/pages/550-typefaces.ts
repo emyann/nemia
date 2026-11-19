@@ -15,7 +15,7 @@ const FACES = [
  * heavy — mono text, by the `font-mono` class or in a `code` element, is set in the mono face, and every font file the page asked for
  * came from the board's own origin, never a font service.
  */
-async function expectTypefaces(page: Page): Promise<void> {
+async function expectTypefaces(page: Page) {
   const seen = await page.evaluate(async (faces) => {
     const loaded: Record<string, number> = {};
     for (const face of faces) loaded[face.family] = (await document.fonts.load(face.font, 'Run 0123')).length;
@@ -23,7 +23,7 @@ async function expectTypefaces(page: Page): Promise<void> {
       .getEntriesByType('resource')
       .map((entry) => entry.name)
       .filter((name) => /\.(?:woff2?|ttf|otf)(?:\?|$)/.test(name));
-    const monoOf = (tag: string, className: string): string => {
+    const monoOf = (tag: string, className: string) => {
       const probe = document.body.appendChild(Object.assign(document.createElement(tag), { className }));
       const family = getComputedStyle(probe).fontFamily;
       probe.remove();

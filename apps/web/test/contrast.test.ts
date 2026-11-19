@@ -7,18 +7,19 @@ import { BAR, failing, grainedOf, hex, lookOf, ratio, ratioOf, tableOf, under, t
 import { scratch } from 'test-kit/scratch';
 
 const WHITE = [255, 255, 255] as const;
-const pair = (ink: Pair['ink'], rest: Partial<Pair> = {}): Pair => ({
-  state: 'measured',
-  ink,
-  ground: WHITE,
-  faded: false,
-  grained: false,
-  text: 'a line of text',
-  classes: 'text-neutral-500',
-  count: 1,
-  ...rest,
-});
-const sheet = (picture: string, scheme: Sheet['scheme'], pairs: Pair[]): Sheet => ({ picture, scheme, pairs });
+const pair = (ink: Pair['ink'], rest: Partial<Pair> = {}) =>
+  ({
+    state: 'measured',
+    ink,
+    ground: WHITE,
+    faded: false,
+    grained: false,
+    text: 'a line of text',
+    classes: 'text-neutral-500',
+    count: 1,
+    ...rest,
+  }) satisfies Pair;
+const sheet = (picture: string, scheme: Sheet['scheme'], pairs: Pair[]) => ({ picture, scheme, pairs }) satisfies Sheet;
 
 test('the ratio is WCAG’s: black on white is 21, and the bar falls between #767676 and #777777 on white', () => {
   assert.equal(ratio([0, 0, 0], WHITE), 21);

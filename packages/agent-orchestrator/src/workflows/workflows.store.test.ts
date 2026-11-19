@@ -26,10 +26,10 @@ import { aSkill } from '../../test/skill-walks.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
 
-for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
+for (const [name, body] of walksOn(WORKFLOW_WALKS, () => {
   const root = scratch('wf-workflow-door-');
   const defs = { agents: doorFrom(AgentDoor, agentDoorFiles(root)), skills: doorFrom(SkillDoor, skillDoorFiles(root)) };
-  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files', defs };
+  return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files', defs } satisfies WorkflowSide;
 }))
   test(name, body);
 
@@ -40,13 +40,13 @@ const store = () => {
 };
 
 /** Every file under `dir`, by its path from it, with its bytes. */
-const bytes = (dir: string): Record<string, string> =>
+const bytes = (dir: string) =>
   Object.fromEntries(
     fs
       .readdirSync(dir)
       .sort()
       .map((file) => [file, fs.readFileSync(path.join(dir, file), 'utf8')]),
-  );
+  ) satisfies Record<string, string>;
 
 test("a folder written through the door is, byte for byte, the folder today's writer writes", () => {
   const { root, side } = store();
@@ -171,20 +171,20 @@ const OWN = [
 ];
 
 /** Every file of `src` but the tests and the stores, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
+const sourcesOfSrc = () => sourcesUnder(PKG, 'src', OWN) satisfies Record<string, string>;
 
 /** The seam's calls in each file, comment lines left out: what `seamRefusals` refuses. */
-const seamUses = (sources: Record<string, string>): Map<string, number> =>
-  usesOf(sources, new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g'));
+const seamUses = (sources: Record<string, string>) =>
+  usesOf(sources, new RegExp(`(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`, 'g')) satisfies Map<string, number>;
 
 /**
  * Each file of `sources` that calls the workflow folder's stores rather than yielding the door, with how many times: a refusal, since
  * every caller is converted and none may come back.
  */
-const seamRefusals = (sources: Record<string, string>): string[] =>
+const seamRefusals = (sources: Record<string, string>) =>
   [...seamUses(sources)].map(
     ([file, n]) => `${file} calls the workflow folder's stores ${n} time(s): yield WorkflowDoor (src/workflows/workflows.store.ts) instead`,
-  );
+  ) satisfies string[];
 
 test("no file of src calls the workflow folder's stores: every caller yields WorkflowDoor", () => {
   assert.deepEqual(seamRefusals(sourcesOfSrc()), []);

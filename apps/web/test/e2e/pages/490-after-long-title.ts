@@ -28,7 +28,7 @@ const rowsOf = (page: Page) => {
 };
 
 /** The long run's row lies inside its card, its title read whole, every word of it on the page; and its picture, as `what`. */
-async function expectWhole(page: Page, what: string): Promise<void> {
+async function expectWhole(page: Page, what: string) {
   const { card, row, title } = rowsOf(page);
   await expectVisible(row, `${LONG.id} is offered to wait on`);
   await settled(page);

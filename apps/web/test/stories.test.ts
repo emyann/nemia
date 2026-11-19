@@ -17,10 +17,10 @@ import { DESTINATIONS, EXEMPT } from './destinations.ts';
 import { a11yTodos, argless, handDrawn, mapGaps, offCategory, secondSystem, seenOnceFound, storyless, storyModuleOf } from './stories.ts';
 
 /** The board's files that are there, from the workspace root. */
-const board = (): string[] => files().filter((file) => file.startsWith('apps/web/') && fs.existsSync(path.join(REPO, file)));
+const board = () => files().filter((file) => file.startsWith('apps/web/') && fs.existsSync(path.join(REPO, file)));
 
 /** The text of `file`, from the workspace root. */
-const textOf = (file: string): string => fs.readFileSync(path.join(REPO, file), 'utf8');
+const textOf = (file: string) => fs.readFileSync(path.join(REPO, file), 'utf8');
 
 /** Each story file of the board but the vendored folders', with what `storyModuleOf` reads of it. */
 const storyModules = (all: readonly string[]) =>
@@ -35,13 +35,13 @@ const against = (found: readonly string[], listed: readonly string[]) => ({
 });
 
 /** The entries the tree's baseline lists on `list`, every file's lines together. */
-const listed = (list: BaselineList): string[] => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
+const listed = (list: BaselineList) => readBaseline(REPO).lists[list].flatMap(({ entries }) => entries);
 
 /**
  * Asserts `found` is the baseline's `list` exactly, naming what to add a story for, and for each mended entry the file it is cut
  * from: the line, or the whole file where it is the last.
  */
-const heldTo = (found: readonly string[], list: BaselineList): void => {
+const heldTo = (found: readonly string[], list: BaselineList) => {
   const { added, stale } = against(found, listed(list));
   assert.deepEqual(added, [], `mend each of these, never add it to ${FOLDER}${list}/`);
   assert.deepEqual(
@@ -52,7 +52,7 @@ const heldTo = (found: readonly string[], list: BaselineList): void => {
 };
 
 /** Writes each of `planted` under `root`, by its path from the workspace root, with its text. */
-const plant = (root: string, planted: Readonly<Record<string, string>>): void => {
+const plant = (root: string, planted: Readonly<Record<string, string>>) => {
   for (const [file, text] of Object.entries(planted)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), text);

@@ -28,7 +28,7 @@ const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown = {}) => app.request(url, { method, headers: json, body: JSON.stringify(body) });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -36,13 +36,13 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 }
 
 /** The factory's file as it is on disk, or null where there is none: what a refusal must leave as it was. */
-const fileOf = (name: string): string | null => {
+const fileOf = (name: string) => {
   const file = path.join(root, 'factories', `${name}.json`);
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 };
 
 /** That `res` was refused with `status`, and the factory `name`'s file is as it was before. */
-async function refused(name: string, res: () => Response | Promise<Response>, status: number): Promise<void> {
+async function refused(name: string, res: () => Response | Promise<Response>, status: number) {
   const before = fileOf(name);
   const answer = await res();
   assert.equal(answer.status, status, await answer.text());

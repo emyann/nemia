@@ -14,7 +14,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -40,7 +40,7 @@ import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { factsOf, typed as onHandler, type StartedAnswer } from './typed.ts';
+import { factsOf, typed as onHandler } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -52,25 +52,27 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RU
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? onHandler(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 type Mount = { path: string; readOnly: boolean };
 type Refusal = Error & { _tag?: string; exitCode?: number };
 
 /** Read-only mounts of `paths`, as a record and a filing hold them. */
-const readOnly = (...paths: string[]): Mount[] => paths.map((p) => ({ path: p, readOnly: true }));
+const readOnly = (...paths: string[]) => paths.map((p) => ({ path: p, readOnly: true })) satisfies Mount[];
 
 /** A repository with one commit on `main`, in a folder named from `prefix`. */
-function aRepo(prefix = 'repo-'): string {
+function aRepo(prefix = 'repo-') {
   const repo = fs.mkdtempSync(path.join(ROOT, prefix));
   stage.place().world.repository(repo, { 'README.md': 'x\n' });
   return repo;
 }
 
 /** A workflow folder `name` in `team`, of `files`, each a step's file by its name. */
-function workflow(team: string, name: string, files: Record<string, string>): string {
+function workflow(team: string, name: string, files: Record<string, string>) {
   const dir = path.join(team, name);
   fs.mkdirSync(dir, { recursive: true });
   for (const [step, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, `${step}.md`), text);
@@ -81,7 +83,7 @@ function workflow(team: string, name: string, files: Record<string, string>): st
  * The tests' team with two more workflows: `plain`, implement then review, and `notes`, a folder team; the factory `trio` filed afresh
  * on three repositories, both attached, `plain` working on the first. Its repositories, sorted, the team and the two folders.
  */
-function fresh(): { repos: string[]; team: string; plain: string; notes: string } {
+function fresh() {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const team = teamCopy();
   const plain = workflow(team, 'plain', {
@@ -93,7 +95,7 @@ function fresh(): { repos: string[]; team: string; plain: string; notes: string 
   addFactoryAt(ROOT, { name: 'trio', volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'plain', repo: path.basename(repos[0]) });
   attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'notes' });
-  return { repos, team, plain, notes };
+  return { repos, team, plain, notes } satisfies { repos: string[]; team: string; plain: string; notes: string };
 }
 
 /** `plain`'s implement step, rewritten to say `writable: <names>`. */
@@ -112,17 +114,17 @@ const filedFor = (id: string, step: string) => filings().get(runRecord(ROOT, id)
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** What `nemia start` answers: what its handler answered, and the facts the client words (`StartedAnswer`). */
-const started = async (argv: string[]): Promise<StartedAnswer> => factsOf((await stage.main(['start', ...argv])) as Started);
+const started = async (argv: string[]) => factsOf((await stage.main(['start', ...argv])) as Started);
 
 /** What `nemia <argv>` prints, a line each. */
-async function typed(argv: string[]): Promise<string[]> {
+async function typed(argv: string[]) {
   const lines: string[] = [];
-  const log = console.log;
-  console.log = (...args: unknown[]) => lines.push(args.join(' '));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
-    console.log = log;
+    lines.push(...log.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
   }
   return lines;
 }
@@ -134,12 +136,12 @@ const runFiles = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(
  * The folders a filing mounts that its brief does not name as it mounts them: a writable one on the line that says it may be written, a
  * read-only one on a line that says it must not be. Each by its path.
  */
-const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }): string[] => {
+const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }) => {
   const lines = filing.brief.split('\n');
   const mounts = (filing.config?.mounts ?? []) as Mount[];
   return mounts
     .filter((m) => !lines.some((l) => l.includes(`\`${m.path}\``) && (m.readOnly ? /must not write/ : /you may write/).test(l)))
-    .map((m) => m.path);
+    .map((m) => m.path) satisfies string[];
 };
 
 describe('mounts on every filing: a factory run whose implement writes one folder of it, reads the inbox and the inputs, then a review and an ending read what was handed', () => {
@@ -365,7 +367,7 @@ describe('where a run mounts less: the default factory and a factory of one repo
 });
 
 /** That `opts` is refused as `Invalid`, exit 2, naming each of `facts`, with no run written: the refusal. */
-const refused = async (opts: Parameters<typeof startRun>[0], ...facts: string[]): Promise<string> => {
+const refused = async (opts: Parameters<typeof startRun>[0], ...facts: string[]) => {
   const before = runFiles();
   let failed: Refusal | undefined;
   try {
@@ -718,16 +720,18 @@ const FIX = ['never what it may do', 'Delete the line', 'allows `Edit(**)`'];
 type Row = { row: string; run: () => unknown; naming?: string[] };
 
 /** A row reading `lines` as the folders `writable` lists. */
-const reads = (row: string, lines: string, writable?: string[]): Row => ({
-  row,
-  run: () => assert.deepEqual(fm(lines).writable, writable),
-});
+const reads = (row: string, lines: string, writable?: string[]) =>
+  ({
+    row,
+    run: () => assert.deepEqual(fm(lines).writable, writable),
+  }) satisfies Row;
 /** A row refusing `lines`, naming each of `naming` after `review: `. */
-const refuses = (row: string, lines: string, ...naming: string[]): Row => ({
-  row: `REFUSED: ${row}`,
-  run: () => fm(lines),
-  naming: ['review: ', ...naming],
-});
+const refuses = (row: string, lines: string, ...naming: string[]) =>
+  ({
+    row: `REFUSED: ${row}`,
+    run: () => fm(lines),
+    naming: ['review: ', ...naming],
+  }) satisfies Row;
 
 const MOUNTS = readOnly('/srv/a', '/srv/web');
 

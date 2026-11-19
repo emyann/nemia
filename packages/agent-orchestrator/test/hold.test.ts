@@ -91,20 +91,20 @@ const tick = (b: Board, run: Run | string) => stage.runWith(b.e, advanceRun(type
  * The hold on `id` made one that code older than `nemia hold --by` wrote: its file without `by`, which every screen says as the plain
  * `held until <run> lands`.
  */
-const asOlder = (id: string): void => {
+const asOlder = (id: string) => {
   const { by, ...older } = JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { by?: string };
   assert.equal(by, os.userInfo().username, `a hold put with no --by is put by the OS user`);
   fs.writeFileSync(holdFileOf(id), JSON.stringify(older, null, 2));
 };
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
 };
 /** A workflow folder of these files, by name. */
-const folderOf = (prefix: string, files: Record<string, string>): string => {
+const folderOf = (prefix: string, files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, prefix));
   for (const [file, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, file), text);
   return dir;
@@ -150,7 +150,7 @@ const committed = (wt: string, file: string) => {
   world().commit(wt, `add ${file}`);
 };
 /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand. */
-const mergedByHand = (repo: string, branch: string): void => {
+const mergedByHand = (repo: string, branch: string) => {
   world().stage(repo, branch);
   world().commit(repo, 'merge');
 };
@@ -177,15 +177,13 @@ const aStarted = (repo: string, brief: string, workflowDir = oneStep(), more: Pa
 
 /** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: Finishes, ...argv: string[]) => {
-  const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
+  const printed = () => log.mock.calls.map((a) => a.join(' ')).join('\n');
   try {
     await stage.main(argv);
-    return { printed: printed.join('\n'), error: undefined };
+    return { printed: printed(), error: undefined };
   } catch (err) {
-    return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
+    return { printed: printed(), error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
     log.mockRestore();
   }
@@ -194,19 +192,19 @@ const typed = async (t: Finishes, ...argv: string[]) => {
 type Held = { id: string; lifted: boolean; hold: { until: string[]; why?: string; by?: string } };
 
 /** `nemia hold <argv>` on its entry's handler, as the api runs it: what it answers. */
-const holdTyped = async (...argv: string[]): Promise<Held> => (await stage.main(['hold', ...argv])) as Held;
+const holdTyped = async (...argv: string[]) => (await stage.main(['hold', ...argv])) as Held;
 
 /** `nemia <verb>` answered, refused by nothing. */
-const said = async (t: TestContext, ...argv: string[]): Promise<void> => {
+const said = async (t: TestContext, ...argv: string[]) => {
   const { error } = await typed(t, ...argv);
   assert.equal(error, undefined, `nemia ${argv.join(' ')}: ${error?.message}`);
 };
 
 /** `nemia ls <id>` on its entry's handler, as the api runs it: run `id`'s record and its listing, out of what it answers (`RunsListed`). */
-const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+const listed = async (id: string) => {
   const all = (await stage.main(['ls', id])) as RunsListed;
   const listing = listedRow(all, id);
-  return { run: all.runs.find((r) => r.run.id === id)!.run, listing };
+  return { run: all.runs.find((r) => r.run.id === id)!.run, listing } satisfies { run: Run; listing: Listing };
 };
 /**
  * What a run's listing says of its hold: its word (`holdWord`, which says too when every run it names has landed) and whether it is on
@@ -215,14 +213,14 @@ const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
 const holdSaid = ({ run, listing }: { run: Run; listing: Listing }) =>
   listing.holding && { word: holdWord(listing.holding, run.hold), onYou: holdNeedsYou(listing.holding) };
 /** What a run's listing asks of a person, by name (`onYouWords`, `approve <step>` at a gate). */
-const onYou = async (id: string): Promise<string[]> => onYouWords((await listed(id)).listing);
+const onYou = async (id: string) => onYouWords((await listed(id)).listing);
 /** Each step's word and note in a run's listing, as a person reads them beside its name (`shownStatus`, `shownNote`). */
-const stepWords = (listing: Listing): string => JSON.stringify(listing.steps.map((row) => [row.name, shownStatus(row), shownNote(row)]));
+const stepWords = (listing: Listing) => JSON.stringify(listing.steps.map((row) => [row.name, shownStatus(row), shownNote(row)]));
 /**
  * A run's listing asks nothing of anyone and offers no verb: no step waiting on you, no run it waits on that would make it so, nothing to
  * decide, and no `nemia approve|retry|round|accept` in any step's word or note.
  */
-const asksNothing = (listing: Listing): void => {
+const asksNothing = (listing: Listing) => {
   assert.deepEqual([listing.waitingOnYou, listing.waiting, listing.toDecide], [[], [], undefined], stepWords(listing));
   assert.doesNotMatch(stepWords(listing), VERBS);
 };
@@ -241,15 +239,15 @@ const VERBS = /nemia (approve|retry|round|accept) /;
 /** Run `id`'s decision on this file's stage, as the api serves it (`RunDecision`). */
 const decision = async (id: string) => (await decisionOn(stage, id)).decision;
 /** Run `id`'s decision as one text, for what it says and does not say. */
-const decisionText = async (id: string): Promise<string> => JSON.stringify(await decision(id));
+const decisionText = async (id: string) => JSON.stringify(await decision(id));
 /** The looping steps of run `id` out of rounds, waiting on you (`Decided`'s `exhausted`); none where it awaits nobody. */
-const exhaustedOf = async (id: string): Promise<string[]> => {
+const exhaustedOf = async (id: string) => {
   const d = (await decidedOn(stage, id)).decision;
-  return d.kind === 'awaiting' ? d.exhausted : [];
+  return (d.kind === 'awaiting' ? d.exhausted : []) satisfies string[];
 };
 
 /** `text` as a pattern that matches it and nothing else inside a line. */
-const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** A run at its gate on `b`: `implement` signed, `review` held back by the gate. */
 const atItsGate = async (b: Board, repo: string, brief: string) => {
@@ -309,6 +307,7 @@ describe('a run held until another lands: said by every screen with why and who,
       'held again with no --why after a lift: no why of the lifted hold survives',
     );
     const nameless = await aStarted(repo, 'held by a user the system cannot name');
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a user the system cannot name, no seam gives
     vi.spyOn(os, 'userInfo').mockImplementation(() => {
       throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
     });
@@ -753,13 +752,13 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
     u = ['hold', id, '--until', target.id];
     return t.end;
   });
-  const holdFiles = (): string[] =>
-    fs.existsSync(path.join(ROOT, 'runs'))
+  const holdFiles = () =>
+    (fs.existsSync(path.join(ROOT, 'runs'))
       ? fs
           .readdirSync(path.join(ROOT, 'runs'))
           .filter((f) => f.includes('.hold'))
           .sort()
-      : [];
+      : []) satisfies string[];
   const rows: Array<[string, () => [string[], string, string[]]]> = [
     ['both', () => [['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']]],
     ['a flag it does not take', () => [['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']]],
@@ -964,6 +963,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const holdFile = holdFileOf(id);
   const file = b.e.file.bind(b.e);
   let held = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a hold put as the check is filed: a race
   vi.spyOn(b.e, 'file').mockImplementation((spec: Parameters<Engine['file']>[0]) => {
     if (!held && spec.id?.endsWith('-check')) {
       held = true;
@@ -973,6 +973,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   });
   const exists = fs.existsSync;
   let lifted = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold lifted as it is read: a race
   vi.spyOn(fs, 'existsSync').mockImplementation((p: fs.PathLike) => {
     const there = exists(p);
     if (p === holdFile && there && !lifted) {
@@ -1028,6 +1029,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const put = { at: '2099-01-01T00:00:00.000Z', until: [other.id] };
   const read = fs.readFileSync;
   let reads = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold changed between two reads: a race
   vi.spyOn(fs, 'readFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
     if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
     return read.apply(this, args);
@@ -1046,6 +1048,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const race = await aRunning(b, repo);
   const first = { at: '2099-01-02T00:00:00.000Z', until: [other.id] };
   const write = fs.writeFileSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- another hold put first: a race no seam gives
   vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
     if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
     return write.apply(this, args);
@@ -1278,6 +1281,7 @@ test('a defect is no refusal: `hold` and `unhold` die of what the engine or the 
   await stage.runWith(b.e, hold(run.id, [target.id]));
   const denied = Object.assign(new Error(`EACCES: permission denied, unlink '${holdFileOf(run.id)}'`), { code: 'EACCES' });
   const rm = fs.rmSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the removal refused on cue (EACCES)
   vi.spyOn(fs, 'rmSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
     if (args[0] === holdFileOf(run.id)) throw denied;
     return rm.apply(this, args);

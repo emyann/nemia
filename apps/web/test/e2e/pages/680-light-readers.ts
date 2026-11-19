@@ -17,7 +17,7 @@ const LIST = /^\/api\/(?:runs|namespaces\/[^/]+\/runs)$/;
 type Heard = { path: string; query: URLSearchParams };
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
@@ -26,7 +26,7 @@ async function visit(page: Page, to: string): Promise<void> {
  * Refuses a reader that asked for a list of the runs with no `fieldSelector` (the whole list), or that did not ask for each selector of
  * `wanted`.
  */
-function judge(reader: string, heard: readonly Heard[], wanted: readonly string[]): void {
+function judge(reader: string, heard: readonly Heard[], wanted: readonly string[]) {
   const lists = heard.filter((one) => LIST.test(one.path));
   const whole = lists.filter((one) => !one.query.has('fieldSelector'));
   if (whole.length)

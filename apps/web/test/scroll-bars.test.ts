@@ -75,21 +75,21 @@ const SAID: ReadonlyArray<{ what: string; where: 'parts' | 'others' | 'styles'; 
  * What of the look's scroll bar rule `css` does not say, by name; none when the rule is whole. Each block is read from its own name to
  * the next one that is there, and the last to the ink's.
  */
-function unsaid(css: string): string[] {
+function unsaid(css: string) {
   const [parts, others, ink] = [css.indexOf(PARTS), css.indexOf(OTHERS), css.indexOf(INK)];
   const blocks = {
     parts: parts >= 0 && ink > parts ? css.slice(parts, others > parts ? others : ink) : '',
     others: others >= 0 && ink > others ? css.slice(others, ink) : '',
     styles: css,
   };
-  return SAID.filter(({ where, says }) => !says.test(blocks[where])).map(({ what }) => what);
+  return SAID.filter(({ where, says }) => !says.test(blocks[where])).map(({ what }) => what) satisfies string[];
 }
 
 /** A stand-in for an element: what was written on it, in order. */
 type Stand = { written: string[]; setAttribute: (name: string, value: string) => void };
-const stand = (): Stand => {
+const stand = () => {
   const written: string[] = [];
-  return { written, setAttribute: (name, value) => void written.push(`${name}=${value}`) };
+  return { written, setAttribute: (name, value) => void written.push(`${name}=${value}`) } satisfies Stand;
 };
 
 /** A stand-in for the document, which keeps the listener it is given, and a scheduler that runs what is due only when stepped. */
@@ -177,7 +177,7 @@ describe('markScrolls: what scrolled shown, and at rest once its linger has pass
 });
 
 /** The text of the board's file at `file`, from `from` to `to`, two names it must hold in that order. */
-function sliceOf(file: string, from: string, to: string): string {
+function sliceOf(file: string, from: string, to: string) {
   const text = fs.readFileSync(path.resolve(import.meta.dirname, '..', 'src', file), 'utf8');
   const [start, end] = [text.indexOf(from), text.indexOf(to, text.indexOf(from) + from.length)];
   assert.ok(start >= 0 && end > start, `${file} holds ${from}, then ${to}`);

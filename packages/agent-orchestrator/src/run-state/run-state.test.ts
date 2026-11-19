@@ -11,7 +11,7 @@ import { clockUntilOf, finishedAtOf, runInFactory, kindOf, type Listed, outcomeO
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
 
 /** A run that succeeded, created at 10:00, its work ended at 10:30, and `more` over it. */
-const listed = (more: Partial<Listed> = {}): Listed => ({
+const listed = (more: Partial<Listed> = {}) => ({
   id: 'r-1',
   factory: null,
   createdAt: at(10),

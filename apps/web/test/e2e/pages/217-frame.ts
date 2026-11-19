@@ -55,7 +55,7 @@ const expectPane = (page: Page, shown: boolean, assertion: string) =>
   );
 
 /** The rail at the window's left, then the pane when docked, then the column, then the sheet when open, on one row over the machine bar. */
-async function inRow(page: Page, width: number, pane: boolean, sheet: boolean): Promise<void> {
+async function inRow(page: Page, width: number, pane: boolean, sheet: boolean) {
   const rail = await boxOf(railColumnOf(page), 'the rail');
   const column = await boxOf(columnOf(page), "the page's column");
   const bar = await boxOf(machineBarOf(page), 'the machine bar');
@@ -78,7 +78,7 @@ async function inRow(page: Page, width: number, pane: boolean, sheet: boolean): 
 }
 
 /** Her sheet comes in, or goes, as `open` says, by her face. */
-async function sheetTo(page: Page, open: boolean): Promise<void> {
+async function sheetTo(page: Page, open: boolean) {
   const shown =
     (await frameSheetOf(page)
       .getAttribute('data-sheet-shows')
@@ -102,7 +102,7 @@ async function sheetTo(page: Page, open: boolean): Promise<void> {
  * factory (`sidebar`); the pane docked at 1600 and wider whatever the sheet, under 1600 covered by the sheet; the column never under
  * `COLUMN_AT_768` beside the pane; each pictured.
  */
-async function atWidth(page: Page, width: number): Promise<void> {
+async function atWidth(page: Page, width: number) {
   const size = page.viewportSize();
   await page.setViewportSize({ width, height: size?.height ?? 900 });
   await sheetTo(page, false);
@@ -122,7 +122,7 @@ async function atWidth(page: Page, width: number): Promise<void> {
 }
 
 /** The menu button folds the pane and unfolds it, and so does Ctrl+B, but on a store's page; each state outlives a reload. */
-async function folds(page: Page): Promise<void> {
+async function folds(page: Page) {
   await expectPane(page, true, 'unfolded as this browser left it');
   await expectVisible(menuOf(page).and(page.getByRole('button', { name: 'Fold the factory pane' })), 'unfolded, the menu button folds it');
   await menuOf(page).click();
@@ -150,7 +150,7 @@ async function folds(page: Page): Promise<void> {
 }
 
 /** On a phone's screen the rail and the pane leave the page's side: the menu button opens a drawer that holds both, which a pick closes. */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await expectCount(railColumnOf(page), 0, "on a phone the rail leaves the page's side");
   await expectCount(paneOf(page), 0, 'and so does the pane');

@@ -94,7 +94,7 @@ describe('each path of the Api reads to its plural, its namespace, its name and 
 const VERBS: readonly ResourceVerb[] = ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete'];
 
 /** Whether `route` does `verb` of the kind its plural names: the collection lists, watches and creates; one by its name the rest. */
-const kindDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
+const kindDoes = (route: ApiRoute, verb: ResourceVerb) =>
   route.sub === null &&
   (route.item
     ? { get: 'GET', update: 'PUT', patch: 'PATCH', delete: 'DELETE' }[verb as string] === route.method
@@ -103,7 +103,7 @@ const kindDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
       : route.method === 'POST' && verb === 'create');
 
 /** Whether `route`, a sub-resource's, does `verb`: its method's verb alone. */
-const subDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
+const subDoes = (route: ApiRoute, verb: ResourceVerb) =>
   route.sub !== null && { GET: 'get', POST: 'create', PUT: 'update', PATCH: 'patch', DELETE: 'delete' }[route.method] === verb;
 
 /**
@@ -111,7 +111,7 @@ const subDoes = (route: ApiRoute, verb: ResourceVerb): boolean =>
  * listed once under its plural, every sub-resource listed once, and each resource's verbs exactly what its routes do; and nothing
  * listed that no kind's route serves, which the contract proves since tsverify 0.9.0 (`onlyWhatIsServed`).
  */
-const broken = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], output: readonly Resource[]): string[] => {
+const broken = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], output: readonly Resource[]) => {
   const named = (name: string) => output.filter((r) => r.name === name);
   const subsOf = (k: KindPlural) => [
     ...new Set(routes.filter((t) => t.plural === k.plural && t.sub !== null).map((t) => `${k.plural}/${t.sub}`)),

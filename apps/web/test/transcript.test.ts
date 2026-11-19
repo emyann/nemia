@@ -23,35 +23,39 @@ import type { TranscriptEvent } from '../src/lib/api/steps.ts';
 let clock = Date.parse('2026-09-13T08:00:00.000Z');
 const at = () => new Date((clock += 1000)).toISOString();
 
-const said = (id: string, text: string, role: 'user' | 'assistant' = 'assistant'): TranscriptEvent => ({
-  id,
-  at: at(),
-  role,
-  kind: 'text',
-  text,
-});
-const thought = (id: string, text?: string): TranscriptEvent => ({
-  id,
-  at: at(),
-  role: 'assistant',
-  kind: 'thinking',
-  ...(text === undefined ? {} : { text }),
-});
-const quiet = (id: string, text: string): TranscriptEvent => ({ id, at: at(), role: 'system', kind: 'system', text });
-const use = (id: string, name: string, input: unknown = {}): TranscriptEvent => ({
-  id,
-  at: at(),
-  role: 'assistant',
-  kind: 'tool_use',
-  tool: { name, input },
-});
-const result = (id: string, text: string, isError = false): TranscriptEvent => ({
-  id,
-  at: at(),
-  role: 'user',
-  kind: 'tool_result',
-  result: { text, isError },
-});
+const said = (id: string, text: string, role: 'user' | 'assistant' = 'assistant') =>
+  ({
+    id,
+    at: at(),
+    role,
+    kind: 'text',
+    text,
+  }) satisfies TranscriptEvent;
+const thought = (id: string, text?: string) =>
+  ({
+    id,
+    at: at(),
+    role: 'assistant',
+    kind: 'thinking',
+    ...(text === undefined ? {} : { text }),
+  }) satisfies TranscriptEvent;
+const quiet = (id: string, text: string) => ({ id, at: at(), role: 'system', kind: 'system', text }) satisfies TranscriptEvent;
+const use = (id: string, name: string, input: unknown = {}) =>
+  ({
+    id,
+    at: at(),
+    role: 'assistant',
+    kind: 'tool_use',
+    tool: { name, input },
+  }) satisfies TranscriptEvent;
+const result = (id: string, text: string, isError = false) =>
+  ({
+    id,
+    at: at(),
+    role: 'user',
+    kind: 'tool_result',
+    result: { text, isError },
+  }) satisfies TranscriptEvent;
 /** A call and its result, as a transcript has them: one after the other. */
 const call = (id: string, name: string, input: unknown = {}, out = `${name} said ok`, isError = false) => [
   use(id, name, input),
@@ -61,8 +65,8 @@ const call = (id: string, name: string, input: unknown = {}, out = `${name} said
 const kinds = (turns: Turn[]) => turns.map((t) => t.kind);
 const fold = (turns: Turn[]) => turns.find((t): t is ToolsTurn => t.kind === 'tools')!;
 
-const calls = (...named: Array<[string, unknown?]>): ToolCall[] =>
-  named.map(([name, input = {}], i) => ({ id: `c${i}`, at: '', name, input, result: null }));
+const calls = (...named: Array<[string, unknown?]>) =>
+  named.map(([name, input = {}], i) => ({ id: `c${i}`, at: '', name, input, result: null })) satisfies ToolCall[];
 
 describe('foldTranscript: the calls between two things said fold into one turn, and what is drawn on its own', () => {
   test('the calls between two things said fold into one turn, in the order they came, each with its result', () => {
@@ -273,7 +277,7 @@ describe("the transcript's helpers: a call's detail, events merged, the session 
     );
   });
   test('closeoutOf reads a v0 and a v1 statement into one shape: one line, its body, files by path and values by name', () => {
-    const call = (input: Record<string, unknown>): ToolCall => ({ id: 'c', name: 'StructuredOutput', input, result: null }) as ToolCall;
+    const call = (input: Record<string, unknown>) => ({ id: 'c', name: 'StructuredOutput', input, result: null }) as ToolCall;
     assert.deepEqual(closeoutOf(call({ outcome: 'done', summary: 'First.\n\nMore.', artifacts: ['a.md'], needs: null })), {
       outcome: 'done',
       summary: 'First.',

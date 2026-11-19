@@ -32,7 +32,7 @@ const root = eachTest(() => scratch('wf-turn-'));
 const engine = eachTest(testEngine);
 
 /** A memory with the harness's install and sign-in read as `install` and `signIn`. */
-const memoWith = (install: 'met' | 'missing', signIn: 'met' | 'missing'): NeedsMemo => {
+const memoWith = (install: 'met' | 'missing', signIn: 'met' | 'missing') => {
   const memo = needsMemo(root());
   for (const need of memo.harnessNeeds) {
     if (need.name === HARNESS) memo.readings.set(checkKey(harnessCheckOf(need)), install);

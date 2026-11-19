@@ -10,7 +10,6 @@ import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import type { Run as RunObject } from 'objects';
 import { runIn, runListOf, type RunQuery } from './run-list.verb.ts';
-import type { RunObjectAnswer } from '../object/run.verb.ts';
 
 type Listed = { id: string; factory?: string; workflowDir: string; labels?: Record<string, string> };
 
@@ -25,7 +24,7 @@ const runs: Listed[] = [
 const judgeOf = (broken: readonly string[] = []) => {
   const asked: string[] = [];
   const judge = (run: Listed) =>
-    Effect.sync((): RunObjectAnswer => {
+    Effect.sync(() => {
       asked.push(run.id);
       return broken.includes(run.id)
         ? { unjudged: 'its journal does not read', steps: [{ name: 'build', message: 'unreadable', branch: null }] }
@@ -40,11 +39,11 @@ const listed = (query: RunQuery, broken?: readonly string[]) => {
   return { exit, asked };
 };
 
-const valueOf = <A, E>(exit: Exit.Exit<A, E>): A => {
+const valueOf = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return exit.value;
   throw new Error(`failed: ${String(exit.cause)}`);
 };
-const kindOf = <A, E>(exit: Exit.Exit<A, E>): string => {
+const kindOf = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return 'ok';
   const failed = exit.cause.reasons.find((r) => r._tag === 'Fail');
   return failed && 'error' in failed ? String((failed.error as { _tag?: unknown })._tag) : 'defect';

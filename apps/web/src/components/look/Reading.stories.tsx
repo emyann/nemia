@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { Skeleton } from '@/components/ui/ds';
 import { Reading, ReadingLines } from './Reading';
-import { ON_CARD } from './stories.fixtures';
+import { ON_CARD } from './stories.fixture';
 
 /** What a part draws while its first read is out: the kit's skeletons in the shape of what is coming, named for a screen reader. */
 const meta: Meta<typeof Reading> = {

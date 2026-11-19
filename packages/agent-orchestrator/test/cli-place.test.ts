@@ -50,7 +50,7 @@ const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(ru
 const aPass = () => runWith(engineOf(engine().layer), passStanding(listRuns(ROOT)));
 
 /** A workflow folder of one step, `implement`, which works in a workspace of its own. */
-function oneStep(): string {
+function oneStep() {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
@@ -103,23 +103,26 @@ test('a run started, read once a pass has read where its branch stands, and remo
 });
 
 /** Every file of the CLI's code, by its path from the package, with its text. */
-function cliFiles(): { file: string; text: string }[] {
+function cliFiles() {
   const dir = path.join(import.meta.dirname, '..', 'src', 'cli');
   return fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
-    .map((file) => ({ file: path.posix.join('src/cli', file), text: fs.readFileSync(path.join(dir, file), 'utf8') }));
+    .map((file) => ({ file: path.posix.join('src/cli', file), text: fs.readFileSync(path.join(dir, file), 'utf8') })) satisfies {
+    file: string;
+    text: string;
+  }[];
 }
 
 /** The place `main` takes when it is handed none: the one line of the CLI that names the git place. */
 const DEFAULT = /\bplace:\s*Place\s*=\s*builtinGitPlace\b/;
 
 /** Each naming of the git place in `text`, its imports and `main`'s one default aside: a program given it, its layer, or the place. */
-const placeNamed = (text: string): string[] =>
-  text
+const placeNamed = (text: string) =>
+  (text
     .replace(/import\s*(?:type\s*)?\{[^}]*\}\s*from\s*'[^']*';/g, '')
     .replace(DEFAULT, '')
-    .match(/\bbuiltin\s*\(|\bgitPlaceLayer\b|\bbuiltinGitPlace\b/g) ?? [];
+    .match(/\bbuiltin\s*\(|\bgitPlaceLayer\b|\bbuiltinGitPlace\b/g) ?? []) satisfies string[];
 
 test('REFUSED: a file of `src/cli` that names the git place — a program given it with `builtin(`, its layer, the place itself — but `main`, once, as its default', () => {
   assert.deepEqual(placeNamed('const data = await runWith(e, builtin(command.handler(args)));'), ['builtin(']);

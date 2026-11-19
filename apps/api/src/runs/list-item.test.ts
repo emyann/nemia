@@ -49,7 +49,7 @@ beforeEachTest(() => {
   );
 });
 
-const read = async <T>(address: string): Promise<T> => {
+const read = async <T>(address: string) => {
   const res = await app().request(address);
   assert.equal(res.status, 200, `${address}: ${await res.clone().text()}`);
   return (await res.json()) as T;

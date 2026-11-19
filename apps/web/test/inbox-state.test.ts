@@ -16,13 +16,13 @@ const SRC = path.join(WEB, 'src');
 const REBUILT = /startedAs\s*\.\s*(length|includes|some|find|every)\b/g;
 
 /** Each place `text`, the file `file`, rebuilds a card's state from `startedAs`, as `<file>:<line>` and the fix. */
-export const rebuiltAt = (file: string, text: string): string[] =>
+export const rebuiltAt = (file: string, text: string) =>
   [...text.matchAll(REBUILT)].map(
     (m) =>
       `${file}:${text.slice(0, m.index).split('\n').length} reads startedAs.${m[1]}: read whether it started off its \`state\` through CARD_KIND (src/lib/inbox.ts) instead`,
   );
 
-const sources = (dir: string): string[] =>
+const sources = (dir: string) =>
   fs
     .readdirSync(dir, { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))

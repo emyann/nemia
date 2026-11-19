@@ -61,7 +61,7 @@ describe('each refusal is an Error of its kind with its words and exit code 2, a
     assert.equal(isRefusal({ _tag: 'Missing', message: 'a look-alike', exitCode: 2 }), false);
     assert.equal(isRefusal(undefined), false);
   });
-  const thrown = async (made: () => unknown): Promise<unknown> => {
+  const thrown = async (made: () => unknown) => {
     try {
       return await made();
     } catch (err) {
@@ -90,7 +90,7 @@ describe('each refusal is an Error of its kind with its words and exit code 2, a
  * The modules a fresh `node`, in the package, loads for `entry` and then for each of `more`, by URL: counted by a `registerHooks` load
  * hook, so a module is counted once however many import it.
  */
-function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
+function modulesLoaded(entry: string, more: readonly string[] = []) {
   const program = [
     "import { registerHooks } from 'node:module';",
     'const seen = [];',
@@ -164,10 +164,10 @@ const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/workflow': { all: 152, effect: 15 },
 };
 
-const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');
+const isEffectModule = (url: string) => url.includes('/node_modules/effect/');
 
 /** Why what `entry` loaded is not what it is pinned to, or nothing. */
-function loadBreaks(entry: string, loaded: readonly string[]): string[] {
+function loadBreaks(entry: string, loaded: readonly string[]) {
   const pinned = PINNED_MODULES[entry];
   const out: string[] = [];
   const barrel = loaded.filter((url) => url.endsWith('/node_modules/effect/dist/index.js'));
@@ -205,7 +205,7 @@ test('REFUSED: an entry that loads the effect barrel besides', () => {
 });
 
 /** Each place in `texts`, by file and line, that sets `exitCode: 2` on an object: a refusal thrown as other than one of the classes. */
-function untaggedRefusals(texts: Record<string, string>): string[] {
+function untaggedRefusals(texts: Record<string, string>) {
   return Object.entries(texts).flatMap(([file, text]) =>
     [...text.matchAll(/\bexitCode\s*:\s*2\b/g)].map(
       (m) =>

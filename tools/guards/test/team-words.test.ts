@@ -25,7 +25,7 @@ const MECHANISM: Array<{ file: string; holds: string; body: boolean }> = [
 ];
 
 /** The text of `file` the guard reads: a skill's body after its frontmatter, or the file whole. */
-const textOf = (file: string, body: boolean): string => {
+const textOf = (file: string, body: boolean) => {
   const text = fs.readFileSync(path.join(REPO, file), 'utf8');
   return body ? splitFrontmatter(file, text).body : text;
 };

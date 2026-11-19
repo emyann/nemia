@@ -33,7 +33,7 @@ heldUnasked(engine);
 /** The harness's own file, in a folder each checkpoint is given anew. */
 let file = '';
 /** A harness file of its own, not there yet, and a store with no factory. */
-function anew(): void {
+function anew() {
   process.env.CLAUDE_CONFIG_DIR = scratch('wf-trust-harness-');
   file = path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json');
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
@@ -43,13 +43,13 @@ function anew(): void {
 type Asked = { name: string; trusts: readonly PlaceTrust[] };
 
 /** `nemia <argv>` run onto its handler on `place` (this test's by default): what it answers. */
-const typed = (argv: string[], place = stand().place): Promise<unknown> => handlerOf(argv, engineOf(engine().layer), undefined, place, ENV);
+const typed = (argv: string[], place = stand().place) => handlerOf(argv, engineOf(engine().layer), undefined, place, ENV);
 
 /** What `nemia factory add` or `nemia factory trust` answered on `place`. */
-const asked = async (argv: string[], place = stand().place): Promise<Asked> => (await typed(argv, place)) as Asked;
+const asked = async (argv: string[], place = stand().place) => (await typed(argv, place)) as Asked;
 
 /** The places the listing says are not trusted, on `place`. */
-const untrusted = async (place = stand().place): Promise<readonly Untrusted[]> =>
+const untrusted = async (place = stand().place) =>
   ((await typed(['factory', 'ls'], place)) as { untrusted: readonly Untrusted[] }).untrusted;
 
 /** The trusts of `answer` written now, with what each grants and the way back. */
@@ -59,7 +59,7 @@ const wrote = (answer: Asked) => answer.trusts.flatMap((one) => ('wrote' in one 
 const said = (answer: Asked) => answer.trusts.filter((one) => 'unasked' in one || one.wrote || one.refused !== null);
 
 /** The folders the harness's file says are trusted, in order. */
-const trusted = (): string[] => {
+const trusted = () => {
   if (!fs.existsSync(file)) return [];
   const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
   return Object.keys(projects)
@@ -71,7 +71,7 @@ const trusted = (): string[] => {
  * A repository of this test's place at `<area>/repo`, a workspace cut from it at `<area>/ws`, a second repository at `<area>/plain`, its
  * own root, and a folder in no repository at `<area>/notes`, which a factory takes read-only alone.
  */
-function places(): { repo: string; workspace: string; plain: string; notes: string } {
+function places() {
   const area = scratch('wf-trust-places-');
   const [repo, workspace, plain, notes] = ['repo', 'ws', 'plain', 'notes'].map((leaf) => path.join(area, leaf)) as [
     string,
@@ -90,7 +90,7 @@ function places(): { repo: string; workspace: string; plain: string; notes: stri
 }
 
 /** The harness's file without its trust of `folder`, as a person takes one back by hand. */
-function takenBack(folder: string): void {
+function takenBack(folder: string) {
   const held = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
   held.projects[folder].hasTrustDialogAccepted = false;
   fs.writeFileSync(file, JSON.stringify(held, null, 2));

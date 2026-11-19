@@ -29,7 +29,7 @@ const DEP = '@anthropic-ai/claude-agent-sdk';
 const FIX = `npm install ${DEP}@${SDK_VERSION} --save-exact --workspace agent-runtime, from the workspace root, and commit the lock with it`;
 
 /** Whether `spec` names one version and no range: `0.3.316`, never `^0.3.316`, `~0.3.316`, `0.3.x`, `>=0.3.316` or `*`. */
-const isExact = (spec: string): boolean => /^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(spec);
+const isExact = (spec: string) => /^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(spec);
 
 /** The tree's four facts about the SDK, as the three files on disk say them. */
 type Pinned = {
@@ -42,7 +42,7 @@ type Pinned = {
 };
 
 /** Where `tree` disagrees with the pin, each worded with what to type. */
-const pinRefusals = (tree: Pinned): string[] => {
+const pinRefusals = (tree: Pinned) => {
   const out: string[] = [];
   if (!isExact(tree.spec))
     out.push(`packages/agent-runtime/package.json asks for ${DEP} as \`${tree.spec}\`, a range: the lock can fall behind it. Type: ${FIX}`);
@@ -58,13 +58,13 @@ const pinRefusals = (tree: Pinned): string[] => {
         `${CLAUDE_CODE_VERSION}. Re-measure the two constants together: the alias \`opus\` resolves inside that Claude Code, so its ` +
         "version is what makes the factory's sessions and the owner's own terminal mean the same model.",
     );
-  return out;
+  return out satisfies string[];
 };
 
-const read = (at: string): unknown => JSON.parse(fs.readFileSync(at, 'utf8'));
+const read = (at: string) => JSON.parse(fs.readFileSync(at, 'utf8')) as unknown;
 
 /** The tree as it stands. */
-const onDisk = (): Pinned => {
+const onDisk = () => {
   const { dependencies } = read(path.join(PKG, 'package.json')) as { dependencies: Record<string, string> };
   const { packages } = read(path.join(ROOT, 'package-lock.json')) as { packages: Record<string, { version?: string }> };
   return {
@@ -73,7 +73,7 @@ const onDisk = (): Pinned => {
       .filter(([at]) => at.includes(DEP))
       .map(([at, held]) => [at, held.version]),
     installed: read(path.join(ROOT, 'node_modules', DEP, 'package.json')) as Pinned['installed'],
-  };
+  } satisfies Pinned;
 };
 
 test('the manifest, the lock, the installed tree and the bundled Claude Code all say the pin', () => {

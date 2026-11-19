@@ -11,7 +11,7 @@ const WAITING = 'Write now; she reads it when she is up';
 const WAKES = 'Write to her; your message wakes her';
 
 /** Her session down: why she stopped, where it is started, and that what the person writes waits for her in the outbox. */
-async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string): Promise<void> {
+async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string) {
   const panel = await openChat(page);
   const band = panel.locator('[data-band="stopped"]');
   await expectVisible(band, 'the panel says her session stopped');

@@ -27,7 +27,7 @@ const RUN = 'r-follow';
 const STEPS = ['implement', 'review', 'late', 'held', 'opened', 'tried', 'drifted', 'lost'];
 
 /** The run's record, each step of `STEPS` on the task `t-<step>`, but those `moved` names on another. */
-function writeRun(moved: Record<string, string> = {}): void {
+function writeRun(moved: Record<string, string> = {}) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'runs', `${RUN}.json`),
@@ -48,7 +48,8 @@ function writeRun(moved: Record<string, string> = {}): void {
 }
 writeRun();
 
-const said = (id: string, text = id): TranscriptEvent => ({ id, at: '2026-10-07T12:00:00.000Z', role: 'assistant', kind: 'text', text });
+const said = (id: string, text = id) =>
+  ({ id, at: '2026-10-07T12:00:00.000Z', role: 'assistant', kind: 'text', text }) satisfies TranscriptEvent;
 
 /**
  * A task on the test's engine: its attempts' live moments, each a queue the test offers to, how many of them have ended, whether it
@@ -112,7 +113,10 @@ const attempt = () => {
 };
 
 /** A task with one attempt in flight, nothing said yet but `history`. */
-const working = (history: TranscriptEvent[] = []): Task => ({ attempts: [attempt()], ended: 0, settled: null, history });
+const working = (history: TranscriptEvent[] = []) => {
+  const made: Task = { attempts: [attempt()], ended: 0, settled: null, history };
+  return made;
+};
 
 /** `m` said by the attempt `n` (from 1) of `task`. */
 const push = (task: Task, n: number, m: Followed) => Queue.offerUnsafe(task.attempts[n - 1], m);
@@ -135,7 +139,7 @@ function appOver(t: TestContext, e: ReturnType<typeof engine>) {
 }
 
 type Block = { event?: string; data?: string; id?: string };
-const blocks = (text: string): Block[] =>
+const blocks = (text: string) =>
   text
     .split('\n\n')
     .filter((b) => b.trim())
@@ -146,7 +150,7 @@ const blocks = (text: string): Block[] =>
         if (at > 0) block[line.slice(0, at) as keyof Block] = line.slice(at + 1).trimStart();
       }
       return block;
-    });
+    }) satisfies Block[];
 
 /** One follower of the step `step`: what it was sent so far (`said`), waited on until `holds` does, and let go (`leave`). */
 async function follower(t: TestContext, app: ReturnType<typeof appOver>['app'], step: string) {
@@ -157,7 +161,7 @@ async function follower(t: TestContext, app: ReturnType<typeof appOver>['app'], 
   let text = '';
   const rung = bell();
   const got = () => blocks(text.slice(0, text.lastIndexOf('\n\n') + 2));
-  const pump = async (): Promise<void> => {
+  const pump = async () => {
     const { done, value } = await reader.read();
     if (done) return;
     text += decoder.decode(value, { stream: true });

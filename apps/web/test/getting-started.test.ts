@@ -8,12 +8,13 @@ import type { MilestoneRead } from 'objects';
 import { keepStarterDismissed, readStarterDismissed, starterShown } from '../src/lib/gettingStarted.ts';
 
 /** The four milestones, the change one in `landed`'s state and the rest done. */
-const read = (landed: MilestoneRead['state']): MilestoneRead[] => [
-  { name: 'harness', state: 'done', message: '' },
-  { name: 'factory', state: 'done', message: '' },
-  { name: 'volume', state: 'done', message: '' },
-  { name: 'landed', state: landed, message: '' },
-];
+const read = (landed: MilestoneRead['state']) =>
+  [
+    { name: 'harness', state: 'done', message: '' },
+    { name: 'factory', state: 'done', message: '' },
+    { name: 'volume', state: 'done', message: '' },
+    { name: 'landed', state: landed, message: '' },
+  ] satisfies MilestoneRead[];
 
 describe('Getting started: shown until a change is merged, or the person dismisses it', () => {
   describe('each row: whether the list is shown', () => {
@@ -31,6 +32,7 @@ describe('Getting started: shown until a change is merged, or the person dismiss
   test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
     const kept = new Map<string, string>();
     const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: (k: string) => kept.get(k) ?? null,
@@ -41,7 +43,9 @@ describe('Getting started: shown until a change is merged, or the person dismiss
       writable: true,
     });
     t.onTestFinished(() => {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
       if (before) Object.defineProperty(globalThis, 'localStorage', before);
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
       else Reflect.deleteProperty(globalThis, 'localStorage');
     });
     assert.equal(readStarterDismissed(), false, 'nothing kept: not dismissed');

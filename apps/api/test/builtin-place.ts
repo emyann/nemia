@@ -23,4 +23,4 @@ import {
 export const runWith = <A, E>(
   e: Parameters<typeof runEngine>[0],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-): Promise<A> => runEngine(e, builtin(program.pipe(Eff.provide(storeConfigLayer(process.env)))));
+) => runEngine(e, builtin(program.pipe(Eff.provide(storeConfigLayer(process.env))))) satisfies Promise<A>;

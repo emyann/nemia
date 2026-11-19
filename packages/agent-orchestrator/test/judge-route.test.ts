@@ -42,10 +42,10 @@ const NAMES = JUDGED.map((s) => s.name);
 const passOf = (filed: Record<string, TaskPhase>, output?: Record<string, unknown>) => {
   const r = run(Object.fromEntries(NAMES.map((n) => [n, n in filed ? `t-${n}` : null])));
   const phaseOf = phases(Object.fromEntries(Object.entries(filed).map(([n, p]) => [`t-${n}`, p])));
-  const said = (name: string): Closeout | undefined =>
-    filed[name] === 'succeeded'
+  const said = (name: string) =>
+    (filed[name] === 'succeeded'
       ? { outcome: 'done', summary: `did ${name}`, artifacts: [], ...(name === 'triage' && output ? { output } : {}) }
-      : undefined;
+      : undefined) satisfies Closeout | undefined;
   const asked = () => true;
   return {
     a: assess(aRead(JUDGED, r, { phaseOf, signedOff: said, asked })),

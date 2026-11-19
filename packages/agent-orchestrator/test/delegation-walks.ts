@@ -14,12 +14,13 @@ type Walk = DoorWalk<DelegationDoorShape>;
 const GRANTS: DelegationSpec = { rules: [{ resources: ['workflows'], resourceNames: [], verbs: ['update'] }] };
 
 /** `agent`'s delegation in `factory`, granting `spec`. */
-export const aDelegation = (agent: string, factory = 'acme', spec: DelegationSpec = GRANTS): DelegationRecord => ({
-  factory,
-  agent,
-  since: '2026-11-01T00:00:00.000Z',
-  spec,
-});
+export const aDelegation = (agent: string, factory = 'acme', spec: DelegationSpec = GRANTS) =>
+  ({
+    factory,
+    agent,
+    since: '2026-11-01T00:00:00.000Z',
+    spec,
+  }) satisfies DelegationRecord;
 
 export const DELEGATION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   'delegations.list': [

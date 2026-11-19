@@ -11,7 +11,7 @@ import { Api, type Event, EventList } from 'objects';
 import { FEED_TEMPLATES, readAnswer, viewOf } from './resources.ts';
 
 /** Whether a success schema of the `Api` is an `EventList`, read off its AST: an object whose `kind` is the literal `EventList`. */
-const isEventList = (ast: SchemaAST.AST): boolean => {
+const isEventList = (ast: SchemaAST.AST) => {
   if (!SchemaAST.isObjects(ast)) return false;
   const kind = ast.propertySignatures.find((p) => p.name === 'kind')?.type;
   return kind !== undefined && SchemaAST.isLiteral(kind) && kind.literal === 'EventList';
@@ -72,16 +72,17 @@ test('REFUSED: another path, another query key, another scheme, a host, no URI a
 });
 
 /** An Event of the feed, its message `size` characters long, at byte `at`. */
-const eventAt = (at: number, size: number): Event => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Event',
-  metadata: { name: String(at), creationTimestamp: '2026-11-12T10:00:00.000Z', resourceVersion: String(at + 1) },
-  involved: { kind: 'Run', name: `r-${at}` },
-  reason: 'Running',
-  type: 'Normal',
-  message: 'x'.repeat(size),
-  source: 'tick',
-});
+const eventAt = (at: number, size: number) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Event',
+    metadata: { name: String(at), creationTimestamp: '2026-11-12T10:00:00.000Z', resourceVersion: String(at + 1) },
+    involved: { kind: 'Run', name: `r-${at}` },
+    reason: 'Running',
+    type: 'Normal',
+    message: 'x'.repeat(size),
+    source: 'tick',
+  }) satisfies Event;
 
 test('a read within the bound answers every event; past it, the oldest left out, a whole EventList at its resourceVersion', () => {
   const events = [0, 1, 2, 3, 4].map((at) => eventAt(at, 1_000));

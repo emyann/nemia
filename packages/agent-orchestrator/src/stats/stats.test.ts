@@ -28,12 +28,12 @@ import type { SkillRule } from '../skills/skills.ts';
 import { deniedCallsOf } from './discipline.ts';
 
 const MIN = 60_000;
-const minus = (at: string, ms: number): string => new Date(Date.parse(at) - ms).toISOString();
+const minus = (at: string, ms: number) => new Date(Date.parse(at) - ms).toISOString();
 
 /** A step of a fixture workflow, filled by `agent` where one is named. */
-const step = (name: string, after: string[], more: Partial<StepSpec> & { by?: string } = {}): StepSpec => {
+const step = (name: string, after: string[], more: Partial<StepSpec> & { by?: string } = {}) => {
   const { by, ...keys } = more;
-  return { name, after, body: '', ...(by ? { agent: { name: by, keys: [], body: '', given: {} } } : {}), ...keys };
+  return { name, after, body: '', ...(by ? { agent: { name: by, keys: [], body: '', given: {} } } : {}), ...keys } satisfies StepSpec;
 };
 
 /** The team's shape: a design, the work, a review that loops back to it, and an ending in the checkout. */
@@ -68,25 +68,26 @@ type Try = {
 };
 
 /** A session or a check that ran `ranMs`, an hour unless given, and ended at `end`: succeeded, unless `failed`. */
-const ended = (end: string, cost: number | null, failed = false, ranMs = 60 * MIN): TaskClock => ({
-  phase: failed ? 'failed' : 'succeeded',
-  state: {
-    brief: 'x',
-    settled: failed ? 'failed' : 'succeeded',
-    attempts: [
-      {
-        startedAt: minus(end, ranMs),
-        spawnedAt: minus(end, ranMs),
-        endedAt: end,
-        reason: 'harness',
-        usage: cost === null ? null : { costUsd: cost },
-      },
-    ],
-  },
-});
+const ended = (end: string, cost: number | null, failed = false, ranMs = 60 * MIN) =>
+  ({
+    phase: failed ? 'failed' : 'succeeded',
+    state: {
+      brief: 'x',
+      settled: failed ? 'failed' : 'succeeded',
+      attempts: [
+        {
+          startedAt: minus(end, ranMs),
+          spawnedAt: minus(end, ranMs),
+          endedAt: end,
+          reason: 'harness',
+          usage: cost === null ? null : { costUsd: cost },
+        },
+      ],
+    },
+  }) satisfies TaskClock;
 
 /** `view` answered in the same session: its attempts, then a turn more of ten minutes that ended at `end` and cost fifty cents. */
-const answeredBy = (view: TaskClock, end: string): TaskClock => {
+const answeredBy = (view: TaskClock, end: string) => {
   const turn = Math.max(...view.state.attempts.map((a) => a.turn ?? 0)) + 1;
   const answer = {
     startedAt: minus(end, 10 * MIN),
@@ -96,7 +97,7 @@ const answeredBy = (view: TaskClock, end: string): TaskClock => {
     usage: { costUsd: 0.5 },
     turn,
   };
-  return { ...view, state: { ...view.state, attempts: [...view.state.attempts, answer] } };
+  return { ...view, state: { ...view.state, attempts: [...view.state.attempts, answer] } } satisfies TaskClock;
 };
 
 /**
@@ -156,8 +157,8 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
     },
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
     filesOf: (taskId: string) => files.get(taskId) ?? null,
-    rulesOf: (_step: StepSpec): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
-    appliesOf: (_step: StepSpec): ReadonlyMap<string, readonly string[]> => new Map(),
+    rulesOf: (_step: StepSpec) => new Map() satisfies ReadonlyMap<string, readonly SkillRule[]>,
+    appliesOf: (_step: StepSpec) => new Map() satisfies ReadonlyMap<string, readonly string[]>,
     deadlineOf: (taskId: string) => deadlines.get(taskId) ?? null,
     closeoutOfTask: (taskId: string) => {
       const output = closeouts.get(taskId);
@@ -169,7 +170,7 @@ function readOf(id: string, steps: readonly StepSpec[], tries: Record<string, Tr
 }
 
 const DAY = '2026-09-10';
-const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
+const at = (hour: number, day = DAY) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
 const NOW = new Date(`${DAY}T20:00:00.000Z`);
 
 /** A run of the team that went round its loop twice and landed on the ending's first try. */
@@ -188,35 +189,38 @@ const twoRounds = (id: string, steps = TEAM, landed: object = { commit: 'abc' },
 };
 
 /** `r` with its ending's record saying what the run did with its merge. */
-function withLanded<R extends ReturnType<typeof readOf>>(r: R, ending: string, landed: object): R {
+function withLanded<R extends ReturnType<typeof readOf>>(r: R, ending: string, landed: object) {
   r.run.steps[ending] = { ...r.run.steps[ending], landed } as Run['steps'][string];
-  return r;
+  return r satisfies R;
 }
 
-const factsOfAll = (...reads: ReturnType<typeof readOf>[]): Facts => ({
-  tries: reads.flatMap((r) => factsOf(r).tries),
-  runs: reads.flatMap((r) => factsOf(r).runs),
-  frozen: [],
-});
+const factsOfAll = (...reads: ReturnType<typeof readOf>[]) =>
+  ({
+    tries: reads.flatMap((r) => factsOf(r).tries),
+    runs: reads.flatMap((r) => factsOf(r).runs),
+    frozen: [],
+  }) satisfies Facts;
 
 /** A day whose `claude` tries ran as jobs, and the moment the stats are read on it. */
 const JOBS_DAY = '2026-09-28';
 const JOBS_NOW = new Date(`${JOBS_DAY}T20:00:00.000Z`);
 
 /** `r`, its steps' frozen skills declaring the paths `applies`, by step name and then by skill. */
-const applying = <R extends ReturnType<typeof readOf>>(r: R, applies: Record<string, Record<string, string[]>>): R => ({
-  ...r,
-  appliesOf: (s: StepSpec) => new Map(Object.entries(applies[s.name] ?? {})),
-});
+const applying = <R extends ReturnType<typeof readOf>>(r: R, applies: Record<string, Record<string, string[]>>) =>
+  ({
+    ...r,
+    appliesOf: (s: StepSpec) => new Map(Object.entries(applies[s.name] ?? {})),
+  }) satisfies R;
 
 const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };
 const checksBare: SkillRule = { id: 'checks-bare', says: 'Run a check bare', breaks: ['Bash(cd:*)'] };
 
 /** `r`, its steps' frozen skills declaring `declared`, by step name and then by skill. */
-const declaring = <R extends ReturnType<typeof readOf>>(r: R, declared: Record<string, Record<string, SkillRule[]>>): R => ({
-  ...r,
-  rulesOf: (s: StepSpec) => new Map(Object.entries(declared[s.name] ?? {})),
-});
+const declaring = <R extends ReturnType<typeof readOf>>(r: R, declared: Record<string, Record<string, SkillRule[]>>) =>
+  ({
+    ...r,
+    rulesOf: (s: StepSpec) => new Map(Object.entries(declared[s.name] ?? {})),
+  }) satisfies R;
 
 const DAY_BEFORE = '2026-09-09';
 const TWO_BEFORE = '2026-09-08';
@@ -237,7 +241,7 @@ const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?:
 type Row = { name: string; check: () => void };
 
 /** Runs `rows` as subtests of `t`, in order. */
-const rowsOf = (rows: readonly Row[]): void => {
+const rowsOf = (rows: readonly Row[]) => {
   for (const row of rows) test(row.name, row.check);
 };
 

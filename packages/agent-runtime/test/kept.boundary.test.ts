@@ -30,10 +30,10 @@ const HARNESS = 'claude';
 const at = '2026-10-12T10:00:00.000Z';
 
 /** The bytes `file` takes on the disk, read by the test itself. */
-const blocksOf = (file: string): number => fs.lstatSync(file).blocks * 512;
+const blocksOf = (file: string) => fs.lstatSync(file).blocks * 512;
 
 /** A file of `bytes` bytes at `file`, its folder made: at least a block, so no file system keeps it inline. */
-const plant = (file: string, bytes = 8192): string => {
+const plant = (file: string, bytes = 8192) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, 'x'.repeat(bytes));
   assert.ok(blocksOf(file) > 0, `${file} takes blocks`);
@@ -41,7 +41,7 @@ const plant = (file: string, bytes = 8192): string => {
 };
 
 /** Where Claude Code keeps the transcript of the session `id`, in the project folder `project`. */
-const transcriptAt = (project: string, id: string): string => path.join(config, 'projects', project, `${id}.jsonl`);
+const transcriptAt = (project: string, id: string) => path.join(config, 'projects', project, `${id}.jsonl`);
 
 /** A journal of one attempt under `taskId`, written through the store: filed on `harness`, started, and ended by `nativeId` when given. */
 const journalled = async (

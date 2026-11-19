@@ -10,7 +10,7 @@ import { scratch } from 'test-kit/scratch';
 import { TRY_STEP, triesDir, tryDir, writeTryFolder } from './try.store.ts';
 
 /** What `fn` was refused with, by its message; empty when it was not. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -48,8 +48,7 @@ test("REFUSED, nothing written through: a tries/, a try's folder or a step file 
   fs.mkdirSync(path.join(linkedFile, 'tries', 'scribe'), { recursive: true });
   fs.writeFileSync(path.join(away, 'elsewhere.md'), 'Not a try.\n');
   fs.symlinkSync(path.join(away, 'elsewhere.md'), path.join(linkedFile, 'tries', 'scribe', 'try.md'));
-  const said = (at: string): string =>
-    `${at} is a link, and a try's folder is written by the store: make it a folder of its own, or remove it.`;
+  const said = (at: string) => `${at} is a link, and a try's folder is written by the store: make it a folder of its own, or remove it.`;
   assert.equal(
     refusal(() => writeTryFolder('scribe', 'Try it.\n', linkedTries)),
     said(path.join(linkedTries, 'tries')),

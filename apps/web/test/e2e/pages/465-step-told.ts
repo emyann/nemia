@@ -22,13 +22,13 @@ const LAYERS = ['instructions', 'custom', 'folder', 'factory', 'policy', 'task']
 /** What the rules' layer says of a step told none, read in a factory. */
 const NONE_TOLD = 'This step is told none: the factory keeps none that can be told, or the step is on a remote agent';
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
 
 /** Refuses unless the link `selector` on the page goes to `href`. */
-async function expectHref(page: Page, selector: string, href: string, what: string): Promise<void> {
+async function expectHref(page: Page, selector: string, href: string, what: string) {
   const link = page.locator(selector).first();
   await expectVisible(link, what);
   const at = await link.getAttribute('href');
@@ -40,7 +40,7 @@ async function expectHref(page: Page, selector: string, href: string, what: stri
  * refuses unless the page reads all the same, its rules' layer saying the step is told none and never that the factory wrote none. Takes
  * the directory back.
  */
-async function untold(page: Page, placed: string, factory: string): Promise<void> {
+async function untold(page: Page, placed: string, factory: string) {
   const folder = path.join(store!, 'factories', factory);
   const had = fs.existsSync(folder);
   fs.mkdirSync(path.join(folder, 'RULES.md'), { recursive: true });
@@ -66,7 +66,7 @@ const PLAIN = 'plain';
  * beside the step's own `agent:` line, as 181-workflow finds), the agent's file, and RECENT's record on the checkout from its `main`, as
  * `wf start` freezes one; returns what takes them back.
  */
-function written(checkout: string): () => void {
+function written(checkout: string) {
   const factoryFile = path.join(store!, 'factories', `${FACTORIES.hiring.name}.json`);
   const factoryText = fs.readFileSync(factoryFile, 'utf8');
   const reviewerFile = path.join(checkout, 'workflows', 'agents', `${REVIEWER}.md`);
@@ -98,16 +98,16 @@ function written(checkout: string): () => void {
   fs.writeFileSync(record, JSON.stringify(run, null, 2));
   const plain = path.join(store!, 'factories', `${PLAIN}.json`);
   fs.writeFileSync(plain, JSON.stringify({ volumes: worked([checkout]), workflows: [WORKFLOWS.good.name] }, null, 2));
-  return () => {
+  return (() => {
     fs.rmSync(plain, { force: true });
     fs.rmSync(record, { force: true });
     fs.rmSync(reviewerFile, { force: true });
     fs.writeFileSync(factoryFile, factoryText);
-  };
+  }) satisfies () => void;
 }
 
 /** On a phone, the step's page is photographed and no wider than the phone; then the window is put back. */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   const was = page.viewportSize();
   await page.setViewportSize(PHONE);
   try {

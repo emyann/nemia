@@ -19,8 +19,6 @@ import type { FeedWait, PauseTimeoutAnswer } from 'objects';
 import { app, runtime } from '../app.ts';
 import { root } from '../../test/harness.ts';
 
-type FeedWords = import('agent-orchestrator').FeedWords;
-
 /** The feed's live readers in this process, as the package counts them: a wait is counted once it holds its cursor. */
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
@@ -28,7 +26,7 @@ const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 const memo = freshFeedMemo();
 const written = (runs: Record<string, string>) =>
   runtime.runPromise(
-    emitFeed(new Map(Object.entries(runs).map(([id, word]): [string, FeedWords] => [id, { run: { word }, steps: [] }])), { memo }).pipe(
+    emitFeed(new Map(Object.entries(runs).map(([id, word]) => [id, { run: { word }, steps: [] }])), { memo }).pipe(
       Effect.provide(Logger.layer([])),
     ),
   );

@@ -75,25 +75,25 @@ const EXCEPTIONS: Readonly<Record<string, Exception>> = {
 };
 
 /** `node` without the parentheses, `as`, `satisfies` and `!` around it. */
-function unwrapped(node: ts.Expression): ts.Expression {
+function unwrapped(node: ts.Expression) {
   let at = node;
   while (ts.isParenthesizedExpression(at) || ts.isAsExpression(at) || ts.isSatisfiesExpression(at) || ts.isNonNullExpression(at))
     at = at.expression;
-  return at;
+  return at satisfies ts.Expression;
 }
 
 /** The identifier a callee is rooted in: `fs` of `fs.promises.stat`, `list` of `list`. */
-function calleeRoot(call: ts.CallExpression): ts.Identifier | undefined {
+function calleeRoot(call: ts.CallExpression) {
   let at = unwrapped(call.expression);
   while (ts.isPropertyAccessExpression(at)) at = unwrapped(at.expression);
-  return ts.isIdentifier(at) ? at : undefined;
+  return (ts.isIdentifier(at) ? at : undefined) satisfies ts.Identifier | undefined;
 }
 
 /** What a file's imports bind: the names of the store's roots, and each name bound to `fs` with the function it names, if one. */
 type Bindings = { roots: ReadonlySet<string>; fsNames: ReadonlyMap<string, string | undefined> };
 
 /** The bindings of a file's imports, each kind of `fs` import under `named` but the default and the namespace, which are `fs` itself. */
-function bindingsOf(source: ts.SourceFile, rules: readonly Rule[]): Bindings {
+function bindingsOf(source: ts.SourceFile, rules: readonly Rule[]) {
   const roots = new Set(ROOTS);
   const fsNames = new Map<string, string | undefined>();
   for (const statement of source.statements) {
@@ -110,22 +110,22 @@ function bindingsOf(source: ts.SourceFile, rules: readonly Rule[]): Bindings {
       if (ROOTS.includes(imported) && rules.includes('aliases')) roots.add(element.name.text);
     }
   }
-  return { roots, fsNames };
+  return { roots, fsNames } satisfies Bindings;
 }
 
 /** The expressions a function returns: an arrow's expression body, else each `return`'s, a nested function's left out. */
-function returnsOf(fn: ts.SignatureDeclaration): ts.Expression[] {
+function returnsOf(fn: ts.SignatureDeclaration) {
   const body = (fn as ts.FunctionLikeDeclaration).body;
-  if (!body) return [];
-  if (!ts.isBlock(body)) return [body];
+  if (!body) return [] satisfies ts.Expression[];
+  if (!ts.isBlock(body)) return [body] satisfies ts.Expression[];
   const out: ts.Expression[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isFunctionLike(node)) return;
     if (ts.isReturnStatement(node) && node.expression) out.push(node.expression);
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(body, visit);
-  return out;
+  return out satisfies ts.Expression[];
 }
 
 type Site = { line: number; callee: string };
@@ -134,15 +134,18 @@ type Site = { line: number; callee: string };
  * Each call of `source` that hands `fs` a path from the store's folders, by its line and its callee, under `rules`; a declaration
  * named in `through` taints nothing.
  */
-function sitesIn(source: ts.SourceFile, checker: ts.TypeChecker, through: readonly string[], rules: readonly Rule[]): Site[] {
+function sitesIn(source: ts.SourceFile, checker: ts.TypeChecker, through: readonly string[], rules: readonly Rule[]) {
   const { roots, fsNames } = bindingsOf(source, rules);
   const tainted = new Set<ts.Symbol>();
-  const symbolOf = (id: ts.Identifier): ts.Symbol | undefined =>
-    ts.isShorthandPropertyAssignment(id.parent) ? checker.getShorthandAssignmentValueSymbol(id.parent) : checker.getSymbolAtLocation(id);
-  const isRoot = (call: ts.CallExpression): boolean => {
+  const symbolOf = (id: ts.Identifier) =>
+    (ts.isShorthandPropertyAssignment(id.parent)
+      ? checker.getShorthandAssignmentValueSymbol(id.parent)
+      : checker.getSymbolAtLocation(id)) satisfies ts.Symbol | undefined;
+  const isRoot = (call: ts.CallExpression) => {
     const callee = unwrapped(call.expression);
     return ts.isIdentifier(callee) && roots.has(callee.text);
   };
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const holds = (node: ts.Node): boolean => {
     if (ts.isCallExpression(node) && isRoot(node)) return true;
     if (ts.isIdentifier(node)) {
@@ -153,7 +156,7 @@ function sitesIn(source: ts.SourceFile, checker: ts.TypeChecker, through: readon
     return ts.forEachChild(node, (child) => holds(child) || undefined) ?? false;
   };
   const seeds: Array<{ name: ts.Identifier; value: () => ts.Node[] }> = [];
-  const collect = (node: ts.Node): void => {
+  const collect = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const init = node.initializer;
       seeds.push({ name: node.name, value: () => [init] });
@@ -181,7 +184,7 @@ function sitesIn(source: ts.SourceFile, checker: ts.TypeChecker, through: readon
     }
   }
   const sites: Site[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node)) {
       const paths = pathArguments(node, fsNames, rules);
       if (paths.some(holds))
@@ -193,30 +196,32 @@ function sitesIn(source: ts.SourceFile, checker: ts.TypeChecker, through: readon
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return sites;
+  return sites satisfies Site[];
 }
 
 /** `node` unwrapped when it is an expression. */
-const unwrappedNode = (node: ts.Node): ts.Node => (ts.isExpression(node) ? unwrapped(node) : node);
+const unwrappedNode = (node: ts.Node) => (ts.isExpression(node) ? unwrapped(node) : node) satisfies ts.Node;
 
 /** The arguments a call hands `fs` as paths: none for a call that is no `fs` call nor a wrapper's. */
-function pathArguments(call: ts.CallExpression, fsNames: Bindings['fsNames'], rules: readonly Rule[]): ts.Expression[] {
+function pathArguments(call: ts.CallExpression, fsNames: Bindings['fsNames'], rules: readonly Rule[]) {
   const root = calleeRoot(call);
   const callee = unwrapped(call.expression);
   const [first, second] = call.arguments;
-  if (!first) return [];
+  if (!first) return [] satisfies ts.Expression[];
   if (root && fsNames.has(root.text)) {
     const name = ts.isPropertyAccessExpression(callee) ? callee.name.text : fsNames.get(root.text);
-    return rules.includes('targets') && name !== undefined && TWO_PATHS.includes(name) && second ? [first, second] : [first];
+    return (
+      rules.includes('targets') && name !== undefined && TWO_PATHS.includes(name) && second ? [first, second] : [first]
+    ) satisfies ts.Expression[];
   }
-  if (rules.includes('wrappers') && ts.isIdentifier(callee) && WRAPPERS.includes(callee.text)) return [first];
-  return [];
+  if (rules.includes('wrappers') && ts.isIdentifier(callee) && WRAPPERS.includes(callee.text)) return [first] satisfies ts.Expression[];
+  return [] satisfies ts.Expression[];
 }
 
 /** Every name a file declares: a variable's, a function's, a parameter's. */
-function declaredIn(source: ts.SourceFile): Set<string> {
+function declaredIn(source: ts.SourceFile) {
   const names = new Set<string>();
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (
       (ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isParameter(node)) &&
       node.name &&
@@ -226,11 +231,11 @@ function declaredIn(source: ts.SourceFile): Set<string> {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return names;
+  return names satisfies Set<string>;
 }
 
 /** One program over `texts`, each file alone: no import resolved and no library read, so a symbol is the file's own. */
-function programOf(texts: ReadonlyMap<string, string>): { sources: Map<string, ts.SourceFile>; checker: ts.TypeChecker } {
+function programOf(texts: ReadonlyMap<string, string>) {
   const sources = new Map(
     [...texts].map(([file, text]) => [file, ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)]),
   );
@@ -246,7 +251,10 @@ function programOf(texts: ReadonlyMap<string, string>): { sources: Map<string, t
     fileExists: (file) => sources.has(file),
     readFile: (file) => texts.get(file),
   };
-  return { sources, checker: ts.createProgram([...sources.keys()], options, host).getTypeChecker() };
+  return { sources, checker: ts.createProgram([...sources.keys()], options, host).getTypeChecker() } satisfies {
+    sources: Map<string, ts.SourceFile>;
+    checker: ts.TypeChecker;
+  };
 }
 
 const FIX =
@@ -258,7 +266,7 @@ function breaks(
   texts: ReadonlyMap<string, string>,
   exceptions: Readonly<Record<string, Exception>> = EXCEPTIONS,
   rules: readonly Rule[] = RULES,
-): string[] {
+) {
   const { sources, checker } = programOf(texts);
   const out: string[] = [];
   for (const [file, source] of sources) {
@@ -278,25 +286,25 @@ function breaks(
     if (unknown.length) out.push(`${file}'s exception goes through ${unknown.join(', ')}, which it does not declare: name a declaration`);
     else if (!sitesIn(source, checker, [], rules).length) out.push(`${file} hands fs no path of the store's: take its exception off`);
   }
-  return out;
+  return out satisfies string[];
 }
 
 /** Whether a file of a `src` is left out: a test, beside its code or in a `test` folder. */
-const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.split('/').includes('test');
+const isTest = (file: string) => /\.test\.tsx?$/.test(file) || file.split('/').includes('test');
 
 /** Every `.ts` under each of `SOURCES` in `root`, by its path from `root`, but the tests. */
-function sourcesOf(root: string): string[] {
+function sourcesOf(root: string) {
   return SOURCES.filter((src) => fs.existsSync(path.join(root, src)))
     .flatMap((src) =>
       fs.readdirSync(path.join(root, src), { recursive: true, encoding: 'utf8' }).map((f) => `${src}/${f.split(path.sep).join('/')}`),
     )
     .filter((f) => /\.tsx?$/.test(f) && !isTest(f))
-    .sort();
+    .sort() satisfies string[];
 }
 
 const AT = 'packages/agent-orchestrator/src/new/new.verb.ts';
 
-const one = (text: string, file = AT): Map<string, string> => new Map([[file, text]]);
+const one = (text: string, file = AT) => new Map([[file, text]]) satisfies Map<string, string>;
 
 const HEAD = "import fs from 'node:fs';\nimport path from 'node:path';\nimport { inboxDir, runsDir } from '../record/record.store.ts';\n";
 

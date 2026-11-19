@@ -11,7 +11,7 @@ import { timeoutAt, timeoutFile, putTimeout } from './pause-timeout.store.ts';
 import { DEFAULT_TIMEOUT_MS } from './pause.ts';
 
 /** Whether `fn` refuses `Invalid` with exit 2, its message naming each of `facts`. */
-function invalid(fn: () => unknown, ...facts: string[]): void {
+function invalid(fn: () => unknown, ...facts: string[]) {
   try {
     fn();
   } catch (err) {

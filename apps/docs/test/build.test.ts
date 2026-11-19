@@ -22,7 +22,7 @@ const ASTRO = path.join(ROOT, 'node_modules', 'astro', 'bin', 'astro.mjs');
 const LOCK = path.join(APP, '.astro', 'dev.json');
 
 /** `astro build` of the site at `root` into `outDir`, by its own configuration or by `config`: its exit status and all it printed. */
-const build = (root: string, outDir: string, config?: string): { status: number | null; said: string } => {
+const build = (root: string, outDir: string, config?: string) => {
   const ran = spawnSync(
     process.execPath,
     [ASTRO, 'build', '--root', root, '--outDir', outDir, ...(config ? ['--config', path.relative(root, config)] : [])],

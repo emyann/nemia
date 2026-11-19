@@ -4,9 +4,9 @@
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { spentOf, type LabelStats } from '../src/lib/api/labels.ts';
+import { spentOf } from '../src/lib/api/labels.ts';
 
-const stats = (costs: (number | null)[], costPerLanded: number | null = null): LabelStats => ({
+const stats = (costs: (number | null)[], costPerLanded: number | null = null) => ({
   all: { total: { runs: costs.length, landed: null, costPerLanded }, steps: costs.map((costUsd) => ({ costUsd })) },
 });
 

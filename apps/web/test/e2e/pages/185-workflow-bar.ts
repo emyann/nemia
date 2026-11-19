@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
@@ -29,13 +29,13 @@ const specBar = (page: Page, from: string, name: string, step: string) => page.l
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Refuses unless no bar is drawn and the address names none. */
-async function expectNoBar(page: Page, assertion: string): Promise<void> {
+async function expectNoBar(page: Page, assertion: string) {
   await expectCount(page.locator('aside[data-bar]'), 0, assertion);
   if (barInUrl(page) !== null) throw new Refused(`${assertion}: the address names no bar — it is ${page.url()}`);
 }
@@ -44,7 +44,7 @@ async function expectNoBar(page: Page, assertion: string): Promise<void> {
  * Refuses unless the bar shows the step `step` of `name` read from `from`, the address names it, and its node alone on the page is
  * marked.
  */
-async function expectSpec(page: Page, from: string, name: string, step: string, assertion: string): Promise<Locator> {
+async function expectSpec(page: Page, from: string, name: string, step: string, assertion: string) {
   const bar = specBar(page, from, name, step);
   const value = `spec:${from}/${name}/${step}`;
   await expectVisible(bar, assertion);
@@ -55,7 +55,7 @@ async function expectSpec(page: Page, from: string, name: string, step: string, 
 }
 
 /** Refuses unless the page reaches `pathname` within the wait. */
-async function expectAt(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectAt(page: Page, pathname: string, assertion: string) {
   try {
     await page.waitForURL((url) => url.pathname === pathname, { timeout: WAIT_MS });
   } catch {
@@ -64,7 +64,7 @@ async function expectAt(page: Page, pathname: string, assertion: string): Promis
 }
 
 /** Clicks a point of the canvas of `name` with nothing drawn on it, where the click lands on the empty pane. */
-async function clickPane(page: Page, name: string): Promise<void> {
+async function clickPane(page: Page, name: string) {
   const spot = await canvasOf(page, name).evaluate((canvas) => {
     const box = canvas.getBoundingClientRect();
     for (let y = box.top + box.height - 12; y > box.top + 12; y -= 12)
@@ -81,7 +81,7 @@ async function clickPane(page: Page, name: string): Promise<void> {
  * the step waits on; again closes it; another step, on this canvas or another workflow's, switches it; Enter shows one; the empty canvas
  * closes it.
  */
-async function presses(page: Page): Promise<void> {
+async function presses(page: Page) {
   await canvasOf(page, good.name).scrollIntoViewIfNeeded();
   await nodeOf(page, good.name, WAITS).click();
   const bar = await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node shows the step in the bar`);
@@ -139,7 +139,7 @@ async function presses(page: Page): Promise<void> {
 }
 
 /** The bar's Open and a double click on a step each open the step's page, with no bar. */
-async function opens(page: Page): Promise<void> {
+async function opens(page: Page) {
   const to = `/factories/${hiring.name}/workflows/repo/${good.name}/${WAITS}`;
   const inHiring = (assertion: string) => {
     if (!new URL(page.url()).pathname.startsWith(`/factories/${hiring.name}/`))
@@ -161,7 +161,7 @@ async function opens(page: Page): Promise<void> {
  * Build, pressed from the keyboard beside the bar in the sheet, swaps a workflow's canvas for its builder and closes the bar showing
  * one of its steps; a click on a step in the builder selects it for its form, and shows no bar.
  */
-async function builds(page: Page): Promise<void> {
+async function builds(page: Page) {
   const [mine] = yours.steps;
   await visit(page, pageOf('user', yours.name));
   await nodeOf(page, yours.name, mine).click();

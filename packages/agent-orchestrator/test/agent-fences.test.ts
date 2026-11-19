@@ -114,23 +114,23 @@ const PROBES: Call[] = [
 ];
 
 /** A SKILL.md's `allowed-tools`, split on commas: what a session that loads the skill may run without asking. */
-function allowedToolsOf(file: string): string[] {
+function allowedToolsOf(file: string) {
   const front = /^---\n([\s\S]*?)\n---/.exec(fs.readFileSync(file, 'utf8'))?.[1] ?? '';
   const line = /^allowed-tools:(.*)$/m.exec(front)?.[1]?.trim();
-  if (line === undefined) return [];
+  if (line === undefined) return [] satisfies string[];
   if (line === '' || line.startsWith('[')) throw new Error(`${file}: allowed-tools is not one line of rules; read its shape here`);
-  return line.split(/,\s*/).filter(Boolean);
+  return line.split(/,\s*/).filter(Boolean) satisfies string[];
 }
 
 /** Every grant of every skill of the folders of skills `folders`. */
-const grantsOf = (folders: readonly string[]): string[] =>
+const grantsOf = (folders: readonly string[]) =>
   folders.flatMap((dir) =>
     fs
       .readdirSync(dir)
       .map((name) => path.join(dir, name, 'SKILL.md'))
       .filter((file) => fs.existsSync(file))
       .flatMap(allowedToolsOf),
-  );
+  ) satisfies string[];
 
 /** Every skill's grants, from every folder a step of the tests' team may load one from. */
 const SKILL_GRANTS = grantsOf(SKILL_FOLDERS);
@@ -141,11 +141,13 @@ type Step = ReturnType<typeof loadWorkflows>[number];
  * What of `calls` (`FENCED` by default) a step could run, each as `<step>: <call>`; empty for a step fenced from all of it. A dontAsk
  * job runs what an allow reaches: its own, `settings`' and `grants`, a skill's.
  */
-function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FENCED, grants: readonly string[] = SKILL_GRANTS): string[] {
+function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FENCED, grants: readonly string[] = SKILL_GRANTS) {
   const harness = step.harness ?? 'claude';
   if (harness === 'codex')
-    return step.sandbox === 'read-only' ? [] : [`${step.name}: on codex in sandbox ${step.sandbox ?? 'workspace-write'}, not read-only`];
-  if (harness !== 'claude') return [`${step.name}: on ${harness}, which this test does not know how to fence`];
+    return (
+      step.sandbox === 'read-only' ? [] : [`${step.name}: on codex in sandbox ${step.sandbox ?? 'workspace-write'}, not read-only`]
+    ) satisfies string[];
+  if (harness !== 'claude') return [`${step.name}: on ${harness}, which this test does not know how to fence`] satisfies string[];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
   const dontAsk = step.permissionMode === 'dontAsk' && step.workspace !== 'base';
@@ -154,26 +156,26 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
       if (deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
       return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
     })
-    .map((call) => `${step.name}: ${shown(call)}`);
+    .map((call) => `${step.name}: ${shown(call)}`) satisfies string[];
 }
 
 /** The settings' allows, which name this repository's commands for every session in it: an agent's own fence names none. */
 const SETTINGS_ALLOWS = SETTINGS.permissions?.allow ?? [];
 
 /** The commands a step's fence would refuse: reached by no allow of its own or of the settings' `allowed`, or by a deny of its own. */
-function unallowed(step: Step, commands: string[], allowed: readonly string[] = SETTINGS_ALLOWS): string[] {
+function unallowed(step: Step, commands: string[], allowed: readonly string[] = SETTINGS_ALLOWS) {
   const allows = granting([...(step.allowedTools ?? []), ...allowed]);
   return commands.filter((command) => {
     const call = { tool: 'Bash', command } as const;
     return !allows.some((rule) => reaches(rule, call)) || (step.disallowedTools ?? []).some((rule) => reaches(rule, call));
-  });
+  }) satisfies string[];
 }
 
 /** The step of the tests' team that names an agent, as its folder resolves it. */
-const stepOf = (agent: string): Step => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)!;
+const stepOf = (agent: string) => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)! satisfies Step;
 
 /** A folder of steps written from their frontmatter and a one-line body, beside no agents. */
-const folderOf = (steps: Record<string, string>): string => {
+const folderOf = (steps: Record<string, string>) => {
   const dir = scratch('wf-fences-folder-');
   for (const [name, front] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
@@ -321,14 +323,16 @@ type FenceList = 'tools' | 'allowedTools' | 'disallowedTools';
  * the key four spaces in), or at the top level, the former spelling. Its value is a comma string; a list written as YAML items is thrown
  * on, since no edit here reads one, so that such a list is never read as empty.
  */
-function fenceLineIn(text: string, key: FenceList): { start: number; at: number; end: number; head: string; value: string } | undefined {
+function fenceLineIn(text: string, key: FenceList) {
   const front = /^---\n[\s\S]*?\n---\n/.exec(text)?.[0] ?? '';
   const found = new RegExp(`^(\\w+:\\n  fence:\\n(?:    .*\\n)*?    |)(${key}: ?)(.*)$`, 'm').exec(front);
-  if (!found) return undefined;
+  if (!found) return undefined satisfies { start: number; at: number; end: number; head: string; value: string } | undefined;
   const [whole, block = '', head = '', value = ''] = found;
   if (value.trim() === '') throw new Error(`the ${key} list is not a comma string on its own line: write it as one`);
   const at = found.index + block.length;
-  return { start: text.lastIndexOf('\n', at) + 1, at, end: found.index + whole.length, head, value };
+  return { start: text.lastIndexOf('\n', at) + 1, at, end: found.index + whole.length, head, value } satisfies
+    | { start: number; at: number; end: number; head: string; value: string }
+    | undefined;
 }
 
 /**
@@ -336,7 +340,7 @@ function fenceLineIn(text: string, key: FenceList): { start: number; at: number;
  * gives `undefined`, and its block with it once the block holds nothing. `text` as it was where it has no such list, which each caller's
  * `notEqual` names.
  */
-function withFenceList(text: string, key: FenceList, edit: (value: string) => string | undefined): string {
+function withFenceList(text: string, key: FenceList, edit: (value: string) => string | undefined) {
   const found = fenceLineIn(text, key);
   if (!found) return text;
   const value = edit(found.value);
@@ -345,7 +349,7 @@ function withFenceList(text: string, key: FenceList, edit: (value: string) => st
 }
 
 /** Whether a step is a dontAsk job, which runs only what an allow reaches. */
-const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.workspace !== 'base';
+const dontAskJob = (step: Step) => step.permissionMode === 'dontAsk' && step.workspace !== 'base';
 
 /**
  * Git's read-only questions a read-only step asks, in the spellings a session types: a form for each rule of the set its agent's
@@ -414,13 +418,7 @@ const GIT_WRITES: Call[] = [
  * no deny of its own or of `settings` does, nor Claude Code's own check of a path outside the working tree (`readsOutside`), unless
  * `inside` is false, which reads the rules alone. Each as a rule would name it.
  */
-function runs(
-  step: Step,
-  calls: readonly Call[],
-  settings: Settings = SETTINGS,
-  grants: readonly string[] = SKILL_GRANTS,
-  inside = true,
-): string[] {
+function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS, grants: readonly string[] = SKILL_GRANTS, inside = true) {
   assert.ok(dontAskJob(step), `${step.name} is a dontAsk job, which runs only what an allow reaches`);
   return runsUnder(
     {
@@ -429,7 +427,7 @@ function runs(
     },
     calls,
     { inside },
-  );
+  ) satisfies string[];
 }
 
 /** A read of each text tool inside the working tree, which every read-only agent runs by its own allow. */
@@ -585,12 +583,12 @@ const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)',
 const SDLC_FENCES = path.join(REPO, 'packages', 'templates', 'sdlc', 'fences');
 
 /** The lines of sdlc's fence file `file`, a YAML list of strings. */
-const fenceLines = (file: string): string[] => yaml.load(fs.readFileSync(path.join(SDLC_FENCES, file), 'utf8')) as string[];
+const fenceLines = (file: string) => yaml.load(fs.readFileSync(path.join(SDLC_FENCES, file), 'utf8')) as string[];
 
 /** `rules` less `rule`, which it holds, so taking it off says something. */
-const less = (rules: readonly string[], ...rule: string[]): string[] => {
+const less = (rules: readonly string[], ...rule: string[]) => {
   for (const one of rule) assert.ok(rules.includes(one), `${one} is planted, so taking it off says something`);
-  return rules.filter((kept) => !rule.includes(kept));
+  return rules.filter((kept) => !rule.includes(kept)) satisfies string[];
 };
 
 /** The proposal of a change to the factory's definitions, which each read-only agent allows itself beside the read set. */
@@ -609,7 +607,7 @@ const READ_SET_ALLOWS = less(fenceLines('read-only.allow.yaml'), PROPOSE_ALLOW);
 const READ_ONLY_DENIES = fenceLines('read-only.deny.yaml');
 
 /** Whether a rule is a deny of gh's, which a test of gh's reads plants on its own (`GH_DENIES`). */
-const ofGh = (rule: string): boolean => /^Bash\((?:\*=\* )?gh /.test(rule);
+const ofGh = (rule: string) => /^Bash\((?:\*=\* )?gh /.test(rule);
 
 /**
  * Every deny planted beside the read set, on the agent's own line, a step's own line adding to it: sdlc's read-only denies less gh's
@@ -629,7 +627,7 @@ function planted({
   allows = READ_SET_ALLOWS,
   denies = READ_SET_DENIES,
   own,
-}: { allows?: readonly string[]; denies?: readonly string[]; own?: string } = {}): Step {
+}: { allows?: readonly string[]; denies?: readonly string[]; own?: string } = {}) {
   const root = teamCopy('wf-fences-planted-');
   const agent = path.join(root, 'agents', 'reviewer.md');
   const text = fs.readFileSync(agent, 'utf8');
@@ -646,7 +644,7 @@ function planted({
   const review = loadWorkflows(path.join(root, 'dev')).find((step) => step.name === 'review')!;
   assert.equal(review.agent?.name, 'reviewer');
   assert.ok(dontAskJob(review), 'the review is a dontAsk job, which runs only what an allow reaches');
-  return review;
+  return review satisfies Step;
 }
 
 /**
@@ -679,8 +677,8 @@ test('REFUSED: git whole, git worktree whole or git branch whole in place of a r
     GIT_WRITES.map(shown),
     'git whole opens every write',
   );
-  const swapped = (from: string, to: string): string[] =>
-    runs(planted({ allows: [...less(READ_SET_ALLOWS, from), to] }), GIT_WRITES, {}, []);
+  const swapped = (from: string, to: string) =>
+    runs(planted({ allows: [...less(READ_SET_ALLOWS, from), to] }), GIT_WRITES, {}, []) satisfies string[];
   assert.deepEqual(swapped('Bash(git worktree list:*)', 'Bash(git worktree:*)'), [
     'Bash(git worktree add ../x)',
     'Bash(git worktree remove x)',
@@ -704,7 +702,7 @@ test('REFUSED: without Claude Code’s check of a path, or without the deny of w
 test('REFUSED: without the denies of a read outside a dontAsk step reads one by each, and each deny refuses its own spellings', () => {
   const open = planted({ denies: less(UNASSIGNED_DENIES, ...READS_OUTSIDE_DENIES) });
   assert.deepEqual(runs(open, GIT_READS_OUTSIDE, {}, []), GIT_READS_OUTSIDE.map(shown));
-  const without = (rule: string): string[] => runs(planted({ denies: less(UNASSIGNED_DENIES, rule) }), GIT_READS_OUTSIDE, {}, []);
+  const without = (rule: string) => runs(planted({ denies: less(UNASSIGNED_DENIES, rule) }), GIT_READS_OUTSIDE, {}, []) satisfies string[];
   assert.deepEqual(without('Bash(git *--no-ind*)'), [
     'Bash(git diff --no-index /etc/hostname CLAUDE.md)',
     'Bash(git diff --stat --no-index /etc/hostname CLAUDE.md)',
@@ -736,7 +734,7 @@ test('REFUSED: without the deny of --output a dontAsk step writes a file by each
 test('REFUSED: without the denies of a program a dontAsk step runs one by each, and each refuses its own spellings', () => {
   const open = planted({ denies: less(READ_SET_DENIES, ...RUNS_A_PROGRAM_DENIES) });
   assert.deepEqual(runs(open, GIT_RUNS_A_PROGRAM, {}, []), GIT_RUNS_A_PROGRAM.map(shown));
-  const without = (rule: string): string[] => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_RUNS_A_PROGRAM, {}, []);
+  const without = (rule: string) => runs(planted({ denies: less(READ_SET_DENIES, rule) }), GIT_RUNS_A_PROGRAM, {}, []) satisfies string[];
   assert.deepEqual(without('Bash(git grep *O*)'), [
     'Bash(git grep -Osh foo HEAD)',
     'Bash(git grep -n -Osh foo HEAD)',
@@ -843,10 +841,10 @@ const CONTRACT_SHAPED_WRITES: Call[] = [...CONTRACTS_FOLDERS_FILES, ...NOT_CONTR
 }));
 
 /** The paths of those writes `step` makes, each from the root where it is in `WORK`: each run on its own, `runs` showing no path. */
-const writtenBy = (step: Step): string[] =>
+const writtenBy = (step: Step) =>
   CONTRACT_SHAPED_WRITES.filter((call) => runs(step, [call], {}, []).length > 0).map((call) =>
     call.path!.startsWith(`${WORK}/`) ? call.path!.slice(WORK.length + 1) : call.path!,
-  );
+  ) satisfies string[];
 
 test('a dontAsk step with the read set and the contract allows planted writes exactly the contracts of the checkout, and still asks each read', () => {
   const step = planted({ allows: [...READ_SET_ALLOWS, ...CONTRACT_WRITES] });
@@ -889,7 +887,7 @@ const COMPILERS = ['tsrs', 'tsc'] as const;
 type Compiler = (typeof COMPILERS)[number];
 
 /** The settings' allow of `compiler` run to measure: `--noEmit` first, so no allow reaches a build, an emit or a watch by its first one. */
-const measureAllow = (compiler: Compiler): string => `Bash(npx ${compiler} --noEmit:*)`;
+const measureAllow = (compiler: Compiler) => `Bash(npx ${compiler} --noEmit:*)`;
 
 /** What a compiler is typed with to measure, after `npx <compiler> `, none of which writes or watches. */
 const MEASURE_ARGS = [
@@ -950,15 +948,16 @@ const FAST_BY_ENV = [
 ];
 
 /** The refused spellings of `compiler`, by the deny of each: tsc's, and tsrs's with `--fast` and `TSRS_FAST` beside them. */
-const refusedOf = (compiler: Compiler): Record<string, string[]> => ({
-  ...Object.fromEntries(
-    Object.entries(compiler === 'tsrs' ? { ...COMPILER_WRITES, ...FAST } : COMPILER_WRITES).map(([deny, spellings]) => [
-      `Bash(npx ${compiler} ${deny})`,
-      spellings.map((args) => `npx ${compiler} --noEmit ${args}`),
-    ]),
-  ),
-  ...(compiler === 'tsrs' ? { [FAST_BY_ENV_DENY]: FAST_BY_ENV } : {}),
-});
+const refusedOf = (compiler: Compiler) =>
+  ({
+    ...Object.fromEntries(
+      Object.entries(compiler === 'tsrs' ? { ...COMPILER_WRITES, ...FAST } : COMPILER_WRITES).map(([deny, spellings]) => [
+        `Bash(npx ${compiler} ${deny})`,
+        spellings.map((args) => `npx ${compiler} --noEmit ${args}`),
+      ]),
+    ),
+    ...(compiler === 'tsrs' ? { [FAST_BY_ENV_DENY]: FAST_BY_ENV } : {}),
+  }) satisfies Record<string, string[]>;
 
 /**
  * The denies a read-only step that measures carries on its line, tsrs's and tsc's, each compiler's held equal by being written from the
@@ -969,7 +968,7 @@ const MEASURE_DENIES = COMPILERS.flatMap((compiler) => Object.keys(refusedOf(com
 /** The denies that keep intake and the janitor, which measure nothing, from the settings' allows of the compilers. */
 const MEASURELESS_DENIES = COMPILERS.map((compiler) => `Bash(npx ${compiler}:*)`);
 
-const bash = (command: string): Call => ({ tool: 'Bash', command });
+const bash = (command: string) => ({ tool: 'Bash', command }) satisfies Call;
 
 /** Every measure, by each compiler, and one behind a `timeout`. */
 const MEASURES: Call[] = COMPILERS.flatMap((compiler) => [
@@ -989,7 +988,7 @@ const NO_EMIT_FIRST: Call[] = COMPILERS.flatMap((compiler) =>
 );
 
 /** The reviewer with the read set and the measure's denies planted, or `denies` in their place. */
-const measuring = (denies: readonly string[] = MEASURE_DENIES): Step => planted({ denies: [...READ_SET_DENIES, ...denies] });
+const measuring = (denies: readonly string[] = MEASURE_DENIES) => planted({ denies: [...READ_SET_DENIES, ...denies] }) satisfies Step;
 
 test("a dontAsk step with the measure's denies planted measures by tsrs and by tsc through the settings, and is refused each write, watch and --fast", () => {
   for (const compiler of COMPILERS)
@@ -1121,8 +1120,8 @@ const GH_REFUSED_CALLS: Call[] = Object.values(GH_REFUSED)
 const GH_WRITES: Call[] = FENCED.filter((call) => call.command?.startsWith('gh '));
 
 /** The reviewer with the read set and gh's reads planted, and their denies, or `denies` in place of gh's. */
-const ghPlanted = ({ allows = GH_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}): Step =>
-  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] });
+const ghPlanted = ({ allows = GH_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}) =>
+  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] }) satisfies Step;
 
 test("a dontAsk step with gh's two reads and their denies planted reads its pull request, and runs no other form of gh", () => {
   const step = ghPlanted();
@@ -1232,8 +1231,8 @@ const HELP_REFUSED: Call[] = [
 ].map((command) => ({ tool: 'Bash', command }));
 
 /** The reviewer with the read set, gh's denies and `allows` in place of the help lines. */
-const helpPlanted = ({ allows = HELP_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}): Step =>
-  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] });
+const helpPlanted = ({ allows = HELP_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}) =>
+  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] }) satisfies Step;
 
 test("a dontAsk step with the help lines planted reads gh's and claude's help, and runs no alias, extension, flag or other command by them", () => {
   const step = helpPlanted();
@@ -1244,7 +1243,8 @@ test("a dontAsk step with the help lines planted reads gh's and claude's help, a
 });
 
 test('REFUSED: gh help whole, gh … --help, claude … --help in place of the lines, or no deny of an assignment, each run what the lines refuse', () => {
-  const reached = (allows: string[], denies: string[] = GH_DENIES): string[] => runs(helpPlanted({ allows, denies }), HELP_REFUSED, {}, []);
+  const reached = (allows: string[], denies: string[] = GH_DENIES) =>
+    runs(helpPlanted({ allows, denies }), HELP_REFUSED, {}, []) satisfies string[];
   assert.deepEqual(reached(['Bash(gh * --help)']), [
     'Bash(gh auth login --help)',
     'Bash(gh pr co --help)',
@@ -1282,6 +1282,7 @@ test('a dontAsk step with nemia propose planted proposes, and REFUSED: without t
 const NOT_CHECKOUT = new Set(['node_modules', '.git', 'dist', '.turbo']);
 
 /** Every file under the checkout `repo`, by its path from it, but under `NOT_CHECKOUT`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function checkoutFiles(repo: string, under = ''): string[] {
   return fs
     .readdirSync(path.join(repo, under), { withFileTypes: true })
@@ -1293,7 +1294,7 @@ function checkoutFiles(repo: string, under = ''): string[] {
 }
 
 /** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
-function appliesUnmatched(skillsDir: string, repo: string): string[] {
+function appliesUnmatched(skillsDir: string, repo: string) {
   const files = checkoutFiles(repo);
   return fs
     .readdirSync(skillsDir)
@@ -1302,7 +1303,7 @@ function appliesUnmatched(skillsDir: string, repo: string): string[] {
       appliesOf(fs.readFileSync(path.join(skillsDir, skill, 'SKILL.md'), 'utf8'))
         .filter((glob) => !files.some((file) => appliesMatch(file, [glob])))
         .map((glob) => `${skill}: ${glob}`),
-    );
+    ) satisfies string[];
 }
 
 test('every path a repository skill applies to matches a file of the checkout, and the two that say so are read', () => {
@@ -1356,7 +1357,7 @@ const BUILD_INFO_OPTIONS = ['incremental', 'composite'] as const;
  * Each tsconfig of the checkout `repo`, by its path from it, that sets an option of `BUILD_INFO_OPTIONS`, itself or through what it
  * extends, as TypeScript reads it.
  */
-function buildInfoConfigs(repo = REPO): string[] {
+function buildInfoConfigs(repo = REPO) {
   return checkoutFiles(repo)
     .filter((file) => /(?:^|\/)tsconfig[^/]*\.json$/.test(file))
     .filter((file) => {
@@ -1365,7 +1366,7 @@ function buildInfoConfigs(repo = REPO): string[] {
       assert.equal(read.error, undefined, `${file} reads as a tsconfig`);
       const { options } = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(at), undefined, at);
       return BUILD_INFO_OPTIONS.some((option) => options[option] === true);
-    });
+    }) satisfies string[];
 }
 
 test('no tsconfig of the checkout sets incremental or composite, so a measure with --noEmit writes no build-info file', () => {
@@ -1390,7 +1391,7 @@ test('REFUSED: a tsconfig that sets incremental, or extends one that sets compos
 });
 
 /** Nemia as her keeper files her: her shipped definition, long-lived. */
-const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia' });
+const nemia = (file?: string) => ({ ...readNemia(file), name: 'nemia' }) satisfies Step;
 
 test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
   const her = nemia();
@@ -1431,18 +1432,18 @@ type Rules = { allow: readonly string[]; ask: readonly string[]; deny: readonly 
  * (`nemiaFence`) less each prompt `local` allows by its own rule (`widened`) and the store's denies (`storeDenies`), her memory allowed
  * her; with the person's own allows `local` besides, in her folder's local settings.
  */
-function herRules(root: string, local: readonly string[] = []): Rules {
+function herRules(root: string, local: readonly string[] = []) {
   const her = nemia();
   const fence = widened(nemiaFence(TABLE), local);
   return {
     allow: [...(her.allowedTools ?? []), ...fence.allow, `Edit(/${path.join(root, 'nemia', 'memory')}/**)`, ...local],
     ask: fence.ask,
     deny: [...(her.disallowedTools ?? []), ...fence.deny, ...storeDenies(root)],
-  };
+  } satisfies Rules;
 }
 
 /** A store with what her keeper reads to deny her: a run's folder, the daemon's file and her own folder. */
-function herStore(): string {
+function herStore() {
   const root = scratch('wf-nemia-store-');
   fs.mkdirSync(path.join(root, 'runs', 'r-1'), { recursive: true });
   fs.mkdirSync(path.join(root, 'nemia', 'memory'), { recursive: true });
@@ -1451,8 +1452,10 @@ function herStore(): string {
 }
 
 /** What waits on the person in the tests' store: `design` of `r-1` at its gate; `check` of `r-1` on no one; no other run is there. */
-const waitOf = (runId: string, step: string): string | undefined =>
-  runId !== 'r-1' ? 'is not there: no such run' : step === 'design' ? 'is awaiting approval' : undefined;
+const waitOf = (runId: string, step: string) =>
+  (runId !== 'r-1' ? ('is not there: no such run' as const) : step === 'design' ? ('is awaiting approval' as const) : undefined) satisfies
+    | string
+    | undefined;
 
 /** What Claude Code does with a call: refuse it, ask the person, run it unasked, or leave it to its mode, which no rule reaches. */
 type Verdict = 'deny' | 'ask' | 'allow' | 'unmatched';
@@ -1461,25 +1464,29 @@ type Verdict = 'deny' | 'ask' | 'allow' | 'unmatched';
  * The verdict on the shell line `command` under `rules`, with her admission asked first (`admissionOf`) unless `admitted` is false: a
  * deny on any part refuses it; else her admission's ask, or an ask on any part, asks; else an allow on every part runs it unasked.
  */
-function verdictOf(rules: Rules, command: string, admitted = true): Verdict {
+function verdictOf(rules: Rules, command: string, admitted = true) {
   const parts = partsOfCall({ tool: 'Bash', command });
   const on = (list: readonly string[]) => (part: Call) => list.some((rule) => reaches(rule, part));
-  if (parts.some(on(rules.deny))) return 'deny';
+  if (parts.some(on(rules.deny))) return 'deny' as const satisfies Verdict;
   const asked = admitted && admissionOf({ tool: 'Bash', input: { command }, cwd: '/' }, TABLE, waitOf) !== undefined;
-  if (asked || parts.some(on(rules.ask))) return 'ask';
-  return parts.every(on(rules.allow)) ? 'allow' : 'unmatched';
+  if (asked || parts.some(on(rules.ask))) return 'ask' as const satisfies Verdict;
+  return (parts.every(on(rules.allow)) ? ('allow' as const) : ('unmatched' as const)) satisfies Verdict;
 }
 
 /** Whether an `Edit` rule on an absolute path (`Edit(//at)`, `Edit(//at/**)`) reaches a write of `file`: that file, or one under it. */
-function editReaches(rule: string, file: string): boolean {
+function editReaches(rule: string, file: string) {
   const at = /^Edit\(\/(\/.*?)(\/\*\*)?\)$/.exec(rule);
   if (at === null) return false;
   return at[2] === undefined ? file === at[1] : file.startsWith(`${at[1]}/`);
 }
 
 /** The verdict on an edit of `file` under `rules`: a deny that reaches it refuses it, else an allow runs it unasked. */
-const editVerdictOf = (rules: Rules, file: string): Verdict =>
-  rules.deny.some((rule) => editReaches(rule, file)) ? 'deny' : rules.allow.some((rule) => editReaches(rule, file)) ? 'allow' : 'unmatched';
+const editVerdictOf = (rules: Rules, file: string) =>
+  (rules.deny.some((rule) => editReaches(rule, file))
+    ? ('deny' as const)
+    : rules.allow.some((rule) => editReaches(rule, file))
+      ? ('allow' as const)
+      : ('unmatched' as const)) satisfies Verdict;
 
 /**
  * Each call the command line serves of every command of `table`, and the verdict its class for an agent owes (`agentClassOf`: a
@@ -1488,28 +1495,28 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
  * bare runs unasked with an argument and with a flag it reads by, and asks with each word or flag that sets, after its argument and
  * before it.
  */
-function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
+function owedOf(table: readonly (typeof TABLE)[number][]) {
   return table
     .filter((entry) => entry.only?.side !== 'api')
     .map((entry) => ({ name: entry.name, class: agentClassOf(entry) }))
-    .flatMap(({ name, class: c }): [string, Verdict][] => {
+    .flatMap(({ name, class: c }) => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
-      if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
-      if (typeof c !== 'object') return forms.map((form) => [form, 'allow']);
+      if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']) satisfies [string, Verdict][];
+      if (typeof c !== 'object') return forms.map((form) => [form, 'allow']) satisfies [string, Verdict][];
       const set = (s: string) => (s.startsWith('-') ? [`nemia ${name} r-1 ${s} v`, `nemia ${name} ${s} v r-1`] : [`nemia ${name} ${s}`]);
       return [
-        ...forms.map((form): [string, Verdict] => [form, 'allow']),
-        ...(c.readsBy ?? []).map((s): [string, Verdict] => [`nemia ${name} r-1 ${s} v`, 'allow']),
-        ...c.setsBy.flatMap(set).map((form): [string, Verdict] => [form, c.sets === 'none' ? 'deny' : 'ask']),
-      ];
-    });
+        ...forms.map((form) => [form, 'allow'] satisfies [string, Verdict]),
+        ...(c.readsBy ?? []).map((s) => [`nemia ${name} r-1 ${s} v`, 'allow'] satisfies [string, Verdict]),
+        ...c.setsBy.flatMap(set).map((form) => [form, c.sets === 'none' ? 'deny' : 'ask'] satisfies [string, Verdict]),
+      ] satisfies [string, Verdict][];
+    }) satisfies [string, Verdict][];
 }
 
 /** Each call of `owedOf` whose verdict under `rules`, her admission left out, is not the one its class owes, as `<call>: <verdict>`. */
-const misjudged = (rules: Rules, table = TABLE): string[] =>
+const misjudged = (rules: Rules, table = TABLE) =>
   owedOf(table)
     .filter(([command, owed]) => verdictOf(rules, command, false) !== owed)
-    .map(([command]) => `${command}: ${verdictOf(rules, command, false)}`);
+    .map(([command]) => `${command}: ${verdictOf(rules, command, false)}`) satisfies string[];
 
 test('her fence asks every write that prompts and every write form of a command that reads bare, denies her what is out, and lets the rest through', () => {
   const rules = herRules(herStore());

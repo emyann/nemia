@@ -22,7 +22,7 @@ const engine = eachTest(testEngine);
 const DEAD = 4_194_305;
 
 /** Plants a built release of `tag` in `home`, built on day `day` of November. */
-function planted(home: string, tag: string, day: number): void {
+function planted(home: string, tag: string, day: number) {
   fs.mkdirSync(releaseDir(tag, home), { recursive: true });
   writeReleaseFile(releaseDir(tag, home), {
     tag,
@@ -33,7 +33,7 @@ function planted(home: string, tag: string, day: number): void {
 }
 
 /** The tags installed in `home`, sorted. */
-const tags = (home: string): string[] =>
+const tags = (home: string) =>
   fs
     .readdirSync(releasesDir(home))
     .filter((n) => !n.startsWith('.') && n !== 'current')

@@ -26,14 +26,14 @@ const ALLOWED = ['src/config/root.store.ts'];
  * `text` with every comment blanked and its line breaks kept, so a root named in prose — a header paragraph, a line above a
  * signature — is passed over while the line numbers still read true.
  */
-const uncommented = (text: string): string => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
+const uncommented = (text: string) => text.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*/g, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
  * The names `text` holds a store root under: one a module-level binding reads from `wfRoot` (`export const HOME = wfRoot();`, `const
  * ROOT = wfRoot(process.env)`), and `HOME` where the file imports it — the spelling `record/record.store.ts` exported while 40 files of
  * `src` shared it. Read from the text alone, so the rule stays a pure function over one file.
  */
-const rootNames = (clean: string): string[] => {
+const rootNames = (clean: string) => {
   const names = new Set<string>();
   for (const m of clean.matchAll(/^(?:export\s+)?const\s+(\w+)\s*(?::[^=]*)?=\s*wfRoot\s*\(/gm)) names.add(m[1]);
   for (const m of clean.matchAll(/^[ \t]*import\b[\s\S]*?from\s*['"][^'"]*['"]/gm)) {
@@ -50,7 +50,7 @@ const rootNames = (clean: string): string[] => {
 const BINDINGS =
   /^[ \t]*(?:import\b[\s\S]*?from\s*['"][^'"]*['"]|import\s*['"][^'"]*['"]|export\s+(?:type\s+)?(?:\{[\s\S]*?\}|\*(?:\s+as\s+\w+)?)\s*from\s*['"][^'"]*['"])\s*;?/gm;
 
-const withoutBindings = (clean: string): string => clean.replace(BINDINGS, (found) => found.replace(/[^\n]/g, ' '));
+const withoutBindings = (clean: string) => clean.replace(BINDINGS, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
  * Each root `text` holds as it loads, by its line and the line's own words. Four forms, each laid over as many lines as a formatter
@@ -67,7 +67,7 @@ const withoutBindings = (clean: string): string => clean.replace(BINDINGS, (foun
  *
  * So what is found in a file is the lines that have to change for that file to take its root as a parameter.
  */
-export const globalRoots = (text: string): string[] => {
+export const globalRoots = (text: string) => {
   const clean = uncommented(text);
   const lines = clean.split('\n');
   const at = (index: number) => clean.slice(0, index).split('\n').length;
@@ -195,7 +195,7 @@ test('REFUSED: a body that reads an imported root by name is found, and a file t
 });
 
 /** Every file of `src` that is no test, by its path from the package. */
-const sources = (): string[] =>
+const sources = () =>
   fs
     .readdirSync(SRC, { recursive: true, encoding: 'utf8' })
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))

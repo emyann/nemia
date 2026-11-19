@@ -20,13 +20,13 @@ const WIRE = {
   securityRequirements: [{ schemes: { bearer: {} } }, { schemes: { key: { list: [] } } }],
 };
 
-const taken = (json: unknown): AgentCard => {
+const taken = (json: unknown) => {
   const read = cardOfJson(json);
   assert.ok('card' in read, 'wrong' in read ? read.wrong : '');
   return read.card;
 };
 
-const wrong = (json: unknown): string => {
+const wrong = (json: unknown) => {
   const read = cardOfJson(json);
   assert.ok('wrong' in read, `${JSON.stringify(json)} was taken`);
   return read.wrong;

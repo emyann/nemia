@@ -21,10 +21,10 @@ import { REPO } from 'test-kit/repo';
 const LAYERS_FILE = 'packages/agent-orchestrator/src/workflow/layers.ts';
 
 /** `LAYER_HEADINGS` as `LAYERS_FILE` declares it: each key's heading, read from the object literal by the TypeScript parser. */
-function readHeadings(): Record<string, string> {
+function readHeadings() {
   const source = ts.createSourceFile(LAYERS_FILE, fs.readFileSync(path.join(REPO, LAYERS_FILE), 'utf8'), ts.ScriptTarget.Latest, true);
   let literal: ts.ObjectLiteralExpression | undefined;
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'LAYER_HEADINGS' && node.initializer) {
       const value = ts.isAsExpression(node.initializer) ? node.initializer.expression : node.initializer;
       if (ts.isObjectLiteralExpression(value)) literal = value;
@@ -48,7 +48,7 @@ const LAYER_HEADINGS = readHeadings();
 type Layer = { number: number; name: string };
 
 /** The layers the code heads, read off `headings`, in their order. */
-function layersOf(headings: Readonly<Record<string, string>>): Layer[] {
+function layersOf(headings: Readonly<Record<string, string>>) {
   return Object.values(headings).map((heading) => {
     const found = /^#+\s*(\d+)\.\s+(.+?)\s+—/.exec(heading);
     assert.ok(found, `the heading "${heading}" names no layer as "## n. Name — whose": read it here as the code now writes it`);
@@ -60,7 +60,7 @@ const ESCAPE_HATCH = /escape\s+hatch/i;
 const HIGHER_NUMBER = /\bthe\s+higher\s+number\s+wins\b/i;
 
 /** Every numbered item of a passage's layer list, by its `1. **Name**` line, whitespace in a name collapsed to one space. */
-function numbered(passage: string): Layer[] {
+function numbered(passage: string) {
   return [...passage.matchAll(/^(\d+)\.\s+\*\*([^*]+)\*\*/gm)].map((m) => ({
     number: Number(m[1]),
     name: m[2].replace(/\s+/g, ' ').trim(),
@@ -72,7 +72,7 @@ function numbered(passage: string): Layer[] {
  * files, which no code heads, among them), a number out of order, a layer the code heads named otherwise, a layer called an escape
  * hatch — or undefined.
  */
-function layersRefusal(passage: string, layers: readonly Layer[]): string | undefined {
+function layersRefusal(passage: string, layers: readonly Layer[]) {
   const items = numbered(passage);
   const count = Math.max(...layers.map((layer) => layer.number));
   if (items.length !== count) return `it numbers ${items.length} layers, and the code's precedence order has ${count}`;
@@ -87,7 +87,7 @@ function layersRefusal(passage: string, layers: readonly Layer[]): string | unde
 }
 
 /** The text of `file` from the line `from` begins, up to the heading `to` matches, which must follow it. */
-function slice(file: string, from: string, to: RegExp): string {
+function slice(file: string, from: string, to: RegExp) {
   const text = fs.readFileSync(path.join(REPO, file), 'utf8');
   const start = text.indexOf(from);
   assert.ok(start >= 0, `${file} has ${from}`);
@@ -97,8 +97,8 @@ function slice(file: string, from: string, to: RegExp): string {
   return rest.slice(0, end);
 }
 
-const SKILL = (): string => slice('packages/agent-orchestrator/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
-const PAGE = (): string => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
+const SKILL = () => slice('packages/agent-orchestrator/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
+const PAGE = () => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
 
 /** A fixture's layers, not the code's: three of them headed, at 1, 2 and 4 of four. */
 const PLANTED: Layer[] = [
@@ -108,7 +108,7 @@ const PLANTED: Layer[] = [
 ];
 
 /** A numbered list of the layers, each item `n. **Name** — words`, built from the names and numbers given. */
-const listOf = (names: readonly string[], numbers?: readonly number[]): string =>
+const listOf = (names: readonly string[], numbers?: readonly number[]) =>
   names.map((name, i) => `${numbers?.[i] ?? i + 1}. **${name}** — what it says.`).join('\n');
 
 const FOUR = ['Own words', 'Added words', 'The files', "The place's rules"];

@@ -19,11 +19,14 @@ import type { Stage } from './story.ts';
 export type DecisionOver = { readonly place: Place; readonly env?: Env; readonly sensitive?: readonly string[] };
 
 /** Run `id`'s decision, or why it is not judged, read over the engine `e` as the api reads it; a refusal (`Missing`) thrown as it is. */
-export const decisionOrWhy = (e: Engine, id: string, over: DecisionOver): Promise<DecisionRead | DecisionUnjudged> =>
-  runWith(e, placedIn(over.env ?? process.env, over.place, decisionRead(id, over.sensitive ? { sensitive: [...over.sensitive] } : {})));
+export const decisionOrWhy = (e: Engine, id: string, over: DecisionOver) =>
+  runWith(
+    e,
+    placedIn(over.env ?? process.env, over.place, decisionRead(id, over.sensitive ? { sensitive: [...over.sensitive] } : {})),
+  ) satisfies Promise<DecisionRead | DecisionUnjudged>;
 
 /** Run `id`'s decision (`decisionOrWhy`), thrown as an `Error` in the read model's own words where it is not judged. */
-export async function decisionOf(e: Engine, id: string, over: DecisionOver): Promise<DecisionRead> {
+export async function decisionOf(e: Engine, id: string, over: DecisionOver) {
   const read = await decisionOrWhy(e, id, over);
   if ('unjudged' in read) throw new Error(read.saidBy('nemia decide'));
   return read;
@@ -33,7 +36,7 @@ export async function decisionOf(e: Engine, id: string, over: DecisionOver): Pro
  * The package's whole reading of run `id` (`Decided`), off its decision: thrown where the decision read none (a run waiting, called
  * off).
  */
-export async function decidedOf(e: Engine, id: string, over: DecisionOver): Promise<Decided> {
+export async function decidedOf(e: Engine, id: string, over: DecisionOver) {
   const { decided, decision } = await decisionOf(e, id, over);
   if (decided === undefined) throw new Error(`${id}'s decision was read without its reading: ${JSON.stringify(decision)}`);
   return decided;
@@ -43,18 +46,14 @@ export async function decidedOf(e: Engine, id: string, over: DecisionOver): Prom
  * Run `id`'s decision on a story's stage (`decisionOf`): over its board's engine, its place and its store, the globs `sensitive` names
  * read in full.
  */
-export async function decisionOn(
-  stage: Pick<Stage, 'runWith' | 'board'>,
-  id: string,
-  sensitive?: readonly string[],
-): Promise<DecisionRead> {
+export async function decisionOn(stage: Pick<Stage, 'runWith' | 'board'>, id: string, sensitive?: readonly string[]) {
   const read = await stage.runWith(stage.board().e, decisionRead(id, sensitive ? { sensitive: [...sensitive] } : {}));
   if ('unjudged' in read) throw new Error(read.saidBy('nemia decide'));
   return read;
 }
 
 /** The package's whole reading of run `id` on a story's stage (`decisionOn`), thrown where the decision read none. */
-export async function decidedOn(stage: Pick<Stage, 'runWith' | 'board'>, id: string): Promise<Decided> {
+export async function decidedOn(stage: Pick<Stage, 'runWith' | 'board'>, id: string) {
   const { decided, decision } = await decisionOn(stage, id);
   if (decided === undefined) throw new Error(`${id}'s decision was read without its reading: ${JSON.stringify(decision)}`);
   return decided;
@@ -64,11 +63,11 @@ export async function decidedOn(stage: Pick<Stage, 'runWith' | 'board'>, id: str
 const spanOf = (s: TaskSpan | null) => s && [s.at, s.filedAt, s.spawnedAt, s.endedAt, s.queued, s.ran];
 
 /** Each list of `decided`'s verdicts that names a step, by its name, and the run's outcome: what a run awaiting a person ended with. */
-function verdictsOf(decided: Decided): Record<string, unknown> {
+function verdictsOf(decided: Decided) {
   const d = decided.decision;
-  if (d.kind !== 'awaiting') return { kind: d.kind };
+  if (d.kind !== 'awaiting') return { kind: d.kind } satisfies Record<string, unknown>;
   const named = Object.entries(d).filter(([, v]) => Array.isArray(v) && v.length && v.every((x) => typeof x === 'string'));
-  return { outcome: d.outcome, ...Object.fromEntries(named.filter(([k]) => k !== 'branches')) };
+  return { outcome: d.outcome, ...Object.fromEntries(named.filter(([k]) => k !== 'branches')) } satisfies Record<string, unknown>;
 }
 
 /**
@@ -76,7 +75,7 @@ function verdictsOf(decided: Decided): Record<string, unknown> {
  * verdict, whether it passed), what its session used and its cost line, each try on the clock (session and check), and, only where it has
  * one, what its harness waits for, what it was denied, what a person said to it, their answer, the retry that answers it and its gate.
  */
-function stepOf(decided: Decided, used: Record<string, { used: string }>, name: string): Record<string, unknown> {
+function stepOf(decided: Decided, used: Record<string, { used: string }>, name: string) {
   const c = decided.closeouts[name];
   const check = decided.checks[name];
   const extras = {
@@ -95,7 +94,7 @@ function stepOf(decided: Decided, used: Record<string, { used: string }>, name: 
     cost: decided.costs[name] ?? null,
     tries: (decided.timeline.steps[name] ?? []).map((t) => [t.try, spanOf(t.session), spanOf(t.check)]),
     ...Object.fromEntries(Object.entries(extras).filter(([, v]) => v !== undefined)),
-  };
+  } satisfies Record<string, unknown>;
 }
 
 /**
@@ -106,7 +105,7 @@ function stepOf(decided: Decided, used: Record<string, { used: string }>, name: 
  * run, the run's cost and time, each result branch's counts and the notes it added, where each branch stands, the collisions, and the
  * commands offered.
  */
-export function decisionFacts(read: DecisionRead): Record<string, unknown> {
+export function decisionFacts(read: DecisionRead) {
   const { decision: d, decided } = read;
   if (!('touched' in d) || decided === undefined)
     return {
@@ -117,7 +116,7 @@ export function decisionFacts(read: DecisionRead): Record<string, unknown> {
         retrying: decided.retrying.map((r) => [r.step, r.try, r.mode, r.by]),
         rounding: decided.rounding.map((r) => [r.step, r.target, r.round, r.by]),
       }),
-    };
+    } satisfies Record<string, unknown>;
   const steps = decided.steps.map((x) => x.name).filter((n) => decided.closeouts[n] || decided.checks[n] || decided.run.steps[n]?.taskId);
   return {
     verdicts: verdictsOf(decided),
@@ -141,5 +140,5 @@ export function decisionFacts(read: DecisionRead): Record<string, unknown> {
     standings: d.standings.map((x) => x.said),
     collisions: d.collisions && [d.collisions.base.map((b) => b.said), d.collisions.said],
     commands: d.commands.map((c) => [c.label, c.command]),
-  };
+  } satisfies Record<string, unknown>;
 }

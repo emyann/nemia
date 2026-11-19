@@ -33,7 +33,7 @@ const WORDS = 'Not dist: clean out/ instead';
  * Her chat's asks file with two permissions of hers on it, as the keeper copies a held call into it (`kind: 'permission'`, the
  * orchestrator's `chat.store.ts`): the edit first, then the run. Taken back with her folder by `herChat`'s take-back.
  */
-function permissions(): void {
+function permissions() {
   const chat = path.join(store!, 'nemia', 'chat');
   fs.mkdirSync(chat, { recursive: true });
   const at = (seconds: number) => new Date(Date.now() - 200_000 + seconds * 1000).toISOString();

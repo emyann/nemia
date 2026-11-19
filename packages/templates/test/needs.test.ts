@@ -27,14 +27,14 @@ type Need = {
 const LANDING = ['build', 'quick'];
 
 /** The needs a rendered workflow's README declares in its frontmatter (`needs:`), none where it has no frontmatter. */
-function needsOf(tree: string, workflow: string): Need[] {
+function needsOf(tree: string, workflow: string) {
   const text = fs.readFileSync(path.join(tree, 'workflows', workflow, 'README.md'), 'utf8');
   const block = /^---\n([\s\S]*?)\n---\n/.exec(text);
   return block?.[1] === undefined ? [] : ((yaml.load(block[1]) as { needs?: Need[] }).needs ?? []);
 }
 
 /** The exit of `check` run as the sweep runs one, on a PATH that holds no gh, from a scratch folder. */
-function checked(check: string, carried: string): number | null {
+function checked(check: string, carried: string) {
   const bin = scratch('nemia-needs-bin-');
   fs.symlinkSync(process.execPath, path.join(bin, 'node'));
   const ran = spawnSync('/bin/sh', ['-c', check], {
@@ -57,7 +57,7 @@ for (const github of [true, false]) {
         ['gh', 'gh-sign-in', 'git-identity', 'browser'],
         workflow,
       );
-      const of = (name: string): Need | undefined => needs.find((need) => need.name === name);
+      const of = (name: string) => needs.find((need) => need.name === name);
       assert.equal(of('git-identity')?.fills, 'git-identity', `${workflow}'s identity fills the git place's need`);
       assert.match(of('gh')?.fixes?.[0]?.command ?? '', /needs\.ts" install-gh$/);
       assert.match(of('git-identity')?.fixes?.[0]?.command ?? '', /needs\.ts" identity/);

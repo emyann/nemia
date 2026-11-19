@@ -5,7 +5,7 @@
 import type { Locator, Page, Request } from 'playwright';
 
 /** `text` as a regular expression that matches it and nothing else. */
-export const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** How long an element has to appear. The pages read an api on this machine; slower than this is a finding. */
 export const WAIT_MS = 10_000;
@@ -25,8 +25,8 @@ export const CHAT_STREAM = '/api/nemia/chat/stream';
 
 /** The streams the frame holds open on every page: neither ever answers in full, and either is aborted when the page itself goes. */
 const PAGE_STREAMS = [FEED_STREAM, CHAT_STREAM];
-const isPageStream = (request: Request): boolean => PAGE_STREAMS.includes(new URL(request.url()).pathname);
-const isFeedStream = (request: Request): boolean => new URL(request.url()).pathname === FEED_STREAM;
+const isPageStream = (request: Request) => PAGE_STREAMS.includes(new URL(request.url()).pathname);
+const isFeedStream = (request: Request) => new URL(request.url()).pathname === FEED_STREAM;
 
 /** A page's requests in flight, the frame's streams left out; when one last started or ended; whether the feed's stream answered. */
 type Flights = { open: Set<Request>; last: number; fed: boolean };
@@ -43,7 +43,7 @@ const flights = new WeakMap<Page, Flights>();
  * asks for nothing, and lets nothing go. It also notes when the feed's stream answers its headers, forgotten at each such commit, for
  * `feedAnswered`.
  */
-export function track(page: Page): void {
+export function track(page: Page) {
   if (flights.has(page)) return;
   const f: Flights = { open: new Set(), last: performance.now(), fed: false };
   let uncommittedNavigation: Request | undefined;
@@ -76,7 +76,7 @@ export function track(page: Page): void {
  * the page loaded, else when it does. What the board says of the feed is judged from then, since a loaded machine answers the stream late
  * and the board says `connecting` until it does. A stream unanswered after `timeout`, the api's bound as `idle`'s, is refused, naming it.
  */
-export async function feedAnswered(page: Page, timeout = 30_000): Promise<void> {
+export async function feedAnswered(page: Page, timeout = 30_000) {
   track(page);
   if (flights.get(page)!.fed) return;
   try {
@@ -95,7 +95,7 @@ export const QUIET_MS = 500;
  * stream too, and never fires; and a `waitForLoadState('networkidle')` after a click answers at once, however much the click set going. A
  * network still busy after `timeout` is refused, naming what is in flight.
  */
-export async function idle(page: Page, timeout = 30_000): Promise<void> {
+export async function idle(page: Page, timeout = 30_000) {
   track(page);
   const f = flights.get(page)!;
   const from = performance.now();
@@ -122,7 +122,7 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
  * though Playwright 1.62 reports none of a navigation's, and a later one may. A stream the board closes while the address stands is
  * counted, as any other failure is.
  */
-export function watch(page: Page): { problems: () => string[] } {
+export function watch(page: Page) {
   track(page);
   const seen: string[] = [];
   let order = 0;
@@ -151,11 +151,11 @@ export function watch(page: Page): { problems: () => string[] } {
   page.on('response', (response) => {
     if (response.status() >= 400) seen.push(`request answered ${response.status()}: ${response.request().method()} ${response.url()}`);
   });
-  return { problems: () => [...seen] };
+  return { problems: () => [...seen] } satisfies { problems: () => string[] };
 }
 
 /** The element is on the page and visible, within `timeout`. */
-export async function expectVisible(locator: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectVisible(locator: Locator, assertion: string, timeout = WAIT_MS) {
   try {
     await locator.first().waitFor({ state: 'visible', timeout });
   } catch {
@@ -167,7 +167,7 @@ export async function expectVisible(locator: Locator, assertion: string, timeout
  * The image is drawn, within `timeout`: visible, loaded, and with pixels. A broken image's box is visible all the same, so
  * `expectVisible` alone passes an image whose request failed.
  */
-export async function expectDrawn(image: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectDrawn(image: Locator, assertion: string, timeout = WAIT_MS) {
   const until = performance.now() + timeout;
   await expectVisible(image, assertion, timeout);
   const drawn = () =>
@@ -181,7 +181,7 @@ export async function expectDrawn(image: Locator, assertion: string, timeout = W
 }
 
 /** As many elements match as `count`, within `timeout`. */
-export async function expectCount(locator: Locator, count: number, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectCount(locator: Locator, count: number, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const found = await locator.count();
@@ -193,7 +193,7 @@ export async function expectCount(locator: Locator, count: number, assertion: st
 }
 
 /** The elements matched read `texts`, one each and in that order, within `timeout`: a menu's places, the first one first. */
-export async function expectTexts(locator: Locator, texts: readonly string[], assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectTexts(locator: Locator, texts: readonly string[], assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const found = (await locator.allTextContents()).map((text) => text.trim());
@@ -209,7 +209,7 @@ export async function expectTexts(locator: Locator, texts: readonly string[], as
  * Every element matched lies inside `frame`'s box, give or take a pixel for borders that round onto its edge: a node on its canvas, not
  * hanging off the edge.
  */
-export async function expectInside(elements: Locator, frame: Locator, assertion: string): Promise<void> {
+export async function expectInside(elements: Locator, frame: Locator, assertion: string) {
   const box = await frame.boundingBox();
   if (!box) throw new Refused(`${assertion} — the frame is not on the page`);
   const outside: string[] = [];
@@ -229,7 +229,7 @@ export async function expectInside(elements: Locator, frame: Locator, assertion:
  * nodes off the edge that a person, a moment later, would not see. Not an assertion: a canvas still
  * moving after `timeout` is taken as it is, and `expectInside` says what that looks like.
  */
-export async function settled(page: Page, timeout = 3_000): Promise<void> {
+export async function settled(page: Page, timeout = 3_000) {
   const transforms = () =>
     page.locator('.react-flow__viewport').evaluateAll((viewports) => viewports.map((v) => (v as HTMLElement).style.transform).join(' | '));
   const until = performance.now() + timeout;
@@ -246,14 +246,14 @@ export async function settled(page: Page, timeout = 3_000): Promise<void> {
  * Resolves once every face the page has asked for is loaded: a face that swaps in after a width was measured moves what was measured.
  * The faces are the board's own files, so the wait ends with their requests.
  */
-export const facesLoaded = (page: Page): Promise<void> => page.evaluate(async () => void (await document.fonts.ready));
+export const facesLoaded = (page: Page) => page.evaluate(async () => void (await document.fonts.ready));
 
 /**
  * The page is in the theme asked for: the browser prefers it, and the page's ground is dark in the dark
  * and light in the light. Without the second half, both screenshots of a page could be the same picture. The ground's colour is read
  * back as sRGB off a pixel painted with it, whatever its space (Tailwind's are oklch); a ground nobody painted is the browser's white.
  */
-export async function expectTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+export async function expectTheme(page: Page, theme: 'light' | 'dark') {
   const seen = await page.evaluate(() => {
     const color = getComputedStyle(document.body).backgroundColor;
     const pixel = document.createElement('canvas').getContext('2d')!;
@@ -274,7 +274,7 @@ export async function expectTheme(page: Page, theme: 'light' | 'dark'): Promise<
 type Boxed = { name: string; box: { x: number; y: number; width: number; height: number } | null };
 
 /** Each element matched, by its `data-id` (else its place), and where it is on the page. */
-const boxesOf = async (elements: Locator): Promise<Boxed[]> =>
+const boxesOf = async (elements: Locator) =>
   Promise.all(
     (await elements.all()).map(async (element, i) => ({
       name: (await element.getAttribute('data-id')) ?? `#${i + 1}`,
@@ -287,10 +287,10 @@ const boxesOf = async (elements: Locator): Promise<Boxed[]> =>
  * left beneath it. Polled, because the floor is laid out again a render after whatever moved it. Nothing
  * matched on either side is refused too: an overlap between nothing and something proves nothing.
  */
-export async function expectApart(these: Locator, those: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  const problem = async (): Promise<string | null> => {
+export async function expectApart(these: Locator, those: Locator, assertion: string, timeout = WAIT_MS) {
+  const problem = async () => {
     const [a, b] = await Promise.all([boxesOf(these), boxesOf(those)]);
-    if (!a.length || !b.length) return `nothing to compare: ${a.length} and ${b.length} found`;
+    if (!a.length || !b.length) return `nothing to compare: ${a.length} and ${b.length} found` satisfies string | null;
     const over = a.flatMap((one) =>
       b
         .filter(
@@ -304,7 +304,7 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
         )
         .map((other) => `${one.name} and ${other.name}`),
     );
-    return over.length ? `${over.join(', ')} overlap` : null;
+    return (over.length ? `${over.join(', ')} overlap` : null) satisfies string | null;
   };
   await expectNone(problem, assertion, timeout);
 }
@@ -313,7 +313,7 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
  * Every element matched shows its text whole: none is cut short by the room it was given (`truncate`, an ellipsis), within `timeout`.
  * Nothing matched is refused too.
  */
-export async function expectUncut(elements: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectUncut(elements: Locator, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const cut = await elements.evaluateAll((all) =>
@@ -341,7 +341,7 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
  * @param timeout how long the state has to come; slower than `WAIT_MS` is a finding
  * @throws `Refused`, `<assertion> — <what problem said last>`
  */
-export async function expectNone(problem: () => Promise<string | null>, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectNone(problem: () => Promise<string | null>, assertion: string, timeout = WAIT_MS) {
   const end = performance.now() + timeout;
   let found = await problem();
   while (found && performance.now() < end) {
@@ -355,7 +355,7 @@ export async function expectNone(problem: () => Promise<string | null>, assertio
  * `element` lies whole inside `frame`'s box, within `timeout`: a state a scrolling body brought into view, not one below its bottom edge.
  * Both boxes are relative to the viewport.
  */
-export async function expectInView(element: Locator, frame: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectInView(element: Locator, frame: Locator, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const [box, view] = await Promise.all([element.boundingBox(), frame.boundingBox()]);
@@ -373,7 +373,7 @@ export async function expectInView(element: Locator, frame: Locator, assertion: 
  * Every element of `left` ends left of where every element of `right` begins, within `timeout`: a card left of each card that waits on
  * it. Nothing matched on either side is refused too.
  */
-export async function expectLeftOf(left: Locator, right: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectLeftOf(left: Locator, right: Locator, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const [a, b] = await Promise.all([boxesOf(left), boxesOf(right)]);
@@ -395,7 +395,7 @@ export async function expectLeftOf(left: Locator, right: Locator, assertion: str
  * window is not enough — the run page's inspector starts 40 pixels above the bottom of an unscrolled 800 — so its bottom must be in it too.
  * `boundingBox` is relative to the viewport.
  */
-export async function expectOnScreen(element: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectOnScreen(element: Locator, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const [box, height] = await Promise.all([element.boundingBox(), element.page().evaluate(() => window.innerHeight)]);
@@ -413,7 +413,7 @@ export async function expectOnScreen(element: Locator, assertion: string, timeou
  * The vertical middle of every element of `middle` lies strictly between the middles of `one` and `other`, within `timeout`: a card level
  * with the middle of the two it is joined to, as a diamond's top and bottom are with its sides. Nothing matched is refused too.
  */
-export async function expectBetween(middle: Locator, one: Locator, other: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectBetween(middle: Locator, one: Locator, other: Locator, assertion: string, timeout = WAIT_MS) {
   const centre = (b: Boxed) => (b.box ? b.box.y + b.box.height / 2 : Number.NaN);
   await expectNone(
     async () => {
@@ -436,7 +436,7 @@ export async function expectBetween(middle: Locator, one: Locator, other: Locato
  * higher than the middle of any — a loop's edge back curved under its steps, not over them or through them. Nothing
  * matched on either side is refused too.
  */
-export async function expectBeneath(these: Locator, row: Locator, assertion: string): Promise<void> {
+export async function expectBeneath(these: Locator, row: Locator, assertion: string) {
   const [under, over] = await Promise.all([boxesOf(these), boxesOf(row)]);
   if (!under.length || !over.length) throw new Refused(`${assertion} — nothing to compare: ${under.length} and ${over.length} found`);
   const problems = under.flatMap(({ name, box }) => {
@@ -456,13 +456,7 @@ export async function expectBeneath(these: Locator, row: Locator, assertion: str
  * dragged with its card. And every element of `still`, when it is given, stays where it was: the cards and steps
  * beside what was dragged. Nothing matched in `still` is refused too. A pixel of slack for positions that round differently.
  */
-export async function expectMovedWith(
-  followers: Locator,
-  leader: Locator,
-  move: () => Promise<void>,
-  assertion: string,
-  still?: Locator,
-): Promise<void> {
+export async function expectMovedWith(followers: Locator, leader: Locator, move: () => Promise<void>, assertion: string, still?: Locator) {
   const [lead] = await boxesOf(leader);
   const before = await boxesOf(followers);
   const staying = still ? await boxesOf(still) : [];
@@ -492,5 +486,5 @@ export async function expectMovedWith(
  * While `move` runs, `moved` moves, and every element of `still` stays where it was: a card or a step on the Factory dragged alone,
  * and what waits on it left behind. Nothing matched in `still` is refused, as `moved` not moving is.
  */
-export const expectMovedAlone = (moved: Locator, move: () => Promise<void>, assertion: string, still: Locator): Promise<void> =>
+export const expectMovedAlone = (moved: Locator, move: () => Promise<void>, assertion: string, still: Locator) =>
   expectMovedWith(moved, moved, move, assertion, still);

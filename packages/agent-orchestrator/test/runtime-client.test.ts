@@ -12,7 +12,7 @@ import { asked, engineOf, HARNESSES, quotaHarnesses, runWith } from '../src/runt
 import { HARNESSES as STEP_HARNESSES } from '../src/harness/harness.ts';
 
 /** What `run` was rejected or thrown with: the error, and the exit code it carries. */
-const failure = async (run: () => unknown): Promise<Error & { exitCode?: number }> => {
+const failure = async (run: () => unknown) => {
   try {
     await run();
   } catch (e) {
@@ -48,9 +48,7 @@ describe("the runtime's failures as the client reads them: a refusal exit 2 led 
 });
 
 test('REFUSED: a program run through runWith says no Info line, and still says its warnings and errors on the console', async () => {
-  const said: string[] = [];
-  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const)
-    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void said.push(args.map(String).join(' ')));
+  const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) => vi.spyOn(console, method));
   await runWith(
     engineOf(testEngine().layer),
     Effect.gen(function* () {
@@ -59,6 +57,7 @@ test('REFUSED: a program run through runWith says no Info line, and still says i
       yield* Effect.logError('an error a command must not swallow');
     }),
   );
+  const said = spies.flatMap((spy) => spy.mock.calls.map((args) => args.map(String).join(' ')));
   vi.restoreAllMocks();
   assert.equal(said.filter((s) => s.includes('a feed line')).length, 0, said.join('\n'));
   assert.equal(said.filter((s) => s.includes('a warning a command must not swallow')).length, 1, said.join('\n'));

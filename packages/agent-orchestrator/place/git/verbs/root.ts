@@ -6,16 +6,16 @@
  * checkout `dir` is in: never the git folder, which nobody works in. Refuses a `dir` that is no directory.
  */
 import path from 'node:path';
-import { gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { gitSays, isDirectory, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The checkout git names at `dir`, undefined where it names none. */
-function* checkoutAt(dir: string): Asking<string | undefined> {
+function* checkoutAt(dir: string) {
   return (yield* gitSays(dir, ['rev-parse', '--path-format=absolute', '--show-toplevel'])) || undefined;
 }
 
 /** The verb's body. */
-export function* root({ dir }: PlaceRequests['root']): Asking<Reply<'root'>> {
+export function* root({ dir }: PlaceRequests['root']) {
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so it is in no repository: name a folder that is there`);
   const common = yield* gitSays(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
   if (!common) return { root: null };

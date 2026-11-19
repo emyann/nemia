@@ -8,7 +8,7 @@ import { noRuns } from '../../../.storybook/fixtures/runs';
 import { saysReading, Unread } from '../../../.storybook/unread';
 
 /** A file named `name` of `size` bytes, as a browser hands one; its size set, so a story lists a large one without holding it. */
-const fileOf = (name: string, size: number, type = 'image/png'): File => {
+const fileOf = (name: string, size: number, type = 'image/png') => {
   const file = new File(['x'], name, { type });
   Object.defineProperty(file, 'size', { value: size });
   return file;
@@ -88,7 +88,7 @@ export const PastLimit: Story = {
 const SENT = { uploads: 0, starts: [] as string[][] };
 
 /** The id the api answers the `n`th upload with, as a file id is: `file_` and 32 hex characters. */
-const idOf = (n: number): string => `file_${String(n).padStart(32, '0')}`;
+const idOf = (n: number) => `file_${String(n).padStart(32, '0')}`;
 
 /**
  * The api of a start whose file the api no longer keeps: each upload kept under an id of its own, the first start refused 422 naming the

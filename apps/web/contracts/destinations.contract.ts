@@ -20,7 +20,7 @@ export type Gaps = {
 };
 
 /** Whether `list` holds no value twice: none is among those before it. */
-const once = (list: readonly string[]): boolean => list.every((one, at) => !list.slice(0, at).includes(one));
+const once = (list: readonly string[]) => list.every((one, at) => !list.slice(0, at).includes(one));
 
 const mapGapsSpec = spec<(taken: readonly string[], mapped: readonly string[]) => Gaps>({
   requires: ({ input: [taken, mapped] }) => once(taken) && once(mapped),

@@ -32,7 +32,7 @@ const STOP = '\u0003';
 const ERASE = ['\u007f', '\b'];
 
 /** A line read off the terminal, not shown as it is typed: the terminal in raw mode until Enter, Ctrl-C refusing (`Invalid`). */
-function hiddenLine(prompt: string): Promise<string> {
+function hiddenLine(prompt: string) {
   const input = process.stdin;
   return new Promise((resolve, reject) => {
     let line = '';
@@ -55,19 +55,21 @@ function hiddenLine(prompt: string): Promise<string> {
     input.setRawMode(true);
     input.on('data', typed);
     input.resume();
-  });
+  }) satisfies Promise<string>;
 }
 
 /** Everything piped into stdin. */
-async function piped(): Promise<string> {
+async function piped() {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk as Buffer));
   return Buffer.concat(chunks).toString('utf8');
 }
 
 /** The token as the person gives it: typed hidden at a terminal, else piped in. */
-const tokenGiven = (): Promise<string> =>
-  process.stdin.isTTY ? hiddenLine(`the token ${TOKEN_MAKER} printed (it is not shown as you type): `) : piped();
+const tokenGiven = () =>
+  (process.stdin.isTTY
+    ? hiddenLine(`the token ${TOKEN_MAKER} printed (it is not shown as you type): `)
+    : piped()) satisfies Promise<string>;
 
 /** What `set` did: the file it wrote. */
 export type ClaudeTokenSet = { readonly file: string };

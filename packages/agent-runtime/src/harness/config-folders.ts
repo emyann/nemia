@@ -14,7 +14,7 @@ export const CONFIG_FOLDERS: readonly string[] = [...new Set(CLAUDE_CONFIG_FOLDE
  * whole and in its case: `.claude-notes` and `claude` are not `.claude`.
  * @param path The path to look in, relative or absolute, with either separator.
  */
-export const configFolderIn = (path: string): string | undefined => path.split(/[\\/]/).find((part) => CONFIG_FOLDERS.includes(part));
+export const configFolderIn = (path: string) => path.split(/[\\/]/).find((part) => CONFIG_FOLDERS.includes(part));
 
 /**
  * What a harness reads of a folder added beside a session's own: the path of its skills folder inside it, by its segments (`skills`), the
@@ -29,4 +29,4 @@ export const ADDED_FOLDER_READS: Readonly<Record<string, AddedFolderReads>> = { 
  * What the harness `harness` reads of a folder added beside a session's own (`ADDED_FOLDER_READS`); `undefined` for one that adds none.
  * @param harness The harness's name.
  */
-export const addedFolderReadsOf = (harness: string): AddedFolderReads | undefined => own(ADDED_FOLDER_READS, harness);
+export const addedFolderReadsOf = (harness: string) => own(ADDED_FOLDER_READS, harness);

@@ -13,7 +13,7 @@ import { when } from '../step/Facts';
  *
  * @param bytes the size, in bytes
  */
-export const bytesWord = (bytes: number): string =>
+export const bytesWord = (bytes: number) =>
   bytes < 1024
     ? `${bytes} B`
     : bytes < 1024 ** 2

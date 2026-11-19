@@ -13,7 +13,7 @@ import { filterOf } from './feed.ts';
  * @param queryClient The board's query client, whose reads are marked to read again.
  * @param id The run the write changed, or undefined for the lists alone.
  */
-export const runsMoved = (queryClient: QueryClient, id?: string): Promise<void> => {
+export const runsMoved = (queryClient: QueryClient, id?: string) => {
   const keys: QueryKey[] = [
     ['runs'],
     ['runs-open'],

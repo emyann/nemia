@@ -8,15 +8,14 @@ import { reposNamed, type Factory } from '../src/factory/factory.ts';
 import { hiresInto, type WiringChange } from '../src/factory/wiring/wiring.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
-export const gated = (step: StepSpec, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
+export const gated = (step: StepSpec, run: Run) => step.gate === true || (run.gates ?? []).includes(step.name);
 /** The try a step is on, from 1: one past the tries its record keeps. */
-export const tryNow = (run: Run, name: string): number => {
+export const tryNow = (run: Run, name: string) => {
   const tries = run.steps[name]?.tries;
   return tries === undefined ? 1 : tries.length + 1;
 };
 /** Whether a person approved the try a step is on. */
-export const approved = (run: Run, name: string): boolean =>
-  (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
+export const approved = (run: Run, name: string) => (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
 
 /**
  * Whether a factory takes a change of its wiring, its names aside, as `wiringRefusal` judges it: a hire or a schedule only into a workflow
@@ -24,10 +23,7 @@ export const approved = (run: Run, name: string): boolean =>
  * into, an unschedule only of a workflow it schedules, an attach that names a repository only by a folder name one of its repositories
  * alone has.
  */
-export const accepted = (
-  factory: Pick<Factory, 'volumes' | 'workflows' | 'hires' | 'schedules' | 'costLines'>,
-  change: WiringChange,
-): boolean => {
+export const accepted = (factory: Pick<Factory, 'volumes' | 'workflows' | 'hires' | 'schedules' | 'costLines'>, change: WiringChange) => {
   if (change.verb === 'hire') return factory.workflows.includes(change.step.slice(0, change.step.indexOf('/')));
   if (change.verb === 'schedule') return factory.workflows.includes(change.workflow);
   if (change.verb === 'detach')

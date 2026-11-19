@@ -23,7 +23,7 @@ export const viewerOf: ViewerOf = (file) => {
  * has none, or where its only dot starts it (`.env`).
  * @param name The file's name or path.
  */
-export function extensionOf(name: string): string {
+export function extensionOf(name: string) {
   const base = name.slice(name.lastIndexOf('/') + 1);
   const dot = base.lastIndexOf('.');
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : '';

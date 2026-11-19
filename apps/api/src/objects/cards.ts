@@ -31,7 +31,6 @@ import {
   inboxNameRefusal,
   informerMemo,
   Invalid as Refused,
-  type SummaryHow,
   verifiesRest,
 } from 'agent-orchestrator';
 import { Api, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
@@ -43,14 +42,14 @@ import { wantsTable } from './table.ts';
 import { readsBounded } from './answer-bound.ts';
 
 /** How a read of the cards judges a started card's run: off the app's informer, verified as the env says. */
-const howOf = (s: Served): SummaryHow => ({
+const howOf = (s: Served) => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
   verify: verifiesRest(s.env),
 });
 
 /** One selector, several, or none, as a list. */
-const listOf = (given: string | readonly string[] | undefined): string[] =>
+const listOf = (given: string | readonly string[] | undefined) =>
   given === undefined ? [] : typeof given === 'string' ? [given] : [...given];
 
 type ListQuery = {
@@ -64,7 +63,7 @@ type ListQuery = {
 /** A page of the cards of `namespace` (every card for none) the query asks for: as a `Table` where the request asks for one. */
 const page = (namespace: string | undefined, query: ListQuery) =>
   Effect.flatMap(wantsTable, (table) =>
-    answered((s): Promise<CardList | Table> => {
+    answered((s) => {
       const asked = {
         namespace,
         limit: query.limit === undefined ? null : Number(query.limit),
@@ -72,7 +71,9 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
         fieldSelector: query.fieldSelector,
       };
-      return table ? s.inRequest(cardTable(s.e, howOf(s), asked)) : s.inRequest(cardList(s.e, howOf(s), asked));
+      return (table ? s.inRequest(cardTable(s.e, howOf(s), asked)) : s.inRequest(cardList(s.e, howOf(s), asked))) satisfies Promise<
+        CardList | Table
+      > as Promise<CardList | Table>;
     }),
   );
 
@@ -87,7 +88,7 @@ const cardIn = async (s: Served, namespace: string | undefined, name: string) =>
 };
 
 /** The factory a namespace names: none for `default`. */
-const factoryOf = (namespace: string): string | undefined => (namespace === DEFAULT_NAMESPACE ? undefined : namespace);
+const factoryOf = (namespace: string) => (namespace === DEFAULT_NAMESPACE ? undefined : namespace);
 
 /**
  * The card `name` of `namespace` queued on the workflow sent by name (`workflow`, written over the card's own) or else the one it names,

@@ -25,13 +25,13 @@ import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan
 import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
 
 /** The words under `key`, or none. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
-  return typeof value === 'string' ? value : undefined;
+  return (typeof value === 'string' ? value : undefined) satisfies string | undefined as string | undefined;
 };
 
 /** The words given under the flag `key` that takes many, in order. */
-const manyOf = (args: Args, key: string): string[] => {
+const manyOf = (args: Args, key: string) => {
   const value = args[key];
   return Array.isArray(value) ? value.map(String) : [];
 };
@@ -40,10 +40,10 @@ const manyOf = (args: Args, key: string): string[] => {
  * An argument of a command line, quoted for a shell where it holds anything but plain characters.
  * @param arg The argument as it is, unquoted.
  */
-export const shellArg = (arg: string): string => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
+export const shellArg = (arg: string) => (/^[\w./:=@+-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`);
 
 /** The line that takes `name` over by the template at `source` with `sets`, carrying the plan's `digest`. */
-const adoptLine = (name: string, source: string, sets: readonly string[], digest: string): string =>
+const adoptLine = (name: string, source: string, sets: readonly string[], digest: string) =>
   `nemia factory adopt ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s]), '--plan', digest].map(shellArg).join(' ')}`;
 
 /**
@@ -52,7 +52,7 @@ const adoptLine = (name: string, source: string, sets: readonly string[], digest
  * @param source The template's source as the person named it.
  * @param sets The `--set` words given, each `name=value`.
  */
-export const diffLine = (name: string, source: string, sets: readonly string[]): string =>
+export const diffLine = (name: string, source: string, sets: readonly string[]) =>
   `nemia factory diff ${[name, '--template', source, ...sets.flatMap((s) => ['--set', s])].map(shellArg).join(' ')}`;
 
 /** What a takeover is asked of: the factory as it is, the template's source and `--set` words, and its render. */

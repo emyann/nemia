@@ -30,10 +30,10 @@ export const address = assume(isAddress, { pure: true });
 export const askedText = assume(asked, { pure: true });
 
 /** Whether an address is this machine's loopback alone. */
-const loopbackAddress = (host: string): boolean => host === LOOPBACK || host === '::1';
+const loopbackAddress = (host: string) => host === LOOPBACK || host === '::1';
 
 /** Whether `value` asks for nothing: unset, or blank. */
-const unasked = (value: string | undefined): boolean => asked(value) === '';
+const unasked = (value: string | undefined) => asked(value) === '';
 
 const bindOfSpec = spec<(value: string | undefined, exposed: boolean) => Bind>({
   ensures: {

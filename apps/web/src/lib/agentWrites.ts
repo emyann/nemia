@@ -11,7 +11,7 @@ import { workflowsQuery } from './api/workflows.ts';
  * agents that give it.
  * @param queryClient The board's query client, whose reads are invalidated.
  */
-export const invalidateAgents = (queryClient: QueryClient): Promise<unknown> =>
+export const invalidateAgents = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: agentsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true }),
@@ -24,14 +24,14 @@ export const invalidateAgents = (queryClient: QueryClient): Promise<unknown> =>
  * now given what was written, its card, cost and version read again — and the workflows, whose version covers what their agents are given.
  * @param queryClient The board's query client, whose reads are invalidated.
  */
-export const invalidateSkills = (queryClient: QueryClient): Promise<unknown> => invalidateAgents(queryClient);
+export const invalidateSkills = (queryClient: QueryClient) => invalidateAgents(queryClient);
 
 /**
  * What a hire or a fire changes on the board: every workflow and step read, which say the agent hired into each step; a factory's
  * workflows, read with its hires; the agents, each listed with the steps it fills; and the factories, each with its hires.
  * @param queryClient The board's query client, whose reads are invalidated.
  */
-export const invalidateHires = (queryClient: QueryClient): Promise<unknown> =>
+export const invalidateHires = (queryClient: QueryClient) =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: ['factory-workflows'] }),

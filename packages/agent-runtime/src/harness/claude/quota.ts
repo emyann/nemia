@@ -8,9 +8,9 @@
  * a test stands in for.
  */
 import os from 'node:os';
-import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { Effect, Predicate } from 'effect';
-import type { HarnessQuota, HeardQuota, QuotaLimit } from '../seam.ts';
+import type { HarnessQuota, HeardQuota } from '../seam.ts';
 import { readHeard } from './heard.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { programIn } from '../harness-bin.ts';
@@ -44,7 +44,7 @@ const SESSION_KEYS = new Set([
  * The environment an ask runs in: `env`, without what a Claude Code session hands its children (`SESSION_KEYS`).
  * @param env The environment to take from; this process's unless given.
  */
-export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function usageEnv(env: NodeJS.ProcessEnv = process.env) {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !SESSION_KEYS.has(key)));
 }
 
@@ -62,7 +62,7 @@ export const EXECUTABLE_VARIABLE = 'AE_CLAUDE_EXECUTABLE';
  * @param named The engine's `claudeExecutable`; absent where it names none.
  * @param env The environment read for `EXECUTABLE_VARIABLE`; this process's unless given.
  */
-export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined =>
+export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEnv = process.env) =>
   named ?? (env[EXECUTABLE_VARIABLE] || undefined);
 
 /**
@@ -75,7 +75,7 @@ export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEn
  * @param command The Claude Code to ask; absent, the SDK's own.
  * @param env The environment the ask runs in, before its session keys and telemetry are taken out; this process's unless given.
  */
-export const usageOptions = (command?: string, env: NodeJS.ProcessEnv = process.env): Options => ({
+export const usageOptions = (command?: string, env: NodeJS.ProcessEnv = process.env) => ({
   cwd: os.tmpdir(),
   env: withoutTelemetry(usageEnv(env)),
   persistSession: false,
@@ -100,16 +100,19 @@ export type OpenUsage = (command: string | undefined) => UsageAsk;
  * The input of an ask's query: it yields no message, and ends only once the ask is done with it. A query whose input has ended closes
  * the child's stdin, on which Claude Code exits — so the question would race the exit were the input to end at once.
  */
-const heldInput = (): { prompt: AsyncIterable<SDKUserMessage>; release: () => void } => {
-  let release = (): void => {};
+const heldInput = () => {
+  let release = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const next = async (): Promise<IteratorResult<SDKUserMessage, undefined>> => {
+  const next = async () => {
     await held;
-    return { done: true, value: undefined };
+    return { done: true, value: undefined } satisfies IteratorResult<SDKUserMessage, undefined>;
   };
-  return { prompt: { [Symbol.asyncIterator]: () => ({ next }) }, release };
+  return { prompt: { [Symbol.asyncIterator]: () => ({ next }) }, release } satisfies {
+    prompt: AsyncIterable<SDKUserMessage>;
+    release: () => void;
+  };
 };
 
 /**
@@ -118,9 +121,8 @@ const heldInput = (): { prompt: AsyncIterable<SDKUserMessage>; release: () => vo
  * asked what it is handed, and closed with its input. `claudeQuota` asks `skipBehaviors: true`: the plan's limits need none of the scan
  * of local transcripts the answer's behaviours section would cost.
  */
-const sdkUsageAsk =
-  (env: NodeJS.ProcessEnv): OpenUsage =>
-  (command) => {
+const sdkUsageAsk = (env: NodeJS.ProcessEnv) =>
+  ((command) => {
     const input = heldInput();
     const q = query({ prompt: input.prompt, options: usageOptions(command, env) });
     return {
@@ -130,10 +132,10 @@ const sdkUsageAsk =
         await q.return(undefined);
       },
     };
-  };
+  }) satisfies OpenUsage;
 
 /** Every limit of Claude Code's `rate_limits` with a finite `utilization` in percent, in its order: null ones and the rest are left out. */
-function limitsOf(limits: Record<string, unknown>): QuotaLimit[] {
+function limitsOf(limits: Record<string, unknown>) {
   return Object.entries(limits).flatMap(([key, w]) => {
     if (!Predicate.isObject(w) || typeof w.utilization !== 'number' || !Number.isFinite(w.utilization)) return [];
     const at = typeof w.resets_at === 'string' ? Date.parse(w.resets_at) : NaN;
@@ -141,8 +143,7 @@ function limitsOf(limits: Record<string, unknown>): QuotaLimit[] {
   });
 }
 
-const subscriptionOf = (usage: Record<string, unknown>): string | null =>
-  typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
+const subscriptionOf = (usage: Record<string, unknown>) => (typeof usage.subscription_type === 'string' ? usage.subscription_type : null);
 
 /**
  * The variable by which a token made by `claude setup-token` signs in. Claude Code gives such a token the `user:inference` scope
@@ -162,18 +163,14 @@ export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
  * @param program The Claude Code asked, as a path a person types to run it by hand; null where none can be named.
  * @param heard What the store's sessions last heard of the plan, carried on a `token` answer; null where nothing was.
  */
-export function quotaOfUsage(
-  usage: unknown,
-  env: NodeJS.ProcessEnv = {},
-  program: string | null = null,
-  heard: HeardQuota | null = null,
-): HarnessQuota {
-  if (!Predicate.isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
-  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token', program, heard } : { kind: 'no-plan', program };
-  if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
-  if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
-  if (!Predicate.isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
-  return { kind: 'windows', limits: limitsOf(usage.rate_limits), subscription: subscriptionOf(usage) };
+export function quotaOfUsage(usage: unknown, env: NodeJS.ProcessEnv = {}, program: string | null = null, heard: HeardQuota | null = null) {
+  if (!Predicate.isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' } satisfies HarnessQuota;
+  if (usage.rate_limits_available === false)
+    return (env[TOKEN_VARIABLE] ? { kind: 'token', program, heard } : { kind: 'no-plan', program }) satisfies HarnessQuota;
+  if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' } satisfies HarnessQuota;
+  if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) } satisfies HarnessQuota;
+  if (!Predicate.isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' } satisfies HarnessQuota;
+  return { kind: 'windows', limits: limitsOf(usage.rate_limits), subscription: subscriptionOf(usage) } satisfies HarnessQuota;
 }
 
 /**
@@ -192,7 +189,7 @@ const STDERR_TAIL = '. stderr: ';
  * What Claude Code itself said, read off an SDK message: the last line of the stderr tail the SDK appends (`STDERR_TAIL`), or of the
  * message where it appended none — a control request Claude Code refused says its own words there, with no child to have failed.
  */
-const saidIn = (message: string): string => {
+const saidIn = (message: string) => {
   const at = message.indexOf(STDERR_TAIL);
   const tail = at < 0 ? message : message.slice(at + STDERR_TAIL.length);
   return tail.trim().split('\n').pop()?.trim() ?? '';
@@ -205,18 +202,19 @@ const saidIn = (message: string): string => {
  * @param error What the ask threw, undecoded.
  * @param program The Claude Code asked, as a path a person types to run it by hand; null where none can be named.
  */
-export function quotaOfRefusal(error: unknown, program: string | null = null): HarnessQuota {
+export function quotaOfRefusal(error: unknown, program: string | null = null) {
   const { errorClass, exitCode, signal, message } = (Predicate.isObject(error) ? error : {}) as SdkError;
   const said = saidIn(typeof message === 'string' ? message : String(error));
-  if (errorClass === 'executable_not_found') return { kind: 'missing' };
-  if (errorClass === 'control_request_failed') return { kind: 'unknown', what: `it refused the request (${said || 'no error given'})` };
+  if (errorClass === 'executable_not_found') return { kind: 'missing' } satisfies HarnessQuota;
+  if (errorClass === 'control_request_failed')
+    return { kind: 'unknown', what: `it refused the request (${said || 'no error given'})` } satisfies HarnessQuota;
   return {
     kind: 'failed',
     code: typeof exitCode === 'number' ? exitCode : null,
     signal: typeof signal === 'string' ? signal : null,
     said,
     program,
-  };
+  } satisfies HarnessQuota;
 }
 
 /**
@@ -227,8 +225,8 @@ export function quotaOfRefusal(error: unknown, program: string | null = null): H
  * one named, the SDK throws nothing for its absence there (it fails the spawn, read by `quotaOfRefusal`), so a throw is read as any
  * other refusal.
  */
-const quotaOfUnopened = (cause: unknown, named: string | undefined, program: string | null): HarnessQuota =>
-  named === undefined ? { kind: 'missing' } : quotaOfRefusal(cause, program);
+const quotaOfUnopened = (cause: unknown, named: string | undefined, program: string | null) =>
+  (named === undefined ? { kind: 'missing' } : quotaOfRefusal(cause, program)) satisfies HarnessQuota;
 
 /** An ask that threw before its query was open, told apart from one whose question was refused. */
 class Unopened {
@@ -264,7 +262,7 @@ export const claudeQuota = ({
   ask?: OpenUsage;
   harnessBin?: string;
   heardFile?: string;
-} = {}): Effect.Effect<HarnessQuota> =>
+} = {}) =>
   Effect.suspend(() => {
     const executable = quotaExecutable(command, env) ?? programIn(harnessBin, 'claude');
     const program = claudeExecutableOf(executable, harnessBin) ?? null;
@@ -283,4 +281,4 @@ export const claudeQuota = ({
         orElse: () => Effect.succeed<HarnessQuota>({ kind: 'timeout', ms: timeoutMs, program }),
       }),
     );
-  });
+  }) satisfies Effect.Effect<HarnessQuota>;

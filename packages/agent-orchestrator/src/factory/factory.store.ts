@@ -39,7 +39,6 @@ import {
   type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
-  type Schedule,
   type Volume,
   volumeEntry,
 } from './factory.ts';
@@ -58,10 +57,10 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
  * Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there.
  * @param home The store's root.
  */
-export const factoriesDirAt = (home: string): string => path.join(home, 'factories');
+export const factoriesDirAt = (home: string) => path.join(home, 'factories');
 
 /** The file the factory `name` is kept in, in the store `home`, whether or not it is there. */
-const fileAt = (home: string, name: string): string => path.join(factoriesDirAt(home), `${name}.json`);
+const fileAt = (home: string, name: string) => path.join(factoriesDirAt(home), `${name}.json`);
 
 /** A schedule as a factory's file holds it (`Schedule`), a key a later `nemia` writes beside its own kept. */
 const ScheduleSchema = Schema.StructWithRest(
@@ -146,41 +145,44 @@ const isFormer = (raw: unknown): raw is Record<string, unknown> =>
  * The file of the factory `name`, read — or why it does not read as one: a name that is no slug, and `default.json`, since the default
  * factory is no file, are each to be removed by hand; and a file an earlier release wrote, which the daemon moves at its start.
  */
-function factoryFile(home: string, name: string): FileRead {
+function factoryFile(home: string, name: string) {
   const file = fileAt(home, name);
   const badName = factoryNameRefusal(name);
-  if (badName) return { file, error: `${badName} Remove the file by hand.` };
+  if (badName) return { file, error: `${badName} Remove the file by hand.` } satisfies FileRead as FileRead;
   if (name === DEFAULT_NAMESPACE)
     return {
       file,
       error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.',
-    };
+    } satisfies FileRead as FileRead;
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    return { file, error: `is not JSON (${(err as Error).message}): nemia factory rm ${name}, then add it again.` };
+    return {
+      file,
+      error: `is not JSON (${(err as Error).message}): nemia factory rm ${name}, then add it again.`,
+    } satisfies FileRead as FileRead;
   }
   if (isFormer(raw))
     return {
       file,
       error: `is in the shape an earlier release wrote, its repositories under repos: start the daemon, nemia up, which moves it into one list of volumes once.`,
-    };
+    } satisfies FileRead as FileRead;
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
-  if (Result.isSuccess(decoded)) return { file, content: decoded.success };
+  if (Result.isSuccess(decoded)) return { file, content: decoded.success } satisfies FileRead as FileRead;
   const { path: where, words } = firstRefusal(FactoryFileSchema, raw);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
-  return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
+  return {
+    file,
+    error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.`,
+  } satisfies FileRead as FileRead;
 }
 
 /**
  * The workflows, hires, revisions policy and workflows' repositories of a templated factory `name`: its tree's, none while the tree is
  * not rendered, or why they do not read.
  */
-function treeWiringOf(
-  home: string,
-  name: string,
-): Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'> | { error: string } {
+function treeWiringOf(home: string, name: string) {
   const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
@@ -198,7 +200,7 @@ function treeWiringOf(
  * kept and whether its runs follow merged revisions only when the file says. A factory made from a template reads its workflows, hires
  * and revisions policy from its tree (`tree`), or why they do not read; its schedules, from its file.
  */
-function factoryOf(home: string, name: string, content: FactoryFile): Factory | { error: string } {
+function factoryOf(home: string, name: string, content: FactoryFile) {
   const template = content.template;
   const own = {
     ...(content.revisions === undefined ? {} : { revisions: content.revisions }),
@@ -206,7 +208,7 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
   };
   const wiring =
     template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {}, ...own } : treeWiringOf(home, name);
-  if ('error' in wiring) return wiring;
+  if ('error' in wiring) return wiring satisfies Factory | { error: string } as Factory | { error: string };
   return {
     name,
     volumes: content.volumes.map(volumeEntry),
@@ -217,21 +219,25 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
     ...(content.costLines === undefined ? {} : { costLines: content.costLines }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
-  };
+  } satisfies Factory | { error: string } as Factory | { error: string };
 }
 
 /**
  * One entry of the folder as `nemia factory ls` lists it: the factory its file says, with what the controller last observed of it where it
  * is made from a template (`readStatus`), or why the file does not read as one.
  */
-function factoryAt(home: string, file: string): FactoryListing {
+function factoryAt(home: string, file: string) {
   const name = file.slice(0, -'.json'.length);
   const read = factoryFile(home, name);
   const factory = 'error' in read ? read : factoryOf(home, name, read.content);
-  if ('error' in factory) return { name, file: read.file, error: factory.error };
-  if (factory.template === undefined) return { ...factory, file: read.file };
+  if ('error' in factory) return { name, file: read.file, error: factory.error } satisfies FactoryListing;
+  if (factory.template === undefined) return { ...factory, file: read.file } satisfies FactoryListing;
   const status = readStatus(home, name);
-  return { ...factory, file: read.file, status: { applied: status?.version ?? null, conditions: status?.conditions ?? [] } };
+  return {
+    ...factory,
+    file: read.file,
+    status: { applied: status?.version ?? null, conditions: status?.conditions ?? [] },
+  } satisfies FactoryListing;
 }
 
 /**
@@ -239,24 +245,24 @@ function factoryAt(home: string, file: string): FactoryListing {
  * — each read as a factory or listed with why, so one bad file hides no other. None when there is no folder yet.
  * @param home The store's root.
  */
-export function readFactoriesAt(home: string): FactoryListing[] {
+export function readFactoriesAt(home: string) {
   let names: string[];
   try {
     names = fs.readdirSync(factoriesDirAt(home));
   } catch {
-    return [];
+    return [] satisfies FactoryListing[] as FactoryListing[];
   }
   return names
     .filter((n) => n.endsWith('.json') && !n.startsWith('.'))
     .sort()
-    .map((file) => factoryAt(home, file));
+    .map((file) => factoryAt(home, file)) satisfies FactoryListing[] as FactoryListing[];
 }
 
 /**
  * The clones of `volumes`: each folder kept as a clone, to the URL it is cloned from (`origin`), as `cloned` makes them.
  * @param volumes The volumes, each with its origin where it is a clone.
  */
-export const clonesOf = (volumes: readonly Volume[]): Record<string, string> =>
+export const clonesOf = (volumes: readonly Volume[]) =>
   Object.fromEntries(volumes.flatMap((v) => (v.origin === undefined ? [] : [[v.path, v.origin]])));
 
 /**
@@ -271,7 +277,7 @@ export const clonesOf = (volumes: readonly Volume[]): Record<string, string> =>
  * @param given Each `--volume` as typed: `<path|url>:ro` or `<path|url>:rw`.
  * @param cwd The folder a relative path is resolved from.
  */
-export function volumesGiven(home: string, name: string, given: readonly string[], cwd: string): Volume[] {
+export function volumesGiven(home: string, name: string, given: readonly string[], cwd: string) {
   let volumes: Volume[] = [];
   const refusals: string[] = [];
   for (const spelled of given) {
@@ -290,14 +296,14 @@ export function volumesGiven(home: string, name: string, given: readonly string[
  * @param name The factory's name, as typed.
  * @param verb The `nemia factory` verb that writes it, named in the default factory's refusal.
  */
-export function refuseName(name: string, verb: FactoryWrite): void {
+export function refuseName(name: string, verb: FactoryWrite) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal(verb) });
 }
 
 /** Whether `volumes` hold no writable one: a factory that works on no repository. */
-const workedOnNone = (volumes: readonly Volume[]): boolean => volumes.every((v) => v.readOnly);
+const workedOnNone = (volumes: readonly Volume[]) => volumes.every((v) => v.readOnly);
 
 /**
  * `nemia factory add`, and `nemia factory apply` with the `template` it is made from: a factory filed in the store `home` as
@@ -308,10 +314,7 @@ const workedOnNone = (volumes: readonly Volume[]): boolean => volumes.every((v) 
  * @param opts The factory's name, each `--volume` as typed, none or several, the folder a relative one is resolved from (where `nemia`
  * runs where none is given), and the template it is made from, where it is one.
  */
-export function addFactoryAt(
-  home: string,
-  opts: { name: string; volumes: readonly string[]; cwd?: string; template?: FactoryTemplate },
-): { factory: Factory; file: string } {
+export function addFactoryAt(home: string, opts: { name: string; volumes: readonly string[]; cwd?: string; template?: FactoryTemplate }) {
   refuseName(opts.name, 'add');
   const volumes = volumesGiven(home, opts.name, opts.volumes, opts.cwd ?? process.cwd());
   const template = opts.template;
@@ -330,7 +333,7 @@ export function addFactoryAt(
  * @param home The store's root.
  * @param factory The factory to file.
  */
-export function createFactoryAt(home: string, factory: Factory): string {
+export function createFactoryAt(home: string, factory: Factory) {
   if (factory.template !== undefined && (factory.workflows.length || Object.keys(factory.hires).length || factory.revisions !== undefined))
     throw new Conflict({ message: unrenderedTreeRefusal(factory.name, treeDir(home, factory.name), 'Nothing was filed.') });
   fs.mkdirSync(factoriesDirAt(home), { recursive: true });
@@ -357,7 +360,7 @@ export function createFactoryAt(home: string, factory: Factory): string {
  * its template, the keys a later `nemia` wrote
  * beside it kept.
  */
-function fileContentOf(content: FactoryFile | undefined, factory: Factory): FactoryFile {
+function fileContentOf(content: FactoryFile | undefined, factory: Factory) {
   const next: Record<string, unknown> = {
     ...content,
     volumes: factory.volumes.map((v) => ({ ...content?.volumes.find((was) => was.path === v.path), ...volumeEntry(v) })),
@@ -388,7 +391,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
 }
 
 /** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
-const noFactory = (home: string, name: string, notDone: string): Missing =>
+const noFactory = (home: string, name: string, notDone: string) =>
   new Missing({
     message: `${noFactoryLine(
       name,
@@ -402,7 +405,7 @@ const noFactory = (home: string, name: string, notDone: string): Missing =>
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function removeFactoryAt(home: string, name: string): { file: string } {
+export function removeFactoryAt(home: string, name: string) {
   refuseName(name, 'rm');
   const file = fileAt(home, name);
   try {
@@ -427,7 +430,7 @@ export function removeFactoryAt(home: string, name: string): { file: string } {
  * @param name The factory's name.
  * @param notDone What the caller did not do, said at the end of a refusal; `Nothing was started.` by default.
  */
-export function readFactoryAt(home: string, name: string, notDone = 'Nothing was started.'): Factory {
+export function readFactoryAt(home: string, name: string, notDone = 'Nothing was started.') {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   const read = factoryFile(home, name);
@@ -445,7 +448,7 @@ export function readFactoryAt(home: string, name: string, notDone = 'Nothing was
  * @param factory The factory as read, or undefined where none is filed.
  * @param who The command that writes into the tree, named in a refusal.
  */
-export function treeChecked<F extends { tree?: string }>(name: string, factory: F | undefined, who: string): F & { tree: string } {
+export function treeChecked<F extends { tree?: string }>(name: string, factory: F | undefined, who: string) {
   const tree = factory?.tree;
   if (factory === undefined || tree === undefined)
     throw new Invalid({
@@ -459,19 +462,19 @@ export function treeChecked<F extends { tree?: string }>(name: string, factory: 
 }
 
 /** The store's factories that read, and the names of those whose file does not. */
-function readable(home: string): { factories: Factory[]; unread: string[] } {
+function readable(home: string) {
   const listing = readFactoriesAt(home);
   return {
     factories: listing.flatMap((f) => ('error' in f ? [] : [f])),
     unread: listing.flatMap((f) => ('error' in f ? [f.name] : [])),
-  };
+  } satisfies { factories: Factory[]; unread: string[] };
 }
 
 /**
  * The names of the store's factories that read, as a refusal offers them.
  * @param home The store's root.
  */
-export const factoryNamesAt = (home: string): string[] => readable(home).factories.map((f) => f.name);
+export const factoryNamesAt = (home: string) => readable(home).factories.map((f) => f.name) satisfies string[] as string[];
 
 /**
  * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory `named`,
@@ -488,13 +491,7 @@ export const factoryNamesAt = (home: string): string[] => readable(home).factori
  * @param fix The start's words for naming a factory, `<name>` in them.
  * @param defaultStarts Whether a start that finds no factory goes to the default one.
  */
-export function startFactoryAt(
-  home: string,
-  named: string | undefined,
-  at: string,
-  fix: string,
-  defaultStarts: boolean,
-): { factory?: Factory; repo?: string } {
+export function startFactoryAt(home: string, named: string | undefined, at: string, fix: string, defaultStarts: boolean) {
   if (named === DEFAULT_NAMESPACE) throw new Invalid({ message: defaultStartRefusal(fix, factoryNamesAt(home)) });
   if (named !== undefined) return { factory: readFactoryAt(home, named) };
   const { factories, unread } = readable(home);
@@ -531,11 +528,11 @@ const DONE = {
 type Rewrite = keyof typeof DONE;
 
 /** The wiring a factory's tree holds, as its workflows, hires and revisions policy, for telling whether a rewrite changes it. */
-const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>): string =>
+const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>) =>
   JSON.stringify([[...wiring.workflows].sort(), wiring.hires, wiring.revisions ?? null, wiring.workflowRepos ?? null]);
 
 /** The file a factory's wiring is kept in: its tree's `factory.json` where it is made from a template, else its own file. */
-const wiringFileAt = (home: string, factory: Factory): string =>
+const wiringFileAt = (home: string, factory: Factory) =>
   factory.template === undefined ? fileAt(home, factory.name) : path.join(treeDir(home, factory.name), 'factory.json');
 
 /**
@@ -543,7 +540,7 @@ const wiringFileAt = (home: string, factory: Factory): string =>
  * workflows' repositories, every other key kept — where it changes it: the file written, or undefined where it was left as it was.
  * Refused: a tree whose wiring does not read (`Invalid`), and one not rendered yet where the wiring changes (`Conflict`).
  */
-function treeRewired(home: string, factory: Factory, notDone: string): string | undefined {
+function treeRewired(home: string, factory: Factory, notDone: string) {
   const { name } = factory;
   const tree = readTreeWiring(home, name);
   if ('error' in tree) throw new Invalid({ message: `the factory ${name}: ${tree.error} ${notDone}` });
@@ -576,7 +573,7 @@ function treeRewired(home: string, factory: Factory, notDone: string): string | 
  * @param notDone What the caller did not do, said at the end of a refusal; `Nothing was written.` by default.
  * @param counted Whether a change of the factory's spec was made beside its file (its level); false by default.
  */
-export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Nothing was written.', counted = false): string {
+export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Nothing was written.', counted = false) {
   const { name } = factory;
   const read = factoryFile(home, name);
   if (!fs.existsSync(read.file)) throw noFactory(home, name, notDone);
@@ -595,7 +592,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
  * The factory `name` of the store `home`, as `verb` changes it. Refused: the name (`refuseName`), and the factory (`readFactoryAt`,
  * `notDone` naming the verb).
  */
-function toChange(home: string, name: string, verb: Rewrite): Factory {
+function toChange(home: string, name: string, verb: Rewrite) {
   refuseName(name, verb);
   return readFactoryAt(home, name, `Nothing was ${DONE[verb]}.`);
 }
@@ -607,7 +604,7 @@ function toChange(home: string, name: string, verb: Rewrite): Factory {
  * @param name The factory's name.
  * @param change The change of its wiring: its verb and what it names.
  */
-export function wiringNamesRefused(name: string, change: WiringChange): void {
+export function wiringNamesRefused(name: string, change: WiringChange) {
   if (change.verb !== 'fire') {
     const bad = change.verb === 'hire' ? hireRefusal(change.step, change.agent) : workflowNameRefusal(change.workflow);
     if (bad) throw new Invalid({ message: `${bad} Nothing was ${DONE[change.verb]}.` });
@@ -622,11 +619,7 @@ export function wiringNamesRefused(name: string, change: WiringChange): void {
  * @param change The change of its wiring: its verb and what it names.
  * @param onDisk What a fact of the disk or the clock refuses of the factory, or undefined; refuses nothing by default.
  */
-export function wiringChecked(
-  factory: Factory,
-  change: WiringChange,
-  onDisk: (factory: Factory) => Error | undefined = () => undefined,
-): Factory {
+export function wiringChecked(factory: Factory, change: WiringChange, onDisk: (factory: Factory) => Error | undefined = () => undefined) {
   const tree = factory.tree;
   if (tree !== undefined && change.verb !== 'schedule' && change.verb !== 'unschedule' && !fs.existsSync(path.join(tree, 'factory.json')))
     throw new Conflict({ message: unrenderedTreeRefusal(factory.name, tree, `Nothing was ${DONE[change.verb]}.`) });
@@ -641,12 +634,7 @@ export function wiringChecked(
  * The factory `name` of the store `home`, changed by `change` and written back: what it was, what it is, and the file written. Refused
  * before anything is written: the names (`wiringNamesRefused`), the factory (`readFactoryAt`), and what `wiringChecked` refuses.
  */
-function wiredAt(
-  home: string,
-  name: string,
-  change: WiringChange,
-  onDisk?: (factory: Factory) => Error | undefined,
-): { was: Factory; now: Factory; file: string } {
+function wiredAt(home: string, name: string, change: WiringChange, onDisk?: (factory: Factory) => Error | undefined) {
   wiringNamesRefused(name, change);
   const notDone = `Nothing was ${DONE[change.verb]}.`;
   const was = readFactoryAt(home, name, notDone);
@@ -666,10 +654,7 @@ function wiredAt(
  * @param opts The factory's name, the agent, the step as `<workflow>/<step>`, and the store whose `workflows/` is looked in for the step's
  * own file, `home` where absent.
  */
-export function hireAgentAt(
-  home: string,
-  opts: { factory: string; agent: string; step: string; home?: string },
-): { file: string; replaced?: string } {
+export function hireAgentAt(home: string, opts: { factory: string; agent: string; step: string; home?: string }) {
   const { was, file } = wiredAt(home, opts.factory, { verb: 'hire', step: opts.step, agent: opts.agent }, (factory) =>
     ownAgentRefusal(opts.home ?? home, factory, opts.step),
   );
@@ -683,7 +668,7 @@ export function hireAgentAt(
  * @param home The store's root.
  * @param opts The factory's name and the step as `<workflow>/<step>`.
  */
-export function fireAgentAt(home: string, opts: { factory: string; step: string }): { file: string; fired: string } {
+export function fireAgentAt(home: string, opts: { factory: string; step: string }) {
   const { was, file } = wiredAt(home, opts.factory, { verb: 'fire', step: opts.step });
   const fired = was.hires[opts.step];
   if (fired === undefined) throw new Missing({ message: unhiredFireRefusal(opts.factory, opts.step, was.hires) });
@@ -699,13 +684,10 @@ export function fireAgentAt(home: string, opts: { factory: string; step: string 
  * @param home The store's root.
  * @param opts The factory's name, the workflow's folder name, and the folder name of the repository its runs work on, where one is named.
  */
-export function attachWorkflowAt(
-  home: string,
-  opts: { factory: string; workflow: string; repo?: string },
-): { file: string; already?: true } {
+export function attachWorkflowAt(home: string, opts: { factory: string; workflow: string; repo?: string }) {
   const change = { verb: 'attach', workflow: opts.workflow, ...(opts.repo === undefined ? {} : { repo: opts.repo }) } as const;
   const { was, now, file } = wiredAt(home, opts.factory, change);
-  return now === was ? { file, already: true } : { file };
+  return (now === was ? { file, already: true } : { file }) satisfies { file: string; already?: true };
 }
 
 /**
@@ -716,7 +698,7 @@ export function attachWorkflowAt(
  * @param home The store's root.
  * @param opts The factory's name, and where its instruction is kept: a path in its first folder, the store, or undefined to remove the key.
  */
-export function setInstructionAt(home: string, opts: { factory: string; at: InstructionAt | undefined }): { file: string } {
+export function setInstructionAt(home: string, opts: { factory: string; at: InstructionAt | undefined }) {
   const at = opts.at;
   if (at !== undefined && 'path' in at) {
     const bad = instructionPathRefusal(at.path);
@@ -738,10 +720,7 @@ export function setInstructionAt(home: string, opts: { factory: string; at: Inst
  * `scheduleRepoRefusal` refuses of its repository — a `repo` set or changed, which is retired, or a workflow the factory's wiring places
  * on none of its repositories (`wiredRepo`) — naming the `nemia factory attach` that places its runs.
  */
-function scheduleRefusal(
-  factory: Factory,
-  opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
-): string | undefined {
+function scheduleRefusal(factory: Factory, opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string }) {
   const notDone = 'Nothing was scheduled.';
   const fires = firesOf(opts, Date.now());
   if ('error' in fires) return `--cron ${JSON.stringify(opts.cron)}${opts.tz ? ` --tz ${opts.tz}` : ''}: ${fires.error}. ${notDone}`;
@@ -769,7 +748,7 @@ function scheduleRefusal(
 export function setScheduleAt(
   home: string,
   opts: { factory: string; workflow: string; cron: string; brief: string; repo?: string; tz?: string },
-): { file: string; schedule: Schedule; replaced?: Schedule } {
+) {
   const schedule = scheduleOf(opts);
   const { was, file } = wiredAt(home, opts.factory, { verb: 'schedule', workflow: opts.workflow, schedule }, (factory) =>
     scheduleRefused(factory, opts),
@@ -783,7 +762,7 @@ export function setScheduleAt(
  * as an old schedule's sent back as it is, kept resolved.
  * @param opts The cron, the brief, the retired repository and the time zone, where given.
  */
-export const scheduleOf = (opts: { cron: string; brief: string; repo?: string; tz?: string }): Schedule => ({
+export const scheduleOf = (opts: { cron: string; brief: string; repo?: string; tz?: string }) => ({
   cron: opts.cron,
   brief: opts.brief,
   ...(opts.repo === undefined ? {} : { repo: path.resolve(opts.repo) }),
@@ -796,10 +775,7 @@ export const scheduleOf = (opts: { cron: string; brief: string; repo?: string; t
  * @param factory The factory the schedule is written into.
  * @param opts The workflow's folder name, the cron, the brief, the retired repository and the time zone, where given.
  */
-export function scheduleRefused(
-  factory: Factory,
-  opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
-): Invalid | undefined {
+export function scheduleRefused(factory: Factory, opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string }) {
   const bad = scheduleRefusal(factory, opts);
   return bad === undefined ? undefined : new Invalid({ message: bad });
 }
@@ -811,7 +787,7 @@ export function scheduleRefused(
  * @param home The store's root.
  * @param opts The factory's name and the workflow's folder name.
  */
-export function clearScheduleAt(home: string, opts: { factory: string; workflow: string }): { file: string; cleared: Schedule } {
+export function clearScheduleAt(home: string, opts: { factory: string; workflow: string }) {
   const { was, file } = wiredAt(home, opts.factory, { verb: 'unschedule', workflow: opts.workflow });
   const cleared = was.schedules[opts.workflow];
   if (cleared === undefined) throw new Missing({ message: unscheduledRefusal(opts.factory, opts.workflow, Object.keys(was.schedules)) });
@@ -829,7 +805,7 @@ const FormerKeysSchema = Schema.Struct({
 });
 
 /** Whether `xs` names each of its strings once: what `volumesFromRepos` asks of a file's repositories and of its volumes' paths. */
-const once = (xs: readonly string[]): boolean => new Set(xs).size === xs.length;
+const once = (xs: readonly string[]) => new Set(xs).size === xs.length;
 
 /**
  * The factory files of the store `home` an earlier release wrote, each moved once into one list of volumes (`volumesFromRepos`): its
@@ -841,7 +817,7 @@ const once = (xs: readonly string[]): boolean => new Set(xs).size === xs.length;
  * reads as a file in the earlier shape, naming `nemia up`. A hidden file, one being written, is left out.
  * @param home The store's root.
  */
-export function volumesMovedAt(home: string): VolumesMoved {
+export function volumesMovedAt(home: string) {
   let names: string[];
   try {
     names = fs.readdirSync(factoriesDirAt(home));

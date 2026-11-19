@@ -7,7 +7,7 @@ import { milestonesQuery } from '@/lib/api/readiness';
 import { nextStepsOf } from '@/lib/firstCard';
 
 /** The factory "You are set" speaks of: the first of the store's own with a writable volume, else the first of its own. */
-const setFactoryOf = (factories: readonly Factory[]): Factory | undefined => {
+const setFactoryOf = (factories: readonly Factory[]) => {
   const own = factories.filter((f) => !f.default);
   return own.find((f) => f.volumes.some((v) => !v.readOnly)) ?? own[0];
 };

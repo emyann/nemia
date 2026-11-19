@@ -23,13 +23,14 @@ export default meta;
 type Story = StoryObj<typeof PolicyRules>;
 
 /** `PolicyRules` over `list`. */
-const over = (list: PolicyList): Story => ({
-  render: (args) => (
-    <QueryClientProvider client={seeded([[policyQuery(args.agent).queryKey, list]])}>
-      <PolicyRules {...args} />
-    </QueryClientProvider>
-  ),
-});
+const over = (list: PolicyList) =>
+  ({
+    render: (args) => (
+      <QueryClientProvider client={seeded([[policyQuery(args.agent).queryKey, list]])}>
+        <PolicyRules {...args} />
+      </QueryClientProvider>
+    ),
+  }) satisfies Story;
 
 /** The default in force, a Drop beside it, and a proposed rule waiting on Confirm. */
 export const Proposed: Story = {

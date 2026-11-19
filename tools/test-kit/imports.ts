@@ -36,7 +36,7 @@ const ENDS_VALUE = new Set<ts.SyntaxKind>([
  * is never taken for a comment. A `}` that closes a template's `${` is read again as the template's next part, and a `/` where no value
  * stands before it as a pattern. JSX text is scanned as code, so a `//` written in it reads as a comment to the end of its line.
  */
-export function commentRanges(text: string): Array<{ from: number; to: number }> {
+export function commentRanges(text: string) {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, text);
   const ranges: Array<{ from: number; to: number }> = [];
   const opened: boolean[] = [];
@@ -61,7 +61,7 @@ export function commentRanges(text: string): Array<{ from: number; to: number }>
 }
 
 /** `text` with every comment blanked, each of its characters a space but its line breaks, so line numbers and columns still count. */
-export const withoutComments = (text: string): string => {
+export const withoutComments = (text: string) => {
   let out = '';
   let at = 0;
   for (const { from, to } of commentRanges(text)) {
@@ -75,7 +75,7 @@ export const withoutComments = (text: string): string => {
 export type Import = { spec: string; typeOnly: boolean };
 
 /** Every module a piece of source names outside its comments, and whether each import is erased. */
-export function importsIn(text: string): Import[] {
+export function importsIn(text: string) {
   const code = withoutComments(text);
   const out: Import[] = [];
   for (const m of code.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
@@ -106,7 +106,7 @@ const ALL_CALLS: readonly Call[] = ['import', 'require', 'import.meta.resolve', 
  * each call of `calls` (every one by default). With `closed`, a call counts only when its argument is the whole of it (`import('x')`,
  * never `import('x' + y)`). Comments are read as code: blank them first with `withoutComments` where prose must not count.
  */
-export function specifiersIn(text: string, { calls = ALL_CALLS, closed = false }: Reading = {}): string[] {
+export function specifiersIn(text: string, { calls = ALL_CALLS, closed = false }: Reading = {}) {
   const found = new Set<string>();
   for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1] ?? '');
   for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1] ?? '');
@@ -119,5 +119,5 @@ export function specifiersIn(text: string, { calls = ALL_CALLS, closed = false }
 }
 
 /** The path a relative specifier in `file` names, from the same place `file` is named from; undefined for a package or a builtin. */
-export const resolved = (file: string, spec: string): string | undefined =>
+export const resolved = (file: string, spec: string) =>
   spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)) : undefined;

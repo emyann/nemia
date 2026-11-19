@@ -22,7 +22,7 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { stepDraftOf, workflowSpecOf, type WorkflowSpecRead } from './workflow-spec.ts';
+import { stepDraftOf, workflowSpecOf } from './workflow-spec.ts';
 import { agentSpecOf } from './agent-spec.ts';
 import { skillSpecOf } from './skill-spec.ts';
 import { textIn } from '../folder/folder.ts';
@@ -59,7 +59,7 @@ const NONE: Current = { version: null };
  * @param factory The factory's name.
  * @param what Which folder of the tree: its workflows, its agents or its skills.
  */
-export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills'): string => {
+export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills') => {
   const filed = filedAtOnce(home, factory);
   if (filed?.tree === undefined)
     throw new Invalid({
@@ -73,7 +73,7 @@ export const treeDir = (home: string, factory: string, what: 'workflows' | 'agen
 };
 
 /** A failure of a read that says nothing is there (`Missing`) as nothing at the name; any other refusal as it was. */
-const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Current): Effect.Effect<Current, Refusal, R> =>
+const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Current) =>
   read.pipe(
     Effect.map(current),
     Effect.catch((err) => (err._tag === 'Missing' ? Effect.succeed(NONE) : Effect.fail(err))),
@@ -86,7 +86,7 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
  * `spec`, and what a proposal's stale check and access read, so a spec read and proposed back changes nothing.
  * @param dir The workflow's folder.
  */
-export function workflowSpecAt(dir: string): WorkflowSpecRead {
+export function workflowSpecAt(dir: string) {
   const texts = fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isFile())
@@ -118,7 +118,7 @@ export const workflowStepsWritten = (place: ProposalPlace, factory: string, name
   });
 
 /** What `render` answers, or undefined where it refuses a step (`WorkflowError`); anything else it throws, thrown. */
-const renderedOrNone = <A>(render: () => A): A | undefined => {
+const renderedOrNone = <A>(render: () => A) => {
   try {
     return render();
   } catch (err) {
@@ -166,7 +166,7 @@ const skillNow = (place: ProposalPlace, factory: string, name: string) =>
   });
 
 /** `object`'s version and spec as a `Current`, from a served object. */
-const servedNow = (object: { metadata: { resourceVersion: string }; spec: unknown }): Current => ({
+const servedNow = (object: { metadata: { resourceVersion: string }; spec: unknown }) => ({
   version: object.metadata.resourceVersion,
   spec: object.spec,
 });
@@ -206,12 +206,7 @@ const factoryNow = (place: ProposalPlace, factory: string) =>
  * @param kind The kind of the object.
  * @param name The object's name; for a Factory, the factory's own.
  */
-export const currentOf = (
-  place: ProposalPlace,
-  factory: string,
-  kind: ProposableKind,
-  name: string,
-): Effect.Effect<Current, Refusal, ProposalNeeds> => {
+export const currentOf = (place: ProposalPlace, factory: string, kind: ProposableKind, name: string) => {
   switch (kind) {
     case 'Workflow':
       return workflowNow(place, factory, name);

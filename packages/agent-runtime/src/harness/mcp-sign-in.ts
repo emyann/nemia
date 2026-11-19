@@ -52,9 +52,8 @@ const CLI_MS = 60_000;
  * The real CLI: `executable` spawned with no shell, its output gathered, killed at `CLI_MS`.
  * @param executable The path of the CLI's program.
  */
-export const claudeCli =
-  (executable: string): McpCli =>
-  (args, { cwd, env }) =>
+export const claudeCli = (executable: string) =>
+  ((args, { cwd, env }) =>
     new Promise((resolve) => {
       const child = spawn(executable, [...args], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: CLI_MS });
       let out = '';
@@ -62,7 +61,7 @@ export const claudeCli =
       child.stderr.on('data', (b: Buffer) => (out += b.toString()));
       child.on('error', (e) => resolve({ code: null, out: `${out}${e.message}` }));
       child.on('close', (code) => resolve({ code, out }));
-    });
+    })) satisfies McpCli;
 
 /**
  * The Claude Code every road runs — a session, held or a job, its sign-in check, its quota, a `claude mcp` child — so the key a secret
@@ -77,14 +76,11 @@ export const claudeCli =
  * @param harnessBin The folder the engine keeps harness programs in, or undefined to skip it.
  * @param sdkFrom The file the bundled program is resolved from, this module unless a test plants another tree.
  */
-export const claudeExecutableOf = (
-  executable: string | undefined,
-  harnessBin?: string,
-  sdkFrom: string = import.meta.url,
-): string | undefined => executable || programIn(harnessBin, 'claude') || sdkBundledClaude(sdkFrom) || programOnPath('claude');
+export const claudeExecutableOf = (executable: string | undefined, harnessBin?: string, sdkFrom: string = import.meta.url) =>
+  executable || programIn(harnessBin, 'claude') || sdkBundledClaude(sdkFrom) || programOnPath('claude');
 
 /** The Claude Code the Agent SDK resolved from `from` bundles for this platform, or `undefined` where it bundles none. */
-const sdkBundledClaude = (from: string): string | undefined => {
+const sdkBundledClaude = (from: string) => {
   try {
     const sdk = createRequire(from).resolve('@anthropic-ai/claude-agent-sdk');
     const bundled = createRequire(sdk).resolve(`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`);
@@ -95,7 +91,7 @@ const sdkBundledClaude = (from: string): string | undefined => {
 };
 
 /** `text` with every appearance of `secret` taken out, so no refusal quotes it. */
-const withoutSecret = (text: string, secret: string): string => (secret ? text.split(secret).join('<secret>') : text);
+const withoutSecret = (text: string, secret: string) => (secret ? text.split(secret).join('<secret>') : text);
 
 /**
  * The argv of `claude mcp add` for `server` under `name`, as `mcpServerOf` hands its bytes — the headers in its order, which is the
@@ -107,7 +103,7 @@ const withoutSecret = (text: string, secret: string): string => (secret ? text.s
  * @param server The remote server, its URL, headers and OAuth app.
  * @param secret Whether `--client-secret` is given; false for the add a sign-out makes.
  */
-export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true): string[] => {
+export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true) => {
   const s = mcpServerOf(server);
   return [
     'mcp',
@@ -135,13 +131,7 @@ export const mcpAddArgs = (name: string, server: RemoteMcpServer, secret = true)
  * @param secret The OAuth app's client secret.
  * @param cwd The folder the CLI runs in, whose local scope the server is added to.
  */
-export const storeClientSecret = async (
-  cli: McpCli,
-  name: string,
-  server: RemoteMcpServer,
-  secret: string,
-  cwd: string,
-): Promise<string | undefined> => {
+export const storeClientSecret = async (cli: McpCli, name: string, server: RemoteMcpServer, secret: string, cwd: string) => {
   const env = withoutTelemetry(process.env);
   await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env });
   const added = await cli(mcpAddArgs(name, server), { cwd, env: { ...env, MCP_CLIENT_SECRET: secret } });
@@ -159,7 +149,7 @@ export const storeClientSecret = async (
  * @param server The remote server, added again first so that the remove finds its key.
  * @param cwd The folder the sign-in added it in, whose local scope it is cleared from.
  */
-export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpServer, cwd: string): Promise<string | undefined> => {
+export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpServer, cwd: string) => {
   const env = withoutTelemetry(process.env);
   await cli(mcpAddArgs(name, server, false), { cwd, env });
   const removed = await cli(['mcp', 'remove', '--scope', 'local', name], { cwd, env });
@@ -260,18 +250,18 @@ export const claudeMcpSignIn: McpSignInAsk = async (name, server, { cwd, executa
     end();
     throw new Error(`the harness answered no address to sign in to \`${name}\` at: it may be signed in already. Check its state again.`);
   }
-  const settled = (async (): Promise<SignInSettled> => {
+  const settled = (async () => {
     while (!abort.signal.aborted) {
       await new Promise((r) => setTimeout(r, SIGN_IN_POLL_MS).unref());
       if (abort.signal.aborted) break;
       const states = await q.mcpServerStatus().catch(() => []);
       const s = states.find((x) => x.name === name);
-      if (s?.status === 'connected') return { connected: true };
-      if (s?.status === 'failed') return { connected: false, why: s.error ?? 'the harness said the server failed' };
+      if (s?.status === 'connected') return { connected: true } satisfies SignInSettled;
+      if (s?.status === 'failed') return { connected: false, why: s.error ?? 'the harness said the server failed' } satisfies SignInSettled;
     }
-    return { connected: false, why: 'the sign-in was ended before the server read connected' };
+    return { connected: false, why: 'the sign-in was ended before the server read connected' } satisfies SignInSettled;
   })();
-  const submit = async (callbackUrl: string): Promise<void> => {
+  const submit = async (callbackUrl: string) => {
     const handOn = sdk.mcpSubmitOAuthCallbackUrl;
     if (typeof handOn !== 'function') {
       throw new Error(

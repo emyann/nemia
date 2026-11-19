@@ -19,7 +19,7 @@ import { floorEntryOf, floorWords } from '../caller/index.ts';
 import { answered, type ApiError, bodyOf, ServedNow, statusOf } from './refused.ts';
 
 /** The JSON length of `text` as a JSON string: its quotes, and each character as `JSON.stringify` escapes it. */
-const stringLength = (text: string): number => {
+const stringLength = (text: string) => {
   let length = 2;
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
@@ -38,10 +38,10 @@ const stringLength = (text: string): number => {
 };
 
 /** Whether `value` is one `JSON.stringify` leaves out of an object, and writes `null` for in an array. */
-const unwritten = (value: unknown): boolean => value === undefined || typeof value === 'function' || typeof value === 'symbol';
+const unwritten = (value: unknown) => value === undefined || typeof value === 'function' || typeof value === 'symbol';
 
 /** `value` as `JSON.stringify` writes it under `key`: what its `toJSON` answers, a boxed primitive unboxed. */
-const asWritten = (key: string, value: unknown): unknown => {
+const asWritten = (key: string, value: unknown) => {
   const told =
     typeof value === 'object' && value !== null && typeof (value as { toJSON?: unknown }).toJSON === 'function'
       ? (value as { toJSON: (key: string) => unknown }).toJSON(key)
@@ -50,7 +50,7 @@ const asWritten = (key: string, value: unknown): unknown => {
 };
 
 /** The JSON length of a value that holds no other: `null`, a boolean, a number (`null` where it is not finite), a string. */
-const scalarLength = (value: unknown): number => {
+const scalarLength = (value: unknown) => {
   if (typeof value === 'string') return stringLength(value);
   if (typeof value === 'number') return Number.isFinite(value) ? String(value).length : 4;
   if (typeof value === 'bigint') throw new TypeError('Do not know how to serialize a BigInt');
@@ -61,7 +61,7 @@ const scalarLength = (value: unknown): number => {
 type Walk = { total: number; readonly most: number };
 
 /** Adds the JSON length of `raw`, read under `key`, to the walk; whether it is past its most. */
-const walked = (walk: Walk, key: string, raw: unknown): boolean => {
+const walked = (walk: Walk, key: string, raw: unknown) => {
   const value = asWritten(key, raw);
   if (typeof value !== 'object' || value === null) walk.total += scalarLength(value);
   else if (Array.isArray(value)) return itemsWalked(walk, value);
@@ -70,7 +70,7 @@ const walked = (walk: Walk, key: string, raw: unknown): boolean => {
 };
 
 /** Adds the JSON length of the array `items` to the walk, each item in turn; whether it is past its most. */
-const itemsWalked = (walk: Walk, items: readonly unknown[]): boolean => {
+const itemsWalked = (walk: Walk, items: readonly unknown[]) => {
   walk.total += 2 + Math.max(0, items.length - 1);
   for (const [i, item] of items.entries()) {
     if (walk.total > walk.most) return true;
@@ -81,7 +81,7 @@ const itemsWalked = (walk: Walk, items: readonly unknown[]): boolean => {
 };
 
 /** Adds the JSON length of the object `value` to the walk, each key it writes in turn; whether it is past its most. */
-const keysWalked = (walk: Walk, value: object): boolean => {
+const keysWalked = (walk: Walk, value: object) => {
   walk.total += 2;
   let written = 0;
   for (const [name, item] of Object.entries(value)) {
@@ -101,7 +101,7 @@ const keysWalked = (walk: Walk, value: object): boolean => {
  * @param value The value whose JSON is measured.
  * @param most The length, in characters, past which the walk stops.
  */
-export const jsonLengthPast = (value: unknown, most: number): number => {
+export const jsonLengthPast = (value: unknown, most: number) => {
   if (unwritten(value)) return 0;
   const walk: Walk = { total: 0, most };
   walked(walk, '', value);
@@ -137,12 +137,11 @@ export class AnswerPastBound extends Error {
  * @param endpoint The GET endpoint, by its group and name.
  * @param handler The endpoint's handler.
  */
-export const readHandled =
-  <Args extends ReadonlyArray<unknown>, A, E, R>(
-    endpoint: ApiGetName,
-    handler: (...args: Args) => Effect.Effect<A, E, R>,
-  ): ((...args: Args) => Effect.Effect<A, E, R | ServedNow>) =>
-  (...args) => {
+export const readHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
+  endpoint: ApiGetName,
+  handler: (...args: Args) => Effect.Effect<A, E, R>,
+) =>
+  ((...args) => {
     const { shape } = READS[endpoint];
     if (shape === 'bytes' || shape === 'stream') return handler(...args);
     return Effect.gen(function* () {
@@ -152,7 +151,7 @@ export const readHandled =
       if (jsonLengthPast(answer, answerMost) > answerMost) return yield* Effect.die(new AnswerPastBound(endpoint, answerMost));
       return answer;
     });
-  };
+  }) satisfies (...args: Args) => Effect.Effect<A, E, R | ServedNow>;
 
 /** The handlers of a group as `readsBounded` hands them on: their `handle` is all it changes. */
 type Handling = {
@@ -160,17 +159,16 @@ type Handling = {
 };
 
 /** The method of the endpoint `name` of the group `group` of `objects`' `Api`, or undefined where it has no such endpoint. */
-const methodOf = (group: string, name: string): string | undefined =>
+const methodOf = (group: string, name: string) =>
   (Api.groups as Readonly<Record<string, { readonly endpoints: Readonly<Record<string, { readonly method: string }>> }>>)[group]?.endpoints[
     name
   ]?.method;
 
 /** Whether the endpoint `name` of the group `group` of `objects`' `Api` is a GET: a read, bounded. */
-const isRead = (group: string, name: string): boolean => methodOf(group, name) === 'GET';
+const isRead = (group: string, name: string) => methodOf(group, name) === 'GET';
 
 /** `value` as a record of its keys, or none where it is no object. */
-const partsOf = (value: unknown): Readonly<Record<string, unknown>> =>
-  typeof value === 'object' && value !== null ? (value as Readonly<Record<string, unknown>>) : {};
+const partsOf = (value: unknown) => (typeof value === 'object' && value !== null ? (value as Readonly<Record<string, unknown>>) : {});
 
 /**
  * `handler`, the handler of the endpoint `name` of the group `group`, judged first by the floor of an agent's standing token for a caller
@@ -181,15 +179,12 @@ const partsOf = (value: unknown): Readonly<Record<string, unknown>> =>
  * @param name The endpoint's name in its group.
  * @param handler The endpoint's handler.
  */
-export const floorHandled =
-  <Args extends ReadonlyArray<unknown>, A, E, R>(
-    group: string,
-    name: string,
-    handler: (...args: Args) => Effect.Effect<A, E, R>,
-  ): ((
-    ...args: Args
-  ) => Effect.Effect<A | HttpServerResponse.HttpServerResponse, E | ApiError, R | ServedNow | HttpServerRequest.HttpServerRequest>) =>
-  (...args) =>
+export const floorHandled = <Args extends ReadonlyArray<unknown>, A, E, R>(
+  group: string,
+  name: string,
+  handler: (...args: Args) => Effect.Effect<A, E, R>,
+) =>
+  ((...args) =>
     Effect.gen(function* () {
       const { caller } = yield* ServedNow;
       if (caller.kind !== 'agent' || !caller.token) return yield* handler(...args);
@@ -206,13 +201,15 @@ export const floorHandled =
       const factory = typeof namespace === 'string' ? namespace : undefined;
       const refused = new Forbidden({ reason: answer.reason, error: floorWords(route, entry, caller, answer.reason, factory) });
       return HttpServerResponse.jsonUnsafe(bodyOf(refused), { status: statusOf(refused) });
-    });
+    })) satisfies (
+    ...args: Args
+  ) => Effect.Effect<A | HttpServerResponse.HttpServerResponse, E | ApiError, R | ServedNow | HttpServerRequest.HttpServerRequest>;
 
 /**
  * `handlers`, the handlers of the group `group`, with each endpoint's handler judged first by the floor of an agent's standing token
  * (`floorHandled`), and each GET endpoint's given through `readHandled` as it is registered: every other key as it is.
  */
-const boundedHandlers = <H>(group: string, handlers: H): H => {
+const boundedHandlers = <H>(group: string, handlers: H) => {
   const target = handlers as H & Handling;
   const bounded: H = new Proxy(target, {
     get: (held, key, receiver) =>

@@ -10,7 +10,7 @@ import { turnOf } from './turn.ts';
  * answer, with no process running.
  * @param state The task's fold.
  */
-export function waitsForInput(state: State): boolean {
+export function waitsForInput(state: State) {
   const last = state.attempts.at(-1);
   return (
     state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'succeeded' && (last.turn ?? 0) === state.inputs.length
@@ -24,7 +24,7 @@ export function waitsForInput(state: State): boolean {
  * `decide` holds the start on it, `admit` writes an entry only while it holds, and a view says `queued` by it.
  * @param state The task's fold.
  */
-export function awaitsAdmission(state: State): boolean {
+export function awaitsAdmission(state: State) {
   return admissionOf(state) === 'queued';
 }
 
@@ -34,7 +34,7 @@ export function awaitsAdmission(state: State): boolean {
  * one whose turn has started or has nothing left to start, which the phase says.
  * @param state The task's fold.
  */
-export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
+export function admissionOf(state: State) {
   if (state.queued === false || state.settled || state.stopRequested) return undefined;
   const last = state.attempts.at(-1);
   if (last && last.ended === null) return undefined;

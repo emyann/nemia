@@ -26,7 +26,7 @@ export type RunClock = { wallMs: number; sessionsMs: number; checksMs: number; p
 type Span = { from: number; to: number };
 
 /** `spans` cut to `wall`, one with no end running to the wall's; an interval the cut leaves empty is dropped. */
-const clipped = (spans: readonly Ran[], wall: Span): Span[] =>
+const clipped = (spans: readonly Ran[], wall: Span) =>
   spans.flatMap((s) => {
     const from = Math.max(s.from, wall.from);
     const to = Math.min(s.to ?? wall.to, wall.to);
@@ -34,22 +34,22 @@ const clipped = (spans: readonly Ran[], wall: Span): Span[] =>
   });
 
 /** The intervals the tasks `ids` ran in (`ranIn`), a task `views` does not hold running nothing. */
-const ranOf = (ids: readonly string[], views: ReadonlyMap<string, TaskClock>): Ran[] =>
+const ranOf = (ids: readonly string[], views: ReadonlyMap<string, TaskClock>) =>
   ids.flatMap((id) => {
     const view = views.get(id);
     return view ? ranIn(view) : [];
-  });
+  }) satisfies Ran[];
 
 /** The interval between two instants, `to` null for one still open; none where `from` is not known. */
-const spanOf = (from: string | null | undefined, to: string | null): Ran[] =>
+const spanOf = (from: string | null | undefined, to: string | null) =>
   from ? [{ from: Date.parse(from), to: to === null ? null : Date.parse(to) }] : [];
 
 /** The waits at a gate that an approval closed: each approved try of a gated step, for as long as `gateWaitOf` says. */
-const gateWaits = (run: Run, tl: Timeline, steps: readonly StepSpec[]): Ran[] =>
+const gateWaits = (run: Run, tl: Timeline, steps: readonly StepSpec[]) =>
   steps
     .filter((step) => hasGate(step, run))
     .flatMap((step) =>
-      (tl.steps[step.name] ?? []).flatMap((t): Ran[] => {
+      (tl.steps[step.name] ?? []).flatMap((t) => {
         const approval = run.approvals?.find((a) => a.step === step.name && a.try === t.try);
         const ms = gateWaitOf(run, tl, step, t);
         if (!approval || ms === null) return [];
@@ -62,13 +62,13 @@ const gateWaits = (run: Run, tl: Timeline, steps: readonly StepSpec[]): Ran[] =>
  * The waits on a person's answer to a blocked sign-off: from the end of the turn that asked to the first spawn of the turn that
  * answered.
  */
-const answerWaits = (tl: Timeline): Ran[] =>
+const answerWaits = (tl: Timeline) =>
   Object.values(tl.steps)
     .flat()
     .flatMap((t) => (t.turn?.asked && t.turn.spawnedAt ? spanOf(t.turn.heldFrom, t.turn.spawnedAt) : []));
 
 /** The latest end among `tries` that ended (`tryEndOf`), or null where none did. */
-const lastEndOf = (tries: readonly TimelineTry[]): string | null =>
+const lastEndOf = (tries: readonly TimelineTry[]) =>
   tries
     .map(tryEndOf)
     .filter((at): at is string => at !== null)
@@ -79,7 +79,7 @@ const lastEndOf = (tries: readonly TimelineTry[]): string | null =>
  * The waits still open on a person: each step of `waiting`, from the end of its last try, or, for one whose last try has no end — a step
  * held at its gate before it is filed — from the latest end of the steps it comes after; none where neither is known.
  */
-const openWaits = (tl: Timeline, steps: readonly StepSpec[], waiting: readonly string[]): Ran[] =>
+const openWaits = (tl: Timeline, steps: readonly StepSpec[], waiting: readonly string[]) =>
   waiting.flatMap((name) => {
     const own = tl.steps[name]?.at(-1);
     const after = steps.find((s) => s.name === name)?.after ?? [];
@@ -87,14 +87,14 @@ const openWaits = (tl: Timeline, steps: readonly StepSpec[], waiting: readonly s
   });
 
 /** A task's wait for a slot: filed → its first spawn, and still open while it is queued or starting; none where its filing is not known. */
-const taskSlot = (span: TaskSpan | null): Ran[] => {
+const taskSlot = (span: TaskSpan | null) => {
   if (!span) return [];
   if (span.at === 'queued' || span.at === 'starting') return spanOf(span.filedAt, null);
   return span.spawnedAt ? spanOf(span.filedAt, span.spawnedAt) : [];
 };
 
 /** The waits for a slot: each task's (`taskSlot`), and the run's own for a run slot (`SlotWait`), open until its first task is filed. */
-const slotWaits = (run: Run, tl: Timeline): Ran[] => {
+const slotWaits = (run: Run, tl: Timeline) => {
   const tasks = Object.values(tl.steps)
     .flat()
     .flatMap((t) => [...taskSlot(t.session), ...taskSlot(t.check)]);
@@ -119,7 +119,7 @@ export function clockOf(
   steps: readonly StepSpec[],
   waiting: readonly string[],
   until: number,
-): RunClock {
+) {
   const from = Date.parse(run.createdAt);
   const wall = { from, to: Math.max(from, until) };
   const tl = timeline(run, views, steps);
@@ -161,7 +161,7 @@ export function waitingSinceOf(
   steps: readonly StepSpec[],
   waiting: readonly string[],
   held: string | null,
-): string | null {
+) {
   const starts = [...openWaits(timeline(run, views, steps), steps, waiting), ...spanOf(held, null)].map((wait) => wait.from);
   return starts.length ? new Date(Math.min(...starts)).toISOString() : null;
 }

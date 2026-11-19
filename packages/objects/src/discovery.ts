@@ -7,7 +7,7 @@
  * Kubernetes' words. The parser is pure.
  */
 import { Schema } from 'effect';
-import type { ApiRoute, KindPlural, Resource, ResourcesOf, RouteMethod } from '../contracts/discovery.contract.ts';
+import type { ApiRoute, KindPlural, ResourcesOf, RouteMethod } from '../contracts/discovery.contract.ts';
 import { API_VERSION } from './meta.ts';
 import { KINDS, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
 
@@ -40,7 +40,7 @@ export type APIResourceList = typeof APIResourceList.Type;
 const ROUTE_METHODS: readonly RouteMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /** Whether a path's segment is a name the route is given (`:name`), not a word of it. */
-const isParam = (segment: string): boolean => segment.startsWith(':');
+const isParam = (segment: string) => segment.startsWith(':');
 
 /**
  * The route `method` and `path` (the `Api`'s, with `:param` segments) read as: its plural, the first word after `/api/` or after
@@ -49,7 +49,7 @@ const isParam = (segment: string): boolean => segment.startsWith(':');
  * @param method The route's HTTP method.
  * @param path The route's path, as the Api spells it.
  */
-export const routeOf = (method: string, path: string): ApiRoute | null => {
+export const routeOf = (method: string, path: string) => {
   const routeMethod = ROUTE_METHODS.find((m) => m === method);
   if (routeMethod === undefined || !path.startsWith('/api/')) return null;
   const segments = path.slice('/api/'.length).split('/');
@@ -71,7 +71,7 @@ export const routeOf = (method: string, path: string): ApiRoute | null => {
 const VERBS: readonly ResourceVerb[] = RESOURCE_VERBS;
 
 /** The verb a method is, said of one object: what a sub-resource's route does, and a kind's route of one by its name. */
-const verbOfMethod = (method: RouteMethod): ResourceVerb =>
+const verbOfMethod = (method: RouteMethod) =>
   method === 'GET' ? 'get' : method === 'POST' ? 'create' : method === 'PUT' ? 'update' : method === 'PATCH' ? 'patch' : 'delete';
 
 /**
@@ -79,22 +79,21 @@ const verbOfMethod = (method: RouteMethod): ResourceVerb =>
  * collection `list` and `watch` (every list is watched with `?watch=true`) where it is a `GET`, `create` where it is a `POST`; and of one
  * by its name its method's verb, but `create`, which is the collection's.
  */
-const routeDoes = (route: ApiRoute, verb: ResourceVerb): boolean => {
+const routeDoes = (route: ApiRoute, verb: ResourceVerb) => {
   if (route.sub !== null) return verbOfMethod(route.method) === verb;
   if (!route.item) return route.method === 'GET' ? verb === 'list' || verb === 'watch' : route.method === 'POST' && verb === 'create';
   return route.method !== 'POST' && verbOfMethod(route.method) === verb;
 };
 
 /** The verbs the routes of `kind`'s plural with sub-resource `sub` (null for the kind itself) do, in the order discovery names them. */
-const verbsOf = (routes: readonly ApiRoute[], kind: KindPlural, sub: string | null): ResourceVerb[] =>
+const verbsOf = (routes: readonly ApiRoute[], kind: KindPlural, sub: string | null) =>
   VERBS.flatMap((v) => (routes.some((t) => t.plural === kind.plural && t.sub === sub && routeDoes(t, v)) ? [v] : []));
 
 /** Whether a route of `kind`'s plural is under a namespace, which makes the kind and each of its sub-resources namespaced. */
-const namespacedOf = (routes: readonly ApiRoute[], kind: KindPlural): boolean =>
-  routes.some((t) => t.plural === kind.plural && t.namespaced);
+const namespacedOf = (routes: readonly ApiRoute[], kind: KindPlural) => routes.some((t) => t.plural === kind.plural && t.namespaced);
 
 /** The sub-resource the route at `i` of `routes` is the first of, where a kind has its plural; null for any other route. */
-const subResourceAt = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], t: ApiRoute, i: number): Resource | null => {
+const subResourceAt = (routes: readonly ApiRoute[], kinds: readonly KindPlural[], t: ApiRoute, i: number) => {
   const kind = kinds.find((k) => k.plural === t.plural);
   return kind === undefined || t.sub === null || routes.slice(0, i).some((u) => u.plural === t.plural && u.sub === t.sub)
     ? null
@@ -109,7 +108,7 @@ const subResourceAt = (routes: readonly ApiRoute[], kinds: readonly KindPlural[]
  */
 export const resourcesOf: ResourcesOf = (routes, kinds) =>
   [
-    ...kinds.map((kind): Resource | null => ({
+    ...kinds.map((kind) => ({
       name: kind.plural,
       kind: kind.kind,
       namespaced: namespacedOf(routes, kind),

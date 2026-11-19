@@ -5,10 +5,10 @@
 import { AGENTS_FOLDER, type OutputOwner, refuse, shapesKept, type StepOutput } from '../step/step.ts';
 
 /** Who declares a field: `agent` with its name and schema file, or `step` with its own. */
-const ownerOf = (by: OutputOwner['by'], name: string, output: StepOutput): OutputOwner => ({ by, name, file: output.file });
+const ownerOf = (by: OutputOwner['by'], name: string, output: StepOutput) => ({ by, name, file: output.file });
 
 /** Where a declarer's `output:` line is, as a refusal names it. */
-const declarer = (o: OutputOwner): string =>
+const declarer = (o: OutputOwner) =>
   o.by === 'agent'
     ? `agent ${o.name} (${AGENTS_FOLDER}/${o.name}.md, \`output: ${o.file}\`)`
     : `step ${o.name} (${o.name}.md, \`output: ${o.file}\`)`;
@@ -23,12 +23,7 @@ const declarer = (o: OutputOwner): string =>
  * @param fromAgent The agent's `output:` declaration, undefined where it declares none.
  * @param own The step's own `output:` declaration, undefined where it declares none.
  */
-export function mergedOutput(
-  step: string,
-  agent: string,
-  fromAgent: StepOutput | undefined,
-  own: StepOutput | undefined,
-): StepOutput | undefined {
+export function mergedOutput(step: string, agent: string, fromAgent: StepOutput | undefined, own: StepOutput | undefined) {
   const declaring = own ?? fromAgent;
   if (!declaring) return undefined;
   const sides = [

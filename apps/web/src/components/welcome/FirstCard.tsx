@@ -25,7 +25,7 @@ import {
 } from '@/lib/firstCard';
 
 /** The factory a first card is filed in: the one chosen, else the first with a writable volume, else the first of the store's. */
-const factoryFiledIn = (factories: readonly Factory[], chosen: string | undefined): Factory | undefined => {
+const factoryFiledIn = (factories: readonly Factory[], chosen: string | undefined) => {
   const own = factories.filter((f) => !f.default);
   return own.find((f) => f.name === chosen) ?? own.find((f) => f.worksOn.length > 0) ?? own[0];
 };
@@ -131,7 +131,7 @@ export function FirstCard() {
  * is read, which says its ending step; undefined while it is read. A workflow the factory wires to no one repository is started with none,
  * and the start says the api's refusal.
  */
-function useFirstGates(factory: Factory | undefined, workflow: string | undefined): readonly string[] | undefined {
+function useFirstGates(factory: Factory | undefined, workflow: string | undefined) {
   const on = factory !== undefined && workflow !== undefined && workflow !== FIRST_WORKFLOW ? startRepo(factory, workflow) : undefined;
   const repo = on !== undefined && 'repo' in on ? on.repo : undefined;
   const listed = useQuery({

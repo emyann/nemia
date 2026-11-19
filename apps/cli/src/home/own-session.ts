@@ -9,10 +9,10 @@ import type { OwnSessionOf, SessionEnv, StaleCopiesOf } from '../../contracts/ow
 export type { OwnSession, OwnSessionPlace, SessionFlag, SessionEnv } from '../../contracts/own-session.contract.ts';
 
 /** Whether `inner` is `outer` or a folder under it. */
-const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer + '/');
+const within = (inner: string, outer: string) => inner === outer || inner.startsWith(outer + '/');
 
 /** The environment the session adds: the variable that loads an added folder's memory files, where the person turned them on. */
-const memoryEnv = (on: boolean): SessionEnv => (on ? { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' } : {});
+const memoryEnv = (on: boolean) => (on ? { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' } : {}) satisfies SessionEnv;
 
 /**
  * The person's session in the copy `copy` of a factory's home, `repo` added beside it: refused where one folder holds the other, else

@@ -22,13 +22,13 @@ export type Unswept = { status: string; atRest: boolean; repository: boolean; he
 export type UntakenWhy = 'held' | 'unfrozen';
 
 /** Finished, as the retention reads it: succeeded or cancelled. */
-const finished = (r: Unswept): boolean => r.status === 'succeeded' || r.status === 'cancelled';
+const finished = (r: Unswept) => r.status === 'succeeded' || r.status === 'cancelled';
 
 /** Out of the candidates for a reason the sweep says: finished, a repository's, and not found at rest. */
-const leftOut = (r: Unswept): boolean => finished(r) && r.repository && !r.atRest;
+const leftOut = (r: Unswept) => finished(r) && r.repository && !r.atRest;
 
 /** A hold on a run that succeeded: the one hold that keeps a finished run out of rest. */
-const heldSucceeded = (r: Unswept): boolean => r.status === 'succeeded' && r.held;
+const heldSucceeded = (r: Unswept) => r.status === 'succeeded' && r.held;
 
 const untakenSpec = spec<(run: Unswept) => UntakenWhy | null>({
   ensures: {

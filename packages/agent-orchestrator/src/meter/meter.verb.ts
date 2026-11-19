@@ -9,12 +9,12 @@ import { Context, Effect, Exit, Metric, Option } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { verbOf } from '../engine-verbs/engine-verbs.verb.ts';
 import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
-import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
+import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type PassCost, type Phase } from './meter.ts';
 import { exportedNow, seriesBorn } from '../telemetry/telemetry.store.ts';
 import { boundedAttributes, type DeniedFact, type StepFact, type TimelineFact, type Wait, type WaitFact } from './step.ts';
 
 /** The phase each of the engine's verbs is counted in, where the meter counts it (`ENGINE_VERBS`). */
-const phaseOf = (key: string): Phase | undefined => verbOf(key)?.phase;
+const phaseOf = (key: string) => verbOf(key)?.phase;
 
 type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
 
@@ -22,7 +22,7 @@ type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
  * The runtime's running totals, or undefined for an engine that keeps none (a test's fake).
  * @param e The engine to read the totals of.
  */
-export const ioOf = (e: Engine): Effect.Effect<EngineIo | undefined> => (typeof e.io === 'function' ? e.io() : Effect.succeed(undefined));
+export const ioOf = (e: Engine) => (typeof e.io === 'function' ? e.io() : Effect.succeed(undefined));
 
 /**
  * `program` in a tally of the runtime's own (`Engine.tallied`), so that the totals `ioOf` reads inside it are the program's work alone,
@@ -30,16 +30,16 @@ export const ioOf = (e: Engine): Effect.Effect<EngineIo | undefined> => (typeof 
  * @param e The engine whose tally the program runs in.
  * @param program The program whose work alone the totals are to count.
  */
-export const talliedIn = <A, E, R>(e: Engine, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-  typeof e.tallied === 'function' ? e.tallied(program) : program;
+export const talliedIn = <A, E, R>(e: Engine, program: Effect.Effect<A, E, R>) =>
+  (typeof e.tallied === 'function' ? e.tallied(program) : program) satisfies Effect.Effect<A, E, R> as Effect.Effect<A, E, R>;
 
 /**
  * Each harness's observes between two of the runtime's totals, for a harness observed in between; `unread` only where some observe could
  * not read, and read as none from totals that carry no count of it.
  */
-const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined): Record<string, HarnessCost> =>
+const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined) =>
   Object.fromEntries(
-    Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
+    Object.entries(after?.observed ?? {}).flatMap(([name, o]) => {
       const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
       const unread = (o.unread ?? 0) - (b.unread ?? 0);
       return o.calls > b.calls
@@ -64,7 +64,7 @@ const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefin
  * started, with the time its harnesses' observes took moved to `observe`. A pass observes its harnesses at once, so its observe took the
  * slowest's time; a view observes the one harness of its task.
  */
-const engineCall = <A, E>(e: Engine, verb: string, phase: Phase, call: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+const engineCall = <A, E>(e: Engine, verb: string, phase: Phase, call: Effect.Effect<A, E>) =>
   Effect.gen(function* () {
     const before = yield* asideEffect(ioOf(e));
     return yield* withinEffect(phase, call).pipe(
@@ -89,7 +89,7 @@ const engineCall = <A, E>(e: Engine, verb: string, phase: Phase, call: Effect.Ef
  * The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is.
  * @param e The engine to count the verbs of.
  */
-export const meteredEngine = (e: Engine): Engine =>
+export const meteredEngine = (e: Engine) =>
   new Proxy(e, {
     get(target, key, receiver) {
       const value = Reflect.get(target, key, receiver) as unknown;
@@ -112,7 +112,7 @@ export const meteredEngine = (e: Engine): Engine =>
  * @param before The runtime's totals before the pass, or undefined for an engine that keeps none.
  * @param after The runtime's totals after the pass, or undefined for an engine that keeps none.
  */
-export const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined): PassCost =>
+export const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined) =>
   passCost({
     at: new Date().toISOString(),
     ms,
@@ -227,7 +227,7 @@ export const WAIT_SPAN_KEYS = ['run', 'try'] as const satisfies ReadonlyArray<ke
 const WAIT_METRICS = { queue: STEP_METRICS.queue, check: STEP_METRICS.check, gate: STEP_METRICS.gate } as const;
 
 /** A time in ms since the epoch, as a span's clock reads it: ns. */
-const nanos = (at: string): bigint => BigInt(Date.parse(at)) * 1_000_000n;
+const nanos = (at: string) => BigInt(Date.parse(at)) * 1_000_000n;
 
 /** The span each call a harness denied a step's session is traced as, its name the one a dashboard counts. */
 export const DENIED_SPAN = 'step.denied';
@@ -276,14 +276,14 @@ export const rootSpan = (
  * try (`WAIT_SPAN_KEYS`) beside its step's attributes: a wait spans passes, so no pass's span is its parent. Its histogram is
  * `writesOf`'s.
  */
-const recordWait = (fact: WaitFact): Effect.Effect<void> =>
+const recordWait = (fact: WaitFact) =>
   rootSpan(WAIT_SPANS[fact.wait], fact.from, fact.to, Object.fromEntries(WAIT_SPAN_KEYS.map((key) => [key, fact[key]])), fact.attributes);
 
 /**
  * One denied call into a span of its own (`DENIED_SPAN`), a root of its own trace, at the moment its attempt ended, carrying its run, its
  * task, its tool and its call (`DENIED_SPAN_KEYS`) beside its step's labels; into no metric, which could carry none of the four.
  */
-const recordDenied = (fact: DeniedFact): Effect.Effect<void> =>
+const recordDenied = (fact: DeniedFact) =>
   rootSpan(DENIED_SPAN, fact.at, fact.at, Object.fromEntries(DENIED_SPAN_KEYS.map((key) => [key, fact[key]])), fact.attributes);
 
 /** The span each number of a finished run's timeline is traced as, its name the one a dashboard averages. */
@@ -299,37 +299,34 @@ export const TIMELINE_SPAN_KEYS = ['run', 'try', 'of', 'row', 'part', 'value'] a
  * One number of a run's timeline into a span of its own (`TIMELINE_SPAN`), a root of its own trace and of no length, at the moment it is
  * recorded, carrying what the fact has of `TIMELINE_SPAN_KEYS` beside its attributes; into no metric, which could carry no row.
  */
-const recordTimeline = (fact: TimelineFact): Effect.Effect<void> =>
+const recordTimeline = (fact: TimelineFact) =>
   Effect.suspend(() => {
     const now = new Date().toISOString();
     const own = Object.fromEntries(TIMELINE_SPAN_KEYS.flatMap((key) => (fact[key] === undefined ? [] : [[key, fact[key]]])));
     return rootSpan(TIMELINE_SPAN, now, now, own, fact.attributes);
   });
 
-/** One value a fact puts into one series: the series, to be born before it (`seriesBorn`), and the value put into it (`said`). */
-type Write = { series: Metric.Metric<never, unknown>; said: Effect.Effect<void> };
-
 /** `value` into the counter `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
-const counted = (metric: Metric.Counter<number>, attributes: Record<string, string>, value: number): Write => {
+const counted = (metric: Metric.Counter<number>, attributes: Record<string, string>, value: number) => {
   const series = Metric.withAttributes(metric, boundedAttributes(attributes));
   return { series, said: Metric.update(series, value) };
 };
 
 /** `value` into the histogram `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
-const measured = (metric: Metric.Histogram<number>, attributes: Record<string, string>, value: number): Write => {
+const measured = (metric: Metric.Histogram<number>, attributes: Record<string, string>, value: number) => {
   const series = Metric.withAttributes(metric, boundedAttributes(attributes));
   return { series, said: Metric.update(series, value) };
 };
 
 /** A step's attributes without its outcome: a task is counted once, whatever its tries come to. */
-const withoutOutcome = ({ outcome: _, ...keys }: Record<string, string>): Record<string, string> => keys;
+const withoutOutcome = ({ outcome: _, ...keys }: Record<string, string>) => keys;
 
 /**
  * Each value `fact` puts into the step's metrics (`STEP_METRICS`), the one account of them that both a series' birth and its value are
  * read off: a session's tally and time, and its cost and tokens where measured; a check's or a round's count; a wait's time
  * (`WAIT_METRICS`). None for a denied call and a number of a run's timeline, which are spans alone.
  */
-function writesOf(fact: StepFact): Write[] {
+function writesOf(fact: StepFact) {
   const { attributes } = fact;
   if (fact.metric === 'denied' || fact.metric === 'timeline') return [];
   if (fact.metric === 'wait') return [measured(WAIT_METRICS[fact.wait], attributes, fact.ms)];
@@ -348,7 +345,7 @@ function writesOf(fact: StepFact): Write[] {
 }
 
 /** The span of a fact that has one: a wait's (`recordWait`), a denied call's (`recordDenied`), a timeline number's (`recordTimeline`). */
-function spanOf(fact: StepFact): Effect.Effect<void> {
+function spanOf(fact: StepFact) {
   if (fact.metric === 'wait') return recordWait(fact);
   if (fact.metric === 'denied') return recordDenied(fact);
   return fact.metric === 'timeline' ? recordTimeline(fact) : Effect.void;

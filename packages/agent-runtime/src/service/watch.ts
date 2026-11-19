@@ -14,9 +14,8 @@ import type { EngineShape } from './engine.ts';
  * @param subscribe The store's signal of a write, handed a callback and answering its unsubscribe; undefined for a store that cannot
  *   signal, read on the interval alone.
  */
-export const watchOf =
-  (feed: EngineShape['feed'], subscribe?: (onChange: () => void) => () => void): EngineShape['watch'] =>
-  ({ onEntry, from = 0, intervalMs = 1_000, onError }) =>
+export const watchOf = (feed: EngineShape['feed'], subscribe?: (onChange: () => void) => () => void) =>
+  (({ onEntry, from = 0, intervalMs = 1_000, onError }) =>
     Effect.sync(() => {
       let cursor = from;
       let stopped = false;
@@ -66,4 +65,4 @@ export const watchOf =
           unsubscribe?.();
         },
       };
-    });
+    })) satisfies EngineShape['watch'];

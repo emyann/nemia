@@ -59,7 +59,7 @@ export const copyAgent = Effect.fn('copyAgent')(function* ({
 });
 
 /** A skill's version where the Skill door holds one at `name` in the folder of skills `at`, else null. */
-const heldVersion = (there: DefinitionThere): string | null => (there.kind === 'held' ? there.version : null);
+const heldVersion = (there: DefinitionThere) => (there.kind === 'held' ? there.version : null);
 
 /**
  * The copy judged whole before a byte is written (`copyAgent`): its source, its skills and its parts, or the refusal of it. Each skill is
@@ -104,7 +104,7 @@ const judgedCopy = Effect.fnUntraced(function* (file: string, as: string | undef
 const writeCopy = (source: Source, skills: readonly SourceSkill[], parts: readonly Part[], home: string) =>
   Effect.gen(function* () {
     const { name } = source.draft;
-    const held = (part: string): boolean => parts.some((p) => p.part === part && p.held);
+    const held = (part: string) => parts.some((p) => p.part === part && p.held);
     const copied: string[] = [];
     const made: string[] = [];
     const { skills: skillDoor } = yield* SkillDoor;

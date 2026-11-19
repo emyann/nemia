@@ -72,45 +72,44 @@ export type NemiaAct =
   | 'answer';
 
 /** Her task is open: filed, not settled, and no stop asked. */
-const isOpen = (t: HerTask | undefined): boolean => t !== undefined && !t.settled && !t.stopRequested;
+const isOpen = (t: HerTask | undefined) => t !== undefined && !t.settled && !t.stopRequested;
 
 /** Someone wants her: a factory above `manual`, or a word of the person's in her chat waiting for her. */
-const wanted = (k: Keeping): boolean => k.above || k.owed === true || k.answered === true;
+const wanted = (k: Keeping) => k.above || k.owed === true || k.answered === true;
 
 /**
  * A new task of hers may be filed: none is open, she is wanted, and either she never had one, the last was put to rest by the keeper,
  * or the person spoke after it ended with no rest.
  */
-const mayFile = (k: Keeping, t: HerTask | undefined): boolean =>
+const mayFile = (k: Keeping, t: HerTask | undefined) =>
   !isOpen(t) && wanted(k) && (t === undefined || k.rested === true || k.heard === true);
 
 /** Her subscription tells her current task, with her floor and her selectors. */
-const proper = (k: Keeping, s: HerSubscription | undefined): boolean =>
+const proper = (k: Keeping, s: HerSubscription | undefined) =>
   s !== undefined && k.task !== undefined && s.task === k.task && s.scoped && s.selected;
 
 /** She is operating: her open task, not put to rest, while some factory is above `manual`. */
-const operating = (k: Keeping, t: HerTask | undefined): boolean => isOpen(t) && k.above && k.rested !== true;
+const operating = (k: Keeping, t: HerTask | undefined) => isOpen(t) && k.above && k.rested !== true;
 
 /** The conversation is quiet: her session idle long enough since the last word, and nothing of the person's or hers waiting. */
-const quietAll = (k: Keeping): boolean =>
+const quietAll = (k: Keeping) =>
   k.quiet === true && k.idle === true && k.owed !== true && k.answered !== true && k.asking !== true && k.closing !== true;
 
 /** Her open task is to be put to rest: one the keeper already marked rested, or a quiet conversation at `manual`. */
-const restDue = (k: Keeping, t: HerTask | undefined): boolean => isOpen(t) && (k.rested === true || (!k.above && quietAll(k)));
+const restDue = (k: Keeping, t: HerTask | undefined) => isOpen(t) && (k.rested === true || (!k.above && quietAll(k)));
 
 /** Her session is one the keeper speaks to: open, not being put to rest, and, while operating, subscribed as hers. */
-const speaking = (k: Keeping, t: HerTask | undefined, s: HerSubscription | undefined): boolean =>
+const speaking = (k: Keeping, t: HerTask | undefined, s: HerSubscription | undefined) =>
   isOpen(t) && !restDue(k, t) && (!k.above || proper(k, s));
 
 /** Her task ended with no rest of the keeper's, and the person has said nothing since. */
-const stoppedUnheard = (k: Keeping, t: HerTask | undefined): boolean =>
-  t !== undefined && !isOpen(t) && k.rested !== true && k.heard !== true;
+const stoppedUnheard = (k: Keeping, t: HerTask | undefined) => t !== undefined && !isOpen(t) && k.rested !== true && k.heard !== true;
 
 /** Whether `out` holds the act `a`. */
-const has = (out: readonly NemiaAct[], a: NemiaAct): boolean => out.includes(a);
+const has = (out: readonly NemiaAct[], a: NemiaAct) => out.includes(a);
 
 /** Whether `a` comes before `b` in `out`, both being there: the first of the two in `out` is `a`. */
-const before = (out: readonly NemiaAct[], a: NemiaAct, b: NemiaAct): boolean => out.filter((x) => x === a || x === b).at(0) === a;
+const before = (out: readonly NemiaAct[], a: NemiaAct, b: NemiaAct) => out.filter((x) => x === a || x === b).at(0) === a;
 
 const nemiaDueSpec = spec<(keeping: Keeping, task: HerTask | undefined, subscribed: HerSubscription | undefined) => NemiaAct[]>({
   ensures: {

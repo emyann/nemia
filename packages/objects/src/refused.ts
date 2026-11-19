@@ -26,19 +26,19 @@ export interface RefusedPlace {
 
 const EXPECTED = 'Expected ';
 
-const withoutExpected = (text: string): string => (text.startsWith(EXPECTED) ? text.slice(EXPECTED.length) : text);
+const withoutExpected = (text: string) => (text.startsWith(EXPECTED) ? text.slice(EXPECTED.length) : text);
 
-const definedOnly = (ast: SchemaAST.AST): SchemaAST.AST => {
+const definedOnly = (ast: SchemaAST.AST) => {
   if (!SchemaAST.isUnion(ast)) return ast;
   const kept = ast.types.filter((member) => !SchemaAST.isUndefined(member));
   return kept.length === ast.types.length ? ast : new SchemaAST.Union(kept, ast.options);
 };
 
-const typeOf = (ast: SchemaAST.AST): string => withoutExpected(SchemaIssue.defaultLeafHook(new SchemaIssue.InvalidType(definedOnly(ast))));
+const typeOf = (ast: SchemaAST.AST) => withoutExpected(SchemaIssue.defaultLeafHook(new SchemaIssue.InvalidType(definedOnly(ast))));
 
-const stringOf = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+const stringOf = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
-const declared = (issue: SchemaIssue.Issue): string | undefined => {
+const declared = (issue: SchemaIssue.Issue) => {
   switch (issue._tag) {
     case 'Pointer':
     case 'Composite':
@@ -59,7 +59,7 @@ const declared = (issue: SchemaIssue.Issue): string | undefined => {
   }
 };
 
-const expectedOf = (issue: SchemaIssue.Issue): string => {
+const expectedOf = (issue: SchemaIssue.Issue) => {
   switch (issue._tag) {
     case 'InvalidType':
     case 'AnyOf':
@@ -80,7 +80,7 @@ const expectedOf = (issue: SchemaIssue.Issue): string => {
   }
 };
 
-const placeOf = (issue: SchemaIssue.Issue, path: readonly PropertyKey[], message: string | undefined): RefusedPlace => ({
+const placeOf = (issue: SchemaIssue.Issue, path: readonly PropertyKey[], message: string | undefined) => ({
   path,
   _tag: issue._tag,
   ...(SchemaIssue.hasInput(issue) ? { input: issue.input } : {}),
@@ -88,6 +88,7 @@ const placeOf = (issue: SchemaIssue.Issue, path: readonly PropertyKey[], message
   expected: expectedOf(issue),
 });
 
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const walk = (issue: SchemaIssue.Issue, path: readonly PropertyKey[], filter?: SchemaIssue.Filter): RefusedPlace[] => {
   switch (issue._tag) {
     case 'Filter':
@@ -112,4 +113,4 @@ const walk = (issue: SchemaIssue.Issue, path: readonly PropertyKey[], filter?: S
  * and what was expected. Decode with `{ reportInput: true }` for each place to hold its `input`.
  * @param issue The issue of a schema's refusal (`SchemaError.issue`).
  */
-export const refusedIn = (issue: SchemaIssue.Issue): readonly RefusedPlace[] => walk(issue, []);
+export const refusedIn = (issue: SchemaIssue.Issue) => walk(issue, []);

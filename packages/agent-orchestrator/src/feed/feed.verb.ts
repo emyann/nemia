@@ -56,7 +56,7 @@ export const FeedHub = Context.Reference<PubSub.PubSub<FeedPublished> | undefine
  * reader, and a reader that takes nothing costs at most `capacity` lines of memory, the oldest dropped first.
  * @param capacity The most lines the hub holds for a reader that lags, 1024 where not given.
  */
-export const feedHubLayer = (capacity = 1024): Layer.Layer<never> =>
+export const feedHubLayer = (capacity = 1024) =>
   Layer.effect(FeedHub, Effect.acquireRelease(PubSub.sliding<FeedPublished>(capacity), PubSub.shutdown));
 
 /** The live readers of the feed in this process, each counted while its stream is open (`followFeed`). */
@@ -92,13 +92,13 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
  * the reason a machine selects on,
  * how serious it is, and its word.
  */
-const logged = (line: FeedLine): Effect.Effect<void> => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
+const logged = (line: FeedLine) => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
 
 /**
  * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon, its store or its factory, its reason,
  * type, try and word.
  */
-const lineFields = (line: FeedLine): Record<string, unknown> => ({
+const lineFields = (line: FeedLine) => ({
   ...line.labels,
   ...(isRunLine(line)
     ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) }
@@ -119,7 +119,7 @@ const lineFields = (line: FeedLine): Record<string, unknown> => ({
  * and Warning for `blocked`. One the run could not read is logged at Warning, its message what came back (`said`) and why it was refused
  * (`error`, `parseCloseout`'s). This record is the line's one record: the feed's file keeps the line alone, and never the closeout.
  */
-const closeoutLogged = (line: FeedLine, c: FeedCloseout): Effect.Effect<void> => {
+const closeoutLogged = (line: FeedLine, c: FeedCloseout) => {
   const fields = lineFields(line);
   if ('error' in c.read) return Effect.logWarning(JSON.stringify({ error: c.read.error, said: c.said })).pipe(Effect.annotateLogs(fields));
   const message = JSON.stringify(c.read);
@@ -131,15 +131,13 @@ const closeoutLogged = (line: FeedLine, c: FeedCloseout): Effect.Effect<void> =>
  * Logs each line a pass wrote: a `closed out` line as the closeout the pass read beside it (`closeoutLogged`, off `now`'s `closeouts` by
  * its run, step and try), every other as its words (`logged`).
  */
-const loggedOf =
-  (now: ReadonlyMap<string, FeedWords>) =>
-  (line: FeedLine): Effect.Effect<void> => {
-    const closeout =
-      isRunLine(line) && line.reason === 'ClosedOut'
-        ? now.get(line.run)?.closeouts?.find((c) => c.step === line.step && c.try === line.try)
-        : undefined;
-    return closeout ? closeoutLogged(line, closeout) : logged(line);
-  };
+const loggedOf = (now: ReadonlyMap<string, FeedWords>) => (line: FeedLine) => {
+  const closeout =
+    isRunLine(line) && line.reason === 'ClosedOut'
+      ? now.get(line.run)?.closeouts?.find((c) => c.step === line.step && c.try === line.try)
+      : undefined;
+  return closeout ? closeoutLogged(line, closeout) : logged(line);
+};
 
 /**
  * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put
@@ -216,7 +214,7 @@ type Woken = Effect.Effect<readonly [Following, Followed[]], Refusal>;
  * the read before it failed. A refusal (exit 2, the feed cut under the cursor) fails the stream; any other failure is said once, and the
  * next wake reads again.
  */
-const readOn = (at: Following): Woken =>
+const readOn = (at: Following) =>
   Metric.update(FEED_FOLLOW_READS, 1).pipe(
     Effect.andThen(Effect.flatMap(FeedDoor, (door) => door.lines.read(at.cursor))),
     Effect.matchCauseEffect({
@@ -241,7 +239,7 @@ const readOn = (at: Following): Woken =>
           ],
         ] as const),
     }),
-  );
+  ) satisfies Woken as Woken;
 
 /**
  * One wake of a reader at `at`: an item of the hub (`published`), or a beat (undefined). An item that ends at or before the cursor was
@@ -250,13 +248,16 @@ const readOn = (at: Following): Woken =>
  * (`FEED_FOLLOW_BEATS`): the file is read only when its size is not the cursor, so a cut (smaller) is refused by the read. A reader whose
  * last read failed reads on every wake.
  */
-const wake = (at: Following, published: FeedPublished | undefined): Woken => {
-  if (at.failing) return readOn(at);
+const wake = (at: Following, published: FeedPublished | undefined) => {
+  if (at.failing) return readOn(at) satisfies Woken;
   if (published) {
-    if (published.to <= at.cursor) return Effect.succeed([at, []] as const);
+    if (published.to <= at.cursor) return Effect.succeed([at, []] as const) satisfies Woken;
     if (published.from === at.cursor)
-      return Effect.succeed([{ ...at, cursor: published.to }, [{ kind: 'line', line: published.line, cursor: published.to }]] as const);
-    return readOn(at);
+      return Effect.succeed([
+        { ...at, cursor: published.to },
+        [{ kind: 'line', line: published.line, cursor: published.to }],
+      ] as const) satisfies Woken;
+    return readOn(at) satisfies Woken;
   }
   return Metric.update(FEED_FOLLOW_BEATS, 1).pipe(
     Effect.andThen(Effect.flatMap(FeedDoor, (door) => door.lines.end())),
@@ -264,19 +265,19 @@ const wake = (at: Following, published: FeedPublished | undefined): Woken => {
       onFailure: () => readOn(at),
       onSuccess: (end) => ((end?.cursor ?? 0) === at.cursor ? Effect.succeed([at, []] as const) : readOn(at)),
     }),
-  );
+  ) satisfies Woken as Woken;
 };
 
 /**
  * One take of a reader at `at`: the items of the hub taken at once, or a beat, each woken in order (`wake`), what each hands on handed on
  * together.
  */
-const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | undefined>): Woken =>
+const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | undefined>) =>
   Effect.reduce(
     taken,
-    (): readonly [Following, Followed[]] => [at, []],
+    () => [at, []] satisfies readonly [Following, Followed[]] as readonly [Following, Followed[]],
     ([now, handed], published) => Effect.map(wake(now, published), ([next, more]) => [next, [...handed, ...more]] as const),
-  );
+  ) satisfies Woken as Woken;
 
 /**
  * The feed from `from`, live: every line after the cursor, then each as it is written, once each and in order, each with the cursor just
@@ -294,7 +295,7 @@ const wakeAll = (at: Following, taken: NonEmptyReadonlyArray<FeedPublished | und
  * cut under the cursor, truncated below it or replaced, whether before the stream opens or while it is open.
  * @param from The cursor to read from, in bytes of the feed.
  */
-export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duration.Input } = {}): Stream.Stream<Followed, Refusal> =>
+export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duration.Input } = {}) =>
   Stream.unwrap(
     Effect.gen(function* () {
       const hub = yield* FeedHub;
@@ -307,11 +308,13 @@ export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duratio
         Stream.drop(1),
         Stream.map(() => undefined),
       );
-      const live = Stream.merge(published, beats).pipe(Stream.mapAccumArrayEffect((): Following => following, wakeAll));
+      const live = Stream.merge(published, beats).pipe(
+        Stream.mapAccumArrayEffect(() => following satisfies Following as Following, wakeAll),
+      );
       return Stream.concat(Stream.fromIterable(caught), live).pipe(
         Stream.mapArrayEffect((chunk) =>
           Metric.update(FEED_FOLLOW_LINES, chunk.filter((f) => f.kind === 'line').length).pipe(Effect.as(chunk)),
         ),
       );
     }),
-  );
+  ) satisfies Stream.Stream<Followed, Refusal> as Stream.Stream<Followed, Refusal>;

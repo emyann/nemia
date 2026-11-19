@@ -13,7 +13,6 @@ import { ADDED_FOLDER_READS } from 'agent-runtime/vocabulary';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
-import type { StartFound } from '../filed/filed.ts';
 import { runsDir } from '../record/record.store.ts';
 import { carriedFilesRoot, homeFilesRoot, workflowFilesRoot } from '../record/places.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
@@ -26,7 +25,7 @@ import { CARRIED_FOLDER, HOME_FOLDER } from '../step/step.ts';
  * @param run The run, by its id.
  * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
-export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => workflowFilesRoot(runsDir(home), run.id, hex);
+export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string) => workflowFilesRoot(runsDir(home), run.id, hex);
 
 /**
  * The run's own copies of the carried folder, `runs/<id>/carried`, and with `hex` the one copy under that digest (`Run.carriedFiles`):
@@ -35,7 +34,7 @@ export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: strin
  * @param run The run, by its id.
  * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
-export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => carriedFilesRoot(runsDir(home), run.id, hex);
+export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string) => carriedFilesRoot(runsDir(home), run.id, hex);
 
 /**
  * The run's own copies of its factory's home, `runs/<id>/home`, and with `hex` the one copy under that digest (`Run.homeFiles`): the folder
@@ -45,20 +44,20 @@ export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string
  * @param run The run, by its id.
  * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
-export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => homeFilesRoot(runsDir(home), run.id, hex);
+export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string) => homeFilesRoot(runsDir(home), run.id, hex);
 
 /**
  * The home folder of a factory's tree (`tree`), `home/` in it, where its template gave one.
  * @param tree The factory's tree, or undefined for a factory made by hand, which has none.
  */
-export const homeDirOf = (tree: string | undefined): string | undefined => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
+export const homeDirOf = (tree: string | undefined) => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
 
 /**
  * Every file of the factory's home in its tree (`homeDirOf`), read and refused as `workflowFilesOf` reads and refuses them; undefined
  * where the factory has no tree or its tree no `home/`.
  * @param tree The factory's tree, or undefined for a factory made by hand.
  */
-export const homeFilesOf = (tree: string | undefined): WorkflowFile[] | undefined => {
+export const homeFilesOf = (tree: string | undefined) => {
   const dir = homeDirOf(tree);
   return dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? workflowFilesOf(dir) : undefined;
 };
@@ -70,7 +69,7 @@ export const homeFilesOf = (tree: string | undefined): WorkflowFile[] | undefine
  * @param run The run, by its id.
  * @param tree The factory's tree, or undefined for a factory made by hand.
  */
-export function freezeHomeFiles(home: string, run: Pick<Run, 'id'>, tree: string | undefined): string | undefined {
+export function freezeHomeFiles(home: string, run: Pick<Run, 'id'>, tree: string | undefined) {
   const files = homeFilesOf(tree);
   return files === undefined ? undefined : freezeInto(home, files, run, 'home');
 }
@@ -79,7 +78,7 @@ export function freezeHomeFiles(home: string, run: Pick<Run, 'id'>, tree: string
  * The carried folder of the workflow at `workflowDir`: `carried/` beside it, the files the workflows of its folder share.
  * @param workflowDir The workflow's folder.
  */
-export const carriedDirOf = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), CARRIED_FOLDER);
+export const carriedDirOf = (workflowDir: string) => path.join(path.dirname(path.resolve(workflowDir)), CARRIED_FOLDER);
 
 /** A file of a workflow folder: its path from the folder with `/` between parts, its permission bits, its bytes. */
 export type WorkflowFile = { path: string; mode: number; bytes: Uint8Array };
@@ -90,9 +89,9 @@ export type WorkflowFile = { path: string; mode: number; bytes: Uint8Array };
  * that is neither a file nor a folder.
  * @param dir The workflow folder to read.
  */
-export function workflowFilesOf(dir: string): WorkflowFile[] {
+export function workflowFilesOf(dir: string) {
   const files: WorkflowFile[] = [];
-  const walk = (at: string, rel: string): void => {
+  const walk = (at: string, rel: string) => {
     for (const name of fs.readdirSync(at).sort()) {
       const full = path.join(at, name);
       const relPath = rel ? `${rel}/${name}` : name;
@@ -116,7 +115,7 @@ export function workflowFilesOf(dir: string): WorkflowFile[] {
  * No bound on a path's length, as an archive's has: a folder any run can be started on has a digest.
  * @param files The folder's files, sorted by path (`workflowFilesOf`).
  */
-export function workflowFilesDigest(files: readonly WorkflowFile[]): string {
+export function workflowFilesDigest(files: readonly WorkflowFile[]) {
   const hash = createHash('sha256');
   for (const file of files) {
     hash.update(`${file.path}\0${(file.mode & 0o555).toString(8)}\0${file.bytes.length}\0`);
@@ -134,7 +133,7 @@ export function workflowFilesDigest(files: readonly WorkflowFile[]): string {
  * @param run The run, by its id.
  * @param dir The workflow folder to copy.
  */
-export const freezeWorkflowFiles = (home: string, run: Pick<Run, 'id'>, dir: string): string =>
+export const freezeWorkflowFiles = (home: string, run: Pick<Run, 'id'>, dir: string) =>
   freezeInto(home, workflowFilesOf(dir), run, 'workflow');
 
 /**
@@ -144,7 +143,7 @@ export const freezeWorkflowFiles = (home: string, run: Pick<Run, 'id'>, dir: str
  * @param run The run, by its id.
  * @param workflowDir The workflow's folder, beside which the carried folder lies.
  */
-export function freezeCarriedFiles(home: string, run: Pick<Run, 'id'>, workflowDir: string): string | undefined {
+export function freezeCarriedFiles(home: string, run: Pick<Run, 'id'>, workflowDir: string) {
   const files = carriedFilesOf(workflowDir);
   return files === undefined ? undefined : freezeInto(home, files, run, 'carried');
 }
@@ -154,7 +153,7 @@ export function freezeCarriedFiles(home: string, run: Pick<Run, 'id'>, workflowD
  * undefined where no such folder is there.
  * @param workflowDir The workflow's folder, beside which the carried folder lies.
  */
-export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined => {
+export const carriedFilesOf = (workflowDir: string) => {
   const dir = carriedDirOf(workflowDir);
   return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? workflowFilesOf(dir) : undefined;
 };
@@ -163,7 +162,7 @@ export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined 
  * Copies `files`, a folder as read, into the run's copies of its workflow folder, of its carried files or of its home (`which`), under its
  * digest, as `freezeWorkflowFiles` says; answers the hex.
  */
-function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried' | 'home'): string {
+function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried' | 'home') {
   const hex = workflowFilesDigest(files);
   const parent =
     which === 'workflow' ? workflowFilesDir(home, run) : which === 'carried' ? carriedFilesDir(home, run) : homeFilesDir(home, run);
@@ -196,11 +195,7 @@ function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run,
  * @param run The run: its frozen home, its mounts and its volumes.
  * @param workspace The step's workspace.
  */
-export const startFoundAt = (
-  home: string,
-  run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>,
-  workspace: string,
-): { start?: StartFound } => {
+export const startFoundAt = (home: string, run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>, workspace: string) => {
   if (run.homeFiles === undefined) return {};
   const at = homeFilesDir(home, run, run.homeFiles);
   const folders = [at, workspace, ...(run.mounts ?? []).map((m) => m.path), ...(run.volumes ?? []).map((m) => m.path)];
@@ -218,7 +213,7 @@ export const startFoundAt = (
  * `SKILL.md`, sorted, once each; none where it has none or cannot be read.
  * @param folder The folder.
  */
-const projectSkillsIn = (folder: string): string[] => {
+const projectSkillsIn = (folder: string) => {
   const names = new Set<string>();
   for (const reads of Object.values(ADDED_FOLDER_READS)) {
     const dir = path.join(folder, ...reads.skills);

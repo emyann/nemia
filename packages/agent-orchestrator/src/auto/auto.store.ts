@@ -80,10 +80,10 @@ export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; di
  * The folder of `<store>/auto/`, under the store `home`.
  * @param home The store's root.
  */
-export const policyDir = (home: string): string => path.join(home, POLICY_FOLDER);
+export const policyDir = (home: string) => path.join(home, POLICY_FOLDER);
 
 /** `agent`'s name, refused (`Invalid`) where it is no agent's. */
-function named(agent: string): string {
+function named(agent: string) {
   const bad = agentNameRefusal(agent);
   if (bad) throw new Invalid({ message: bad });
   return agent;
@@ -94,24 +94,24 @@ function named(agent: string): string {
  * @param home The store's root.
  * @param agent The agent's name.
  */
-export const confirmedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.json`);
+export const confirmedFile = (home: string, agent: string) => path.join(policyDir(home), `${named(agent)}.json`);
 
 /**
  * The file `agent`'s proposals are kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's.
  * @param home The store's root.
  * @param agent The agent's name.
  */
-export const proposedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.proposed.json`);
+export const proposedFile = (home: string, agent: string) => path.join(policyDir(home), `${named(agent)}.proposed.json`);
 
 /**
  * The digest of the words of a custom instruction, or null for none: what a proposal is stale against once the words change.
  * @param words The custom instruction's words; undefined where there are none.
  */
-export const digestOf = (words: string | undefined): string | null =>
+export const digestOf = (words: string | undefined) =>
   words === undefined ? null : createHash('sha256').update(words).digest('hex').slice(0, 16);
 
 /** A rule as decoded, its optional keys left out where absent. */
-const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): PolicyRule =>
+const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>) =>
   rule.answer === APPROVE_PROPOSAL
     ? {
         id: rule.id,
@@ -134,7 +134,7 @@ const ruleOf = (rule: Schema.Schema.Type<typeof RuleSchema>): PolicyRule =>
       };
 
 /** The JSON in `file`, or undefined where no file is there; refused (`Invalid`), naming `fix`, where it is no JSON. */
-function jsonIn(file: string, fix: string): unknown {
+function jsonIn(file: string, fix: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -148,13 +148,13 @@ function jsonIn(file: string, fix: string): unknown {
 }
 
 /** The refusal of `raw`, read from `file`, that `schema` refused: its first wrong field, and `fix`. */
-function unread(file: string, raw: unknown, schema: Schema.ConstraintDecoder<unknown>, fix: string): Invalid {
+function unread(file: string, raw: unknown, schema: Schema.ConstraintDecoder<unknown>, fix: string) {
   const { path: at, words } = firstRefusal(schema, raw);
   return new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
 }
 
 /** Writes `value` to `file` whole, through a hidden file renamed over it. */
-function jsonWritten(file: string, value: unknown): void {
+function jsonWritten(file: string, value: unknown) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, `${JSON.stringify(value)}\n`);
 }
@@ -165,7 +165,7 @@ function jsonWritten(file: string, value: unknown): void {
  * @param home The store's root.
  * @param agent The agent's name.
  */
-export function readConfirmed(home: string, agent: string): Confirmed | undefined {
+export function readConfirmed(home: string, agent: string) {
   const file = confirmedFile(home, agent);
   const fix = `it is yours, written by nemia policy confirm and nemia policy rm alone: move it aside, and confirm the rules again`;
   const raw = jsonIn(file, fix);
@@ -180,7 +180,7 @@ export function readConfirmed(home: string, agent: string): Confirmed | undefine
  * @param home The store's root.
  * @param agent The agent's name.
  */
-export function readProposed(home: string, agent: string): Proposed | undefined {
+export function readProposed(home: string, agent: string) {
   const fix = `propose again with nemia policy propose ${agent} --file <path>`;
   const file = proposedFile(home, agent);
   const raw = jsonIn(file, fix);
@@ -197,7 +197,7 @@ export function readProposed(home: string, agent: string): Proposed | undefined 
  * @param agent The agent's name.
  * @param proposed What it proposes: its rules and its guidance.
  */
-export function writeProposed(home: string, agent: string, proposed: Proposed): void {
+export function writeProposed(home: string, agent: string, proposed: Proposed) {
   jsonWritten(proposedFile(home, agent), proposed);
 }
 
@@ -212,7 +212,7 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
  * @param words The rule's words as the person read them.
  * @param now When it is confirmed, the list's `since`.
  */
-export function confirmRule(home: string, agent: string, id: string, words: string, now: Date): Confirmed {
+export function confirmRule(home: string, agent: string, id: string, words: string, now: Date) {
   const rule = id === DEFAULT_ID ? DEFAULT_POLICY : readProposed(home, agent)?.rules.find((r) => r.id === id);
   if (rule === undefined)
     throw new Missing({
@@ -240,7 +240,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
  * @param id The rule's id.
  * @param now When it is dropped, the list's `since`.
  */
-export function dropRule(home: string, agent: string, id: string, now: Date): Confirmed {
+export function dropRule(home: string, agent: string, id: string, now: Date) {
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_POLICY];
   if (!rules.some((r) => r.id === id))
     throw new Missing({

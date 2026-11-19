@@ -24,7 +24,7 @@ export const CostLineRmInput = Schema.Struct({ factory: Schema.String, workflow:
 export type CostLineRmInput = typeof CostLineRmInput.Type;
 
 /** The default factory, refused before anything is read: it offers no workflow of its own and starts no run. */
-const notDefault = (factory: string): Effect.Effect<void, Invalid> =>
+const notDefault = (factory: string) =>
   factory === DEFAULT_NAMESPACE ? Effect.fail(new Invalid({ message: defaultFactoryRefusal('cost-line') })) : Effect.void;
 
 /** What a set answers: the file written, the factory, the workflow and its line, and the line it replaced, or null. */

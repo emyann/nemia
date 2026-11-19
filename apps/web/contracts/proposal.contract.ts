@@ -32,7 +32,7 @@ export type ProposalOffersOf = Implementation<typeof proposalOffersSpec>;
 export type ProposalOrderFacts = { readonly waiting: boolean; readonly at: number };
 
 /** Whether `a` and `b` are of one kind: both waiting, or neither. */
-const sameKind = (a: ProposalOrderFacts, b: ProposalOrderFacts): boolean => a.waiting === b.waiting;
+const sameKind = (a: ProposalOrderFacts, b: ProposalOrderFacts) => a.waiting === b.waiting;
 
 const proposalBeforeSpec = spec<(a: ProposalOrderFacts, b: ProposalOrderFacts) => number>({
   requires: ({ input: [a, b] }) => a.at >= 0 && b.at >= 0,

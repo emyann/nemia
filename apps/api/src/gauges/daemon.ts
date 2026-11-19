@@ -66,7 +66,7 @@ export function daemonOf(
   now: number,
   pass: PassCostRead | null = null,
   branches: ListedStanding = { none: true },
-): Daemon {
+) {
   const line = daemonLine(standing, now);
   const branchesLine = standingLine(branches, standing, now) ?? null;
   if (standing.kind === 'none' || standing.kind === 'unreadable') {
@@ -120,5 +120,5 @@ export function daemonOf(
  * @param home The store's root folder.
  * @param now The wall time, in milliseconds since the epoch, its ages are worded at; the clock's by default.
  */
-export const readDaemon = (home: string, now = Date.now()): Daemon =>
+export const readDaemon = (home: string, now = Date.now()) =>
   daemonOf(daemonStanding(home), now, lastPassCost(home) ?? null, listedStanding(home));

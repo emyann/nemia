@@ -20,7 +20,7 @@ export type Harnessed = {
  * @param harnesses The engine's harnesses, each by its name.
  * @param runners The runners the engine made, by harness; a harness with none is left out.
  */
-export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: Record<string, SeamOps>): Record<string, Harnessed> =>
+export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: Record<string, SeamOps>) =>
   Object.fromEntries(
     Object.entries(harnesses).flatMap(([name, config]) => {
       const runner = own(runners, name);
@@ -33,7 +33,7 @@ export const harnessedOf = (harnesses: Record<string, HarnessConfig>, runners: R
  * @param fallback The harness named to take a task that names none.
  * @param harnesses The engine's harnesses, each by its name.
  */
-export const noFallbackRefusal = (fallback: string, harnesses: Record<string, HarnessConfig>): string => {
+export const noFallbackRefusal = (fallback: string, harnesses: Record<string, HarnessConfig>) => {
   const names = Object.keys(harnesses);
   return names.length
     ? `\`defaultHarness: ${fallback}\` is not a harness this engine has, so a task that names none has nowhere to run. Name one of its harnesses (${names.join(', ')}), or leave \`defaultHarness\` out for the first.`
@@ -45,7 +45,7 @@ export const noFallbackRefusal = (fallback: string, harnesses: Record<string, Ha
  * @param harnesses The engine's harnesses, each by its name.
  * @param name The name of the harness asked.
  */
-export const remoteIn = (harnesses: Record<string, HarnessConfig>, name: string): boolean => {
+export const remoteIn = (harnesses: Record<string, HarnessConfig>, name: string) => {
   const config = own(harnesses, name);
   return config !== undefined && isRemote(config);
 };

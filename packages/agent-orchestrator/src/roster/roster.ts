@@ -40,7 +40,7 @@ export function inFactory<L extends { file: string }>(
   filled: readonly FilledStep[],
   byFile: ReadonlyMap<string, readonly string[]>,
   factory?: Factory,
-): Array<L & { fills: AgentFill[]; factories: string[] }> {
+) {
   const tagged = listings.map((listing) => {
     const file = path.resolve(listing.file);
     return {
@@ -121,13 +121,13 @@ const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as
  * A `skills:` line as written, for a file that does not read — none where it names a card file, a former line the package refuses: a
  * form's save then writes the agent without it, which is the fix its refusal names.
  */
-function skillsLineOf(source: string): string | null {
+function skillsLineOf(source: string) {
   const line = frontmatterKey(source, 'skills');
   return line === undefined || isCardFile(line) ? null : line;
 }
 
 /** A file's harness prompt as written, or its former `systemPrompt:` line in the word it is now; null for neither. */
-function harnessPromptOf(source: string): string | null {
+function harnessPromptOf(source: string) {
   const former = frontmatterKey(source, 'systemPrompt');
   return frontmatterKey(source, 'harnessPrompt') ?? (former === undefined ? null : harnessPromptNamed(former));
 }
@@ -141,14 +141,7 @@ function harnessPromptOf(source: string): string | null {
  * @param version The agent's version.
  * @param usedBy The nodes that name the agent.
  */
-export const emptyReading = (
-  from: AgentPlace,
-  dir: string,
-  file: string,
-  name: string,
-  version: string,
-  usedBy: AgentUser[],
-): AgentReading => ({
+export const emptyReading = (from: AgentPlace, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]) => ({
   name,
   from,
   dir,
@@ -175,7 +168,7 @@ export const emptyReading = (
  * The role keys `source` writes, a former key read as the key it became, and a sandbox under the former key `permissionMode:` read as its
  * `sandbox` (`codexSandboxNamed`) unless `sandbox:` is written beside it.
  */
-function keysWritten(file: string, source: string): Partial<Record<RoleKey, string>> {
+function keysWritten(file: string, source: string) {
   const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
   const keys = Object.fromEntries(
     ROLE_KEYS.flatMap((key) => {
@@ -200,7 +193,7 @@ export function unreadReading(
   source: string,
   agent: Error | undefined,
   sidecarOf: (named: string | undefined) => AgentReading['schema'],
-): AgentReading {
+) {
   const keys = keysWritten(base.file, source);
   let body = '';
   try {

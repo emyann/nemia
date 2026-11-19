@@ -48,12 +48,6 @@ export type ForgottenFeed = {
   linesByTask?: Readonly<Record<string, number>>;
 };
 
-/**
- * A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were
- * forgotten, when any.
- */
-type FeedRead = { entries: unknown[]; cursor: number; forgotten?: number };
-
 /** The three files of the feed under `root`. */
 const feedFiles = (root: string) => ({
   head: path.join(root, 'feed.jsonl'),
@@ -62,19 +56,19 @@ const feedFiles = (root: string) => ({
 });
 
 /** A header line of `key`: the JSON object, padded to `HEADER_BYTES` with its line break. */
-const headerLine = (key: 'feedBase' | 'sealedTo', value: number): string => {
+const headerLine = (key: 'feedBase' | 'sealedTo', value: number) => {
   const text = `{"${key}":${value}}`;
   return `${text.padEnd(HEADER_BYTES - 1)}\n`;
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
-const parsed = (line: string): unknown => Option.getOrElse(jsonOf(line), () => line);
+const parsed = (line: string) => Option.getOrElse(jsonOf(line), () => line);
 
 /** A line's text decoded as JSON, or none where it is not. */
 const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** `length` bytes of `fd` from `from`, in one positioned read, counted. */
-const bytesAt = (fd: number, from: number, length: number): Buffer => {
+const bytesAt = (fd: number, from: number, length: number) => {
   const buf = Buffer.alloc(Math.max(0, length));
   const read = buf.length ? fs.readSync(fd, buf, 0, buf.length, from) : 0;
   countRead(read);
@@ -82,7 +76,7 @@ const bytesAt = (fd: number, from: number, length: number): Buffer => {
 };
 
 /** The value of the header `key` that `start`, a file's first bytes, begins with, or `undefined` when it begins with none. */
-const headerIn = (start: Buffer, key: 'feedBase' | 'sealedTo'): number | undefined => {
+const headerIn = (start: Buffer, key: 'feedBase' | 'sealedTo') => {
   if (start.length < HEADER_BYTES) return undefined;
   const text = start.subarray(0, HEADER_BYTES).toString('utf8');
   if (!text.startsWith(`{"${key}":`) || !text.endsWith('\n')) return undefined;
@@ -114,7 +108,7 @@ const headerOf = (file: string, fd: number, id: Identity & { size: number }, key
  * `file` opened for reading, with its header `key` (`at`, where its lines begin; `base`, their first cursor); none, when absent.
  * A header already read off the same file costs no byte; `whole` reads the file from 0 in the read that learns its header.
  */
-const openFeedFile = (file: string, key: 'feedBase' | 'sealedTo', whole = false): Opened | undefined => {
+const openFeedFile = (file: string, key: 'feedBase' | 'sealedTo', whole = false) => {
   let fd: number;
   try {
     fd = fs.openSync(file, 'r');
@@ -130,14 +124,14 @@ const openFeedFile = (file: string, key: 'feedBase' | 'sealedTo', whole = false)
 };
 
 /** `length` bytes of the open file `o` from `from`: off what was read whole, or read now. */
-const bytesOf = (o: Opened, from: number, length: number): Buffer =>
+const bytesOf = (o: Opened, from: number, length: number) =>
   o.whole ? o.whole.subarray(from, from + Math.max(0, length)) : bytesAt(o.fd, from, length);
 
 /** A sealed record: a line kept (`entry`), or a run of lines forgotten (`lines`, each one's bytes), ending at cursor `c`. */
 type Sealed = { c: number; entry?: unknown; lines?: number[] };
 
 /** The records of an open sealed file, in order. */
-const sealedRecords = (sealed: Opened): Sealed[] =>
+const sealedRecords = (sealed: Opened) =>
   bytesOf(sealed, sealed.at, sealed.size - sealed.at)
     .toString('utf8')
     .split('\n')
@@ -145,7 +139,7 @@ const sealedRecords = (sealed: Opened): Sealed[] =>
     .map((line) => parsed(line) as Sealed);
 
 /** How many of the forgotten lines of `run`, which ends at `c`, end after `after`. */
-const forgottenAfter = (run: readonly number[], c: number, after: number): number => {
+const forgottenAfter = (run: readonly number[], c: number, after: number) => {
   let end = c;
   let count = 0;
   for (let i = run.length - 1; end > after; i--) {
@@ -158,7 +152,7 @@ const forgottenAfter = (run: readonly number[], c: number, after: number): numbe
 };
 
 /** The complete lines of the head from cursor `from`, each with its end cursor, and where the last complete one ends. */
-const headLines = (head: Opened, from: number): { lines: { text: string; c: number }[]; end: number } => {
+const headLines = (head: Opened, from: number) => {
   const buf = bytesOf(head, head.at + from - head.base, head.size - head.at - (from - head.base));
   const last = buf.lastIndexOf(0x0a) + 1;
   const lines: { text: string; c: number }[] = [];
@@ -174,7 +168,7 @@ const headLines = (head: Opened, from: number): { lines: { text: string; c: numb
 };
 
 /** A read's answer, `forgotten` said only when a line was. */
-const answer = (entries: unknown[], cursor: number, forgotten: number): FeedRead => ({
+const answer = (entries: unknown[], cursor: number, forgotten: number) => ({
   entries,
   cursor,
   ...(forgotten ? { forgotten } : {}),
@@ -205,7 +199,7 @@ const readSealed = (sealed: Opened, after: number) => {
  * @param root The store's folder.
  * @param after The cursor to read past, as a read before answered it; 0 reads the whole feed.
  */
-export const readFeed = (root: string, after: number): FeedRead => {
+export const readFeed = (root: string, after: number) => {
   const files = feedFiles(root);
   const head = openFeedFile(files.head, 'feedBase', after === 0);
   const sealed = openFeedFile(files.sealed, 'sealedTo', after === 0);
@@ -229,7 +223,7 @@ export const readFeed = (root: string, after: number): FeedRead => {
 type Holder = { pid: number; token: string; at: string };
 
 /** The holder `file` names, or `undefined` when there is none or it is not one this runtime wrote. */
-const holderIn = (file: string): Holder | undefined => {
+const holderIn = (file: string) => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -243,7 +237,7 @@ const holderIn = (file: string): Holder | undefined => {
 };
 
 /** Wait `ms` without leaving the call: the store's writes are synchronous. */
-const pause = (ms: number): void => {
+const pause = (ms: number) => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 };
 
@@ -252,7 +246,7 @@ const pause = (ms: number): void => {
  * it is still the dead one's; a lock a live process took meanwhile is linked back. One taken by a third process in that moment
  * cannot be put back, and that is said, never passed over.
  */
-const breakDead = (lock: string, dead: Holder): void => {
+const breakDead = (lock: string, dead: Holder) => {
   const aside = `${lock}.${randomUUID()}.broken`;
   try {
     fs.renameSync(lock, aside);
@@ -276,7 +270,7 @@ const breakDead = (lock: string, dead: Holder): void => {
 };
 
 /** The words of a lock held past `waitMs` by a live process, saying what to do: the bound it names is the one it waited. */
-const heldWords = (lock: string, holder: Holder | undefined, waitMs: number): string =>
+const heldWords = (lock: string, holder: Holder | undefined, waitMs: number) =>
   holder
     ? `the feed's lock, ${lock}, is held by process ${holder.pid} since ${holder.at}, alive, past ${waitMs} ms: if it is stopped, continue it or end it, then write again. Nothing was written.`
     : `the feed's lock, ${lock}, is not one this runtime wrote, and nobody has let it go in ${waitMs} ms: if no \`ae\` and no engine runs on this store, remove it, then write again. Nothing was written.`;
@@ -285,7 +279,7 @@ const heldWords = (lock: string, holder: Holder | undefined, waitMs: number): st
  * Take the lock `lock`: linked from a file of this take's own, so it is whole when it is there. Answers the token it was taken
  * with. A live holder is waited for up to `waitMs`, then named in the refusal.
  */
-const takeLock = (lock: string, waitMs: number): string => {
+const takeLock = (lock: string, waitMs: number) => {
   const token = randomUUID();
   const mine = `${lock}.${token}`;
   fs.writeFileSync(mine, JSON.stringify({ pid: process.pid, token, at: new Date().toISOString() }));
@@ -314,7 +308,7 @@ const takeLock = (lock: string, waitMs: number): string => {
 };
 
 /** Let go of the lock `lock` taken with `token`, only while it is still that take's. */
-const releaseLock = (lock: string, token: string): void => {
+const releaseLock = (lock: string, token: string) => {
   if (holderIn(lock)?.token === token) fs.rmSync(lock, { force: true });
 };
 
@@ -329,7 +323,7 @@ const releaseLock = (lock: string, token: string): void => {
  * @param fn What to run under the lock.
  * @param waitMs How long to wait for a live holder, in milliseconds.
  */
-export const withFeedLock = <A>(root: string, fn: () => A, waitMs = FEED_LOCK_WAIT_MS): A => {
+export const withFeedLock = <A>(root: string, fn: () => A, waitMs = FEED_LOCK_WAIT_MS) => {
   fs.mkdirSync(root, { recursive: true });
   const { lock } = feedFiles(root);
   const token = takeLock(lock, waitMs);
@@ -341,7 +335,7 @@ export const withFeedLock = <A>(root: string, fn: () => A, waitMs = FEED_LOCK_WA
 };
 
 /** The id of the task a feed line names, or `undefined`. */
-const taskIdOf = (entry: unknown): unknown => (typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined);
+const taskIdOf = (entry: unknown) => (typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined);
 
 /**
  * How many of the feed's lines under `root` name each task of `taskIds`, the feed read once (`readFeed`), each line parsed for its
@@ -350,7 +344,7 @@ const taskIdOf = (entry: unknown): unknown => (typeof entry === 'object' && entr
  * @param root The store's folder.
  * @param taskIds The tasks to count the lines of.
  */
-export const feedLinesOf = (root: string, taskIds: readonly string[]): Record<string, number> => {
+export const feedLinesOf = (root: string, taskIds: readonly string[]) => {
   const counts = new Map(taskIds.map((id) => [id, 0]));
   for (const entry of readFeed(root, 0).entries) {
     const id = taskIdOf(entry);
@@ -367,21 +361,21 @@ export const feedLinesOf = (root: string, taskIds: readonly string[]): Record<st
 type Writing = { fd: number; at: number; prev: number; run: number[]; forgotten: number; byTask: Map<string, number> };
 
 /** Write `text` at the end of what `w` has written. */
-const put = (w: Writing, text: string): void => {
+const put = (w: Writing, text: string) => {
   const buf = Buffer.from(text);
   fs.writeSync(w.fd, buf, 0, buf.length, w.at);
   w.at += buf.length;
 };
 
 /** Write the run of forgotten lines `w` holds, if any. */
-const flushRun = (w: Writing): void => {
+const flushRun = (w: Writing) => {
   if (!w.run.length) return;
   put(w, `${JSON.stringify({ c: w.prev, lines: w.run })}\n`);
   w.run = [];
 };
 
 /** One line, ending at cursor `c`, written kept or added to the run forgotten, as `forget` says. */
-const sealLine = (w: Writing, entry: unknown, c: number, forget: ReadonlySet<string>): void => {
+const sealLine = (w: Writing, entry: unknown, c: number, forget: ReadonlySet<string>) => {
   const id = taskIdOf(entry);
   if (typeof id === 'string' && forget.has(id)) {
     w.run.push(c - w.prev);
@@ -395,13 +389,13 @@ const sealLine = (w: Writing, entry: unknown, c: number, forget: ReadonlySet<str
 };
 
 /** A run of lines a former rotation forgot, carried on, merged with the run before it. */
-const sealRun = (w: Writing, run: readonly number[], c: number): void => {
+const sealRun = (w: Writing, run: readonly number[], c: number) => {
   w.run.push(...run);
   w.prev = c;
 };
 
 /** The head's complete lines from cursor `from`, sealed into `w`; answers the cursor past the last. */
-const sealHead = (w: Writing, head: Opened, from: number, forget: ReadonlySet<string>): number => {
+const sealHead = (w: Writing, head: Opened, from: number, forget: ReadonlySet<string>) => {
   const read = headLines(head, from);
   for (const line of read.lines) sealLine(w, parsed(line.text), line.c, forget);
   return read.end;
@@ -421,7 +415,7 @@ const sameFiles = (a: Seen, b: Seen) =>
   a.head?.ino === b.head?.ino && a.head?.base === b.head?.base && a.sealed?.ino === b.sealed?.ino && a.sealed?.base === b.sealed?.base;
 
 /** The feed's files under `root`, open as they are now. */
-const seeFeed = (root: string, whole = false): Seen => {
+const seeFeed = (root: string, whole = false) => {
   const files = feedFiles(root);
   return { head: openFeedFile(files.head, 'feedBase', whole), sealed: openFeedFile(files.sealed, 'sealedTo', whole) };
 };
@@ -433,7 +427,7 @@ const sizeOf = (seen: Seen) => (seen.head?.size ?? 0) + (seen.sealed?.size ?? 0)
 type Built = { w: Writing; tmp: string; reached: number };
 
 /** `bytes` written to a new file beside `file`, flushed, and renamed over `file` (`replaceFile`): one write counted. */
-const replaceWith = (file: string, bytes: Uint8Array): void => {
+const replaceWith = (file: string, bytes: Uint8Array) => {
   replaceFile(file, bytes, { fsync: true });
   countWrite();
 };
@@ -442,7 +436,7 @@ const replaceWith = (file: string, bytes: Uint8Array): void => {
  * The sealed file up to the end of the head's complete lines, written beside it with every line of a task in `forget` dropped
  * into a run: the records already sealed carried on, then the head's lines. Answers where it stands, and the cursor it reached.
  */
-const sealUpTo = (root: string, seen: Seen, forget: ReadonlySet<string>): Built => {
+const sealUpTo = (root: string, seen: Seen, forget: ReadonlySet<string>) => {
   const tmp = `${feedFiles(root).sealed}.${randomUUID()}.tmp`;
   const w: Writing = { fd: fs.openSync(tmp, 'w'), at: 0, prev: 0, run: [], forgotten: 0, byTask: new Map() };
   put(w, headerLine('sealedTo', 0));
@@ -458,7 +452,7 @@ const sealUpTo = (root: string, seen: Seen, forget: ReadonlySet<string>): Built 
 };
 
 /** Whether the head begins before the sealed file ends: a rotation stopped between its two renames, the head's renaming left to do. */
-const staleHead = (now: Seen): boolean => now.head !== undefined && now.sealed !== undefined && now.head.base < now.sealed.base;
+const staleHead = (now: Seen) => now.head !== undefined && now.sealed !== undefined && now.head.base < now.sealed.base;
 
 /**
  * Under the lock, with `now` the files as the lock found them: the head's lines written since `sealUpTo` read it sealed too, then,
@@ -466,7 +460,7 @@ const staleHead = (now: Seen): boolean => now.head !== undefined && now.sealed !
  * that begins there (with any bytes of a write cut short after its last line, so no cursor goes back). Answers how many lines
  * were forgotten; the file written beside the sealed one is gone either way.
  */
-const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<string>): number => {
+const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<string>) => {
   const { w } = built;
   const head = now.head;
   let renamed = false;
@@ -496,7 +490,7 @@ const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<str
  * One attempt at a rotation (`rotateFeed`): the sealed file built outside the lock, then, under it, finished and renamed into place
  * unless another rotation changed the files meanwhile, which answers `undefined`; and `then`, under the same lock.
  */
-const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs: number): ForgottenFeed | undefined => {
+const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs: number) => {
   const seen = seeFeed(root, true);
   let built: Built | undefined;
   try {
@@ -541,7 +535,7 @@ const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void,
  * @param then What to run under the lock once the feed is rotated.
  * @param waitMs How long to wait for a live holder of the lock, in milliseconds.
  */
-export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs = FEED_LOCK_WAIT_MS): ForgottenFeed => {
+export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs = FEED_LOCK_WAIT_MS) => {
   for (let round = 0; round < 10; round++) {
     const done = rotateOnce(root, forget, then, waitMs);
     if (done) return done;

@@ -33,10 +33,10 @@ export const LATEST = 'latest.json';
  * @param tag The release's tag, like `v1.3.0`.
  * @param platform The platform the archive is built for.
  */
-export const assetName = (tag: string, platform: ReleasePlatform): string => `nemia-${tag}-${platform}.tar.gz`;
+export const assetName = (tag: string, platform: ReleasePlatform) => `nemia-${tag}-${platform}.tar.gz`;
 
 /** A download base without its trailing slashes. */
-const based = (source: string): string => source.replace(/\/+$/, '');
+const based = (source: string) => source.replace(/\/+$/, '');
 
 /**
  * Where the asset `name` of `tag` is downloaded from.
@@ -44,13 +44,13 @@ const based = (source: string): string => source.replace(/\/+$/, '');
  * @param tag The release's tag.
  * @param name The asset's file name.
  */
-export const assetUrl = (source: string, tag: string, name: string): string => `${based(source)}/download/${tag}/${name}`;
+export const assetUrl = (source: string, tag: string, name: string) => `${based(source)}/download/${tag}/${name}`;
 
 /**
  * Where the newest release's `latest.json` is read from.
  * @param source The download base, as the running release's `release.json` carries it.
  */
-export const latestUrl = (source: string): string => `${based(source)}/latest/download/${LATEST}`;
+export const latestUrl = (source: string) => `${based(source)}/latest/download/${LATEST}`;
 
 /**
  * The bytes at `url`: a `file:` URL read from the disk, any other fetched, sending only `CLIENT_NAME`. Refused, led by `by`: nothing
@@ -58,7 +58,7 @@ export const latestUrl = (source: string): string => `${based(source)}/latest/do
  * @param url The address to read: a `file:` URL, or one fetched over the network.
  * @param by The words that lead a refusal: the command or the work that asked.
  */
-export async function fetched(url: string, by: string): Promise<Buffer> {
+export async function fetched(url: string, by: string) {
   if (url.startsWith('file:')) {
     try {
       return fs.readFileSync(fileURLToPath(url));
@@ -85,7 +85,7 @@ export async function fetched(url: string, by: string): Promise<Buffer> {
  * @param source The download base, `<host>/<owner>/<repo>/releases`.
  * @param tag The release's tag.
  */
-export function releaseApiUrl(source: string, tag: string): string | undefined {
+export function releaseApiUrl(source: string, tag: string) {
   let url: URL;
   try {
     url = new URL(based(source));
@@ -106,7 +106,7 @@ const ReleaseSchema = Schema.Struct({ assets: Schema.Array(Schema.Struct({ name:
  * @param source The download base, `<host>/<owner>/<repo>/releases`.
  * @param tag The release's tag.
  */
-export async function releaseAssets(source: string, tag: string): Promise<readonly string[] | undefined> {
+export async function releaseAssets(source: string, tag: string) {
   const url = releaseApiUrl(source, tag);
   if (url === undefined) return undefined;
   try {
@@ -124,7 +124,7 @@ export async function releaseAssets(source: string, tag: string): Promise<readon
  * (`releaseAssets`), refused `Conflict`: the release workflow attaches it a few minutes after the tag, so the same upgrade goes through
  * then. Where there is no such release, or it cannot be read, refused as `fetched` refuses.
  */
-async function awaitedAsset(source: string, tag: string, name: string, by: string): Promise<Buffer> {
+async function awaitedAsset(source: string, tag: string, name: string, by: string) {
   try {
     return await fetched(assetUrl(source, tag, name), by);
   } catch (err) {
@@ -142,7 +142,7 @@ async function awaitedAsset(source: string, tag: string, name: string, by: strin
  * @param sums The text of a `SHA256SUMS` file.
  * @param name The asset's file name.
  */
-export function sumOf(sums: string, name: string): string | undefined {
+export function sumOf(sums: string, name: string) {
   for (const line of sums.split('\n')) {
     const read = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(line.trim());
     if (read?.[2] === name) return read[1]?.toLowerCase();
@@ -159,7 +159,7 @@ export type LatestFile = { readonly tag: string; readonly version: string; reado
 const LatestSchema = Schema.Struct({ tag: Schema.String, version: Schema.String, notes: Schema.optionalKey(Schema.Unknown) });
 
 /** `notes` where it is the address of a page a browser opens over http(s), else undefined: any other value is dropped, never shown. */
-function notesOf(notes: unknown): string | undefined {
+function notesOf(notes: unknown) {
   if (typeof notes !== 'string') return undefined;
   try {
     const url = new URL(notes);
@@ -173,7 +173,7 @@ function notesOf(notes: unknown): string | undefined {
  * `text` read as a `latest.json` whose tag is a version, its notes kept where they are an http(s) address (`notesOf`), or undefined.
  * @param text The text of a `latest.json`.
  */
-export function latestOf(text: string): LatestFile | undefined {
+export function latestOf(text: string) {
   try {
     const decoded = Schema.decodeUnknownResult(Schema.fromJsonString(LatestSchema))(text);
     if (Result.isFailure(decoded) || parseVersion(decoded.success.tag) === null) return undefined;
@@ -189,7 +189,7 @@ export function latestOf(text: string): LatestFile | undefined {
  * @param source The download base, as the running release's `release.json` carries it.
  * @param by The words that lead a refusal: the command or the work that asked.
  */
-export async function fetchLatest(source: string, by: string): Promise<LatestFile> {
+export async function fetchLatest(source: string, by: string) {
   const url = latestUrl(source);
   const latest = latestOf((await fetched(url, by)).toString('utf8'));
   if (latest === undefined)
@@ -210,13 +210,7 @@ export async function fetchLatest(source: string, by: string): Promise<LatestFil
  * @param building The build's folder, its tree and its log.
  * @param by The words that lead a refusal: the command or the work that asked.
  */
-export async function unpackedArchive(
-  source: string,
-  tag: string,
-  platform: ReleasePlatform,
-  building: Building,
-  by: string,
-): Promise<void> {
+export async function unpackedArchive(source: string, tag: string, platform: ReleasePlatform, building: Building, by: string) {
   const name = assetName(tag, platform);
   const bytes = await awaitedAsset(source, tag, name, by);
   const sums = (await awaitedAsset(source, tag, SUMS, by)).toString('utf8');
@@ -237,7 +231,7 @@ export async function unpackedArchive(
 }
 
 /** Writes `text` to `file` whole: a file beside it, renamed over it, so no reader meets half of it. */
-function writtenWhole(file: string, text: string): void {
+function writtenWhole(file: string, text: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const hidden = path.join(path.dirname(file), `.${path.basename(file)}-${process.pid}`);
   fs.writeFileSync(hidden, text);
@@ -248,7 +242,7 @@ function writtenWhole(file: string, text: string): void {
  * The store's record of its floor.
  * @param home The store's folder.
  */
-export const storeFile = (home: string): string => path.join(home, 'store.json');
+export const storeFile = (home: string) => path.join(home, 'store.json');
 
 const StoreFileSchema = Schema.Struct({ readableFrom: Schema.String });
 
@@ -256,7 +250,7 @@ const StoreFileSchema = Schema.Struct({ readableFrom: Schema.String });
  * The oldest release that can read the store at `home`, as `store.json` records it; null where it records none, or none that reads.
  * @param home The store's folder.
  */
-export function readStoreFloor(home: string): Version | null {
+export function readStoreFloor(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(storeFile(home), 'utf8');
@@ -276,7 +270,7 @@ export function readStoreFloor(home: string): Version | null {
  * @param home The store's folder.
  * @param floor The oldest release that can read the store.
  */
-export const writeStoreFloor = (home: string, floor: Version): void =>
+export const writeStoreFloor = (home: string, floor: Version) =>
   writtenWhole(storeFile(home), `${JSON.stringify({ readableFrom: versionTag(floor) }, null, 2)}\n`);
 
 /**
@@ -285,7 +279,7 @@ export const writeStoreFloor = (home: string, floor: Version): void =>
  * @param home The store's folder.
  * @param own The floor this release writes for, `STORE_READABLE_FROM` where absent.
  */
-export function raiseStoreFloor(home: string, own: Version = STORE_READABLE_FROM): Version {
+export function raiseStoreFloor(home: string, own: Version = STORE_READABLE_FROM) {
   const record = readStoreFloor(home);
   const after = floorAfter(record, own);
   if (record === null || versionTag(record) !== versionTag(after)) writeStoreFloor(home, after);
@@ -296,13 +290,13 @@ export function raiseStoreFloor(home: string, own: Version = STORE_READABLE_FROM
  * Where the release check keeps the newest release it read.
  * @param home The store's folder.
  */
-export const latestFile = (home: string): string => path.join(releasesDir(home), LATEST);
+export const latestFile = (home: string) => path.join(releasesDir(home), LATEST);
 
 /**
  * The newest release the store's release check last read, or undefined where it read none or the file does not read.
  * @param home The store's folder.
  */
-export function readLatest(home: string): LatestFile | undefined {
+export function readLatest(home: string) {
   try {
     return latestOf(fs.readFileSync(latestFile(home), 'utf8'));
   } catch {
@@ -315,5 +309,4 @@ export function readLatest(home: string): LatestFile | undefined {
  * @param home The store's folder.
  * @param latest The newest release, as `latest.json` gave it.
  */
-export const writeLatest = (home: string, latest: LatestFile): void =>
-  writtenWhole(latestFile(home), `${JSON.stringify(latest, null, 2)}\n`);
+export const writeLatest = (home: string, latest: LatestFile) => writtenWhole(latestFile(home), `${JSON.stringify(latest, null, 2)}\n`);

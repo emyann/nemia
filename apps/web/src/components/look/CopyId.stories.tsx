@@ -12,7 +12,7 @@ export default meta;
  * Each id the story drawn in `canvas` holds, as its box is laid out: its edge, its room and how tall it is; and its glyph, twelve
  * pixels across and seven from the id, on a line no taller than the id.
  */
-async function idsHold(canvas: HTMLElement, boxes: readonly string[]): Promise<void> {
+async function idsHold(canvas: HTMLElement, boxes: readonly string[]) {
   await document.fonts.ready;
   const found = [...canvas.querySelectorAll<HTMLElement>('[data-run-id]')].map((id) => {
     const style = getComputedStyle(id);
@@ -29,10 +29,10 @@ async function idsHold(canvas: HTMLElement, boxes: readonly string[]): Promise<v
 }
 
 /** The ink of the short id drawn in `canvas`, as the page computes it. */
-const inkOf = (canvas: HTMLElement): string => getComputedStyle(canvas.querySelector('[data-run-id]')!).color;
+const inkOf = (canvas: HTMLElement) => getComputedStyle(canvas.querySelector('[data-run-id]')!).color;
 
 /** The hue of a session at work, as the page computes it. */
-const aliveOf = (): string => {
+const aliveOf = () => {
   const probe = document.createElement('i');
   probe.style.color = 'var(--meaning-alive)';
   document.body.append(probe);

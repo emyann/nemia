@@ -10,7 +10,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { Effect, Option, Stream } from 'effect';
-import type { Fix, FixPhase, FixStart, Need, NeedFix } from 'objects';
+import type { Fix, FixStart, Need, NeedFix } from 'objects';
 import { asked, EngineService, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import { pathLedByTools, StoreRoot, toolsDir } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
@@ -55,7 +55,7 @@ export const FIX_FOLLOW_MS = 500;
  * The variable an ask's answer reaches a fix's command in: `NEMIA_ANSWER_` and its name in capitals, any other character `_`.
  * @param name The ask's name, as the fix declares it.
  */
-export const answerVariable = (name: string): string => `NEMIA_ANSWER_${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+export const answerVariable = (name: string) => `NEMIA_ANSWER_${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
 
 /**
  * Where a fix was declared: a builtin place's machine need, a harness's need, the store's own (`toolsNeed`), a factory's workflow, or a
@@ -81,7 +81,7 @@ type FixFound = {
 type Declared = { readonly fix: NeedFix; readonly origin: Origin };
 
 /** The factory `name` of the store `home`, read; refused (`Missing`) where there is none, or its file does not read. */
-function factoryNamed(home: string, name: string): Exclude<FactoryListing, { error: string }> {
+function factoryNamed(home: string, name: string) {
   const all = listedAtOnce(home);
   const found = all.find((f) => f.name === name);
   if (found === undefined)
@@ -105,7 +105,7 @@ type Declaring = Pick<FixFound, 'listing' | 'folders' | 'repository'> & {
  * The need `start` names of the factory and workflow it names, as its files are now: the workflow's own, or a place need it fills, its
  * fixes before the place's. Refused (`Missing`) for a factory or a workflow that is not there.
  */
-function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string; workflow: string }): Declaring {
+function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string; workflow: string }) {
   const listing = factoryNamed(home, start.factory);
   const workflow = factoryWorkflows([listing]).find((w) => w.workflow === start.workflow);
   if (workflow === undefined)
@@ -114,13 +114,15 @@ function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: Fix
     });
   const folders = { workflowFiles: workflow.dir, carriedFiles: carriedDirOf(workflow.dir) };
   const own = workflowNeedsRead(workflow.dir).needs;
-  const ofWorkflow = (fixes: readonly NeedFix[] | undefined): Declared[] => (fixes ?? []).map((fix) => ({ fix, origin: 'workflow' }));
+  const ofWorkflow = (fixes: readonly NeedFix[] | undefined) =>
+    (fixes ?? []).map((fix) => ({ fix, origin: 'workflow' })) satisfies Declared[];
   const mine = own.find((n) => n.name === start.need && (n.fills === undefined || !placeNeeds.some((p) => p.name === n.fills)));
-  if (mine !== undefined) return { need: mine, declared: ofWorkflow(mine.fixes), listing, folders, ...ownRepository(mine, workflow) };
+  if (mine !== undefined)
+    return { need: mine, declared: ofWorkflow(mine.fixes), listing, folders, ...ownRepository(mine, workflow) } satisfies Declaring;
   const placed = placeNeeds.find((p) => p.name === start.need);
   const fillers = own.filter((n) => placed !== undefined && n.fills === placed.name).flatMap((n) => ofWorkflow(n.fixes));
-  const places = (placed?.fixes ?? []).map((fix): Declared => ({ fix, origin: 'place' }));
-  return { need: placed, declared: [...fillers, ...places], listing, folders };
+  const places = (placed?.fixes ?? []).map((fix) => ({ fix, origin: 'place' }) satisfies Declared);
+  return { need: placed, declared: [...fillers, ...places], listing, folders } satisfies Declaring;
 }
 
 /**
@@ -130,7 +132,7 @@ function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: Fix
  * @param need The workflow's own need, with its scope.
  * @param workflow The factory's workflow, with its factory's repository where it has one.
  */
-export function ownRepository(need: Need, workflow: FactoryWorkflow): { repository?: string } {
+export function ownRepository(need: Need, workflow: FactoryWorkflow) {
   if (!isRepositoryNeed(need)) return {};
   if (workflow.repository === undefined)
     throw new Invalid({
@@ -144,7 +146,7 @@ export function ownRepository(need: Need, workflow: FactoryWorkflow): { reposito
  * (`factoryRepository`). Refused (`Missing`) for a factory that is not there, and (`Invalid`) for a need of no repository, which a
  * workflow names with the factory.
  */
-function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string }): Declaring {
+function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: FixStart & { factory: string }) {
   const need = placeNeeds.find((p) => p.name === start.need && isRepositoryNeed(p));
   if (need === undefined)
     throw new Invalid({
@@ -157,7 +159,7 @@ function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: F
     declared: (need.fixes ?? []).map((fix) => ({ fix, origin: 'repository' })),
     listing,
     ...(repository === undefined ? {} : { repository }),
-  };
+  } satisfies Declaring;
 }
 
 /**
@@ -165,16 +167,22 @@ function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: F
  * factory named alone (`repositoryDeclaring`), else a machine need of the builtin places (`placeNeeds`), of a harness (`harnessNeeds`)
  * or of the store itself (`toolsNeed`, the tools folder's `nemia`).
  */
-function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart): Declaring {
+function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart) {
   const { factory, workflow } = start;
-  if (factory !== undefined && workflow !== undefined) return workflowDeclaring(home, placeNeeds, { ...start, factory, workflow });
-  if (factory !== undefined) return repositoryDeclaring(home, placeNeeds, { ...start, factory });
+  if (factory !== undefined && workflow !== undefined)
+    return workflowDeclaring(home, placeNeeds, { ...start, factory, workflow }) satisfies Declaring as Declaring;
+  if (factory !== undefined) return repositoryDeclaring(home, placeNeeds, { ...start, factory }) satisfies Declaring as Declaring;
   const placed = placeNeeds.find((p) => p.name === start.need && !isRepositoryNeed(p));
   const harnessed = placed === undefined ? harnessNeeds.find((h) => h.name === start.need) : undefined;
-  if (harnessed !== undefined) return { need: harnessed, declared: (harnessed.fixes ?? []).map((fix) => ({ fix, origin: 'harness' })) };
+  if (harnessed !== undefined)
+    return {
+      need: harnessed,
+      declared: (harnessed.fixes ?? []).map((fix) => ({ fix, origin: 'harness' })),
+    } satisfies Declaring as Declaring;
   const stored = placed === undefined ? [toolsNeed(home)].find((n) => n.name === start.need) : undefined;
-  if (stored !== undefined) return { need: stored, declared: (stored.fixes ?? []).map((fix) => ({ fix, origin: 'store' })) };
-  return { need: placed, declared: (placed?.fixes ?? []).map((fix) => ({ fix, origin: 'place' })) };
+  if (stored !== undefined)
+    return { need: stored, declared: (stored.fixes ?? []).map((fix) => ({ fix, origin: 'store' })) } satisfies Declaring as Declaring;
+  return { need: placed, declared: (placed?.fixes ?? []).map((fix) => ({ fix, origin: 'place' })) } satisfies Declaring as Declaring;
 }
 
 /**
@@ -183,7 +191,7 @@ function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: re
  * the workflow named of the factory named (`workflowDeclaring`). Refused (`Missing`) for a factory, a workflow or a need that is not
  * there, and (`Invalid`) for a workflow named without its factory, and an index no fix of the need has.
  */
-function fixFound(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart): FixFound {
+function fixFound(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart) {
   const index = start.index ?? 0;
   const { factory, workflow } = start;
   if (factory === undefined && workflow !== undefined)
@@ -214,7 +222,7 @@ function fixFound(home: string, placeNeeds: readonly Need[], harnessNeeds: reado
 }
 
 /** The answers `start` gives, each to the ask of the fix its name names; refused (`Invalid`) where one is left out or none asks it. */
-function answersOf(found: FixFound, start: FixStart): Record<string, string> {
+function answersOf(found: FixFound, start: FixStart) {
   const asks = found.fix.asks ?? [];
   const given = start.answers ?? {};
   const left = asks.filter((a) => !given[a.name]?.trim());
@@ -352,14 +360,14 @@ const unfinishedNeeding = Effect.fnUntraced(function* (
  * else `failed`), `running` once an attempt began, else `pending`.
  * @param view The task's view, or undefined where the runtime has none: `pending`.
  */
-export const commandPhaseOf = (view: TaskView | undefined): FixPhase => {
+export const commandPhaseOf = (view: TaskView | undefined) => {
   if (view === undefined) return 'pending';
   if (view.state.settled) return view.state.settled === 'succeeded' ? 'succeeded' : 'failed';
   return view.state.attempts.length ? 'running' : 'pending';
 };
 
 /** The `Fix` of `record` over its task's view and the end of its output. */
-const fixRead = (record: FixRecord, view: TaskView | undefined, output: string): Fix => {
+const fixRead = (record: FixRecord, view: TaskView | undefined, output: string) => {
   const exitCode = view?.state.settled ? view.state.attempts.at(-1)?.exitCode : undefined;
   return {
     id: record.id,
@@ -370,11 +378,11 @@ const fixRead = (record: FixRecord, view: TaskView | undefined, output: string):
     output,
     ...(record.code === undefined ? {} : { code: record.code }),
     ...(typeof exitCode === 'number' ? { exitCode } : {}),
-  };
+  } satisfies Fix;
 };
 
 /** The record of the fix `id`, refused (`Missing`) where the store has none, naming how one is started. */
-const recordOf = (home: string, id: string): Effect.Effect<FixRecord, Missing> => {
+const recordOf = (home: string, id: string) => {
   const record = readFixRecord(home, id);
   return record === undefined
     ? Effect.fail(new Missing({ message: `no fix ${id} was started here: nemia doctor fix <need> starts one, and prints its id.` }))

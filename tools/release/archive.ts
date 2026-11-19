@@ -58,20 +58,20 @@ class Refusal extends Error {}
 class Usage extends Refusal {}
 
 /** The archive's file name, as `install.sh` and the upgrade fetch it. */
-export const assetName = (tag: string, platform: Platform): string => `nemia-${tag}-${platform}.tar.gz`;
+export const assetName = (tag: string, platform: Platform) => `nemia-${tag}-${platform}.tar.gz`;
 
 /** The platform `name` names, or a refusal naming them. */
-export const platformOf = (name: string | undefined): Platform => {
+export const platformOf = (name: string | undefined) => {
   const found = PLATFORMS.find((each) => each === name);
   if (found === undefined) throw new Refusal(`no platform ${String(name)}: pass --platform as one of ${PLATFORMS.join(', ')}`);
   return found;
 };
 
 /** The sha256 of a file, in hex. */
-export const sha256Of = (file: string): string => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+export const sha256Of = (file: string) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 /** Runs `command` in `cwd`, inheriting the output, and refuses on a non-zero exit, naming the command. */
-const run = (command: string, args: string[], cwd: string): void => {
+const run = (command: string, args: string[], cwd: string) => {
   const ran = spawnSync(command, args, { cwd, stdio: 'inherit', timeout: CALL_MS });
   if (ran.status !== 0)
     throw new Refusal(
@@ -88,6 +88,7 @@ export const SDK_PLATFORM_PREFIX = 'claude-agent-sdk-';
 const SDK_SCOPE = '@anthropic-ai';
 
 /** The `node_modules` folders under `dir`'s own, each package's nested one too, `dir`'s first. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const nodeModulesUnder = (dir: string): string[] => {
   const modules = path.join(dir, 'node_modules');
   if (!fs.existsSync(modules)) return [];
@@ -110,7 +111,7 @@ const nodeModulesUnder = (dir: string): string[] => {
  * package's nested one), and leaves the SDK itself: `npm ci --omit=dev` installs the one of the machine it runs on as the SDK's optional
  * dependency, and `--omit=optional` would drop every package's. Returns the folders it took out, relative to `tree`.
  */
-export const dropHarnessBinaries = (tree: string): string[] => {
+export const dropHarnessBinaries = (tree: string) => {
   const workspaces = ['packages', 'apps', 'tools']
     .map((group) => path.join(tree, group))
     .filter((group) => fs.existsSync(group))
@@ -145,7 +146,7 @@ export type Packed = {
  * last into the tree, then `<out>/nemia-<tag>-<platform>.tar.gz` with the tree's entries at its root and `<out>/SHA256SUMS` holding its
  * one line. Returns the archive's path.
  */
-export const pack = (given: Packed): string => {
+export const pack = (given: Packed) => {
   dropHarnessBinaries(given.tree);
   fs.cpSync(given.node, path.join(given.tree, 'node'), { recursive: true, verbatimSymlinks: true });
   fs.mkdirSync(path.join(given.tree, 'bin'), { recursive: true });
@@ -168,10 +169,10 @@ export const pack = (given: Packed): string => {
 };
 
 /** The pinned Node, read from `node.json` beside this file. */
-const nodePin = (): NodePin => JSON.parse(fs.readFileSync(path.join(HERE, 'node.json'), 'utf8')) as NodePin;
+const nodePin = () => JSON.parse(fs.readFileSync(path.join(HERE, 'node.json'), 'utf8')) as NodePin;
 
 /** Downloads the pinned Node for `platform` into `work`, refuses it unless its sha256 is the pinned one, and returns its folder. */
-const fetchNode = async (platform: Platform, work: string): Promise<string> => {
+const fetchNode = async (platform: Platform, work: string) => {
   const pin = nodePin();
   const base = `node-v${pin.version}-${platform}`;
   const url = `${pin.source}/v${pin.version}/${base}.tar.gz`;
@@ -187,7 +188,7 @@ const fetchNode = async (platform: Platform, work: string): Promise<string> => {
 };
 
 /** The checkout's head commit. */
-const commitOf = (): string => {
+const commitOf = () => {
   const ran = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' });
   if (ran.status !== 0) throw new Refusal(`git rev-parse HEAD failed in ${ROOT}: run this in a checkout of the repository`);
   return ran.stdout.trim();
@@ -197,7 +198,7 @@ const commitOf = (): string => {
  * Builds the release folder in `work`: the board built in the checkout, the tracked tree copied, production dependencies installed;
  * `pack` takes the SDK's platform package back out.
  */
-const buildTree = (work: string): string => {
+const buildTree = (work: string) => {
   run('npm', ['ci'], ROOT);
   run('npm', ['run', 'build', '--workspace', 'web'], ROOT);
   const tree = path.join(work, 'tree');
@@ -212,7 +213,7 @@ const buildTree = (work: string): string => {
 };
 
 /** The flags given, as `--name value` pairs; a flag with no value or a bare word is refused. */
-const flagsOf = (argv: string[]): Record<string, string> => {
+const flagsOf = (argv: string[]) => {
   const flags: Record<string, string> = {};
   for (let i = 0; i < argv.length; i += 2) {
     const [name, value] = [argv[i], argv[i + 1]];
@@ -226,14 +227,14 @@ const USAGE =
   'usage: node tools/release/archive.ts --platform <linux-x64|linux-arm64|darwin-x64|darwin-arm64> --tag <vX.Y.Z> --source <download base> --out <dir> [--tree <dir> --node <dir>]';
 
 /** The flags a run needs, each refused when missing. */
-const needed = (flags: Record<string, string>, name: string): string => {
+const needed = (flags: Record<string, string>, name: string) => {
   const value = flags[name];
   if (value === undefined || value === '') throw new Usage(`--${name} is missing: ${USAGE}`);
   return value;
 };
 
 /** Builds and packs the archive the flags name: its path. */
-const archive = async (flags: Record<string, string>): Promise<string> => {
+const archive = async (flags: Record<string, string>) => {
   const platform = platformOf(flags.platform);
   const [tag, source, out] = [needed(flags, 'tag'), needed(flags, 'source'), path.resolve(needed(flags, 'out'))];
   const builtAt = new Date().toISOString();
@@ -252,7 +253,7 @@ const archive = async (flags: Record<string, string>): Promise<string> => {
 };
 
 /** Runs the tool: its exit code. */
-export const main = async (argv: string[], out: (line: string) => void = console.log): Promise<number> => {
+export const main = async (argv: string[], out: (line: string) => void = console.log) => {
   try {
     out(`archive: wrote ${await archive(flagsOf(argv))}`);
     return 0;

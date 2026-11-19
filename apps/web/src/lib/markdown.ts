@@ -32,7 +32,7 @@ const FENCES: Readonly<Record<string, Exclude<CodeLanguage, 'text'>>> = {
  * `language-bash`. A fence the code block has no grammar for, and a block with no fence word, are `text`: shown as written.
  * @param className The code element's class, as the pipeline gives it: a string, a list of them, or anything else for none.
  */
-export function languageOf(className: unknown): CodeLanguage {
+export function languageOf(className: unknown) {
   const classes = Array.isArray(className) ? className.map(String) : typeof className === 'string' ? className.split(/\s+/) : [];
   const word = classes
     .find((c) => c.startsWith('language-'))
@@ -51,6 +51,7 @@ type TextNode = {
 };
 
 /** Every piece of text under `node`, in order: a code block's code. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const textOf = (node: TextNode | undefined): string =>
   !node ? '' : node.type === 'text' ? (node.value ?? '') : (node.children ?? []).map(textOf).join('');
 
@@ -59,7 +60,7 @@ const textOf = (node: TextNode | undefined): string =>
  * And the fence's class, for `languageOf`.
  * @param pre The block's `pre` node, or undefined where there is none.
  */
-export function fencedCode(pre: TextNode | undefined): { code: string; className: unknown } {
+export function fencedCode(pre: TextNode | undefined) {
   const code = pre?.children?.find((child) => child.type === 'element' && child.tagName === 'code');
   return { code: textOf(code ?? pre).replace(/\n$/, ''), className: code?.properties?.className };
 }
@@ -75,25 +76,23 @@ const FOOTNOTE_LABEL = 'footnote-label';
  * described by that one: without it, two texts with footnotes on one page share the id `footnote-label`. A rehype plugin's transform.
  * @param prefix The prefix the text's notes and their references are given.
  */
-export const labelFootnotes =
-  (prefix: string) =>
-  (tree: LabelNode): void => {
-    const walk = (node: LabelNode) => {
-      const properties = node.properties;
-      if (properties?.id === FOOTNOTE_LABEL) properties.id = `${prefix}${FOOTNOTE_LABEL}`;
-      const described = properties?.ariaDescribedBy;
-      if (Array.isArray(described))
-        properties!.ariaDescribedBy = described.map((id) => (id === FOOTNOTE_LABEL ? `${prefix}${FOOTNOTE_LABEL}` : id));
-      for (const child of node.children ?? []) walk(child);
-    };
-    walk(tree);
+export const labelFootnotes = (prefix: string) => (tree: LabelNode) => {
+  const walk = (node: LabelNode) => {
+    const properties = node.properties;
+    if (properties?.id === FOOTNOTE_LABEL) properties.id = `${prefix}${FOOTNOTE_LABEL}`;
+    const described = properties?.ariaDescribedBy;
+    if (Array.isArray(described))
+      properties!.ariaDescribedBy = described.map((id) => (id === FOOTNOTE_LABEL ? `${prefix}${FOOTNOTE_LABEL}` : id));
+    for (const child of node.children ?? []) walk(child);
   };
+  walk(tree);
+};
 
 /** A node of the drawn tree as its headings are found in it: an element's tag and properties. */
 type HeadingNode = { type: string; tagName?: string; properties?: Record<string, unknown>; children?: HeadingNode[] };
 
 /** The depth a heading element was written at, from its tag: 0 for any other node. */
-const depthOf = (node: HeadingNode): number =>
+const depthOf = (node: HeadingNode) =>
   node.type === 'element' && /^h[1-6]$/.test(node.tagName ?? '') ? Number(node.tagName!.slice(1)) : 0;
 
 /**
@@ -104,26 +103,24 @@ const depthOf = (node: HeadingNode): number =>
  * @param top Whether the shallowest heading the text writes, rather than its `#`, stands at `level`.
  * @param sized The class a heading written at a depth is drawn with.
  */
-export const placeHeadings =
-  (level: number, top: boolean, sized: (depth: number) => string) =>
-  (tree: HeadingNode): void => {
-    const headings: HeadingNode[] = [];
-    const walk = (node: HeadingNode) => {
-      if (depthOf(node)) headings.push(node);
-      for (const child of node.children ?? []) walk(child);
-    };
-    walk(tree);
-    const written = headings
-      .filter((node) => !(typeof node.properties?.id === 'string' && node.properties.id.endsWith(FOOTNOTE_LABEL)))
-      .map(depthOf);
-    const from = top && written.length ? Math.min(...written) : 1;
-    for (const node of headings) {
-      const depth = depthOf(node);
-      const own = node.properties?.className;
-      node.tagName = `h${Math.min(Math.max(level + depth - from, 1), 6)}`;
-      node.properties = {
-        ...node.properties,
-        className: [...(Array.isArray(own) ? own : own ? [own] : []), ...sized(depth).split(' ').filter(Boolean)],
-      };
-    }
+export const placeHeadings = (level: number, top: boolean, sized: (depth: number) => string) => (tree: HeadingNode) => {
+  const headings: HeadingNode[] = [];
+  const walk = (node: HeadingNode) => {
+    if (depthOf(node)) headings.push(node);
+    for (const child of node.children ?? []) walk(child);
   };
+  walk(tree);
+  const written = headings
+    .filter((node) => !(typeof node.properties?.id === 'string' && node.properties.id.endsWith(FOOTNOTE_LABEL)))
+    .map(depthOf);
+  const from = top && written.length ? Math.min(...written) : 1;
+  for (const node of headings) {
+    const depth = depthOf(node);
+    const own = node.properties?.className;
+    node.tagName = `h${Math.min(Math.max(level + depth - from, 1), 6)}`;
+    node.properties = {
+      ...node.properties,
+      className: [...(Array.isArray(own) ? own : own ? [own] : []), ...sized(depth).split(' ').filter(Boolean)],
+    };
+  }
+};

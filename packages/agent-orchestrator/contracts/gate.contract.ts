@@ -69,7 +69,7 @@ const atItsGate = (
   a: ((taskId: string) => CloseoutAsked) | undefined,
   v: ((step: string) => Verdict | undefined) | undefined,
   s: SpendOf | undefined,
-): boolean => {
+) => {
   const step = steps.find((x) => x.name === name);
   if (step === undefined || theRunsWord(steps, run, name, p, c, a, v, s) !== 'awaiting approval') return false;
   return (
@@ -82,7 +82,7 @@ const atItsGate = (
  * Whether a step is an ending not yet filed whose approval would take what is not there to take: a step it comes after is sent
  * back, or every result branch is already on the base.
  */
-const anEndingNotToTake = (step: StepSpec, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]): boolean =>
+const anEndingNotToTake = (step: StepSpec, run: Run, asks: readonly RetryAsk[], standings: readonly BranchStanding[]) =>
   step.workspace === 'base' &&
   gated(step, run) &&
   !run.steps[step.name]?.taskId &&

@@ -25,7 +25,7 @@ export const tokensQuery = queryOptions({
  * (403).
  * @param name The token's name.
  */
-export const retireToken = (name: string): Promise<Token> =>
+export const retireToken = (name: string) =>
   call(
     (c) => c.tokens.retire({ params: { name } }),
     write(Token, 'The token may be retired: read the list again before retiring it again.'),

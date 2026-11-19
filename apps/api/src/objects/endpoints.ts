@@ -23,6 +23,7 @@ export type Endpoint = {
 };
 
 /** The `kind` a schema answers, where it is a literal: `RunList` for a list of runs; each member's for a union. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const kindsOf = (ast: SchemaAST.AST): string[] => {
   if (SchemaAST.isUnion(ast)) return ast.types.flatMap(kindsOf);
   if (!SchemaAST.isObjects(ast)) return [];
@@ -31,10 +32,10 @@ const kindsOf = (ast: SchemaAST.AST): string[] => {
 };
 
 /** A path of the `Api` as a pattern of the paths it serves: each `:name` one segment. */
-const patternOf = (path: string): RegExp => new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]+/g, '[^/]+')}$`);
+const patternOf = (path: string) => new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]+/g, '[^/]+')}$`);
 
 /** How many names a path leaves to the request: a path that names a segment (`/api/runs/watch`) is matched before one that takes any. */
-const namesIn = (path: string): number => path.match(/:[A-Za-z]+/g)?.length ?? 0;
+const namesIn = (path: string) => path.match(/:[A-Za-z]+/g)?.length ?? 0;
 
 /** Every endpoint of the `Api`, the fewest names first, so a request matches the most specific path that serves it. */
 export const ENDPOINTS: readonly Endpoint[] = Object.values(Api.groups)
@@ -52,7 +53,7 @@ export const ENDPOINTS: readonly Endpoint[] = Object.values(Api.groups)
  * @param method The request's HTTP method.
  * @param path The request's path, its query left off.
  */
-export const endpointOf = (method: string, path: string): Endpoint | undefined =>
+export const endpointOf = (method: string, path: string) =>
   ENDPOINTS.find((endpoint) => endpoint.method === method && endpoint.pattern.test(path));
 
 /**
@@ -63,7 +64,7 @@ export const endpointOf = (method: string, path: string): Endpoint | undefined =
  * @param method The request's HTTP method: a HEAD is read as a GET.
  * @param path The request's path.
  */
-export const routeAt = (matched: readonly string[], method: string, path: string): string | undefined => {
+export const routeAt = (matched: readonly string[], method: string, path: string) => {
   const route = matched.find((one) => one !== MOUNT);
   if (route !== undefined || !matched.includes(MOUNT)) return route;
   return endpointOf(method === 'HEAD' ? 'GET' : method, path)?.path;

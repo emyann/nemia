@@ -26,23 +26,23 @@ import { FOLDER_STAYS } from '../move/move.ts';
 /** Where the stand-in says a factory's files are: the root its paths are named under, as the files' are under the store's root. */
 export const MEMORY_ROOT = '/memory';
 
-const factoriesAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'factories', ...parts);
+const factoriesAt = (...parts: string[]) => path.posix.join(MEMORY_ROOT, 'factories', ...parts);
 
 /** A name that is no factory's, refused (`Invalid`) as the files refuse it, before anything is read or written. */
-const named = (name: string): string => {
+const named = (name: string) => {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return name;
 };
 
 /** The factory `name` of `factories` counted one change more where its level `now` changes the one it held (`was`); none for no factory. */
-const levelCounted = (factories: Map<string, Factory>, name: string, was: FactoryLevelFile | undefined, now: FactoryLevelFile): void => {
+const levelCounted = (factories: Map<string, Factory>, name: string, was: FactoryLevelFile | undefined, now: FactoryLevelFile) => {
   const factory = factories.get(name);
   if (factory !== undefined && levelDiffers(was, now)) factories.set(name, generationWritten(factory, factory, true));
 };
 
 /** The rules of `rules`, by factory, each factory as `held` reads it, checked as the files check them. */
-function rulesIn(rules: Map<string, string>, held: (name: string, notDone: string) => Factory): FactoryLayer['rules'] {
+function rulesIn(rules: Map<string, string>, held: (name: string, notDone: string) => Factory) {
   return {
     read: (name) => {
       held(name, 'There are no rules to read.');
@@ -64,14 +64,14 @@ function rulesIn(rules: Map<string, string>, held: (name: string, notDone: strin
       held(name, 'Nothing was removed.');
       return rules.delete(name);
     },
-  };
+  } satisfies FactoryLayer['rules'];
 }
 
 /**
  * The instructions of `instructions`, by factory, each factory as `held` reads it: one kept in its first folder reads as none, since the
  * stand-in reads no disk, and takes no text the store keeps.
  */
-function instructionsIn(instructions: Map<string, string>, held: (name: string, notDone: string) => Factory): FactoryLayer['instruction'] {
+function instructionsIn(instructions: Map<string, string>, held: (name: string, notDone: string) => Factory) {
   const instructionOf = (name: string, notDone: string) =>
     instructionRead(
       held(name, notDone),
@@ -99,7 +99,7 @@ function instructionsIn(instructions: Map<string, string>, held: (name: string, 
       storeKept(name, 'Nothing was removed.');
       return instructions.delete(name);
     },
-  };
+  } satisfies FactoryLayer['instruction'];
 }
 
 /** The files the store keeps beside a factory that the stand-in holds in maps of their own, at the paths the files keep them. */
@@ -107,10 +107,10 @@ const LEVEL_FILE = 'level.json';
 const SERVERS_FILE = 'servers.json';
 
 /** The bytes of `text` in UTF-8, as a file of a folder holds them. */
-const fileOf = (path: string, text: string): TreeFile => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
+const fileOf = (path: string, text: string) => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
 
 /** The text of a file of a folder. */
-const textOf = (file: TreeFile): string => new TextDecoder().decode(file.bytes);
+const textOf = (file: TreeFile) => new TextDecoder().decode(file.bytes);
 
 /** The maps the stand-in keeps a factory's files in, by factory. */
 type Kept = {
@@ -123,17 +123,17 @@ type Kept = {
 };
 
 /** Whether `path` is a file a map of `Kept` holds rather than the folder's own. */
-const isMapped = (path: string): boolean => [LEVEL_FILE, SERVERS_FILE, FACTORY_RULES_FILE, DEFAULT_INSTRUCTION].includes(path);
+const isMapped = (path: string) => [LEVEL_FILE, SERVERS_FILE, FACTORY_RULES_FILE, DEFAULT_INSTRUCTION].includes(path);
 
 /** The JSON of the file `file` of the folder of `name`, refused `Invalid` where it does not read. */
-const jsonOf = (name: string, file: TreeFile): unknown => {
+const jsonOf = (name: string, file: TreeFile) => {
   const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(textOf(file));
   if (Option.isNone(json)) throw new Invalid({ message: `${factoriesAt(name, file.path)} is not JSON. Nothing was placed.` });
   return json.value;
 };
 
 /** The folders of `kept`, as a layer's: read with what its maps hold, placed into them, removed from them. */
-function foldersIn(kept: Kept): FactoryLayer['folder'] {
+function foldersIn(kept: Kept) {
   const there = (name: string) =>
     kept.folders.has(name) || kept.levels.has(name) || kept.rules.has(name) || kept.instructions.has(name) || kept.servers.has(name);
   return {
@@ -183,11 +183,11 @@ function foldersIn(kept: Kept): FactoryLayer['folder'] {
       for (const map of [kept.folders, kept.stays, kept.levels, kept.rules, kept.instructions, kept.servers]) map.delete(name);
       return was;
     },
-  };
+  } satisfies FactoryLayer['folder'];
 }
 
 /** A fresh Factory door over maps: nothing filed, no level, rules, instruction, servers nor folder. */
-export function factoryDoorMemory(): Layer.Layer<never> {
+export function factoryDoorMemory() {
   const factories = new Map<string, Factory>();
   const levels = new Map<string, FactoryLevelFile>();
   const rules = new Map<string, string>();
@@ -196,7 +196,7 @@ export function factoryDoorMemory(): Layer.Layer<never> {
   const folders = new Map<string, readonly TreeFile[]>();
   const names = () => [...factories.keys()].sort();
   const missing = (name: string, notDone: string) => new Missing({ message: `${noFactoryLine(name, names())} ${notDone}` });
-  const held = (name: string, notDone: string): Factory => {
+  const held = (name: string, notDone: string) => {
     const factory = factories.get(named(name));
     if (factory === undefined) throw missing(name, notDone);
     return factory;

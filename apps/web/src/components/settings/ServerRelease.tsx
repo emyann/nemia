@@ -338,7 +338,7 @@ function FollowedUpgrade({ upgrade }: { upgrade: Upgrade }) {
 }
 
 /** The pieces new runs wait on: missing, at the cost of a run (a piece that declares no cost, an older server's, counted as one). */
-const waitedOn = (readiness: Readiness): Readiness => ({
+const waitedOn = (readiness: Readiness) => ({
   ready: false,
   pieces: readiness.pieces.filter((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run'),
 });
@@ -379,24 +379,24 @@ function WaitOn({ readiness }: { readiness: Readiness }) {
 let loadedWith: string | undefined;
 
 /** The release a version answer names, whole: its kind, tag, commit and folder. */
-const releaseKey = (release: Release | undefined): string =>
+const releaseKey = (release: Release | undefined) =>
   release === undefined ? '' : [release.kind, release.tag, release.commit, release.root].join('|');
 
 /** The release this page was loaded with: `now`'s key the first time it is asked, the one kept every time after. */
-function pageRelease(now: Release): string {
+function pageRelease(now: Release) {
   if (loadedWith === undefined) loadedWith = releaseKey(now);
   return loadedWith;
 }
 
 /** An error's message, whatever was thrown. */
-const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** What the section shows of the version and the upgrades read, a start being sent or refused, and an upgrades read that failed. */
 function shownOf(
   version: VersionAnswer,
   upgrades: { data: UpgradesRead | undefined; error: unknown },
   start: { starting?: Which; refused?: string },
-): ServerReleaseShown {
+) {
   const read = upgrades.data;
   return {
     running: versionWords(version).title,

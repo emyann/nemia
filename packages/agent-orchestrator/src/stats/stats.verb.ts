@@ -25,7 +25,7 @@ import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from 
 import { followedFeed } from '../rest/rest.verb.ts';
 import type { SeriesMemo } from '../series/series.ts';
 import { seriesHealth } from '../series/series.store.ts';
-import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
+import { dayOf, factsOf, keysOf, statsOf, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
 import { selectedRuns } from '../labels/labels.ts';
@@ -36,7 +36,7 @@ import { StoreRoot } from '../config/root.store.ts';
  * How a check's task ended (`CheckVerdict`): passed, refused (its exit code a verdict, `attemptVerdict`, and non-zero, `refusedCheck`), or
  * unfinished.
  */
-function verdictOf(view: TaskView | undefined): CheckVerdict {
+function verdictOf(view: TaskView | undefined) {
   const phase = phaseOfView(view);
   if (phase === 'succeeded') return 'passed';
   const verdict = attemptVerdict(view?.state.attempts.at(-1));
@@ -47,12 +47,12 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
  * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
  * is there.
  */
-const frozenRun = (home: string, run: Run, steps: readonly StepSpec[]): RunFrozen =>
+const frozenRun = (home: string, run: Run, steps: readonly StepSpec[]) =>
   frozenOf(
     { ...keysOf(run), day: dayOf(run.createdAt), at: run.createdAt, workflowDir: run.workflowDir },
     steps,
     new Map(steps.map((step) => [step.name, renderedSkillVersions(home, run, step)])),
-  );
+  ) satisfies RunFrozen;
 
 /**
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
@@ -100,7 +100,7 @@ type RunRead = { id: string; facts: RunFacts; unreadable: boolean; keeps: boolea
 export type StatsMemo = { cursor?: number; runs: Map<string, { stamp: string; read: RunRead }> };
 
 /** A memo that holds nothing: what a serving process starts with. */
-export const freshStatsMemo = (): StatsMemo => ({ runs: new Map() });
+export const freshStatsMemo = () => ({ runs: new Map() }) satisfies StatsMemo as StatsMemo;
 
 /**
  * How `stats` reads: `memo`, the memo it answers runs from and keeps them in, none by default, which reads every run; and `verify`, which
@@ -208,9 +208,9 @@ const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now
  * Whether a run is one `selectors` takes, off the labels of every run the Run door lists (`selectedRuns`): read only where a selector was
  * given, since it reads every record the memo would not.
  */
-function takenBy(listed: readonly Run[], selectors: Selectors): (run: string) => boolean {
+function takenBy(listed: readonly Run[], selectors: Selectors) {
   const ids = new Set(selectedRuns(listed, selectors).map((run) => run.id));
-  return (run) => ids.has(run);
+  return ((run) => ids.has(run)) satisfies (run: string) => boolean;
 }
 
 /**

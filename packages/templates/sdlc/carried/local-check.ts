@@ -24,7 +24,7 @@ const PLACEHOLDER = /^echo "Error: no test specified" && exit 1$/;
  * package manager's init wrote left out.
  * @param manifest The parsed `package.json`, whatever it holds.
  */
-export function localPlan(manifest: unknown): string[] {
+export function localPlan(manifest: unknown) {
   const scripts =
     typeof manifest === 'object' && manifest !== null && 'scripts' in manifest && typeof manifest.scripts === 'object'
       ? (manifest.scripts as Record<string, unknown> | null)
@@ -37,7 +37,7 @@ export function localPlan(manifest: unknown): string[] {
 }
 
 /** The runner `--runner` names in `argv`, where it names one. */
-const runnerOf = (argv: readonly string[]): string | undefined => {
+const runnerOf = (argv: readonly string[]) => {
   const at = argv.indexOf('--runner');
   const runner = at < 0 ? undefined : argv[at + 1];
   return runner === undefined || runner.trim() === '' || runner.startsWith('--') ? undefined : runner;
@@ -47,7 +47,7 @@ const runnerOf = (argv: readonly string[]): string | undefined => {
  * The check at `root`, each script run by `runner`: the exit of the first script of its plan that fails, or 0, with a line saying what
  * it ran or why nothing.
  */
-function main(root: string, runner: string): number {
+function main(root: string, runner: string) {
   const file = path.join(root, 'package.json');
   if (!fs.existsSync(file)) {
     process.stdout.write('nemia local check: no package.json here, so nothing is run: the review judges the work\n');

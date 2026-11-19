@@ -20,7 +20,7 @@ import type { ResolutionOwner } from '../../../contracts/resolution.contract.ts'
 type Texts = ReadonlyMap<string, string>;
 
 /** `choices` with each conflict of `merge` left without one given `'ours'`: what a part of the merge is composed with. */
-const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Record<string, Choice> =>
+const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>) =>
   Object.fromEntries(merge.conflicts.map((c) => [c.at, choices[c.at] ?? 'ours']));
 
 /**
@@ -28,7 +28,7 @@ const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>):
  * @param merge The merge of the trees: its clean entries and its conflicts.
  * @param choices The person's choice for each conflict, by where it is; a conflict with none is taken as the tree has it.
  */
-export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Texts {
+export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>) {
   const composed = compose(merge, filledFor(merge, choices));
   const entries = 'entries' in composed ? composed.entries : [];
   return new Map(
@@ -40,7 +40,7 @@ export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string,
 }
 
 /** The files of `texts` under `prefix`, each by its path after it, at any depth, or directly in it alone (`direct`). */
-const under = (texts: Texts, prefix: string, direct: boolean): { path: string; text: string }[] =>
+const under = (texts: Texts, prefix: string, direct: boolean) =>
   [...texts]
     .filter(([at]) => at.startsWith(prefix) && !(direct && at.slice(prefix.length).includes('/')))
     .map(([at, text]) => ({ path: at.slice(prefix.length), text }));
@@ -50,18 +50,18 @@ const under = (texts: Texts, prefix: string, direct: boolean): { path: string; t
  * @param factory The factory's name.
  * @param owner The owner of the conflicts chosen for: its kind and name.
  */
-export const keptLine = (factory: string, owner: ResolutionOwner): string =>
+export const keptLine = (factory: string, owner: ResolutionOwner) =>
   `Nothing was proposed; your choice is kept. Choose again for a conflict of the ${owner.kind} ${owner.name} to propose it again ` +
   `(nemia factory resolve ${factory} <conflict> --ours|--theirs|--file <path>).`;
 
 /** A removal no proposal makes, refused: what to type instead. */
-const unremovable = (factory: string, owner: ResolutionOwner, what: string): Invalid =>
+const unremovable = (factory: string, owner: ResolutionOwner, what: string) =>
   new Invalid({
     message: `nemia factory resolve: your choices remove ${what}, which no proposal removes: keep it, --ours or --file <path> on its conflict. ${keptLine(factory, owner)}`,
   });
 
 /** `read()`, or `Invalid` saying the owner as the choices compose it does not read. */
-function readOrRefused<A>(factory: string, owner: ResolutionOwner, read: () => A): A {
+function readOrRefused<A>(factory: string, owner: ResolutionOwner, read: () => A) {
   try {
     return read();
   } catch (err) {
@@ -72,7 +72,7 @@ function readOrRefused<A>(factory: string, owner: ResolutionOwner, read: () => A
 }
 
 /** The Workflow `name` as `texts` compose its folder, its removal where it is left no file. */
-function workflowOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown {
+function workflowOf(factory: string, owner: ResolutionOwner, texts: Texts) {
   const files = under(texts, `workflows/${owner.name}/`, true).map(({ path, text }) => ({ name: path, text }));
   if (files.length === 0) return undefined;
   const spec = readOrRefused(factory, owner, () => workflowSpecOf(files));
@@ -84,7 +84,7 @@ function workflowOf(factory: string, owner: ResolutionOwner, texts: Texts): unkn
 }
 
 /** The Agent `name` as `texts` compose its file and its result schema, its removal where it is left no file. */
-function agentOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown {
+function agentOf(factory: string, owner: ResolutionOwner, texts: Texts) {
   const folder = `workflows/${AGENTS_FOLDER}/`;
   const text = texts.get(`${folder}${owner.name}.md`);
   if (text === undefined) return undefined;
@@ -95,7 +95,7 @@ function agentOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown
 }
 
 /** The Skill `name` as `texts` compose its folder; refused where it is left no SKILL.md. */
-function skillOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown {
+function skillOf(factory: string, owner: ResolutionOwner, texts: Texts) {
   const files = under(texts, `workflows/${SKILLS_FOLDER}/${owner.name}/`, false);
   const page = files.find((f) => f.path === 'SKILL.md');
   if (page === undefined) throw unremovable(factory, owner, `the skill ${owner.name}'s SKILL.md`);
@@ -104,17 +104,17 @@ function skillOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown
 }
 
 /** The Hire `<workflow>.<step>` as the composed wiring hires its step: its agent, or none where the wiring hires no one there. */
-function hireOf(factory: string, owner: ResolutionOwner, texts: Texts): unknown {
+function hireOf(factory: string, owner: ResolutionOwner, texts: Texts) {
   const cut = owner.name.indexOf('.');
   const [workflow, step] = [owner.name.slice(0, cut), owner.name.slice(cut + 1)];
-  const wiring = readOrRefused(factory, owner, (): unknown => JSON.parse(texts.get(WIRING_FILE) ?? '{}'));
+  const wiring = readOrRefused(factory, owner, () => JSON.parse(texts.get(WIRING_FILE) ?? '{}'));
   const hires = isJsonObject(wiring) ? wiring.hires : undefined;
   const agent = isJsonObject(hires) ? hires[`${workflow}/${step}`] : undefined;
   return { workflow, step, ...(typeof agent === 'string' && { agent }) };
 }
 
 /** The Factory's rules and instruction as `texts` compose them; refused where either is removed. */
-function factoryOf(factory: string, owner: ResolutionOwner, texts: Texts, ours: Texts): unknown {
+function factoryOf(factory: string, owner: ResolutionOwner, texts: Texts, ours: Texts) {
   const rules = texts.get('RULES.md');
   const instruction = texts.get('NEMIA.md');
   if (rules === undefined && ours.has('RULES.md')) throw unremovable(factory, owner, `the factory ${factory}'s rules, RULES.md`);
@@ -138,18 +138,19 @@ export function ownerSpec(
   merge: TreeMerge,
   choices: Readonly<Record<string, Choice>>,
   ours: Texts,
-): unknown {
+) {
   const texts = composedTexts(merge, choices);
   switch (owner.kind) {
     case 'Workflow':
-      return workflowOf(factory, owner, texts);
+      return workflowOf(factory, owner, texts) as unknown;
     case 'Agent':
-      return agentOf(factory, owner, texts);
+      return agentOf(factory, owner, texts) as unknown;
     case 'Skill':
-      return skillOf(factory, owner, texts);
+      return skillOf(factory, owner, texts) as unknown;
     case 'Hire':
-      return hireOf(factory, owner, texts);
+      return hireOf(factory, owner, texts) as unknown;
     case 'Factory':
-      return factoryOf(factory, owner, texts, ours);
+      return factoryOf(factory, owner, texts, ours) as unknown;
   }
+  return undefined;
 }

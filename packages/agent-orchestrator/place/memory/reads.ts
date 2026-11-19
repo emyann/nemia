@@ -16,23 +16,23 @@ export type Refusal = { readonly refused: string };
 export type Reply<V extends PlaceVerb> = PlaceAnswers[V] | Refusal;
 
 /** A refusal in the place's words. */
-export const refused = (words: string): Refusal => ({ refused: words });
+export const refused = (words: string) => ({ refused: words });
 
 /**
  * The branch the test place names for the cut `leaf` of `run`: the git place's spelling (`runBranch` in `place/git/git.ts`) mirrored, so
  * a run's branches read the same on both places.
  */
-export const runBranch = (run: string, leaf: string): string => `${runBranches(run)}${leaf}`;
+export const runBranch = (run: string, leaf: string) => `${runBranches(run)}${leaf}`;
 
 /** The prefix every branch of `run` opens with, on the test place as on git's. */
-export const runBranches = (run: string): string => `wf/${run}/`;
+export const runBranches = (run: string) => `wf/${run}/`;
 
 /** How a directory the test place holds no repository in is said, with what makes one. */
-export const noRepository = (dir: string): string =>
+export const noRepository = (dir: string) =>
   `${dir} is no repository this test place holds: make one there with world.repository, or ask the place that made it`;
 
 /** `root`: the root of the repository that holds a checkout at `dir` or above it, or null where the place holds none there. */
-export function root(held: Held, { dir }: PlaceRequests['root']): Reply<'root'> {
+export function root(held: Held, { dir }: PlaceRequests['root']) {
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so it is in no repository: name a folder that is there`);
   const at = real(dir);
   for (const repo of held.repositories.values())
@@ -41,7 +41,7 @@ export function root(held: Held, { dir }: PlaceRequests['root']): Reply<'root'> 
 }
 
 /** `open`: the repository at `root`, the commit and the branch it is on, and the file a staged merge is marked by. */
-export function open(held: Held, { root }: PlaceRequests['open']): Reply<'open'> {
+export function open(held: Held, { root }: PlaceRequests['open']) {
   if (!isDirectory(root)) return refused(`${root} is not a directory: name a repository with --repo`);
   const at = checkoutAt(held, root);
   if (!at) return refused(noRepository(root));
@@ -54,75 +54,78 @@ export function open(held: Held, { root }: PlaceRequests['open']): Reply<'open'>
 }
 
 /** Whether a commit is within another, or unknown where the repository lacks one of them. */
-function withinOf(repo: Repository, commit: string, of: string): 'yes' | 'no' | 'unknown' {
+function withinOf(repo: Repository, commit: string, of: string) {
   const base = commitAt(repo, of);
   if (!base || !repo.commits.has(commit)) return 'unknown';
   return within(repo, commit, base.id) ? 'yes' : 'no';
 }
 
 /** Where one branch asked of stands against `base`, whose commit is `baseId`. */
-function stood(repo: Repository, base: string, baseId: string, one: PlaceRequests['standing']['branches'][number]): BranchStood {
+function stood(repo: Repository, base: string, baseId: string, one: PlaceRequests['standing']['branches'][number]) {
   const head = repo.branches.get(one.branch) ?? null;
   const commit = head ?? one.tip;
   const onBase = commit ? withinOf(repo, commit, base) : 'unknown';
   const known = one.known?.tip === commit && one.known?.pastBase !== null ? one.known?.pastBase : undefined;
   const inRunBase = onBase === 'yes' && known === undefined && commit ? withinOf(repo, commit, one.baseRef) : 'unknown';
   const pastBase = onBase !== 'yes' ? null : (known ?? (inRunBase === 'unknown' ? null : inRunBase === 'no'));
-  return { branch: one.branch, tip: head, onBase, pastBase, ahead: head === null ? null : ahead(repo, baseId, head) };
+  return { branch: one.branch, tip: head, onBase, pastBase, ahead: head === null ? null : ahead(repo, baseId, head) } satisfies BranchStood;
 }
 
 /** `standing`: every branch and its commit, and where each branch asked of stands against `base`. */
-export function standing(held: Held, { repo: dir, base, branches }: PlaceRequests['standing']): Reply<'standing'> {
+export function standing(held: Held, { repo: dir, base, branches }: PlaceRequests['standing']) {
   const repo = repositoryAt(held, dir);
-  if (!repo) return refused(`the branches of ${dir} cannot be listed: ${noRepository(dir)}`);
+  if (!repo) return refused(`the branches of ${dir} cannot be listed: ${noRepository(dir)}`) satisfies Reply<'standing'>;
   const baseAt = commitAt(repo, base);
   if (branches.length && !baseAt)
-    return refused(`${base} names no commit in ${dir}, the base the branches are asked of: is it a branch of that repository?`);
+    return refused(
+      `${base} names no commit in ${dir}, the base the branches are asked of: is it a branch of that repository?`,
+    ) satisfies Reply<'standing'>;
   const tips = Object.fromEntries([...repo.branches].sort(([a], [b]) => (a < b ? -1 : 1)));
-  return { tips, branches: baseAt ? branches.map((one) => stood(repo, base, baseAt.id, one)) : [] };
+  return { tips, branches: baseAt ? branches.map((one) => stood(repo, base, baseAt.id, one)) : [] } satisfies Reply<'standing'>;
 }
 
 /** `report`: what each branch the repository has changed since the commit it shares with the base. */
-export function report(held: Held, request: PlaceRequests['report']): Reply<'report'> {
+export function report(held: Held, request: PlaceRequests['report']) {
   const { repo: dir, baseRef, onto, branches, diffOf, present, atBase } = request;
-  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so nothing a branch in it changed can be read`);
+  if (!isDirectory(dir))
+    return refused(`${dir} is not a directory, so nothing a branch in it changed can be read`) satisfies Reply<'report'>;
   const repo = repositoryAt(held, dir);
   const base = repo && commitAt(repo, baseRef);
-  if (!repo || !base) return refused(`the base ${baseRef} cannot be read in ${dir}`);
+  if (!repo || !base) return refused(`the base ${baseRef} cannot be read in ${dir}`) satisfies Reply<'report'>;
   const read = branches.flatMap((branch) => {
     const tip = commitAt(repo, branch);
     return tip ? [{ branch, tip, changes: changesOf(baseOf(repo, base.id, tip.id)?.tree ?? {}, tip.tree) }] : [];
   });
-  const by = <A>(of: (one: (typeof read)[number]) => A): Record<string, A> => Object.fromEntries(read.map((one) => [one.branch, of(one)]));
+  const by = <A>(of: (one: (typeof read)[number]) => A) => Object.fromEntries(read.map((one) => [one.branch, of(one)]));
   return {
     at: { baseRef, onto: commitAt(repo, onto)?.id ?? null, tips: by(({ tip }) => tip.id) },
     files: by(({ changes }) => changes.map(({ path, status, added, removed }) => ({ added, removed, path, status }))),
     diffs: by(({ changes }) => Object.fromEntries(changes.filter((c) => diffOf.includes(c.path)).map((c) => [c.path, c.diff]))),
     present: by(({ tip }) => Object.fromEntries(present.map((p) => [p, kindIn(tip.tree, p)]))),
     atBase: Object.fromEntries(atBase.map((p) => [p, base.tree[p] ?? null])),
-  };
+  } satisfies Reply<'report'>;
 }
 
 /** Whether `branch` merges onto `onto` as both are now. */
-function tried(repo: Repository | undefined, { onto, branch }: { readonly onto: string; readonly branch: string }): TrialMerge {
+function tried(repo: Repository | undefined, { onto, branch }: { readonly onto: string; readonly branch: string }) {
   const [ours, theirs] = [repo && commitAt(repo, onto), repo && commitAt(repo, branch)];
-  if (!repo || !ours || !theirs) return { unknown: `${!ours ? onto : branch} names no commit the test place holds` };
+  if (!repo || !ours || !theirs) return { unknown: `${!ours ? onto : branch} names no commit the test place holds` } satisfies TrialMerge;
   const { conflicts } = merged(baseOf(repo, ours.id, theirs.id)?.tree ?? {}, ours.tree, theirs.tree);
-  return conflicts.length ? { clean: false, conflicts } : { clean: true };
+  return (conflicts.length ? { clean: false, conflicts } : { clean: true }) satisfies TrialMerge;
 }
 
 /** `trial`: the commit each base names now, and whether each branch merges onto its base. */
-export function trial(held: Held, { repo: dir, trials }: PlaceRequests['trial']): Reply<'trial'> {
-  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no branch in it can be tried`);
+export function trial(held: Held, { repo: dir, trials }: PlaceRequests['trial']) {
+  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no branch in it can be tried`) satisfies Reply<'trial'>;
   const repo = repositoryAt(held, dir);
   const at = Object.fromEntries(trials.map(({ onto }) => [onto, (repo && commitAt(repo, onto)?.id) ?? null]));
-  return { at, trials: trials.map((pair) => tried(repo, pair)) };
+  return { at, trials: trials.map((pair) => tried(repo, pair)) } satisfies Reply<'trial'>;
 }
 
 /** `status`: whose merge is staged in a checkout, whether it conflicts, and the tips a commit now would leave out. */
-export function status(held: Held, { repo: dir, tips }: PlaceRequests['status']): Reply<'status'> {
+export function status(held: Held, { repo: dir, tips }: PlaceRequests['status']) {
   const at = checkoutAt(held, dir);
-  if (!at) return refused(`no merge can be staged in ${dir}: ${noRepository(dir)}`);
+  if (!at) return refused(`no merge can be staged in ${dir}: ${noRepository(dir)}`) satisfies Reply<'status'>;
   const { repo, checkout } = at;
   const heads = checkout.staged?.heads ?? [];
   const asked = new Set(Object.values(tips));
@@ -137,14 +140,14 @@ export function status(held: Held, { repo: dir, tips }: PlaceRequests['status'])
     missing,
     tip: head,
     ...(landed ? { landedBy: landed } : {}),
-  };
+  } satisfies Reply<'status'>;
 }
 
 /**
  * The first commit of `head`'s first-parent line that holds every one of `ids`, each held by `head`: for each, the oldest commit of the
  * line that holds it, and of those the newest. Undefined where none is asked of. Read off the place's own graph, not git's walk.
  */
-function firstToHold(repo: Repository, head: string, ids: readonly string[]): string | undefined {
+function firstToHold(repo: Repository, head: string, ids: readonly string[]) {
   if (!ids.length) return undefined;
   const line: string[] = [];
   for (let at: string | undefined = head; at !== undefined; at = repo.commits.get(at)?.parents[0]) line.push(at);
@@ -153,7 +156,7 @@ function firstToHold(repo: Repository, head: string, ids: readonly string[]): st
 }
 
 /** A path the commit does not know, as the highest folder of it holding no path the commit knows, closed by `/`; else the path. */
-function unknownIn(known: readonly string[], file: string): string {
+function unknownIn(known: readonly string[], file: string) {
   const folders = file.split('/').slice(0, -1);
   const prefixes = folders.map((_, i) => `${folders.slice(0, i + 1).join('/')}/`);
   return prefixes.find((prefix) => !known.some((k) => k.startsWith(prefix))) ?? file;
@@ -163,7 +166,7 @@ function unknownIn(known: readonly string[], file: string): string {
  * The paths `found`'s checkout holds that its commit does not, those the commit knows first, each group in order: a folder the commit
  * does not know is named once, whatever it holds.
  */
-function changesIn({ repo, checkout }: Found): string[] {
+function changesIn({ repo, checkout }: Found) {
   const [was, now] = [treeOf(repo, checkout), readTree(checkout.dir)];
   const paths = [...new Set([...Object.keys(was), ...Object.keys(now)])].filter((p) => was[p] !== now[p]).sort();
   const news = paths.filter((p) => was[p] === undefined).map((p) => unknownIn(Object.keys(was), p));
@@ -174,7 +177,7 @@ function changesIn({ repo, checkout }: Found): string[] {
  * One workspace as `inventory` lists it: `gone` where its directory is no longer there, else removable; the test place holds no lock and
  * no workspace off its branch, so none is `held` and each is on its branch.
  */
-function left(found: Found): Left {
+function left(found: Found) {
   const { repo, checkout } = found;
   const there = fs.existsSync(checkout.dir);
   const changes = there ? changesIn(found) : [];
@@ -186,12 +189,12 @@ function left(found: Found): Left {
     clean: there ? !dirty(repo, checkout) : null,
     onBranch: true,
     ...(changes.length ? { changes } : {}),
-  };
+  } satisfies Left;
 }
 
 /** `inventory`: the workspaces a repository has inside `under`, and the branches of `run` alone with whether `base` holds each. */
-export function inventory(held: Held, { repo: dir, under, run, base }: PlaceRequests['inventory']): Reply<'inventory'> {
-  if (!isDirectory(dir)) return { workspaces: [], branches: [] };
+export function inventory(held: Held, { repo: dir, under, run, base }: PlaceRequests['inventory']) {
+  if (!isDirectory(dir)) return { workspaces: [], branches: [] } satisfies Reply<'inventory'>;
   const repo = repositoryAt(held, dir);
   if (!repo) throw new Error(noRepository(dir));
   const onto = commitAt(repo, base);
@@ -201,5 +204,5 @@ export function inventory(held: Held, { repo: dir, under, run, base }: PlaceRequ
       .filter(([branch]) => branch.startsWith(runBranches(run)))
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([branch, id]) => ({ branch, merged: Boolean(onto && within(repo, id, onto.id)) })),
-  };
+  } satisfies Reply<'inventory'>;
 }

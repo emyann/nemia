@@ -18,7 +18,7 @@ const IPV6_TEXT = /^[0-9A-Fa-f:.]+$/;
  * this file reaches nothing of the machine). An IPv6 zone (`%eth0`) is none.
  * @param text The text to read, as given: white space around it makes it no address.
  */
-export const isAddress = (text: string): boolean => {
+export const isAddress = (text: string) => {
   if (IPV4.test(text)) return true;
   if (!text.includes(':') || !IPV6_TEXT.test(text)) return false;
   try {
@@ -32,7 +32,7 @@ export const isAddress = (text: string): boolean => {
  * The text `value` asks for, its white space left out: blank where it is unset.
  * @param value The setting as read, or undefined where it is unset.
  */
-export const asked = (value: string | undefined): string => value?.trim() ?? '';
+export const asked = (value: string | undefined) => value?.trim() ?? '';
 
 /**
  * The names a write with no token may be addressed to: this machine's loopback, on any port. Such a write is a pairing's alone, every
@@ -44,14 +44,14 @@ const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
  * Whether `host` names this machine's loopback, on any port, in any case, the white space around it left out.
  * @param host A host, with or without its port, as a request or a setting names it.
  */
-export const loopback = (host: string): boolean => LOOPBACK_HOST.test(host.trim());
+export const loopback = (host: string) => LOOPBACK_HOST.test(host.trim());
 
 /**
  * The name `host` addresses, its port and the white space around it left out, in lower case, without a trailing dot: an IPv6 address
  * kept in its brackets.
  * @param host A host, with or without its port, as a request's `Host` names it.
  */
-export const nameOf = (host: string): string => {
+export const nameOf = (host: string) => {
   const text = host.trim().toLowerCase();
   const name = text.startsWith('[') ? text.slice(0, text.indexOf(']') + 1) : text.replace(/:\d{1,5}$/, '');
   return name.replace(/\.$/, '');
@@ -62,7 +62,7 @@ export const nameOf = (host: string): string => {
  * @param host A host, with or without its port, as a request's `Host` names it.
  * @param names The names the store is served at, each in lower case with no port, an IPv6 address in brackets.
  */
-export const servedAt = (host: string, names: readonly string[]): boolean => {
+export const servedAt = (host: string, names: readonly string[]) => {
   const name = nameOf(host);
   return name !== '' && names.includes(name);
 };

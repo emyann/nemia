@@ -14,7 +14,7 @@ import { type BranchReader, branchStandings, landedOf } from '../branches/branch
 import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spendKnown, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
-import { wordOfView, type EnginePhase } from '../views/views-words.ts';
+import { wordOfView } from '../views/views-words.ts';
 import { holdAdvice, holdNeedsYou, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
 import { type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
@@ -68,7 +68,7 @@ export type RunToDecide = (
  * What a person has to decide, as the board is given it: the package's own reading, with its words and the command that ends them. Null
  * where the package leaves it — a run still going, one called off, one whose ending has run, and a branch already on the base.
  */
-function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly StepSpec[]): RunToDecide | null {
+function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly StepSpec[]) {
   if (!t) return null;
   const said = toDecideWords(run, t);
   if (t.kind === 'result') return { ...t, said, command: `nemia decide ${run.id}` };
@@ -97,7 +97,7 @@ export type Spent = { usd: number; measured: number; unmeasured: number; live?: 
  * A spend as the board is given it (`Spent`), or null when nothing of it was measured.
  * @param spend The spend as it was measured.
  */
-export const spentOf = (spend: Spend): Spent | null =>
+export const spentOf = (spend: Spend) =>
   spendKnown(spend)
     ? {
         usd: spend.usd,
@@ -193,14 +193,14 @@ export type StepNeeds = {
  * The package decides it (`neverLands` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
  * it may never land without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
-const neverLands = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
+const neverLands = (w: Wait) => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
 /**
  * What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run.
  * @param run The run that waits.
  * @param waits The runs it waits on, as the reading found them; empty where it waits on none.
  */
-export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
+export function runWaitingOf(run: Run, waits: readonly Wait[]) {
   if (!waits.length) return null;
   return {
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
@@ -216,7 +216,7 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
  * @param run The run held.
  * @param holds The holds the reading found on it; empty where nobody holds it.
  */
-export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
+export function holdingOf(run: Run, holds: readonly Wait[]) {
   if (!run.hold || run.cancelledAt) return null;
   return {
     at: run.hold.at,
@@ -240,10 +240,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
  * and `succeeded` for a task held open that was closed after it signed, which it calls `between-attempts` until its next pass settles it.
  * @param views The engine's views of the tasks the request read.
  */
-export const wordOf =
-  (views: Views) =>
-  (taskId: string): EnginePhase | 'unknown' =>
-    wordOfView(views.get(taskId));
+export const wordOf = (views: Views) => (taskId: string) => wordOfView(views.get(taskId));
 
 /**
  * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason`, `on`, `via` and `verdict`): `on` null but on a
@@ -258,7 +255,7 @@ export type StepCodes = {
 };
 
 /** A row's codes as a door carries them (`StepCodes`): what qualifies its reason null where nothing does. */
-const doorCodes = (s: CodedStep & { verdict?: CheckVerdict }): StepCodes => ({
+const doorCodes = (s: CodedStep & { verdict?: CheckVerdict }) => ({
   phase: s.phase,
   reason: s.reason,
   on: s.on ?? null,
@@ -267,7 +264,7 @@ const doorCodes = (s: CodedStep & { verdict?: CheckVerdict }): StepCodes => ({
 });
 
 /** A run's codes as a door carries them: what qualifies its reason null where nothing does. */
-const runDoor = (c: CodedRun): { phase: RunPhase; reason: RunReason; on: WaitOn | null; via: AnswerVia | null } => ({
+const runDoor = (c: CodedRun) => ({
   phase: c.phase,
   reason: c.reason,
   on: c.on ?? null,
@@ -278,9 +275,7 @@ const runDoor = (c: CodedRun): { phase: RunPhase; reason: RunReason; on: WaitOn 
  * A run's word and codes as a door says them (`RunSummary`): `assess`'s status, and its phase and reason (`runCodes`).
  * @param judged The run's judgement, read down to its status, phase, reason and where it came from.
  */
-export const runSaid = (
-  judged: Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'>,
-): Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'> => ({
+export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'>) => ({
   status: judged.status,
   phase: judged.phase,
   reason: judged.reason,
@@ -292,7 +287,7 @@ export const runSaid = (
  * What `judged` holds of the step `name` in `of`, its codes or its words. Thrown for a step it did not judge, which a caller naming the
  * steps of the run it judged (`judgedSteps`) never asks for.
  */
-const judgedOf = <T>(of: ReadonlyMap<string, T>, name: string): T => {
+const judgedOf = <T>(of: ReadonlyMap<string, T>, name: string) => {
   const held = of.get(name);
   if (held === undefined) throw new Error(`${name} is no step of the judged run: name one of the steps judge read of it (judgedSteps).`);
   return held;
@@ -303,7 +298,7 @@ const judgedOf = <T>(of: ReadonlyMap<string, T>, name: string): T => {
  * @param judged The step's judgement, read down to its codes and words.
  * @param name The step's name.
  */
-export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string } => {
+export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string) => {
   const { phase, reason, on, via, verdict } = judgedOf(judged.codes, name);
   const word = judgedOf(judged.words, name);
   return { phase, reason, on, via, message: word, verdict };
@@ -403,7 +398,7 @@ const onTheBase = new Map<string, { filed: string; landed: Landed }>();
  * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
  * or a round, files a task of its own, so this changes exactly when the work that could grow a result branch has been done again.
  */
-const workFiled = (run: Run, steps: readonly StepSpec[]): string =>
+const workFiled = (run: Run, steps: readonly StepSpec[]) =>
   resultSteps(steps)
     .map((s) => `${s.name}:${run.steps[s.name]?.taskId ?? ''}:${run.steps[s.name]?.tries?.length ?? 0}`)
     .join(' ');
@@ -429,17 +424,11 @@ const workFiled = (run: Run, steps: readonly StepSpec[]): string =>
  * @param git The request's reader of the branches.
  * @param asked Told what was read of, or undefined where nobody watches.
  */
-export function standingsOf(
-  run: Run,
-  steps: readonly StepSpec[],
-  status: RunStatus,
-  git: BranchReader,
-  asked?: GitAsked,
-): BranchStanding[] {
-  if (!isRepositoryRun(run)) return [];
+export function standingsOf(run: Run, steps: readonly StepSpec[], status: RunStatus, git: BranchReader, asked?: GitAsked) {
+  if (!isRepositoryRun(run)) return [] satisfies BranchStanding[];
   const filed = workFiled(run, steps);
   const branches = branchesAsked(askedOf(run, steps, status));
-  if (!branches.length) return [];
+  if (!branches.length) return [] satisfies BranchStanding[];
   const known = (branch: string) => onTheBase.get(`${run.id}/${branch}`)?.filed === filed;
   try {
     const read = branchStandings(
@@ -451,10 +440,12 @@ export function standingsOf(
       if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, { filed, landed: landedOf(run, git)(stood.branch) });
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     if (asked && read.some((stood) => stood.where === 'unread')) asked.failed = true;
-    return branches.map((branch) => read.find((stood) => stood.branch === branch) ?? { branch, where: 'on' as const });
+    return branches.map(
+      (branch) => read.find((stood) => stood.branch === branch) ?? { branch, where: 'on' as const },
+    ) satisfies BranchStanding[];
   } catch {
     if (asked) asked.failed = true;
-    return [];
+    return [] satisfies BranchStanding[];
   }
 }
 
@@ -466,12 +457,10 @@ export function standingsOf(
  * @param steps The steps the run is judged by.
  * @param git The request's reader of the branches.
  */
-export const landedThrough =
-  (run: Run, steps: readonly StepSpec[], git: BranchReader) =>
-  (branch: string): Landed => {
-    const kept = onTheBase.get(`${run.id}/${branch}`);
-    return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
-  };
+export const landedThrough = (run: Run, steps: readonly StepSpec[], git: BranchReader) => (branch: string) => {
+  const kept = onTheBase.get(`${run.id}/${branch}`);
+  return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
+};
 
 /**
  * What `standingsOf` read for one run: the result branches not found on the base, and whether one was unread or the read failed
@@ -581,11 +570,11 @@ export const judge = Effect.fn('judge')(function* (
  * Whether a step's codes say its harness stopped its session to ask, with no closeout signed off blocked: the engine's `needs-human`.
  * @param codes The step's codes: its reason, and how it was answered where it was.
  */
-export const atHarness = (codes: { reason: StepReason; via?: AnswerVia | null }): boolean =>
+export const atHarness = (codes: { reason: StepReason; via?: AnswerVia | null }) =>
   codes.reason === 'AwaitingAnswer' && codes.via === 'session';
 
 /** The name a step's harness lists its current try's session under (`nameFor`); null for a step with no task, or no attempt yet. */
-const sessionOf = (taskId: string | null | undefined, view: ReturnType<Views['get']>): string | null => {
+const sessionOf = (taskId: string | null | undefined, view: ReturnType<Views['get']>) => {
   const attempt = view?.state.attempts.at(-1)?.n;
   return taskId && attempt !== undefined ? nameFor(taskId, attempt) : null;
 };
@@ -602,7 +591,7 @@ const sessionOf = (taskId: string | null | undefined, view: ReturnType<Views['ge
  * @param views The engine's views of the tasks the request read.
  * @param judged The step's judgement, read down to its codes, whether it waits on you, and what it put beside its status.
  */
-export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'codes' | 'waitingOnYou' | 'beside'>): StepNeeds {
+export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'codes' | 'waitingOnYou' | 'beside'>) {
   const taskId = run.steps[name]?.taskId;
   const view = taskId ? views.get(taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;

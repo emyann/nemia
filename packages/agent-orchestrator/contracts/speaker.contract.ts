@@ -23,7 +23,7 @@ export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
 export type SpeakerRefused = { kind: 'Invalid'; message: string };
 
 /** Whether `speaker` is an agent whose name is one an agent speaks under. */
-const wellNamedAgent = (speaker: Speaker): boolean => speaker.kind === 'agent' && speakerNameRefusal(speaker.name) === undefined;
+const wellNamedAgent = (speaker: Speaker) => speaker.kind === 'agent' && speakerNameRefusal(speaker.name) === undefined;
 
 const speakerRefusalSpec = spec<(speaker: Speaker) => SpeakerRefused | null>({
   ensures: {

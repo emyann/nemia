@@ -10,7 +10,7 @@
  * `Api`'s 403 with its reason, as every refusal is answered by its kind (`refusedAs`); a write the disk refused is `Failed`, a 500 in its
  * own words.
  */
-import { approveProgram, declineProgram, proposalGet, proposalsList, proposeProgram, type ProposalPlace } from 'agent-orchestrator';
+import { approveProgram, declineProgram, proposalGet, proposalsList, proposeProgram } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
@@ -22,7 +22,7 @@ import { readsBounded } from '../objects/answer-bound.ts';
  * Where a proposal is judged and applied: the store's root, whose factories say their own repositories.
  * @param s The request's services, its caller and the place it is answered in.
  */
-export const placeOf = (s: Served): ProposalPlace => ({ home: s.home });
+export const placeOf = (s: Served) => ({ home: s.home });
 
 export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>
   handlers

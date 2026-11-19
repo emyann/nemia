@@ -49,7 +49,7 @@ function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
 }
 
 /** What the activation says of where it stands: installing, installed and to sign in, or installed and signed in. */
-const activationSaid = (activation: Activation): string => {
+const activationSaid = (activation: Activation) => {
   if (!activation.installed) return 'The server installs it: its output shows here as it runs.';
   return activation.choice.signIn?.state === 'met'
     ? 'It is installed and signed in: a session can start on it.'

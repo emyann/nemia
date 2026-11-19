@@ -29,7 +29,7 @@ import {
 import { ANSWER_MOST } from 'objects';
 import { McpAsker } from './capabilities/capabilities.ts';
 import { routeOf } from './request/request.ts';
-import { type Place, type PlaceQuery, placeFor } from './factory/place.ts';
+import { type Place, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
 import type { UpgradeStarts } from './upgrades/index.ts';
@@ -45,7 +45,7 @@ import type { StepRun } from './step/step.ts';
 export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS.ProcessEnv; readonly running?: Running }>()(
   'api/ApiConfig',
 ) {
-  static readonly layer = (env: NodeJS.ProcessEnv, running?: Running): Layer.Layer<ApiConfig> =>
+  static readonly layer = (env: NodeJS.ProcessEnv, running?: Running) =>
     Layer.succeed(ApiConfig)(running === undefined ? { env } : { env, running });
 }
 
@@ -139,7 +139,7 @@ export const traceOf = Effect.fnUntraced(function* (c: RequestContext<ApiEnv>) {
 });
 
 /** `program` under the request's server span, where `saidRequest` opened one. */
-const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect<A, E, R>) =>
   c.var.span === undefined ? program : Effect.withParentSpan(program, c.var.span);
 
 /**
@@ -211,15 +211,14 @@ export const POLL_READS = Metric.histogram('api.poll.reads', {
 });
 
 /** The files the engine has read so far, its journals among them, or none for an engine that keeps no count (a test's fake). */
-const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
-  typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined);
+const readsOf = (e: Engine['Service']) => (typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined));
 
 /**
  * The factory and the repository the request names, as `placeFor` reads them: its `?factory=` and `?repo=`; and, for a `?repo=` with no
  * `?factory=` under a namespace's path (`/api/namespaces/<namespace>/…`), that namespace's factory, so the repository is judged against
  * the factory the handler places the request in (`placedIn`) and not the default's, which reads only a factory's repository.
  */
-function placeQueryOf(c: RequestContext<ApiEnv>): PlaceQuery {
+function placeQueryOf(c: RequestContext<ApiEnv>) {
   const factory = c.req.query('factory');
   const repo = c.req.query('repo');
   if (factory !== undefined || repo === undefined) return { factory, repo };
@@ -237,7 +236,7 @@ function placeQueryOf(c: RequestContext<ApiEnv>): PlaceQuery {
  * @param c The request's context, carrying the app's runtime and the request's span.
  * @param handle The handler's body, given the request's services.
  */
-export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
+export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>) =>
   c.var.runtime.runPromise(
     underRequest(
       c,
@@ -245,10 +244,10 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         const { env, running } = yield* ApiConfig;
         const context = yield* Effect.context<Services>();
         const e = yield* Engine;
-        const inRequest = <A, E>(program: Effect.Effect<A, E, Services | EngineService>): Promise<A> =>
+        const inRequest = <A, E>(program: Effect.Effect<A, E, Services | EngineService>) =>
           Effect.runPromiseWith(context)(underRequest(c, Effect.provideService(program, EngineService, e)));
         const home = yield* StoreRoot;
-        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, home);
+        const placedIn = (namespace: string) => placeFor({ factory: namespace, repo: c.req.query('repo') }, home);
         const services = {
           env,
           running,

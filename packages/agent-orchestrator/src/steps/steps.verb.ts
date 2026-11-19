@@ -5,7 +5,6 @@
  * (`test/boundary.test.ts`); the refusal and the frozen read are pure (`steps.ts`).
  */
 import { Cause, Effect, Exit, Option } from 'effect';
-import type { StepSpec } from '../workflow.ts';
 import { orderSteps } from '../workflow.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -28,7 +27,7 @@ import type { ParentRun } from '../wait/wait.ts';
  * folder that does not load — any failure or defect of the read but an interruption — fails `UnloadedFolder`.
  * @param run The run's record.
  */
-export const stepsOf = (run: Run): Effect.Effect<StepSpec[], Refusal> => {
+export const stepsOf = (run: Run) => {
   const frozen = frozenStepsOf(run);
   if (frozen !== undefined) return Effect.succeed(frozen);
   return Effect.gen(function* () {
@@ -51,14 +50,14 @@ export const stepsOf = (run: Run): Effect.Effect<StepSpec[], Refusal> => {
   });
 };
 
-const wordsOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const wordsOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
  * Why the tick leaves `run` out of its pass, read now: the words of its unfrozen folder that does not load (`unloadedFolder`); undefined
  * for a run whose steps read. Fails any other refusal.
  * @param run The run's record.
  */
-export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal> =>
+export const unloadedOf = (run: Run) =>
   stepsOf(run).pipe(
     Effect.as(undefined),
     Effect.catchIf(
@@ -72,7 +71,7 @@ export const unloadedOf = (run: Run): Effect.Effect<string | undefined, Refusal>
  * goes on without the steps and says why. Fails any other refusal, so a read given no store root is refused, never read as no steps.
  * @param run The run's record.
  */
-export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: StepSpec[] } | { unloaded: string }, Refusal> =>
+export const stepsOrWhy = (run: Run) =>
   stepsOf(run).pipe(
     Effect.map((steps) => ({ steps })),
     Effect.catchIf(
@@ -86,7 +85,7 @@ export const stepsOrWhy = (run: Run): Effect.Effect<{ steps: StepSpec[] } | { un
  * run, as a pause's finishing tasks and held checks are. Fails any other refusal.
  * @param run The run's record.
  */
-export const stepsOrNone = (run: Run): Effect.Effect<StepSpec[], Refusal> =>
+export const stepsOrNone = (run: Run) =>
   stepsOf(run).pipe(
     Effect.catchIf(
       (err) => err instanceof UnloadedFolder,
@@ -99,7 +98,7 @@ export const stepsOrNone = (run: Run): Effect.Effect<StepSpec[], Refusal> =>
  * (`(run) => among.get(run.id) ?? []`) rather than reading the folder once per helper.
  * @param runs The runs' records.
  */
-export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<string, readonly StepSpec[]>, Refusal> =>
+export const stepsAmong = (runs: readonly Run[]) =>
   Effect.map(
     Effect.forEach(runs, (run) => Effect.map(stepsOrNone(run), (steps) => [run.id, steps] as const)),
     (pairs) => new Map(pairs),
@@ -114,7 +113,7 @@ export const stepsAmong = (runs: readonly Run[]): Effect.Effect<ReadonlyMap<stri
  * @param id The waited-on run's id, as given.
  * @param git The reader that says which result branches are gone.
  */
-export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<ParentRun, 'record' | 'gone' | 'unread'>, Refusal> =>
+export const parentRecord = (id: string, git: BranchReader) =>
   Effect.gen(function* () {
     const read = yield* Effect.exit(
       Effect.flatMap(
@@ -132,4 +131,7 @@ export const parentRecord = (id: string, git: BranchReader): Effect.Effect<Pick<
       ? yield* tried(() => branches.filter((b) => git.unread(cut, b) === undefined && !git.has(cut.repo, b) && !git.landed(cut, b)))
       : [];
     return { record, ...(gone.length ? { gone } : {}) };
-  });
+  }) satisfies Effect.Effect<Pick<ParentRun, 'record' | 'gone' | 'unread'>, Refusal> as Effect.Effect<
+    Pick<ParentRun, 'record' | 'gone' | 'unread'>,
+    Refusal
+  >;

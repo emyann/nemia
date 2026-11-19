@@ -5,7 +5,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { WorkflowFile } from 'objects';
 import { Refused } from '../refused.ts';
 
 /**
@@ -13,7 +12,7 @@ import { Refused } from '../refused.ts';
  * @param file The path of the file to read.
  * @param command The command's name, said in the refusal.
  */
-export function textOf(file: string, command: string): string {
+export function textOf(file: string, command: string) {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (err) {
@@ -29,7 +28,7 @@ export function textOf(file: string, command: string): string {
  * @param folder The path of the draft folder.
  * @param command The command's name, said in a refusal.
  */
-export function folderFiles(folder: string, command: string): WorkflowFile[] {
+export function folderFiles(folder: string, command: string) {
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
     throw new Refused(`nemia ${command} reads the folder ${path.resolve(folder)}, and it is not one. Name the draft folder.`);
   const entries = fs.readdirSync(folder, { withFileTypes: true });
@@ -51,7 +50,7 @@ export function folderFiles(folder: string, command: string): WorkflowFile[] {
  * @param file The path of the agent's file.
  * @param command The command's name, said in a refusal.
  */
-export function agentFiles(file: string, command: string): WorkflowFile[] {
+export function agentFiles(file: string, command: string) {
   const text = textOf(file, command);
   const dir = path.dirname(file);
   const own = path.basename(file);

@@ -22,7 +22,7 @@ import { templateNameRefusal } from './door/templates.ts';
  * The folder of the store the templates sent to its api are kept in, each `<name>-<digest>.tgz`.
  * @param home The store's root folder.
  */
-export const sentTemplatesDir = (home: string): string => path.join(home, 'templates-sent');
+export const sentTemplatesDir = (home: string) => path.join(home, 'templates-sent');
 
 /**
  * The request's template of the `--template` word `given`, as `sourceGiven` reads it: a template's name is a builtin template's, sent by
@@ -30,8 +30,8 @@ export const sentTemplatesDir = (home: string): string => path.join(home, 'templ
  * neither (`Missing`, as an apply here refuses it), and a folder whose files cannot be packed (`Invalid`, each problem at its file).
  * @param given The `--template` word: a builtin template's name, an archive's path or a folder's.
  */
-export const templateGiven = (given: string): Effect.Effect<TemplateGiven, Refusal> =>
-  tried((): TemplateGiven => {
+export const templateGiven = (given: string) =>
+  tried(() => {
     if (templateNameRefusal(given) === null) return { name: given };
     const at = path.resolve(given);
     if (fs.statSync(at, { throwIfNoEntry: false })?.isFile()) return { archive: fs.readFileSync(at).toString('base64') };
@@ -41,10 +41,7 @@ export const templateGiven = (given: string): Effect.Effect<TemplateGiven, Refus
         message: `${at} cannot be sent, since it cannot be packed:\n${tree.problems.map((p) => `  ${p.file}: ${p.message}`).join('\n')}\nNothing was sent.`,
       });
     return { archive: packArchive(tree.name, tree.files).archive.toString('base64') };
-  });
-
-/** A template taken: the source a verb reads it at, and whether this request wrote it there. */
-type Taken = { readonly source: string; readonly wrote: string | null };
+  }) satisfies Effect.Effect<TemplateGiven, Refusal> as Effect.Effect<TemplateGiven, Refusal>;
 
 /**
  * The template `given` as a source under the store `home`: a name as it is, refused where it names no template (`Invalid`); a path as it
@@ -52,7 +49,7 @@ type Taken = { readonly source: string; readonly wrote: string | null };
  * unpacked to be checked, refused as `unpackArchive` refuses it (`Invalid`), and kept at `<name>-<digest>.tgz`, written by this request
  * where none is there yet.
  */
-function taken(home: string, given: TemplateGiven): Taken {
+function taken(home: string, given: TemplateGiven) {
   if ('name' in given) {
     if (templateNameRefusal(given.name) !== null)
       throw new Invalid({
@@ -86,11 +83,7 @@ function taken(home: string, given: TemplateGiven): Taken {
  * @param keep `never` to remove an archive this request wrote as it ends; `made` to keep it unless `use` failed.
  * @param use What is done with the template's source, given its place.
  */
-export const withTemplateTaken = <A, E, R>(
-  given: TemplateGiven,
-  keep: 'never' | 'made',
-  use: (source: string) => Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | Refusal, R | StoreRoot> =>
+export const withTemplateTaken = <A, E, R>(given: TemplateGiven, keep: 'never' | 'made', use: (source: string) => Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     return yield* Effect.acquireUseRelease(

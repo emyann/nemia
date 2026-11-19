@@ -2,7 +2,6 @@
  * What a detached harness's look at the names it was told found, gathered into an observation and the warnings to log.
  */
 import type { Sighting } from '../../core/index.ts';
-import type { Observation } from '../seam.ts';
 
 /**
  * What a look told `names` found: each one's sighting, a name whose run file is there and gave none unread, why each of those was
@@ -11,10 +10,7 @@ import type { Observation } from '../seam.ts';
  * @param names The names of the sessions the look was told to read.
  * @param look Looks one name up: its sighting and its warning, `{}` where its run file could not be read, undefined where there is none.
  */
-export const lookedFor = (
-  names: readonly string[],
-  look: (name: string) => { sighting?: Sighting; warning?: string } | undefined,
-): { value: Observation; warnings: string[] } => {
+export const lookedFor = (names: readonly string[], look: (name: string) => { sighting?: Sighting; warning?: string } | undefined) => {
   const seen = new Map<string, Sighting>();
   const unread = new Set<string>();
   const unreadWhy = new Map<string, string>();

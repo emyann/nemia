@@ -3,9 +3,8 @@
  * workflow it offers on its repository (`listing`), the template it is made from (`template`), its volumes (`volumes`) and its
  * instruction (`instruction`). Each story seeds its query client with them (`seeded`, beside the proposals' fixtures).
  */
-import type { Factory, FactoryInstruction, FactoryTemplate, FactoryVolume } from '../../src/lib/api/factories';
+import type { FactoryTemplate, FactoryVolume } from '../../src/lib/api/factories';
 import type { WorkflowListing } from '../../src/lib/api/workflows';
-import type { FactoryBlock } from '../../src/lib/factories';
 import { FACTORY, factoryView } from './proposals';
 
 /**
@@ -14,7 +13,7 @@ import { FACTORY, factoryView } from './proposals';
  * @param name The factory's name.
  * @param error Why its file does not read; null where it does.
  */
-export const block = (name: string, error: string | null = null): FactoryBlock => ({
+export const block = (name: string, error: string | null = null) => ({
   name,
   default: false,
   repos: ['nemia'],
@@ -27,7 +26,7 @@ export const block = (name: string, error: string | null = null): FactoryBlock =
 });
 
 /** The factory the start's stories start in, offering `build` and `quick`: on one repository, or on two where `repos` says so. */
-export const offering = (repos: readonly string[] = ['/work/nemia']): Factory => ({
+export const offering = (repos: readonly string[] = ['/work/nemia']) => ({
   ...factoryView(FACTORY),
   worksOn: [...repos],
   workflows: ['build', 'quick'],
@@ -39,7 +38,7 @@ export const offering = (repos: readonly string[] = ['/work/nemia']): Factory =>
  * @param name The workflow's name.
  * @param unfilled Why a run of it cannot start in the factory; null where it can.
  */
-export const listing = (name: string, unfilled: string | null = null): WorkflowListing => ({
+export const listing = (name: string, unfilled: string | null = null) => ({
   name,
   from: 'repo',
   dir: `/work/nemia/workflows/${name}`,
@@ -52,7 +51,7 @@ export const listing = (name: string, unfilled: string | null = null): WorkflowL
   version: `${name}-1`,
   error: null,
   unfilled,
-});
+}) satisfies WorkflowListing;
 
 /** The template the factory is made from, before the daemon has rendered it: no parameters, no condition. */
 export const unrendered: FactoryTemplate = { source: 'builtin:sdlc', version: '3.11.0', params: {}, applied: null, conditions: [] };
@@ -79,7 +78,7 @@ export const volumes: FactoryVolume[] = [
  * The factory's instruction: kept in the store, its words given; or, with `store` false, read from `NEMIA.md` in its folder.
  * @param store Whether the store keeps it.
  */
-export const instruction = (store: boolean): FactoryInstruction => ({
+export const instruction = (store: boolean) => ({
   name: FACTORY,
   path: null,
   store,
@@ -93,5 +92,5 @@ export const instruction = (store: boolean): FactoryInstruction => ({
  * Why `workflow` cannot start in the factory: its implement step, which its hires leave with no agent, and the hire that fills it.
  * @param workflow The workflow's name.
  */
-export const unfilled = (workflow: string): string =>
+export const unfilled = (workflow: string) =>
   `implement: no agent fills it in ${FACTORY}: nemia factory hire ${FACTORY} <agent> --step ${workflow}/implement`;

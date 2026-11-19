@@ -17,25 +17,25 @@ import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
-import { runMarkMove, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
+import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
 
 /** The ask's key: the step and number its file is named by (`askWhere`). */
-const keyOf = (person: PersonRequest): AskKey =>
-  person.of === 'base'
+const keyOf = (person: PersonRequest) =>
+  (person.of === 'base'
     ? { of: 'base', step: person.ask.merge.target, n: person.ask.merge.try }
-    : { of: person.of, step: person.ask.step, n: 'round' in person.ask ? person.ask.round : person.ask.try };
+    : { of: person.of, step: person.ask.step, n: 'round' in person.ask ? person.ask.round : person.ask.try }) satisfies AskKey;
 
 /** An ask's name in the stand-in, by which of its verb it is: no file is written, so none has to keep its former name. */
-const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
-const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
+const nameOf = ({ of, step, n }: AskKey) => `${of}-${step}-${n}`;
+const runsAt = (...parts: string[]) => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
 const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause'] as const;
-const recordOf = (run: Run): Run => {
+const recordOf = (run: Run) => {
   const kept: Record<string, unknown> = { ...run };
   for (const key of COMPOSED) delete kept[key];
   return structuredClone(kept) as Run;
@@ -60,28 +60,29 @@ type State = {
   versions: Map<string, number>;
 };
 
-const stateOf = (): State => ({
-  records: new Map(),
-  cancelled: new Map(),
-  cancellers: new Map(),
-  pruned: new Map(),
-  holds: new Map(),
-  unheld: new Map(),
-  labels: new Map(),
-  said: new Map(),
-  refresh: new Map(),
-  asks: new Map(),
-  forgetting: new Map(),
-  versions: new Map(),
-});
+const stateOf = () =>
+  ({
+    records: new Map(),
+    cancelled: new Map(),
+    cancellers: new Map(),
+    pruned: new Map(),
+    holds: new Map(),
+    unheld: new Map(),
+    labels: new Map(),
+    said: new Map(),
+    refresh: new Map(),
+    asks: new Map(),
+    forgetting: new Map(),
+    versions: new Map(),
+  }) satisfies State as State;
 
 /** The marks the stand-in holds of `id` (`runMarkOf`), which each writer of one asks the machine with, as the files' writers do. */
-const marksIn = (st: State, id: string): RunMark =>
+const marksIn = (st: State, id: string) =>
   runMarkOf({ cancelled: st.cancelled.has(id), pruned: st.pruned.has(id), held: st.holds.has(id) });
 
 /** A change to what the stand-in holds of `id`: its stamp moves. */
-const touch = (st: State, id: string): void => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
-const asksOf = (st: State, id: string): Map<string, Held> => st.asks.get(id) ?? new Map();
+const touch = (st: State, id: string) => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
+const asksOf = (st: State, id: string) => (st.asks.get(id) ?? new Map()) satisfies Map<string, Held> as Map<string, Held>;
 const waiting = (st: State, id: string, of: AskOf) =>
   [...asksOf(st, id).values()].filter((h) => !h.done && h.person.of === of).map((h) => structuredClone(h.person.ask));
 
@@ -90,7 +91,7 @@ const approvalsHeld = (st: State, id: string) =>
   [...asksOf(st, id).values()].flatMap((h) => (!h.done && h.person.of === 'gate' ? [structuredClone(h.person.ask)] : []));
 
 /** The run `id`, its person's files composed onto it as `runRecord` composes them. */
-function readOf(st: State, id: string): Run {
+function readOf(st: State, id: string) {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   const approvals = approvalsHeld(st, id).filter((a) => workStands(record, a));
@@ -114,7 +115,7 @@ function readOf(st: State, id: string): Run {
  * Remove what the stand-in holds of `id`, answering each name removed as the files name it under `WF_ROOT`: a run from a card, its claim
  * of the card too, which the stand-in holds as the record itself, a run created only while no other from its card stands.
  */
-function forgetOf(st: State, id: string): string[] {
+function forgetOf(st: State, id: string) {
   const card = st.records.get(id)?.from?.inbox;
   const removed: string[] = [];
   const named: Array<[Map<string, unknown>, string]> = [
@@ -135,9 +136,9 @@ function forgetOf(st: State, id: string): string[] {
   return removed;
 }
 
-function runsOf(st: State): RunsLayer['runs'] {
+function runsOf(st: State) {
   const read = (id: string) => readOf(st, id);
-  const ids = (): string[] => [...st.records.keys()].sort();
+  const ids = () => [...st.records.keys()].sort();
   return {
     read,
     list: (_said, kept) => ids().map((id) => kept?.(id) ?? read(id)),
@@ -183,21 +184,21 @@ function runsOf(st: State): RunsLayer['runs'] {
       const marker = st.pruned.get(id);
       return marker === undefined ? undefined : structuredClone(marker);
     },
-  };
+  } satisfies RunsLayer['runs'];
 }
 
 /**
  * The name an ask set aside is kept under once another is written at its name, as a file in `done/` is never written over (`doneWith`):
  * its name with `.2`, `.3`, … after it, the first not held.
  */
-const keptAside = (held: ReadonlyMap<string, Held>, name: string): string => {
+const keptAside = (held: ReadonlyMap<string, Held>, name: string) => {
   let n = 2;
   while (held.has(`${name}.${n}`)) n++;
   return `${name}.${n}`;
 };
 
 /** Set aside each ask of `of` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
-function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: string; n: number }>): void {
+function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: string; n: number }>) {
   for (const { step, n } of spent) {
     const held = asksOf(st, id).get(nameOf({ of, step, n }));
     if (held && !held.done) {
@@ -207,7 +208,7 @@ function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: st
   }
 }
 
-function asksGroup(st: State): RunsLayer['asks'] {
+function asksGroup(st: State) {
   return {
     read: (id) => ({
       asks: waiting(st, id, 'try') as RetryAsk[],
@@ -275,10 +276,10 @@ function asksGroup(st: State): RunsLayer['asks'] {
       touch(st, id);
       return runsAt(`${id}.asks`, 'done', name);
     },
-  };
+  } satisfies RunsLayer['asks'];
 }
 
-function holdsOf(st: State): RunsLayer['holds'] {
+function holdsOf(st: State) {
   return {
     lift: (id, at, actor) => {
       if (runMarkMove(marksIn(st, id), 'lift').kind !== 'edge') return false;
@@ -302,17 +303,17 @@ function holdsOf(st: State): RunsLayer['holds'] {
       return structuredClone(hold);
     },
     stands: (id) => st.holds.has(id),
-  };
+  } satisfies RunsLayer['holds'];
 }
 
 /** What was said to the run's steps before each was filed, by step, in the order kept, as `saidBefore` composes it; none where none. */
-function saidBeforeOf(st: State, id: string): Pick<Run, 'saidBefore'> {
+function saidBeforeOf(st: State, id: string) {
   const byStep: Record<string, SaidBefore[]> = {};
   for (const { step, at, text } of st.said.get(id) ?? []) (byStep[step] ??= []).push({ at, text });
   return Object.keys(byStep).length ? { saidBefore: byStep } : {};
 }
 
-function saidOf(st: State): RunsLayer['said'] {
+function saidOf(st: State) {
   return {
     put: (id, step, text) => {
       const kept = { at: new Date().toISOString(), text };
@@ -320,20 +321,20 @@ function saidOf(st: State): RunsLayer['said'] {
       touch(st, id);
       return { ...kept };
     },
-  };
+  } satisfies RunsLayer['said'];
 }
 
-function labelsOf(st: State): RunsLayer['labels'] {
+function labelsOf(st: State) {
   return {
     put: (id, labels) => {
       if (Object.keys(labels).length) st.labels.set(id, { ...labels });
       else if (!st.labels.delete(id)) return;
       touch(st, id);
     },
-  };
+  } satisfies RunsLayer['labels'];
 }
 
-function refreshOf(st: State): RunsLayer['refresh'] {
+function refreshOf(st: State) {
   return {
     put: (id) => {
       if (st.refresh.has(id)) return null;
@@ -348,10 +349,10 @@ function refreshOf(st: State): RunsLayer['refresh'] {
       return was;
     },
     stands: (id) => st.refresh.has(id),
-  };
+  } satisfies RunsLayer['refresh'];
 }
 
-function forgettingOf(st: State): RunsLayer['forgetting'] {
+function forgettingOf(st: State) {
   return {
     write: (id, taskIds) => void st.forgetting.set(id, [...taskIds]),
     read: (id) => {
@@ -361,11 +362,11 @@ function forgettingOf(st: State): RunsLayer['forgetting'] {
     list: () => [...st.forgetting.keys()].sort(),
     lift: (id) => void st.forgetting.delete(id),
     where: (id) => path.posix.join(MEMORY_ROOT, 'forgetting', `${id}.json`),
-  };
+  } satisfies RunsLayer['forgetting'];
 }
 
 /** A fresh stand-in's plain methods: the `RunsLayer` the door is over. */
-function memoryRuns(): RunsLayer {
+function memoryRuns() {
   const st = stateOf();
   return {
     runs: runsOf(st),
@@ -375,8 +376,8 @@ function memoryRuns(): RunsLayer {
     labels: labelsOf(st),
     refresh: refreshOf(st),
     forgetting: forgettingOf(st),
-  };
+  } satisfies RunsLayer;
 }
 
 /** A fresh Run door in memory: no run, and nothing kept between two calls (a test makes one per test). */
-export const runDoorMemory = (): Layer.Layer<never> => Layer.succeed(RunDoor)(runDoorOver(memoryRuns()));
+export const runDoorMemory = () => Layer.succeed(RunDoor)(runDoorOver(memoryRuns())) satisfies Layer.Layer<never> as Layer.Layer<never>;

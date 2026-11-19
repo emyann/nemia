@@ -21,7 +21,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The step in `canvas` once its reads are in, on `screen` where named. */
-const loaded = async (canvas: HTMLElement, screen?: string): Promise<HTMLElement> => {
+const loaded = async (canvas: HTMLElement, screen?: string) => {
   await waitFor(
     async () => {
       const page = canvas.querySelector<HTMLElement>('[data-volume-step]');

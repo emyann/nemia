@@ -21,7 +21,7 @@ export type GivenSkill = { name: string; folder?: string };
  * `folder:name` (`SKILL_FOLDER`, one `:`), and nothing for any other text.
  * @param written One entry of a `skills:` line, as written.
  */
-export function givenSkillOf(written: string): GivenSkill | undefined {
+export function givenSkillOf(written: string) {
   const [first = '', second, ...more] = written.split(':');
   if (more.length) return undefined;
   if (second === undefined) return SKILL_NAME.test(first) ? { name: first } : undefined;
@@ -32,16 +32,16 @@ export function givenSkillOf(written: string): GivenSkill | undefined {
  * The bare name of a given skill, as a session loads it and its copy is filed: the text after the last `:` of `written`.
  * @param written One entry of a `skills:` line, a bare name or `folder:name`.
  */
-export const bareSkillOf = (written: string): string => written.slice(written.lastIndexOf(':') + 1);
+export const bareSkillOf = (written: string) => written.slice(written.lastIndexOf(':') + 1);
 
 /**
  * The first two of `names` that are two skills of one bare name (`bareSkillOf`), in the list's order, or nothing.
  * @param names The entries of a `skills:` line, as written.
  */
-export function sameBareIn(names: readonly string[]): [string, string] | undefined {
+export function sameBareIn(names: readonly string[]) {
   for (const [i, name] of names.entries()) {
     const first = names.slice(0, i).find((before) => before !== name && bareSkillOf(before) === bareSkillOf(name));
-    if (first !== undefined) return [first, name];
+    if (first !== undefined) return [first, name] satisfies [string, string] | undefined;
   }
   return undefined;
 }

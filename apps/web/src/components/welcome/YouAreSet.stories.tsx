@@ -15,7 +15,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The steps offered, once the page is read. */
-const stepsIn = async (canvas: HTMLElement): Promise<string[]> => {
+const stepsIn = async (canvas: HTMLElement) => {
   await waitFor(() => expect(canvas.querySelector('[data-you-are-set]')).not.toBeNull(), { timeout: 5000 });
   return [...canvas.querySelectorAll('[data-next-step]')].map((s) => s.getAttribute('data-next-step') ?? '');
 };

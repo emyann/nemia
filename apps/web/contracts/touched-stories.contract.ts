@@ -32,13 +32,13 @@ export type Touched = {
 };
 
 /** Whether `reach` reaches any of `changed`. */
-const reachesAny = (reach: StoryReach, changed: readonly string[]): boolean => reach.reaches.some((file) => changed.includes(file));
+const reachesAny = (reach: StoryReach, changed: readonly string[]) => reach.reaches.some((file) => changed.includes(file));
 
 /** Whether no story of `reach` reaches `file`. */
-const unreached = (file: string, reach: readonly StoryReach[]): boolean => reach.every((one) => !one.reaches.includes(file));
+const unreached = (file: string, reach: readonly StoryReach[]) => reach.every((one) => !one.reaches.includes(file));
 
 /** Whether `list` holds no value twice: none is among those before it. */
-const once = (list: readonly string[]): boolean => list.every((one, at) => !list.slice(0, at).includes(one));
+const once = (list: readonly string[]) => list.every((one, at) => !list.slice(0, at).includes(one));
 
 const storiesTouchedSpec = spec<(changed: readonly string[], reach: readonly StoryReach[], owing: readonly string[]) => Touched>({
   requires: ({ input: [changed, reach, owing] }) =>

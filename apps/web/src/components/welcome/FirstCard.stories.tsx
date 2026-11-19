@@ -18,7 +18,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The page in `canvas` once its cost line is read, as `kind` where named. */
-const loaded = async (canvas: HTMLElement, kind?: string): Promise<HTMLElement> => {
+const loaded = async (canvas: HTMLElement, kind?: string) => {
   await waitFor(
     async () => {
       const line = canvas.querySelector('[data-cost-line]');

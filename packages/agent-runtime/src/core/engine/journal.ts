@@ -21,7 +21,7 @@ import {
   type FormerReason,
   type StoredEvent,
 } from '../event-schema.ts';
-import { FORMER_ARGS, HARNESS_ARGS, RENAMED_ARGS, TAKEN_ARGS, type HarnessArgs } from '../../harness/args.ts';
+import { FORMER_ARGS, HARNESS_ARGS, RENAMED_ARGS, TAKEN_ARGS } from '../../harness/args.ts';
 import { countRead, countWrite } from './tally.ts';
 import { FEED_LOCK_WAIT_MS, feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
@@ -204,7 +204,7 @@ const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps
 type Resolve = ReturnType<typeof resolver>;
 
 /** Why the feed entry `entry`, at `where`, is no runtime's, and the task it names when it names one. */
-const feedRefusalOf = (where: string, entry: unknown): FeedRefusal => {
+const feedRefusalOf = (where: string, entry: unknown) => {
   const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
   return {
     ...(typeof taskId === 'string' ? { taskId } : {}),
@@ -255,7 +255,7 @@ const resolveEvents = (taskId: string, stored: readonly StoredEvent[], located: 
     : Effect.succeed(stored as readonly Resolved[]);
 
 /** Harness arguments `upgrade` put together from ones already read as such: the same object, typed. */
-const argsOf = (config: Record<string, unknown>): HarnessArgs =>
+const argsOf = (config: Record<string, unknown>) =>
   Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
 /** A stored `filed` event with its `priority` kept only when it is a whole number. */
@@ -265,7 +265,7 @@ const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
 };
 
 /** A stored usage in the shape the runtime reads: its responses by today's name, where one given by it is kept. */
-const usageOf = <U extends { turns?: number; responses?: number }>(usage: U): Omit<U, 'turns'> => {
+const usageOf = <U extends { turns?: number; responses?: number }>(usage: U) => {
   const { turns, ...rest } = usage;
   return turns === undefined || rest.responses !== undefined ? rest : { ...rest, responses: turns };
 };
@@ -276,7 +276,7 @@ const usageOf = <U extends { turns?: number; responses?: number }>(usage: U): Om
  * responses by today's, and an end that says `skills` and no `denials` as denied nothing (`[]`): the reader that says skills read
  * the same stream for denials, and dropped an empty list of them.
  */
-const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
+const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>) => {
   const { stated, usage, ...rest } = event;
   const observed = event.observed === 'done' ? 'succeeded' : event.observed;
   const closedOut = rest.closedOut ?? stated;
@@ -287,16 +287,16 @@ const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
     ...(usage === undefined ? {} : { usage: usageOf(usage) }),
     ...(rest.skills !== undefined && rest.denials === undefined ? { denials: [] } : {}),
   };
-  if (end.reason === 'budget') return { ...end, reason: 'harness', limit: 'budget' };
-  if (isFormer(end.reason)) return { ...end, reason: 'harness', closedOut: false, former: end.reason };
-  return { ...end, reason: end.reason };
+  if (end.reason === 'budget') return { ...end, reason: 'harness', limit: 'budget' } satisfies Event;
+  if (isFormer(end.reason)) return { ...end, reason: 'harness', closedOut: false, former: end.reason } satisfies Event;
+  return { ...end, reason: end.reason } satisfies Event;
 };
 
 /** Whether `reason` is one an older runtime gave an end that today's are no word for (`FORMER_REASONS`). */
 const isFormer = (reason: string): reason is FormerReason => (FORMER_REASONS as readonly string[]).includes(reason);
 
 /** Harness arguments with each filed under a former name (`RENAMED_ARGS`) under today's, where one given by it is kept. */
-const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
+const renamed = (config: Record<string, unknown>) => {
   const was = Object.keys(RENAMED_ARGS).filter((key) => Object.hasOwn(config, key));
   if (!was.length) return config;
   const out = { ...config };
@@ -345,18 +345,18 @@ const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
  *   session loads), under a `filed` or an `input` event's `config` or at a `filed` event's top level: read by today's name,
  *   `projectMcp`, where a value already given by it is kept.
  */
-const upgrade = (event: Resolved): Event => {
-  if (event.kind === 'input') return upgradedInput(event);
-  if (event.kind === 'ended') return upgradedEnd(event);
+const upgrade = (event: Resolved) => {
+  if (event.kind === 'input') return upgradedInput(event) satisfies Event;
+  if (event.kind === 'ended') return upgradedEnd(event) satisfies Event;
   if (event.kind === 'measured' || event.kind === 'counted') {
-    return 'turns' in event.usage ? { ...event, usage: usageOf(event.usage) } : event;
+    return ('turns' in event.usage ? { ...event, usage: usageOf(event.usage) } : event) satisfies Event;
   }
-  if (event.kind !== 'filed') return event;
-  return upgradedFiled(event);
+  if (event.kind !== 'filed') return event satisfies Event;
+  return upgradedFiled(event) satisfies Event;
 };
 
 /** A stored answer in the shape the runtime reads: its arguments by today's names, and a cap beside its `config` under it. */
-const upgradedInput = (event: Extract<Resolved, { kind: 'input' }>): Event => {
+const upgradedInput = (event: Extract<Resolved, { kind: 'input' }>) => {
   const { budgetUsd, ...rest } = event;
   const config = rest.config && renamed(rest.config);
   const input = config === undefined || config === rest.config ? rest : { ...rest, config: argsOf(config) };
@@ -365,7 +365,7 @@ const upgradedInput = (event: Extract<Resolved, { kind: 'input' }>): Event => {
 };
 
 /** A stored filing in the shape the runtime reads: its arguments under `config` by today's names, and a former one moved. */
-const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>): Event => {
+const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>) => {
   const filed = weighed(event);
   const legacy: Record<string, unknown> = filed;
   const formerKeys = [...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS), ...Object.keys(TAKEN_ARGS)];
@@ -388,7 +388,7 @@ const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>): Event => {
  * `config` with its former arguments out (`upgrade`): each that a flag of Claude Code's replaces moved into `claude` (`FORMER_ARGS`),
  * where a flag already in `claude` is kept, and each taken away with nothing in its place dropped (`TAKEN_ARGS`).
  */
-const formerArgsOut = (config: Record<string, unknown>, claude: object | undefined): Record<string, unknown> => {
+const formerArgsOut = (config: Record<string, unknown>, claude: object | undefined) => {
   const flags: Record<string, unknown> = {};
   for (const [key, flag] of Object.entries(FORMER_ARGS)) {
     if (config[key] === true) flags[flag] = true;
@@ -400,13 +400,13 @@ const formerArgsOut = (config: Record<string, unknown>, claude: object | undefin
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
-const parsed = (line: string): unknown => Option.getOrElse(jsonOf(line), () => line);
+const parsed = (line: string) => Option.getOrElse(jsonOf(line), () => line);
 
 /** A line's text decoded as JSON, or none where it is not. */
 const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 /** The bytes of `file` from `from` to `to`, in one positioned read, counted. */
-const span = (file: string, from: number, to: number): Buffer => {
+const span = (file: string, from: number, to: number) => {
   const fd = fs.openSync(file, 'r');
   try {
     const buf = Buffer.alloc(to - from);
@@ -437,7 +437,7 @@ type Kept = { dev: number; ino: number; offset: number; mtimeMs: number; entries
  */
 const journalReader = () => {
   const kept = new Map<string, Kept>();
-  return (file: string): unknown[] => {
+  return (file: string) => {
     const stat = fs.statSync(file, { throwIfNoEntry: false });
     if (!stat) {
       kept.delete(file);
@@ -511,7 +511,7 @@ const noBodies = (ref: unknown) =>
  * @param taskId The id of the task appended to.
  * @param event The event appended.
  */
-export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
+export const appendFields = (taskId: string, event: Event) => ({
   task: taskId,
   kind: event.kind,
   ...('attempt' in event ? { attempt: event.attempt } : {}),
@@ -590,7 +590,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
    * `lockWaitMs` is how long a write waits for the feed's lock before it refuses naming its holder, by default the shipped
    * `FEED_LOCK_WAIT_MS`: a parameter so that a test of what a held lock does can shorten it rather than wait the shipped one out.
    */
-  static filesOps = (root: string, lockWaitMs = FEED_LOCK_WAIT_MS): BodiedJournalOps => {
+  static filesOps = (root: string, lockWaitMs = FEED_LOCK_WAIT_MS) => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
@@ -679,7 +679,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
           return () => {};
         }
       },
-    };
+    } satisfies BodiedJournalOps as BodiedJournalOps;
   };
 
   /**

@@ -175,7 +175,7 @@ type Answering = { questions: readonly Frozen<Question>[]; draft: Draft; left: r
 const notAnswered = (left: readonly string[]) => (left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined);
 
 /** Why Approve waits, on hover: the questions not answered, then the budgets whose field holds no amount above zero. */
-const approveWaits = (left: readonly string[], unread: readonly string[]): string | undefined =>
+const approveWaits = (left: readonly string[], unread: readonly string[]) =>
   [notAnswered(left), unread.length > 0 ? `No amount above $0 for: ${unread.join(' · ')}` : undefined].filter(Boolean).join(' — ') ||
   undefined;
 
@@ -344,14 +344,15 @@ function SendBackForm({
 const GATE_MODES: readonly RetryMode[] = ['continue', 'fresh'];
 
 /** A send-back's mode as its radio says it: what it does, and the CLI's flag for it. */
-const modeLabel = (m: RetryMode): ReactNode => (
-  <>
-    {MODES[m]} <code className="text-muted-foreground">--{m}</code>
-  </>
-);
+const modeLabel = (m: RetryMode) =>
+  (
+    <>
+      {MODES[m]} <code className="text-muted-foreground">--{m}</code>
+    </>
+  ) satisfies ReactNode as ReactNode;
 
 /** A step's name, as its radio says it. */
-const asIs = (name: string): ReactNode => name;
+const asIs = (name: string) => name satisfies ReactNode as ReactNode;
 
 /** A row of radios, each option drawn by `label`: a retry's mode with its flag, or the step a send-back names. */
 function Choice<T extends string>({
@@ -397,12 +398,7 @@ function Choice<T extends string>({
  * @param words the words written beside the approval, empty where none
  * @param given the budgets the person changed, none where they changed none
  */
-export const approvalBody = (
-  questions: readonly Frozen<Question>[],
-  draft: Draft,
-  words: string,
-  given: readonly GivenBudget[] = [],
-): { message?: string; answers?: QuestionAnswer[]; budgets?: GivenBudget[] } => ({
+export const approvalBody = (questions: readonly Frozen<Question>[], draft: Draft, words: string, given: readonly GivenBudget[] = []) => ({
   ...(questions.length ? { answers: answersFrom(questions, draft) } : {}),
   ...(words.trim() ? { message: words } : {}),
   ...(given.length ? { budgets: given.map(({ step, usd }) => ({ step, usd })) } : {}),
@@ -422,9 +418,9 @@ export const sendBackWaits = ({
   to: string;
   questions: readonly Frozen<Question>[];
   draft: Draft;
-}): string[] => {
+}) => {
   const left = unanswered(questions, draft);
-  return to === step && left.length < questions.length ? left : [];
+  return (to === step && left.length < questions.length ? left : []) satisfies string[] as string[];
 };
 
 /**
@@ -446,10 +442,21 @@ export const sendBackBody = ({
   objection: string;
   questions: readonly Frozen<Question>[];
   draft: Draft;
-}): { mode: RetryMode; step: string; message?: string; answers?: QuestionAnswer[] } => {
+}) => {
   const answered = to === step && questions.length > 0 && unanswered(questions, draft).length === 0;
-  if (!answered) return { mode, message: objection, step: to };
-  return { mode, step: to, answers: answersFrom(questions, draft), ...(objection.trim() ? { message: objection } : {}) };
+  if (!answered)
+    return { mode, message: objection, step: to } satisfies {
+      mode: RetryMode;
+      step: string;
+      message?: string;
+      answers?: QuestionAnswer[];
+    } as { mode: RetryMode; step: string; message?: string; answers?: QuestionAnswer[] };
+  return { mode, step: to, answers: answersFrom(questions, draft), ...(objection.trim() ? { message: objection } : {}) } satisfies {
+    mode: RetryMode;
+    step: string;
+    message?: string;
+    answers?: QuestionAnswer[];
+  } as { mode: RetryMode; step: string; message?: string; answers?: QuestionAnswer[] };
 };
 
 /** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
@@ -484,7 +491,7 @@ export const takenOf = (
   taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string },
   step: string,
   acts: boolean,
-): { named: string; said: string } =>
+) =>
   'approved' in taken
     ? { named: step, said: `approved try ${taken.approved} — the next tick files ${acts ? 'it' : 'what waits on it'}` }
     : { named: taken.step, said: askedSaid(taken.asked) };
@@ -501,7 +508,7 @@ export const takenOf = (
  *
  * @param step the step, read for its frozen spec
  */
-export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.workspace === 'base';
+export const endsTheRun = (step: Pick<StepView, 'spec'>) => step.spec?.workspace === 'base';
 
 /**
  * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.
@@ -574,7 +581,7 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
  * @param gate the step's gate
  * @param ends whether the step ends the run in the checkout (`endsTheRun`)
  */
-export const gateWord = (gate: StepGate, ends = false): string =>
+export const gateWord = (gate: StepGate, ends = false) =>
   gate.approval
     ? `approved, try ${gate.approval.try}`
     : gate.awaiting

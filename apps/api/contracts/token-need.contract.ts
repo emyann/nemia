@@ -16,13 +16,13 @@ import type { TokenNeed } from 'agent-orchestrator';
 import { CLAIM_SEGMENT, LINK_CLAIM_PATH, MCP_PATH, OPEN_METHOD, PAIRINGS_PATH } from '../src/caller/paths.ts';
 
 /** Whether `path` is `root` or a path under it. */
-const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
+const under = (path: string, root: string) => path === root || path.startsWith(root + '/');
 
 /** Whether `path` is the MCP port's. */
-const onPort = (path: string): boolean => under(path, MCP_PATH);
+const onPort = (path: string) => under(path, MCP_PATH);
 
 /** Whether `path` is a pairing's claim, `/api/pairings/<id>/claim`, its id one segment that is not empty. */
-const pairingClaim = (path: string): boolean => {
+const pairingClaim = (path: string) => {
   const start = PAIRINGS_PATH.length + 1;
   const end = path.length - CLAIM_SEGMENT.length;
   return path.startsWith(PAIRINGS_PATH + '/') && path.endsWith(CLAIM_SEGMENT) && end > start && !path.slice(start, end).includes('/');
@@ -32,11 +32,11 @@ const pairingClaim = (path: string): boolean => {
  * Whether `method` on `path` is one of the three routes a client with no token yet reaches: a pairing asked, a pairing claimed, a
  * first-visit link claimed. Each judges its own secret, and none answers with the store's data.
  */
-const open = (method: string, path: string): boolean =>
+const open = (method: string, path: string) =>
   method === OPEN_METHOD && (path === PAIRINGS_PATH || path === LINK_CLAIM_PATH || pairingClaim(path));
 
 /** Whether `method` on `path` is a route the api answers with the store's data or its route table. */
-const answered = (method: string, path: string): boolean => !open(method, path) && (under(path, '/api') || under(path, '/openapi'));
+const answered = (method: string, path: string) => !open(method, path) && (under(path, '/api') || under(path, '/openapi'));
 
 const needOfSpec = spec<(method: string, path: string) => TokenNeed>({
   ensures: {

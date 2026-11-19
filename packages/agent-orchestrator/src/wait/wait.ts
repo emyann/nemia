@@ -15,7 +15,7 @@ export type { Wait } from '../../contracts/hold.contract.ts';
  * started never waits on a run again.
  * @param run The run asked about.
  */
-export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.tries?.length));
+export const hasStarted = (run: Run) => Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.tries?.length));
 
 /**
  * Whether the gate applies to this run, and a parent is read at all: it waits on runs, nobody has called it off, and nothing of it has
@@ -24,14 +24,14 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
  * `git branch -d` after landing) cannot un-ready it.
  * @param run The run asked about.
  */
-export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
+export const gated = (run: Run) => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
 
 /**
  * The runs this run's pass reads as runs it waits on: its `after` while the gate applies (`gated`), and the runs a person holds it until
  * while the hold stands (`Run.hold`), in that order, a run named twice named twice. Pure.
  * @param run The run asked about.
  */
-export const waitedOn = (run: Run): string[] => [
+export const waitedOn = (run: Run) => [
   ...(gated(run) && run.after ? run.after : []),
   ...(run.hold && !run.cancelledAt ? run.hold.until : []),
 ];
@@ -41,7 +41,7 @@ export const waitedOn = (run: Run): string[] => [
  * @param run The run whose `after` is read.
  * @param landed Whether the run of an id has landed, as `nemia decide` says it.
  */
-export function waitingOn(run: Run, landed: (runId: string) => boolean): string[] {
+export function waitingOn(run: Run, landed: (runId: string) => boolean) {
   if (!gated(run) || !run.after) return [];
   return run.after.filter((id) => !landed(id));
 }
@@ -53,7 +53,7 @@ export function waitingOn(run: Run, landed: (runId: string) => boolean): string[
  * @param run The run whose `after` is read.
  * @param landed Whether the run of an id has landed, as `nemia decide` says it.
  */
-export const runReady = (run: Run, landed: (runId: string) => boolean): boolean => waitingOn(run, landed).length === 0;
+export const runReady = (run: Run, landed: (runId: string) => boolean) => waitingOn(run, landed).length === 0;
 
 /**
  * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in views.verb.ts): its record, when the store has one;
@@ -67,23 +67,23 @@ export type ParentRun = { record?: Run; landed: boolean; gone?: string[]; unread
  * @param run The run whose `after` is read.
  * @param parentOf How a run another waits on reads, by its id: its record, whether it landed, and a result branch gone.
  */
-export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
-  return waitingOn(run, (id) => parentOf(id).landed).map((id) => waitOf(id, parentOf(id)));
+export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun) {
+  return waitingOn(run, (id) => parentOf(id).landed).map((id) => waitOf(id, parentOf(id))) satisfies Wait[];
 }
 
 /** A run this one waits on that has not landed, as `parent` reads it (`Wait`): why it may never, else why it was not read. */
-function waitOf(id: string, { record, gone, unread }: ParentRun): Wait {
-  if (!record) return { run: id, missing: true };
-  if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
-  return gone?.length ? { run: id, gone } : unread ? { run: id, unread } : { run: id };
+function waitOf(id: string, { record, gone, unread }: ParentRun) {
+  if (!record) return { run: id, missing: true } satisfies Wait;
+  if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt } satisfies Wait;
+  return (gone?.length ? { run: id, gone } : unread ? { run: id, unread } : { run: id }) satisfies Wait;
 }
 
 /** A run waited on as the status column names it: `a-1x2y (cancelled)`, with why it may never land or why it was not read. */
-const waitName = (w: Wait): string =>
+const waitName = (w: Wait) =>
   `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : w.unread ? ` (where it stands is unread: ${w.unread})` : ''}`;
 
 /** Whether a person has to act for this run to land: nothing the tick can read will change on its own. */
-const neverLands = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
+const neverLands = (w: Wait) => Boolean(w.missing || w.cancelledAt || w.gone?.length);
 
 /**
  * Whether a standing hold waits on a person (`holdsOf`'s runs): exactly when a run it names never lands without one — no such run, a
@@ -102,7 +102,7 @@ export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
  * @param p What of the run stops a hold: whether it is cancelled, pruned, finished or held, whether it is a folder run, and the runs
  * asked to wait on.
  */
-export const holdStop: HoldStopOf = (p): HoldStop | null => {
+export const holdStop: HoldStopOf = (p) => {
   const move = runMarkMove(runMarkOf(p), 'hold');
   const marked = move.kind === 'refused' ? move.as : null;
   if (marked === 'cancelled' || marked === 'pruned') return marked;
@@ -116,13 +116,13 @@ export const holdStop: HoldStopOf = (p): HoldStop | null => {
  * A run's roots, waiting, as `nemia ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`.
  * @param waits Each run waited on that has not landed, and why it may never (`waitsOf`).
  */
-export const waitWord = (waits: readonly Wait[]): string => `waiting on ${waits.map(waitName).join(', ')}`;
+export const waitWord = (waits: readonly Wait[]) => `waiting on ${waits.map(waitName).join(', ')}`;
 
 /**
  * Why a run this one waits on never lands (`neverLands`), in words: the store has no such run, it was cancelled, or its result branches
  * are gone from `branch`.
  */
-function neverWhy(w: Wait, branch: string | undefined): string {
+function neverWhy(w: Wait, branch: string | undefined) {
   if (w.missing) return `the store has no run ${w.run}`;
   if (w.cancelledAt) return `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never lands`;
   const gone = w.gone ?? [];
@@ -136,7 +136,7 @@ function neverWhy(w: Wait, branch: string | undefined): string {
  * @param run The run whose roots wait.
  * @param waits Each run waited on that has not landed, and why it may never (`waitsOf`).
  */
-export function waitAdvice(run: Run, waits: readonly Wait[]): string {
+export function waitAdvice(run: Run, waits: readonly Wait[]) {
   const never = waits.filter(neverLands);
   if (!never.length) {
     return `nothing of ${run.id} is filed until nemia decide says ${waits.map((w) => w.run).join(' and ')} ${waits.length > 1 ? 'have' : 'has'} landed on ${run.branch}; nothing to decide yet`;
@@ -153,27 +153,27 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  * @param run The run whose hold is read.
  * @param parentOf How a run another waits on reads, by its id: its record, whether it landed, and a result branch gone.
  */
-export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
+export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun) {
   if (!run.hold) return [];
   const waits: Wait[] = run.hold.until.filter((id) => !parentOf(id).landed).map((id) => waitOf(id, parentOf(id)));
   return waits.length ? waits : run.hold.until.map((id) => ({ run: id, landed: true as const }));
 }
 
 /** Words as a shell reads them back whole: in single quotes, each `'` in them closed, escaped and opened again. */
-const shellQuoted = (words: string): string => `'${words.replaceAll("'", `'\\''`)}'`;
+const shellQuoted = (words: string) => `'${words.replaceAll("'", `'\\''`)}'`;
 
 /**
  * The command that holds `id` on `until`, with the words `why` a hold had: `nemia hold r-1 --until a-1 --why 'merge conflicts'`, and
  * `nemia hold r-1` for a hold that names no run.
  */
-const holdAgain = (id: string, until: readonly string[], why?: string): string =>
+const holdAgain = (id: string, until: readonly string[], why?: string) =>
   `nemia hold ${id}${until.map((u) => ` --until ${u}`).join('')}${why ? ` --why ${shellQuoted(why)}` : ''}`;
 
 /** `a` and `b`, or `a, b and c`, of runs. */
-const runList = (ids: readonly string[]): string => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
+const runList = (ids: readonly string[]) => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
 
 /** What the person who put a hold said of it, as it follows `held until …`: ` (why: …; by …)`, ` (why: …)`, ` (by …)`, or nothing. */
-const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
+const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>) => {
   const parts = [...(why ? [`why: ${why}`] : []), ...(by ? [`by ${by}`] : [])];
   return parts.length ? ` (${parts.join('; ')})` : '';
 };
@@ -187,7 +187,7 @@ const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
  * @param waits Each run the hold waits on (`holdsOf`); none for a hold that names no run.
  * @param said The hold's `why` and `by`, each shown when it is there; a hold file older code wrote has neither, and shows the plain line.
  */
-export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}): string {
+export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}) {
   const words = saidWord(said);
   if (!waits.length) return `held until a person lifts it${words}`;
   const named = runList(waits.map(waitName));
@@ -205,7 +205,7 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
  * @param run The held run.
  * @param waits Each run the hold waits on (`holdsOf`); none for a hold that names no run.
  */
-export function holdAdvice(run: Run, waits: readonly Wait[]): string {
+export function holdAdvice(run: Run, waits: readonly Wait[]) {
   const off = `nemia hold ${run.id} --off`;
   if (!waits.length) return `nothing of ${run.id} is filed, and nothing is asked of you, until a person lifts the hold; to go on: ${off}`;
   if (waits.every((w) => w.landed)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
@@ -222,7 +222,7 @@ export function holdAdvice(run: Run, waits: readonly Wait[]): string {
  * The runs `r` waits on, each beside the edge that says how: its `after` while the gate applies (`gated`), then the runs it is held
  * until.
  */
-const waitsOn = (r: Run): Array<[string, string]> => [
+const waitsOn = (r: Run) => [
   ...(gated(r) && r.after ? r.after.map((a) => [a, `${r.id} --after ${a}`] as [string, string]) : []),
   ...(r.hold?.until ?? []).map((h) => [h, `${r.id} held until ${h}`] as [string, string]),
 ];
@@ -231,7 +231,7 @@ const waitsOn = (r: Run): Array<[string, string]> => [
  * The edges from run `u` to run `id` along what each run of `byId` waits on (`waitsOn`), the first found breadth first, or undefined
  * where `u` waits on `id` by no route.
  */
-function routeTo(u: string, id: string, byId: ReadonlyMap<string, Run>): string[] | undefined {
+function routeTo(u: string, id: string, byId: ReadonlyMap<string, Run>) {
   const how = new Map<string, string[]>([[u, []]]);
   const queue = [u];
   for (let at = queue.shift(); at !== undefined; at = queue.shift()) {
@@ -250,7 +250,7 @@ function routeTo(u: string, id: string, byId: ReadonlyMap<string, Run>): string[
 }
 
 /** What of the run refuses its hold (`holdStop`), in words that name the fix. */
-function stopWords(run: Run, stop: HoldStop, until: readonly string[]): string {
+function stopWords(run: Run, stop: HoldStop, until: readonly string[]) {
   const id = run.id;
   if (stop === 'cancelled') return `${id} was cancelled at ${run.cancelledAt}: nothing of it is filed again, so there is nothing to hold.`;
   if (stop === 'pruned')
@@ -293,7 +293,7 @@ export function holdRefusal(
   parentOf: (runId: string) => Pick<ParentRun, 'record' | 'gone' | 'landed'>,
   others: readonly Run[],
   finished?: 'landed' | 'succeeded',
-): string | null {
+) {
   const id = run.id;
   const stop = holdStop({
     cancelled: Boolean(run.cancelledAt),
@@ -359,7 +359,7 @@ export function afterRefusal(
   after: readonly string[],
   child: Pick<Run, 'repo' | 'branch' | 'place'>,
   parentOf: (runId: string) => Pick<ParentRun, 'record' | 'gone'>,
-): string | null {
+) {
   const seen = new Set<string>();
   for (const id of after) {
     const without = `start it without --after ${id}`;

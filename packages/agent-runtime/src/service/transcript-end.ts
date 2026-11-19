@@ -4,7 +4,6 @@
  * fact beside what a verb does, never a reason to refuse it.
  */
 import { Effect } from 'effect';
-import type { TranscriptMark } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
 
 /**
@@ -12,7 +11,7 @@ import type { SeamOps } from '../a2a/index.ts';
  * @param runner The harness's runner, asked for the session's transcript.
  * @param name The session's name.
  */
-export const transcriptEndOf = (runner: SeamOps, name: string): Effect.Effect<TranscriptMark | null> => {
+export const transcriptEndOf = (runner: SeamOps, name: string) => {
   const read = runner.transcriptOf;
   if (!read) return Effect.succeed(null);
   return read(name).pipe(

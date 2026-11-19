@@ -28,7 +28,7 @@ const LONG = 200;
  * The page's name drawn in `canvas` lights its rule exactly under the whole name, and the hairline runs the h1's width, the lit part
  * lying on it at the h1's foot; its lit part's width, in pixels.
  */
-async function litUnder(canvas: HTMLElement, said: string): Promise<number> {
+async function litUnder(canvas: HTMLElement, said: string) {
   await document.fonts.ready;
   const name = canvas.querySelector('[data-page-name]')!;
   const text = document.createRange();

@@ -7,7 +7,7 @@
  * What `nemia` exits with on what `main` threw: its `exitCode` when that is a whole number from 1 to 255, and 1 otherwise.
  * @param thrown What `main` threw, of any shape.
  */
-export const exitCodeOf = (thrown: unknown): number => {
+export const exitCodeOf = (thrown: unknown) => {
   const code = (thrown as { exitCode?: unknown } | null | undefined)?.exitCode;
   return typeof code === 'number' && Number.isInteger(code) && code > 0 && code <= 255 ? code : 1;
 };

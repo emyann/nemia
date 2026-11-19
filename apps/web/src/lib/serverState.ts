@@ -33,9 +33,9 @@ const DRAWN: Readonly<Record<string, Drawn>> = STATES;
  * grew one — are drawn as unread, in rest: a word read as a state it is not would be worse than one read as nothing.
  * @param state The harness's word for the server's state, or null where none was read.
  */
-export const stateDrawn = (state: string | null): { word: string } & Drawn => {
+export const stateDrawn = (state: string | null) => {
   const known = state === null ? undefined : DRAWN[state];
-  if (known) return { word: state!, ...known };
+  if (known) return { word: state!, ...known } satisfies { word: string } & Drawn;
   return {
     word: state ?? UNREAD_STATE,
     hue: 'grey',
@@ -43,5 +43,5 @@ export const stateDrawn = (state: string | null): { word: string } & Drawn => {
       state === null
         ? 'Unread: the state could not be read, which is not an absence — press Check again'
         : `The harness says "${state}", which this board does not know: it is shown as read and nothing is concluded from it`,
-  };
+  } satisfies { word: string } & Drawn;
 };

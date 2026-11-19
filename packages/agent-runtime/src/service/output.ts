@@ -13,13 +13,13 @@ export class OutputRefused extends Schema.TaggedError<OutputRefused>()('OutputRe
  * The words `output` refuses a `stream` that is neither with.
  * @param stream The `stream` `output` was handed.
  */
-export const notAStream = (stream: unknown): string => `\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`;
+export const notAStream = (stream: unknown) => `\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`;
 
 /**
  * The words `output` refuses a `lastBytes` that is no whole number above 0 with.
  * @param lastBytes The `lastBytes` `output` was handed.
  */
-export const notACount = (lastBytes: unknown): string =>
+export const notACount = (lastBytes: unknown) =>
   `\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none for the whole stream.`;
 
 /**

@@ -5,20 +5,20 @@
  * person's alone (`declineProgram`). Each takes its caller explicitly and the store's place; a refusal by who calls is `Forbidden`.
  */
 import { Effect } from 'effect';
-import { PROPOSAL_PHASES, type Proposal } from 'objects';
-import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { PROPOSAL_PHASES } from 'objects';
+import { Conflict, Forbidden, Invalid, Missing } from '../refusal/refusal.ts';
 import { phaseTakes, proposalPhaseSelector } from '../proposal/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { proposalApproval } from './approval.ts';
 import { applyProgram, type RunStateOf } from '../apply/apply.verb.ts';
-import type { ProposalNeeds, ProposalPlace } from '../propose/current.verb.ts';
+import type { ProposalPlace } from '../propose/current.verb.ts';
 import type { ProposalCaller } from '../caller/index.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { factsOf, standingOf } from './standing.verb.ts';
 
 /** The proposal `name` of `factory`, refused (`Missing`) where none is. */
-const proposalAt = (factory: string, name: string): Effect.Effect<Proposal, Refusal> =>
+const proposalAt = (factory: string, name: string) =>
   Effect.gen(function* () {
     const p = yield* (yield* ProposalDoor).proposals.read(factory, name);
     if (p === undefined)
@@ -71,7 +71,7 @@ export const approveProgram = Effect.fn('approveProgram')(function* (
   factory: string,
   name: string,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
+) {
   const proposal = yield* proposalAt(factory, name);
   const standing =
     caller.kind === 'person' ? { level: 'manual' as const, grants: [], rules: [] } : yield* standingOf(place.home, caller.agent, factory);
@@ -97,11 +97,7 @@ export const approveProgram = Effect.fn('approveProgram')(function* (
  * The proposal `name` of `factory` declined by the person, written `declined`: what it is after. Refused: an agent (`Forbidden`,
  * `person-only`), and a proposal no longer waiting or approved (`Conflict`).
  */
-export const declineProgram = Effect.fn('declineProgram')(function* (
-  caller: ProposalCaller,
-  factory: string,
-  name: string,
-): Effect.fn.Return<Proposal, Refusal> {
+export const declineProgram = Effect.fn('declineProgram')(function* (caller: ProposalCaller, factory: string, name: string) {
   if (caller.kind !== 'person')
     return yield* Effect.fail(
       new Forbidden({ reason: 'person-only', message: `the person declines a proposal, never an agent: ask them to decline ${name}.` }),

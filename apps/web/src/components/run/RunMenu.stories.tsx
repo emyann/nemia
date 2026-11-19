@@ -28,7 +28,7 @@ const meta: Meta<typeof RunMenu> = {
 export default meta;
 
 /** The labels of the menu's items, in their order. */
-const itemsOf = (menu: HTMLElement): string[] =>
+const itemsOf = (menu: HTMLElement) =>
   within(menu)
     .getAllByRole('menuitem')
     .map((item) => item.textContent?.trim() ?? '');

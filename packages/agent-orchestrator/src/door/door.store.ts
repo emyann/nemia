@@ -21,7 +21,7 @@ import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
  * program dies of.
  * @param act The synchronous act to run.
  */
-export const fromThrow = <A>(act: () => A): Effect.Effect<A, Refusal> =>
+export const fromThrow = <A>(act: () => A) =>
   Effect.try({ try: act, catch: (err) => err }).pipe(Effect.catch((err) => (isRefusal(err) ? Effect.fail(err) : Effect.die(err))));
 
 /** A method of a layer, turned into the door's: its first parameter, where it is a string, the door's id `I`, and an Effect answered. */
@@ -39,7 +39,7 @@ export type DoorOf<T, I extends string> = {
  * built, so a read is made where the program yields it.
  * @param layer The layer's plain value: groups of synchronous methods.
  */
-export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(layer: T): DoorOf<T, I> {
+export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(layer: T) {
   return Object.fromEntries(
     Object.entries(layer).map(([group, methods]) => [
       group,
@@ -53,7 +53,7 @@ export function doorOf<T extends Record<string, Record<string, (...args: never[]
  * What a synchronous caller that no program yields yet reads a door through, its writes checked as the door checks them.
  * @param door The door to read and write through.
  */
-export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
+export function atOnce<T, I extends string>(door: DoorOf<T, I>) {
   return Object.fromEntries(
     Object.entries(door as Record<string, Record<string, (...args: never[]) => Effect.Effect<unknown, Refusal>>>).map(
       ([group, methods]) => [
@@ -64,12 +64,12 @@ export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
   ) as T;
 }
 
-const shownValue = (value: unknown): string => {
+const shownValue = (value: unknown) => {
   const json = JSON.stringify(value) ?? 'undefined';
   return json.length > 60 ? `${json.slice(0, 60)}…` : json;
 };
 
-const placeWords = (place: RefusedPlace | undefined): string => {
+const placeWords = (place: RefusedPlace | undefined) => {
   if (place === undefined) return 'is not what the schema says';
   if (place.message !== undefined) return place.message;
   return place._tag === 'MissingKey' ? 'is missing' : `is ${shownValue(place.input)}, where the schema takes ${place.expected}`;
@@ -82,7 +82,7 @@ const placeWords = (place: RefusedPlace | undefined): string => {
  * @param schema The aggregate's schema.
  * @param value The value to decode.
  */
-export function brokenBy(schema: Schema.Top, value: unknown): string | null {
+export function brokenBy(schema: Schema.Top, value: unknown) {
   const decoded = Schema.decodeUnknownResult(schema as Schema.Codec<unknown>)(value, { reportInput: true });
   if (Result.isSuccess(decoded)) return null;
   const [place] = refusedIn(decoded.failure.issue);
@@ -97,7 +97,7 @@ export function brokenBy(schema: Schema.Top, value: unknown): string | null {
  */
 export const checked =
   <S extends Schema.Top>(schema: S, subject: (value: never) => string) =>
-  <A>(value: A): Effect.Effect<A, Invalid> => {
+  <A>(value: A) => {
     const broken = brokenBy(schema, value);
     return broken === null
       ? Effect.succeed(value)
@@ -112,7 +112,7 @@ export const checked =
  * @param over Builds the door's layer at a store's root.
  * @param door The door's name, said in the refusal.
  */
-export function rootedDoor<D extends object>(over: (root: string) => D, door: string): D {
+export function rootedDoor<D extends object>(over: (root: string) => D, door: string) {
   const unrooted = new Invalid({
     message: `the ${door} was given no store root: provide StoreRoot where the program is composed (storeRootLayer, src/config/root.store.ts), or give the program the door's memory layer. Nothing was read or written.`,
   });

@@ -222,7 +222,7 @@ export type JudgedRun = Omit<JudgedFields, 'atWork' | 'tokens'>;
  * @param judged The judgement's reading of the run.
  * @param views The engine's views of the tasks the judgement read.
  */
-export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: Views): JudgedFields {
+export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: Views) {
   return {
     waiting: judged.waiting,
     holding: judged.holding,
@@ -232,14 +232,14 @@ export function judgedFields(run: Pick<Run, 'steps'>, judged: JudgedRun, views: 
     atWork: atWork(run, views),
     tokens: runTokens(run, views),
     toDecide: judged.toDecide,
-  };
+  } satisfies JudgedFields as JudgedFields;
 }
 
 /**
  * A run's judged fields when nothing judges it (`unjudged`): `running` and moving, as the tick counts it in flight, with nothing measured,
  * waited on, held or to decide.
  */
-export function unjudgedFields(): JudgedFields {
+export function unjudgedFields() {
   return {
     waiting: null,
     holding: null,
@@ -253,17 +253,17 @@ export function unjudgedFields(): JudgedFields {
     atWork: null,
     tokens: null,
     toDecide: null,
-  };
+  } satisfies JudgedFields;
 }
 
 /** The agent each step of a run is given, by its name, off the workflow it is judged by (`judgedSteps`); null for a step given none. */
-function agentsOf(run: Run, folder: readonly StepSpec[] | null): (name: string) => string | null {
+function agentsOf(run: Run, folder: readonly StepSpec[] | null) {
   const steps = judgedSteps(run, folder);
-  return (name) => steps.find((step) => step.name === name)?.agent?.name ?? null;
+  return ((name) => steps.find((step) => step.name === name)?.agent?.name ?? null) satisfies (name: string) => string | null;
 }
 
 /** When the task of a run's step still at work started (`atWork` of that step alone); null while none of its tasks runs. */
-function stepSince(run: Run, name: string, views: Views): string | null {
+function stepSince(run: Run, name: string, views: Views) {
   const step = run.steps[name];
   return step ? atWork({ steps: { [name]: step } }, views).since : null;
 }
@@ -273,7 +273,7 @@ function stepSince(run: Run, name: string, views: Views): string | null {
  * object reads too, so the list's row and the object say the run alike (Q18). Pure but for `home`, where a try's agent is read from.
  * @param home The store's root folder, where a try's agent is read from.
  */
-export function summaryOf({ run, names, steps, views, judged }: Judgement, home: string): Omit<RunSummary, 'startedAt'> {
+export function summaryOf({ run, names, steps, views, judged }: Judgement, home: string) {
   const agentOf = (name: string) => steps.find((step) => step.name === name)?.agent?.name ?? null;
   return {
     id: run.id,
@@ -307,22 +307,28 @@ export function summaryOf({ run, names, steps, views, judged }: Judgement, home:
     waitingOnYou: judged.waitingOnYou,
     waitingOnYouWords: judged.waitingOnYouWords,
     unreadable: null,
-  };
+  } satisfies Omit<RunSummary, 'startedAt'>;
 }
 
 /**
  * A step's codes on a run left unjudged, off its word (`unjudgedWord`): `failed` with `Unknown` for the step a task of which does not read
  * (`unreadable`), which nothing judges; any other the engine's word for its task (`ENGINE_REASON`), `pending` for none filed.
  */
-function unjudgedCodes(word: UnjudgedWord): {
-  phase: StepPhase;
-  reason: StepReason;
-  on: WaitOn | null;
-  via: AnswerVia | null;
-} {
-  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown', on: null, via: null };
+function unjudgedCodes(word: UnjudgedWord) {
+  if (word === UNREADABLE)
+    return { phase: 'failed', reason: 'Unknown', on: null, via: null } satisfies {
+      phase: StepPhase;
+      reason: StepReason;
+      on: WaitOn | null;
+      via: AnswerVia | null;
+    };
   const { phase, reason, on, via } = codedStep(ENGINE_REASON[word]);
-  return { phase, reason, on: on ?? null, via: via ?? null };
+  return { phase, reason, on: on ?? null, via: via ?? null } satisfies {
+    phase: StepPhase;
+    reason: StepReason;
+    on: WaitOn | null;
+    via: AnswerVia | null;
+  };
 }
 
 /**
@@ -331,7 +337,7 @@ function unjudgedCodes(word: UnjudgedWord): {
  * an earlier try's among them (`unjudgedWord`) — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and
  * counts it in flight, so it is `running` and moving until the journal reads, or the folder loads, again.
  */
-function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string): Omit<RunSummary, 'startedAt'> {
+function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string) {
   const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const wordOf = unjudgedWord(views, unreadable);
@@ -374,11 +380,11 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     waitingOnYou: [],
     waitingOnYouWords: [],
     unreadable: said,
-  };
+  } satisfies Omit<RunSummary, 'startedAt'>;
 }
 
 /** Each of `runs` summarized off what was judged of it, or off its record where it was not judged (`unjudged`). */
-const summariesOf = (runs: readonly Run[], judged: Judgements, home: string): Map<string, Omit<RunSummary, 'startedAt'>> =>
+const summariesOf = (runs: readonly Run[], judged: Judgements, home: string) =>
   new Map(
     runs.flatMap((run) => {
       const one = judged.runs.get(run.id);
@@ -390,7 +396,7 @@ const summariesOf = (runs: readonly Run[], judged: Judgements, home: string): Ma
         ] as const,
       ];
     }),
-  );
+  ) satisfies Map<string, Omit<RunSummary, 'startedAt'>>;
 
 /**
  * Runs judged now, as the list judges them and never from the informer: for a write that must know whether one still moves (a try
@@ -455,11 +461,11 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
   const runs = selectedRuns(all, selectors);
   const judged = yield* informedJudgements(e, home, runs, read, git, () => all);
   const summaries = summariesOf(runs, judged, home);
-  return runs.flatMap((run): RunSummary[] => {
+  return runs.flatMap((run) => {
     const summary = summaries.get(run.id);
     const one = judged.runs.get(run.id);
     const views = one !== undefined && 'judgement' in one ? one.judgement.views : NO_VIEWS;
-    return summary ? [{ ...summary, startedAt: runStartedAt(run, views) }] : [];
+    return (summary ? [{ ...summary, startedAt: runStartedAt(run, views) }] : []) satisfies RunSummary[];
   });
 });
 
@@ -476,11 +482,11 @@ export const cardRuns = Effect.fn('cardRuns')(function* (e: Engine, { home, memo
   const { git, read, all } = yield* listedThrough(e, memo, verify);
   const fromCards = all.filter((run) => run.from?.inbox !== undefined);
   const judged = yield* informedJudgements(e, home, fromCards, read, git, () => all);
-  return fromCards.flatMap((run): CardRun[] => {
+  return fromCards.flatMap((run) => {
     const one = judged.runs.get(run.id);
-    if (one === undefined) return [];
+    if (one === undefined) return [] satisfies CardRun[];
     const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
-    return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }];
+    return [{ id: run.id, ...(run.from === undefined ? {} : { from: run.from }), phase }] satisfies CardRun[];
   });
 });
 
@@ -517,10 +523,12 @@ export const mountingRuns = Effect.fn('mountingRuns')(function* (e: Engine, { ho
   const { git, read, all } = yield* listedThrough(e, memo, verify);
   const mounting = all.filter((run) => (run.volumes?.length ?? 0) > 0);
   const judged = yield* informedJudgements(e, home, mounting, read, git, () => all);
-  return mounting.flatMap((run): MountingRun[] => {
+  return mounting.flatMap((run) => {
     const one = judged.runs.get(run.id);
-    if (one === undefined) return [];
+    if (one === undefined) return [] satisfies MountingRun[];
     const phase = 'judgement' in one ? one.judgement.judged.phase : unjudgedFields().phase;
-    return [{ id: run.id, ...(run.factory === undefined ? {} : { factory: run.factory }), phase, volumes: run.volumes ?? [] }];
+    return [
+      { id: run.id, ...(run.factory === undefined ? {} : { factory: run.factory }), phase, volumes: run.volumes ?? [] },
+    ] satisfies MountingRun[];
   });
 });

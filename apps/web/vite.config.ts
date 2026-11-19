@@ -28,7 +28,7 @@ const logger: Logger = {
  * The line and reason of a compiler event that leaves a function uncompiled, or `undefined` for any other event. The line is the
  * offending expression's where the compiler gives its location, and the function's where it gives none or a symbol in its place.
  */
-function skipped(event: LoggerEvent): { line?: number; reason: string } | undefined {
+function skipped(event: LoggerEvent) {
   switch (event.kind) {
     case 'PipelineError':
       return { line: event.fnLoc?.start.line, reason: event.data };

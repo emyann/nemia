@@ -14,7 +14,7 @@ import { asked } from '../objects.ts';
  * @param args The words parsed against the command's words.
  * @param key The name of the flag or positional to read.
  */
-export const textArg = (args: Args, key: string): string | undefined => {
+export const textArg = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -24,14 +24,14 @@ export const textArg = (args: Args, key: string): string | undefined => {
  * @param args The words parsed against the command's words.
  * @param key The name of the switch to read.
  */
-export const switchArg = (args: Args, key: string): boolean => args[key] === true;
+export const switchArg = (args: Args, key: string) => args[key] === true;
 
 /**
  * The dollars under `key`, or undefined where none were given.
  * @param args The words parsed against the command's words.
  * @param key The name of the flag that takes the amount.
  */
-export const amountArg = (args: Args, key: string): number | undefined => {
+export const amountArg = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'number' ? value : undefined;
 };
@@ -41,9 +41,9 @@ export const amountArg = (args: Args, key: string): number | undefined => {
  * @param args The words parsed against the command's words.
  * @param key The name of the flag or positional to read.
  */
-export const listArg = (args: Args, key: string): readonly string[] => {
+export const listArg = (args: Args, key: string) => {
   const value = args[key];
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /**
@@ -52,7 +52,7 @@ export const listArg = (args: Args, key: string): readonly string[] => {
  * @param command The command's name, said in the api's refusal.
  * @param name The run's id.
  */
-export const namespaceOfRun = async (command: string, name: string): Promise<string> =>
+export const namespaceOfRun = async (command: string, name: string) =>
   (await asked(command, (c) => c.runs.show({ params: { name } }))).metadata.namespace ?? DEFAULT_NAMESPACE;
 
 /**
@@ -60,7 +60,7 @@ export const namespaceOfRun = async (command: string, name: string): Promise<str
  * @param command The command's name, said in the api's refusal.
  * @param name The card's name.
  */
-export const namespaceOfCard = async (command: string, name: string): Promise<string> =>
+export const namespaceOfCard = async (command: string, name: string) =>
   (await asked(command, (c) => c.cards.getAll({ params: { name } }))).metadata.namespace ?? DEFAULT_NAMESPACE;
 
 /**
@@ -69,14 +69,14 @@ export const namespaceOfCard = async (command: string, name: string): Promise<st
  * @param from The place typed: `yours`, `repo`, a factory's name, or undefined where none was typed.
  * @param factory The factory `--factory` names, or undefined (or empty) where none is named.
  */
-export const namespaceOfPlace = (from: string | undefined, factory: string | undefined): string =>
+export const namespaceOfPlace = (from: string | undefined, factory: string | undefined) =>
   from !== undefined && from !== 'user' && from !== 'repo' ? from : factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
 
 /**
  * The `-l` selectors a command line took one by one, as the one label selector a query takes: joined by commas; none where none given.
  * @param args The words parsed against the command's words, whose `selector` holds each `-l` typed.
  */
-export const selectorQuery = (args: Args): { readonly labelSelector?: string } => {
+export const selectorQuery = (args: Args) => {
   const texts = listArg(args, 'selector');
   return texts.length ? { labelSelector: texts.join(',') } : {};
 };
@@ -87,7 +87,7 @@ export const selectorQuery = (args: Args): { readonly labelSelector?: string } =
  * @param typed The path as typed.
  * @param env The environment whose chosen context says whether the daemon is this machine's; this process's by default.
  */
-export const pathSent = (typed: string, env: NodeJS.ProcessEnv = process.env): string =>
+export const pathSent = (typed: string, env: NodeJS.ProcessEnv = process.env) =>
   chosenOf(env).kind === 'remote' ? typed : path.resolve(typed);
 
 /**
@@ -106,7 +106,7 @@ export function repoQueryOf(
   factory: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
   here: string = process.cwd(),
-): { readonly repo?: string } {
+) {
   if (typed !== undefined) return { repo: pathSent(typed, env) };
   return factory !== undefined || chosenOf(env).kind !== 'local' ? {} : { repo: path.resolve(here) };
 }
@@ -115,6 +115,6 @@ export function repoQueryOf(
  * `lines` printed on stdout, one each; nothing for none.
  * @param lines The lines to print, each without its newline.
  */
-export const said = (lines: readonly string[]): void => {
+export const said = (lines: readonly string[]) => {
   if (lines.length) process.stdout.write(`${lines.join('\n')}\n`);
 };

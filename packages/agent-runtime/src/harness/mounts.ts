@@ -23,7 +23,7 @@ export type Mount = {
 const MOUNT_KEYS: readonly string[] = ['path', 'readOnly', 'ruled'];
 
 /** Why one entry of `config.mounts` is not a mount, or `undefined`. */
-const mountRefusalOf = (mount: unknown): string | undefined => {
+const mountRefusalOf = (mount: unknown) => {
   if (typeof mount !== 'object' || mount === null || Array.isArray(mount)) {
     return `\`mounts\` holds ${JSON.stringify(mount)}, which is not a mount. Give an object, like { "path": "/srv/repo", "readOnly": true }.`;
   }
@@ -52,7 +52,7 @@ const mountRefusalOf = (mount: unknown): string | undefined => {
  * not true or false, and a path given twice, whose two modes no harness could hold at once.
  * @param mounts The task's `config.mounts` as filed, of any shape; undefined where it is left out, which is no refusal.
  */
-export const mountsRefusalOf = (mounts: unknown): string | undefined => {
+export const mountsRefusalOf = (mounts: unknown) => {
   if (mounts === undefined) return undefined;
   if (!Array.isArray(mounts)) {
     return `\`mounts: ${JSON.stringify(mounts)}\` is not a list of mounts. Give a list, like [{ "path": "/srv/repo", "readOnly": true }], or leave it out.`;

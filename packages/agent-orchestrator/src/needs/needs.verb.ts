@@ -55,7 +55,7 @@ export type CheckAt = {
  * two repositories, is read twice.
  * @param at The check and the folders it runs with and in.
  */
-export const checkKey = (at: CheckAt): string =>
+export const checkKey = (at: CheckAt) =>
   [at.carriedFiles ?? '', at.workflowFiles ?? '', at.cwd ?? '', at.token ? 'token' : '', at.check].join('\n');
 
 /**
@@ -79,7 +79,7 @@ export type NeedsMemo = {
  * The needs of every harness the runtime declares (`HARNESS_DECLARATIONS`, `harnessNeedsOf`), the default harness's token offered with
  * the command that keeps it in the store (`nemia <token> set`).
  */
-export const declaredHarnessNeeds = (): Need[] =>
+export const declaredHarnessNeeds = () =>
   harnessNeedsOf(HARNESS_DECLARATIONS, { harness: DEFAULT_HARNESS, maker: DEFAULT_SIGN_IN.maker, keep: `nemia ${TOKEN_NAME} set` });
 
 /** The names of the harnesses whose adapters declare needs, in the runtime's order. */
@@ -90,15 +90,16 @@ export const HARNESSES_WITH_NEEDS: readonly string[] = harnessesWithNeeds(HARNES
  * @param home The store's root folder the memory reads for.
  * @param checkMs How long a check may run, in ms, `NEEDS_CHECK_MS` when absent.
  */
-export const needsMemo = (home: string, checkMs: number = NEEDS_CHECK_MS): NeedsMemo => ({
-  home,
-  readings: new Map(),
-  asked: new Map(),
-  placeNeeds: [],
-  harnessNeeds: declaredHarnessNeeds(),
-  version: 0,
-  checkMs,
-});
+export const needsMemo = (home: string, checkMs: number = NEEDS_CHECK_MS) =>
+  ({
+    home,
+    readings: new Map(),
+    asked: new Map(),
+    placeNeeds: [],
+    harnessNeeds: declaredHarnessNeeds(),
+    version: 0,
+    checkMs,
+  }) satisfies NeedsMemo as NeedsMemo;
 
 /**
  * This process's memory of its needs' readings, a `Context.Reference` whose default is none: a daemon gives one (`up`, or the api's
@@ -110,7 +111,7 @@ export const NeedsMemory = Context.Reference<NeedsMemo | undefined>('agent-orche
  * One memory for a process, of the store at `home`: the api gives one per app, read by the daemon's sweep and every request alike.
  * @param home The store's root folder the memory reads for.
  */
-export const needsMemoryLayer = (home: string): Layer.Layer<never> => Layer.sync(NeedsMemory, () => needsMemo(home));
+export const needsMemoryLayer = (home: string) => Layer.sync(NeedsMemory, () => needsMemo(home));
 
 /**
  * The environment a check or a fix runs in, over `base`: PATH led by the tools folder's `bin/` (`pathLedByTools`), `NEMIA_TOOLS` the
@@ -134,7 +135,7 @@ export type CheckOptions = { readonly shell?: string; readonly ms: number };
  * `env` given the default harness's token the store `home` keeps (`loadClaudeToken`), where it is unset: a token file others may read, or
  * an empty one, loads nothing, so the check runs as a session would, with no token.
  */
-const tokenLoaded = (env: Record<string, string | undefined>, home: string): void => {
+const tokenLoaded = (env: Record<string, string | undefined>, home: string) => {
   try {
     loadClaudeToken(env, home);
   } catch {
@@ -147,7 +148,7 @@ const tokenLoaded = (env: Record<string, string | undefined>, home: string): voi
  * token the store keeps (`loadClaudeToken`), as a session is given it; a token file that does not load gives none, and the readiness read
  * says why.
  */
-const checkEnv = (home: string, at: CheckAt): Record<string, string | undefined> => {
+const checkEnv = (home: string, at: CheckAt) => {
   const env: Record<string, string | undefined> = needsEnv(home, process.env, at);
   if (at.token) tokenLoaded(env, home);
   return env;
@@ -160,7 +161,7 @@ const checkEnv = (home: string, at: CheckAt): Record<string, string | undefined>
  * @param home The store's root folder, the folder the check runs in where `at` names none.
  * @param at The check, the folders it runs with and in, and whether it is given the kept token.
  */
-export const checkRan = (home: string, at: CheckAt, { shell = 'sh', ms }: CheckOptions): Effect.Effect<NeedRan> =>
+export const checkRan = (home: string, at: CheckAt, { shell = 'sh', ms }: CheckOptions) =>
   Effect.callback<NeedRan>((resume) => {
     let settled = false;
     const done = (ran: NeedRan) => {
@@ -198,37 +199,36 @@ export const checkRan = (home: string, at: CheckAt, { shell = 'sh', ms }: CheckO
  * Whether `need` is checked and fixed in each factory's repository (`scope: repository`) rather than once on the machine.
  * @param need The need, with its scope.
  */
-export const isRepositoryNeed = (need: Need): boolean => need.scope === 'repository';
+export const isRepositoryNeed = (need: Need) => need.scope === 'repository';
 
 /** The checks of the builtin places' machine needs, as the memory holds them: each run with no workflow's folders. */
-const placeChecks = (memo: NeedsMemo): CheckAt[] =>
-  memo.placeNeeds.filter((need) => !isRepositoryNeed(need)).map((need) => ({ check: need.check }));
+const placeChecks = (memo: NeedsMemo) => memo.placeNeeds.filter((need) => !isRepositoryNeed(need)).map((need) => ({ check: need.check }));
 
 /**
  * Where a harness's need is checked: its check, the default harness's sign-in with the kept token in its environment.
  * @param need The harness's need: its install or its sign-in.
  */
-export const harnessCheckOf = (need: Need): CheckAt =>
-  need.name === signInNeedOf(DEFAULT_HARNESS) ? { check: need.check, token: true } : { check: need.check };
+export const harnessCheckOf = (need: Need) =>
+  (need.name === signInNeedOf(DEFAULT_HARNESS) ? { check: need.check, token: true } : { check: need.check }) satisfies CheckAt;
 
 /** The checks of every declared harness's needs. */
-const harnessChecks = (memo: NeedsMemo): CheckAt[] => memo.harnessNeeds.map(harnessCheckOf);
+const harnessChecks = (memo: NeedsMemo) => memo.harnessNeeds.map(harnessCheckOf) satisfies CheckAt[];
 
 /**
  * The repository a factory's repository needs are checked and fixed in: its first; none for a factory that does not read.
  * @param factory The factory as listed, or its error where it does not read.
  */
-export const factoryRepository = (factory: FactoryListing): string | undefined => ('error' in factory ? undefined : workedOn(factory)[0]);
+export const factoryRepository = (factory: FactoryListing) => ('error' in factory ? undefined : workedOn(factory)[0]);
 
 /**
  * Where a repository need is checked for a repository: its check, run in that repository.
  * @param need The repository need.
  * @param repository The path of the repository to check it in.
  */
-export const repositoryCheckOf = (need: Need, repository: string): CheckAt => ({ check: need.check, cwd: repository });
+export const repositoryCheckOf = (need: Need, repository: string) => ({ check: need.check, cwd: repository });
 
 /** The checks of the places' repository needs in each of `factories`' repositories: what the sweep reads of the trusted ones. */
-const repositoryChecks = (memo: NeedsMemo, factories: readonly FactoryListing[]): CheckAt[] =>
+const repositoryChecks = (memo: NeedsMemo, factories: readonly FactoryListing[]) =>
   factories.flatMap((f) => {
     const repository = factoryRepository(f);
     if (repository === undefined) return [];
@@ -251,7 +251,7 @@ export type FactoryWorkflow = {
  * else under its first repository's `workflows/`. A factory that does not read has none.
  * @param factories The factories as listed, each or its error.
  */
-export const factoryWorkflows = (factories: readonly FactoryListing[]): FactoryWorkflow[] =>
+export const factoryWorkflows = (factories: readonly FactoryListing[]) =>
   factories.flatMap((f) => {
     if ('error' in f) return [];
     const root = f.tree ?? workedOn(f)[0];
@@ -279,7 +279,7 @@ export const trustedOf = Effect.fnUntraced(function* (factories: readonly Factor
  * @param w The factory's workflow, with the folder its live files are in.
  * @param needs The needs the workflow declares.
  */
-export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]): CheckAt[] =>
+export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]) =>
   needs.flatMap((need) => {
     const at = workflowCheckOf(w, need);
     return at === undefined ? [] : [at];
@@ -291,8 +291,10 @@ export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]): Chec
  * @param w The factory's workflow, with its live folder and its factory's repository.
  * @param need The need the workflow declares.
  */
-export const workflowCheckOf = (w: FactoryWorkflow, need: Need): CheckAt | undefined =>
-  ownCheckOf(need, { workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }, w.repository);
+export const workflowCheckOf = (w: FactoryWorkflow, need: Need) =>
+  ownCheckOf(need, { workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }, w.repository) satisfies CheckAt | undefined as
+    | CheckAt
+    | undefined;
 
 /**
  * Where a workflow's own `need` is checked: with the workflow's `folders` as a step is told them, in the store's folder where it says
@@ -306,7 +308,7 @@ export const ownCheckOf = (
   need: Need,
   folders: { readonly workflowFiles: string; readonly carriedFiles?: string },
   repository: string | undefined,
-): CheckAt | undefined => {
+) => {
   if (!isRepositoryNeed(need)) return { check: need.check, ...folders };
   return repository === undefined ? undefined : { check: need.check, ...folders, cwd: repository };
 };
@@ -315,7 +317,7 @@ export const ownCheckOf = (
  * What a workflow's need of `scope: repository` says where there is no repository to check it in: unmet, and why.
  * @param need The workflow's repository need.
  */
-export const noRepositoryMessage = (need: Need): string =>
+export const noRepositoryMessage = (need: Need) =>
   `${need.message}: unmet, since it is checked in its factory's repository and there is none: file the factory on a repository, then nemia doctor reads it`;
 
 /**
@@ -348,7 +350,7 @@ export const needsOnce = Effect.fn('needsOnce')(function* (memo: NeedsMemo, opti
 });
 
 /** `state` kept under `key`, the memory's version counted where it changed the reading. */
-const kept = (memo: NeedsMemo, key: string, state: NeedState): void => {
+const kept = (memo: NeedsMemo, key: string, state: NeedState) => {
   if (memo.readings.get(key) === state) return;
   memo.readings.set(key, state);
   memo.version++;
@@ -358,7 +360,7 @@ const kept = (memo: NeedsMemo, key: string, state: NeedState): void => {
  * The harnesses a run's frozen `steps` run sessions on, among those that declare needs (`harnessesOfRun`): a script condition runs none.
  * @param steps The run's frozen steps.
  */
-export const runHarnesses = (steps: readonly StepSpec[]): readonly string[] =>
+export const runHarnesses = (steps: readonly StepSpec[]) =>
   harnessesOfRun(
     steps.map((step) => ({ harness: step.harness, runsSession: !isScript(step) })),
     DEFAULT_HARNESS,
@@ -370,7 +372,7 @@ export const runHarnesses = (steps: readonly StepSpec[]): readonly string[] =>
  * its needs are read from. Any other run waits on no need.
  * @param run The run's record.
  */
-export const heldOnNeeds = (run: Run): boolean => !hasStarted(run) && !run.cancelledAt && run.workflowFiles !== undefined;
+export const heldOnNeeds = (run: Run) => !hasStarted(run) && !run.cancelledAt && run.workflowFiles !== undefined;
 
 /**
  * The harnesses `run` would be held on, from its frozen `steps` (`runHarnesses`), none where its needs hold it no more (`heldOnNeeds`):
@@ -378,14 +380,14 @@ export const heldOnNeeds = (run: Run): boolean => !hasStarted(run) && !run.cance
  * @param run The run's record.
  * @param steps The run's frozen steps.
  */
-export const harnessesHolding = (run: Run, steps: readonly StepSpec[]): readonly string[] => (heldOnNeeds(run) ? runHarnesses(steps) : []);
+export const harnessesHolding = (run: Run, steps: readonly StepSpec[]) => (heldOnNeeds(run) ? runHarnesses(steps) : []);
 
 /** The needs of `harnessNeeds` of each harness a run's frozen `steps` run sessions on (`runHarnesses`). */
-const harnessNeedsOfRun = (harnessNeeds: readonly Need[], steps: readonly StepSpec[]): Need[] =>
+const harnessNeedsOfRun = (harnessNeeds: readonly Need[], steps: readonly StepSpec[]) =>
   needsOfHarnesses(harnessNeeds, runHarnesses(steps));
 
 /** The needs of `harnessNeeds` of each of `harnesses`: its install and its sign-in. */
-const needsOfHarnesses = (harnessNeeds: readonly Need[], harnesses: readonly string[]): Need[] =>
+const needsOfHarnesses = (harnessNeeds: readonly Need[], harnesses: readonly string[]) =>
   harnessNeeds.filter((need) => harnesses.some((h) => need.name === h || need.name === signInNeedOf(h)));
 
 /**
@@ -402,7 +404,7 @@ export const runNeedNames = (
   needs: { readonly placeNeeds: readonly Need[]; readonly harnessNeeds: readonly Need[] },
   run: Run,
   steps: readonly StepSpec[],
-): string[] => {
+) => {
   const own = run.workflowFiles === undefined ? [] : workflowNeedsRead(workflowFilesDir(home, run, run.workflowFiles)).needs;
   const placed = isRepositoryRun(run) ? needs.placeNeeds : [];
   return needsOfRun(own, placed, harnessNeedsOfRun(needs.harnessNeeds, steps)).map((need) => need.name);
@@ -465,13 +467,10 @@ const checkedHeld = Effect.fnUntraced(function* (memo: NeedsMemo, need: Need, at
  * need, in the run's `repository` (`repositoryCheckOf`); undefined for a workflow's or a place's machine need, which a run checks itself
  * where no sweep has read it.
  */
-const sweptOnly = (
-  need: Need,
-  of: { fromPlace: boolean; own: readonly Need[]; harnessed: readonly Need[]; repository: string },
-): CheckAt | undefined => {
-  if (of.fromPlace) return isRepositoryNeed(need) ? repositoryCheckOf(need, of.repository) : undefined;
+const sweptOnly = (need: Need, of: { fromPlace: boolean; own: readonly Need[]; harnessed: readonly Need[]; repository: string }) => {
+  if (of.fromPlace) return (isRepositoryNeed(need) ? repositoryCheckOf(need, of.repository) : undefined) satisfies CheckAt | undefined;
   if (of.own.some((n) => n.name === need.name)) return undefined;
-  return of.harnessed.some((h) => h.name === need.name) ? harnessCheckOf(need) : undefined;
+  return (of.harnessed.some((h) => h.name === need.name) ? harnessCheckOf(need) : undefined) satisfies CheckAt | undefined;
 };
 
 /**
@@ -494,7 +493,7 @@ const readOrCheck = Effect.fnUntraced(function* (memo: NeedsMemo, at: CheckAt) {
  * need, else by the need's name for a place's or a harness's — or, for a workflow's need of a run in no factory, which the server starts
  * no fix for, its first fix's command to type; its own words where it declares no fix.
  */
-const fixWords = (need: Need, fromPlace: boolean, at: FixAt | undefined): string => {
+const fixWords = (need: Need, fromPlace: boolean, at: FixAt | undefined) => {
   const first = need.fixes?.[0];
   if (first === undefined) return need.message;
   if (fromPlace || at !== undefined) return fixCommandOf(need.name, at);
@@ -506,8 +505,7 @@ const fixWords = (need: Need, fromPlace: boolean, at: FixAt | undefined): string
  * @param memo The process's memory of its needs, or undefined where none is kept.
  * @param run The run's record.
  */
-export const needsVersionOf = (memo: NeedsMemo | undefined, run: Run): number | undefined =>
-  memo === undefined || hasStarted(run) ? undefined : memo.version;
+export const needsVersionOf = (memo: NeedsMemo | undefined, run: Run) => (memo === undefined || hasStarted(run) ? undefined : memo.version);
 
 /** `StoreRoot`'s memory, made where a program was given none: what a daemon composes its passes over. */
 export const needsMemoOf = Effect.gen(function* () {

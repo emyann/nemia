@@ -21,7 +21,7 @@ const SHEET: [string, Presence][] = [
 ];
 
 /** Her face for `presence`, docked. */
-const docked = (presence: Presence): StoryObj => ({
+const docked = (presence: Presence) => ({
   render: () => (
     <div style={AROUND}>
       <NemiaFace presence={presence} />

@@ -16,9 +16,13 @@ import { workflowLink } from '../lib/factoryAddress';
  * factory, `?workflow=` and `?step=` name a step of one of your workflows to hire the agent into once it is written.
  */
 export const Route = createFileRoute('/agents_/new')({
-  validateSearch: (search: Record<string, unknown>): { into?: string; workflow?: string; step?: string } => {
+  validateSearch: (search: Record<string, unknown>) => {
     const { factory: into, workflow, step } = hirePlaceOf(search);
-    return into === undefined ? {} : { into, workflow, step };
+    return (into === undefined ? {} : { into, workflow, step }) satisfies { into?: string; workflow?: string; step?: string } as {
+      into?: string;
+      workflow?: string;
+      step?: string;
+    };
   },
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(storeQuery), context.queryClient.prefetchQuery(keyFormQuery)]),
   component: NewAgentPage,
@@ -118,4 +122,4 @@ function Unhired({ place: { factory, workflow, step }, agent, why }: { place: Hi
 }
 
 /** Brings the notice that the hire was refused into the window: it says so above the form, and Create is pressed at the form's foot. */
-const intoView = (notice: HTMLDivElement | null): void => notice?.scrollIntoView({ block: 'nearest' });
+const intoView = (notice: HTMLDivElement | null) => notice?.scrollIntoView({ block: 'nearest' });

@@ -8,7 +8,7 @@ import { spentTitle } from '@/lib/cost';
 import { namespaceOf } from '@/lib/factories';
 import { clockCounts, inFlight, runClock, standingOf, titleOf } from '@/lib/factory';
 import { labelRun } from '@/lib/api/labels';
-import { container, type Hue } from '@/lib/meaning';
+import { container } from '@/lib/meaning';
 import { runsMoved } from '@/lib/runWrites';
 import type { RunDetail } from '@/lib/runView';
 import { whenWords } from '@/lib/runWords';
@@ -20,7 +20,7 @@ import { Labels } from '../field/Labels';
 import { RunMenu } from './RunMenu';
 
 /** The hue of where a run stands (`standingOf`): waiting on you, in flight, finished, or called off. */
-const standingHue = (standing: string): Hue =>
+const standingHue = (standing: string) =>
   standing === 'waiting on you' ? 'yours' : standing === 'in flight' ? 'alive' : standing === ENDED.cancelled.word ? 'grey' : 'sage';
 
 /**

@@ -47,7 +47,7 @@ export type SessionStart = {
 };
 
 /** Whether the session starts in the home: there is one, the step runs here, and its harness can add the workspace writable beside it. */
-const startsInHome = (i: SessionPlaceOf): boolean => i.home !== undefined && i.local && i.addsFolders;
+const startsInHome = (i: SessionPlaceOf) => i.home !== undefined && i.local && i.addsFolders;
 
 const sessionStartSpec = spec<(i: SessionPlaceOf) => SessionStart>({
   /** The workspace and the home are absolute paths, and the home is not the workspace. */
@@ -96,17 +96,17 @@ export type SessionStartOf = Implementation<typeof sessionStartSpec>;
 const FILE_TOOLS: readonly string[] = ['Read', 'Edit', 'Write', 'NotebookEdit'];
 
 /** A rule's tool and what is inside its parentheses, or null for a bare tool. */
-const partsOf = (rule: string): { tool: string; inner: string | null } => {
+const partsOf = (rule: string) => {
   const open = rule.indexOf('(');
   if (open < 0 || !rule.endsWith(')')) return { tool: rule, inner: null };
   return { tool: rule.slice(0, open), inner: rule.slice(open).slice(1, -1) };
 };
 
 /** Whether a file rule's path is read from the session's working folder: neither absolute (`/`, `//`) nor the user's (`~`). */
-const relative = (inner: string): boolean => inner.length > 0 && !inner.startsWith('/') && !inner.startsWith('~');
+const relative = (inner: string) => inner.length > 0 && !inner.startsWith('/') && !inner.startsWith('~');
 
 /** A relative path with its leading `./` taken off, where it has one. */
-const bare = (inner: string): string => (inner.startsWith('./') ? inner.slice(2) : inner);
+const bare = (inner: string) => (inner.startsWith('./') ? inner.slice(2) : inner);
 
 /**
  * The expansion of `${{ workspace }}` the code calls (`expandedIn`), taken on trust: a split and a join, which the solver does not
@@ -174,7 +174,7 @@ export type MemoryFolder = { readonly path: string; readonly claudeMd: boolean }
 export type MemoryFiles = { readonly load: boolean; readonly excludes: readonly string[] };
 
 /** Whether `inner` is `outer` or a folder under it. */
-const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer + '/');
+const within = (inner: string, outer: string) => inner === outer || inner.startsWith(outer + '/');
 
 const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>({
   /**

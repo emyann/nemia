@@ -11,7 +11,7 @@ export type { CardPlaySelector } from '../../contracts/card-play-selector.contra
 const FIELD = 'status.inPlay';
 
 /** `word` as a boolean, or null where it is neither. */
-const valueOf = (word: string): boolean | null => (word === 'true' ? true : word === 'false' ? false : null);
+const valueOf = (word: string) => (word === 'true' ? true : word === 'false' ? false : null);
 
 /**
  * The selector `text` spells: `status.inPlay`, then `==`, `!=` or `=`, then `true` or `false`; null for anything else.

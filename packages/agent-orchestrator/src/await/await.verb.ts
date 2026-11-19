@@ -35,7 +35,7 @@ export type WaitRead = { readonly cursor: number; readonly lines: readonly Waite
  * @param chunk The next chunk of the feed, each line with where it starts and the cursor after it.
  * @param selectors What the wait takes a line by.
  */
-export function readChunk(read: WaitRead, chunk: Iterable<Followed>, selectors: Selectors): WaitRead {
+export function readChunk(read: WaitRead, chunk: Iterable<Followed>, selectors: Selectors) {
   if (read.lines.length > 0) return read;
   const lines: Waited[] = [];
   let cursor = read.cursor;
@@ -53,8 +53,10 @@ export function readChunk(read: WaitRead, chunk: Iterable<Followed>, selectors: 
  * the follow returns still answers the lines the cursor went past. Pure.
  * @param read What the wait has read: its cursor and the lines it took.
  */
-export const answerOf = (read: WaitRead): WaitAnswer =>
-  read.lines.length > 0 ? { ended: 'matched', lines: read.lines, cursor: read.cursor } : { ended: 'bound', lines: [], cursor: read.cursor };
+export const answerOf = (read: WaitRead) =>
+  (read.lines.length > 0
+    ? { ended: 'matched', lines: read.lines, cursor: read.cursor }
+    : { ended: 'bound', lines: [], cursor: read.cursor }) satisfies WaitAnswer;
 
 /**
  * The feed followed from `from` (the feed's end as it opens where none is given) until a chunk of it — the lines of one pass, or of one

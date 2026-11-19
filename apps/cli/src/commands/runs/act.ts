@@ -24,10 +24,10 @@ import { listArg, namespaceOfRun, said, selectorQuery, switchArg, textArg } from
  * The run a line names first, under `runId`: the parser fills it, its spec requiring it.
  * @param args The words parsed against the command's words, whose `runId` names the run.
  */
-export const runOf = (args: Args): string => textArg(args, 'runId') ?? '';
+export const runOf = (args: Args) => textArg(args, 'runId') ?? '';
 
 /** What `nemia cancel` prints of what it did: that it stopped what was in flight, or why there was nothing to. */
-export const cancelLines = ({ id, plan }: RunCancelled): string[] => {
+export const cancelLines = ({ id, plan }: RunCancelled) => {
   if (plan.kind === 'finished') return [`${id}  already ${plan.status} — nothing to stop`];
   const head = plan.kind === 'already-cancelled' ? `${id}  already cancelled at ${plan.at}` : `${id}  cancelled`;
   if (plan.stop.length)
@@ -39,7 +39,7 @@ export const cancelLines = ({ id, plan }: RunCancelled): string[] => {
  * `nemia cancel <runId>`: what the run has in flight asked to stop, and nothing more filed.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function cancel(args: Args): Promise<number> {
+export async function cancel(args: Args) {
   const name = runOf(args);
   const namespace = await namespaceOfRun(CANCEL_WORDS.name, name);
   said(cancelLines(await asked(CANCEL_WORDS.name, (c) => c.runs.cancel({ params: { namespace, name } }))));
@@ -47,10 +47,10 @@ export async function cancel(args: Args): Promise<number> {
 }
 
 /** Runs named in a sentence: `a`, `a and b`, `a, b and c`. */
-const runList = (ids: readonly string[]): string => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
+const runList = (ids: readonly string[]) => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
 
 /** A hold as `nemia hold` says it: the runs it waits on to land, or a person's lift, and why and by whom where it says. */
-const holdWords = ({ until, why, by }: RunHeld['hold']): string => {
+const holdWords = ({ until, why, by }: RunHeld['hold']) => {
   const parts = [...(why ? [`why: ${why}`] : []), ...(by ? [`by ${by}`] : [])];
   const words = parts.length ? ` (${parts.join('; ')})` : '';
   return until.length
@@ -59,7 +59,7 @@ const holdWords = ({ until, why, by }: RunHeld['hold']): string => {
 };
 
 /** What `nemia hold` prints of a hold put or lifted. */
-export const holdLines = ({ id, lifted, hold }: RunHeld): string[] => [
+export const holdLines = ({ id, lifted, hold }: RunHeld) => [
   lifted
     ? `${id}  hold lifted — the next tick goes on, and what its steps ask is asked`
     : `${id}  ${holdWords(hold)} — nothing more of it is filed, and nothing is asked of you, until then; ${hold.until.length ? 'the next tick lifts the hold' : `no tick lifts it: nemia hold ${id} --off`}`,
@@ -69,7 +69,7 @@ export const holdLines = ({ id, lifted, hold }: RunHeld): string[] => [
  * `nemia hold <runId> [--until <runId> ...] [--why] [--by]`, or `--off`: the hold put (`runs.hold`), or lifted (`runs.unhold`).
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function hold(args: Args): Promise<number> {
+export async function hold(args: Args) {
   const name = runOf(args);
   const namespace = await namespaceOfRun(HOLD_WORDS.name, name);
   const why = textArg(args, 'why');
@@ -91,7 +91,7 @@ export async function hold(args: Args): Promise<number> {
  * What `nemia route` prints of the route written.
  * @param runId The run's id.
  */
-export const routeLines = ({ step, try: n, route, file }: RunRouted, runId: string): string[] => [
+export const routeLines = ({ step, try: n, route, file }: RunRouted, runId: string) => [
   `${runId}  routed: try ${n} of ${step} takes ${route} — the next tick files what its when: names`,
   `   ${file}`,
 ];
@@ -100,7 +100,7 @@ export const routeLines = ({ step, try: n, route, file }: RunRouted, runId: stri
  * `nemia route <runId> <condition> <route>`: a person's route for the condition's try.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function route(args: Args): Promise<number> {
+export async function route(args: Args) {
   const name = runOf(args);
   const step = textArg(args, 'step') ?? '';
   const namespace = await namespaceOfRun(ROUTE_WORDS.name, name);
@@ -112,7 +112,7 @@ export async function route(args: Args): Promise<number> {
 }
 
 /** A kind the run was behind on, as `nemia refresh` says it: its name, the revision it ran on and the one now. */
-const driftWords = (d: NonNullable<RunRefreshed['drift']>[number]): string =>
+const driftWords = (d: NonNullable<RunRefreshed['drift']>[number]) =>
   `${d.kind} ${d.name}: ${d.step ? `${d.step} ran on rev ${d.pinned}` : `rev ${d.pinned}`}, now ${d.now}`;
 
 /**
@@ -120,7 +120,7 @@ const driftWords = (d: NonNullable<RunRefreshed['drift']>[number]): string =>
  * @param runId The run's id.
  * @param base Whether `--base` was typed: the merge of the base asked rather than the new revisions.
  */
-export const refreshLines = ({ drift, said: merged, file }: RunRefreshed, runId: string, base: boolean): string[] =>
+export const refreshLines = ({ drift, said: merged, file }: RunRefreshed, runId: string, base: boolean) =>
   base
     ? [`${runId}  ${merged ?? ''}`, `   ${file ?? ''}`]
     : [
@@ -132,7 +132,7 @@ export const refreshLines = ({ drift, said: merged, file }: RunRefreshed, runId:
  * `nemia refresh <runId> [<step>] [--base]`: the run pinned to the new revisions, or its loop sent to merge its base.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function refresh(args: Args): Promise<number> {
+export async function refresh(args: Args) {
   const name = runOf(args);
   const base = switchArg(args, 'base');
   const step = textArg(args, 'step');
@@ -143,7 +143,7 @@ export async function refresh(args: Args): Promise<number> {
 }
 
 /** A line of the feed as `nemia wait` prints it: its time, what it is about — a run and its step — and what it says. */
-const eventLine = ({ metadata, involved, message }: Event): string => {
+const eventLine = ({ metadata, involved, message }: Event) => {
   const at = (metadata.creationTimestamp ?? '').slice(11, 19);
   const [run, step] = involved.name.split('/');
   const about = involved.kind === 'Run' || involved.kind === 'Step' ? `${run ?? ''}  ${step ?? '—'}` : `${involved.name}  —`;
@@ -154,13 +154,13 @@ const eventLine = ({ metadata, involved, message }: Event): string => {
 const WAIT_BOUND_MS = 300_000;
 
 /** What `nemia wait` prints: each line it took, then the cursor to wait again from. */
-export const waitLines = ({ lines, cursor }: FeedWait): string[] => [...lines.map(eventLine), `cursor: ${cursor}`];
+export const waitLines = ({ lines, cursor }: FeedWait) => [...lines.map(eventLine), `cursor: ${cursor}`];
 
 /**
  * `nemia wait [-l <key>=<value>]... [--from <cursor>] [--for <duration>]`: the feed's next lines `-l` takes, and the cursor after.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function wait(args: Args): Promise<number> {
+export async function wait(args: Args) {
   const from = textArg(args, 'from');
   const bound = textArg(args, 'for');
   const query = { ...selectorQuery(args), ...(from !== undefined ? { from } : {}), ...(bound !== undefined ? { for: bound } : {}) };

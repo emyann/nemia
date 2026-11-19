@@ -2,7 +2,7 @@
  * A person's route for a condition's try (`nemia route`): the file it is asked in (`routeAsk`), the routes read off a run's asks
  * (`personRoutes`), laid on its record as it is read (`withRoutes`) and taken off before it is written back (`unrouted`). Pure.
  */
-import type { Run, StepRecord } from '../record/record.ts';
+import type { Run } from '../record/record.ts';
 
 /** A person's route for a condition's try, as `runRecord` reads it from its file (`routeAsk`): the route named, and when. */
 export type PersonRoute = { step: string; try: number; route: string; at: string };
@@ -12,7 +12,7 @@ export type PersonRoute = { step: string; try: number; route: string; at: string
  * @param step The condition's name.
  * @param n The try of the condition the route is for.
  */
-export const routeAsk = (step: string, n: number): string => `route-${step}-${n}`;
+export const routeAsk = (step: string, n: number) => `route-${step}-${n}`;
 
 /**
  * The routes people named for a run's conditions (`routeAsk`), from the names in its asks folder `dir` and a reader of a file there: a file
@@ -25,8 +25,8 @@ export function personRoutes(
   dir: string,
   names: readonly string[] | undefined,
   read: (file: string) => { read: unknown } | { unreadable: string },
-): PersonRoute[] {
-  return (names ?? []).flatMap((name): PersonRoute[] => {
+) {
+  return (names ?? []).flatMap((name) => {
     const [, step, n] = /^route-(.+)-(\d+)$/.exec(name) ?? [];
     if (step === undefined || n === undefined) return [];
     const held = read(`${dir}/${name}`);
@@ -42,7 +42,7 @@ export function personRoutes(
  * @param run The run whose step records are routed.
  * @param routes The routes people named (`personRoutes`).
  */
-export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonly PersonRoute[]): R => {
+export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonly PersonRoute[]) => {
   const steps = { ...run.steps };
   for (const r of routes) {
     const record = steps[r.step];
@@ -56,10 +56,10 @@ export const withRoutes = <R extends Pick<Run, 'steps'>>(run: R, routes: readonl
  * A record without a person's route on any step, which is their file's and never the record's: what a rewrite writes. Pure.
  * @param run The record a rewrite writes.
  */
-export const unrouted = <R extends Pick<Run, 'steps'>>(run: R): R => ({
+export const unrouted = <R extends Pick<Run, 'steps'>>(run: R) => ({
   ...run,
   steps: Object.fromEntries(
-    Object.entries(run.steps).map(([name, record]): [string, StepRecord] => {
+    Object.entries(run.steps).map(([name, record]) => {
       if (record.route?.by !== 'person') return [name, record];
       const { route: _, ...rest } = record;
       return [name, rest];

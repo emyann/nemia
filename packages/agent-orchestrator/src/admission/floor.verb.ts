@@ -35,17 +35,17 @@ export type FloorRequest = {
 export const TOKEN_LEAST = NEMIA_FLOOR;
 
 /** `value` as a record of its keys, or an empty one where it is none. */
-const keysOf = (value: unknown): Readonly<Record<string, unknown>> =>
+const keysOf = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Readonly<Record<string, unknown>>) : {};
 
 /** The text under `key` of `record`, or undefined where it holds none. */
-const textAt = (record: Readonly<Record<string, unknown>>, key: string): string | undefined => {
+const textAt = (record: Readonly<Record<string, unknown>>, key: string) => {
   const value = record[key];
   return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
 /** The run, the step and the factory `request` names, as its endpoint's parts carry them. */
-function namedBy(request: FloorRequest): { run?: string; step?: string; factory?: string } {
+function namedBy(request: FloorRequest) {
   const params = keysOf(request.params);
   const query = keysOf(request.query);
   const run = textAt(params, 'runId') ?? (request.group === 'runs' ? textAt(params, 'name') : undefined);
@@ -63,7 +63,7 @@ function namedBy(request: FloorRequest): { run?: string; step?: string; factory?
  * The words an answer's body says as the command line says them, which admission reads: a retry's `--round` and a raise of a cap
  * (`--budget`), a retry's own or an approval's of a step after its gate.
  */
-function wordsOf(payload: unknown): string[] {
+function wordsOf(payload: unknown) {
   const body = keysOf(payload);
   const budgets = Array.isArray(body.budgets) ? body.budgets.map(keysOf) : [];
   return [
@@ -74,9 +74,9 @@ function wordsOf(payload: unknown): string[] {
 }
 
 /** The class of `entry` for an agent's call by `method`: out of reach where an agent never types it, and a setter's bare read for a GET. */
-const classFor = (entry: AdmissionEntry, method: string): FloorCall['class'] => {
+const classFor = (entry: AdmissionEntry, method: string) => {
   const c = agentClassOf(entry);
-  return typeof c !== 'object' ? c : method === 'GET' ? c.bare : c.sets;
+  return (typeof c !== 'object' ? c : method === 'GET' ? c.bare : c.sets) satisfies FloorCall['class'];
 };
 
 /** The level of the factory `factory`, or `manual` where it does not read: what admission reads of a factory it cannot. */
@@ -106,8 +106,7 @@ export const tokenFloor = Effect.fnUntraced(function* (caller: ProposalCaller, e
   let ruled = false;
   if (resolved === 'answer') {
     const wait = named.run === undefined || named.step === undefined ? undefined : yield* Effect.result(waitRead(named.run, named.step));
-    const waitOf = (): string | undefined =>
-      wait === undefined ? undefined : Result.isSuccess(wait) ? wait.success : `is not there: ${wait.failure.message}`;
+    const waitOf = () => (wait === undefined ? undefined : Result.isSuccess(wait) ? wait.success : `is not there: ${wait.failure.message}`);
     waits = askedOf(typed, waitOf) !== undefined;
     ruled = waits && policyAllows(typed, [entry], yield* policyReadOf([typed], [entry], caller.agent, yield* StoreRoot));
   }

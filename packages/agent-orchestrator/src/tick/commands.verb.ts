@@ -4,7 +4,7 @@ import type { Args } from '../command/command.ts';
 import type { Ran } from '../command/entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -33,13 +33,15 @@ export const TICK: Ran = {
 };
 
 /** Refused of `nemia up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
-function upRefusal(args: Args): string | null {
+function upRefusal(args: Args) {
   const every = textOf(args, 'every');
   if (every === undefined) return null;
   if (args.stats === true)
-    return `nemia up --stats reads what the last pass cost and ticks nothing, so it takes no ${every}: nemia up --stats alone, or nemia up ${every} to tick.`;
+    return `nemia up --stats reads what the last pass cost and ticks nothing, so it takes no ${every}: nemia up --stats alone, or nemia up ${every} to tick.` satisfies
+      | string
+      | null as string | null;
   const asked = everyOf(every);
-  return 'refusal' in asked ? asked.refusal : null;
+  return ('refusal' in asked ? asked.refusal : null) satisfies string | null as string | null;
 }
 
 /** `nemia up`: a pass every interval, holding the store, until it is stopped; or, with `--stats`, what the last pass cost. */

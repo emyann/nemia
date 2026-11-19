@@ -30,20 +30,20 @@ export { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictio
 export type { WiringChange, WiringRefused } from '../../../contracts/wiring.contract.ts';
 
 /** The workflow a hire's step `<workflow>/<step>` names. */
-const workflowOfStep = (step: string): string => step.slice(0, step.indexOf('/'));
+const workflowOfStep = (step: string) => step.slice(0, step.indexOf('/'));
 
 /** Whether `dict` holds an entry of its own at `key`: a prototype's name (`constructor`, `valueOf`) is none. */
-const holds = (dict: Readonly<Record<string, unknown>>, key: string): boolean => Object.hasOwn(dict, key);
+const holds = (dict: Readonly<Record<string, unknown>>, key: string) => Object.hasOwn(dict, key);
 
 /** The steps of `workflow` a factory's `hires` hire into. */
-const hiredInto = (hires: Readonly<Record<string, string>>, workflow: string): string[] =>
+const hiredInto = (hires: Readonly<Record<string, string>>, workflow: string) =>
   Object.keys(hires).filter((step) => step.startsWith(`${workflow}/`));
 
 /** What each verb did, as its refusal says it was not done. */
 const DONE = { attach: 'attached', detach: 'detached', schedule: 'scheduled', unschedule: 'unscheduled' } as const;
 
-const invalid = (message: string): WiringRefused => ({ kind: 'Invalid', message });
-const missing = (message: string): WiringRefused => ({ kind: 'Missing', message });
+const invalid = (message: string) => ({ kind: 'Invalid', message }) satisfies WiringRefused;
+const missing = (message: string) => ({ kind: 'Missing', message }) satisfies WiringRefused;
 
 /**
  * Why `factory` cannot take `change`, or null where it can, each in the words its verb has always said.
@@ -67,29 +67,33 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
 };
 
 /** Why `factory` cannot hire `agent` into `step`: a step or an agent that is not one, or a workflow it does not offer (`Invalid`). */
-function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent: string): WiringRefused | null {
+function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent: string) {
   const bad = hireRefusal(step, agent);
-  if (bad !== undefined) return invalid(`${bad} Nothing was hired.`);
+  if (bad !== undefined) return invalid(`${bad} Nothing was hired.`) satisfies WiringRefused | null;
   const workflow = workflowOfStep(step);
-  return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
+  return (
+    factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`)
+  ) satisfies WiringRefused | null;
 }
 
 /** Why `factory` cannot attach `workflow` on its repository named `repo`: a folder name none or several of its repositories have. */
-function attachRefused(factory: Parameters<WiringRefusal>[0], workflow: string, repo: string | undefined): WiringRefused | null {
+function attachRefused(factory: Parameters<WiringRefusal>[0], workflow: string, repo: string | undefined) {
   if (repo === undefined) return null;
   const count = reposNamed(factory, repo);
-  return count === 1 ? null : invalid(repoNameRefusal(factory, workflow, repo, count));
+  return (count === 1 ? null : invalid(repoNameRefusal(factory, workflow, repo, count))) satisfies WiringRefused | null;
 }
 
 /**
  * Why `factory` cannot be relieved of `workflow`: it does not offer it (`Missing`), or still hires into, schedules or sets a cost line for
  * it (`Invalid`).
  */
-function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string): WiringRefused | null {
-  if (!factory.workflows.includes(workflow)) return missing(unattachedDetachRefusal(factory, workflow));
-  if (hiresInto(factory.hires, workflow)) return invalid(hiredDetachRefusal(factory.name, workflow, hiredInto(factory.hires, workflow)));
-  if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow));
-  if (factory.costLines !== undefined && holds(factory.costLines, workflow)) return invalid(costLinedDetachRefusal(factory.name, workflow));
+function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string) {
+  if (!factory.workflows.includes(workflow)) return missing(unattachedDetachRefusal(factory, workflow)) satisfies WiringRefused | null;
+  if (hiresInto(factory.hires, workflow))
+    return invalid(hiredDetachRefusal(factory.name, workflow, hiredInto(factory.hires, workflow))) satisfies WiringRefused | null;
+  if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
+  if (factory.costLines !== undefined && holds(factory.costLines, workflow))
+    return invalid(costLinedDetachRefusal(factory.name, workflow)) satisfies WiringRefused | null;
   return null;
 }
 

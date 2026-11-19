@@ -276,7 +276,7 @@ const followedDue = Effect.fnUntraced(function* (
  * to the mark (`settlesCounted`) for the record this pass writes, as `markedOnce`'s are. A record with no mark counts none, and gets
  * no mark.
  */
-function settledOf(run: Run, r: RunRead): ReturnType<typeof settledOnce> {
+function settledOf(run: Run, r: RunRead) {
   const statusOf = (step: StepSpec) => stepStatus(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf);
   return settledOnce(run, r.steps, { views: r.views, spendOf: r.spendOf, signedOff: r.signedOff, statusOf });
 }
@@ -287,7 +287,7 @@ function settledOf(run: Run, r: RunRead): ReturnType<typeof settledOnce> {
  * writes. The metrics record them once the pass is done, after that write (`tickRun`): a process that dies between the two loses them,
  * and never records one twice, a restart between passes included.
  */
-function markedOnce(run: Run, r: RunRead): ReturnType<typeof onceFacts> {
+function markedOnce(run: Run, r: RunRead) {
   return onceFacts(run, r.steps, r.views, denialText);
 }
 
@@ -353,7 +353,7 @@ const marksOf = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, st
  * @param home The store's root folder.
  * @param run The run the pass files for.
  */
-export const mayFileOf = (home: string, run: Run): (() => boolean) => {
+export const mayFileOf = (home: string, run: Run) => {
   let calledOff = false;
   return () => !(calledOff ||= !runsAtOnce(home).runs.exists(run.id) || runsAtOnce(home).runs.calledOff(run.id));
 };
@@ -403,7 +403,7 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: RunRead, place: Pla
  * (`StepRecord.filesRead`), which unsigns the step where there is one: so no later pass reads that task's files again. Answers how
  * many steps it read, each a write the record is owed, and a note for each whose closeout is not accepted.
  */
-function readFiles(home: string, run: Run, r: RunRead): { read: number; notes: string[] } {
+function readFiles(home: string, run: Run, r: RunRead) {
   const due = filesDue(r.steps, run, r.phaseOf, r.signedOff);
   const notes: string[] = [];
   for (const name of due) {
@@ -455,7 +455,7 @@ const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Pare
 type PassCloser = Closer & { waits: (taskId: string) => boolean; closed: Set<string> };
 
 /** One closer for the pass: every close it makes, the sweep's and the filings', counted in one `closed`. */
-function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>): PassCloser {
+function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>) {
   const waits = waitsForWord(views);
   const closed = new Set<string>();
   const closeWaiting = Effect.fnUntraced(function* (name: string, taskId: string) {
@@ -463,8 +463,8 @@ function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>): PassCloser {
     if (!refused) closed.add(taskId);
     return refused && `${name}: ${refused}`;
   });
-  const awaitsWord = (taskId: string | null | undefined): boolean => Boolean(taskId && waits(taskId) && !closed.has(taskId));
-  return { closeWaiting, awaitsWord, waits, closed };
+  const awaitsWord = (taskId: string | null | undefined) => Boolean(taskId && waits(taskId) && !closed.has(taskId));
+  return { closeWaiting, awaitsWord, waits, closed } satisfies PassCloser as PassCloser;
 }
 
 /** Close each step's task held open that waits for a word nobody is to give (`holdsOpen`): answers with the engine's refusals, worded. */
@@ -516,7 +516,7 @@ const admit = Effect.fnUntraced(function* (
 });
 
 /** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */
-function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]): boolean {
+function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]) {
   if (!held || f.run.slotHeldAt || !f.mayFile()) return false;
   f.run.slotHeldAt = new Date().toISOString();
   f.notes.push(`${ready.join(', ')}: ${slotWord(held)} — filed once a run in flight settles`);
@@ -524,14 +524,14 @@ function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[
 }
 
 /** Whether `run` reads other runs: one it waits on (`waitedOn`), or one it is handed as context before it starts. */
-const readsOthers = (run: Run): boolean => waitedOn(run).length > 0 || (!hasStarted(run) && Boolean(run.context?.length));
+const readsOthers = (run: Run) => waitedOn(run).length > 0 || (!hasStarted(run) && Boolean(run.context?.length));
 
 /**
  * Every branch of the run's repository and its commit, read once when first asked: off what the pass read (`standing`, `headsFor`),
  * undefined where it did not, or asked of its place now (`headsNow`, of `place`) where no pass read them (`advanceRun`) or the run
  * committed a hand-off since (`handOffAll`).
  */
-const headsOf = (run: Run, standing: PassStanding | undefined, place: Place): Heads => {
+const headsOf = (run: Run, standing: PassStanding | undefined, place: Place) => {
   let read: { heads: Readonly<Record<string, string>> | undefined } | undefined;
   return () => {
     if (!isRepositoryRun(run)) return undefined;
@@ -549,7 +549,7 @@ function keepTips(
   steps: readonly StepSpec[],
   status: Assessment['status'],
   heads: () => Readonly<Record<string, string>> | undefined,
-): { tipped: string[]; tips: Run['tips'] | undefined } {
+) {
   const tipped = isRepositoryRun(run) ? tipBranches(run, steps, status) : [];
   const seen = tipped.length ? heads() : undefined;
   const tips = seen && isRepositoryRun(run) ? tipsSeen(run, tipped, seen) : undefined;
@@ -571,7 +571,7 @@ function answerOf(
   admission: Admission,
   done: Done,
   pass: { acted: boolean; tipped: string[] },
-): { advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } } {
+) {
   const { steps, views, phaseOf, asks } = r;
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
@@ -608,7 +608,11 @@ function answerOf(
     ...(done.facts?.length ? { facts: done.facts } : {}),
     feed: blockers.length ? feed : { ...feed, atRest: true },
   };
-  return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped: pass.tipped } }) };
+  return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped: pass.tipped } }) } satisfies {
+    advanced: Advanced;
+    blockers: string[];
+    rest?: { tipped: string[] };
+  } as { advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } };
 }
 
 /**
@@ -621,7 +625,7 @@ function answerOf(
  * @param run The run.
  * @param phaseOf The phase of a task, by its id, as the engine views it.
  */
-export const handOffOwed = (steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
+export const handOffOwed = (steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase) =>
   run.pruned
     ? []
     : handOffDue(steps, run, phaseOf).filter((name) => {

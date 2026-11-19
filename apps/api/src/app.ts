@@ -18,7 +18,7 @@ import { BOARD_ROUTE, type BoardFiles, boardOf } from './board/board.ts';
 import { callerGate } from './caller/index.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
-import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from './layer.ts';
+import { ApiConfig, type ApiEnv, ReadMemo, type Services } from './layer.ts';
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
@@ -64,7 +64,7 @@ export const answerError: ErrorHandler = (err, c) => {
  * twice. Merged last, so a test's own `Logger.layer` given after it still wins.
  * @param env The environment the settings, the store's root and its settings are read from.
  */
-export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
+export const liveOf = (env: NodeJS.ProcessEnv = process.env) =>
   Layer.mergeAll(
     ApiConfig.layer(env, runningRelease()),
     Engine.live(env),
@@ -119,7 +119,7 @@ const boardFiles: BoardFiles = {
  * (`answerError`).
  * @param layer Every service the api reads, as appLayer gives them or a test gives its own.
  */
-export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
+export function appOf(layer: Layer.Layer<Services>) {
   const runtime = ManagedRuntime.make(layer);
   const app: Hono<ApiEnv> = new Hono<ApiEnv>()
     .use(async (c, next) => {

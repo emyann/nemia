@@ -38,22 +38,22 @@ export type TimelineRow = {
 };
 
 /** A number two digits wide, so that names holding it sort as text in its order. */
-const padded = (n: number): string => String(n).padStart(2, '0');
+const padded = (n: number) => String(n).padStart(2, '0');
 
 /** The rows of `parts` that were measured: one whose value is null or undefined is no row, never a 0. */
 const measured = (
   row: Omit<TimelineRow, 'part' | 'value'>,
   parts: ReadonlyArray<readonly [TimelineRow['part'], number | null | undefined]>,
-): TimelineRow[] => parts.flatMap(([part, value]) => (value === null || value === undefined ? [] : [{ ...row, part, value }]));
+) => parts.flatMap(([part, value]) => (value === null || value === undefined ? [] : [{ ...row, part, value }]));
 
 /**
  * The rows of one step of the timeline `tl`, named `label`: for each try with a session of its own, how long it was queued, how long it
  * ran and what it cost; for each try's check, how long it was queued and ran; and how many tries the step took. None for a step with no
  * try on the clock.
  */
-function stepRows(tl: Timeline, step: string, label: string): TimelineRow[] {
+function stepRows(tl: Timeline, step: string, label: string) {
   const tries = tl.steps[step] ?? [];
-  if (!tries.length) return [];
+  if (!tries.length) return [] satisfies TimelineRow[];
   return [
     ...tries.flatMap((t) => [
       ...measured({ of: 'try', step, try: t.try, row: label }, [
@@ -67,7 +67,7 @@ function stepRows(tl: Timeline, step: string, label: string): TimelineRow[] {
       ]),
     ]),
     { of: 'step', step, try: null, row: label, part: 'tries', value: tries.length },
-  ];
+  ] satisfies TimelineRow[];
 }
 
 /**
@@ -75,7 +75,7 @@ function stepRows(tl: Timeline, step: string, label: string): TimelineRow[] {
  * it), the time its checks ran, the time people took at its gates (`gateWaitOf`), and the time it waited on a person's answer to a
  * session held open (`answerWaitOf`), each 0 where there was none.
  */
-function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]): TimelineRow[] {
+function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]) {
   if (tl.run.wallMs === null) return [];
   const tries = Object.values(tl.steps).flat();
   const check = tries.reduce((ms, t) => ms + (t.check?.ranMs ?? 0), 0);
@@ -101,12 +101,12 @@ function runRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: rea
  * @param tl The run's timeline (`timeline`).
  * @param steps The workflow the run was judged by, whose order names the rows.
  */
-export function timelineRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]): TimelineRow[] {
+export function timelineRows(run: Pick<Run, 'approvals' | 'gates'>, tl: Timeline, steps: readonly StepSpec[]) {
   return [
     ...steps.flatMap((step, i) => stepRows(tl, step.name, `${padded(i + 1)} ${step.name}`)),
     ...tl.rounds.flatMap((r) =>
       measured({ of: 'round', step: null, try: null, row: `${r.loop} round ${padded(r.round ?? 0)}` }, [['wall', r.wallMs]]),
     ),
     ...runRows(run, tl, steps),
-  ];
+  ] satisfies TimelineRow[];
 }

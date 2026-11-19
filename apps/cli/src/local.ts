@@ -14,14 +14,14 @@ export type Entry = 'nemia' | 'wf';
  * The orchestrator's CLI entry, resolved through its package's `exports`.
  * @param entry Which bin's entry: `nemia`'s or the `wf` alias's.
  */
-export const entryOf = (entry: Entry): string =>
+export const entryOf = (entry: Entry) =>
   fileURLToPath(import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin'));
 
 /**
  * Whether `--local` was typed among `argv`: refused by the route (`routeOf`), never passed on.
  * @param argv The words typed after the bin's name.
  */
-export const unlocal = (argv: readonly string[]): boolean => argv.includes('--local');
+export const unlocal = (argv: readonly string[]) => argv.includes('--local');
 
 /** How the child's stdout is taken: shown as this process's own, or kept and answered. */
 type Out = 'inherit' | 'pipe';
@@ -31,13 +31,7 @@ type Out = 'inherit' | 'pipe';
  * given, its stdout shown or kept as `out` says; answers its exit code — 128 and the signal's number when a signal ended it — and what it
  * printed where it was kept. A signal this process takes is passed on to it, so a Ctrl-C ends the child, which ends here.
  */
-function run(
-  argv: readonly string[],
-  entry: Entry,
-  env: NodeJS.ProcessEnv,
-  out: Out,
-  input?: string,
-): Promise<{ code: number; stdout: string }> {
+function run(argv: readonly string[], entry: Entry, env: NodeJS.ProcessEnv, out: Out, input?: string) {
   const child = spawn(process.execPath, [entryOf(entry), ...argv], {
     stdio: [input === undefined ? 'inherit' : 'pipe', out, 'inherit'],
     env,
@@ -48,7 +42,7 @@ function run(
   const forward = (signal: NodeJS.Signals) => () => void child.kill(signal);
   const handlers = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((signal) => [signal, forward(signal)] as const);
   for (const [signal, handler] of handlers) process.on(signal, handler);
-  return new Promise((resolve, reject) => {
+  return new Promise<{ code: number; stdout: string }>((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code, signal) => {
       for (const [name, handler] of handlers) process.off(name, handler);
@@ -63,7 +57,7 @@ function run(
  * @param entry Which bin's entry to spawn, `nemia`'s where it is left out.
  * @param env The child's environment, this process's where it is left out.
  */
-export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> =>
+export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env) =>
   run(argv, entry, env, 'inherit').then(({ code }) => code);
 
 /**
@@ -73,12 +67,8 @@ export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: No
  * @param entry Which bin's entry to spawn, `nemia`'s where it is left out.
  * @param env The child's environment, this process's where it is left out.
  */
-export const piped = (
-  argv: readonly string[],
-  input: string,
-  entry: Entry = 'nemia',
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<number> => run(argv, entry, env, 'inherit', input).then(({ code }) => code);
+export const piped = (argv: readonly string[], input: string, entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env) =>
+  run(argv, entry, env, 'inherit', input).then(({ code }) => code);
 
 /**
  * Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read
@@ -86,5 +76,4 @@ export const piped = (
  * @param argv The words the orchestrator's CLI is given.
  * @param env The child's environment, this process's where it is left out.
  */
-export const captured = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string }> =>
-  run(argv, 'nemia', env, 'pipe');
+export const captured = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env) => run(argv, 'nemia', env, 'pipe');

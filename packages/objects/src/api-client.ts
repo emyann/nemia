@@ -32,7 +32,7 @@ export const READ_BOUND_MS = 30_000;
  * Mbit/s, a slow uplink) carries a file of the cap within its bound. The cli and the board each bound an upload by it.
  * @param size The file's size in bytes.
  */
-export const uploadBoundMs = (size: number): number => READ_BOUND_MS + Math.ceil(size / Number(ByteSize.mebibytes(1))) * 1000;
+export const uploadBoundMs = (size: number) => READ_BOUND_MS + Math.ceil(size / Number(ByteSize.mebibytes(1))) * 1000;
 
 /** Where the api is and how its caller is known: its token, a session's or a person's, its headers, and its bound. */
 export type ApiClientOptions = {
@@ -57,18 +57,18 @@ export class Answered extends Data.TaggedError('Answered')<{
  * Whether `failed` is a call that gave up at its bound.
  * @param failed What a call failed with, of any type.
  */
-export const timedOut = (failed: unknown): boolean =>
+export const timedOut = (failed: unknown) =>
   HttpClientError.isHttpClientError(failed) && failed.reason._tag === 'TransportError' && Cause.isTimeoutError(failed.reason.cause);
 
 /** Whether `response` is a stream of events, whose body is read as it comes and never whole. */
-const streams = (response: HttpClientResponse.HttpClientResponse): boolean =>
+const streams = (response: HttpClientResponse.HttpClientResponse) =>
   (response.headers['content-type'] ?? '').startsWith('text/event-stream');
 
 /** The path of `url`, as an answer names it: past its origin, before its query. */
-const pathOf = (url: string): string => url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '').replace(/[?#].*$/, '') || '/';
+const pathOf = (url: string) => url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '').replace(/[?#].*$/, '') || '/';
 
 /** The api's words in `response`'s JSON body (its `error`), where it gave some. */
-const saidIn = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<string | undefined> =>
+const saidIn = (response: HttpClientResponse.HttpClientResponse) =>
   response.json.pipe(
     Effect.map((body) => {
       const error = (body as { error?: unknown } | null)?.error;
@@ -78,7 +78,7 @@ const saidIn = (response: HttpClientResponse.HttpClientResponse): Effect.Effect<
   );
 
 /** `failed`, where it is a status outside 2xx the `Api` declares no error for, decoded into `Answered`; else as it is. */
-const decodedFailure = (failed: unknown): Effect.Effect<never, unknown> => {
+const decodedFailure = (failed: unknown) => {
   if (!HttpClientError.isHttpClientError(failed) || !('response' in failed.reason)) return Effect.fail(failed);
   const { response } = failed.reason;
   if (response === undefined || (response.status >= 200 && response.status < 300)) return Effect.fail(failed);
@@ -108,7 +108,7 @@ export const apiClient = (options: ApiClientOptions) =>
       httpClient,
       baseUrl: options.baseUrl,
       transformResponse: (effect) => Effect.catch(effect, decodedFailure),
-    }).pipe(Effect.map((client): HttpApiClient.ForApi<typeof Api, Answered> => client));
+    }).pipe(Effect.map((client) => client));
   });
 
 /** The typed client `apiClient` makes: every group of the `Api`, each endpoint a method. */

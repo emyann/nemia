@@ -30,7 +30,7 @@ export type Capabilities = CapabilitiesWithSteps;
 type CapabilitiesPlace = { factory?: string; repo?: string };
 
 /** The query `place` sends: its factory and its repository where it names them, and no other key a page's search carries. */
-const queryOf = ({ factory, repo }: CapabilitiesPlace): CapabilitiesPlace => ({ ...(factory && { factory }), ...(repo && { repo }) });
+const queryOf = ({ factory, repo }: CapabilitiesPlace) => ({ ...(factory && { factory }), ...(repo && { repo }) });
 
 /**
  * What the repository of `place` offers a step, read in the factory it names, else in the one the store's factories leave. Not polled: it

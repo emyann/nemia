@@ -16,9 +16,9 @@ import { StoreRoot } from '../config/root.store.ts';
  * @param runId The run's id.
  * @param branches The branches tried.
  */
-export function mergesOf(home: string, place: Place, runId: string, branches: readonly string[]): Record<string, StandingMerge> {
+export function mergesOf(home: string, place: Place, runId: string, branches: readonly string[]) {
   const run = runsAtOnce(home).runs.read(runId);
-  if (!isRepositoryRun(run)) return {};
+  if (!isRepositoryRun(run)) return {} satisfies Record<string, StandingMerge> as Record<string, StandingMerge>;
   const { trials } = trialMerges(
     run.repo,
     branches.map((branch) => ({ onto: run.branch, branch })),
@@ -29,7 +29,7 @@ export function mergesOf(home: string, place: Place, runId: string, branches: re
       const merge = mergeWordOf(trials[i] ?? { unknown: `the place answered no trial of ${branch}` });
       return [branch, { ...merge, said: mergeWord(merge, run.branch) }];
     }),
-  );
+  ) satisfies Record<string, StandingMerge> as Record<string, StandingMerge>;
 }
 
 /**

@@ -7,20 +7,20 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { failedWords, git, gitSays, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, git, gitSays, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The message of the empty first commit. */
 const FIRST = 'Begin';
 
 /** Whether `dir` is the top of a repository of its own, and not a folder inside another one. */
-function* isTop(dir: string): Asking<boolean> {
+function* isTop(dir: string) {
   const top = yield* gitSays(dir, ['rev-parse', '--path-format=absolute', '--show-toplevel']);
   return top !== undefined && top === fs.realpathSync(dir);
 }
 
 /** The verb's body. */
-export function* init({ dir }: PlaceRequests['init']): Asking<Reply<'init'>> {
+export function* init({ dir }: PlaceRequests['init']) {
   if (!path.isAbsolute(dir)) return refused(`${dir} is not an absolute path: name the folder to make a repository from the root`);
   const there = fs.statSync(dir, { throwIfNoEntry: false });
   if (there && !there.isDirectory()) return refused(`${dir} is a file, not a folder: name a folder to make a repository`);

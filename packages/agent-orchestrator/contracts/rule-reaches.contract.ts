@@ -9,10 +9,10 @@ import { neverHolds } from '../src/reach/never-holds.ts';
 import type { GateSite } from './never-holds.contract.ts';
 
 /** Whether `rule` names `step` among those it covers, every step where it names none. */
-const covers = (rule: PolicyRule, step: string): boolean => rule.steps === undefined || rule.steps.includes(step);
+const covers = (rule: PolicyRule, step: string) => rule.steps === undefined || rule.steps.includes(step);
 
 /** Whether every condition `rule` needs can hold at `site`. */
-const eachCanHold = (rule: PolicyRule, site: GateSite): boolean => rule.when.every((c) => neverHolds(site, c) === null);
+const eachCanHold = (rule: PolicyRule, site: GateSite) => rule.when.every((c) => neverHolds(site, c) === null);
 
 const ruleReachesSpec = spec<(rule: PolicyRule, site: GateSite) => boolean>({
   ensures: {

@@ -14,7 +14,7 @@ import { repoSent, textOf, writtenOf } from './lines.ts';
  * `nemia factory schedule`: a workflow started at each fire of a cron, and the cron it replaced.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factorySchedule(args: Args): Promise<number> {
+export async function factorySchedule(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const repo = textArg(args, 'repo');
   const tz = textArg(args, 'tz');
@@ -38,7 +38,7 @@ export async function factorySchedule(args: Args): Promise<number> {
  * `nemia factory unschedule`: a workflow's schedule taken back.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryUnschedule(args: Args): Promise<number> {
+export async function factoryUnschedule(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory unschedule', (c) => c.schedules.delete({ params: { namespace: factory, name: workflow } }));
   said([`${factory}  ${workflow} no longer at ${answer.spec.cron}`, `unscheduled: ${writtenOf(answer, 'factory unschedule').file}`]);
@@ -49,7 +49,7 @@ export async function factoryUnschedule(args: Args): Promise<number> {
  * Why the states of `servers` were not read, or null: every server unread (no state) carrying the one error the read gave, which the
  * api sets on each where the harness was not asked.
  */
-function unreadOf(servers: readonly McpServer[]): string | null {
+function unreadOf(servers: readonly McpServer[]) {
   const errors = new Set(servers.map((s) => (s.status?.state === undefined ? s.status?.error : undefined)));
   const [only] = [...errors];
   return errors.size === 1 && only !== undefined ? only : null;
@@ -60,8 +60,9 @@ function unreadOf(servers: readonly McpServer[]): string | null {
  * @param factory The factory's name, said where it has no server.
  * @param servers The factory's recorded servers, as the api lists them.
  */
-export function serverLines(factory: string, servers: readonly McpServer[]): string[] {
-  if (servers.length === 0) return [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`];
+export function serverLines(factory: string, servers: readonly McpServer[]) {
+  if (servers.length === 0)
+    return [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`] satisfies string[] as string[];
   const unread = unreadOf(servers);
   return [
     ...servers.map(({ metadata, spec, status }) => {
@@ -69,14 +70,14 @@ export function serverLines(factory: string, servers: readonly McpServer[]): str
       return `${metadata.name.padEnd(20)} ${spec.type}  ${spec.url}  ${status?.state ?? 'unread'}${status?.tools === undefined ? '' : ` (${status.tools} tools)`}${error}`;
     }),
     ...(unread === null ? [] : [`the states were not read: ${unread}`]),
-  ];
+  ] satisfies string[] as string[];
 }
 
 /**
  * `nemia factory servers`: a factory's recorded MCP servers, each with the state its harness reports now.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryServers(args: Args): Promise<number> {
+export async function factoryServers(args: Args) {
   const factory = textOf(args, 'factory');
   const listed = await asked('factory servers', (c) =>
     pageOf(everyPage((page) => c.mcpservers.list({ params: { namespace: factory }, query: page }))),
@@ -86,7 +87,7 @@ export async function factoryServers(args: Args): Promise<number> {
 }
 
 /** The headers `--header` gave, by name; refused for one with no `<name>=`. */
-function headersOf(args: Args): Record<string, string> | undefined {
+function headersOf(args: Args) {
   const lines = listArg(args, 'header');
   if (!lines.length) return undefined;
   const headers: Record<string, string> = {};
@@ -102,7 +103,7 @@ function headersOf(args: Args): Record<string, string> | undefined {
 }
 
 /** The `oauth` the flags gave, or undefined; refused for a callback port with no client id, or a port that is no port. */
-function oauthOf(args: Args): McpServerWrite['oauth'] {
+function oauthOf(args: Args) {
   const clientId = textArg(args, 'clientId');
   const port = textArg(args, 'callbackPort');
   if (!clientId) {
@@ -121,7 +122,7 @@ function oauthOf(args: Args): McpServerWrite['oauth'] {
 }
 
 /** `--transport`, http where none is given; refused for a word that is no transport. */
-function transportOf(args: Args): McpServerWrite['type'] {
+function transportOf(args: Args) {
   const given = textArg(args, 'transport') ?? 'http';
   const type = MCP_TRANSPORTS.find((t) => t === given);
   if (type !== undefined) return type;
@@ -134,7 +135,7 @@ function transportOf(args: Args): McpServerWrite['type'] {
  * `nemia factory server add`: one remote MCP server recorded for a factory, and the address it replaced.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryServerAdd(args: Args): Promise<number> {
+export async function factoryServerAdd(args: Args) {
   const [factory, server] = [textOf(args, 'factory'), textOf(args, 'server')];
   const headers = headersOf(args);
   const oauth = oauthOf(args);
@@ -157,7 +158,7 @@ export async function factoryServerAdd(args: Args): Promise<number> {
  * `nemia factory server rm`: one server taken off a factory's record; the harness's sign-in for it is left.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryServerRm(args: Args): Promise<number> {
+export async function factoryServerRm(args: Args) {
   const [factory, server] = [textOf(args, 'factory'), textOf(args, 'server')];
   const answer = await asked('factory server rm', (c) => c.mcpservers.delete({ params: { namespace: factory, name: server } }));
   said([

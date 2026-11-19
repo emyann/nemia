@@ -27,7 +27,7 @@ export const leftSignal: LeftSignalOf = (left, askedAgoMs, graceMs) =>
  * gone leaves its group's number to its members, never to a new process, so a group whose leader died is still the run's.
  * @param harness The harness's process group as the run file recorded it: its leader's pid and start; undefined where none is recorded.
  */
-export const groupLeft = (harness: { pid: number; start?: string } | undefined): number | undefined => {
+export const groupLeft = (harness: { pid: number; start?: string } | undefined) => {
   if (harness === undefined || !Number.isInteger(harness.pid) || harness.pid <= 1) return undefined;
   const { pid, start } = harness;
   if (start !== undefined && alive(pid) && processStart(pid) !== start) return undefined;
@@ -47,7 +47,7 @@ const AskedSchema = Schema.Struct({
 const decodeAsked = Schema.decodeUnknownOption(Schema.fromJsonString(AskedSchema));
 
 /** The first ask `file` keeps; `undefined` where there is no file, or it is empty (as a stop wrote it before) or unreadable. */
-const askedIn = (file: string): Instant | undefined => {
+const askedIn = (file: string) => {
   try {
     const decoded = decodeAsked(fs.readFileSync(file, 'utf8'));
     return Option.isSome(decoded) ? decoded.value : undefined;
@@ -62,9 +62,9 @@ const askedIn = (file: string): Instant | undefined => {
  * @param file The run's stop file (`.stop`).
  * @param now The instant of this ask.
  */
-export const firstAsked = (file: string, now: Instant): { at: Instant; first: boolean } => {
+export const firstAsked = (file: string, now: Instant) => {
   const kept = askedIn(file);
-  if (kept) return { at: kept, first: false };
+  if (kept) return { at: kept, first: false } satisfies { at: Instant; first: boolean } as { at: Instant; first: boolean };
   fs.writeFileSync(file, JSON.stringify(now));
-  return { at: now, first: true };
+  return { at: now, first: true } satisfies { at: Instant; first: boolean } as { at: Instant; first: boolean };
 };

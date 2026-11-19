@@ -111,8 +111,8 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * @param spec the step's spec as the api gives it
  * @param filed what the step was filed with, none for a step not filed
  */
-export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null): Array<[string, ReactNode]> =>
-  isRemote(spec, filed)
+export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null) =>
+  (isRemote(spec, filed)
     ? remoteRows(spec, filed)
     : [
         ['harness', code(spec.harness)],
@@ -135,7 +135,7 @@ export const specRows = (spec: StepSpecView, filed: StepFiledView | null = null)
         ...(filed?.bridge
           ? ([['reach', <BridgeWords key="reach" bridge={filed.bridge} data-step-bridge />]] satisfies Array<[string, ReactNode]>)
           : []),
-      ];
+      ]) satisfies Array<[string, ReactNode]>;
 
 /**
  * A bridged session's web link, opened in a new tab, where its bridge is up; why not, in the runtime's words, where it is not. `data` marks
@@ -152,10 +152,11 @@ export function BridgeWords({ bridge, ...data }: { bridge: Bridge } & Record<`da
 }
 
 /** The `place` row of a step that works in a folder the run makes: none for one on a repository, which every step was before the key. */
-const placeRows = (spec: StepSpecView): Array<[string, ReactNode]> => (spec.place === 'folder' ? [['place', code(spec.place)]] : []);
+const placeRows = (spec: StepSpecView) =>
+  (spec.place === 'folder' ? [['place', code(spec.place)]] : []) satisfies Array<[string, ReactNode]>;
 
 /** A step on a remote A2A agent: its harness names one (`a2a:<name>`), or the api says its try was sent to one. */
-const isRemote = (spec: StepSpecView, filed: StepFiledView | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
+const isRemote = (spec: StepSpecView, filed: StepFiledView | null) => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
 
 /**
  * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, `place`,
@@ -163,7 +164,7 @@ const isRemote = (spec: StepSpecView, filed: StepFiledView | null): boolean => !
  * default` row there would say the run chose what nobody here chose. The address is the store's current word; where the store does not
  * declare the agent, it says so.
  */
-function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[string, ReactNode]> {
+function remoteRows(spec: StepSpecView, filed: StepFiledView | null) {
   const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
   return [
     ['harness', code(spec.harness ?? (filed?.remote ? `a2a:${filed.remote.name}` : null))],
@@ -172,7 +173,7 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[str
     ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
     ...placeRows(spec),
     ['deadline', ranWith(deadlineWord(spec.deadlineSeconds), filed, (f) => deadlineWord(f.deadlineSeconds), 'no limit')],
-  ];
+  ] satisfies Array<[string, ReactNode]>;
 }
 
 /**
@@ -180,7 +181,7 @@ function remoteRows(spec: StepSpecView, filed: StepFiledView | null): Array<[str
  *
  * @param spec the step's spec, read for its harness and its sandbox
  */
-export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>): string =>
+export const fenceLabel = (spec: Pick<StepSpecView, 'harness' | 'sandbox'>) =>
   spec.harness === 'codex' || spec.sandbox ? 'sandbox' : 'permission mode';
 
 const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
@@ -197,7 +198,7 @@ function ranWith(
   filed: StepFiledView | null,
   pick: (filed: StepFiledView) => string | null,
   unset = "harness's own",
-): ReactNode {
+) {
   const engine = filed && pick(filed);
   if (!filed || (workflow !== null && (engine === null || engine === workflow))) return code(workflow);
   return workflow === null ? (
@@ -211,7 +212,7 @@ function ranWith(
  * The model, as `ranWith` reads it — and the model a person's `retry --model` asked this try for, marked `this try`, whatever the
  * workflow says.
  */
-function modelRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
+function modelRow(workflow: string | null, filed: StepFiledView | null) {
   if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
   const says = workflow === null ? 'names no model' : `says ${workflow}`;
   return (
@@ -228,7 +229,7 @@ function modelRow(workflow: string | null, filed: StepFiledView | null): ReactNo
  * `default`, and another mode than the one filed, which its harness put it in — Claude Code dropping `auto` on a model, a Codex sandbox
  * narrowed — marked `by harness`. Where no session has said its mode yet, as `ranWith` reads it.
  */
-function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNode {
+function modeRow(workflow: string | null, filed: StepFiledView | null) {
   const runs = filed?.runsIn;
   const asFiled = filed && filedFence(filed.fence, workflow);
   if (!filed || !runs) return ranWith(workflow, filed, (f) => filedFence(f.fence, workflow));
@@ -263,7 +264,7 @@ function modeRow(workflow: string | null, filed: StepFiledView | null): ReactNod
  * reads `sandbox: danger-full-access` (a step frozen with `permissionMode: bypassPermissions`, written back under its sandbox) is that
  * sandbox — Codex runs both `-s danger-full-access` — and not a fence of the try's own.
  */
-const filedFence = (filed: string | null, workflow: string | null): string | null =>
+const filedFence = (filed: string | null, workflow: string | null) =>
   filed === 'bypassPermissions' && workflow === 'danger-full-access' ? workflow : filed;
 
 function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {
@@ -306,10 +307,10 @@ type Priced = Pick<StepView, 'spent' | 'budget' | 'taskId' | 'tries'>;
  *
  * @param step the step, read for its spend, its budget, its task and its tries
  */
-export function spentRows(step: Priced): Array<[string, ReactNode]> {
-  if (!step.budget && step.tries.length < 2) return [];
+export function spentRows(step: Priced) {
+  if (!step.budget && step.tries.length < 2) return [] satisfies Array<[string, ReactNode]>;
   const text = costText(step);
-  if (!text) return [['spent', step.taskId ? 'not measured' : null]];
+  if (!text) return [['spent', step.taskId ? 'not measured' : null]] satisfies Array<[string, ReactNode]>;
   const over = pastBudget(step);
   return [
     [
@@ -322,7 +323,7 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
         {text}
       </span>,
     ],
-  ];
+  ] satisfies Array<[string, ReactNode]>;
 }
 
 /**
@@ -331,8 +332,10 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
  *
  * @param used what the step's sessions used, none where nothing measured it
  */
-export function readRows(used: StepUsed | null | undefined): Array<[string, ReactNode]> {
-  return used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
+export function readRows(used: StepUsed | null | undefined) {
+  return (used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : []) satisfies Array<
+    [string, ReactNode]
+  >;
 }
 
 /**
@@ -341,8 +344,8 @@ export function readRows(used: StepUsed | null | undefined): Array<[string, Reac
  *
  * @param words why the session could not be read, null where it was
  */
-export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
-  words
+export const unreadRows = (words: string | null) =>
+  (words
     ? [
         [
           'unread',
@@ -351,7 +354,7 @@ export const unreadRows = (words: string | null): Array<[string, ReactNode]> =>
           </span>,
         ],
       ]
-    : [];
+    : []) satisfies Array<[string, ReactNode]>;
 
 const WARN = 'text-money';
 

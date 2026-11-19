@@ -5,14 +5,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import {
-  DEFAULT_NAMESPACE,
-  DEFINITION_ORIGINS,
-  type DefinitionOrigin,
-  type Workflow,
-  type WorkflowStep,
-  type WorkflowStepStatus,
-} from 'objects';
+import { DEFAULT_NAMESPACE, DEFINITION_ORIGINS, type DefinitionOrigin, type Workflow, type WorkflowStepStatus } from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
 import { files, runs, workflows as served, type Refuse, type StartFiles } from './objects.ts';
@@ -81,58 +74,60 @@ export type WorkflowListing = {
 const isStepKey = (key: string): key is StepKey => (StepKeySchema.literals as readonly string[]).includes(key);
 
 /** A list copied, as the board's plain types hold one: mutable. */
-const copied = <T>(list: readonly T[]): T[] => [...list];
+const copied = <T>(list: readonly T[]) => [...list];
 
 /** A step's keys as the object has them, decoded as the board's every key: a key the api left out refused, one it does not know dropped. */
-const specOf = (keys: WorkflowStepStatus['spec']): WorkflowStepSpec => Schema.decodeUnknownSync(WorkflowStepSpecSchema)(keys);
+const specOf = (keys: WorkflowStepStatus['spec']) => Schema.decodeUnknownSync(WorkflowStepSpecSchema)(keys);
 
 /** A step of a Workflow's status, as the board reads it. */
-const stepOf = (step: WorkflowStepStatus): ListedStep => ({
-  name: step.name,
-  spec: specOf(step.spec),
-  body: step.body,
-  own: step.own === null ? null : { keys: step.own.keys.filter(isStepKey), body: step.own.body },
-  hired: step.hired,
-  layers:
-    step.layers === null
-      ? null
-      : {
-          ...step.layers,
-          agentSkills: copied(step.layers.agentSkills),
-          addedSkills: copied(step.layers.addedSkills),
-          fence: step.layers.fence.map((f) => ({ ...f })),
-        },
-  mcp: copied(step.mcp),
-});
+const stepOf = (step: WorkflowStepStatus) =>
+  ({
+    name: step.name,
+    spec: specOf(step.spec),
+    body: step.body,
+    own: step.own === null ? null : { keys: step.own.keys.filter(isStepKey), body: step.own.body },
+    hired: step.hired,
+    layers:
+      step.layers === null
+        ? null
+        : {
+            ...step.layers,
+            agentSkills: copied(step.layers.agentSkills),
+            addedSkills: copied(step.layers.addedSkills),
+            fence: step.layers.fence.map((f) => ({ ...f })),
+          },
+    mcp: copied(step.mcp),
+  }) satisfies ListedStep as ListedStep;
 
 /** A graph's edge the board draws: an input's is not drawn, as a run's page draws none (`runView.ts`). */
 const drawnEdge = (edge: Workflow['status']['graph']['edges'][number]): edge is GraphEdge => edge.kind !== 'input';
 
 /** A Workflow, as the board reads it (`WorkflowListing`). */
-const workflowViewOf = (workflow: Workflow): WorkflowListing => ({
-  name: workflow.metadata.name,
-  from: workflow.status.origin,
-  dir: workflow.status.dir,
-  description: workflow.status.description,
-  readme: workflow.status.readmeBody,
-  steps: workflow.status.steps.map(stepOf),
-  graph: {
-    roots: copied(workflow.status.graph.roots),
-    edges: workflow.status.graph.edges.filter(drawnEdge).map((e) => ({ ...e })),
-    nodes: workflow.status.graph.nodes.map((n) => ({ ...n, ...(n.ends ? { ends: copied(n.ends) } : {}) })),
-  },
-  schemas: copied(workflow.status.schemas),
-  folderTeam: workflow.status.folderTeam,
-  version: workflow.metadata.resourceVersion,
-  error: workflow.status.error,
-  unfilled: workflow.status.unfilled,
-});
+const workflowViewOf = (workflow: Workflow) =>
+  ({
+    name: workflow.metadata.name,
+    from: workflow.status.origin,
+    dir: workflow.status.dir,
+    description: workflow.status.description,
+    readme: workflow.status.readmeBody,
+    steps: workflow.status.steps.map(stepOf),
+    graph: {
+      roots: copied(workflow.status.graph.roots),
+      edges: workflow.status.graph.edges.filter(drawnEdge).map((e) => ({ ...e })),
+      nodes: workflow.status.graph.nodes.map((n) => ({ ...n, ...(n.ends ? { ends: copied(n.ends) } : {}) })),
+    },
+    schemas: copied(workflow.status.schemas),
+    folderTeam: workflow.status.folderTeam,
+    version: workflow.metadata.resourceVersion,
+    error: workflow.status.error,
+    unfilled: workflow.status.unfilled,
+  }) satisfies WorkflowListing as WorkflowListing;
 
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
 const LISTS_OF_NONE: readonly string[] = ['tools', 'routes', 'when', 'ends'];
 
 /** Whether a step's file writes `key`'s line: a value set, an empty list only where unset is null. */
-const isSet = (key: string, value: unknown): boolean =>
+const isSet = (key: string, value: unknown) =>
   value !== null && value !== undefined && !(Array.isArray(value) && !value.length && !LISTS_OF_NONE.includes(key));
 
 /**
@@ -140,7 +135,7 @@ const isSet = (key: string, value: unknown): boolean =>
  * which leave `agent` out) and its own note; one with none, every key it sets and all of its body.
  * @param step The step as the builder holds it.
  */
-export const writtenStepOf = (step: StepWritten): WorkflowStep => {
+export const writtenStepOf = (step: StepWritten) => {
   const entries = Object.entries(step.spec) as Array<[StepKey, unknown]>;
   const kept =
     step.own === null
@@ -165,7 +160,7 @@ export type Place = { factory: string; repo: string };
  * The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none.
  * @param place The factory and its repository; undefined or null for none.
  */
-export const placeQuery = (place?: Place | null): string =>
+export const placeQuery = (place?: Place | null) =>
   !place || place.factory === DEFAULT_NAMESPACE
     ? ''
     : `?factory=${encodeURIComponent(place.factory)}&repo=${encodeURIComponent(place.repo)}`;
@@ -196,7 +191,7 @@ export const workflowsInQuery = (place: Place | null) => (place === null ? workf
  * @param from The origin the workflow was read from.
  * @param named The origin the address names.
  */
-export const fromMatches = (from: DefinitionOrigin, named: string): boolean => from === named || sourceOf(from) === named;
+export const fromMatches = (from: DefinitionOrigin, named: string) => from === named || sourceOf(from) === named;
 
 export type { WorkflowStepPage } from 'objects';
 
@@ -227,7 +222,7 @@ export const stepQuery = (from: string, workflow: string, step: string, place: P
  * A workflow by name, as the Workflows page lists it: the last segment of its folder.
  * @param workflowDir The workflow's folder, by its path.
  */
-export const workflowNameOf = (workflowDir: string): string =>
+export const workflowNameOf = (workflowDir: string) =>
   workflowDir
     .replace(/[\\/]+$/, '')
     .split(/[\\/]/)
@@ -267,7 +262,7 @@ export const startRun = (
     files?: StartFiles;
   },
   place?: Place | null,
-): Promise<Started> => {
+) => {
   const { files: given, ...run } = start;
   const namespace = namespaceOf(place?.factory);
   return (given === undefined || given.listed.length === 0 ? Promise.resolve([]) : files.uploaded(namespace, given)).then((inputs) =>
@@ -318,7 +313,7 @@ const refused: Refuse = (words, status, answer) =>
 export const saveWorkflow = async (
   name: string,
   save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[]; readme?: string },
-): Promise<WorkflowListing> =>
+) =>
   workflowViewOf(
     await served.replace(
       name,
@@ -337,7 +332,7 @@ export const saveWorkflow = async (
  * @param name The folder's name, the workflow's.
  * @param step Its first step, as the builder holds it.
  */
-export const createWorkflow = async (name: string, step: StepWritten): Promise<WorkflowListing> =>
+export const createWorkflow = async (name: string, step: StepWritten) =>
   workflowViewOf(await served.create({ metadata: { name }, spec: { steps: [writtenStepOf(step)] } }, refused));
 
 /**
@@ -348,5 +343,4 @@ export const createWorkflow = async (name: string, step: StepWritten): Promise<W
  * @param name The folder's name, the workflow's.
  * @param version The version it was read at (`WorkflowListing.version`).
  */
-export const removeWorkflow = async (name: string, version: string): Promise<WorkflowListing> =>
-  workflowViewOf(await served.delete(name, version));
+export const removeWorkflow = async (name: string, version: string) => workflowViewOf(await served.delete(name, version));

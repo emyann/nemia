@@ -41,7 +41,7 @@ export type WriteRefused = {
 };
 
 /** Whether `a` and `b` name the same factories, in the same order. */
-const sameNames = (a: readonly string[] | undefined, b: readonly string[]): boolean =>
+const sameNames = (a: readonly string[] | undefined, b: readonly string[]) =>
   a !== undefined && a.length === b.length && a.every((name, i) => name === b[i]);
 
 const definitionWriteRefusalSpec = spec<

@@ -45,7 +45,7 @@ export type WorktreeDeps =
 const NO_TREE = 'node_modules';
 
 /** Whether the run writes the worktree's `node_modules` at all. */
-const writes = (out: WorktreeDeps): boolean => out.act !== 'keep';
+const writes = (out: WorktreeDeps) => out.act !== 'keep';
 
 const worktreeDepsSpec = spec<(seen: WorktreeSeen) => WorktreeDeps>({
   requires: ({ input: [seen] }) => (seen.tree === 'own' || seen.parting === null) && (seen.parting === null || seen.parting.length > 0),

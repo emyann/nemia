@@ -6,7 +6,7 @@ import { CLI, type Args, type CommandWords } from './command.ts';
 import { SELECTOR_FLAG_FORM, selectorFlag } from './commands-flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -56,7 +56,7 @@ const RETIRED_WAKE: readonly string[] = ['--wake', '--wake-word'];
  * Why `arg`, typed to `nemia watch`, is a flag that no longer exists, or undefined where it is none of them: a line's prose is no longer
  * matched, and the refusal names what to type for the lines that wait on a person.
  */
-const retiredWake = (arg: string): string | undefined => {
+const retiredWake = (arg: string) => {
   const flag = arg.split('=')[0] ?? arg;
   if (!RETIRED_WAKE.includes(flag)) return undefined;
   return (
@@ -69,7 +69,7 @@ const retiredWake = (arg: string): string | undefined => {
  * The refusal of a cursor typed beside `--cursor-file`: the file is where the watch keeps its place, so one of the two would be lost
  * without a word. It names which to drop.
  */
-const bothCursors = (cursor: string): string =>
+const bothCursors = (cursor: string) =>
   `${CLI} watch takes a cursor or --cursor-file, not both, and it was given ${cursor} and a file: the file is where the watch keeps its ` +
   `place, so drop the ${cursor} — or drop --cursor-file and read from ${cursor} this once (delete the file to start the watch over).`;
 

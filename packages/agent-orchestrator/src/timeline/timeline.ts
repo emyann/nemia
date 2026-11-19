@@ -74,7 +74,7 @@ type Filed = { readonly state: { readonly filedAt?: string } };
  * `phaseOfView` reads it as the session it signed, and the timeline as a session that ended. Pure, and here because this file is.
  * @param v The engine's view of the task.
  */
-export const signedAndHeld = (v: TaskClock): boolean =>
+export const signedAndHeld = (v: TaskClock) =>
   !v.state.settled && (v.phase === 'input-required' || (v.state.closed === true && v.state.attempts.at(-1)?.ended === 'succeeded'));
 
 /**
@@ -83,7 +83,7 @@ export const signedAndHeld = (v: TaskClock): boolean =>
  * and rebuilt its cache is counted in `rebuiltCaches` (`rebuiltCache`): only the attempt knows it was resumed.
  * @param view The engine's view of the task; undefined where the engine has no record of it.
  */
-export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
+export const taskUsage = (view: TaskClock | undefined) =>
   view
     ? sumUsage(
         view.state.attempts
@@ -191,7 +191,7 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * @param views The engine's views of the run's tasks, by task id.
  * @param steps The workflow the run is judged by; the one it froze where left out.
  */
-export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps: readonly StepSpec[] = run.workflow ?? []): Timeline {
+export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps: readonly StepSpec[] = run.workflow ?? []) {
   const loops = steps.filter((s) => s.loop);
   const loopOf = new Map(loops.flatMap((looping) => loopSpan(steps, looping).map((name) => [name, looping.name] as const)));
   const byStep: Record<string, TimelineTry[]> = {};
@@ -207,7 +207,7 @@ export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps:
       })),
       ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
     ];
-    byStep[name] = tries.map((t, i): TimelineTry => {
+    byStep[name] = tries.map((t, i) => {
       const first = tries.findIndex((u) => u.taskId === t.taskId);
       const session = first === i ? spanOf(t.taskId, views.get(t.taskId)) : null;
       const check = t.check ? spanOf(t.check, views.get(t.check)) : null;
@@ -245,7 +245,7 @@ export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, steps:
 }
 
 /** The turn of an earlier try's session that try `i` of `tries` ran (`TurnSpan`), off the view of its task; undefined where it ran none. */
-function turnIn(tries: readonly TurnTry[], i: number, view: TaskClock | undefined): TurnSpan | undefined {
+function turnIn(tries: readonly TurnTry[], i: number, view: TaskClock | undefined) {
   const turn = turnOf(tries, i);
   if (turn === null) return undefined;
   const over = view !== undefined && (view.state.settled !== null || signedAndHeld(view));
@@ -253,7 +253,7 @@ function turnIn(tries: readonly TurnTry[], i: number, view: TaskClock | undefine
 }
 
 /** A run's wait for a run slot (`SlotWait`), off its record and its tasks' views; null on a run the cap never held. */
-function slotWaitOf(run: Run, views: ReadonlyMap<string, Filed>): SlotWait | null {
+function slotWaitOf(run: Run, views: ReadonlyMap<string, Filed>) {
   if (!run.slotHeldAt) return null;
   const from = run.after?.length ? run.slotHeldAt : run.createdAt;
   if (!hasStarted(run)) return { from, filedAt: null, ms: null, queued: 'still waiting' };
@@ -272,7 +272,7 @@ function slotWaitOf(run: Run, views: ReadonlyMap<string, Filed>): SlotWait | nul
  * @param run The run whose tries' tasks are read.
  * @param views What the engine knows of when each task was filed, by task id.
  */
-export function firstFiledAt(run: Run, views: ReadonlyMap<string, Filed>): string | null {
+export function firstFiledAt(run: Run, views: ReadonlyMap<string, Filed>) {
   const tasks = Object.values(run.steps).flatMap((record) => [
     ...(record.tries ?? []).flatMap((t) => [t.taskId, t.check?.taskId]),
     record.taskId,
@@ -294,17 +294,16 @@ export function firstFiledAt(run: Run, views: ReadonlyMap<string, Filed>): strin
  * @param run The run asked about.
  * @param views What the engine knows of when each task was filed, by task id.
  */
-export const runStartedAt = (run: Run, views: ReadonlyMap<string, Filed>): string | null =>
+export const runStartedAt = (run: Run, views: ReadonlyMap<string, Filed>) =>
   firstFiledAt(run, views) ?? (hasStarted(run) ? run.createdAt : null);
 
-const between = (from: string | null, to: string | null): number | null =>
-  from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null;
+const between = (from: string | null, to: string | null) => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
 
 /**
  * How long a task that ended ran: each turn's first spawn to its last end, summed — one turn, for a task not held open. Null where a turn
  * that spawned has no end on the record, or where nothing spawned.
  */
-function ranOf(attempts: readonly AttemptClock[]): number | null {
+function ranOf(attempts: readonly AttemptClock[]) {
   const turns = new Map<number, AttemptClock[]>();
   for (const a of attempts) turns.set(a.turn ?? 0, [...(turns.get(a.turn ?? 0) ?? []), a]);
   let ms = 0;
@@ -321,10 +320,10 @@ function ranOf(attempts: readonly AttemptClock[]): number | null {
 }
 
 /** When the task `view` is of was filed, as the view says (`State.filedAt`); null with no view, or one that says no filing. */
-const filedOf = (view: TaskClock | undefined): string | null => view?.state.filedAt ?? null;
+const filedOf = (view: TaskClock | undefined) => view?.state.filedAt ?? null;
 
 /** One task on the clock (`TaskSpan`), off the engine's view of it, which says when it was filed (`filedOf`). */
-function spanOf(taskId: string, view: TaskClock | undefined): TaskSpan {
+function spanOf(taskId: string, view: TaskClock | undefined) {
   const filedAt = filedOf(view);
   const attempts = view?.state.attempts ?? [];
   const settled = view?.state.settled ?? null;
@@ -376,7 +375,7 @@ function spanOf(taskId: string, view: TaskClock | undefined): TaskSpan {
  * time in words is the sum of the times known, then what it leaves out, and `—` rather than a sum of none, which would read as nothing
  * spent.
  */
-function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[], slot: SlotWait | null = null): TimelineTotal {
+function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[], slot: SlotWait | null = null) {
   const inFlight = spans.filter((s) => s.at === 'queued' || s.at === 'starting' || s.at === 'running');
   const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), slot?.ms ?? 0);
   const ranMs = spans.reduce((n, s) => n + (s.ranMs ?? 0), 0);
@@ -395,7 +394,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
     !lasts.length
       ? null
       : between(filed.sort()[0] ?? null, lasts.sort().at(-1) ?? null);
-  const said = (known: number, ms: number, pending: [number, string], unknown: number): string =>
+  const said = (known: number, ms: number, pending: [number, string], unknown: number) =>
     [
       known ? durationWord(ms) : '',
       pending[0] ? `${pending[0]} ${pending[1]}` : '',
@@ -428,7 +427,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
  * session what it used and, where the engine measured it, what it cost. Empty for a step not filed.
  * @param tries The step's tries on the timeline, in the order they ran.
  */
-export function timelineLines(tries: readonly TimelineTry[]): string[] {
+export function timelineLines(tries: readonly TimelineTry[]) {
   const instants = tries
     .flatMap((t) => [t.session, t.check])
     .flatMap((s) => (s ? [s.filedAt, s.spawnedAt, s.endedAt] : []))
@@ -436,7 +435,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const day = instants.sort()[0]?.slice(0, 10);
   const clock = (at: string | null) =>
     at === null ? 'not known' : `${at.slice(0, 10) === day ? '' : `${at.slice(5, 10)} `}${at.slice(11, 19)}Z`;
-  const words = (s: TaskSpan): string => {
+  const words = (s: TaskSpan) => {
     if (s.at === 'unknown') return `the engine has no record of ${s.taskId}`;
     const filedAt = `filed ${clock(s.filedAt)}`;
     if (s.at === 'queued') return `${filedAt}  waiting for a slot`;
@@ -447,7 +446,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
     if (s.at === 'running') return `${times}  no end yet, still running  queued ${s.queued}${attempts}`;
     return `${times}  ended ${clock(s.endedAt)}  queued ${s.queued}  ran ${s.ran}${attempts}`;
   };
-  const rows = tries.flatMap((t): Array<[string, string]> => {
+  const rows = tries.flatMap((t) => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
     const [usedLine = ''] = usedLines(t.used);
     const used = usedLine.replace(/^used\s+/, '');
@@ -455,7 +454,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
     return [
       [label, t.session ? `${words(t.session)}  used ${used}${cost}` : `its session is try ${t.sessionOf}'s, checked again`],
       ...(t.check ? [[`try ${t.try} check`, words(t.check)] satisfies [string, string]] : []),
-    ];
+    ] satisfies Array<[string, string]>;
   });
   return rowsUnder('timeline', rows);
 }
@@ -466,19 +465,19 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
  * its queue.
  * @param t The run's timeline (`timeline`).
  */
-export function timelineTotalLines(t: Timeline): string[] {
+export function timelineTotalLines(t: Timeline) {
   if (!t.run.tasks) return [];
   const said = (total: TimelineTotal) => `queued ${total.queued}  ran ${total.ran}  wall ${total.wall}`;
   const went = [...new Set(t.rounds.map((r) => r.loop))].filter((loop) => t.rounds.filter((r) => r.loop === loop).length > 1);
   const shown = t.rounds
     .filter((r) => went.includes(r.loop))
-    .map((r): [string, string] => [`${went.length > 1 ? `${r.loop} ` : ''}round ${r.round}`, said(r)]);
+    .map((r) => [`${went.length > 1 ? `${r.loop} ` : ''}round ${r.round}`, said(r)] satisfies [string, string]);
   const slot: Array<[string, string]> = t.slot ? [['run slot', `queued ${t.slot.queued}`]] : [];
   return rowsUnder('timeline', [...shown, ...slot, ['run', said(t.run)]]);
 }
 
 /** Rows under a label, the label on the first and the rest aligned under it, each row's name padded to the longest. */
-function rowsUnder(label: string, rows: ReadonlyArray<readonly [string, string]>): string[] {
+function rowsUnder(label: string, rows: ReadonlyArray<readonly [string, string]>) {
   const width = Math.max(0, ...rows.map(([name]) => name.length));
   return rows.map(([name, text], i) => `${i ? ' '.repeat(label.length) : label}  ${name.padEnd(width)}  ${text}`);
 }

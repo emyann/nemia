@@ -24,7 +24,7 @@ export type Place = { readonly kind: 'user' } | { readonly kind: 'factory'; read
  * @param usage The command's usage, said in the refusal.
  * @param what What the path is, said in the refusal.
  */
-export function pathArg(args: Args, key: string, command: string, usage: string, what: string): string {
+export function pathArg(args: Args, key: string, command: string, usage: string, what: string) {
   const given = textArg(args, key);
   if (given !== undefined && given !== '') return given;
   throw new Refused(`nemia ${command} takes --${key}, ${what}: nemia ${command} ${usage}`);
@@ -37,17 +37,17 @@ export function pathArg(args: Args, key: string, command: string, usage: string,
  * @param command The command's name, said in a refusal.
  * @param usage The command's usage, said in a refusal.
  */
-export function placeOf(args: Args, command: string, usage: string): Place {
+export function placeOf(args: Args, command: string, usage: string) {
   const from = textArg(args, 'from');
   const factory = textArg(args, 'factory');
   if (from === 'user') {
-    if (factory === undefined) return { kind: 'user' };
+    if (factory === undefined) return { kind: 'user' } satisfies Place;
     throw new Refused(
       `nemia ${command} user writes the user library, and --factory names a factory's tree: drop --factory, or propose it to the factory, \`nemia ${command} factory … --factory ${factory}\``,
     );
   }
   if (from === 'factory') {
-    if (factory !== undefined && factory !== '') return { kind: 'factory', factory };
+    if (factory !== undefined && factory !== '') return { kind: 'factory', factory } satisfies Place;
     throw new Refused(
       `nemia ${command} factory proposes the write to a templated factory: name it, \`nemia ${command} factory … --factory <name>\``,
     );
@@ -61,7 +61,7 @@ export function placeOf(args: Args, command: string, usage: string): Place {
  * The namespace a write in `place` reads the object served now from: `default` for the user library, the factory's for a proposal.
  * @param place Where the writer writes: the user library, or a factory's tree.
  */
-export const namespaceOf = (place: Place): string => (place.kind === 'user' ? DEFAULT_NAMESPACE : place.factory);
+export const namespaceOf = (place: Place) => (place.kind === 'user' ? DEFAULT_NAMESPACE : place.factory);
 
 /**
  * The line a write prints: the object, whether it was made or written, and the version it is at now.
@@ -70,5 +70,5 @@ export const namespaceOf = (place: Place): string => (place.kind === 'user' ? DE
  * @param made Whether it was made (`create`) rather than written over (`replace`).
  * @param version The object's version after the write.
  */
-export const writtenLine = (resource: string, name: string, made: boolean, version: string): string =>
+export const writtenLine = (resource: string, name: string, made: boolean, version: string) =>
   `${resource}/${name} ${made ? 'created' : 'written'}, at version ${version}\n`;

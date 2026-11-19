@@ -48,7 +48,7 @@ export const PHASE_OF_ACTION: Readonly<Record<ApplyAction, ProposalPhase | null>
 };
 
 /** The phases no move leaves. */
-export const proposalFinal = (): ProposalPhase[] =>
+export const proposalFinal = () =>
   (Object.keys(PROPOSAL_STATES) as ProposalPhase[]).filter((s) => !PROPOSAL_EDGES.some((e) => e.from === s));
 
 /**
@@ -56,7 +56,7 @@ export const proposalFinal = (): ProposalPhase[] =>
  * own. A phase's word is its id, so a `state "<word>" as <id>` line would draw nothing a move does not already (the docs' drawer
  * refuses such a line, `unreadLines`).
  */
-export const proposalDiagram = (): string =>
+export const proposalDiagram = () =>
   [
     'stateDiagram-v2',
     `  [*] --> ${PROPOSAL_INITIAL}: proposed`,

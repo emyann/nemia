@@ -32,7 +32,7 @@ export const cardVersion = versionDigest;
 export type CardReplaced = { card: InboxCard; file: string; written: boolean };
 
 /** The words of each refusal of a card's whole write, naming the fix. */
-const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, started: readonly string[]): Conflict | Invalid => {
+const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, started: readonly string[]) => {
   switch (refusal) {
     case 'started':
       return new Conflict({ message: startedRefusal(card, file, started) });
@@ -59,7 +59,7 @@ const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, sta
  * A `spec.workflow` changed to what is no workflow's name (`cardWorkflowRefusal`); none sent, or the card's own sent back, is no
  * change.
  */
-const workflowWriteRefusal = (sent: string | undefined, now: string | undefined): string | undefined =>
+const workflowWriteRefusal = (sent: string | undefined, now: string | undefined) =>
   sent === undefined || sent === now ? undefined : cardWorkflowRefusal('spec.workflow', sent, 'Nothing was written.');
 
 /**

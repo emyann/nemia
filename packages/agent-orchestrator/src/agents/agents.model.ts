@@ -37,7 +37,7 @@ export const Agent = Schema.Struct({
 export type Agent = typeof Agent.Type;
 
 /** Why a skill's `description:` is refused, or nothing: one line, and there, as the card reader requires (`skillEntryOf`). */
-const descriptionRefusal = (description: string): string | undefined =>
+const descriptionRefusal = (description: string) =>
   description.trim() === ''
     ? 'is required, as the A2A protocol marks it: write one line saying what the skill does.'
     : /[\r\n]/.test(description)

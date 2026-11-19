@@ -7,7 +7,7 @@ import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
-import type { SaidBy, SaidFrom } from '../../contracts/step-speaker.contract.ts';
+import type { SaidBy } from '../../contracts/step-speaker.contract.ts';
 import { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';
 
 export { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';
@@ -37,7 +37,7 @@ export type SaidTo = Said & { try: number };
  * @param run The run whose step's record is read.
  * @param name The step the words are said to.
  */
-export const saidAhead = (run: Run, name: string): boolean => {
+export const saidAhead = (run: Run, name: string) => {
   const step = run.steps[name];
   return step !== undefined && !step.taskId && !step.tries?.length;
 };
@@ -59,7 +59,7 @@ export const saidAhead = (run: Run, name: string): boolean => {
  * @param name The step the words are said to.
  * @param phaseOf The phase of each of the run's tasks, by its id: whether the current try's task has settled.
  */
-export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
+export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase) {
   if (!steps.some((s) => s.name === name) || !run.steps[name])
     return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
   if (run.cancelledAt) {
@@ -87,14 +87,14 @@ export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, p
  * How `nemia ls` notes a step whose current try a person said something to (`nemia say`): `said to 2×`. Empty when nobody did.
  * @param times How many times a person said something to the step's current try.
  */
-export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
+export const saidWord = (times: number) => (times > 0 ? `said to ${times}×` : '');
 
 /**
  * How `nemia ls` notes a step said to before it was filed (`nemia say`, kept for its first try): `said to 2× before it ran`, while it is
  * on its first try or has none yet. Empty when nobody did.
  * @param times How many times a person said something to the step before it was filed.
  */
-export const saidBeforeWord = (times: number): string => (times > 0 ? `said to ${times}× before it ran` : '');
+export const saidBeforeWord = (times: number) => (times > 0 ? `said to ${times}× before it ran` : '');
 
 /**
  * What `nemia decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`nemia say`), in
@@ -103,7 +103,7 @@ export const saidBeforeWord = (times: number): string => (times > 0 ? `said to $
  * said. Pure. None when nothing was said, so the screen of a step nobody spoke to is what it was.
  * @param said What a person said to the step's sessions, in the order given: when, to which try and attempt, and the words.
  */
-export function saidLines(said: readonly SaidTo[]): string[] {
+export function saidLines(said: readonly SaidTo[]) {
   return said.flatMap((s) => [
     `said to try ${s.try}${s.attempt > 1 ? `, attempt ${s.attempt}` : ''}, at ${s.at}:`,
     ...fenced(s.text, 'text'),
@@ -140,7 +140,7 @@ export const saidBy: SaidBy = (text) => {
  * words without the frame (`words`) where an agent did; the person's unchanged, no key added. Pure.
  * @param said The engine's entry as journalled, its words in `text`.
  */
-export function saidOf<S extends { text: string }>(said: S): S | (S & SaidFrom) {
+export function saidOf<S extends { text: string }>(said: S) {
   const by = saidBy(said.text);
   return by.from.kind === 'agent' ? { ...said, from: by.from, words: by.words } : said;
 }

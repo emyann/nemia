@@ -37,7 +37,7 @@ const Texts = ({ texts }: { texts: readonly string[] }) => (
 );
 
 /** Who a line is from, as its fold's title says it. */
-function titleOf(line: GotLine): string {
+function titleOf(line: GotLine) {
   switch (line.from) {
     case 'you':
       return 'From you';

@@ -29,11 +29,10 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
 }
 
 /** What kind of state a state is, said over its name on its box: where the machine starts, where it can end, or neither. */
-const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>): string =>
-  initial ? 'initial state' : final ? 'final state' : 'state';
+const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>) => (initial ? 'initial state' : final ? 'final state' : 'state');
 
 /** The fill and ring of a box: alive while lit. */
-const markOf = ({ lit }: MachineFlowNode['data']): string => (lit ? 'bg-alive-container ring-4 ring-alive' : 'bg-card');
+const markOf = ({ lit }: MachineFlowNode['data']) => (lit ? 'bg-alive-container ring-4 ring-alive' : 'bg-card');
 
 /**
  * A state of a machine, in the box its layout gave it: its kind and its name, and under them the edges that come back to it. The first

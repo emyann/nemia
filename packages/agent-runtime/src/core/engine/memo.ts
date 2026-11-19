@@ -28,7 +28,7 @@ export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness'
  * What a memo keeps of a settled task (`Releasable`), taken off its fold.
  * @param state The settled task's fold.
  */
-export const releasableOf = (state: State): Releasable => ({
+export const releasableOf = (state: State) => ({
   taskId: state.taskId,
   settled: state.settled,
   config: state.config,
@@ -69,7 +69,7 @@ export const tickMemoLayer = (options: { verify?: boolean } = {}) =>
  * @param memo The engine's memo, or undefined for a pass without one.
  * @param id The task's id.
  */
-export const keptIn = (memo: TickMemoState | undefined, id: string): { memo: TickMemoState; kept: Releasable } | undefined => {
+export const keptIn = (memo: TickMemoState | undefined, id: string) => {
   const kept = memo?.settled.get(id);
   return memo && kept ? { memo, kept } : undefined;
 };
@@ -78,8 +78,8 @@ export const keptIn = (memo: TickMemoState | undefined, id: string): { memo: Tic
  * The settled tasks `memo` keeps looking for, each whose finished session could still move (`listed`); none without a memo.
  * @param memo The engine's memo, or undefined for a pass without one.
  */
-export const keptLooked = (memo: TickMemoState | undefined): Releasable[] =>
-  memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : [];
+export const keptLooked = (memo: TickMemoState | undefined) =>
+  (memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : []) satisfies Releasable[] as Releasable[];
 
 /**
  * Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip.
@@ -87,7 +87,7 @@ export const keptLooked = (memo: TickMemoState | undefined): Releasable[] =>
  * @param fresh The task's fold, read again from its journal.
  * @param decided What `decide` answers of the fresh fold.
  */
-export const divergence = (kept: Releasable, fresh: State, decided: { do: string }): string | undefined =>
+export const divergence = (kept: Releasable, fresh: State, decided: { do: string }) =>
   !settledQuiet(fresh)
     ? `the memo kept it settled (${kept.settled}), and its journal says it is not`
     : decided.do !== 'nothing'

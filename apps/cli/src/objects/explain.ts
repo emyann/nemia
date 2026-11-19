@@ -34,13 +34,13 @@ type Node = { readonly [key: string]: unknown };
 const isNode = (value: unknown): value is Node => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The document's components, each a kind's or a part's Schema by its name. */
-const schemasOf = (): Node => {
+const schemasOf = () => {
   const components: unknown = OpenApi.fromApi(Api).components;
   return isNode(components) && isNode(components.schemas) ? components.schemas : {};
 };
 
 /** `node` with its `$ref` followed into `schemas`, as many times as it takes. */
-function resolved(node: Node, schemas: Node, seen: ReadonlySet<string> = new Set()): Node {
+function resolved(node: Node, schemas: Node, seen: ReadonlySet<string> = new Set()) {
   const ref = node.$ref;
   if (typeof ref !== 'string') return node;
   const name = ref.split('/').at(-1) ?? '';
@@ -50,10 +50,11 @@ function resolved(node: Node, schemas: Node, seen: ReadonlySet<string> = new Set
 }
 
 /** The members of a union `node` is, where it is one. */
-const membersOf = (node: Node): Node[] | undefined =>
+const membersOf = (node: Node) =>
   Array.isArray(node.anyOf) ? node.anyOf.filter(isNode) : Array.isArray(node.oneOf) ? node.oneOf.filter(isNode) : undefined;
 
 /** The type `node` says, as `kubectl explain` writes one: `string`, `[]string`, `map[string]string`, `Object`, `a | b`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function typeOf(raw: Node, schemas: Node): string {
   const node = resolved(raw, schemas);
   const union = membersOf(node);
@@ -68,6 +69,7 @@ function typeOf(raw: Node, schemas: Node): string {
 }
 
 /** The object `node` holds, past an array's items and a union of one object, where its fields are. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function fieldsNode(raw: Node, schemas: Node): Node | undefined {
   const node = resolved(raw, schemas);
   if (isNode(node.properties)) return node;
@@ -77,6 +79,7 @@ function fieldsNode(raw: Node, schemas: Node): Node | undefined {
 }
 
 /** Every field of `node`, under `parent`, and every field under each, as rows, to `depth` levels at most. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function rowsUnder(node: Node, parent: string, schemas: Node, depth: number): FieldRow[] {
   const object = fieldsNode(node, schemas);
   if (object === undefined || depth === 0 || !isNode(object.properties)) return [];
@@ -100,20 +103,20 @@ function rowsUnder(node: Node, parent: string, schemas: Node, depth: number): Fi
  * The fields of `kind`'s object as rows, flattened from its component in the package's own OpenAPI document.
  * @param kind The kind whose component is read.
  */
-export function fieldRowsOf(kind: Kind): FieldRow[] {
+export function fieldRowsOf(kind: Kind) {
   const schemas = schemasOf();
   const component = schemas[kind];
   return isNode(component) ? rowsUnder(component, '', schemas, 12) : [];
 }
 
 /** A description, indented under its heading. */
-const indented = (text: string, by: string): string[] => text.split('\n').map((line) => `${by}${line}`.trimEnd());
+const indented = (text: string, by: string) => text.split('\n').map((line) => `${by}${line}`.trimEnd());
 
 /** A field's own name: the last word of its path. */
-const leaf = (row: FieldRow): string => row.path.split('.').at(-1) ?? row.path;
+const leaf = (row: FieldRow) => row.path.split('.').at(-1) ?? row.path;
 
 /** One field as FIELDS lists it: its name, its type, whether it is required, and its description under it. */
-const fieldLines = (row: FieldRow): string[] => [
+const fieldLines = (row: FieldRow) => [
   `  ${leaf(row)}\t<${row.type}>${row.required ? ' -required-' : ''}`,
   ...(row.description === null ? [] : indented(row.description, '    ')),
 ];
@@ -123,10 +126,10 @@ const fieldLines = (row: FieldRow): string[] => [
  * the exit code, or throws its refusal.
  * @param args The words typed after `explain`: the resource and its fields' path, or `--help`.
  */
-export async function explain(args: readonly string[]): Promise<number> {
+export async function explain(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(EXPLAIN_HELP);
-    return 0;
+    return 0 satisfies number;
   }
   const [typed, ...more] = args;
   if (typed === undefined || typed.startsWith('-') || more.length)
@@ -157,5 +160,5 @@ export async function explain(args: readonly string[]): Promise<number> {
     ...(answer.fields.length ? ['FIELDS:', ...answer.fields.flatMap(fieldLines)] : []),
   ];
   for (const line of lines) process.stdout.write(`${line}\n`);
-  return 0;
+  return 0 satisfies number;
 }

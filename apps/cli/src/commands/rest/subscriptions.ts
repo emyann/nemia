@@ -12,7 +12,7 @@ import { amountArg, listArg, said, textArg } from '../requests.ts';
  * `nemia subscribe`'s runner: the subscription put, said as what its task is told and when.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function subscribe(args: Args): Promise<number> {
+export async function subscribe(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const selectors = listArg(args, 'selectors');
   const digestEvery = amountArg(args, 'digestEvery');
@@ -36,7 +36,7 @@ export async function subscribe(args: Args): Promise<number> {
  * `nemia unsubscribe`'s runner: the subscription taken away.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function unsubscribe(args: Args): Promise<number> {
+export async function unsubscribe(args: Args) {
   const { name } = await asked(UNSUBSCRIBE_WORDS.name, (c) =>
     c.subscriptions.unsubscribe({ params: { name: textArg(args, 'name') ?? '' } }),
   );

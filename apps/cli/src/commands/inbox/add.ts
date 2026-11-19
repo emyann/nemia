@@ -12,7 +12,7 @@ import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './ca
 const { name: COMMAND } = INBOX_ADD_WORDS;
 
 /** A line per key the card was filed without, since the runs of its `from:` disagree on it: each run with its value, and how to set it. */
-const leftOutLines = (card: Card): string[] =>
+const leftOutLines = (card: Card) =>
   (card.status.labelsLeftOut ?? []).map(
     ({ key, values }) =>
       `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label inbox ${card.metadata.name} ${key}=<value>`,
@@ -22,7 +22,7 @@ const leftOutLines = (card: Card): string[] =>
  * What `nemia inbox add` prints of the card filed: a line of it, a line per label left out, and how to start it.
  * @param card The card the api filed.
  */
-export const filedLines = (card: Card): string[] => {
+export const filedLines = (card: Card) => {
   const { name, labels } = card.metadata;
   const { spec } = card;
   const title = (spec.body ?? '').split('\n')[0] ?? '';
@@ -37,7 +37,7 @@ export const filedLines = (card: Card): string[] => {
  * `nemia inbox add`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function inboxAdd(args: Args): Promise<number> {
+export async function inboxAdd(args: Args) {
   const body = textOrFile(textArg(args, 'idea') ?? '', COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
   const factory = textArg(args, 'factory');

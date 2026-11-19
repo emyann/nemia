@@ -15,13 +15,13 @@ const COMMAND = /\bnemia retry ([\w.-]+) ([\w-]+)([^\n`]*)/g;
 const FLAG = /--(recheck|fresh|continue|model|budget|message)\b(?:[ =]("[^"]*"|'[^']*'|(?!--)\S+))?/g;
 
 /** Whether a value is a placeholder a person fills (`<answer>`), which names no message. */
-const placeholder = (value: string): boolean => /^<[^>]*>$/.test(value);
+const placeholder = (value: string) => /^<[^>]*>$/.test(value);
 
 /** A flag's value, its quotes taken off. */
-const unquoted = (value: string): string => value.replace(/^(["'])(.*)\1$/, '$2');
+const unquoted = (value: string) => value.replace(/^(["'])(.*)\1$/, '$2');
 
 /** How the flags after a named command ask for the try (`RetryHow`), as `nemia retry` would read them. */
-function howOf(flags: string): RetryHow {
+function howOf(flags: string) {
   let how: RetryHow = { mode: 'continue' };
   for (const [, flag, raw] of flags.matchAll(FLAG)) {
     const value = raw === undefined ? undefined : unquoted(raw);
@@ -38,7 +38,7 @@ function howOf(flags: string): RetryHow {
  * @param text The text the commands are read from.
  * @param runId The run whose commands are kept.
  */
-export function retriesNamed(text: string, runId: string): RetryNamed[] {
+export function retriesNamed(text: string, runId: string) {
   const named: RetryNamed[] = [];
   for (const [, run, step, rest] of text.matchAll(COMMAND)) {
     if (run !== runId || step === undefined) continue;

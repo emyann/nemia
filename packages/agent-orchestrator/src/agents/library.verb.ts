@@ -23,20 +23,21 @@ import { StoreRoot } from '../config/root.store.ts';
 import { AGENTS_COPY } from '../sources/copy.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** A text flag under `key`, as the api hands it. */
-const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
+const keyed = (key: string) => ({ flag: `--${key}`, kind: 'text', key }) satisfies Flag;
 
 /** The spec of an entry served on the api alone: its positionals, and its text flags by key. */
-const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): Spec => ({
-  positionals,
-  flags: keys.map(keyed),
-  unknown: (arg) => `the board's agents take no ${arg}.`,
-});
+const apiSpec = (positionals: readonly Positional[], keys: readonly string[]) =>
+  ({
+    positionals,
+    flags: keys.map(keyed),
+    unknown: (arg) => `the board's agents take no ${arg}.`,
+  }) satisfies Spec;
 
 /** The place an agent is read from, and its name, as the api's path names them. */
 const PLACE_AND_NAME: readonly Positional[] = [

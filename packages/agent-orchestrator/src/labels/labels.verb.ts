@@ -18,7 +18,7 @@ import { inboxCards } from '../inbox/inbox.store.ts';
 import { tried } from '../runtime-client.ts';
 
 /** `edits` parsed and applied to `current`, or the refusal of either, as `Invalid` naming the command typed. */
-const edited = (command: string, current: Labels, edits: readonly string[], overwrite: boolean): Effect.Effect<Labels, Invalid> => {
+const edited = (command: string, current: Labels, edits: readonly string[], overwrite: boolean) => {
   if (!edits.length)
     return Effect.fail(new Invalid({ message: `${command} takes the edits to make: key=value to set a key, key- to remove one.` }));
   const parsed = parseLabelEdits(edits);

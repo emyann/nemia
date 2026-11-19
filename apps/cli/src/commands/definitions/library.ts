@@ -10,7 +10,7 @@ import { Refused } from '../../refused.ts';
 import { said, textArg } from '../requests.ts';
 
 /** The name `args` names in the user library; refused, naming `command` typed with `user`, for any other place. */
-const libraryNamed = (args: Args, command: string): string => {
+const libraryNamed = (args: Args, command: string) => {
   const from = textArg(args, 'from');
   const name = textArg(args, 'name') ?? '';
   if (from === 'user') return name;
@@ -27,14 +27,14 @@ const removalOf = (args: Args, command: string) => {
 };
 
 /** The folder of a removal, and each file it took where the api says them (one older than this client does not). */
-const removedLine = (dir: string, removed: readonly string[] | undefined): string =>
+const removedLine = (dir: string, removed: readonly string[] | undefined) =>
   removed === undefined ? dir : `${dir}: ${removed.join(', ')}`;
 
 /**
  * `nemia agents rm user <name> --version <v>`'s runner: the agent removed, and the files it took.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsRm(args: Args): Promise<number> {
+export async function agentsRm(args: Args) {
   const asking = removalOf(args, AGENTS_RM_WORDS.name);
   const { status } = await asked(AGENTS_RM_WORDS.name, (c) => c.agents.deleteLibrary(asking));
   said([`removed from ${removedLine(status.dir, status.removed)}`]);
@@ -45,7 +45,7 @@ export async function agentsRm(args: Args): Promise<number> {
  * `nemia workflows rm user <name> --version <v>`'s runner: the folder removed whole, and the files it held.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function workflowsRm(args: Args): Promise<number> {
+export async function workflowsRm(args: Args) {
   const asking = removalOf(args, WORKFLOWS_RM_WORDS.name);
   const { status } = await asked(WORKFLOWS_RM_WORDS.name, (c) => c.workflows.deleteLibrary(asking));
   said([`removed ${removedLine(status.dir, status.removed)}`]);
@@ -56,7 +56,7 @@ export async function workflowsRm(args: Args): Promise<number> {
  * `nemia agents run user <name> --brief <words>`'s runner: the try started, and where to follow it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsRun(args: Args): Promise<number> {
+export async function agentsRun(args: Args) {
   const name = libraryNamed(args, AGENTS_RUN_WORDS.name);
   const brief = textArg(args, 'brief') ?? '';
   const { id } = await asked(AGENTS_RUN_WORDS.name, (c) => c.agents.tryLibrary({ params: { name }, payload: { brief } }));

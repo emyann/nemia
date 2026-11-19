@@ -30,7 +30,7 @@ const NAME_BYTES = 255;
  * `t-<base36>-<8>` (`file`, `engine/filing.ts`) and every id a caller gives `file`, which may hold spaces and punctuation.
  * @param value The task id to judge.
  */
-export const taskIdRefusal = (value: string): string | undefined => {
+export const taskIdRefusal = (value: string) => {
   if (value === '') return 'A task id is empty. Give the task an id, or leave `id` out and the runtime mints one.';
   if (value === '.' || value === '..')
     return `A task id may not be \`${value}\`, which names a folder. Give it a name with a letter in it.`;
@@ -148,7 +148,7 @@ const Said = Schema.Struct({
 const Input = Schema.Struct({ at: Schema.String, text: Schema.String, config: Schema.optional(HarnessArgsSchema) });
 
 /** Why a task's attempts do not number 1, 2, 3…, or nothing when they do. */
-const attemptsGap = (attempts: ReadonlyArray<{ readonly n: number }>): string | undefined => {
+const attemptsGap = (attempts: ReadonlyArray<{ readonly n: number }>) => {
   const at = attempts.findIndex((a, i) => a.n !== i + 1);
   return at === -1
     ? undefined
@@ -216,4 +216,4 @@ const runtimeModel = {
  * The runtime's entity-relation diagram, as `docs/model.md` holds it between its `diagram:runtime-model` markers.
  * Exported only for the tests that import it.
  */
-export const runtimeModelDiagram = (): string => erDiagram(runtimeModel);
+export const runtimeModelDiagram = () => erDiagram(runtimeModel);

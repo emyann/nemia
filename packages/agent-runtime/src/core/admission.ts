@@ -5,15 +5,7 @@
  * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and one reading of the machine,
  * and journals what it returns.
  */
-import type {
-  AdmissionPass,
-  AdmissionWait,
-  Admitted,
-  AdmitOne,
-  Holder,
-  MachineMemory,
-  Waiter,
-} from '../../contracts/admission.contract.ts';
+import type { AdmissionPass, AdmissionWait, AdmitOne, Holder, MachineMemory } from '../../contracts/admission.contract.ts';
 import type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
 import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';
@@ -39,7 +31,7 @@ export type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
  * @param m The machine's memory as the pass read it, and the floor kept off it.
  * @param holders The tasks holding a slot, each with its need and whether its process is there.
  */
-export const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
+export const roomOf = (m: MachineMemory, holders: readonly Holder[]) => {
   let promised = 0;
   let unseen = 0;
   for (const h of holders) {
@@ -71,7 +63,7 @@ export const admitOne: AdmitOne = (one) => {
  * one behind it may fit. The laws of the whole pass, which sum over its waiters, are held by `test/admission.test.ts`.
  * @param pass The ceiling, the machine's memory (null where it was not read), the holders of a slot and the waiters in turn.
  */
-export const admitting = (pass: AdmissionPass): Admitted => {
+export const admitting = (pass: AdmissionPass) => {
   let room = pass.machine === null ? null : roomOf(pass.machine, pass.holders);
   const inPool = new Map<string, number>();
   for (const h of pass.holders) inPool.set(h.pool, (inPool.get(h.pool) ?? 0) + 1);
@@ -149,13 +141,13 @@ export const runsUnder: RunsUnder = ({ filed, inFlight, defaults }: Sizing) => {
 };
 
 /** The attempt of a task's view still in flight, its last while it has not ended, or `null`. */
-const inFlightOf = (view: AdmissionView): { resources: TaskResources | undefined } | null => {
+const inFlightOf = (view: AdmissionView) => {
   const last = view.state.attempts?.at(-1);
   return last === undefined || last.ended !== null ? null : { resources: last.resources };
 };
 
 /** What admission counts a task at, in bytes: what it runs under (`runsUnder`) as `rule` holds its defaults now (`needBytesOf`). */
-const needOf = (view: AdmissionView, rule: AdmissionRule): number =>
+const needOf = (view: AdmissionView, rule: AdmissionRule) =>
   needBytesOf(runsUnder({ filed: view.state.resources, inFlight: inFlightOf(view), defaults: rule.defaultsOf?.(view.state.harness) }));
 
 /**
@@ -163,7 +155,7 @@ const needOf = (view: AdmissionView, rule: AdmissionRule): number =>
  * limit, which stands for its request as Kubernetes gives a container that names a limit and no request, else nothing.
  * @param resources What the task runs under, or undefined where it runs under none.
  */
-export const needBytesOf = (resources: TaskResources | undefined): number => {
+export const needBytesOf = (resources: TaskResources | undefined) => {
   const quantity = resources?.requests?.memory ?? resources?.limits?.memory;
   return (quantity === undefined ? undefined : memoryBytesOf(quantity)) ?? 0;
 };
@@ -172,7 +164,7 @@ export const needBytesOf = (resources: TaskResources | undefined): number => {
  * The pool a harness counts against when the engine names none for it: its own name, and `default` for a task with no harness.
  * @param harness The task's harness, or undefined where it names none.
  */
-export const ownPool = (harness: string | undefined): string => harness ?? 'default';
+export const ownPool = (harness: string | undefined) => harness ?? 'default';
 
 /**
  * Whether a task in each phase holds a slot of its pool: a session at work (`working`, `quiescent`) and one spawned and not yet in the
@@ -202,17 +194,16 @@ const HOLDS_SLOT: Record<TaskPhase, boolean> = {
  * Exported only for the tests that import it.
  * @param view The task's phase and its admission mark.
  */
-export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boolean =>
-  view.admission === 'admitted' || HOLDS_SLOT[view.phase];
+export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>) => view.admission === 'admitted' || HOLDS_SLOT[view.phase];
 
 /** A filing time as a number to sort by; one that does not parse goes last. */
-const filedMs = (view: AdmissionView): number => {
+const filedMs = (view: AdmissionView) => {
   const ms = Date.parse(view.state.filedAt ?? '');
   return Number.isNaN(ms) ? Infinity : ms;
 };
 
 /** Two waiting tasks in the order a free slot goes to them: the higher priority, then the earlier filing, then the lower id. */
-const byTurn = (a: AdmissionView, b: AdmissionView): number => {
+const byTurn = (a: AdmissionView, b: AdmissionView) => {
   const pa = a.state.priority ?? 0;
   const pb = b.state.priority ?? 0;
   if (pa !== pb) return pb - pa;
@@ -231,10 +222,10 @@ const byTurn = (a: AdmissionView, b: AdmissionView): number => {
  * @param views Every task's view off the pass's one observation.
  * @param rule What the engine admits under: the ceiling, the pools, the machine's memory and the defaults.
  */
-export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): Admitted {
+export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule) {
   const { ceiling, poolOf } = rule;
   if (ceiling === undefined || rule.unschedulable?.()) return { admit: [], waits: [] };
-  const holders = views.filter(holdsSlot).map((v): Holder => ({
+  const holders = views.filter(holdsSlot).map((v) => ({
     pool: poolOf(v.state.harness),
     needBytes: needOf(v, rule),
     running: v.phase === 'working' || v.phase === 'quiescent',
@@ -242,6 +233,6 @@ export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): A
   const waiting = views
     .filter((w) => w.admission === 'queued')
     .sort(byTurn)
-    .map((v): Waiter => ({ id: v.id, pool: poolOf(v.state.harness), needBytes: needOf(v, rule) }));
+    .map((v) => ({ id: v.id, pool: poolOf(v.state.harness), needBytes: needOf(v, rule) }));
   return admitting({ ceiling, machine: rule.machine?.() ?? null, holders, waiting });
 }

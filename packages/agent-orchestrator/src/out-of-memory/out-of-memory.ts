@@ -31,7 +31,7 @@ const GI = MI * KI;
  * or past 1Gi (`3.7Gi`), whole `Mi` below that, rounded, and whole `Ki` below 1Mi, rounded up.
  * @param n The number of bytes.
  */
-export const memoryBytesWord = (n: number): string => {
+export const memoryBytesWord = (n: number) => {
   if (n >= GI) return Number.isInteger(n / GI) ? `${n / GI}Gi` : `${(Math.round((n / GI) * 10) / 10).toString()}Gi`;
   if (n >= MI) return `${Math.round(n / MI)}Mi`;
   return `${Math.ceil(n / KI)}Ki`;
@@ -47,7 +47,7 @@ export const memoryBytesWord = (n: number): string => {
  * @param own The step's own `memory:`, or undefined where it names none.
  * @param of Whether a session or a check was killed, a session where none is said.
  */
-export const outOfMemoryWords = (k: OutOfMemoryKill, own: string | undefined, of: 'session' | 'check' = 'session'): string => {
+export const outOfMemoryWords = (k: OutOfMemoryKill, own: string | undefined, of: 'session' | 'check' = 'session') => {
   const head = of === 'check' ? 'check out of memory' : 'out of memory';
   const processes = `${k.kills} process${k.kills === 1 ? '' : 'es'}`;
   if (k.by === 'machine') {

@@ -6,7 +6,7 @@ import type { StepAttempts } from './api/tries.ts';
  * its attempt recorded neither — one an older runtime ran, or one whose runner could not say. Nothing for a step with no attempt.
  * @param latest The step's latest attempt: its release and its harness; null or undefined for a step with no attempt.
  */
-export function ranOnWords(latest: Pick<NonNullable<StepAttempts['latest']>, 'release' | 'harness'> | null | undefined): string | null {
+export function ranOnWords(latest: Pick<NonNullable<StepAttempts['latest']>, 'release' | 'harness'> | null | undefined) {
   if (!latest) return null;
   const { release, harness } = latest;
   const said = [

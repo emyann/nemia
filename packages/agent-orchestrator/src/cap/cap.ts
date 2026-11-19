@@ -38,7 +38,7 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  * and a run held on one pass is asked again on the next.
  * @param claims Each run's claim on its repository's checkout: whether its ending step holds it, else since when it waits for it.
  */
-export function heldCheckouts(claims: readonly MainClaim[]): Map<string, CheckoutHold> {
+export function heldCheckouts(claims: readonly MainClaim[]) {
   const held = new Map<string, CheckoutHold>();
   const repos = new Map<string, MainClaim[]>();
   for (const c of claims) repos.set(c.repo, [...(repos.get(c.repo) ?? []), c]);
@@ -90,7 +90,7 @@ export function slotNeed(
   a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
   landed: (runId: string) => boolean,
   steps: readonly Pick<StepSpec, 'slot'>[] = [],
-): { inFlight: boolean; wants: boolean } {
+) {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
   const due =
@@ -107,7 +107,7 @@ export function slotNeed(
  * workflow of one step. Pure. It counts against nothing and waits for nothing — a session that watches the runs the cap holds.
  * @param steps The run's steps, the slot each says.
  */
-export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
+export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]) => steps.some((s) => s.slot === 'none');
 
 /**
  * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that
@@ -117,7 +117,7 @@ export const takesNoSlot = (steps: readonly Pick<StepSpec, 'slot'>[]): boolean =
  * @param slot The cap and the count in flight, or undefined where `advance` is called outside a tick.
  * @param steps The run's steps, the slot each says; left out, the run takes a slot.
  */
-export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<StepSpec, 'slot'>[] = []): boolean =>
+export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<StepSpec, 'slot'>[] = []) =>
   hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
 
 /**
@@ -125,13 +125,13 @@ export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly
  * been advanced.
  * @param slot The cap and the count in flight; a cap of 0 is no cap.
  */
-export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;
+export const slotFree = (slot: RunSlot) => slot.cap <= 0 || slot.inFlight < slot.cap;
 
 /**
  * Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure.
  * @param runs The runs to order.
  */
-export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: readonly R[]): R[] =>
+export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: readonly R[]) =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
 /**
@@ -141,10 +141,7 @@ export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: re
  * @param runs Each run with what it asks of the cap (`slotNeed`).
  * @param cap The most runs in flight at once; 0 or less is no cap.
  */
-export function heldRuns(
-  runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>,
-  cap: number,
-): Map<string, RunSlot> {
+export function heldRuns(runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>, cap: number) {
   const held = new Map<string, RunSlot>();
   if (cap <= 0) return held;
   let inFlight = runs.filter((r) => r.inFlight).length;
@@ -162,7 +159,7 @@ export const SLOT_WAIT = 'waiting for a run slot';
  * A run the cap holds, as `nemia ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`.
  * @param slot The cap and the count in flight it was held at.
  */
-export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
+export const slotWord = (slot: RunSlot) => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**
  * The daemon's two ceilings, as it says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude`, `codex` and checks
@@ -181,7 +178,7 @@ export const ceilingLines = (c: {
   cgroupParent?: string;
   request?: string;
   reserved?: string;
-}): string[] => [
+}) => [
   `sessions at work per pool: at most ${c.sessions} at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)`,
   `runs in flight: ${c.runs > 0 ? `at most ${c.runs} at once — a run with nothing filed waits for a slot, oldest first` : 'no cap'} (WF_MAX_RUNS)`,
   ...(c.memory === undefined
@@ -204,7 +201,7 @@ export type InFlight = { name: string; taskId: string };
  * @param run The run's record.
  * @param phaseOf The phase of a task the engine holds, by its id.
  */
-export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFlight[] {
+export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   const live: InFlight[] = [];
   for (const [name, step] of Object.entries(run.steps)) {
     for (const [label, taskId] of [

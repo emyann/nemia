@@ -35,7 +35,7 @@ const PRINTED =
   'Fetching v0.4.0 …\nChecking the archive against its sum … ok\nUnpacking beside v0.3.0 …\nCarrying the harnesses … 2 carried\nSwitching to v0.4.0 …\n';
 
 /** An upgrade to v0.4.0 from v0.3.0, in `phase`. */
-const upgrade = (phase: Upgrade['phase'], extra: Partial<Upgrade> = {}): Upgrade => ({
+const upgrade = (phase: Upgrade['phase'], extra: Partial<Upgrade> = {}) => ({
   id: 'u-7f3k',
   tag: 'v0.4.0',
   from: 'v0.3.0',

@@ -25,7 +25,7 @@ import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
 
 /** The lines of `kinds` in `output`, decoded; throws an `Error` whose message is `printedLinesOf`'s `wrong` when one does not decode. */
-const decoded = (output: string, kinds: readonly PrintedKind[]): PrintedLine[] => {
+const decoded = (output: string, kinds: readonly PrintedKind[]) => {
   const read = printedLinesOf(output, kinds);
   if ('wrong' in read) throw new Error(read.wrong);
   return read.lines;
@@ -70,13 +70,13 @@ type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unkno
  * Exported only for the tests that import it.
  * @param output What the session printed: its stream or its one JSON object, stderr beside it.
  */
-export const claudeResultOutput = (output: string): HarnessOutput => {
+export const claudeResultOutput = (output: string) => {
   const results = decoded(output, ['result']).flatMap((l) => (l.kind === 'result' ? [l.line] : []));
-  return readClaude(results.at(-1), [], new Map());
+  return readClaude(results.at(-1), [], new Map()) satisfies HarnessOutput as HarnessOutput;
 };
 
 /** A result's token counts, in their classes, when it gives every class and its input sums to more than 0; else none. */
-const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
+const tokensOf = (usage: Printed<'result'>['usage']) => {
   const { input_tokens: uncachedTokens, cache_creation_input_tokens: cacheWriteTokens } = usage ?? {};
   const { cache_read_input_tokens: cacheReadTokens, output_tokens: outputTokens } = usage ?? {};
   if (uncachedTokens === undefined || cacheWriteTokens === undefined || cacheReadTokens === undefined || outputTokens === undefined)
@@ -90,7 +90,7 @@ const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
  * to more than 0; else none. A class a model left out sums to `NaN`, which no comparison passes.
  * @param modelUsage The `modelUsage` of a `result` line, each model's counts by its id; undefined where the line has none.
  */
-export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Usage => {
+export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']) => {
   const models = Object.values(modelUsage ?? {});
   const sum = (key: keyof (typeof models)[number]) => models.reduce((n, m) => n + (m[key] ?? NaN), 0);
   const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
@@ -110,11 +110,7 @@ export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Us
  * ahead of the result's own. Everything else is the result's alone, and a stream with no result says only what it denied. A result
  * says its denials even when there are none (`[]`): it lists every call refused.
  */
-const readClaude = (
-  result: Printed<'result'> | undefined,
-  denied: readonly DeniedEntry[],
-  inputs: ReadonlyMap<string, unknown>,
-): HarnessOutput => {
+const readClaude = (result: Printed<'result'> | undefined, denied: readonly DeniedEntry[], inputs: ReadonlyMap<string, unknown>) => {
   const denials = deniedCalls([...denied, ...(result?.permission_denials ?? [])], inputs);
   if (!result) return denials.length ? { denials } : {};
   const { total_cost_usd: costUsd, duration_api_ms: apiMs } = result;
@@ -152,17 +148,17 @@ const FILE_KEYS: Readonly<Record<string, string>> = {
 export const READ_INPUT_KEYS: Readonly<Record<string, string>> = { Bash: 'command', Skill: 'skill', ...FILE_KEYS };
 
 /** The key of `tool`'s input a reader reads (`READ_INPUT_KEYS`), or none. */
-const readKeyOf = (tool: string): string | undefined => (Object.hasOwn(READ_INPUT_KEYS, tool) ? READ_INPUT_KEYS[tool] : undefined);
+const readKeyOf = (tool: string) => (Object.hasOwn(READ_INPUT_KEYS, tool) ? READ_INPUT_KEYS[tool] : undefined);
 
 /** The first word of a command, as `denialOf` names a denied one. */
-const firstWord = (command: string): string => firstPiece(command.trim(), /\s+/);
+const firstWord = (command: string) => firstPiece(command.trim(), /\s+/);
 
 /**
  * A denied call as a person reads it, and as a permission rule would name it: a command by its first word
  * (`Bash(pytest)`), a skill by its name (`Skill(look)`), a file tool by its path. Any other tool, or an input that says
  * none of these, is the tool alone — never a guess at what the rest of its input meant.
  */
-const denialOf = (tool: string, input: unknown): Denial => {
+const denialOf = (tool: string, input: unknown) => {
   const key = readKeyOf(tool);
   const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   const given = typeof v === 'string' && v.trim() ? v.trim() : undefined;
@@ -176,7 +172,7 @@ const denialOf = (tool: string, input: unknown): Denial => {
  * call was made with (`inputs`, by id), or else the one a later entry for the same call gives: a call named again keeps
  * the place of its first naming. An entry with no id is a call of its own.
  */
-const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string, unknown>): Denial[] => {
+const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string, unknown>) => {
   const seen = new Map<string, { denial: Denial; input: unknown }>();
   let unnamed = 0;
   for (const { tool_name: tool, tool_use_id: id, tool_input: given } of entries) {
@@ -230,7 +226,7 @@ type StreamFacts = {
 };
 
 /** What `facts` learn from the calls an assistant's line makes. */
-const gatherCalls = (facts: StreamFacts, line: Printed<'assistant'>): void => {
+const gatherCalls = (facts: StreamFacts, line: Printed<'assistant'>) => {
   const { content } = line.message;
   for (const { id, name, input } of typeof content === 'string' ? [] : content.filter(isCall)) {
     facts.inputs.set(id, input);
@@ -240,7 +236,7 @@ const gatherCalls = (facts: StreamFacts, line: Printed<'assistant'>): void => {
 };
 
 /** What `facts` learn from one decoded line of a stream. */
-const gather = (facts: StreamFacts, printed: PrintedLine): void => {
+const gather = (facts: StreamFacts, printed: PrintedLine) => {
   if (printed.kind === 'result') {
     facts.result = printed.line;
     for (const { tool_use_id: id } of printed.line.permission_denials ?? []) if (id) facts.denied.add(id);
@@ -280,7 +276,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
  * @param output The job's stream capture, one JSON object a line, stderr beside it.
  */
-export const claudeStreamOutput = (output: string): HarnessOutput => {
+export const claudeStreamOutput = (output: string) => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
   for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
   const skills = facts.started ? loadedSkills(facts) : undefined;
@@ -293,11 +289,11 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
     ...(facts.model ? { ranOn: facts.model } : {}),
     ...(facts.harnessVersion ? { harnessVersion: facts.harnessVersion } : {}),
     ...(facts.ranIn ? { ranIn: facts.ranIn } : {}),
-  };
+  } satisfies HarnessOutput as HarnessOutput;
 };
 
 /** The skill a `Skill` call's input names, after its last `:` — a plugin's skill by its bare name — or none. */
-const skillNamed = (input: unknown): string | undefined => {
+const skillNamed = (input: unknown) => {
   const key = readKeyOf('Skill');
   const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   const name = typeof v === 'string' ? v.slice(v.lastIndexOf(':') + 1).trim() : '';
@@ -310,11 +306,11 @@ const skillNamed = (input: unknown): string | undefined => {
  * its result, loaded nothing; a call naming no skill is skipped. Read only of a stream with a `system` `init` line: else
  * no session is known to have started.
  */
-const loadedSkills = ({ skills, denied }: StreamFacts): string[] =>
+const loadedSkills = ({ skills, denied }: StreamFacts) =>
   [...skills].flatMap(([id, input]) => (denied.has(id) ? [] : (skillNamed(input) ?? [])));
 
 /** The file a file tool's call names, as `FILE_KEYS` reads it, made relative to `cwd`: none when it names none, or one outside `cwd`. */
-const fileIn = (cwd: string, tool: string, input: unknown): string | undefined => {
+const fileIn = (cwd: string, tool: string, input: unknown) => {
   const key = readKeyOf(tool);
   const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   if (typeof v !== 'string' || !v.trim()) return undefined;
@@ -328,13 +324,13 @@ const fileIn = (cwd: string, tool: string, input: unknown): string | undefined =
  * or its result, touched nothing; a file outside its folder is not counted. Read only of a stream whose `init` line names a folder:
  * else no session is known to have started, or no path can be read against it.
  */
-const touchedFiles = (cwd: string, { files, denied }: StreamFacts): string[] => {
+const touchedFiles = (cwd: string, { files, denied }: StreamFacts) => {
   const touched = [...files].flatMap(([id, [tool, input]]) => (denied.has(id) ? [] : (fileIn(cwd, tool, input) ?? [])));
   return [...new Set(touched)];
 };
 
 /** An assistant's `tool_use` block, written again: its id, its tool, and its input whole, or only what a reader reads of it. */
-const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>): object => {
+const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>) => {
   if (input === undefined) return { type: 'tool_use', id, name };
   if (denied.has(id)) return { type: 'tool_use', id, name, input };
   const key = readKeyOf(name);
@@ -344,7 +340,7 @@ const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>): ob
 };
 
 /** An assistant's line cut to the calls it makes (`callKept`), or none when it makes none. */
-const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>): string | undefined => {
+const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>) => {
   const { content } = line.message;
   const calls = typeof content === 'string' ? [] : content.filter(isCall);
   return calls.length ? JSON.stringify({ type: 'assistant', message: { content: calls.map((c) => callKept(c, denied)) } }) : undefined;
@@ -364,7 +360,7 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
  * Throws, as `claudeStreamOutput` does, when a line of a kind it reads does not decode: a refused capture is kept whole.
  * @param output The job's stream capture, one JSON object a line, stderr beside it.
  */
-export const claudeStreamKept = (output: string): string => {
+export const claudeStreamKept = (output: string) => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
   for (const printed of decoded(output, STREAM_KINDS)) gather(facts, printed);
   let read: InitRead | undefined;
@@ -383,7 +379,7 @@ export const claudeStreamKept = (output: string): string => {
  * What a reader reads once `line` follows what `read` already said: the first folder, the first model, the last version and the last
  * mode named.
  */
-const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
+const readAfter = (read: InitRead | undefined, line: InitRead) => ({
   cwd: read?.cwd ?? line.cwd,
   model: read?.model ?? line.model,
   claude_code_version: line.claude_code_version ?? read?.claude_code_version,
@@ -397,7 +393,7 @@ const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
  * @param text One line of the capture.
  * @param read What the earlier `init` and `status` lines say to a reader, or undefined before the first.
  */
-export const initLineKept = (text: string, read: InitRead | undefined): { kept?: string; read: InitRead } | undefined => {
+export const initLineKept = (text: string, read: InitRead | undefined) => {
   if (printedKindOf(text) !== 'system init') return undefined;
   const [printed] = decoded(text, ['system init']);
   if (printed?.kind !== 'system init') return undefined;
@@ -416,7 +412,7 @@ export const initLineKept = (text: string, read: InitRead | undefined): { kept?:
  * once it is read, the mode it names folded into `read` once an `init` line began it. None when `text` is no `status` line. Throws, as
  * `claudeStreamKept` does, when it does not decode.
  */
-const statusLineKept = (text: string, read: InitRead | undefined): { kept?: string; read: InitRead | undefined } | undefined => {
+const statusLineKept = (text: string, read: InitRead | undefined) => {
   if (printedKindOf(text) !== 'system status') return undefined;
   const [printed] = decoded(text, ['system status']);
   if (printed?.kind !== 'system status') return undefined;
@@ -429,7 +425,7 @@ const statusLineKept = (text: string, read: InitRead | undefined): { kept?: stri
  * What a capture keeps of its line `text` (`claudeStreamKept`) when it is no `init` or `status` line, the calls `denied` named whole, or
  * nothing.
  */
-const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined => {
+const lineKept = (text: string, denied: ReadonlySet<string>) => {
   const kind = printedKindOf(text);
   if (kind === undefined) return text;
   if (kind === 'other' || !STREAM_KINDS.includes(kind)) return undefined;
@@ -445,10 +441,12 @@ const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined
  * @param output The whole lines of the stream read this time.
  * @param before How many lines of the stream came before `output`, so that a refusal numbers its line in the whole output.
  */
-export const claudePartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
+export const claudePartials = (output: string, before: number) => {
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
-  if ('wrong' in read) return read;
-  return { marks: read.lines.flatMap(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) };
+  if ('wrong' in read) return read satisfies { marks: PartialMark[] } | { wrong: string } as { marks: PartialMark[] } | { wrong: string };
+  return { marks: read.lines.flatMap<PartialMark>(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) } satisfies
+    | { marks: PartialMark[] }
+    | { wrong: string } as { marks: PartialMark[] } | { wrong: string };
 };
 
 /**

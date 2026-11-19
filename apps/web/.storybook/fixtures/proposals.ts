@@ -7,9 +7,7 @@
  */
 import { QueryClient } from '@tanstack/react-query';
 import type { Proposal, ProposalPhase } from 'objects';
-import type { Factory } from '../../src/lib/api/factories';
 import type { InboxEntry } from '../../src/lib/api/inbox';
-import type { OpenRuns } from '../../src/lib/api/runs';
 
 /** The factory every fixture here is in. */
 export const FACTORY = 'nemia';
@@ -24,7 +22,7 @@ const AT = '2026-11-15T18:00:00.000Z';
  * @param phase Where it stands.
  * @param widens Whether it widens access.
  */
-export const proposal = (name: string, phase: ProposalPhase, widens = false): Proposal => ({
+export const proposal = (name: string, phase: ProposalPhase, widens = false) => ({
   apiVersion: 'nemia/v1',
   kind: 'Proposal',
   metadata: { name, namespace: FACTORY, creationTimestamp: AT, resourceVersion: `${name}-1` },
@@ -46,14 +44,14 @@ export const proposal = (name: string, phase: ProposalPhase, widens = false): Pr
     changes: [{ resource: 'hires', name: 'build.plan', verb: 'update', access: widens ? 'widens' : 'same' }],
     widens,
   },
-});
+}) satisfies Proposal;
 
 /**
  * The factory `name` as the board views it: one repository, the workflow `build`, nothing scheduled, trusted and mounted.
  * @param name The factory's name.
  * @param isDefault Whether it is the default factory, which holds no proposal.
  */
-export const factoryView = (name: string, isDefault = false): Factory => ({
+export const factoryView = (name: string, isDefault = false) => ({
   name,
   default: isDefault,
   worksOn: ['/work/nemia'],
@@ -81,7 +79,7 @@ export const factoryView = (name: string, isDefault = false): Factory => ({
  * @param name The card's name.
  * @param factory The factory it is filed in.
  */
-export const unstartedCard = (name: string, factory: string): InboxEntry => ({
+export const unstartedCard = (name: string, factory: string) => ({
   labels: {},
   name,
   file: `${name}.md`,
@@ -96,7 +94,7 @@ export const unstartedCard = (name: string, factory: string): InboxEntry => ({
   body: `${name}\n`,
   filedAt: AT,
   factoryRepo: null,
-});
+}) satisfies InboxEntry;
 
 /**
  * A card of `factory` queued at `place` in the order the tick starts cards in.
@@ -104,14 +102,14 @@ export const unstartedCard = (name: string, factory: string): InboxEntry => ({
  * @param factory The factory it is filed in.
  * @param place Its place in the queue, from 1.
  */
-export const queuedCard = (name: string, factory: string, place: number): InboxEntry => ({
+export const queuedCard = (name: string, factory: string, place: number) => ({
   ...unstartedCard(name, factory),
   state: 'queued',
   queued: { at: AT, place },
-});
+}) satisfies InboxEntry;
 
 /** The frame's light answer of the runs: `waiting` runs wait on the person, none listed, since the pane reads the counts alone. */
-export const openRuns = (waiting: number): OpenRuns => ({
+export const openRuns = (waiting: number) => ({
   asOf: AT,
   counts: { waiting, inFlight: 0, finished: 0 },
   waiting: [],
@@ -123,7 +121,7 @@ export const openRuns = (waiting: number): OpenRuns => ({
  * with and asks the network nothing.
  * @param data Each query's key and the data it holds.
  */
-export function seeded(data: ReadonlyArray<readonly [readonly unknown[], unknown]>): QueryClient {
+export function seeded(data: ReadonlyArray<readonly [readonly unknown[], unknown]>) {
   const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false, staleTime: Infinity } } });
   for (const [key, value] of data) client.setQueryData(key, value);
   return client;

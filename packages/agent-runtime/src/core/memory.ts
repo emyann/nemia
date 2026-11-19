@@ -20,7 +20,7 @@ const UNIT_BYTES: Readonly<Record<MemoryUnit, number>> = {
 };
 
 /** The bytes one of `unit` is. */
-const unitBytes = (unit: MemoryUnit): number => UNIT_BYTES[unit];
+const unitBytes = (unit: MemoryUnit) => UNIT_BYTES[unit];
 
 /** The most bytes a limit may be: the largest whole number a number holds exactly (`Number.MAX_SAFE_INTEGER`). */
 const MOST = 9_007_199_254_740_991;
@@ -37,7 +37,7 @@ const MOST_OF: Readonly<Record<MemoryUnit, number>> = {
   Gi: 8_388_607,
   Ti: 8_191,
 };
-const mostOf = (unit: MemoryUnit): number => MOST_OF[unit];
+const mostOf = (unit: MemoryUnit) => MOST_OF[unit];
 
 /**
  * The whole bytes `amount` of `unit` is, a whole amount; `undefined` for an amount not above nothing, or past what a
@@ -60,7 +60,7 @@ const UNITS: readonly MemoryUnit[] = ['', 'k', 'M', 'G', 'T', 'Ki', 'Mi', 'Gi', 
 const BELOW: Partial<Record<MemoryUnit, MemoryUnit>> = { k: '', M: 'k', G: 'M', T: 'G', Ki: '', Mi: 'Ki', Gi: 'Mi', Ti: 'Gi' };
 
 /** The amount and unit a quantity is written as, or `undefined` where it is no quantity of this form. */
-const split = (quantity: string): { amount: number; unit: MemoryUnit; fraction: boolean } | undefined => {
+const split = (quantity: string) => {
   const m = QUANTITY.exec(quantity);
   if (!m) return undefined;
   const unit = UNITS.find((u) => u === (m[3] ?? ''));
@@ -73,7 +73,7 @@ const split = (quantity: string): { amount: number; unit: MemoryUnit; fraction: 
  * (`8Gi`, `512Mi`, `4G`, `1073741824`). `undefined` for anything else: words for it are `memoryQuantityRefusal`'s.
  * @param quantity The memory quantity as written.
  */
-export const memoryBytesOf = (quantity: string): number | undefined => {
+export const memoryBytesOf = (quantity: string) => {
   const q = split(quantity);
   return q === undefined || q.fraction ? undefined : quantityBytes(q.amount, q.unit);
 };
@@ -82,7 +82,7 @@ export const memoryBytesOf = (quantity: string): number | undefined => {
  * Why `quantity` is no memory limit the runtime reads, naming the form to write; `undefined` for one it reads.
  * @param quantity The memory quantity as written.
  */
-export const memoryQuantityRefusal = (quantity: string): string | undefined => {
+export const memoryQuantityRefusal = (quantity: string) => {
   if (memoryBytesOf(quantity) !== undefined) return undefined;
   const form =
     'a whole number and one of the units Ki, Mi, Gi, Ti (powers of 1024) or k, M, G, T (powers of 1000), or none for bytes, like `8Gi` or `512Mi`';

@@ -104,7 +104,7 @@ export function follow<S extends Followed, C>(
   follower: Follower<S, C>,
   update: (change: (s: S) => S) => void,
   frames: Frames,
-): () => void {
+) {
   let arrived: C[] = [];
   let frame = 0;
   let grace: ReturnType<typeof setTimeout> | undefined;
@@ -131,7 +131,7 @@ export function follow<S extends Followed, C>(
     if (!(last !== undefined && follower.joined(last, c))) arrived.push(c);
     frame ||= frames.request(flush);
   };
-  const cleared = (s: S): S => (s.error === null && s.retrying === null ? s : { ...s, error: null, retrying: null });
+  const cleared = (s: S) => (s.error === null && s.retrying === null ? s : { ...s, error: null, retrying: null });
   for (const [name, read] of Object.entries(follower.reads)) {
     stream.addEventListener(name, (message) => {
       for (const got of read(message)) {

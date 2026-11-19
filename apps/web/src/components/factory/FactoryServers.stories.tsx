@@ -14,13 +14,14 @@ const meta: Meta = { title: 'Factory/FactoryServers' };
 export default meta;
 
 /** A row of a factory's list, in the state `state`, with whatever else that state comes with. */
-const server = (name: string, state: string | null, more: Partial<FactoryServer> = {}): FactoryServer => ({
-  name,
-  type: 'http',
-  url: 'https://api.githubcopilot.com/mcp/',
-  state,
-  ...more,
-});
+const server = (name: string, state: string | null, more: Partial<FactoryServer> = {}) =>
+  ({
+    name,
+    type: 'http',
+    url: 'https://api.githubcopilot.com/mcp/',
+    state,
+    ...more,
+  }) satisfies FactoryServer;
 
 /** The box a section of the settings page gives its list. */
 const BOX: CSSProperties = { width: 720 };

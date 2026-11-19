@@ -338,10 +338,10 @@ function ServerRow({ server }: { server: McpServer }) {
 }
 
 /** The servers a step's fence names, as its line reads: the names, or that it names none and so loads none. */
-const serversNamed = (names: readonly string[]): string => names.join(', ') || 'none named: its sessions load no server';
+const serversNamed = (names: readonly string[]) => names.join(', ') || 'none named: its sessions load no server';
 
 /** The tools of the listed servers that `rule` is the one to refuse, by server. */
-const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
+const refusedBy = (mcp: Capabilities['mcp'], rule: string) =>
   mcp.flatMap((server) => (server.tools ?? []).filter((tool) => tool.denied === rule).map((tool) => `${server.name} · ${tool.name}`));
 
 /** A rule of the settings — a deny, with the listed tools it refuses, or an ask rule — and where it was read. */

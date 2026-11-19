@@ -12,17 +12,17 @@ export type Segment = { clean: string[] } | { conflict: { a: number; b: number; 
  * `text` cut into its lines, each with its `\n`; the last without one where the text does not end in one.
  * @param text A file's text.
  */
-export function linesOf(text: string): string[] {
+export function linesOf(text: string) {
   const lines = text.split(/(?<=\n)/);
   return lines.length === 1 && lines[0] === '' ? [] : lines;
 }
 
 /** For each line of `a`, the index of the line of `b` a longest common subsequence pairs it with, or -1. */
-function matched(a: readonly string[], b: readonly string[]): number[] {
+function matched(a: readonly string[], b: readonly string[]) {
   const rows = a.length + 1;
   const cols = b.length + 1;
   const table = new Uint32Array(rows * cols);
-  const cell = (i: number, j: number): number => table[i * cols + j] ?? 0;
+  const cell = (i: number, j: number) => table[i * cols + j] ?? 0;
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)
       table[i * cols + j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
@@ -38,17 +38,17 @@ function matched(a: readonly string[], b: readonly string[]): number[] {
 }
 
 /** Whether two runs of lines are the same. */
-const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((line, i) => line === b[i]);
+const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((line, i) => line === b[i]);
 
 /** The run between stable lines, `base` against `ours` and `theirs`, as a segment: one side's change, both's same one, or a conflict. */
-function chunkOf(at: number, base: string[], ours: string[], theirs: string[]): Segment {
+function chunkOf(at: number, base: string[], ours: string[], theirs: string[]) {
   if (same(ours, base)) return { clean: theirs };
   if (same(theirs, base) || same(ours, theirs)) return { clean: ours };
   return { conflict: { a: at + 1, b: at + base.length, base, ours, theirs } };
 }
 
 /** `segments` with each run of clean lines joined into one, and empty ones dropped. */
-function joined(segments: readonly Segment[]): Segment[] {
+function joined(segments: readonly Segment[]) {
   const out: Segment[] = [];
   for (const segment of segments) {
     const last = out.at(-1);
@@ -65,7 +65,7 @@ function joined(segments: readonly Segment[]): Segment[] {
  * @param ours The lines of our side, the tree as it is.
  * @param theirs The lines of their side, the one merged in.
  */
-export function diff3Lines(base: readonly string[], ours: readonly string[], theirs: readonly string[]): Segment[] {
+export function diff3Lines(base: readonly string[], ours: readonly string[], theirs: readonly string[]) {
   const toOurs = matched(base, ours);
   const toTheirs = matched(base, theirs);
   const segments: Segment[] = [];
@@ -100,7 +100,7 @@ export function diff3Lines(base: readonly string[], ours: readonly string[], the
  * @param ours The lines of our side, which a conflict is addressed by.
  * @param theirs The lines of their side.
  */
-export function diff2Lines(ours: readonly string[], theirs: readonly string[]): Segment[] {
+export function diff2Lines(ours: readonly string[], theirs: readonly string[]) {
   const toTheirs = matched(ours, theirs);
   const segments: Segment[] = [];
   let j = 0;

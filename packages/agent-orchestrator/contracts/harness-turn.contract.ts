@@ -34,8 +34,7 @@ export type TurnFailure = 'deadline' | 'budget' | 'unstarted' | 'stopped' | 'una
 export type TurnVerdict = { readonly state: TurnState; readonly failure?: TurnFailure };
 
 /** Whether `s` is an answer: ended by the harness itself, under no limit, with something said. */
-const answered = (s: TurnSeen): boolean =>
-  s.settled && s.end === 'harness' && !s.budget && s.answer !== undefined && s.answer.trim() !== '';
+const answered = (s: TurnSeen) => s.settled && s.end === 'harness' && !s.budget && s.answer !== undefined && s.answer.trim() !== '';
 
 const turnCheckOfSpec = spec<(seen: TurnSeen) => TurnVerdict>({
   ensures: {

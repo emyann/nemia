@@ -68,7 +68,7 @@ export type RunReading = StepsReading & { readonly clock: Timeline };
  * Where what a page shows of a step's workflow is read from: the workflow the run froze at `nemia start`, which the tick
  * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
  */
-const shownWorkflow = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] | null => run.workflow ?? folder;
+const shownWorkflow = (run: Run, folder: readonly StepSpec[] | null) => run.workflow ?? folder;
 
 /**
  * The run's steps read once (`StepsReading`): its judgement (`judgedOn`), the informer's where it serves one, else judged off the views of
@@ -110,7 +110,7 @@ export const stepsReadingOf = Effect.fnUntraced(function* (
  * Whether a read of `at` failed where it would read again: a refused check's stream the engine did not give (`unreadable`). What is built
  * on such a read is served once and never kept, since the run's inputs may not move until it reads.
  */
-export const readFailed = ({ checks, stderr }: StepsReading): boolean =>
+export const readFailed = ({ checks, stderr }: StepsReading) =>
   [...stderr.values()].some((said) => typeof said === 'string') || [...checks.values()].some((check) => check.refused?.unreadable != null);
 
 /**
@@ -128,7 +128,7 @@ export const runReading = Effect.fnUntraced(function* (run: Run) {
  * task and check (`viewsFor`), each saying when it was filed.
  * @param steps The run's steps read once, judged.
  */
-export const runReadingOf = (steps: StepsReading): RunReading => ({
+export const runReadingOf = (steps: StepsReading) => ({
   ...steps,
   clock: timeline(steps.run, steps.views, steps.steps),
 });
@@ -140,12 +140,13 @@ export const runReadingOf = (steps: StepsReading): RunReading => ({
  * @param views The views of the run's tasks, already read.
  * @param steps The run's steps, whose closeouts are read with them.
  */
-export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]): RaiseReads => ({
-  phaseOf: (taskId) => phaseOfView(views.get(taskId)),
-  closeoutOf: closeoutReader(views, run, steps),
-  askedCloseout: closeoutAsked(views),
-  verdictOf: exitVerdicts(views, run),
-});
+export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]) =>
+  ({
+    phaseOf: (taskId) => phaseOfView(views.get(taskId)),
+    closeoutOf: closeoutReader(views, run, steps),
+    askedCloseout: closeoutAsked(views),
+    verdictOf: exitVerdicts(views, run),
+  }) satisfies RaiseReads;
 
 /**
  * The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts.
@@ -171,5 +172,5 @@ export const currentOf = (home: string, { run, source, steps, views, judged, che
  * @param name The step's name.
  * @param current The step's current try as judged, `currentOf`'s where none is given.
  */
-export const triesIn = (home: string, at: StepsReading, name: string, current = currentOf(home, at, name)): StepTry[] =>
-  triesOf(home, at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);
+export const triesIn = (home: string, at: StepsReading, name: string, current = currentOf(home, at, name)) =>
+  triesOf(home, at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases) satisfies StepTry[] as StepTry[];

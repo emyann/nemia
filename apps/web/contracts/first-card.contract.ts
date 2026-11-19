@@ -43,10 +43,10 @@ export type RunCost = { readonly ms: number; readonly dollars: number };
 export type CostLine = { readonly kind: 'measured' | 'estimate' } & RunCost;
 
 /** Whether the stats measured a landed run's cost and time. */
-const measured = (m: LandedMeasure): boolean => m.landed !== null && m.landed > 0 && m.costPerLanded !== null && m.timePerLanded !== null;
+const measured = (m: LandedMeasure) => m.landed !== null && m.landed > 0 && m.costPerLanded !== null && m.timePerLanded !== null;
 
 /** Whether `n` is a number a figure can be compared by: absent, or no NaN (JSON carries none, and the estimate is a constant). */
-const figure = (n: number | null): boolean => n === null || !Number.isNaN(n);
+const figure = (n: number | null) => n === null || !Number.isNaN(n);
 
 const costLineOfSpec = spec<(stats: LandedMeasure | undefined, estimate: RunCost) => CostLine>({
   requires: ({ input: [stats, estimate] }) =>

@@ -4,7 +4,7 @@
  * carries and the shape its `x-shape` named (`fieldReadOf`). Pure.
  */
 import type { FieldShape } from 'objects';
-import type { FieldRead, JsonType, WidgetOf } from '../../contracts/field-widget.contract.ts';
+import type { JsonType, WidgetOf } from '../../contracts/field-widget.contract.ts';
 
 export type { FieldWidget } from '../../contracts/field-widget.contract.ts';
 
@@ -15,11 +15,10 @@ const JSON_TYPES: readonly JsonType[] = ['string', 'number', 'integer', 'boolean
  * Whether the types but null are exactly the one type `t`: `t` among them, and every other null (a nullable field is drawn by what it is
  * when it is not null). A schema's `type` names each word once, and `fieldReadOf` reads it so.
  */
-const only = (types: readonly JsonType[], t: JsonType): boolean =>
-  types.some((x) => x === t) && types.every((x) => x === t || x === 'null');
+const only = (types: readonly JsonType[], t: JsonType) => types.some((x) => x === t) && types.every((x) => x === t || x === 'null');
 
 /** Whether the types but null are exactly one scalar. */
-const scalar = (types: readonly JsonType[]): boolean =>
+const scalar = (types: readonly JsonType[]) =>
   only(types, 'string') || only(types, 'number') || only(types, 'integer') || only(types, 'boolean');
 
 /**
@@ -41,7 +40,7 @@ export const widgetOf: WidgetOf = (field) => {
 };
 
 /** The `type` words of a schema, as a list: its one word, each word of its list, or none for anything else. */
-function typesOf(schema: unknown): JsonType[] {
+function typesOf(schema: unknown) {
   if (typeof schema !== 'object' || schema === null) return [];
   const type = (schema as { type?: unknown }).type;
   const words: unknown[] = Array.isArray(type) ? type : [type];
@@ -54,7 +53,7 @@ function typesOf(schema: unknown): JsonType[] {
  * @param schema The field's JSON Schema, the closeout's for the field; anything not an object reads as no types.
  * @param shape The shape the field's `x-shape` named, or null for none.
  */
-export function fieldReadOf(schema: unknown, shape: FieldShape | null): FieldRead {
+export function fieldReadOf(schema: unknown, shape: FieldShape | null) {
   const object = typeof schema === 'object' && schema !== null ? (schema as { enum?: unknown; items?: unknown }) : {};
   const types = typesOf(schema);
   return {

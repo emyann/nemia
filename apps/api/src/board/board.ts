@@ -45,7 +45,7 @@ const TYPES: Readonly<Record<string, string>> = {
 const DIST = path.join('apps', 'web', 'dist');
 
 /** The board's folder: `NEMIA_BOARD_DIR` where set, else the running code's `apps/web/dist`. */
-const boardDirOf = async (c: Parameters<Handler<ApiEnv>>[0]): Promise<string> => {
+const boardDirOf = async (c: Parameters<Handler<ApiEnv>>[0]) => {
   const { env, running } = await c.var.runtime.runPromise(Effect.map(ApiConfig, (config) => config));
   const given = env.NEMIA_BOARD_DIR?.trim() ?? '';
   return given !== '' ? path.resolve(given) : path.join((running ?? runningRelease()).root, DIST);
@@ -56,7 +56,7 @@ const boardDirOf = async (c: Parameters<Handler<ApiEnv>>[0]): Promise<string> =>
  * a backslash, a NUL, or an encoding that does not decode.
  * @param urlPath The request's path, as it came, still encoded.
  */
-export function segmentsOf(urlPath: string): string[] | null {
+export function segmentsOf(urlPath: string) {
   let decoded: string;
   try {
     decoded = decodeURIComponent(urlPath);
@@ -75,7 +75,7 @@ export type BoardFiles = {
 };
 
 /** `file` sent with its type, read afresh: the board's build replaces its files whole, under new names. */
-const sent = async (c: Parameters<Handler<ApiEnv>>[0], files: BoardFiles, file: string, cache: string): Promise<Response> =>
+const sent = async (c: Parameters<Handler<ApiEnv>>[0], files: BoardFiles, file: string, cache: string) =>
   c.body(await files.read(file), 200, {
     'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
     'cache-control': cache,
@@ -85,9 +85,8 @@ const sent = async (c: Parameters<Handler<ApiEnv>>[0], files: BoardFiles, file: 
  * The board's handler over `files`: a file of its folder, its `index.html` for a route of the board's own, or the refusals above.
  * @param files The board's built files, read by path.
  */
-export const boardOf =
-  (files: BoardFiles): Handler<ApiEnv> =>
-  async (c) => {
+export const boardOf = (files: BoardFiles) =>
+  (async (c) => {
     const urlPath = c.req.path;
     if (onPort(urlPath) || answered(urlPath)) return c.notFound();
     const segments = segmentsOf(urlPath);
@@ -112,4 +111,4 @@ export const boardOf =
       return sent(c, files, file, segments[0] === 'assets' ? 'public, max-age=31536000, immutable' : 'no-cache');
     if (segments[0] === 'assets') return c.notFound();
     return sent(c, files, index, 'no-cache');
-  };
+  }) satisfies Handler<ApiEnv> as Handler<ApiEnv>;

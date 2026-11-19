@@ -25,7 +25,7 @@ const NAME_INK: Partial<Record<StepMark, string>> = { alive: 'text-alive', yours
  * Which row under the graph names each step: a column's steps, a fork's lanes, one under another in the order their nodes stand, so no
  * two names share a box; and how many rows the widest column takes.
  */
-function namedRows(points: readonly { id: string; kind: string; x: number; y: number }[]): { of: Map<string, number>; count: number } {
+function namedRows(points: readonly { id: string; kind: string; x: number; y: number }[]) {
   const of = new Map<string, number>();
   const columns = new Map<number, { id: string; y: number }[]>();
   for (const point of points) if (point.kind === 'step') columns.set(point.x, [...(columns.get(point.x) ?? []), point]);
@@ -67,19 +67,13 @@ const GONE = 'var(--md-sys-color-outline)';
 const AHEAD = 'var(--md-sys-color-outline-variant)';
 
 /** A diamond of half-width `s` about the origin, its path starting at its top corner. */
-const diamond = (s: number): string => `M0,${-s} L${s},0 L0,${s} L${-s},0 Z`;
+const diamond = (s: number) => `M0,${-s} L${s},0 L0,${s} L${-s},0 Z`;
 
 /**
  * How a node's mark is painted: done filled sage, alive and yours filled in their hue with a still glow, failure filled red; a step
  * not started hollow, by its corners alone where it waits on something now; a route passed by dotted and small; the rest a quiet fill.
  */
-function markPaint(mark: StepMark): {
-  fill: string;
-  stroke?: string;
-  strokeDasharray?: string;
-  strokeDashoffset?: number;
-  filter?: string;
-} {
+function markPaint(mark: StepMark) {
   if (mark === 'done') return { fill: paint.sage };
   if (mark === 'alive') return { fill: paint.alive, filter: `drop-shadow(0 0 4px ${paint.alive})` };
   if (mark === 'yours') return { fill: paint.yours, filter: `drop-shadow(0 0 3px ${paint.yours})` };
@@ -318,4 +312,4 @@ function Node({
 }
 
 /** A step's rail word, as the rail says it, or nothing for a name the run does not have. */
-const wordOf = (step: WrappedStep | undefined, held: boolean): string => (step ? stateWordsOf(step.state, step.on, held).rail : '');
+const wordOf = (step: WrappedStep | undefined, held: boolean) => (step ? stateWordsOf(step.state, step.on, held).rail : '');

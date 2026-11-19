@@ -8,7 +8,7 @@ import { folderNamesQuery } from '@/lib/api/folders';
 const SETTLE_MS = 200;
 
 /** `typed`, once it has stood unchanged a moment, so the listing is asked once a pause and not once a key. */
-function useSettled(typed: string): string {
+function useSettled(typed: string) {
   const [settled, setSettled] = useState(typed);
   useEffect(() => {
     const timer = setTimeout(() => setSettled(typed), SETTLE_MS);
@@ -18,7 +18,7 @@ function useSettled(typed: string): string {
 }
 
 /** The whole path of `name` in the folder `dir`. */
-const joined = (dir: string, name: string): string => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`);
+const joined = (dir: string, name: string) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`);
 
 /**
  * The folder way's field: a path typed, the api offering the folders under what is typed as the person goes (names alone, under the

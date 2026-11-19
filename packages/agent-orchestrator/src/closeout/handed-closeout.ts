@@ -26,7 +26,7 @@ export type HandedCloseout = {
  * @param said The step's closeout.
  * @param there The absolute paths, in the step's files directory, of the files it named that are there.
  */
-export function handedCloseout(step: StepSpec, said: Closeout, there: readonly string[]): HandedCloseout {
+export function handedCloseout(step: StepSpec, said: Closeout, there: readonly string[]) {
   const replies = said.output && Object.hasOwn(said.output, LOOP_REPLIES) ? [LOOP_REPLIES] : [];
   return {
     apiVersion: CLOSEOUT_V1,
@@ -36,5 +36,5 @@ export function handedCloseout(step: StepSpec, said: Closeout, there: readonly s
     artifacts: [...there.map((path) => ({ path })), ...(said.values ?? [])],
     needs: said.needs ?? null,
     output: declaredOutput(step, said, [...outputFields(step), ...replies]).given,
-  };
+  } satisfies HandedCloseout;
 }

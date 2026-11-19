@@ -29,7 +29,7 @@ export type Filing = { text: string; workflow?: string; repo?: string; factory?:
  * @param body The card's body, as the endpoint decodes it.
  * @param home The store's root folder, whose factories are read.
  */
-export function filingOf(body: CardFile, home: string): Filing {
+export function filingOf(body: CardFile, home: string) {
   if (body.factory !== undefined) readFactoryAtOnce(home, body.factory, 'Nothing was filed.');
   return {
     text: body.body,

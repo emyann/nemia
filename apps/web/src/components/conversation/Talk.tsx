@@ -150,7 +150,7 @@ export function Talk<Own>({
  * The talk's box `box` scrolled to its end: that box alone, never what holds it, so a talk under a step's part (the bar, the step's page)
  * leaves their scroll where the person put it, as `scrollIntoView` would not.
  */
-function toLatest(box: HTMLElement | null, behavior: ScrollBehavior): void {
+function toLatest(box: HTMLElement | null, behavior: ScrollBehavior) {
   box?.scrollTo({ top: box.scrollHeight, behavior });
 }
 

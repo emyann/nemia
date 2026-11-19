@@ -13,7 +13,6 @@ import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { wfRoot } from '../config/config.store.ts';
 import { Missing } from '../refusal/refusal.ts';
-import type { Machine } from './service.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 /** The package's own folder, whose checkout the service runs until a release is installed. */
@@ -23,7 +22,7 @@ const PACKAGE = path.join(import.meta.dirname, '..', '..');
 const CALL_MS = 15_000;
 
 /** A path's real path, or undefined where it is not there. */
-const realOf = (at: string): string | undefined => {
+const realOf = (at: string) => {
   try {
     return fs.realpathSync(at);
   } catch {
@@ -32,7 +31,7 @@ const realOf = (at: string): string | undefined => {
 };
 
 /** A file's text, or null where it is not there. */
-const textOf = (file: string): string | null => {
+const textOf = (file: string) => {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch (err) {
@@ -42,7 +41,7 @@ const textOf = (file: string): string | null => {
 };
 
 /** What the machine is: its platform, whether the kernel is WSL's, and whether systemd is its init (`/run/systemd/system`). */
-export function machineOf(): Machine {
+export function machineOf() {
   const release = textOf('/proc/sys/kernel/osrelease') ?? '';
   return {
     platform: process.platform,
@@ -52,7 +51,7 @@ export function machineOf(): Machine {
 }
 
 /** The `nemia.daemon` a folder's `package.json` names, or undefined where it names none or has none. */
-const daemonNamed = (dir: string): string | undefined => {
+const daemonNamed = (dir: string) => {
   const text = textOf(path.join(dir, 'package.json'));
   if (text === null) return undefined;
   return Option.getOrUndefined(daemonIn(text))?.nemia?.daemon;
@@ -64,7 +63,7 @@ const daemonIn = Schema.decodeUnknownOption(
 );
 
 /** The first folder at or above `from` whose `package.json` names its daemon, with what it names, or undefined. */
-function checkoutAbove(from: string): { checkout: string; daemon: string } | undefined {
+function checkoutAbove(from: string) {
   let at: string | undefined = realOf(from);
   while (at !== undefined) {
     const daemon = daemonNamed(at);
@@ -75,7 +74,7 @@ function checkoutAbove(from: string): { checkout: string; daemon: string } | und
 }
 
 /** The folder of the nearest `package.json` above `file`: the workspace the daemon's entry belongs to, which it runs in. */
-function workspaceOf(file: string, checkout: string): string {
+function workspaceOf(file: string, checkout: string) {
   for (let at = path.dirname(file); at.startsWith(checkout); at = path.dirname(at))
     if (fs.existsSync(path.join(at, 'package.json'))) return at;
   return checkout;
@@ -87,7 +86,7 @@ function workspaceOf(file: string, checkout: string): string {
  * is not there.
  * @param from The folder to look above. Left out, this package's own folder.
  */
-export function daemonEntry(from: string = PACKAGE): { checkout: string; entry: string; cwd: string } {
+export function daemonEntry(from: string = PACKAGE) {
   const found = checkoutAbove(from);
   if (found === undefined)
     throw new Missing({
@@ -105,10 +104,10 @@ export function daemonEntry(from: string = PACKAGE): { checkout: string; entry: 
  * The checkout a service's entry is of, as `daemonEntry` finds it, or undefined where it is gone.
  * @param entry The path of the service's entry.
  */
-export const checkoutOf = (entry: string): string | undefined => checkoutAbove(path.dirname(entry))?.checkout;
+export const checkoutOf = (entry: string) => checkoutAbove(path.dirname(entry))?.checkout;
 
 /** Where a service's files go: the user's home, and the folder of its settings (`XDG_CONFIG_HOME`, else `~/.config`). */
-export const serviceDirs = (): { home: string; configHome: string } => {
+export const serviceDirs = () => {
   const home = os.homedir();
   return { home, configHome: process.env.XDG_CONFIG_HOME || path.join(home, '.config') };
 };
@@ -117,20 +116,20 @@ export const serviceDirs = (): { home: string; configHome: string } => {
  * The store the service is of, and the default one: a store not the default is given a service name of its own.
  * @param root The store's root folder.
  */
-export const storeRoots = (root: string): { root: string; defaultRoot: string } => ({ root, defaultRoot: wfRoot({}) });
+export const storeRoots = (root: string) => ({ root, defaultRoot: wfRoot({}) });
 
 /**
  * The service's file, or null where it is not installed.
  * @param file The path of the service's file.
  */
-export const readUnit = (file: string): string | null => textOf(file);
+export const readUnit = (file: string) => textOf(file);
 
 /**
  * Writes the service's file whole, through a hidden file renamed over it, so the system never reads half of it.
  * @param file The path of the service's file.
  * @param text The file's whole text.
  */
-export function writeUnit(file: string, text: string): void {
+export function writeUnit(file: string, text: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeWhole(file, text);
 }
@@ -139,7 +138,7 @@ export function writeUnit(file: string, text: string): void {
  * Removes the service's file; answers whether there was one.
  * @param file The path of the service's file.
  */
-export function removeUnit(file: string): boolean {
+export function removeUnit(file: string) {
   try {
     fs.unlinkSync(file);
     return true;
@@ -153,7 +152,7 @@ export function removeUnit(file: string): boolean {
  * Runs one of the system's own programs (`systemctl`, `launchctl`, `loginctl`) and answers what it printed; throws when it fails.
  * @param argv The program, then its arguments.
  */
-export const systemCall = (argv: readonly string[]): string => {
+export const systemCall = (argv: readonly string[]) => {
   const [command, ...args] = argv;
   if (command === undefined) throw new Error('systemCall runs a program: give it argv with the program first.');
   return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: CALL_MS });
@@ -163,7 +162,7 @@ export const systemCall = (argv: readonly string[]): string => {
  * Whether `user`'s services outlive their login sessions (`loginctl show-user -p Linger`), or undefined where loginctl cannot say.
  * @param user The user's name.
  */
-export function lingerOf(user: string): boolean | undefined {
+export function lingerOf(user: string) {
   try {
     const said = /^Linger=(yes|no)$/m.exec(systemCall(['loginctl', 'show-user', user, '-p', 'Linger']))?.[1];
     return said === undefined ? undefined : said === 'yes';
@@ -173,7 +172,7 @@ export function lingerOf(user: string): boolean | undefined {
 }
 
 /** The user the services are installed for, by name and id: launchd's domain is `gui/<uid>`. */
-export const userOf = (): { name: string; uid: number } => {
+export const userOf = () => {
   const info = os.userInfo();
   return { name: info.username, uid: info.uid };
 };
@@ -183,7 +182,7 @@ export const userOf = (): { name: string; uid: number } => {
  * not.
  * @param dir The folder read.
  */
-export function unitsOf(dir: string): { name: string; text: string }[] {
+export function unitsOf(dir: string) {
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -209,7 +208,7 @@ export type Spawned = { pid: number | undefined; ended: Promise<SpawnEnded> };
  * @param s What is started: the node binary, the entry, the folder it runs in, its whole environment, and the log file its output is
  *   appended to.
  */
-export function spawnDetached(s: { node: string; entry: string; cwd: string; env: Record<string, string>; log: string }): Spawned {
+export function spawnDetached(s: { node: string; entry: string; cwd: string; env: Record<string, string>; log: string }) {
   fs.mkdirSync(path.dirname(s.log), { recursive: true });
   const fd = fs.openSync(s.log, 'a');
   try {

@@ -12,41 +12,41 @@ type Request = Readonly<Record<string, unknown>>;
 export class Malformed extends Error {}
 
 /** How a field that is not what was asked is said: its value, or that it is missing. */
-const said = (value: unknown): string => JSON.stringify(value) ?? 'missing';
+const said = (value: unknown) => JSON.stringify(value) ?? 'missing';
 
 /** Refuses a `key` of `request` that is no string. */
-function text(request: Request, key: string): void {
+function text(request: Request, key: string) {
   if (typeof request[key] !== 'string') throw new Malformed(`the request's \`${key}\` is ${said(request[key])}, where a string is asked`);
 }
 
 /** Refuses a `key` of `request` that is no object of strings. */
-function strings(request: Request, key: string): void {
+function strings(request: Request, key: string) {
   const value = request[key];
   if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.values(value).some((v) => typeof v !== 'string'))
     throw new Malformed(`the request's \`${key}\` is ${said(value)}, where an object of strings is asked`);
 }
 
 /** Refuses a `key` of `request` that is no list of strings. */
-function texts(request: Request, key: string): void {
+function texts(request: Request, key: string) {
   const value = request[key];
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))
     throw new Malformed(`the request's \`${key}\` is ${said(value)}, where a list of strings is asked`);
 }
 
 /** Refuses a `key` of `request` that is no boolean. */
-function flag(request: Request, key: string): void {
+function flag(request: Request, key: string) {
   if (typeof request[key] !== 'boolean') throw new Malformed(`the request's \`${key}\` is ${said(request[key])}, where a boolean is asked`);
 }
 
 /** Whether `value` is what `standing` was last told of a branch: `{ tip, pastBase }`, a string or null and a boolean or null. */
-const isKnown = (value: unknown): boolean => {
+const isKnown = (value: unknown) => {
   if (typeof value !== 'object' || value === null) return false;
   const { tip, pastBase } = value as Record<string, unknown>;
   return (typeof tip === 'string' || tip === null) && (typeof pastBase === 'boolean' || pastBase === null);
 };
 
 /** Refuses `branches` of `request` that is no list, and the first of them that is no branch `standing` can read. */
-function branches(request: Request): void {
+function branches(request: Request) {
   const value = request.branches;
   if (!Array.isArray(value)) throw new Malformed(`the request's \`branches\` is ${said(value)}, where a list of branches is asked`);
   value.forEach((b: unknown, i) => {
@@ -65,7 +65,7 @@ function branches(request: Request): void {
 }
 
 /** Refuses `trials` of `request` that is no list of pairs, each a string `onto` and `branch`. */
-function pairs(request: Request): void {
+function pairs(request: Request) {
   const value = request.trials;
   const valid =
     Array.isArray(value) &&
@@ -77,7 +77,7 @@ function pairs(request: Request): void {
 }
 
 /** Refuses an `act` of `request` that is neither commit nor abort, and a commit with no message. */
-function act(request: Request): void {
+function act(request: Request) {
   text(request, 'act');
   if (request.act !== 'commit' && request.act !== 'abort')
     throw new Malformed(`the request's \`act\` is ${JSON.stringify(request.act)}, where commit or abort is asked`);
@@ -111,6 +111,6 @@ const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[
 };
 
 /** Throws `Malformed` for a `request` that `verb` cannot read. */
-export function readable(verb: PlaceVerb, request: object): void {
+export function readable(verb: PlaceVerb, request: object) {
   for (const read of READS[verb]) read(request as Request);
 }

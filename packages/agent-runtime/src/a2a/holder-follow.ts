@@ -15,7 +15,7 @@
  * holds (`packages/agent-runtime/docs/open-issues.md`).
  */
 import { Effect, Stream } from 'effect';
-import { RunnerError, type Followed } from '../harness/index.ts';
+import { RunnerError } from '../harness/index.ts';
 import type { SeamOps } from './client.ts';
 import { cardOfJson } from './card.ts';
 import { followedOf } from './follow.ts';
@@ -37,34 +37,32 @@ export type HolderAgent = { card: Record<string, unknown> };
  * `follows`, so its headers alone are bounded and the stream itself is not. A failure is the follow's own refusal, naming
  * what the holder said.
  */
-const holderFollowOf =
-  (agent: HolderAgent, harness: string, credentials: Credentials | undefined) =>
-  (name: string): Stream.Stream<Followed, RunnerError> => {
-    const connection = connectionOf(harness, agent, credentials, REQUEST_MS, SEND_MS);
-    return Stream.unwrap(
-      Effect.gen(function* () {
-        const stop = yield* Effect.acquireRelease(
-          Effect.sync(() => new AbortController()),
-          (c) => Effect.sync(() => c.abort()),
-        );
-        connection.follows.add(stop.signal);
-        const client = yield* Effect.tryPromise({
-          try: () => connection.ask(async (c) => c),
-          catch: (cause) =>
-            new RunnerError({
-              verb: 'follow',
-              message: `the engine holding \`${name}\` could not be reached (${wordsOf(cause)}): read its transcript instead for what is new.`,
-              refused: true,
-            }),
-        });
-        const answers = client.resubscribeTask({ tenant: '', id: name }, { signal: stop.signal });
-        return Stream.fromAsyncIterable(
-          abortedOnReturn(answers, stop),
-          (cause) => new RunnerError({ verb: 'follow', message: wordsOf(cause) }),
-        );
-      }),
-    ).pipe(Stream.map(followedOf), Stream.flattenIterable);
-  };
+const holderFollowOf = (agent: HolderAgent, harness: string, credentials: Credentials | undefined) => (name: string) => {
+  const connection = connectionOf(harness, agent, credentials, REQUEST_MS, SEND_MS);
+  return Stream.unwrap(
+    Effect.gen(function* () {
+      const stop = yield* Effect.acquireRelease(
+        Effect.sync(() => new AbortController()),
+        (c) => Effect.sync(() => c.abort()),
+      );
+      connection.follows.add(stop.signal);
+      const client = yield* Effect.tryPromise({
+        try: () => connection.ask(async (c) => c),
+        catch: (cause) =>
+          new RunnerError({
+            verb: 'follow',
+            message: `the engine holding \`${name}\` could not be reached (${wordsOf(cause)}): read its transcript instead for what is new.`,
+            refused: true,
+          }),
+      });
+      const answers = client.resubscribeTask({ tenant: '', id: name }, { signal: stop.signal });
+      return Stream.fromAsyncIterable(
+        abortedOnReturn(answers, stop),
+        (cause) => new RunnerError({ verb: 'follow', message: wordsOf(cause) }),
+      );
+    }),
+  ).pipe(Stream.map(followedOf), Stream.flattenIterable);
+};
 
 /**
  * `ops` with its `follow` alone asking `holder` at every call, and every other verb left as it is — the same function values,
@@ -86,7 +84,7 @@ export const holderSeamOf = (
   harness: string,
   credentials: Credentials | undefined,
   ops: SeamOps,
-): SeamOps =>
+) =>
   holder === undefined
     ? ops
     : {
@@ -106,18 +104,16 @@ export const holderSeamOf = (
  * start: the seam always carries a `follow` once a holder function is given, since whether there is a holder is only known at
  * the call, so a harness that cannot be followed here says so there instead of at the build.
  */
-const local =
-  (ops: SeamOps, harness: string) =>
-  (name: string): Stream.Stream<Followed, RunnerError> =>
-    ops.follow
-      ? ops.follow(name)
-      : Stream.fail(
-          new RunnerError({
-            verb: 'follow',
-            message: `no engine holds the \`${harness}\` harness's sessions now, and this harness follows none of its own: start the engine that holds them, or read \`${name}\`'s transcript instead for what is new.`,
-            refused: true,
-          }),
-        );
+const local = (ops: SeamOps, harness: string) => (name: string) =>
+  ops.follow
+    ? ops.follow(name)
+    : Stream.fail(
+        new RunnerError({
+          verb: 'follow',
+          message: `no engine holds the \`${harness}\` harness's sessions now, and this harness follows none of its own: start the engine that holds them, or read \`${name}\`'s transcript instead for what is new.`,
+          refused: true,
+        }),
+      );
 
 /**
  * Why the holder given for the harness `harness` cannot be taken, or `undefined`. Asked by `Engine.layer`, in the order
@@ -138,11 +134,7 @@ const local =
  * @param holder The holder as given, which must be a function.
  * @param place The harnesses this engine runs (`harnesses`), and whether it runs this one attached, its sessions held in one process.
  */
-export const holderRefusal = (
-  harness: string,
-  holder: unknown,
-  place: { harnesses: readonly string[]; claude: boolean },
-): string | undefined => {
+export const holderRefusal = (harness: string, holder: unknown, place: { harnesses: readonly string[]; claude: boolean }) => {
   if (!place.harnesses.includes(harness)) {
     const runs = place.harnesses.length ? place.harnesses.map((n) => `\`${n}\``).join(', ') : 'none';
     return `\`holder\` names the \`${harness}\` harness, which this engine does not run: it runs ${runs}. Name a harness of \`harnesses\`, whose sessions the holder runs.`;
@@ -164,7 +156,7 @@ export const holderRefusal = (
  * @param harness The name of the harness, said in the refusal.
  * @param agent What the holder function answered: an entry holding `card` alone.
  */
-export const holderAgentRefusal = (harness: string, agent: unknown): string | undefined => {
+export const holderAgentRefusal = (harness: string, agent: unknown) => {
   if (typeof agent !== 'object' || agent === null || Object.keys(agent).some((k) => k !== 'card')) {
     const given =
       typeof agent === 'object' && agent !== null

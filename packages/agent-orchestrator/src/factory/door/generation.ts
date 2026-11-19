@@ -21,10 +21,10 @@ export const generationAfter: GenerationAfter = (before, specChanged) => {
  * The generation `factory` reads as: its own, or 1 for a file written before the counter.
  * @param factory The factory as its file reads, by its generation.
  */
-export const generationOf = (factory: Pick<Factory, 'generation'>): number => factory.generation ?? 1;
+export const generationOf = (factory: Pick<Factory, 'generation'>) => factory.generation ?? 1;
 
 /** What of a factory is its spec, the desired state its runs read: its file's keys that say what it works on and how, in one key. */
-const specKey = (factory: Factory): string =>
+const specKey = (factory: Factory) =>
   JSON.stringify([
     factory.workflows,
     factory.hires,
@@ -44,7 +44,7 @@ const specKey = (factory: Factory): string =>
  * @param was The factory as its file held it.
  * @param now The factory as it is to be written.
  */
-export const specDiffers = (was: Factory, now: Factory): boolean => specKey(was) !== specKey(now);
+export const specDiffers = (was: Factory, now: Factory) => specKey(was) !== specKey(now);
 
 /**
  * `now` as the door writes it over `was`: its generation counted by `generationAfter`, whatever generation `now` itself carries, one more
@@ -54,8 +54,10 @@ export const specDiffers = (was: Factory, now: Factory): boolean => specKey(was)
  * @param now The factory as it is to be written.
  * @param counted Whether a change of the factory's spec was made beside the write (its level); false by default.
  */
-export const generationWritten = (was: Factory | { error: string }, now: Factory, counted = false): Factory =>
-  'error' in was ? now : { ...now, generation: generationAfter(was.generation ?? null, counted || specDiffers(was, now)) };
+export const generationWritten = (was: Factory | { error: string }, now: Factory, counted = false) =>
+  ('error' in was
+    ? now
+    : { ...now, generation: generationAfter(was.generation ?? null, counted || specDiffers(was, now)) }) satisfies Factory as Factory;
 
 /**
  * Whether a factory's level file `now` changes the spec `was` held: its own default level, absent where none was written. A raise and
@@ -63,5 +65,4 @@ export const generationWritten = (was: Factory | { error: string }, now: Factory
  * @param was The level file the factory held before, or undefined where none was written.
  * @param now The level file written now.
  */
-export const levelDiffers = (was: FactoryLevelFile | undefined, now: FactoryLevelFile): boolean =>
-  (was?.level ?? null) !== (now.level ?? null);
+export const levelDiffers = (was: FactoryLevelFile | undefined, now: FactoryLevelFile) => (was?.level ?? null) !== (now.level ?? null);

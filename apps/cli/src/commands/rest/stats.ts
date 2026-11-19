@@ -35,7 +35,7 @@ const queryOf = (args: Args) => {
 };
 
 /** The answer's JSON part `value`, read by `schema`: refused where it does not read, naming the whole answer and the releases' check. */
-const readAs = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S, value: unknown, part: string): S['Type'] => {
+const readAs = <S extends Schema.Top & { readonly DecodingServices: never }>(schema: S, value: unknown, part: string) => {
   const read = Schema.decodeUnknownExit(schema)(value);
   if (read._tag === 'Success') return read.value;
   throw new Refused(
@@ -47,7 +47,7 @@ const readAs = <S extends Schema.Top & { readonly DecodingServices: never }>(sch
  * `nemia stats`' runner: the stats asked, printed as `--json` or `--line` asks, else in words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function stats(args: Args): Promise<number> {
+export async function stats(args: Args) {
   const answer = await asked(COMMAND, (c) => c.server.stats({ query: queryOf(args) }));
   if (switchArg(args, 'json')) {
     said([JSON.stringify(answer, null, 2)]);

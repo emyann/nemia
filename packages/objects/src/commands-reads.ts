@@ -13,7 +13,7 @@ import { WATCH_WORDS } from './commands-reads-watch.ts';
 const takesNo = (verb: string, form: string) => (arg: string) => `${CLI} ${verb} takes ${form}: not ${arg}.`;
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -22,7 +22,7 @@ const textOf = (args: Args, key: string): string | undefined => {
  * `-o <output>` and `--output <output>`, how a list's table prints: `wide`, every column, the one the client takes (`outputRefused`). Taken
  * at the command line alone: the client asks the list for its table and prints the columns it asks.
  */
-const outputFlags = (command: string): Flag[] =>
+const outputFlags = (command: string) =>
   ['-o', '--output'].map((flag) => ({
     flag,
     kind: 'text',
@@ -30,10 +30,10 @@ const outputFlags = (command: string): Flag[] =>
     takes: `${flag} takes how the table prints, wide for every column: ${CLI} ${command} ${flag} wide`,
     twice: `${CLI} ${command} takes ${flag} once.`,
     only: { side: 'cli', why: 'the client asks the list for its table and prints the columns it asks; the api is sent no output' },
-  }));
+  })) satisfies Flag[];
 
 /** The refusal of an output the client does not print, or null: `-o wide` alone is one. */
-const outputRefused = (command: string, args: Args): string | null => {
+const outputRefused = (command: string, args: Args) => {
   const output = textOf(args, 'output');
   return output === undefined || output === 'wide'
     ? null
@@ -81,7 +81,7 @@ export const CLOSEOUT_WORDS = {
 const QUERY_KEY = selectorFlag('nemia ls').key ?? '';
 
 /** The refusal of a run named beside `-l`: one run is read whole, and the runs a label query takes are listed without one. */
-const lsRefused = (args: Args): string | null => {
+const lsRefused = (args: Args) => {
   const run = textOf(args, 'runId');
   const queried = args[QUERY_KEY];
   if (run !== undefined && Array.isArray(queried) && queried.length > 0)

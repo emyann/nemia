@@ -28,7 +28,7 @@ const FactoryLevelSchema = Schema.StructWithRest(
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function factoryLevelFile(home: string, name: string): string {
+export function factoryLevelFile(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name, 'level.json');
@@ -40,10 +40,11 @@ export function factoryLevelFile(home: string, name: string): string {
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const readFactoryLevel = (home: string, name: string): FactoryLevelFile | undefined => levelIn(factoryLevelFile(home, name), name);
+export const readFactoryLevel = (home: string, name: string) =>
+  levelIn(factoryLevelFile(home, name), name) satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
 
 /** The level `file` of the factory `name` holds, or undefined where it is not there; refused where it does not read. */
-function levelIn(file: string, name: string): FactoryLevelFile | undefined {
+function levelIn(file: string, name: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -70,11 +71,10 @@ function levelIn(file: string, name: string): FactoryLevelFile | undefined {
  * @param name The factory's name.
  * @param level The file to write: the factory's own default and its raise, either absent.
  */
-export const writeFactoryLevel = (home: string, name: string, level: FactoryLevelFile): void =>
-  levelWritten(factoryLevelFile(home, name), level);
+export const writeFactoryLevel = (home: string, name: string, level: FactoryLevelFile) => levelWritten(factoryLevelFile(home, name), level);
 
 /** `level` written whole onto `file`, or the file removed where it says neither a level nor a raise. */
-function levelWritten(file: string, level: FactoryLevelFile): void {
+function levelWritten(file: string, level: FactoryLevelFile) {
   if (level.level === undefined && level.raise === undefined) {
     fs.rmSync(file, { force: true });
     return;

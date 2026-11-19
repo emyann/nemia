@@ -154,7 +154,7 @@ const OPENING = 'opening the pull request';
  * What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. Apart from
  * `landing.ts`'s on purpose: a missing `gh` here is a person's refusal, exit 78.
  */
-function gh(...args: string[]): string {
+function gh(...args: string[]) {
   const ran = run('gh', args);
   if (ran.missing) throw new PersonsRefusal(noGh(OPENING));
   if (ran.status !== 0) throw new Refusal(`\`gh ${args.join(' ')}\` failed: ${ran.err}`);
@@ -162,10 +162,10 @@ function gh(...args: string[]): string {
 }
 
 /** Whatever `gh` printed for `args`, failure included: for a read whose failure is said in words, never thrown. */
-const read = (...args: string[]): Ran => run('gh', args);
+const read = (...args: string[]) => run('gh', args);
 
 /** `text` parsed as JSON; refuses, naming what was read and what it said, when it does not parse. Apart: it shares `hinted` with reads. */
-function parsed<T>(what: string, text: string): T {
+function parsed<T>(what: string, text: string) {
   const said = hinted<T>(text);
   if (said === undefined) throw new Refusal(`cannot read ${what}, which is no JSON: ${text.trim().slice(0, 200)}`);
   return said;
@@ -175,7 +175,7 @@ function parsed<T>(what: string, text: string): T {
  * `said` parsed as JSON, a read's output where it passed; `undefined` where it failed or does not parse: for a read that only hints,
  * whose failure is no refusal.
  */
-function hinted<T>(said: string | Ran): T | undefined {
+function hinted<T>(said: string | Ran) {
   try {
     return JSON.parse(typeof said === 'string' ? said : said.status === 0 ? said.out : '') as T;
   } catch {
@@ -187,7 +187,7 @@ function hinted<T>(said: string | Ran): T | undefined {
  * The branch this workspace is on, with the run it names and its leaf; refuses any other branch. The leaf is `run` for a run's own line of
  * work and a step's name for a fork or a merge, so it is no step to type: the retry line reads the step off `WF_STEP` instead.
  */
-function branchOf(): { branch: string; run: string; leaf: string } {
+function branchOf() {
   const head = run('git', ['symbolic-ref', '--short', 'HEAD']);
   const branch = head.status === 0 ? head.out.trim() : '';
   const named = /^wf\/([^/]+)\/([^/]+)$/.exec(branch);
@@ -200,7 +200,7 @@ function branchOf(): { branch: string; run: string; leaf: string } {
 }
 
 /** The remote `origin`'s address; refuses, naming the read, where there is none. Apart from `landing.ts`'s: this one returns it. */
-function origin(): string {
+function origin() {
   const remote = run('git', ['remote', 'get-url', 'origin']);
   if (remote.status !== 0)
     throw new PersonsRefusal(
@@ -211,10 +211,10 @@ function origin(): string {
 }
 
 /** The commit `HEAD` is on. */
-const head = (): string => git('what commit HEAD is', 'rev-parse', 'HEAD');
+const head = () => git('what commit HEAD is', 'rev-parse', 'HEAD');
 
 /** The open pull requests whose head is `branch`; apart from `landing.ts`'s, which reads every state of the run's branches. */
-function pulls(branch: string): Pr[] {
+function pulls(branch: string) {
   const fields = 'number,url,isDraft,baseRefName,headRefOid,mergeable,labels';
   return parsed<Pr[]>(`the pull requests of ${branch}`, gh('pr', 'list', '--head', branch, '--state', 'open', '--json', fields));
 }
@@ -231,7 +231,7 @@ const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{r
  * The one open pull request of `open`, read as this script requires one; refuses a draft, another base, none, or two. Apart from
  * `landing.ts`'s, which tells a merged pull request from an open one instead.
  */
-function sole(open: readonly Pr[], branch: string, onto: string): Pr {
+function sole(open: readonly Pr[], branch: string, onto: string) {
   if (open.length === 0)
     throw new Refusal(
       `no open pull request has ${branch} as its head, and CI judges a pull request's head. Open it in your session, after you ` +
@@ -254,11 +254,11 @@ function sole(open: readonly Pr[], branch: string, onto: string): Pr {
         `the base: a person moves its base (\`gh pr edit ${pr.number} --base ${onto}\`, or \`${API_LINE(pr.number, `base=${onto}`)}\` ` +
         `where \`gh pr edit\` fails on GitHub's deprecated Projects query), then the step is retried with \`--recheck\``,
     );
-  return pr;
+  return pr satisfies Pr as Pr;
 }
 
 /** `branch` pushed to `origin`, never forced; refuses a push git rejected, naming the merge that answers it. */
-function pushing(branch: string): string {
+function pushing(branch: string) {
   const pushed = run('git', ['push', 'origin', branch]);
   if (pushed.status !== 0)
     throw new Refusal(
@@ -276,7 +276,7 @@ type LabelRule = { key: string; value: string; label: string };
 const RULE = /^([^=\s]+)=([^:\s]+):(\S+)$/;
 
 /** The rules of `push --labels`, from its arguments; none where it was given none, or an empty string. Refuses anything else. */
-function labelRules(args: readonly string[]): LabelRule[] {
+function labelRules(args: readonly string[]) {
   if (args.length === 0) return [];
   const [flag, given, ...rest] = args;
   if (flag !== '--labels' || given === undefined || rest.length)
@@ -302,7 +302,7 @@ function labelRules(args: readonly string[]): LabelRule[] {
  * The run's own labels, from `WF_LABELS`; `undefined` where the check was given none, which a run of an older Nemia does not. Refuses
  * a value that is no JSON object of strings.
  */
-function runLabels(): Record<string, string> | undefined {
+function runLabels() {
   const said = process.env.WF_LABELS;
   if (said === undefined) return undefined;
   const read = hinted<unknown>(said);
@@ -315,7 +315,7 @@ function runLabels(): Record<string, string> | undefined {
 }
 
 /** The labels the repository has, every page of them. */
-function repoLabels(): Set<string> {
+function repoLabels() {
   const names = gh('api', '--paginate', 'repos/{owner}/{repo}/labels?per_page=100', '--jq', '.[].name');
   return new Set(names.split(/\s*\n\s*/).filter(Boolean));
 }
@@ -324,10 +324,18 @@ function repoLabels(): Set<string> {
  * What `push --labels` has to set, worked out before anything is pushed: the labels the rules give the run, and every label a rule could
  * give; `undefined` where there is nothing to set. Refuses a label a rule gives that the repository lacks.
  */
-function labelPlan(rules: readonly LabelRule[], run: string): { want: Set<string>; givable: Set<string> } | { note: string } | undefined {
-  if (rules.length === 0) return undefined;
+function labelPlan(rules: readonly LabelRule[], run: string) {
+  if (rules.length === 0)
+    return undefined satisfies { want: Set<string>; givable: Set<string> } | { note: string } | undefined as
+      | { want: Set<string>; givable: Set<string> }
+      | { note: string }
+      | undefined;
   const ofRun = runLabels();
-  if (ofRun === undefined) return { note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives it" };
+  if (ofRun === undefined)
+    return { note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives it" } satisfies
+      | { want: Set<string>; givable: Set<string> }
+      | { note: string }
+      | undefined as { want: Set<string>; givable: Set<string> } | { note: string } | undefined;
   if (!rules.some((rule) => Object.hasOwn(ofRun, rule.key) && ofRun[rule.key] === rule.value))
     throw new PersonsRefusal(unmatched(rules, ofRun, run));
   const givable = new Set(rules.map((rule) => rule.label));
@@ -340,16 +348,19 @@ function labelPlan(rules: readonly LabelRule[], run: string): { want: Set<string
         'the step with `--recheck`',
     );
   const want = new Set(rules.filter((rule) => Object.hasOwn(ofRun, rule.key) && ofRun[rule.key] === rule.value).map((rule) => rule.label));
-  return { want, givable };
+  return { want, givable } satisfies { want: Set<string>; givable: Set<string> } | { note: string } | undefined as
+    | { want: Set<string>; givable: Set<string> }
+    | { note: string }
+    | undefined;
 }
 
 /**
  * Why a run whose labels match none of `rules` is refused: each key the rules read, the run's value of it and the values the rules take,
  * and the `nemia label run` that sets one. A pull request no rule labels fails a check that reads its labels, found out at the merge.
  */
-function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, run: string): string {
-  const has = (key: string): string => (Object.hasOwn(ofRun, key) ? `${key}=${ofRun[key]}` : `no ${key}`);
-  const takes = (key: string): string => `${key}=${rules.flatMap((rule) => (rule.key === key ? [rule.value] : [])).join('|')}`;
+function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, run: string) {
+  const has = (key: string) => (Object.hasOwn(ofRun, key) ? `${key}=${ofRun[key]}` : `no ${key}`);
+  const takes = (key: string) => `${key}=${rules.flatMap((rule) => (rule.key === key ? [rule.value] : [])).join('|')}`;
   const keys = [...new Set(rules.map((rule) => rule.key))].map((key) => `\n  the run has ${has(key)}; the rules take ${takes(key)}`);
   const fix = `\n  label the run with one, \`nemia label run ${run} <key>=<value> --overwrite\`, then type this again`;
   return `this run's labels match none of the factory's label rules, so its pull request would carry no label:${keys.join('')}${fix}`;
@@ -359,7 +370,7 @@ function unmatched(rules: readonly LabelRule[], ofRun: Record<string, string>, r
  * The labels of `pr` set to `want`, through REST (`issues/<n>/labels`) for the reason `edited` says: what it lacks of `want` added, and
  * what it carries of `givable` and not of `want` removed, a label no rule gives left as it is. The line that says what it set.
  */
-function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }): string {
+function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }) {
   const has = new Set((pr.labels ?? []).map((label) => label.name));
   const adding = [...plan.want].filter((label) => !has.has(label));
   const removing = [...has].filter((label) => plan.givable.has(label) && !plan.want.has(label));
@@ -372,7 +383,7 @@ function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }): 
 }
 
 /** The `statusCheckRollup` of `number`, as it is now. */
-function rollup(number: number): Entry[] {
+function rollup(number: number) {
   const text = gh('pr', 'view', String(number), '--json', 'statusCheckRollup');
   return parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${number}`, text).statusCheckRollup ?? [];
 }
@@ -381,20 +392,19 @@ function rollup(number: number): Entry[] {
 type Job = { id?: number; name?: string; status?: string; conclusion?: string | null; html_url?: string };
 
 /** The jobs of the workflow run `id`, its latest attempt's, as GitHub says; `undefined` where they cannot be read. */
-const jobsOf = (id: string): Job[] | undefined =>
-  hinted<{ jobs?: Job[] }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}/jobs`))?.jobs;
+const jobsOf = (id: string) => hinted<{ jobs?: Job[] }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}/jobs`))?.jobs;
 
 /**
  * `entry` as the jobs that failed it: itself where it names a job or no Actions run, and where it names only a run — the rollup entry of
  * a run started by `workflow_dispatch` links the run, not a job — that run's jobs that did not pass, read from GitHub, each as an entry
  * linking its job, so their logs are read as a `pull_request` run's are; itself still where none can be read.
  */
-function jobsFailing(entry: Entry): Entry[] {
+function jobsFailing(entry: Entry) {
   const id = runIdOf(entry);
   if (jobIdOf(entry) || !id) return [entry];
   const runUrl = linkOf(entry).replace(/(\/actions\/runs\/\d+).*$/, '$1');
   const failed = (jobsOf(id) ?? [])
-    .map((job): Entry => ({
+    .map((job) => ({
       name: job.name ?? '',
       workflowName: entry.workflowName,
       status: job.status?.toUpperCase(),
@@ -414,7 +424,7 @@ function jobsFailing(entry: Entry): Entry[] {
  * is read with the flag, and again without it where that read gives none, whatever gh said: no version is asked, and no refusal's words
  * are read.
  */
-function jobLog(id: string): Ran {
+function jobLog(id: string) {
   const at = `repos/{owner}/{repo}/actions/jobs/${id}/logs`;
   const flagged = read('api', at, '--allow-escape-sequences');
   return flagged.status === 0 && flagged.out.trim() ? flagged : read('api', at);
@@ -428,7 +438,7 @@ function jobLog(id: string): Ran {
  * URL a person reads it at. The `check` context itself, which may only gather the others, comes last. No agent of this
  * team may call `gh`, so this is the whole of what the next try is handed.
  */
-function why(entries: readonly Entry[], check: string): string[] {
+function why(entries: readonly Entry[], check: string) {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED).flatMap(jobsFailing);
   const jobs = new Map<string, Entry>();
   const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
@@ -472,7 +482,7 @@ const TIME_LIMIT = /has exceeded the maximum execution time/;
 /** Whether GitHub cut the job `id` off at its time limit, by its check run's annotations, read once per job; unread, it was not. */
 const cutOff = (() => {
   const known = new Map<string, boolean>();
-  return (id: string): boolean => {
+  return (id: string) => {
     const was = known.get(id);
     if (was !== undefined) return was;
     const notes = hinted<unknown>(read('api', `repos/{owner}/{repo}/check-runs/${id}/annotations?per_page=100`));
@@ -489,7 +499,7 @@ const cutOff = (() => {
  * conclusion for it, `TIMED_OUT`: a red, the work's, re-run once as any red, since a test that hangs is the change's to answer. A
  * cancelled entry without the mark, or that names no job, stays cancelled, a person's.
  */
-const timedOut = (entries: readonly Entry[], check: string): Entry[] =>
+const timedOut = (entries: readonly Entry[], check: string) =>
   entries.map((entry) => {
     const id = jobIdOf(entry);
     const cancelled = nameOf(entry) === check && !pending(entry) && verdict(entry) === 'CANCELLED';
@@ -497,7 +507,7 @@ const timedOut = (entries: readonly Entry[], check: string): Entry[] =>
   });
 
 /** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
-function openArgs(args: string[]): { title: string; bodyFile: string; rules: LabelRule[] } {
+function openArgs(args: string[]) {
   const opts = new Map<string, string>();
   for (let i = 0; i < args.length; i += 2) opts.set(args[i] ?? '', args[i + 1] ?? '');
   const [title, bodyFile, labels] = ['--title', '--body-file', '--labels'].map((flag) => opts.get(flag));
@@ -510,7 +520,7 @@ function openArgs(args: string[]): { title: string; bodyFile: string; rules: Lab
 }
 
 /** The branch, the run it names and its leaf, with the remote's default branch, every guard of the act passed. */
-function placed(): { branch: string; run: string; leaf: string; onto: string } {
+function placed() {
   const named = branchOf();
   origin();
   authed(OPENING, PersonsRefusal);
@@ -528,7 +538,7 @@ function placed(): { branch: string; run: string; leaf: string; onto: string } {
  * query asks for the pull request's project cards, which GitHub refuses since it deprecated Projects (classic), so it fails on a
  * pull request this script has every right to edit. `-F body=@<file>` has `gh` read the file, as `--body-file` did.
  */
-function edited(n: number, title: string, bodyFile: string): void {
+function edited(n: number, title: string, bodyFile: string) {
   gh('api', '-X', 'PATCH', `repos/{owner}/{repo}/pulls/${n}`, '-f', `title=${title}`, '-F', `body=@${bodyFile}`);
 }
 
@@ -536,37 +546,43 @@ function edited(n: number, title: string, bodyFile: string): void {
  * `open`: the branch pushed and the pull request opened or brought up to date, labelled by the rules from the run's labels, and its
  * address last, for the closeout. Every refusal of the labels comes before the push.
  */
-function open(args: string[]): string[] {
+function open(args: string[]) {
   const { title, bodyFile, rules } = openArgs(args);
   const { branch, run, onto } = placed();
   const plan = labelPlan(rules, run);
   const already = pulls(branch);
   const standing = already.length ? sole(already, branch, onto) : undefined;
   const said = [pushing(branch)];
-  const labelling = (pr: () => Pr): string[] => (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]);
+  const labelling = (pr: () => Pr) =>
+    (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]) satisfies string[] as string[];
   if (standing) {
     edited(standing.number, title, bodyFile);
     const updated = `#${standing.number} brought up to date with the title and body you wrote`;
-    return [...said, updated, ...labelling(() => standing), standing.url];
+    return [...said, updated, ...labelling(() => standing), standing.url] satisfies string[] as string[];
   }
   const printed = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile);
   const url = printed.split('\n').at(-1)?.trim() ?? '';
   const number = Number(/\/pull\/(\d+)$/.exec(url)?.[1]);
   const made: Pr = { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] };
-  return [...said, 'opened', ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))), url];
+  return [
+    ...said,
+    'opened',
+    ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))),
+    url,
+  ] satisfies string[] as string[];
 }
 
 /**
  * The one open pull request of `branch`, read again until its head is `at` or the bound is out: GitHub reports the head of a push a
  * moment after it, so the first read after a push that landed can still name the commit before it. Refuses a head that stays elsewhere.
  */
-function headed(branch: string, onto: string, at: string): Pr {
+function headed(branch: string, onto: string, at: string) {
   const whole = seconds('WF_PR_HEAD_SECONDS', HEAD_SECONDS);
   const poll = seconds('WF_PR_HEAD_POLL_SECONDS', HEAD_POLL_SECONDS);
   const began = Date.now();
   for (;;) {
     const pr = sole(pulls(branch), branch, onto);
-    if (pr.headRefOid === at) return pr;
+    if (pr.headRefOid === at) return pr satisfies Pr as Pr;
     const secs = Math.round((Date.now() - began) / 1000);
     if (Date.now() - began >= whole * 1000)
       throw new Refusal(
@@ -582,7 +598,7 @@ function headed(branch: string, onto: string, at: string): Pr {
  * `push [--labels "<rules>"]`: the commit CI judges made the commit the check judges, proven by the pull request's head, and the pull
  * request labelled by the rules from the run's labels. Every refusal of the labels comes before the push.
  */
-function push(args: string[]): string[] {
+function push(args: string[]) {
   const rules = labelRules(args);
   const { branch, run, onto } = placed();
   const plan = labelPlan(rules, run);
@@ -590,8 +606,8 @@ function push(args: string[]): string[] {
   const at = head();
   const pr = headed(branch, onto, at);
   const proven = `#${pr.number} is at ${at.slice(0, 12)}, the commit this check judges: ${pr.url}`;
-  if (plan === undefined) return [said, proven];
-  return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)];
+  if (plan === undefined) return [said, proven] satisfies string[] as string[];
+  return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)] satisfies string[] as string[];
 }
 
 /** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`); apart: it is spread whole. */
@@ -604,7 +620,7 @@ type Rest = Partial<Record<string, string>>;
  * status at all. Each read goes through `read`, so a failure is no throw: a read that fails gives no entries. Apart from `landing.ts`'s
  * on purpose: the base's red here is a hint, never a verdict.
  */
-function entriesAt(sha: string): Entry[] {
+function entriesAt(sha: string) {
   const at = `repos/{owner}/{repo}/commits/${sha}`;
   const runs = hinted<{ check_runs?: Rest[] }>(read('api', `${at}/check-runs?per_page=100`))?.check_runs ?? [];
   const statuses = hinted<{ statuses?: Rest[] }>(read('api', `${at}/status`))?.statuses ?? [];
@@ -616,7 +632,7 @@ function entriesAt(sha: string): Entry[] {
  * base): that it is, the base's jobs that did not pass, and how to read the head's lines against them. A hint, never a verdict: a read
  * that fails, or a base pending, green or with no `check`, adds nothing, and the refusal is as it was.
  */
-function baseRed(pr: Pr, onto: string, check: string): string[] {
+function baseRed(pr: Pr, onto: string, check: string) {
   const sha = hinted<{ merge_base_commit?: Rest }>(read('api', `repos/{owner}/{repo}/compare/${onto}...${pr.headRefOid}`))
     ?.merge_base_commit?.sha;
   const entries = sha ? entriesAt(sha) : [];
@@ -634,7 +650,7 @@ function baseRed(pr: Pr, onto: string, check: string): string[] {
  * the base `onto` says of it (`baseRed`), why, and what to type next; `rerun`, the lines that say what was re-run and how it ended, or
  * why nothing was, after its first line.
  */
-const redly = (pr: Pr, check: string, ours: Entry[], entries: Entry[], retry: string, onto: string, rerun: string[] = []): string =>
+const redly = (pr: Pr, check: string, ours: Entry[], entries: Entry[], retry: string, onto: string, rerun: string[] = []) =>
   [
     `\`${check}\` for #${pr.number} is ${ours.map(verdict).join(', ').toLowerCase()}, so this round is red where it is judged.`,
     ...rerun,
@@ -645,10 +661,10 @@ const redly = (pr: Pr, check: string, ours: Entry[], entries: Entry[], retry: st
   ].join('\n');
 
 /** How a CI entry not over stands, lower-cased; one over, whose re-run GitHub has not shown yet, is awaiting it. */
-const stateOf = (entry: Entry): string => (pending(entry) ? (entry.status ?? entry.state ?? '').toLowerCase() : 'awaiting its re-run');
+const stateOf = (entry: Entry) => (pending(entry) ? (entry.status ?? entry.state ?? '').toLowerCase() : 'awaiting its re-run');
 
 /** The refusal of a CI context `check` that never came, or never finished, within the bound the wait carries. */
-function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: Entry[], secs: number, tail: string[]): string {
+function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: Entry[], secs: number, tail: string[]) {
   const checks = `${pr.url}/checks`;
   if (seen === 'pending')
     return [
@@ -669,7 +685,7 @@ function unanswered(seen: Seen, pr: Pr, check: string, ours: Entry[], entries: E
  * The one open pull request of `branch`, read again while GitHub says its `mergeable` is `UNKNOWN` and the bound is not out; refuses one
  * GitHub says is `CONFLICTING`, naming the merge that answers it. Any other answer, `UNKNOWN` to the end included, is waited on as before.
  */
-function unconflicted(branch: string, onto: string, check: string, began: number, retry: string): Pr {
+function unconflicted(branch: string, onto: string, check: string, began: number, retry: string) {
   const whole = seconds('WF_PR_MERGEABLE_SECONDS', MERGEABLE_SECONDS);
   const poll = seconds('WF_PR_MERGEABLE_POLL_SECONDS', MERGEABLE_POLL_SECONDS);
   for (;;) {
@@ -695,7 +711,7 @@ function unconflicted(branch: string, onto: string, check: string, began: number
  * verdict — until the wait's whole bound since `began` (`WF_CI_WAIT_SECONDS`), where the last error is a person's refusal. A person's
  * refusal, such as no `gh` at all, stands at once.
  */
-function retried<T>(what: string, value: () => T, began: number, retry: string): T {
+function retried<T>(what: string, value: () => T, began: number, retry: string) {
   for (;;) {
     try {
       return value();
@@ -723,7 +739,7 @@ type Dispatch = { dispatched: string[]; refused: string[]; lines: string[] };
  * The workflow file of the run `id`, by the name `gh workflow run` takes (the last part of the path GitHub gives the run), as GitHub says;
  * `undefined` where it cannot be read.
  */
-function fileOf(id: string): string | undefined {
+function fileOf(id: string) {
   const at = hinted<{ path?: string }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}`))?.path;
   return at ? (at.split('@')[0] ?? at).split('/').pop() : undefined;
 }
@@ -733,15 +749,15 @@ function fileOf(id: string): string | undefined {
  * `required: true`. Read by indentation, as no YAML parser is beside this script; a file it cannot read so gives none, and the command
  * it is told then is one GitHub refuses naming the input it lacks.
  */
-function requiredInputs(yaml: string): string[] {
+function requiredInputs(yaml: string) {
   const lines = yaml.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
-  const indent = (line: string): number => line.search(/\S/);
-  const under = (at: number): number[] => {
+  const indent = (line: string) => line.search(/\S/);
+  const under = (at: number) => {
     const out: number[] = [];
     for (let i = at + 1; i < lines.length && indent(lines[i] ?? '') > indent(lines[at] ?? ''); i++) out.push(i);
     return out;
   };
-  const key = (at: number, word: string): boolean => new RegExp(`^\\s*${word}:\\s*(?:#.*)?$`).test(lines[at] ?? '');
+  const key = (at: number, word: string) => new RegExp(`^\\s*${word}:\\s*(?:#.*)?$`).test(lines[at] ?? '');
   const dispatch = lines.findIndex((_, at) => key(at, 'workflow_dispatch'));
   const inputs = dispatch === -1 ? undefined : under(dispatch).find((at) => key(at, 'inputs'));
   const listed = inputs === undefined ? [] : under(inputs);
@@ -767,7 +783,7 @@ function requiredInputs(yaml: string): string[] {
  * jobs cannot be read is not dispatched, and a dispatch GitHub refuses (no `workflow_dispatch` trigger, a required input, a token that
  * may not) names the stuck run and the command a person types, with `-f` for each input the file requires; each said in a line.
  */
-function dispatchStuck(sha: string, branch: string): Dispatch {
+function dispatchStuck(sha: string, branch: string) {
   const runs = hinted<Listed[]>(read('run', 'list', '--commit', sha, '--json', 'databaseId,workflowName,status,event'));
   if (!Array.isArray(runs))
     return { dispatched: [], refused: [], lines: [`  not dispatched: the workflow runs of ${sha.slice(0, 12)} could not be read`] };
@@ -812,7 +828,7 @@ function dispatchStuck(sha: string, branch: string): Dispatch {
 }
 
 /** The CI context `wait` reads, from `--check <name>`; refuses a wait given none, or given anything else. */
-function checkOf(args: readonly string[]): string {
+function checkOf(args: readonly string[]) {
   const [flag, name, ...rest] = args;
   if (flag !== '--check' || !name || name.startsWith('--') || rest.length)
     throw new PersonsRefusal(
@@ -823,17 +839,17 @@ function checkOf(args: readonly string[]): string {
 }
 
 /** Whether the wait looks for the head's runs GitHub never started: its context still absent once `stuck` seconds since `began` are out. */
-const dispatchDue = (seen: Seen, began: number, stuck: number): boolean => seen === 'absent' && Date.now() - began >= stuck * 1000;
+const dispatchDue = (seen: Seen, began: number, stuck: number) => seen === 'absent' && Date.now() - began >= stuck * 1000;
 
 /**
  * The refusal of a context with no verdict where the wait stops, `say` given its tail: the work's while a re-run it asked still runs, since
  * the next check reads that verdict, else the person's; each with `said` and the retry line after it.
  */
-const stalled = (rerun: Rerun | undefined, said: string[], retry: string, say: (tail: string[]) => string): Refusal =>
+const stalled = (rerun: Rerun | undefined, said: string[], retry: string, say: (tail: string[]) => string) =>
   rerun?.runs.length ? new Refusal(say([...said, RERUNNING, retry])) : new PersonsRefusal(say([...said, retry]));
 
 /** What the wait dispatched, then what it re-ran and how each job ended the second time; nothing where it asked neither. */
-const waitSaid = (dispatch: Dispatch | undefined, rerun: Rerun | undefined, entries: readonly Entry[]): string[] => [
+const waitSaid = (dispatch: Dispatch | undefined, rerun: Rerun | undefined, entries: readonly Entry[]) => [
   ...(dispatch?.lines ?? []),
   ...rerunSaid(rerun, entries),
 ];
@@ -842,13 +858,13 @@ const waitSaid = (dispatch: Dispatch | undefined, rerun: Rerun | undefined, entr
  * The seconds a context still absent is waited on before the head's runs GitHub never started are looked for (`dispatchStuck`): half the
  * start bound `start`, within it; `WF_CI_STUCK_SECONDS` sets it for a test.
  */
-const stuckSeconds = (start: number): number => Math.min(seconds('WF_CI_STUCK_SECONDS', start / 2), start);
+const stuckSeconds = (start: number) => Math.min(seconds('WF_CI_STUCK_SECONDS', start / 2), start);
 
 /**
  * The seconds the wait waited when it stops on a context with no verdict: `bound`, once it is out, or at once where every dispatch it asked
  * GitHub refused, since nothing is then to come and the person's command is said now; `undefined` while it waits on.
  */
-function stopsAt(began: number, bound: number, dispatch: Dispatch | undefined): number | undefined {
+function stopsAt(began: number, bound: number, dispatch: Dispatch | undefined) {
   const waited = Date.now() - began;
   if (waited >= bound * 1000) return bound;
   return dispatch?.refused.length && !dispatch.dispatched.length ? Math.floor(waited / 1000) : undefined;
@@ -860,7 +876,7 @@ function stopsAt(began: number, bound: number, dispatch: Dispatch | undefined): 
  * dispatched once on the branch (`dispatchStuck`), waited on within the same start bound; its refusal says why CI went red, and what the
  * re-run or the dispatch did.
  */
-function wait(args: string[]): string[] {
+function wait(args: string[]) {
   const check = checkOf(args);
   const { branch, run: ofRun, onto } = placed();
   const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
@@ -893,7 +909,7 @@ function wait(args: string[]): string[] {
  * the round's check waits on its context, and refuses, exit 1, where neither declares one, so the check judges the round by the factory's
  * local check in place of a wait on a context that will not come. The base is read only where the head declares none.
  */
-function declaresCiAtHead(args: string[]): string[] {
+function declaresCiAtHead(args: string[]) {
   if (args.length) throw new Refusal(`declares-ci takes nothing, and was given ${args.join(' ')}: type it alone`);
   if (declaresCi(workflowsAt('HEAD'))) return ['HEAD declares a CI workflow in .github/workflows: its context judges the round'];
   const onto = base('the round', gh);
@@ -909,8 +925,7 @@ function declaresCiAtHead(args: string[]): string[] {
 }
 
 /** The paths under `.github/workflows` in the tree of `rev`, a revision of this checkout. */
-const workflowsAt = (rev: string): string[] =>
-  git(`the files of ${rev}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
+const workflowsAt = (rev: string) => git(`the files of ${rev}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
 
 /** The verbs, by name, each with the tag its lines are printed under. */
 const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> = {
@@ -924,7 +939,7 @@ const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> 
  * The whole run: exit 0 with what was done on stdout, or the refusal on stderr, each line under the verb's tag, with 78 for a person's
  * (`PERSONS_EXIT`) and 1 for any other.
  */
-function main(): number {
+function main() {
   const [verb = '', ...args] = process.argv.slice(2);
   const named = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;
   const tag = named?.tag ?? 'nemia pr';

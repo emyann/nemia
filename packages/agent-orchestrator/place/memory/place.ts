@@ -65,16 +65,16 @@ export const declared: PlaceDeclared = {
 export type TestPlace = { readonly place: Place; readonly layer: Layer.Layer<PlaceService>; readonly world: World };
 
 /** A new test place, which holds nothing yet and shares nothing with another. */
-export function testPlace(): TestPlace {
+export function testPlace() {
   const held: Held = { repositories: new Map(), made: 0 };
-  const askNow = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]): PlaceOutcome<V> => {
+  const askNow = <V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) => {
     try {
       const reply = VERBS[verb](held, request);
-      return 'refused' in reply ? { refused: reply.refused } : { answer: reply };
+      return ('refused' in reply ? { refused: reply.refused } : { answer: reply }) satisfies PlaceOutcome<V> as PlaceOutcome<V>;
     } catch (threw) {
-      return unreadNow(verb, threwWords(verb, threw));
+      return unreadNow(verb, threwWords(verb, threw)) satisfies PlaceOutcome<V> as PlaceOutcome<V>;
     }
   };
   const place: Place = { declared, askNow, ask: (verb, request) => Effect.sync(() => askNow(verb, request)) };
-  return { place, layer: PlaceService.layer(place), world: worldOf(held) };
+  return { place, layer: PlaceService.layer(place), world: worldOf(held) } satisfies TestPlace as TestPlace;
 }

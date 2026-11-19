@@ -19,7 +19,7 @@ const standing = (canvasElement: HTMLElement) => canvasElement.querySelector('[d
  * @param canvasElement The story's canvas.
  * @param names The levels' names, the page's own last.
  */
-async function expectLevels(canvasElement: HTMLElement, names: readonly string[]): Promise<void> {
+async function expectLevels(canvasElement: HTMLElement, names: readonly string[]) {
   const trail = within(canvasElement).getByRole('navigation', { name: 'Where you are' });
   await waitFor(() =>
     expect(
@@ -39,7 +39,7 @@ async function expectLevels(canvasElement: HTMLElement, names: readonly string[]
  * @param name The level's name.
  * @param at The address it leads to.
  */
-async function climbTo(canvasElement: HTMLElement, name: string, at: string): Promise<void> {
+async function climbTo(canvasElement: HTMLElement, name: string, at: string) {
   await userEvent.click(within(canvasElement).getByRole('link', { name }));
   await waitFor(() => expect(standing(canvasElement)).toBe(at));
 }

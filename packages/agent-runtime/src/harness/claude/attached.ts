@@ -36,7 +36,7 @@ import { elapsedMs, purseOf, type Purse } from '../../core/clock.ts';
 import { capLeft, capSpent } from '../../core/cap.ts';
 import type { Sighting, Usage } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
-import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
+import type { RunnerOps, SpawnRequest } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
 import { claudeStreamOutput } from '../detached/output.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
@@ -122,7 +122,7 @@ const LET_GO_CALLS_SHARE = 0.8;
  *
  * @returns whether it was over within `ms`
  */
-const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
+const waitedOut = (over: () => boolean, ms: number) =>
   Effect.repeat(Effect.sync(over), { schedule: Schedule.spaced(LET_GO_EVERY_MS), until: (done) => done }).pipe(
     Effect.timeoutOption(ms),
     Effect.map(Option.isSome),
@@ -132,10 +132,8 @@ const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
  * A failure of what `what` says — an ask of a session's this holder sends and does not wait on — recorded as a warning, with its
  * cause, by the program whose services are `context`: what failed is said, never dropped.
  */
-const recorded =
-  (context: Context.Context<never>, what: string) =>
-  (cause: unknown): void =>
-    void Effect.runForkWith(context)(Effect.logWarning(`${what}: ${cause instanceof Error ? cause.message : String(cause)}`, cause));
+const recorded = (context: Context.Context<never>, what: string) => (cause: unknown) =>
+  void Effect.runForkWith(context)(Effect.logWarning(`${what}: ${cause instanceof Error ? cause.message : String(cause)}`, cause));
 
 /** What the capture of the session under `name` says, as a job's stream is read. */
 const saidBy = (root: string, name: string) => {
@@ -151,7 +149,7 @@ const saidBy = (root: string, name: string) => {
  * session printed, which the resumed one's own result prints on in its. None found: nothing, and the measure is dropped, never
  * counted twice (`lessCarried`).
  */
-const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun['carried']> => {
+const carriedFrom = (root: string, resumeFrom: string) => {
   const parent = [...everyRun(root).values()]
     .filter((r) => r.sessionId === resumeFrom)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
@@ -162,11 +160,13 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
  * What the attempt of `run` has spent so far, as its capture `told` says it: the last result's running totals, the parent's it
  * carried on taken off (`lessCarried`). What a sighting counts, and what a take-up takes off the cap.
  */
-const ownUsage = (told: ReturnType<typeof saidBy>, run: AttachedRun): Usage | undefined =>
-  told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage;
+const ownUsage = (told: ReturnType<typeof saidBy>, run: AttachedRun) =>
+  (told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage) satisfies Usage | undefined as
+    | Usage
+    | undefined;
 
 /** The spend cap a run file's request asked for, where it asked one. */
-const capOf = (run: AttachedRun): number | undefined => {
+const capOf = (run: AttachedRun) => {
   const cap = (run.request as { config?: { budgetUsd?: unknown } }).config?.budgetUsd;
   return typeof cap === 'number' ? cap : undefined;
 };
@@ -175,7 +175,7 @@ const capOf = (run: AttachedRun): number | undefined => {
  * What a holder taking `run` up resumes it with: the request its run file kept, its brief left out and its cap what is left of it
  * (`capLeft`); the run file keeps the whole cap, for the next take-up to count from. Nothing where its attempt has spent its cap.
  */
-const resumedRequest = (root: string, run: AttachedRun): SpawnRequest | undefined => {
+const resumedRequest = (root: string, run: AttachedRun) => {
   const left = capLeft(capOf(run), ownUsage(saidBy(root, run.name), run)?.costUsd);
   if (capSpent(left)) return undefined;
   const request = run.request as Omit<SpawnRequest, 'brief'>;
@@ -192,7 +192,7 @@ const resumedRequest = (root: string, run: AttachedRun): SpawnRequest | undefine
  * its idle session is open (`idleOf`); with its holder gone it is one the harness is taking up again (`respawning`), and is not
  * restarted under its feet. A session that has ended says nothing of a process, as it did before.
  */
-const sightingOf = (root: string, run: AttachedRun): Sighting => {
+const sightingOf = (root: string, run: AttachedRun) => {
   const told = saidBy(root, run.name);
   const { denials, usage: _, ownTokens: __, ...said } = told;
   const own = ownUsage(told, run);
@@ -213,14 +213,14 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(run.limit ? { limit: run.limit } : {}),
     ...(run.memory ? { memory: run.memory } : {}),
     ...asksOf(root, run),
-  };
+  } satisfies Sighting;
 };
 
 /**
  * What a session's sighting says it is held at, while its holder holds it under a drain: since when a new call waits at its hook and
  * after which call (`hold`), or, cut by the sessions' drain and waiting for its lift, since the cut, after no call.
  */
-const heldBackOf = (run: AttachedRun): Pick<Sighting, 'heldBack'> => {
+const heldBackOf = (run: AttachedRun) => {
   if (run.state !== 'working') return {};
   if (run.hold) return { heldBack: run.hold };
   return run.cut ? { heldBack: { since: run.cut.since } } : {};
@@ -231,34 +231,34 @@ const heldBackOf = (run: AttachedRun): Pick<Sighting, 'heldBack'> => {
  * (`openAsks`) and those whose call took an answer (`asksTaken`). Nothing at all for a session that may ask nobody, so a sighting says
  * `asks` only where the harness can hold one.
  */
-const asksOf = (root: string, run: AttachedRun): Pick<Sighting, 'asks' | 'asksTaken'> => {
+const asksOf = (root: string, run: AttachedRun) => {
   if ((run.request as { config?: { mayAsk?: unknown } }).config?.mayAsk !== true) return {};
   const taken = asksTaken(root, run.name);
   return { asks: openAsks(root, run.name), ...(taken.length ? { asksTaken: taken } : {}) };
 };
 
 /** Whether a holder takes `run` up: parked, or at work under a process that is gone, its pid taken by another since included. */
-const orphaned = (run: AttachedRun): boolean => run.state === 'parked' || (isOpen(run.state) && holderGone(run));
+const orphaned = (run: AttachedRun) => run.state === 'parked' || (isOpen(run.state) && holderGone(run));
 
 /**
  * What a resumed session is told first, by its run file: which call did not finish, where one was in flight when its holder ended or
  * cut it at its bound (`crashNote`), or where the sessions' drain cut it and it was let go before the lift (`cutWords`), else that it
  * was paused between two calls (`CARRY_ON`).
  */
-const noteOf = (run: AttachedRun): string => (run.calling ? crashNote(run.calling.tool) : run.cut ? cutWords(run.cut.tool) : CARRY_ON);
+const noteOf = (run: AttachedRun) => (run.calling ? crashNote(run.calling.tool) : run.cut ? cutWords(run.cut.tool) : CARRY_ON);
 
 /**
  * How many calls of `l` are in flight doing work: those of its calls that are not waiting on a person (`Live.asking`). A call held
  * open for a person to answer is not work a let-go waits for — nothing of it will finish until someone answers, and the park cuts it
  * and leaves the answer to be said as words.
  */
-const workingIn = (l: Live): number => [...(l.calls?.keys() ?? [])].filter((id) => l.asking?.has(id) !== true).length;
+const workingIn = (l: Live) => [...(l.calls?.keys() ?? [])].filter((id) => l.asking?.has(id) !== true).length;
 
 /** The sessions of `live` at work with a call in flight. */
-const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter((l) => workingIn(l) > 0 && l.run.state === 'working');
+const inCallOf = (live: Map<string, Live>) => [...live.values()].filter((l) => workingIn(l) > 0 && l.run.state === 'working');
 
 /** The tool of the call `l` is in, as a line names it. */
-const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
+const toolOf = (l: Live) => l.run.calling?.tool ?? 'a tool';
 
 /**
  * Each session of `live` at work, or idle between a long-lived session's turns, written `parked`, its file its holder's last word;
@@ -269,7 +269,7 @@ const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
  * the process's facts until `ended` takes them off, so a holder that dies before then leaves the next holder what it kills.
  * Uninterruptible as one: a second signal leaves no session neither parked nor running.
  */
-const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
+const parked = (root: string, live: Map<string, Live>, cut: boolean) =>
   Effect.flatMap(Effect.context(), (context) =>
     Effect.sync(() => {
       for (const l of live.values()) {
@@ -297,7 +297,7 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
  * one `childOf` answers, so a pid another process has taken since is left alone, and a run file another holder has taken since is
  * not written. Uninterruptible as one, like the park.
  */
-const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
+const ended = (root: string, live: Map<string, Live>) =>
   Effect.sync(() => {
     for (const l of live.values()) {
       if (!l.abort || !l.letGo || l.run.state !== 'parked') continue;
@@ -334,7 +334,7 @@ export const letGoOf = (
   letGoMs: number,
   purse: Purse = purseOf(letGoMs, instantNow),
   callsShare: number = LET_GO_CALLS_SHARE,
-): Effect.Effect<void> =>
+) =>
   Effect.gen(function* () {
     const waited = inCallOf(live);
     if (waited.length)
@@ -368,7 +368,7 @@ const adoptIn =
     stopped: (run: AttachedRun) => boolean,
     gonePollMs: number,
   ) =>
-  async (run: AttachedRun): Promise<void> => {
+  async (run: AttachedRun) => {
     cutAsks(root, run.name);
     const child = childOf(run);
     killGroup(child);
@@ -392,7 +392,7 @@ const adoptIn =
  * — the run stopped, never named its session, spent its cap, or was refused — so the next look reads the run's file as it was written,
  * and holds no entry with no session behind it.
  */
-const leftUnheld = (live: Map<string, Live>, placeholder: Live): void => {
+const leftUnheld = (live: Map<string, Live>, placeholder: Live) => {
   if (live.get(placeholder.run.name) === placeholder) live.delete(placeholder.run.name);
 };
 
@@ -401,7 +401,7 @@ const leftUnheld = (live: Map<string, Live>, placeholder: Live): void => {
  * through the SDK (`interruptTurn`) and the file dropped once that was sent. A send that failed is `record`ed, and asked again on the
  * next look, the file left.
  */
-const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, record: (cause: unknown) => void): void => {
+const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, record: (cause: unknown) => void) => {
   const file = filesOf(root, run.name).interrupt;
   if (at === undefined || !fs.existsSync(file)) return;
   if (run.state !== 'working') return fs.rmSync(file, { force: true });
@@ -428,7 +428,7 @@ export const attachedSessions = (
   root: string,
   executable?: string,
   options: { letGoMs?: number; callsShare?: number; holdPollMs?: number; gonePollMs?: number; harnessBin?: string } & ScopeAt = {},
-): Attached => {
+) => {
   const live = new Map<string, Live>();
   const { letGoMs = LET_GO_MS, callsShare = LET_GO_CALLS_SHARE, holdPollMs = HELD_POLL_MS, gonePollMs = GONE_POLL_MS } = options;
   let holding = false;
@@ -448,7 +448,7 @@ export const attachedSessions = (
 
   const adopt = adoptIn(root, start, stopped, gonePollMs);
 
-  const paused = (at: Live): void => {
+  const paused = (at: Live) => {
     if (!at.abort || at.letGo) return;
     const drain = sessionsDrain();
     if (drain === null) return toldCut(root, at);
@@ -457,9 +457,9 @@ export const attachedSessions = (
     void cutTurn(root, at, toolOf(at)).catch(recorded(context, `${at.run.name}'s call was not cut past its drain's grace`));
   };
 
-  const looked = (run: AttachedRun): AttachedRun => {
+  const looked = (run: AttachedRun) => {
     const at = live.get(run.name);
-    if (!holding) return run;
+    if (!holding) return run satisfies AttachedRun;
     if (at?.abort && stopped(run) && isOpen(at.run.state)) at.abort.abort();
     interruptAsked(root, at, run, recorded(context, `${run.name}'s turn was not interrupted as asked; the next look asks again`));
     if (at) paused(at);
@@ -473,16 +473,16 @@ export const attachedSessions = (
           live.delete(run.name);
           recorded(context, `${run.name} was not taken up; the next look takes it up again`)(cause);
         });
-      return { ...run, state: 'working' };
+      return { ...run, state: 'working' } satisfies AttachedRun;
     }
-    return run;
+    return run satisfies AttachedRun;
   };
 
-  const runs = (names?: readonly string[]): Map<string, Sighting> => {
+  const runs = (names?: readonly string[]) => {
     const found = names
       ? new Map(names.flatMap((n) => [readRun(filesOf(root, n).run) ?? []].flat().map((r) => [n, r] as const)))
       : everyRun(root);
-    return new Map([...found].map(([name, run]) => [name, sightingOf(root, looked(run))]));
+    return new Map([...found].map(([name, run]) => [name, sightingOf(root, looked(run))])) satisfies Map<string, Sighting>;
   };
 
   const letGo = Effect.gen(function* () {
@@ -507,7 +507,7 @@ export const attachedSessions = (
     has: (name) => fs.existsSync(filesOf(root, name).run),
     following: pushes.following,
     ops: { ...opsOf(root, live, start, runs, pushes), release: releaseOn(root) },
-  };
+  } satisfies Attached as Attached;
 };
 
 /**
@@ -516,9 +516,8 @@ export const attachedSessions = (
  * is what it is thrown as (`Refusal`, carried out as `refused: true`): nothing of it will change by asking again, and the verb above
  * tells a refusal from a send that may yet pass by that mark alone (`answerVerbOf`, `AnswerRefused` against `AnswerUnsent`).
  */
-const answerOn =
-  (root: string): NonNullable<RunnerOps['answer']> =>
-  (session, given) =>
+const answerOn = (root: string) =>
+  ((session, given) =>
     Effect.try({
       try: () => {
         const run = readRun(filesOf(root, session.name).run);
@@ -531,7 +530,7 @@ const answerOn =
         appendAnswer(root, session.name, { id: given.id, at: new Date().toISOString(), answers: given.answers });
       },
       catch: failed('answer'),
-    });
+    })) satisfies NonNullable<RunnerOps['answer']>;
 
 /** Why a verb failed, as the runner's error, a `Refusal` of it carried out as the refusal it is. */
 const failed = (verb: string) => (cause: unknown) =>
@@ -548,9 +547,8 @@ const ENDED: readonly AttachedRun['state'][] = ['completed', 'failed', 'canceled
  * The holder's `release`: of a session that has ended (`ENDED`), what is left in its scope (`scopeLeft`) killed, failing while it
  * held anything, so the engine asks again on its next pass and lets the session go once its scope is empty.
  */
-const releaseOn =
-  (root: string): NonNullable<RunnerOps['release']> =>
-  (session) =>
+const releaseOn = (root: string) =>
+  ((session) =>
     Effect.try({
       try: () => {
         const run = readRun(filesOf(root, session.sessionId).run);
@@ -564,7 +562,15 @@ const releaseOn =
         );
       },
       catch: failed('release'),
-    });
+    })) satisfies NonNullable<RunnerOps['release']>;
+
+/**
+ * The refusal of an interrupt of session `name`, which is not answering: there is no turn to end.
+ * @param name The session's name.
+ * @param run Its run file as read, or undefined where it is no attached session.
+ */
+const noTurnToEnd = (name: string, run: AttachedRun | undefined) =>
+  new Error(`\`${name}\` is ${run ? run.state : 'not an attached session'}, so it has no turn to end. Interrupt it while it answers.`);
 
 /**
  * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is
@@ -578,77 +584,75 @@ const opsOf = (
   start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
   runs: (names?: readonly string[]) => Map<string, Sighting>,
   pushes: Pushes,
-): Omit<Attached['ops'], 'release'> => ({
-  spawn: (r) =>
-    Effect.try({
-      try: () => {
-        const { out, stop, interrupt, say, mcp, asks, answers } = filesOf(root, r.name);
-        for (const f of [out, stop, interrupt, say, mcp, asks, answers]) fs.rmSync(f, { force: true });
-        const run: AttachedRun = {
-          name: r.name,
-          state: 'working',
-          ...thisHolder(),
-          startedAt: new Date().toISOString(),
-          ...(r.resumeFrom ? { carried: carriedFrom(root, r.resumeFrom) } : {}),
-          request: keptRequest(r),
-        };
-        start(r, run, r.brief, r.resumeFrom);
-      },
-      catch: failed('spawn'),
-    }),
-  observe: Effect.sync(() => runs()),
-  observeFor: (expected) => Effect.sync((): Observation => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() })),
-  stop: (name) =>
-    Effect.try({
-      try: () => {
-        fs.writeFileSync(filesOf(root, name).stop, String(process.pid));
-        live.get(name)?.abort?.abort();
-      },
-      catch: failed('stop'),
-    }),
-  logs: (name) =>
-    Effect.try({
-      try: () => {
-        const run = readRun(filesOf(root, name).run);
-        return `${run?.state ?? 'unknown'}${run?.sessionId ? ` ${run.sessionId}` : ''}${run?.calling ? `, calling ${run.calling.tool}` : ''}`;
-      },
-      catch: failed('logs'),
-    }),
-  transcript: (name, after) =>
-    Effect.tryPromise({
-      try: () => {
-        const id = readRun(filesOf(root, name).run)?.sessionId;
-        return readTranscript(id ? claudeTranscriptFile(id) : undefined, after, claudeTranscriptEvents);
-      },
-      catch: failed('transcript'),
-    }),
-  interrupt: (session) =>
-    Effect.tryPromise({
-      try: async () => {
-        const { run: file, interrupt } = filesOf(root, session.name);
-        const run = readRun(file);
-        if (run?.state !== 'working')
-          throw new Error(
-            `\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so it has no turn to end. Interrupt it while it answers.`,
-          );
-        fs.writeFileSync(interrupt, String(process.pid));
-        if (await interruptTurn(live.get(session.name))) fs.rmSync(interrupt, { force: true });
-      },
-      catch: failed('interrupt'),
-    }),
-  follow: (name) => pushes.follow(name),
-  answer: answerOn(root),
-  say: (session, text) =>
-    Effect.try({
-      try: () => {
-        const { run: file, say } = filesOf(root, session.name);
-        const run = readRun(file);
-        if (run === undefined || !isOpen(run.state))
-          throw new Error(`\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so nothing said to it would be heard.`);
-        fs.appendFileSync(say, `${JSON.stringify({ text })}\n`);
-        const at = live.get(session.name);
-        if (at?.input) hear(root, at);
-      },
-      catch: failed('say'),
-    }),
-});
+) =>
+  ({
+    spawn: (r) =>
+      Effect.try({
+        try: () => {
+          const { out, stop, interrupt, say, mcp, asks, answers } = filesOf(root, r.name);
+          for (const f of [out, stop, interrupt, say, mcp, asks, answers]) fs.rmSync(f, { force: true });
+          const run: AttachedRun = {
+            name: r.name,
+            state: 'working',
+            ...thisHolder(),
+            startedAt: new Date().toISOString(),
+            ...(r.resumeFrom ? { carried: carriedFrom(root, r.resumeFrom) } : {}),
+            request: keptRequest(r),
+          };
+          start(r, run, r.brief, r.resumeFrom);
+        },
+        catch: failed('spawn'),
+      }),
+    observe: Effect.sync(() => runs()),
+    observeFor: (expected) => Effect.sync(() => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() })),
+    stop: (name) =>
+      Effect.try({
+        try: () => {
+          fs.writeFileSync(filesOf(root, name).stop, String(process.pid));
+          live.get(name)?.abort?.abort();
+        },
+        catch: failed('stop'),
+      }),
+    logs: (name) =>
+      Effect.try({
+        try: () => {
+          const run = readRun(filesOf(root, name).run);
+          return `${run?.state ?? 'unknown'}${run?.sessionId ? ` ${run.sessionId}` : ''}${run?.calling ? `, calling ${run.calling.tool}` : ''}`;
+        },
+        catch: failed('logs'),
+      }),
+    transcript: (name, after) =>
+      Effect.tryPromise({
+        try: () => {
+          const id = readRun(filesOf(root, name).run)?.sessionId;
+          return readTranscript(id ? claudeTranscriptFile(id) : undefined, after, claudeTranscriptEvents);
+        },
+        catch: failed('transcript'),
+      }),
+    interrupt: (session) =>
+      Effect.tryPromise({
+        try: async () => {
+          const { run: file, interrupt } = filesOf(root, session.name);
+          const run = readRun(file);
+          if (run?.state !== 'working') throw noTurnToEnd(session.name, run);
+          fs.writeFileSync(interrupt, String(process.pid));
+          if (await interruptTurn(live.get(session.name))) fs.rmSync(interrupt, { force: true });
+        },
+        catch: failed('interrupt'),
+      }),
+    follow: (name) => pushes.follow(name),
+    answer: answerOn(root),
+    say: (session, text) =>
+      Effect.try({
+        try: () => {
+          const { run: file, say } = filesOf(root, session.name);
+          const run = readRun(file);
+          if (run === undefined || !isOpen(run.state))
+            throw new Error(`\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so nothing said to it would be heard.`);
+          fs.appendFileSync(say, `${JSON.stringify({ text })}\n`);
+          const at = live.get(session.name);
+          if (at?.input) hear(root, at);
+        },
+        catch: failed('say'),
+      }),
+  }) satisfies Omit<Attached['ops'], 'release'>;

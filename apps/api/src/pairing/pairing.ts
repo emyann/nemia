@@ -46,7 +46,7 @@ const ticketed = <A>(work: (s: Served, nowMs: number) => A) =>
   Effect.flatMap(Clock.currentTimeMillis, (nowMs) => answeredWrite(async (s) => work(s, nowMs)));
 
 /** The url the api ticking the store `home` serves at, as its lease says; none where no api ticks it. */
-const leasedUrl = (home: string): string | undefined => {
+const leasedUrl = (home: string) => {
   const standing = daemonStanding(home);
   return standing.kind === 'ticking' && standing.file.by === 'api' ? standing.file.url : undefined;
 };

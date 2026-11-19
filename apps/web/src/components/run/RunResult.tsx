@@ -78,7 +78,7 @@ function Gave({ run, step, now }: { run: RunDetail; step: string; now: Date }) {
 }
 
 /** Whether every final step the run will run is done, and there is one: what the box says of a run that ended with nothing given. */
-const finished = (steps: ReturnType<typeof resultStepsOf>): boolean => {
+const finished = (steps: ReturnType<typeof resultStepsOf>) => {
   const owed = steps.filter((s) => s.final && s.stands !== 'skipped');
   return owed.length > 0 && owed.every((s) => s.stands === 'done');
 };

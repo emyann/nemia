@@ -25,7 +25,7 @@ export type InformedInputs = {
 export type InformedVerdict = 'serve' | 'judge';
 
 /** Every input of a judgement as it was: a run at rest across passes, a moving one within its pass. */
-const held = (i: InformedInputs): boolean => i.stampHeld && i.quiet && i.tipsHeld && (i.atRest || i.samePass);
+const held = (i: InformedInputs) => i.stampHeld && i.quiet && i.tipsHeld && (i.atRest || i.samePass);
 
 const informedSpec = spec<(inputs: InformedInputs) => InformedVerdict>({
   ensures: {

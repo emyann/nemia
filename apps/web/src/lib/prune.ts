@@ -35,14 +35,14 @@ export type Awaiting = NonNullable<Decidable['awaiting']>;
  * read as null.
  * @param decision The api's decision on the run.
  */
-export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
+export const awaitingOf = (decision: RunDecision) => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
 
 /**
  * Whether the run's page offers a prune at all: a repository run (the package prunes repository runs alone), with nothing moving, and
  * with worktrees or files left on disk (`onDisk`). What it offers waits on the decision (`pruneOffer`).
  * @param run The run's detail: its place, its status, whether anything moves, and what it has left on disk.
  */
-export function prunable(run: Prunable): boolean {
+export function prunable(run: Prunable) {
   const { worktrees, files } = run.onDisk;
   return run.place === 'git' && !run.moving && run.status !== 'running' && (worktrees || files);
 }
@@ -54,7 +54,7 @@ export function prunable(run: Prunable): boolean {
  * @param run The run's detail: its place, its status, whether anything moves, and what it has left on disk.
  * @param awaiting What the run waits on, where nobody decided it (`awaitingOf`); null for any other run.
  */
-export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer | null {
+export function pruneOffer(run: Prunable, awaiting: Awaiting | null) {
   if (!prunable(run)) return null;
   const { worktrees, files } = run.onDisk;
   const warning = awaiting ? unmergedWarning(awaiting) : null;
@@ -106,7 +106,7 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for
  * a run that worked on its base branch itself, what it would be decided on is gone.
  */
-function unmergedWarning(awaiting: Awaiting): string {
+function unmergedWarning(awaiting: Awaiting) {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved.';
   if (awaiting.direct)
     return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;
@@ -118,7 +118,7 @@ function unmergedWarning(awaiting: Awaiting): string {
  * The choice selected first: the least a prune gives back that the api would take.
  * @param offer What the run's page offers to prune.
  */
-export function firstChoice(offer: PruneOffer): PruneChoice {
+export function firstChoice(offer: PruneOffer) {
   return offer.choices.find((choice) => !choice.unavailable) ?? offer.choices[0];
 }
 
@@ -128,7 +128,7 @@ export function firstChoice(offer: PruneOffer): PruneChoice {
  * @param choice The choice the person selected.
  * @param offer The offer it is among, whose warning is said again for a run nobody merged.
  */
-export function pruneQuestion(id: string, choice: PruneChoice, offer: PruneOffer): string {
+export function pruneQuestion(id: string, choice: PruneChoice, offer: PruneOffer) {
   const what = choice.label.charAt(0).toLowerCase() + choice.label.slice(1);
   return `Prune ${id}: ${what}? This cannot be undone.${choice.how.unmerged && offer.warning ? ` ${offer.warning}` : ''}`;
 }

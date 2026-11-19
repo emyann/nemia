@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Bump, Landed, LandedVersion, Semver } from './contracts/version.contract.ts';
+import type { LandedVersion, Semver } from './contracts/version.contract.ts';
 
 /** The record of what is released, by its name in the workspace. */
 export const RELEASED = 'released.json';
@@ -39,7 +39,7 @@ export type Records = { [template: string]: Recorded };
 class Refusal extends Error {}
 
 /** The highest part `to` grew over `from` by precedence, or `none` where `to` is not above `from`. */
-const bumpOf = (from: Semver, to: Semver): Bump => {
+const bumpOf = (from: Semver, to: Semver) => {
   if (to[0] !== from[0]) return to[0] > from[0] ? 'major' : 'none';
   if (to[1] !== from[1]) return to[1] > from[1] ? 'minor' : 'none';
   return to[2] > from[2] ? 'patch' : 'none';
@@ -49,7 +49,7 @@ const bumpOf = (from: Semver, to: Semver): Bump => {
  * The version a template takes where its branch lands: the base's where its content did not change, else the least above the base's of
  * the kind the branch bumped by since it forked, refused where it bumped nothing.
  */
-export const landedVersion: LandedVersion = (seam): Landed => {
+export const landedVersion: LandedVersion = (seam) => {
   if (!seam.changed) return { kind: 'kept', version: seam.base };
   const bump = bumpOf(seam.forked, seam.branch);
   const [major, minor, patch] = seam.base;
@@ -60,26 +60,26 @@ export const landedVersion: LandedVersion = (seam): Landed => {
 };
 
 /** `git <args>` in `cwd`: its exit and its streams, never thrown. */
-const git = (cwd: string, ...args: string[]): { code: number | null; out: string; err: string } => {
+const git = (cwd: string, ...args: string[]) => {
   const ran = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return { code: ran.status, out: ran.stdout ?? '', err: ran.stderr ?? '' };
 };
 
 /** `git <args>` in `cwd`, its standard output; throws where git refuses. */
-const gitOut = (cwd: string, ...args: string[]): string => {
+const gitOut = (cwd: string, ...args: string[]) => {
   const ran = git(cwd, ...args);
   if (ran.code !== 0) throw new Error(`git ${args.join(' ')} failed in ${cwd}: ${ran.err.trim()}`);
   return ran.out;
 };
 
 /** The text of `file` (from the repository's root) at `commit`, or `undefined` where the commit holds no such file. */
-const shown = (root: string, commit: string, file: string): string | undefined => {
+const shown = (root: string, commit: string, file: string) => {
   const ran = git(root, 'show', `${commit}:${file}`);
   return ran.code === 0 ? ran.out : undefined;
 };
 
 /** Each file of the folder `dir` that git tracks, by its path from `dir`, with the permission bits git records for it. */
-export function modesOf(dir: string): Map<string, number> {
+export function modesOf(dir: string) {
   const listed = git(dir, 'ls-files', '-s', '-z', '.');
   if (listed.code !== 0) throw new Error(`git ls-files could not list ${dir}: ${listed.err.trim()}; run it in a git checkout`);
   return new Map(
@@ -94,7 +94,7 @@ export function modesOf(dir: string): Map<string, number> {
 }
 
 /** The templates of the workspace `root`: each folder of it that holds a `nemia.yaml`. */
-export const templatesIn = (root: string): string[] =>
+export const templatesIn = (root: string) =>
   fs
     .readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(root, entry.name, 'nemia.yaml')))
@@ -105,7 +105,7 @@ export const templatesIn = (root: string): string[] =>
  * `nemia template lint <folder>` by the orchestrator's CLI, bounded, on a store and home of its own under `work`: an environment that
  * holds the path alone besides, so no telemetry, session or serving variable of the caller reaches it.
  */
-function lint(work: string, folder: string): { code: number | null; out: string; err: string } {
+function lint(work: string, folder: string) {
   const bin = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
   const home = path.join(work, 'home');
   fs.mkdirSync(home, { recursive: true });
@@ -130,7 +130,7 @@ export function digestOf(
   folder: string,
   modes: ReadonlyMap<string, number>,
   replaced: Readonly<{ [file: string]: string }> = {},
-): string {
+) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-released-'));
   try {
     const copy = path.join(work, folder);
@@ -155,29 +155,29 @@ export function digestOf(
 const VERSION_LINE = /^( {2}version: )(\d+)\.(\d+)\.(\d+)[ \t]*$/gm;
 
 /** A version as it is written. */
-const spelt = (v: Semver): string => `${v[0]}.${v[1]}.${v[2]}`;
+const spelt = (v: Semver) => `${v[0]}.${v[1]}.${v[2]}`;
 
 /** The version `text`, a record's, read at `where`; refused where it is no `major.minor.patch`. */
-const parsed = (text: string, where: string): Semver => {
+const parsed = (text: string, where: string) => {
   const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(text);
   if (m === null) throw new Refusal(`${where} records the version ${text}, which is no major.minor.patch: write it as one, e.g. 1.0.0`);
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
+  return [Number(m[1]), Number(m[2]), Number(m[3])] satisfies Semver;
 };
 
 /** The `spec.version` of the manifest `text` read at `where`; refused where it holds not exactly one version line. */
-const versionIn = (text: string, where: string): Semver => {
+const versionIn = (text: string, where: string) => {
   const lines = [...text.matchAll(VERSION_LINE)];
   const [line] = lines;
   if (line === undefined || lines.length !== 1)
     throw new Refusal(`${where} holds ${lines.length} spec.version lines: write exactly one, as "  version: 1.0.0" under spec`);
-  return [Number(line[2]), Number(line[3]), Number(line[4])];
+  return [Number(line[2]), Number(line[3]), Number(line[4])] satisfies Semver;
 };
 
 /** The manifest `text` with its version line saying `v`. */
-const withVersion = (text: string, v: Semver): string => text.replace(VERSION_LINE, (_, head: string) => `${head}${spelt(v)}`);
+const withVersion = (text: string, v: Semver) => text.replace(VERSION_LINE, (_, head: string) => `${head}${spelt(v)}`);
 
 /** The record `text`, a `released.json` read at `where`: none where there is no such file. */
-const recordsOf = (text: string | undefined, where: string): Records => {
+const recordsOf = (text: string | undefined, where: string) => {
   if (text === undefined) return {};
   try {
     return JSON.parse(text) as Records;
@@ -187,10 +187,10 @@ const recordsOf = (text: string | undefined, where: string): Records => {
 };
 
 /** `ours` merged with what `theirs` changed since `forked`, by `git merge-file`; `undefined` where a change of both sides conflicts. */
-function merged(ours: string, forked: string, theirs: string): string | undefined {
+function merged(ours: string, forked: string, theirs: string) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-released-merge-'));
   try {
-    const at = (name: string, text: string): string => {
+    const at = (name: string, text: string) => {
       const file = path.join(work, name);
       fs.writeFileSync(file, text);
       return file;
@@ -206,11 +206,8 @@ function merged(ours: string, forked: string, theirs: string): string | undefine
 /** Where `cut` reads: the repository's root, the workspace's path from it, the commit the branch forked at, and git's modes there. */
 type Seat = { root: string; ws: string; fork: string; modes: ReadonlyMap<string, number> };
 
-/** What `cut` writes of one template: its manifest's text, where it writes one, and its record, where there is one. */
-type Cut = { template: string; manifest: string | undefined; record: Recorded | undefined };
-
 /** The template `template` cut against the base: its manifest merged, and its version and record decided by `landedVersion`. */
-function cutOne(seat: Seat, template: string, records: { base: Records; head: Records }): Cut {
+function cutOne(seat: Seat, template: string, records: { base: Records; head: Records }) {
   const { root, ws, fork, modes } = seat;
   const file = `${ws}/${template}/nemia.yaml`;
   const recorded = records.base[template];
@@ -247,7 +244,7 @@ function cutOne(seat: Seat, template: string, records: { base: Records; head: Re
  * `cut`, run from a worktree of the repository with a merge of the base in progress: each template's version and record cut against the
  * base, written and added, a line per template returned. Refused with what to do, having written nothing.
  */
-export function cut(cwd: string): string[] {
+export function cut(cwd: string) {
   const top = git(cwd, 'rev-parse', '--show-toplevel');
   if (top.code !== 0) throw new Refusal(`${cwd} is in no git repository: run it from the root of the run's worktree`);
   const root = top.out.trim();
@@ -288,7 +285,7 @@ export function cut(cwd: string): string[] {
 }
 
 /** The command: `cut`, a line per template on stdout, exit 0; a refusal on stderr, exit 1; another verb, exit 2. */
-function main(argv: readonly string[]): number {
+function main(argv: readonly string[]) {
   if (argv[0] !== 'cut') {
     process.stderr.write(
       'usage: node packages/templates/released.ts cut, from the root of a worktree with a merge of the base in progress\n',

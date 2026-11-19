@@ -28,7 +28,7 @@ type UpgradeFollowed = { output: string; phase: UpgradePhase; ended?: Upgrade; u
  * running what it runs. The stream is closed on the error its end fires, or a grace after its end, never on the end itself.
  * @param upgrade The started upgrade, as the api answered its start.
  */
-export function useUpgradeFollow(upgrade: Upgrade): UpgradeFollowed {
+export function useUpgradeFollow(upgrade: Upgrade) {
   const queryClient = useQueryClient();
   const [followed, setFollowed] = useState<UpgradeFollowed>({ output: upgrade.output, phase: upgrade.phase, reconnecting: false });
   const id = upgrade.id;

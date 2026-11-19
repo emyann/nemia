@@ -15,11 +15,11 @@ import { denialText, type Event, type Sighting, type State } from '../domain.ts'
  * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
  * @param at The moment each entry is stamped, an ISO time.
  */
-export function deniedFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
+export function deniedFacts(state: State, sighting: Sighting | undefined, at: string) {
   const last = state.attempts.at(-1);
-  if (state.settled || !last || last.ended !== null || sighting?.state !== 'working' || !sighting.denials) return [];
+  if (state.settled || !last || last.ended !== null || sighting?.state !== 'working' || !sighting.denials) return [] satisfies Event[];
   const held = (last.denials ?? []).map(denialText);
   const said = sighting.denials.map(denialText);
-  if (held.some((text, i) => text !== said[i])) return [];
-  return sighting.denials.slice(held.length).map((d) => ({ kind: 'denied', at, attempt: last.n, ...d }));
+  if (held.some((text, i) => text !== said[i])) return [] satisfies Event[];
+  return sighting.denials.slice(held.length).map((d) => ({ kind: 'denied', at, attempt: last.n, ...d })) satisfies Event[];
 }

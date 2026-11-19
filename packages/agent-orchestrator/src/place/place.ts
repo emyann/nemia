@@ -384,7 +384,7 @@ export type PlaceDeclared = {
  * such a hole would be printed as written. Empty when every one is filled. Pure.
  * @param say The place's `say`, its templates by key.
  */
-export function unknownHoles(say: PlaceSay): readonly { readonly key: SayKey; readonly hole: string }[] {
+export function unknownHoles(say: PlaceSay) {
   return PLACE_SAYS.flatMap((key) => {
     const templates: readonly string[] = typeof say[key] === 'string' ? [say[key]] : say[key];
     const named = templates.flatMap((template) =>
@@ -404,7 +404,7 @@ export const SKILL_SECTIONS = { read: 'Read what changed', merge: 'Merge the bas
  * Where a brief sends a step for the place's own commands it was not handed: the section of its place skill named `section`. Pure.
  * @param section Which section of the place skill: how to read what changed, or how to merge the base.
  */
-export const skillSaid = (section: keyof typeof SKILL_SECTIONS): string => `as your place's skill says under *${SKILL_SECTIONS[section]}*`;
+export const skillSaid = (section: keyof typeof SKILL_SECTIONS) => `as your place's skill says under *${SKILL_SECTIONS[section]}*`;
 
 /**
  * A `say` template of a place filled: each `{name}` hole `holes` names replaced by its value, and any other text — a hole it does not
@@ -412,14 +412,14 @@ export const skillSaid = (section: keyof typeof SKILL_SECTIONS): string => `as y
  * @param template The `say` template, with its `{name}` holes.
  * @param holes The value of each hole, by its name.
  */
-export const sayFilled = (template: string, holes: Readonly<Record<string, string>>): string =>
+export const sayFilled = (template: string, holes: Readonly<Record<string, string>>) =>
   template.replace(/\{(\w+)\}/g, (hole: string, name: string) => (Object.hasOwn(holes, name) ? holes[name] : undefined) ?? hole);
 
 /**
  * What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure.
  * @param outcome The verb's outcome that is no answer: its refusal, or its unread.
  */
-export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
+export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }) =>
   'refused' in outcome ? outcome.refused : outcome.unread.said;
 
 /**

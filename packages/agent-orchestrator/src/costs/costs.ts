@@ -35,13 +35,13 @@ export type WorkflowCosts = {
 };
 
 /** The values sorted, low to high. */
-const sorted = (values: readonly number[]): number[] => [...values].sort((a, b) => a - b);
+const sorted = (values: readonly number[]) => [...values].sort((a, b) => a - b);
 
 /**
  * The median of `values`: the middle one, or the mean of the two middle ones; null for none.
  * @param values The numbers to take the median of, in any order: costs in USD, or counts of tries or rounds.
  */
-export function medianOf(values: readonly number[]): number | null {
+export function medianOf(values: readonly number[]) {
   if (!values.length) return null;
   const s = sorted(values);
   const mid = Math.floor(s.length / 2);
@@ -55,7 +55,7 @@ export function medianOf(values: readonly number[]): number | null {
  * The 90th percentile of `values`, nearest rank: the smallest value at or above nine tenths of them; null for none.
  * @param values The numbers to take the percentile of, in any order: costs in USD.
  */
-export function p90Of(values: readonly number[]): number | null {
+export function p90Of(values: readonly number[]) {
   const s = sorted(values);
   return s[Math.ceil(0.9 * s.length) - 1] ?? null;
 }
@@ -64,7 +64,7 @@ export function p90Of(values: readonly number[]): number | null {
 type PerRun = Map<string, { cost: number | null; tries: number }>;
 
 /** Each step's `PerRun`, by step, in the order its tries are met. */
-function perRunOf(tries: readonly TryFact[]): Map<string, PerRun> {
+function perRunOf(tries: readonly TryFact[]) {
   const steps = new Map<string, PerRun>();
   for (const t of tries) {
     const runs = steps.get(t.step) ?? new Map();
@@ -76,7 +76,7 @@ function perRunOf(tries: readonly TryFact[]): Map<string, PerRun> {
 }
 
 /** A step's line (`StepCost`), none where no run measured a cost of it. */
-function stepCostOf(step: string, runs: PerRun): StepCost[] {
+function stepCostOf(step: string, runs: PerRun) {
   const costs = [...runs.values()].flatMap((r) => (r.cost === null ? [] : [r.cost]));
   const tries = [...runs.values()].map((r) => r.tries);
   const [median, p90, triesMedian] = [medianOf(costs), p90Of(costs), medianOf(tries)];
@@ -90,7 +90,7 @@ function stepCostOf(step: string, runs: PerRun): StepCost[] {
  * @param facts The store's facts: every try, and every run newest first.
  * @param of The run asking: its factory and workflow choose the runs read, and its own run is left out.
  */
-export function costsOf(facts: { tries: readonly TryFact[]; runs: readonly RunFact[] }, of: RunKeys): WorkflowCosts {
+export function costsOf(facts: { tries: readonly TryFact[]; runs: readonly RunFact[] }, of: RunKeys) {
   const window = facts.runs.filter((r) => r.factory === of.factory && r.workflow === of.workflow && r.run !== of.run).slice(0, RECENT_RUNS);
   const ids = new Set(window.map((r) => r.run));
   const perStep = perRunOf(facts.tries.filter((t) => ids.has(t.run)));

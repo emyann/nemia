@@ -5,13 +5,11 @@
  * store's root.
  */
 import { Effect } from 'effect';
-import type { Decidable, DiffFile, RunDecision, SensitiveDiff, Standing, StepQuestions } from 'objects';
-import { StoreRoot } from '../config/root.store.ts';
+import type { Decidable, RunDecision } from 'objects';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun, namesInOrder, type Run } from '../record/record.ts';
-import type { Refusal } from '../refusal/refusal.ts';
 import { approvedFirst, branchWord } from '../status/status.ts';
 import { stepsReading, type StepsReading } from '../object/read.verb.ts';
 import { branchesToRead, CHECK_AFFECTING, countsLine, lessonOf, resultSteps } from '../branches/index.ts';
@@ -42,7 +40,7 @@ export type DecisionHow = { sensitive?: readonly string[] };
  * whole. Named for a person — `from → to` for a rename — off the file's own header lines, before its first hunk.
  * @param diff The text `git diff` gave, every file's header and hunks.
  */
-export function diffFiles(diff: string): DiffFile[] {
+export function diffFiles(diff: string) {
   const files: string[][] = [];
   for (const line of diff.replace(/\n$/, '').split('\n')) {
     const last = files.at(-1);
@@ -67,7 +65,7 @@ export function diffFiles(diff: string): DiffFile[] {
  * The path one file's diff is about, off its header lines: `from → to` for a rename, else the `+++` side, else the `---` side. A binary
  * file or a mode change has neither: its `diff --git a/<path> b/<path>` line, whose two halves are the same path, names it.
  */
-function diffPath(lines: readonly string[]): string {
+function diffPath(lines: readonly string[]) {
   const hunk = lines.findIndex((line) => line.startsWith('@@'));
   const head = hunk < 0 ? lines : lines.slice(0, hunk);
   const after = (prefix: string) =>
@@ -90,7 +88,7 @@ function diffPath(lines: readonly string[]): string {
 }
 
 /** A branch's check-affecting diff, off what the place gave (`BranchChanges.inFull`): an error, none, or the files. */
-function sensitiveOf({ branch, inFull }: BranchChanges): SensitiveDiff {
+function sensitiveOf({ branch, inFull }: BranchChanges) {
   if (typeof inFull !== 'string') return { branch, files: [], error: inFull.error };
   return { branch, files: inFull.trim() ? diffFiles(inFull) : [], error: null };
 }
@@ -99,7 +97,7 @@ function sensitiveOf({ branch, inFull }: BranchChanges): SensitiveDiff {
 export type DecisionUnjudged = { run: Run; unjudged: string; saidBy: (by: string) => string };
 
 /** A run's decision, or why it is not read: what `decisionRead` answers, as one type. */
-const answered = (read: DecisionRead | DecisionUnjudged): DecisionRead | DecisionUnjudged => read;
+const answered = (read: DecisionRead | DecisionUnjudged) => read;
 
 /**
  * A run's decision, in one order, off its one reading (`stepsReading`): the judgement the run object, the runs list and the tick's informer
@@ -171,7 +169,7 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
  * The questions each step of `waiting`, the steps waiting on a person, asks in its current closeout, numbered as `nemia decide` prints them
  * (`numberedQuestions`): what `answers` to its approval or its next try names back. A step that asks none is left out.
  */
-const questionsWaiting = (decided: Decided, waiting: readonly string[]): StepQuestions[] =>
+const questionsWaiting = (decided: Decided, waiting: readonly string[]) =>
   waiting.flatMap((step) => {
     const questions = numberedQuestions(
       askedQuestions(
@@ -194,7 +192,7 @@ export const runDecision = Effect.fn('runDecision')(function* (id: string, how: 
 });
 
 /** What a run whose branches are already on its base says: that, and an ending approved first that never ran, nothing left for it. */
-function landedWords(run: Run, branches: readonly string[], steps: Decided['steps']): string {
+function landedWords(run: Run, branches: readonly string[], steps: Decided['steps']) {
   const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
   const never = unrun
     ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
@@ -203,7 +201,7 @@ function landedWords(run: Run, branches: readonly string[], steps: Decided['step
 }
 
 /** What `branch` changed among `changes`, which `changesOf` gives for each branch it was asked: thrown, naming it, where none. */
-function changeOf(changes: readonly BranchChanges[], branch: string): BranchChanges {
+function changeOf(changes: readonly BranchChanges[], branch: string) {
   const change = changes.find((c) => c.branch === branch);
   if (change === undefined) throw new Error(`\`changesOf\` gave nothing for the branch ${branch}, which it was asked to read.`);
   return change;
@@ -222,7 +220,7 @@ const branchesOf = Effect.fnUntraced(function* (
   awaiting: string[] | undefined,
   collisions: Collisions | null,
   how: DecisionHow,
-): Effect.fn.Return<{ touched: BranchChanges[]; results: BranchChanges[]; standings: Standing[] }, Refusal, PlaceService | StoreRoot> {
+) {
   if (!isRepositoryRun(run)) return { touched: [], results: [], standings: [] };
   const place = yield* PlaceService;
   const results = [
@@ -259,4 +257,4 @@ const branchesOf = Effect.fnUntraced(function* (
 });
 
 /** How much a branch changed, in `nemia decide`'s words (`countsLine`), or the sentence saying it is not known; null for nothing. */
-const statOf = (radius: BranchChanges['radius']): string | null => ('error' in radius ? radius.error : countsLine(radius));
+const statOf = (radius: BranchChanges['radius']) => ('error' in radius ? radius.error : countsLine(radius));

@@ -55,7 +55,7 @@ const treeChecked = checked(TemplateTreeWrite, (tree: TreeWrite) => `the templat
  * The door over `layer`: each method as `doorOf` makes it, each write's place and tree checked before the layer writes.
  * @param layer The layer that reads and writes the templates: the files or the memory.
  */
-export function templateDoorOver(layer: TemplateLayer): TemplateDoorShape {
+export function templateDoorOver(layer: TemplateLayer) {
   const door = doorOf<TemplateLayer, TemplateSource>(layer);
   const written =
     <A>(write: (at: TemplateSource, tree: TreeWrite) => Effect.Effect<A, Refusal>) =>
@@ -72,11 +72,11 @@ export function templateDoorOver(layer: TemplateLayer): TemplateDoorShape {
       create: (at, tree) => (path.basename(at) === tree.name ? create(at, tree) : Effect.fail(misnamed(at, tree.name))),
       pack: written(door.templates.pack),
     },
-  };
+  } satisfies TemplateDoorShape;
 }
 
 /** The refusal of a folder written under a name that is not its tree's: a template is named by its folder. */
-const misnamed = (at: string, name: string): Invalid =>
+const misnamed = (at: string, name: string) =>
   new Invalid({
     message: `${at} is not written: a template is named by its folder, and this one holds the template ${name}. Write it at a folder named ${name}.`,
   });
@@ -85,7 +85,7 @@ const misnamed = (at: string, name: string): Invalid =>
  * The refusal of a template's place that is neither a folder nor a file.
  * @param source The place given.
  */
-export const noTemplateAt = (source: string): Missing =>
+export const noTemplateAt = (source: string) =>
   new Missing({
     message: `${source} is neither a folder nor a file: name a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote.`,
   });
@@ -96,7 +96,7 @@ export const noTemplateAt = (source: string): Missing =>
  * @param at The new folder's place.
  * @param kind What is there: a folder, a file, a folder that holds files, or undefined where nothing is.
  */
-export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | undefined): Conflict | null {
+export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | undefined) {
   if (kind === 'file')
     return new Conflict({
       message: `${at} is there, and is no folder: a template is written as a new folder. Move it away, or name another.`,
@@ -112,7 +112,7 @@ export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | unde
  * The refusal of a new archive's place that is taken.
  * @param at The new archive's place.
  */
-export const takenArchive = (at: string): Conflict =>
+export const takenArchive = (at: string) =>
   new Conflict({ message: `${at} is there already, and pack writes a new file: name another with --out, or remove it.` });
 
 /**
@@ -122,33 +122,36 @@ export const takenArchive = (at: string): Conflict =>
  * @param problems Given a problem for each link found.
  * @param under The path under `dir` walked now; empty for `dir` itself.
  */
-export function walkFolder(dir: string, problems: Problem[], under = ''): string[] {
-  return fs
-    .readdirSync(path.join(dir, under), { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((entry): string[] => {
-      const file = under ? `${under}/${entry.name}` : entry.name;
-      if (entry.isSymbolicLink()) {
-        problems.push({ file, message: `${file} is a link, and a template's files are its own: copy what it points at here.` });
+export function walkFolder(dir: string, problems: Problem[], under = '') {
+  return (
+    fs
+      .readdirSync(path.join(dir, under), { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+      .flatMap((entry): string[] => {
+        const file = under ? `${under}/${entry.name}` : entry.name;
+        if (entry.isSymbolicLink()) {
+          problems.push({ file, message: `${file} is a link, and a template's files are its own: copy what it points at here.` });
+          return [];
+        }
+        if (entry.isDirectory()) return walkFolder(dir, problems, file);
+        if (entry.isFile()) return [file];
+        problems.push({ file, message: `${file} is neither a file nor a folder, and a template holds files: remove it.` });
         return [];
-      }
-      if (entry.isDirectory()) return walkFolder(dir, problems, file);
-      if (entry.isFile()) return [file];
-      problems.push({ file, message: `${file} is neither a file nor a folder, and a template holds files: remove it.` });
-      return [];
-    });
+      })
+  );
 }
 
 /** The tree of the folder `dir`: each file's path, permission bits and bytes, as `walk` finds them. */
-function readTree(dir: string, problems: Problem[]): TreeFile[] {
+function readTree(dir: string, problems: Problem[]) {
   return walkFolder(dir, problems).map((file) => {
     const at = path.join(dir, file);
     return { path: file, mode: fs.statSync(at).mode & 0o777, bytes: fs.readFileSync(at) };
-  });
+  }) satisfies TreeFile[];
 }
 
 /** What is at `at`: a folder that holds files, an empty one, something else, or nothing. */
-function placeOf(at: string): 'folder' | 'file' | 'files' | undefined {
+function placeOf(at: string) {
   const stat = fs.lstatSync(at, { throwIfNoEntry: false });
   if (stat === undefined) return undefined;
   if (!stat.isDirectory()) return 'file';
@@ -156,7 +159,7 @@ function placeOf(at: string): 'folder' | 'file' | 'files' | undefined {
 }
 
 /** `write` made at a place beside `at` and renamed into it, the place removed whatever happens. */
-function staged(at: string, write: (to: string) => void, replace: boolean): void {
+function staged(at: string, write: (to: string) => void, replace: boolean) {
   fs.mkdirSync(path.dirname(at), { recursive: true });
   const to = path.join(path.dirname(at), `.${path.basename(at)}.write-${process.pid}`);
   fs.rmSync(to, { recursive: true, force: true });
@@ -170,7 +173,7 @@ function staged(at: string, write: (to: string) => void, replace: boolean): void
 }
 
 /** The templates on this machine's disk, as a layer of the door: today's folders and archives, wherever their places name them. */
-export function templateFiles(): TemplateLayer {
+export function templateFiles() {
   return {
     templates: {
       read: (source) => {
@@ -209,7 +212,7 @@ export function templateFiles(): TemplateLayer {
         return { source: at, digest };
       },
     },
-  };
+  } satisfies TemplateLayer;
 }
 
 /**
@@ -222,7 +225,7 @@ export const TemplateDoor = Context.Reference<TemplateDoorShape>('agent-orchestr
 });
 
 /** The Template door over the files, as a layer: for a program that names the door rather than a `StoreRoot`. */
-export const templateDoorFiles = (): Layer.Layer<never> => Layer.succeed(TemplateDoor)(templateDoorOver(templateFiles()));
+export const templateDoorFiles = () => Layer.succeed(TemplateDoor)(templateDoorOver(templateFiles()));
 
 /**
  * The builtin templates: the templates workspace beside this package, found by its path and never imported, as the package's own
@@ -239,7 +242,7 @@ export const BuiltinTemplates = Context.Reference<string>('agent-orchestrator/Bu
  * The names of the templates `folder` holds, sorted: each folder in it whose `nemia.yaml` is a file. None where `folder` is not there.
  * @param folder The folder of builtin templates.
  */
-export function builtinTemplatesIn(folder: string): string[] {
+export function builtinTemplatesIn(folder: string) {
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return [];
   return fs
     .readdirSync(folder, { withFileTypes: true })

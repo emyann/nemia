@@ -87,7 +87,7 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
 });
 
 /** Who this process runs as, by the name the system gives the user — or undefined, for a user it has no entry for. */
-function osUser(): string | undefined {
+function osUser() {
   try {
     return os.userInfo().username || undefined;
   } catch {

@@ -3,7 +3,6 @@
  * (`readWords`, `peakMark`), and the lines `nemia decide` prints under a step (`usedLines`), with the counts and durations they are said
  * in (`count`, `durationWord`). `views/views.verb.ts` asks the engine (`consumption`). Pure.
  */
-import type { PeakMark } from 'objects';
 import { dollars } from '../money/money.ts';
 
 /**
@@ -58,7 +57,7 @@ const FIELDS = [
  * largest, by the same rule: an attempt that measured none may have been the largest.
  * @param usages Each attempt's usage; null or undefined for one that measured none.
  */
-export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Consumed | undefined {
+export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>) {
   if (!usages.length) return undefined;
   const sum: Consumed = {};
   for (const field of FIELDS) {
@@ -83,7 +82,7 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
  * @param u The attempt's usage; null or undefined where nobody measured it.
  * @param resumed Whether the attempt continued an earlier session.
  */
-export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): boolean =>
+export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean) =>
   resumed &&
   u?.firstCacheWriteTokens !== undefined &&
   u.firstContextTokens !== undefined &&
@@ -99,14 +98,14 @@ export const LARGE_CONTEXT = 200_000;
  * @param u The session's usage; null or undefined where nobody measured it.
  * @param cap The step's `context:` cap, in tokens; undefined for a step with none.
  */
-export function peakMark(u: Consumed | null | undefined, cap: number | undefined): PeakMark | null {
+export function peakMark(u: Consumed | null | undefined, cap: number | undefined) {
   const peak = u?.peakContextTokens;
   if (cap !== undefined) return u?.compactions || (peak !== undefined && peak >= cap) ? 'cap' : null;
   return peak !== undefined && peak > LARGE_CONTEXT ? 'large' : null;
 }
 
 /** What `n` resumed sessions that wrote their context to the cache again say, or undefined for none. */
-const rebuiltWords = (n: number | undefined): string | undefined =>
+const rebuiltWords = (n: number | undefined) =>
   !n
     ? undefined
     : n > 1
@@ -114,7 +113,7 @@ const rebuiltWords = (n: number | undefined): string | undefined =>
       : 'a resumed session wrote its context to the cache again instead of reading it';
 
 /** How often a session compacted, in words: `compacted`, `compacted twice`, `compacted 3 times`. */
-const compactedWords = (n: number): string => `compacted${n === 1 ? '' : n === 2 ? ' twice' : ` ${n} times`}`;
+const compactedWords = (n: number) => `compacted${n === 1 ? '' : n === 2 ? ' twice' : ` ${n} times`}`;
 
 /**
  * What a session read, by price, for a person at a glance: `read 21.4M · wrote 412k · peak 167k` — the cache's reads and writes, which
@@ -124,7 +123,7 @@ const compactedWords = (n: number): string => `compacted${n === 1 ? '' : n === 2
  * @param u The session's usage; null or undefined where nobody measured it.
  * @param cap The step's `context:` cap, in tokens; undefined for a step with none.
  */
-export function readWords(u: Consumed | null | undefined, cap?: number): string {
+export function readWords(u: Consumed | null | undefined, cap?: number) {
   if (!u) return '';
   const mark = peakMark(u, cap);
   const where = [
@@ -147,7 +146,7 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
  * A count for a person, to three figures: 112000 → 112k, 6350000 → 6.35M.
  * @param n The count.
  */
-export function count(n: number): string {
+export function count(n: number) {
   for (const [of, unit] of [
     [1e9, 'B'],
     [1e6, 'M'],
@@ -162,7 +161,7 @@ export function count(n: number): string {
  * A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`.
  * @param ms The duration, in ms; below 0 reads as 0.
  */
-export function durationWord(ms: number): string {
+export function durationWord(ms: number) {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const two = (n: number) => String(n).padStart(2, '0');
   if (s < 60) return `${s}s`;
@@ -182,7 +181,7 @@ export function durationWord(ms: number): string {
  * second reads `<1s`, never `0s`.
  * @param u The step's usage; undefined where nobody measured it.
  */
-export function usedLines(u: Consumed | undefined): string[] {
+export function usedLines(u: Consumed | undefined) {
   const read = readWords(u);
   const cost = `cost  ${u?.costUsd !== undefined ? dollars(u.costUsd) : 'not measured'}${read ? ` · ${read}` : ''}`;
   if (!u) return ['used  not measured', cost];

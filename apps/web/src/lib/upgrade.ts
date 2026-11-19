@@ -4,7 +4,7 @@
  * (`atWork`); and the words of a release the server runs (`releaseWord`). Pure: the drawing is `components/settings/ServerRelease.tsx`.
  */
 import type { Release, Upgrade, UpgradesRead, VersionAnswer } from 'objects';
-import type { UpgradeOffers, UpgradeOffersOf, UpgradeOffersRead } from '../../contracts/upgrade-offers.contract.ts';
+import type { UpgradeOffersOf, UpgradeOffersRead } from '../../contracts/upgrade-offers.contract.ts';
 
 export type { UpgradeOffers } from '../../contracts/upgrade-offers.contract.ts';
 
@@ -14,7 +14,7 @@ export type { UpgradeOffers } from '../../contracts/upgrade-offers.contract.ts';
  * is read, at work or not), and not shown where none older is installed.
  * @param read What the offers read of the version and the upgrades read (`offersReadOf`).
  */
-export const upgradeOffers: UpgradeOffersOf = (read: UpgradeOffersRead): UpgradeOffers => {
+export const upgradeOffers: UpgradeOffersOf = (read: UpgradeOffersRead) => {
   const back = read.previous === null ? 'none' : read.previous.refused ? 'refused' : read.upgrading ? 'none' : 'offered';
   return { upgrade: read.newer && !read.upgrading, back };
 };
@@ -23,7 +23,7 @@ export const upgradeOffers: UpgradeOffersOf = (read: UpgradeOffersRead): Upgrade
  * Whether `upgrade` is still at work: filed and waiting for a slot (`pending`), or running.
  * @param upgrade The store's upgrade, or null or undefined where there is none.
  */
-export const atWork = (upgrade: Upgrade | null | undefined): boolean => upgrade?.phase === 'pending' || upgrade?.phase === 'running';
+export const atWork = (upgrade: Upgrade | null | undefined) => upgrade?.phase === 'pending' || upgrade?.phase === 'running';
 
 /**
  * What the offers read of the version and the upgrades read: a newer release read with a tag to upgrade to, the release going back goes
@@ -32,7 +32,7 @@ export const atWork = (upgrade: Upgrade | null | undefined): boolean => upgrade?
  * @param version The api's version answer, with the latest release the check read.
  * @param upgrades The upgrades read, or undefined where it was not answered.
  */
-export function offersReadOf(version: VersionAnswer, upgrades: UpgradesRead | undefined): UpgradeOffersRead {
+export function offersReadOf(version: VersionAnswer, upgrades: UpgradesRead | undefined) {
   if (upgrades === undefined) return { newer: false, previous: null, upgrading: false };
   return {
     newer: version.latest?.newer === true && version.latest.tag !== undefined,
@@ -45,5 +45,5 @@ export function offersReadOf(version: VersionAnswer, upgrades: UpgradesRead | un
  * The release the server runs, in words: its tag (`v0.4.0`), `an install` where it carries none, `a checkout` for code run from one.
  * @param release The release the api says the server runs, or undefined where it says none.
  */
-export const releaseWord = (release: Release | undefined): string =>
+export const releaseWord = (release: Release | undefined) =>
   release === undefined ? 'a release this api does not say' : release.kind === 'checkout' ? 'a checkout' : (release.tag ?? 'an install');

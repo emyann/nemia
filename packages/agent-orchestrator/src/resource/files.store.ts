@@ -34,7 +34,7 @@ export type StepValue = { name: string; value: string; link: string | null };
  * `http:` or `https:`, so a `javascript:` value, or text that is no URL, is shown and never followed.
  * @param v The value's name and its text, as the closeout handed it on.
  */
-export function valueOf(v: { name: string; value: string }): StepValue {
+export function valueOf(v: { name: string; value: string }) {
   let link: string | null = null;
   try {
     const url = new URL(v.value.trim());
@@ -78,7 +78,7 @@ export const typeOf = (name: string) =>
  * `..`, a backslash or a NUL in it, or an empty part, is refused before the disk is touched.
  * @param rel The path the route was asked for, from the folder.
  */
-export function refusedPath(rel: string): string | null {
+export function refusedPath(rel: string) {
   if (!isFilePath(rel)) {
     return `\`${rel}\` is not the path of a file under the step's folder: its parts are split at \`/\`, and none is empty, \`.\`, or has \`..\` or \`\\\` in it. GET /api/runs/<run> lists each step's closeout, whose \`artifacts\` carry the \`url\` of every file the api serves.`;
   }
@@ -89,11 +89,11 @@ export function refusedPath(rel: string): string | null {
  * Where the api serves the file at `rel` under a step's folder: the route, then the path encoded whole as one segment, its `/` as
  * `%2F`, as the route takes it.
  */
-const urlOf = (run: Pick<Run, 'id'>, step: string, route: 'files' | 'artifacts', rel: string): string =>
+const urlOf = (run: Pick<Run, 'id'>, step: string, route: 'files' | 'artifacts', rel: string) =>
   `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/${route}/${encodeURIComponent(rel)}`;
 
 /** A regular file directly in `dir` by `name`, without following a link: a link that leads out of the directory is not a file in it. */
-function fileIn(dir: string, name: string): fs.Stats | undefined {
+function fileIn(dir: string, name: string) {
   const stat = fs.lstatSync(path.join(dir, name), { throwIfNoEntry: false });
   return stat?.isFile() ? stat : undefined;
 }
@@ -107,7 +107,7 @@ function fileIn(dir: string, name: string): fs.Stats | undefined {
  * @param file The path the closeout named.
  * @param work The folder the step of a folder run works in, whose files a closeout names by absolute path; null for a repository run's.
  */
-export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string, work: string | null): StepArtifact {
+export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: string, file: string, work: string | null) {
   const dir = artifactsDir(home, run, step);
   const files = run.pruned?.artifacts;
   const place = artifactPlace(file, dir);
@@ -124,7 +124,7 @@ export function artifactOf(home: string, run: Pick<Run, 'id' | 'pruned'>, step: 
  * The path from a step's folder of a file a closeout named outside its artifacts folder: a path from the workspace root as it is, since
  * the run collects it at that path; an absolute one inside a folder run's own folder from that folder; none for any other.
  */
-function relativeOf(file: string, place: ReturnType<typeof artifactPlace>, work: string | null): { relativePath?: string } {
+function relativeOf(file: string, place: ReturnType<typeof artifactPlace>, work: string | null) {
   if (place === 'workspace') return { relativePath: path.normalize(file) };
   if (place !== 'outside' || work === null) return {};
   const within = path.relative(path.resolve(work), path.resolve(file));
@@ -133,7 +133,7 @@ function relativeOf(file: string, place: ReturnType<typeof artifactPlace>, work:
 }
 
 /** Whether a path is a directory in its own right — a symlink to one is not, so a link the run did not make is listed as any link is. */
-const isDirectory = (at: string): boolean => {
+const isDirectory = (at: string) => {
   try {
     return fs.lstatSync(at).isDirectory();
   } catch {
@@ -171,12 +171,7 @@ const isDirectory = (at: string): boolean => {
  * @param dir The step's folder whose files are listed.
  * @param route The route the files are linked under.
  */
-export function folderFiles(
-  run: Pick<Run, 'id'>,
-  step: string,
-  dir: string,
-  route: 'files' | 'artifacts',
-): { files: StepArtifact[]; error: string | null } {
+export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string, route: 'files' | 'artifacts') {
   let names: string[];
   try {
     names = fs.readdirSync(dir).sort();
@@ -202,4 +197,4 @@ export function folderFiles(
  * @param run The run's record.
  * @param step The step's name.
  */
-export const workFolderOf = (run: Run, step: string): string | null => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));
+export const workFolderOf = (run: Run, step: string) => (isRepositoryRun(run) ? null : (run.steps[step]?.workspace ?? null));

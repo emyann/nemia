@@ -38,7 +38,6 @@ import {
   runTable,
   SAY,
   SHOW,
-  type SummaryHow,
   verifiesRest,
 } from 'agent-orchestrator';
 import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type RunRetry, type RunSay, Unjudged, WriteFailed } from 'objects';
@@ -57,18 +56,18 @@ import { readsBounded } from './answer-bound.ts';
  * run object and its sub-resources read a run's judgement through, and keep on a miss.
  * @param program The read, given the informer.
  */
-export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>) =>
   Effect.provideService(program, Informer, informer);
 
 /** How a list of the runs judges each: off the app's informer, verified as the env says. */
-const howOf = (s: Served): SummaryHow => ({
+const howOf = (s: Served) => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
   verify: verifiesRest(s.env),
 });
 
 /** One selector, several, or none, as a list. */
-const listOf = (given: string | readonly string[] | undefined): string[] =>
+const listOf = (given: string | readonly string[] | undefined) =>
   given === undefined ? [] : typeof given === 'string' ? [given] : [...given];
 
 type ListQuery = {
@@ -167,14 +166,13 @@ const acted = <A>(at: At, work: (s: Served) => Promise<A>, unrecorded = false) =
   });
 
 /** `value` under `key`, or nothing where it is undefined: a key an answer may leave out is never sent present and undefined. */
-const given = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> =>
-  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
+const given = <K extends string, V>(key: K, value: V | undefined) => (value === undefined ? {} : ({ [key]: value } as Record<K, V>));
 
 /**
  * `value` as JSON says it, a key the orchestrator left undefined dropped: the record is the orchestrator's own object, said by
  * `Schema.Unknown`, which the Api's JSON encoding refuses where a key holds `undefined` (a 500), as `JSON.stringify` never did.
  */
-const asJson = <A>(value: A): A => JSON.parse(JSON.stringify(value)) as A;
+const asJson = <A>(value: A) => JSON.parse(JSON.stringify(value)) as A;
 
 /** The query of a removal: `whole`, `deleteBranches` and `forceUnmerged`, each asked where it is `true`. */
 type RemoveQuery = { readonly whole?: string; readonly deleteBranches?: string; readonly forceUnmerged?: string };

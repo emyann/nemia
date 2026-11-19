@@ -12,7 +12,7 @@ export const TERMINATION_MESSAGE_BYTES = 4096;
  * file. Opened without blocking, so a FIFO left there never holds the worker.
  * @param file The command's `config.terminationMessagePath`, read once at its process's exit.
  */
-export const terminationMessageAt = (file: string): string | undefined => {
+export const terminationMessageAt = (file: string) => {
   let fd: number;
   try {
     fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);

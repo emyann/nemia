@@ -27,7 +27,6 @@ import {
   type DiskRoot,
   type DiskKind,
   type DiskRun,
-  type TaskKept,
 } from './disk.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
@@ -61,13 +60,13 @@ export const DISK_SPAN_KEYS = ['run', 'value'] as const;
 export type DiskMemory = { said: Set<string> };
 
 /** What a daemon's sweeps remember when it starts: nothing. */
-export const freshDiskMemory = (): DiskMemory => ({ said: new Set() });
+export const freshDiskMemory = () => ({ said: new Set() }) satisfies DiskMemory;
 
 /** What one sweep answers: the reading, the runs it named, and what the walk cost, the names it read and the bursts it yielded. */
 export type Measured = { reading: DiskReading; largest: DiskRun[]; names: number; bursts: number };
 
 /** `value` into `disk.bytes` for the part, kind and factory `key` names (`entryKey`), a key of no kind its part's own (`kindAt`). */
-const bytesSaid = (key: string, value: number): Effect.Effect<void> => {
+const bytesSaid = (key: string, value: number) => {
   const { part, kind = kindAt(part), factory } = entryOf(key);
   return factory === undefined
     ? Metric.update(Metric.withAttributes(DISK_METRICS.bytes, { part, kind }), value)
@@ -95,7 +94,7 @@ const gauged = Effect.fnUntraced(function* (reading: DiskReading, memory: DiskMe
 });
 
 /** One of the largest runs into a span of its own (`DISK_SPAN`), a root of no length at `at`, with its factory where it has one. */
-const named = (run: DiskRun, at: string): Effect.Effect<void> =>
+const named = (run: DiskRun, at: string) =>
   rootSpan(
     DISK_SPAN,
     at,
@@ -105,13 +104,13 @@ const named = (run: DiskRun, at: string): Effect.Effect<void> =>
   );
 
 /** The kind a task's output is: a check's where the task was filed on the checks' harness (`HARNESSES.check`), else a session's. */
-const outputKind = (harness: string | undefined): DiskKind => (harness === HARNESSES.check.name ? 'check-output' : 'session-output');
+const outputKind = (harness: string | undefined) => (harness === HARNESSES.check.name ? 'check-output' : 'session-output');
 
 /**
  * What the runtime answered of each task, as the pure half takes it: its journal, bodies, output (`outputKind`) and files as the
  * kinds of `engine`, its records as `sessions`.
  */
-const keptOf = (report: KeptReport): TaskKept[] =>
+const keptOf = (report: KeptReport) =>
   report.tasks.map((task) => ({
     taskId: task.taskId,
     engine: {
@@ -168,7 +167,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   );
   const read = {
     bytes: roots.map((root) => root.own ?? 0),
-    kinds: roots.map((): Record<string, number> | undefined => undefined),
+    kinds: roots.map<Record<string, number> | undefined>(() => undefined),
     unread: roots.map(() => 0),
     read: roots.map(() => true),
   };

@@ -89,7 +89,7 @@ const FILED: StepView['filed'] = {
 };
 
 /** A try of the step, its codes `codes`, ended where `ended`. */
-export const tryOf = (n: number, codes: Codes, ended: boolean, closeout: StepCloseout | null, current = true): StepTry => ({
+export const tryOf = (n: number, codes: Codes, ended: boolean, closeout: StepCloseout | null, current = true) => ({
   try: n,
   round: 1,
   cause: n === 1 && !current ? 'retries' : null,
@@ -119,13 +119,13 @@ export const tryOf = (n: number, codes: Codes, ended: boolean, closeout: StepClo
             harness: null,
           },
         },
-});
+}) satisfies StepTry;
 
 /**
  * The step `design`, standing at `codes`, with `tries` and the closeout of its latest. Its command lines are the api's to spell: a story
  * writes each verb and its names alone.
  */
-export const stepOf = (codes: Codes, tries: StepTry[], gated = false): StepView => ({
+export const stepOf = (codes: Codes, tries: StepTry[], gated = false) => ({
   name: 'design',
   spec: null,
   filed: codes === CODES.come ? null : FILED,
@@ -165,7 +165,7 @@ export const stepOf = (codes: Codes, tries: StepTry[], gated = false): StepView 
 });
 
 /** The run `r-1` of the one step `step`, waiting on you where the step waits at its gate. */
-export const runOf = (step: StepView): RunDetail => ({
+export const runOf = (step: StepView) => ({
   id: 'r-1',
   factory: null,
   labels: {},
@@ -225,17 +225,17 @@ export const runOf = (step: StepView): RunDetail => ({
       cost: null,
     },
   },
-});
+}) satisfies RunDetail;
 
 /** `step` with its spend measured against a budget: the head's meter. */
-export const measured = (step: StepView): StepView => ({
+export const measured = (step: StepView) => ({
   ...step,
   spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
   budget: { usd: 5, said: '$5', of: '$1.25 of $5', over: false },
 });
 
 /** `step` at work, with no budget, whose session has said what it spent so far, a try before it measured: $32.32 so far. */
-export const spendingSoFar = (step: StepView): StepView => ({
+export const spendingSoFar = (step: StepView) => ({
   ...step,
   spent: { usd: 16.06, measured: 1, unmeasured: 0, live: { usd: 16.26, at: NOW.toISOString() }, said: '$32.32 so far' },
   budget: null,
@@ -245,7 +245,7 @@ export const spendingSoFar = (step: StepView): StepView => ({
  * `step` told in layers whose words write their headings at every depth a step's file does — a `##`, a `###` straight under the layer,
  * a `#` — and its task in parts, a run it waited on among them: what `Told` draws on its detail, opened.
  */
-export const toldInLayers = (step: StepView): StepView => ({
+export const toldInLayers = (step: StepView) => ({
   ...step,
   told: null,
   layers: {
@@ -265,4 +265,4 @@ export const toldInLayers = (step: StepView): StepView => ({
     { kind: 'text', text: '## What was asked for\n\nA flag.' },
     { kind: 'from', run: 'r-0', asked: 'Build the cache.', body: '### Its work\n\nIt built the cache.', how: 'waited' },
   ],
-});
+}) satisfies StepView;

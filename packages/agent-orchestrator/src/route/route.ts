@@ -52,7 +52,7 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
   if (parents.length > 0 && parents.every((p) => p === 'skipped')) return 'skipped';
   if (parents.some((p) => stopsFollowers(p))) return 'unreachable';
   if (when !== undefined && answered === undefined) return 'waits';
-  const satisfied = (p: string): boolean => p === 'verified' || p === 'unverified' || p === 'sent';
+  const satisfied = (p: string) => p === 'verified' || p === 'unverified' || p === 'sent';
   if (!parents.every((p) => satisfied(p) || p === 'skipped')) return 'waits';
   return parents.length === 0 || parents.some(satisfied) ? 'ready' : 'waits';
 };
@@ -64,7 +64,7 @@ export type { NodeKind };
  * What kind of node a step is: a condition (`routes:`), a route to a workflow (`workflow:`), or a step.
  * @param step The step read: its `routes` and its `workflow`.
  */
-export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow'>): NodeKind =>
+export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow'>) =>
   step.routes !== undefined ? 'condition' : step.workflow !== undefined ? 'workflow' : 'step';
 
 /**
@@ -72,5 +72,5 @@ export const nodeKind = (step: Pick<StepSpec, 'routes' | 'workflow'>): NodeKind 
  * @param step The node read: its `when:` and its parents.
  * @param steps The workflow's steps, among which its parents are.
  */
-export const conditionOf = (step: StepSpec, steps: readonly StepSpec[]): StepSpec | undefined =>
+export const conditionOf = (step: StepSpec, steps: readonly StepSpec[]) =>
   step.when === undefined ? undefined : steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);

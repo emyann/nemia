@@ -3,7 +3,6 @@
  * whether the run is finished and what stopped it (`stoppedOnWord`). Pure; the tick acts on it, and the verbs and the screens ask it.
  */
 import { retriesDue, type CheckKillOf, type Retry, type RetryAsk, type TipOf } from '../retry/index.ts';
-import type { RetryBriefing } from '../brief/index.ts';
 import {
   waitsOnCheckout,
   roundSpans,
@@ -170,7 +169,7 @@ export type AssessRead = {
  * The read is the pass's (`readRun`), and every reader of a run is handed it, so the tick, the verbs and the screens say one thing of it.
  * @param read The pass's read of the run: its record, its steps and the engine's views of its tasks.
  */
-export function assess(read: AssessRead): Assessment {
+export function assess(read: AssessRead) {
   const {
     steps,
     run,
@@ -198,7 +197,7 @@ export function assess(read: AssessRead): Assessment {
     due: { retry: [], round: [] },
     unheld: [],
   };
-  if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' };
+  if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' } satisfies Assessment;
 
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
   const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf, read.tipOf);
@@ -219,9 +218,9 @@ export function assess(read: AssessRead): Assessment {
       ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
-  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: [...run.hold.until] };
+  if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: [...run.hold.until] } satisfies Assessment;
   const waitingOnNeeds = needsWaited(hasStarted(run), read.needs ?? []);
-  if (waitingOnNeeds.length) return { ...nothing, unreachable, status: 'running', waitingOnNeeds };
+  if (waitingOnNeeds.length) return { ...nothing, unreachable, status: 'running', waitingOnNeeds } satisfies Assessment;
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
@@ -237,7 +236,7 @@ export function assess(read: AssessRead): Assessment {
     due: { retry: due, round },
     unheld: sentBack,
   };
-  return underPause(run, assessed);
+  return underPause(run, assessed) satisfies Assessment;
 }
 
 /**
@@ -252,9 +251,9 @@ function dueSteps(
   closeoutOf: (step: string) => Closeout | undefined,
   checkout: CheckoutHold | undefined,
   waitingOnCheckout: string[],
-): Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> {
+) {
   const due: Pick<Assessment, 'ready' | 'send' | 'check' | 'unreachable'> = { ready: [], send: [], check: [], unreachable: [] };
-  const wordOf = (name: string): StepStatus => status.get(name) ?? 'pending';
+  const wordOf = (name: string) => status.get(name) ?? 'pending';
   for (const step of steps) {
     const own = status.get(step.name);
     if (own === 'checking' && !run.steps[step.name]?.check) due.check.push(step.name);
@@ -272,11 +271,11 @@ function dueSteps(
 }
 
 /** Whether a run's words say it succeeded: every node satisfied, sent or skipped, and at least one that ran. */
-const succeeded = (all: readonly StepStatus[]): boolean =>
+const succeeded = (all: readonly StepStatus[]) =>
   all.every((s) => satisfiesAfter(s) || s === 'skipped') && (all.length === 0 || all.some(satisfiesAfter));
 
 /** The assessment as the store's pause leaves it (`Run.pause`): nothing due, and what was due named in `waitingOnPause`. Pure. */
-function underPause(run: Run, a: Assessment): Assessment {
+function underPause(run: Run, a: Assessment) {
   if (!run.pause) return a;
   const steps = [
     ...new Set([...a.ready, ...a.send, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout]),
@@ -287,7 +286,7 @@ function underPause(run: Run, a: Assessment): Assessment {
 }
 
 /** Read each step of a round due (`roundSpans`) that is `over budget` as its own ending under it, in `status`: never one not stood. */
-function unspent(status: Map<string, StepStatus>, stood: ReadonlyMap<string, { own: StepStatus }>, names: Iterable<string>): void {
+function unspent(status: Map<string, StepStatus>, stood: ReadonlyMap<string, { own: StepStatus }>, names: Iterable<string>) {
   for (const name of names) {
     const st = stood.get(name);
     if (st && status.get(name) === 'over budget') status.set(name, st.own);
@@ -295,7 +294,7 @@ function unspent(status: Map<string, StepStatus>, stood: ReadonlyMap<string, { o
 }
 
 /** A step's status and its own ending under it (`standing`), for `stoppedOnWord`: none for a step the assessment did not stand. */
-const wordsOf = (status: StepStatus | undefined, stood: { own: StepStatus } | undefined): { status: StepStatus; own: StepStatus }[] =>
+const wordsOf = (status: StepStatus | undefined, stood: { own: StepStatus } | undefined) =>
   status !== undefined && stood !== undefined ? [{ status, own: stood.own }] : [];
 
 /**
@@ -303,7 +302,7 @@ const wordsOf = (status: StepStatus | undefined, stood: { own: StepStatus } | un
  * step's status as the run reads it, and its own ending under that (`standing`), as `decision` reads it: a step whose task failed and that
  * is over its budget reads `over budget`, and it still broke. A step about to be tried again reads `running`, and stops nothing.
  */
-function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['status'] {
+function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>) {
   const stops = each.filter((s) => stopsFollowers(s.status));
   if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return 'failed';
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'waiting';
@@ -315,11 +314,7 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
  * @param said The last try's closeout, or undefined where it gave none.
  * @param steps The steps the run is judged by.
  */
-export const refusedTold = (
-  step: StepSpec | undefined,
-  said: Closeout | undefined,
-  steps: readonly StepSpec[],
-): Pick<RetryBriefing, 'refused'> => {
+export const refusedTold = (step: StepSpec | undefined, said: Closeout | undefined, steps: readonly StepSpec[]) => {
   const refused = said ? closeoutRefusals(step, said, steps) : [];
   return refused.length ? { refused } : {};
 };
@@ -332,5 +327,4 @@ export const refusedTold = (
  * @param step The step filed.
  * @param fields Makes the fields, asked only for a step on a local harness.
  */
-export const localFields = <T extends object>(step: StepSpec, fields: () => T): T | Record<string, never> =>
-  isRemoteHarness(step.harness) ? {} : fields();
+export const localFields = <T extends object>(step: StepSpec, fields: () => T) => (isRemoteHarness(step.harness) ? {} : fields());

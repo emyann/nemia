@@ -30,16 +30,16 @@ export const PAGES = [
 ];
 
 /** The SVGs of a built page. */
-const svgsOf = (html: string): string[] => html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
+const svgsOf = (html: string) => html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
 
 /** A page as a person says it: the home page by its path. */
-const said = (page: string): string => page || '/';
+const said = (page: string) => page || '/';
 
 /**
  * What the site built into `dist` is wrong about, each fault worded with its fix, or nothing: a page not built, a figure whose
  * style is printed as an attribute, a missing sequence, and a code-drawn diagram drawn on other than its one page.
  */
-export const faultsOf = (dist: string): string[] => {
+export const faultsOf = (dist: string) => {
   const unbuilt = PAGES.filter((page) => !fs.existsSync(path.join(dist, page, 'index.html')));
   if (unbuilt.length > 0) return [`these pages are not built: ${unbuilt.map(said).join(', ')}`];
   const html = new Map(PAGES.map((page) => [page, fs.readFileSync(path.join(dist, page, 'index.html'), 'utf8')]));

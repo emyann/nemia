@@ -21,9 +21,8 @@ import { ResolutionProposer, type ResolutionProposed } from './proposer.verb.ts'
  * The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by `caller` at `place`, at the version it is at now:
  * the proposal's name.
  */
-const proposedBy =
-  (caller: ProposalCaller, place: ProposalPlace): ResolutionProposed =>
-  (factory, kind, name, spec, why) =>
+const proposedBy = (caller: ProposalCaller, place: ProposalPlace) =>
+  ((factory, kind, name, spec, why) =>
     Effect.gen(function* () {
       const now = yield* currentOf(place, factory, kind, name);
       const verb = spec === undefined ? 'delete' : now.version === null && kind !== 'Factory' ? 'create' : 'update';
@@ -35,7 +34,7 @@ const proposedBy =
       };
       const proposal = yield* proposeProgram(caller, factory, { objects: [object], why }, place);
       return proposal.metadata.name;
-    });
+    })) satisfies ResolutionProposed;
 
 /**
  * The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name.
@@ -62,7 +61,7 @@ export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec
  * `program` given the command line's proposer of an owner's resolution.
  * @param program The program that may propose a resolution.
  */
-export const withResolutionProposer = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+export const withResolutionProposer = <A, E, R>(program: Effect.Effect<A, E, R>) =>
   Effect.provideService(program, ResolutionProposer, resolutionProposed);
 
 /**
@@ -73,5 +72,5 @@ export const withResolutionProposer = <A, E, R>(program: Effect.Effect<A, E, R>)
  */
 export const withResolutionProposerAs =
   (caller: ProposalCaller, place: ProposalPlace) =>
-  <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  <A, E, R>(program: Effect.Effect<A, E, R>) =>
     Effect.provideService(program, ResolutionProposer, proposedBy(caller, place));

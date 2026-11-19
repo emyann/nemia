@@ -7,14 +7,14 @@ import { stepAnchor } from '@/lib/asks';
 import type { Packet } from '@/lib/canvas';
 import { Button } from '@/components/ui/ds';
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /**
  * A packet in words: `plan · 2 fields · 1 file`.
  *
  * @param packet the packet, read for its label and its counts
  */
-export const packetWords = (packet: Pick<Packet, 'label' | 'fields' | 'files'>): string =>
+export const packetWords = (packet: Pick<Packet, 'label' | 'fields' | 'files'>) =>
   `${packet.label} · ${plural(packet.fields, 'field')} · ${plural(packet.files, 'file')}`;
 
 /**

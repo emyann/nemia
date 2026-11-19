@@ -7,7 +7,7 @@
  * release before it switches.
  */
 import { Effect, Stream } from 'effect';
-import { readinessSaid, type Fix, type FixStart, type Readiness } from 'objects';
+import { readinessSaid, type Fix, type Readiness } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { tried } from '../runtime-client.ts';
@@ -27,7 +27,7 @@ const MARK = { met: '✓', missing: '✗', unknown: '?', inactive: '·' } as con
  * piece, its state, its words, and each fix's command.
  * @param r The server's readiness: whether it is ready, and each piece with its fixes.
  */
-export const readinessLines = (r: Readiness): string[] => [
+export const readinessLines = (r: Readiness) => [
   r.ready ? 'ready: every piece is in place' : `${readinessSaid(r)}; each is marked ✗, its fix below it`,
   ...r.pieces.flatMap((p) => [
     `${MARK[p.state]} ${p.area}  ${p.name}${p.factory === undefined ? '' : `  (${p.factory}${p.workflow === undefined ? '' : `/${p.workflow}`})`}: ${p.message}`,
@@ -60,7 +60,7 @@ export const DOCTOR: Command<Readiness> = {
 };
 
 /** The answers `--answer <name>=<value>` gave, by name; refused (`Invalid`) where one has no name before its `=`. */
-const answersIn = (given: Args[string]): Record<string, string> => {
+const answersIn = (given: Args[string]) => {
   const list = Array.isArray(given) ? given : typeof given === 'string' ? [given] : [];
   return Object.fromEntries(
     list.map((pair: string) => {
@@ -78,7 +78,7 @@ const answersIn = (given: Args[string]): Record<string, string> => {
  * What `nemia doctor fix` was asked, as `startFix` takes it; refused (`Invalid`) where `--index` is no whole number from 0.
  * @param args The command's arguments: the need, its factory and workflow, `--index` and each `--answer`.
  */
-export const fixStartOf = (args: Args): FixStart => {
+export const fixStartOf = (args: Args) => {
   const index = args.index === undefined ? undefined : Number(args.index);
   if (index !== undefined && (!Number.isInteger(index) || index < 0))
     throw new Invalid({
@@ -99,7 +99,7 @@ export const fixStartOf = (args: Args): FixStart => {
  * @param pattern The code's pattern, as the fix declared it: a regular expression's source.
  * @param text The fix's output to search.
  */
-export const codesIn = (pattern: string, text: string): string[] => {
+export const codesIn = (pattern: string, text: string) => {
   try {
     return [...text.matchAll(new RegExp(pattern, 'g'))].map((m) => m[0]).filter(Boolean);
   } catch {
@@ -111,7 +111,7 @@ export const codesIn = (pattern: string, text: string): string[] => {
  * A code a fix declared, as the command line shows it: on a line of its own, spaced from what is around it.
  * @param code The code the fix declared.
  */
-export const codeShown = (code: string): string => `\n\n    ${code}\n\n`;
+export const codeShown = (code: string) => `\n\n    ${code}\n\n`;
 
 /**
  * The fix `fix`'s output followed to its end (`followFix`), each piece written to stdout as it comes, and each new code its declared
@@ -143,7 +143,7 @@ const followed = (fix: Fix) =>
   });
 
 /** What `nemia doctor fix` says of the fix once it is told: how it ended, or where it goes on. */
-const fixLines = (fix: Fix): string[] => {
+const fixLines = (fix: Fix) => {
   if (fix.phase === 'succeeded') return [`fix ${fix.id} of ${fix.need} succeeded: nemia doctor reads the need again`];
   if (fix.phase === 'failed')
     return [

@@ -12,14 +12,11 @@ export type Box = { x: number; y: number; width: number; height: number };
 /** React Flow's transform: the pan across and down, in the frame's pixels, and the zoom. */
 export type Transform = readonly [x: number, y: number, zoom: number];
 
-/** A view to move to, as React Flow's `setViewport` takes it. */
-type View = { x: number; y: number; zoom: number };
-
 /**
  * How big `el` is laid out, in its own pixels: 0 × 0 while it is hidden or off the page.
  * @param el The element the frame is drawn in, by its client width and height.
  */
-export const sizeOf = (el: { clientWidth: number; clientHeight: number }): Size => ({ width: el.clientWidth, height: el.clientHeight });
+export const sizeOf = (el: { clientWidth: number; clientHeight: number }) => ({ width: el.clientWidth, height: el.clientHeight });
 
 /** What a card is to React Flow's store, in so far as it says where the card is drawn on the floor and how big it measured. */
 type Measured = { internals: { positionAbsolute: { x: number; y: number } }; measured: { width?: number; height?: number } };
@@ -28,7 +25,7 @@ type Measured = { internals: { positionAbsolute: { x: number; y: number } }; mea
  * The boxes of `nodes` on the floor, as React Flow's store keeps them (`nodeLookup`); a card not measured yet takes no room.
  * @param nodes The cards as React Flow's store keeps them: where each is drawn and how big it measured.
  */
-export function boxesOf(nodes: Iterable<Measured>): Box[] {
+export function boxesOf(nodes: Iterable<Measured>) {
   return [...nodes].map(({ internals, measured }) => ({
     ...internals.positionAbsolute,
     width: measured.width ?? 0,
@@ -43,10 +40,10 @@ const ROOM = 0.9;
  * Whether a frame measured `size` is laid out: wider and taller than nothing. A frame hidden, taken off the page, or squeezed flat by
  * what is drawn beside it measures 0, and a view aimed at its middle then puts every card above and left of it.
  */
-export const sized = ({ width, height }: Size): boolean => width > 0 && height > 0;
+export const sized = ({ width, height }: Size) => width > 0 && height > 0;
 
 /** `box` as it is drawn in the frame under `transform`. */
-function drawn(box: Box, [x, y, zoom]: Transform): Box {
+function drawn(box: Box, [x, y, zoom]: Transform) {
   return { x: box.x * zoom + x, y: box.y * zoom + y, width: box.width * zoom, height: box.height * zoom };
 }
 
@@ -56,7 +53,7 @@ function drawn(box: Box, [x, y, zoom]: Transform): Box {
  * @param transform React Flow's transform: the pan, in the frame's pixels, and the zoom.
  * @param size How big the frame is drawn, in its own pixels.
  */
-export function wholeInView(box: Box, transform: Transform, size: Size): boolean {
+export function wholeInView(box: Box, transform: Transform, size: Size) {
   const at = drawn(box, transform);
   return at.x >= 0 && at.y >= 0 && at.x + at.width <= size.width && at.y + at.height <= size.height;
 }
@@ -67,7 +64,7 @@ export function wholeInView(box: Box, transform: Transform, size: Size): boolean
  * @param transform React Flow's transform: the pan, in the frame's pixels, and the zoom.
  * @param size How big the frame is drawn, in its own pixels.
  */
-export function anyInView(boxes: readonly Box[], transform: Transform, size: Size): boolean {
+export function anyInView(boxes: readonly Box[], transform: Transform, size: Size) {
   return boxes.some((box) => {
     const at = drawn(box, transform);
     return at.x < size.width && at.y < size.height && at.x + at.width > 0 && at.y + at.height > 0;
@@ -78,7 +75,7 @@ export function anyInView(boxes: readonly Box[], transform: Transform, size: Siz
  * Where a side `length` long starting at `start`, at `zoom`, is drawn on an axis of the frame `room` long: its middle in the frame's
  * middle when it fits, else its start at the frame's start, so a card taller or wider than the frame shows its head.
  */
-function aim(start: number, length: number, room: number, zoom: number): number {
+function aim(start: number, length: number, room: number, zoom: number) {
   return length * zoom <= room ? room / 2 - (start + length / 2) * zoom : -start * zoom;
 }
 
@@ -94,7 +91,7 @@ function aim(start: number, length: number, room: number, zoom: number): number 
  * @param minZoom The least zoom the view may take to fit the card.
  * @param top How many pixels at the frame's top the panels drawn over it take: none by default.
  */
-export function revealView(box: Box, transform: Transform, size: Size, minZoom: number, top = 0): View | null {
+export function revealView(box: Box, transform: Transform, size: Size, minZoom: number, top = 0) {
   const room = { width: size.width, height: size.height - top };
   const [x, y, now] = transform;
   if (!sized(room) || wholeInView(box, [x, y - top, now], room)) return null;

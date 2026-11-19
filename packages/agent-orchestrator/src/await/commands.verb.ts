@@ -31,13 +31,13 @@ export const WaitInput = Schema.Struct({
 export type WaitInput = typeof WaitInput.Type;
 
 /** The selectors under `selector`, in the order given, or none. */
-const selectorsOf = (args: Args | WaitInput): readonly string[] => {
+const selectorsOf = (args: Args | WaitInput) => {
   const value = args['selector'];
-  return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return (Array.isArray(value) ? value : typeof value === 'string' ? [value] : []) satisfies readonly string[] as readonly string[];
 };
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args | WaitInput, key: 'from' | 'for'): string | undefined => {
+const textOf = (args: Args | WaitInput, key: 'from' | 'for') => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -47,7 +47,7 @@ const textOf = (args: Args | WaitInput, key: 'from' | 'for'): string | undefined
  * that is no whole number, a `--for` out of its form or refused by `waitBound` (`waitForBound`). A cursor inside a line, or past the feed's
  * end, is the feed's to refuse, as it reads (`followFeed`).
  */
-function waitArgsRefusal(args: Args | WaitInput): string | null {
+function waitArgsRefusal(args: Args | WaitInput) {
   const selectors = selectorsRefusal(selectorsOf(args));
   if (selectors !== undefined) return selectors;
   const from = textOf(args, 'from');

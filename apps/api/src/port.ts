@@ -24,12 +24,12 @@ export const NO_TICK = '--no-tick';
  * started by mistake.
  * @param argv The process's arguments after the program.
  */
-export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: true; every: number } {
+export function argsOf(argv: readonly string[]) {
   const [only] = argv;
-  if (argv.length === 1 && only === NO_TICK) return { ticks: false };
+  if (argv.length === 1 && only === NO_TICK) return { ticks: false } satisfies { ticks: false } | { ticks: true; every: number };
   const asked =
     argv.length === 0 ? everyOf(undefined) : argv.length === 1 && only !== undefined && !only.startsWith('-') ? everyOf(only) : undefined;
-  if (asked && 'every' in asked) return { ticks: true, every: asked.every };
+  if (asked && 'every' in asked) return { ticks: true, every: asked.every } satisfies { ticks: false } | { ticks: true; every: number };
   const other = argv.join(' ');
   throw Object.assign(
     new Error(
@@ -44,10 +44,10 @@ export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: tru
  * Whether the api's process ticks the store, read off its arguments (`argsOf`), refused as it refuses them.
  * @param argv The process's arguments after the program.
  */
-export const ticksOf = (argv: readonly string[]): boolean => argsOf(argv).ticks;
+export const ticksOf = (argv: readonly string[]) => argsOf(argv).ticks;
 
 /** Whether `host` is this machine's loopback alone, v4 or v6. */
-const loopbackAddress = (host: string): boolean => host === LOOPBACK || host === '::1';
+const loopbackAddress = (host: string) => host === LOOPBACK || host === '::1';
 
 /**
  * Where the api listens, read off `NEMIA_BIND` (`value`) and whether the store is marked exposed (`WF_EXPOSED=1`): the loopback where it
@@ -80,7 +80,7 @@ const BIND_WORDS: Readonly<Record<BindRefusal, (value: string) => string>> = {
  * @param value The NEMIA_BIND setting, or undefined where it is unset.
  * @param exposed Whether the store is marked exposed.
  */
-export function hostOf(value: string | undefined, exposed: boolean): string {
+export function hostOf(value: string | undefined, exposed: boolean) {
   const bind = bindOf(value, exposed);
   if (bind.kind === 'bound') return bind.host;
   throw Object.assign(new Error(BIND_WORDS[bind.reason](asked(value))), { exitCode: 2 });
@@ -94,7 +94,7 @@ export function hostOf(value: string | undefined, exposed: boolean): string {
  * @param host The host, as hostOf bound it.
  * @param acknowledged Whether a wildcard or public address is acknowledged.
  */
-export function acknowledgedHost(host: string, acknowledged: boolean): string {
+export function acknowledgedHost(host: string, acknowledged: boolean) {
   if (bindExposure(kindOfBind(host), acknowledged) === 'listen') return host;
   throw Object.assign(
     new Error(
@@ -110,7 +110,7 @@ export function acknowledgedHost(host: string, acknowledged: boolean): string {
  * at the loopback, an IPv6 address in brackets, as a URL writes one, and any other as it is.
  * @param host The host the server is bound on.
  */
-export const leaseHostOf = (host: string): string => {
+export const leaseHostOf = (host: string) => {
   if (host === '0.0.0.0' || host === '::') return LOOPBACK;
   return host.includes(':') ? `[${host}]` : host;
 };
@@ -124,7 +124,7 @@ export const leaseHostOf = (host: string): string => {
  * @param value The PORT setting, or undefined where it is unset.
  * @param ticks Whether the api ticks the store; true by default.
  */
-export function portOf(value: string | undefined, ticks = true): number {
+export function portOf(value: string | undefined, ticks = true) {
   const text = value?.trim() ?? '';
   const unset = ticks ? DEFAULT_PORT : VIEWER_PORT;
   if (!text) return unset;

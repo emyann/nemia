@@ -6,9 +6,9 @@ import { Layer } from 'effect';
 import { DelegationDoor, delegationDoorOver, delegationNamed, type DelegationRecord } from './delegation.store.ts';
 
 /** A fresh Delegation door over a map: no delegation written. */
-export function delegationDoorMemory(): Layer.Layer<never> {
+export function delegationDoorMemory() {
   const held = new Map<string, DelegationRecord>();
-  const key = (factory: string, agent: string): string => {
+  const key = (factory: string, agent: string) => {
     delegationNamed(factory, agent);
     return `${factory}/${agent}`;
   };

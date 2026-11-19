@@ -8,10 +8,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../src/step/step.ts';
 
 /** Whether the folder's own name, the path's last segment, is `name`. */
-const namedAs = (dir: string, name: string): boolean => dir === name || dir.endsWith('/' + name);
+const namedAs = (dir: string, name: string) => dir === name || dir.endsWith('/' + name);
 
 /** Whether a path holds a segment `.` or `..`, an empty one, or ends in a slash: what resolving it would change. */
-const unnormalized = (dir: string): boolean =>
+const unnormalized = (dir: string) =>
   dir.includes('//') ||
   dir.includes('/./') ||
   dir.includes('/../') ||

@@ -71,7 +71,7 @@ const MAX_PAGES = 200;
 const BODY_MAX = 65_000;
 
 /** The version a tag releases, or `undefined` for a tag that is no release. */
-export const releaseTag = (tag: string): string | undefined => {
+export const releaseTag = (tag: string) => {
   const m = TAG.exec(tag);
   return m ? `${Number(m[1])}.${Number(m[2])}.${Number(m[3])}` : undefined;
 };
@@ -79,23 +79,23 @@ export const releaseTag = (tag: string): string | undefined => {
 const ORDER: readonly Bump[] = ['none', 'patch', 'minor', 'major'];
 
 /** The bump of a set of labels: the highest any gives, `none` where none releases. */
-export const bump = (labels: readonly string[]): Bump =>
+export const bump = (labels: readonly string[]) =>
   labels.reduce<Bump>((high, name) => {
     const given = LABELS.find((label) => label.name === name)?.bump ?? 'none';
     return ORDER.indexOf(given) > ORDER.indexOf(high) ? given : high;
   }, 'none');
 
-const parts = (version: string): number[] => version.split('.').map(Number);
+const parts = (version: string) => version.split('.').map(Number);
 
 /** Whether version `a` is below `b`. */
-const below = (a: string, b: string): boolean => {
+const below = (a: string, b: string) => {
   const [x, y] = [parts(a), parts(b)];
   for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i];
   return false;
 };
 
 /** The version after `last` (`undefined`: no release yet) for `by`, never below `FIRST`; `undefined` when `by` releases nothing. */
-export const nextVersion = (last: string | undefined, by: Bump): string | undefined => {
+export const nextVersion = (last: string | undefined, by: Bump) => {
   if (by === 'none') return undefined;
   if (last === undefined) return FIRST;
   const [major, minor, patch] = parts(last);
@@ -109,10 +109,7 @@ class Refusal extends Error {}
 type Out = (line: string) => void;
 type Env = Record<string, string | undefined>;
 
-/** What a call answered. */
-type Ran = { status: number | null; stdout: string; stderr: string };
-
-const spawn = (command: string, args: string[], env: Env, input?: string): Ran => {
+const spawn = (command: string, args: string[], env: Env, input?: string) => {
   const ran = spawnSync(command, args, { encoding: 'utf8', timeout: CALL_MS, env, input, maxBuffer: 256 << 20 });
   if (ran.error) throw new Refusal(`${command} ${args[0]} did not finish (${ran.error.message}): re-run the job once ${command} answers`);
   return { status: ran.status, stdout: ran.stdout, stderr: ran.stderr };
@@ -120,23 +117,23 @@ const spawn = (command: string, args: string[], env: Env, input?: string): Ran =
 
 /** The tool's reach into git and GitHub, under one environment. */
 const reach = (env: Env) => {
-  const git = (...args: string[]): string => {
+  const git = (...args: string[]) => {
     const ran = spawn('git', args, env);
     if (ran.status !== 0) throw new Refusal(`git ${args.join(' ')} failed: ${ran.stderr.trim()}`);
     return ran.stdout.trim();
   };
-  const gitMaybe = (...args: string[]): string | undefined => {
+  const gitMaybe = (...args: string[]) => {
     const ran = spawn('git', args, env);
     return ran.status === 0 ? ran.stdout.trim() : undefined;
   };
-  const gh = (args: string[], input?: string): string => {
+  const gh = (args: string[], input?: string) => {
     const ran = spawn('gh', args, env, input);
     if (ran.status !== 0)
       throw new Refusal(`gh ${args.slice(0, 3).join(' ')} failed: ${ran.stderr.trim()} — check GH_TOKEN and the job's permissions`);
     return ran.stdout;
   };
-  const ghSays = (args: string[]): boolean => spawn('gh', args, env).status === 0;
-  const api = <T>(method: string, endpoint: string, fields: string[] = []): T => {
+  const ghSays = (args: string[]) => spawn('gh', args, env).status === 0;
+  const api = <T>(method: string, endpoint: string, fields: string[] = []) => {
     const out = gh(['api', '-X', method, endpoint, ...fields.flatMap((field) => ['-f', field])]);
     return (out.trim() === '' ? null : JSON.parse(out)) as T;
   };
@@ -156,12 +153,12 @@ type Pull = {
 };
 
 /** The open pull request whose head is `branch`, into main, or `undefined`. */
-const openPull = (r: Reach, branch: string): Pull | undefined =>
+const openPull = (r: Reach, branch: string) =>
   r.api<Pull[]>('GET', `repos/{owner}/{repo}/pulls?state=open&base=${BASE}&head={owner}:${branch}&per_page=100`)[0];
 
-const releaseLabels = (labels: readonly string[]): string[] => labels.filter((name) => LABELS.some((label) => label.name === name));
+const releaseLabels = (labels: readonly string[]) => labels.filter((name) => LABELS.some((label) => label.name === name));
 
-const addCommand = (number: string | undefined): string =>
+const addCommand = (number: string | undefined) =>
   `gh api -X POST repos/{owner}/{repo}/issues/${number ?? '<number>'}/labels -f 'labels[]=<label>'`;
 
 /**
@@ -169,13 +166,13 @@ const addCommand = (number: string | undefined): string =>
  * passes `HEAD_SHA`, the commit it reports on, and the pull request's head must be that commit: a dispatch elsewhere cannot borrow a
  * labelled pull request's number.
  */
-const labelsToCheck = (env: Env, r: Reach): unknown => {
+const labelsToCheck = (env: Env, r: Reach) => {
   const number = env.PR_NUMBER;
   const head = env.HEAD_SHA ?? '';
   if (env.LABELS !== undefined) {
     if (head !== '') throw new Refusal('release-label: HEAD_SHA is compared with the live pull request: unset LABELS, and pass PR_NUMBER');
     try {
-      return JSON.parse(env.LABELS);
+      return JSON.parse(env.LABELS) as unknown;
     } catch {
       return undefined;
     }
@@ -197,7 +194,7 @@ const labelsToCheck = (env: Env, r: Reach): unknown => {
  * `check`: exactly one release label. The labels are read live by `PR_NUMBER`, so a run that starts after the pull request was
  * labelled reads the label it has then, never the payload of the event that started it.
  */
-const check = (env: Env, out: Out, r: Reach): number => {
+const check = (env: Env, out: Out, r: Reach) => {
   const number = env.PR_NUMBER;
   const labels = labelsToCheck(env, r);
   if (!Array.isArray(labels) || labels.some((label) => typeof label !== 'string'))
@@ -215,7 +212,7 @@ const check = (env: Env, out: Out, r: Reach): number => {
 };
 
 /** `labels`: the five labels exist, with their colour and description. */
-const labels = (out: Out, r: Reach): number => {
+const labels = (out: Out, r: Reach) => {
   const have: { name: string; color: string; description: string | null }[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const got = r.api<typeof have>('GET', `repos/{owner}/{repo}/labels?per_page=100&page=${page}`);
@@ -237,7 +234,7 @@ const labels = (out: Out, r: Reach): number => {
 };
 
 /** The releases among the tags merged into `ref`, highest first. */
-const releasesIn = (r: Reach, ref: string): { tag: string; version: string }[] =>
+const releasesIn = (r: Reach, ref: string) =>
   r
     .git('tag', '--merged', ref)
     .split('\n')
@@ -248,20 +245,20 @@ const releasesIn = (r: Reach, ref: string): { tag: string; version: string }[] =
     .sort((a, b) => (below(a.version, b.version) ? 1 : below(b.version, a.version) ? -1 : 0));
 
 /** The root `package.json`'s version at `ref`, or `undefined`. */
-const versionAt = (r: Reach, ref: string): string | undefined => {
+const versionAt = (r: Reach, ref: string) => {
   const text = r.gitMaybe('show', `${ref}:package.json`);
   if (text === undefined) return undefined;
   const version = (JSON.parse(text) as { version?: unknown }).version;
   return typeof version === 'string' ? version : undefined;
 };
 
-const fetchMain = (r: Reach): string => {
+const fetchMain = (r: Reach) => {
   r.git('fetch', '--quiet', '--tags', 'origin', `+refs/heads/${BASE}:refs/remotes/origin/${BASE}`);
   return r.git('rev-parse', `origin/${BASE}`);
 };
 
 /** The notes GitHub generates for `tag` at `target` since `previous`, by `.github/release.yml`'s categories. */
-const notes = (r: Reach, tag: string, target: string, previous: string | undefined): string =>
+const notes = (r: Reach, tag: string, target: string, previous: string | undefined) =>
   r.api<{ body: string }>('POST', 'repos/{owner}/{repo}/releases/generate-notes', [
     `tag_name=${tag}`,
     `target_commitish=${target}`,
@@ -273,7 +270,7 @@ const notes = (r: Reach, tag: string, target: string, previous: string | undefin
  * which the upload job publishes once its assets are attached, so no published release names nothing to download. A tag already there
  * with a release on it (a draft or published) is left alone; one with none, a run cut off between the two, is given its draft.
  */
-const tag = (out: Out, r: Reach): number => {
+const tag = (out: Out, r: Reach) => {
   fetchMain(r);
   const version = versionAt(r, `origin/${BASE}`);
   if (version === undefined) {
@@ -298,17 +295,17 @@ const tag = (out: Out, r: Reach): number => {
 };
 
 /** `obj` with `version` set, in npm's place for it: after `name`. */
-const withVersion = (obj: Record<string, unknown>, version: string): Record<string, unknown> => {
+const withVersion = (obj: Record<string, unknown>, version: string) => {
   if ('version' in obj) return { ...obj, version };
   const entries = Object.entries(obj);
   const at = entries.findIndex(([key]) => key === 'name') + 1;
   return Object.fromEntries([...entries.slice(0, at), ['version', version], ...entries.slice(at)]);
 };
 
-const writeJson = (file: string, value: unknown): void => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
+const writeJson = (file: string, value: unknown) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
 
 /** Writes `version` into the root `package.json` and the lockfile's root, in the working tree at `root`. */
-export const writeVersion = (root: string, version: string): void => {
+export const writeVersion = (root: string, version: string) => {
   const pkg = path.join(root, 'package.json');
   writeJson(pkg, withVersion(JSON.parse(fs.readFileSync(pkg, 'utf8')) as Record<string, unknown>, version));
   const lock = path.join(root, 'package-lock.json');
@@ -322,7 +319,7 @@ export const writeVersion = (root: string, version: string): void => {
 };
 
 /** The pull requests merged into main whose merge commit is in `commits`, read a page at a time. */
-const mergedIn = (r: Reach, commits: Set<string>): Pull[] => {
+const mergedIn = (r: Reach, commits: Set<string>) => {
   const found: Pull[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const got = r.api<Pull[]>('GET', `repos/{owner}/{repo}/pulls?state=closed&base=${BASE}&per_page=100&page=${page}`);
@@ -333,7 +330,7 @@ const mergedIn = (r: Reach, commits: Set<string>): Pull[] => {
 };
 
 /** The release branch's head once it is main plus one commit writing `version`: rebuilt and force-pushed only where it is not. */
-const rebuilt = (out: Out, r: Reach, root: string, main: string, version: string): string => {
+const rebuilt = (out: Out, r: Reach, root: string, main: string, version: string) => {
   const title = `release: v${version}`;
   const remote = r.git('ls-remote', 'origin', `refs/heads/${BRANCH}`);
   if (remote !== '') r.git('fetch', '--quiet', 'origin', `+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}`);
@@ -361,7 +358,7 @@ const TO_RELEASE = [
 ].join('\n');
 
 /** The release pull request's body: what a person does, GitHub's notes, then the pull requests no label counted, within GitHub's bound. */
-const bodyOf = (generated: string, unlabelled: Pull[]): string => {
+const bodyOf = (generated: string, unlabelled: Pull[]) => {
   let body = `${TO_RELEASE}\n\n${generated}\n`;
   if (unlabelled.length) body += `\n## Not labelled, counted for no bump\n\n${unlabelled.map((pull) => `#${pull.number}`).join(', ')}\n`;
   return body.length > BODY_MAX
@@ -370,7 +367,7 @@ const bodyOf = (generated: string, unlabelled: Pull[]): string => {
 };
 
 /** Opens the release pull request with `gh pr create`: its number, or the refusal naming the setting GitHub wants. */
-const opened = (env: Env, title: string, body: string): number => {
+const opened = (env: Env, title: string, body: string) => {
   const ran = spawn('gh', ['pr', 'create', '--base', BASE, '--head', BRANCH, '--title', title, '--body-file', '-'], env, body);
   if (ran.status !== 0 && /not permitted to create or approve pull requests/i.test(ran.stderr))
     throw new Refusal(
@@ -382,18 +379,18 @@ const opened = (env: Env, title: string, body: string): number => {
   return Number(m[1]);
 };
 
-const labelsOf = (pull: Pull): string[] => pull.labels.map((label) => label.name);
+const labelsOf = (pull: Pull) => pull.labels.map((label) => label.name);
 
 type WorkflowRun = { status: string; conclusion: string | null };
 
 /** Whether a dispatched run stands for its check on its head: still to finish, or green. A failed or cancelled one is tried again. */
-const standing = (run: WorkflowRun): boolean => run.status !== 'completed' || run.conclusion === 'success';
+const standing = (run: WorkflowRun) => run.status !== 'completed' || run.conclusion === 'success';
 
 /**
  * Dispatches each of `DISPATCHED` on the release branch where `head` has no dispatched run of it that stands, `release-label.yml` given
  * the pull request's number. Read from the head's runs every pass, whoever pushed it: a rerun with nothing changed dispatches nothing.
  */
-const dispatch = (out: Out, r: Reach, head: string, number: number): void => {
+const dispatch = (out: Out, r: Reach, head: string, number: number) => {
   for (const { file, pr } of DISPATCHED) {
     const { workflow_runs: runs } = r.api<{ workflow_runs: WorkflowRun[] }>(
       'GET',
@@ -406,7 +403,7 @@ const dispatch = (out: Out, r: Reach, head: string, number: number): void => {
 };
 
 /** `pr`: the release pull request, as main and the merged pull requests are now. */
-const pr = (env: Env, out: Out, r: Reach, root: string): number => {
+const pr = (env: Env, out: Out, r: Reach, root: string) => {
   const main = fetchMain(r);
   const last = releasesIn(r, `origin/${BASE}`)[0];
   const range = r.git('rev-list', last ? `${last.tag}..origin/${BASE}` : `origin/${BASE}`);
@@ -438,7 +435,7 @@ const pr = (env: Env, out: Out, r: Reach, root: string): number => {
 const USAGE = 'usage: node tools/release/release.ts check | labels | tag | pr';
 
 /** Runs a verb in the repository at the working directory: its exit code. */
-export const main = async (argv: string[], env: Env = process.env, out: Out = console.log): Promise<number> => {
+export const main = async (argv: string[], env: Env = process.env, out: Out = console.log) => {
   const r = reach(env);
   try {
     switch (argv[0]) {

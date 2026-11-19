@@ -21,7 +21,7 @@ type CheckVerdict = NonNullable<StepCheck['verdict']>;
  * @param t the try to name
  * @param tries every try of the step, to find the one before it
  */
-export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]): string {
+export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]) {
   const before = tries.find((other) => other.try === t.try - 1);
   return `round ${t.round} · try ${t.try}${before?.cause ? ` (${before.cause})` : ''}`;
 }
@@ -31,11 +31,11 @@ export function tryLabel(t: Frozen<StepTry>, tries: readonly Frozen<StepTry>[]):
  *
  * @param tries a step's tries, in any order
  */
-export const triesByRound = <T extends Frozen<Pick<StepTry, 'try' | 'round'>>>(tries: readonly T[]): Array<{ round: number; tries: T[] }> =>
+export const triesByRound = <T extends Frozen<Pick<StepTry, 'try' | 'round'>>>(tries: readonly T[]) =>
   [...new Set(tries.map((t) => t.round))].sort((a, b) => a - b).map((round) => ({ round, tries: tries.filter((t) => t.round === round) }));
 
 /** A try's sessions as its detail says them: how many, and how long the latest took, or that it runs. */
-export function attemptsWord({ count, latest }: StepAttempts): string {
+export function attemptsWord({ count, latest }: StepAttempts) {
   if (!latest) return 'no session';
   const took = latest.endedAt
     ? durationWords(Date.parse(latest.endedAt) - Date.parse(latest.startedAt), 'second')

@@ -50,7 +50,7 @@ export const TemplateRenders = Context.Reference<string>('agent-orchestrator/Tem
 });
 
 /** Why `dir` is not this user's own (`uid`) — a link, no folder, or owned by another — or undefined where it is, or is not there. */
-function notOwned(dir: string, uid: number | undefined): string | undefined {
+function notOwned(dir: string, uid: number | undefined) {
   const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
   if (stat === undefined) return undefined;
   if (!stat.isDirectory()) return `${dir} is no folder`;
@@ -63,13 +63,13 @@ function notOwned(dir: string, uid: number | undefined): string | undefined {
  * the machine's temporary folder, which is sticky, so its owner or root removes it, or the api is started where `os.tmpdir()` is this
  * user's own (`TMPDIR`).
  */
-const rootRefusal = (why: string, root: string): Conflict =>
+const rootRefusal = (why: string, root: string) =>
   new Conflict({
     message: `${why}, so no template is rendered or served from it: have its owner, or root, remove it (rm -rf ${root}) and ask again, or restart the api with TMPDIR set to a folder of this user's own, under which it renders.`,
   });
 
 /** `Conflict` saying why `dir`, inside this user's own folder of renders, is not this user's, and that removing it lets it be staged. */
-const insideRefusal = (why: string, dir: string): Conflict =>
+const insideRefusal = (why: string, dir: string) =>
   new Conflict({
     message: `${why}, so it is not served: remove it (rm -rf ${dir}), and the next ask stages the render again.`,
   });
@@ -97,8 +97,8 @@ const renderStaged = Effect.fn('renderStaged')(function* (root: string, dir: str
  * The names of a template's documents among its `files`: each workflow, agent and skill whose document is there, each sorted.
  * @param files The paths of the template's files.
  */
-export function templateDocumentsOf(files: readonly string[]): { workflows: string[]; agents: string[]; skills: string[] } {
-  const named = (holder: string, leaf: string): string[] =>
+export function templateDocumentsOf(files: readonly string[]) {
+  const named = (holder: string, leaf: string) =>
     files
       .map((file) => file.split('/'))
       .filter((parts) => parts.length === 3 && parts[0] === holder && parts[2] === leaf)
@@ -114,7 +114,7 @@ const SPEC_KEYS = ['version', 'description', 'instruction', 'rules', 'parameters
 const NO_SPEC: TemplateSpec = { parameters: {}, hires: {} };
 
 /** The spec the manifest `doc` writes, each key kept where it decodes as `TemplateSpec`'s; each other a problem of `place`'s manifest. */
-function servedSpec(doc: unknown, place: string): { spec: TemplateSpec; problems: string[] } {
+function servedSpec(doc: unknown, place: string) {
   const manifest = isMap(doc) ? doc : {};
   const written = isMap(manifest.spec) ? manifest.spec : {};
   const metadata = isMap(manifest.metadata) ? manifest.metadata : {};
@@ -155,18 +155,14 @@ const templateAt = Effect.fn('templateAt')(function* (name: string, place: strin
 });
 
 /** A Template of `meta`, `spec` and `status`, its `resourceVersion` its digest, or a digest of its spec and status where it has none. */
-const object = (
-  meta: { name: string; creationTimestamp: string },
-  spec: TemplateSpec,
-  status: TemplateStatus,
-  digest?: string,
-): Template => ({
-  apiVersion: API_VERSION,
-  kind: 'Template',
-  metadata: { ...meta, resourceVersion: digest ?? versionOf(spec, status) },
-  spec,
-  status,
-});
+const object = (meta: { name: string; creationTimestamp: string }, spec: TemplateSpec, status: TemplateStatus, digest?: string) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: 'Template',
+    metadata: { ...meta, resourceVersion: digest ?? versionOf(spec, status) },
+    spec,
+    status,
+  }) satisfies Template;
 
 /** The folder of the builtin template `name`, or `Missing` naming the list and the builtin templates there are. */
 const builtinNamed = Effect.fn('builtinNamed')(function* (name: string) {

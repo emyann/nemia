@@ -11,10 +11,10 @@ import { createHash } from 'node:crypto';
  * The digest of `text` as a `resourceVersion`: its sha256, in hex, cut to 16 characters.
  * @param text The text to digest.
  */
-export const versionDigest = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
+export const versionDigest = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
 
 /**
  * The digest of `value`'s JSON as a `resourceVersion` (`versionDigest`).
  * @param value The value to digest, written as JSON.
  */
-export const valueVersion = (value: unknown): string => versionDigest(JSON.stringify(value));
+export const valueVersion = (value: unknown) => versionDigest(JSON.stringify(value));

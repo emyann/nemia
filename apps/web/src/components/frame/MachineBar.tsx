@@ -32,7 +32,7 @@ const DOT: Record<DaemonTone, string> = {
  *
  * @param presence her presence, as her face reads it
  */
-export function presenceWord(presence: Presence): string {
+export function presenceWord(presence: Presence) {
   if (presence.down) return 'Nemia down';
   if (presence.resting) return 'Nemia resting';
   if (presence.answering) return 'Nemia answering';

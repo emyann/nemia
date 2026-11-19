@@ -39,7 +39,7 @@ export const WorkflowStep = Schema.Struct({
 export type WorkflowStep = typeof WorkflowStep.Type;
 
 /** The folder's own name: its path's last segment. */
-const folderName = (dir: string): string => dir.slice(dir.lastIndexOf('/') + 1);
+const folderName = (dir: string) => dir.slice(dir.lastIndexOf('/') + 1);
 
 /**
  * A workflow, the aggregate: its folder, its name, its steps and its README. Its checks are its invariants, refused by the door before a

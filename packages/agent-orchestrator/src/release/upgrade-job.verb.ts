@@ -10,7 +10,7 @@
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Context, Effect, Option, Stream } from 'effect';
-import type { PreviousRelease, Upgrade, UpgradeStart, UpgradesRead } from 'objects';
+import type { Upgrade, UpgradeStart, UpgradesRead } from 'objects';
 import { asked, EngineService, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { alive } from '../process/alive.store.ts';
@@ -48,21 +48,13 @@ export const RunningCode = Context.Reference<() => Running>('orchestrator/Runnin
  * stdout so a refusal is read in the one stream with the rest.
  * @param tag The tag the upgrade names.
  */
-export const upgradeCommand = (tag: string): string[] => [
-  'sh',
-  '-c',
-  'exec 2>&1\nexec "$0" "$@"',
-  process.execPath,
-  NEMIA_BIN,
-  'upgrade',
-  tag,
-];
+export const upgradeCommand = (tag: string) => ['sh', '-c', 'exec 2>&1\nexec "$0" "$@"', process.execPath, NEMIA_BIN, 'upgrade', tag];
 
 /**
  * Whether the engine holds the task of `view` filed: a task it never filed, or has forgotten, reads as an empty journal, with no filing,
  * and is no upgrade at work nor one to read back.
  */
-const filed = (view: TaskView): boolean => view.state.filedAt !== undefined;
+const filed = (view: TaskView) => view.state.filedAt !== undefined;
 
 /**
  * Whether the task of `record` is filed and has not settled: its view read, and a task the engine cannot read, or holds no filing of,
@@ -129,13 +121,13 @@ export const startUpgrade = Effect.fn('startUpgrade')(function* (start: UpgradeS
 });
 
 /** Why going back to `tag` is refused on a store whose floor is `floor`: the oldest release that reads it, and the upgrade that may go. */
-const floorWords = (tag: string, floor: Version): string => {
+const floorWords = (tag: string, floor: Version) => {
   const oldest = versionTag(floor);
   return `${tag} cannot read this store, which a newer release has run; the oldest release that can is ${oldest} (store.json): upgrade to ${oldest} or newer.`;
 };
 
 /** The `Upgrade` of `record` over its task's view and the end of its output. */
-const upgradeRead = (record: UpgradeRecord, view: TaskView | undefined, output: string): Upgrade => {
+const upgradeRead = (record: UpgradeRecord, view: TaskView | undefined, output: string) => {
   const exitCode = view?.state.settled ? view.state.attempts.at(-1)?.exitCode : undefined;
   return {
     id: record.id,
@@ -145,11 +137,11 @@ const upgradeRead = (record: UpgradeRecord, view: TaskView | undefined, output: 
     output,
     ...(typeof exitCode === 'number' ? { exitCode } : {}),
     startedAt: record.startedAt,
-  };
+  } satisfies Upgrade;
 };
 
 /** The record of the upgrade `id`, refused (`Missing`) where the store has none, naming where the upgrades are read. */
-const recordOf = (home: string, id: string): Effect.Effect<UpgradeRecord, Missing> => {
+const recordOf = (home: string, id: string) => {
   const record = readUpgradeRecord(home, id);
   return record === undefined
     ? Effect.fail(
@@ -206,7 +198,7 @@ export const followUpgrade = (id: string, everyMs: number = UPGRADE_FOLLOW_MS) =
  * The release going back goes to from `running` among the store's installed releases (`previousRelease`), with the floor's words where
  * going back to it is refused (`goingBackRefused`); null where none older is installed, or the server runs code from a repository.
  */
-const previousOf = (home: string, running: Running): PreviousRelease | null => {
+const previousOf = (home: string, running: Running) => {
   const own = running.kind === 'install' ? parseVersion(running.tag) : null;
   const installed = installedReleases(home).map((r) => ({ tag: r.tag, version: parseVersion(r.tag) }));
   const tag = previousRelease(installed, own);

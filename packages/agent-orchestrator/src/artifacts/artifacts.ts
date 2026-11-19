@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { CONFIG_FOLDERS, configFolderIn } from 'agent-runtime/vocabulary';
-import { filesPrunedWords, type Mount, type Pruned, type Run, type TaskPhase } from '../record/record.ts';
+import { filesPrunedWords, type Pruned, type Run, type TaskPhase } from '../record/record.ts';
 import { sandboxed, upstreamOf } from '../workflow/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -42,7 +42,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * @param inMain Whether the step works in the repository's own checkout; false where absent.
  * @param inFolder Whether the step is of a folder run; false where absent.
  */
-export const artifactsContract = (dir: string, inMain = false, inFolder = false): string =>
+export const artifactsContract = (dir: string, inMain = false, inFolder = false) =>
   (inFolder
     ? [
         '',
@@ -107,7 +107,7 @@ const LACKS_REFUSE =
   'A closeout that names a file the run does not then have is refused: nothing that waits on you starts, and you are asked again, told each such name.';
 
 /** The brief's lines saying a file through a configuration folder (`CONFIG_FOLDERS`) is refused, and not `done` with it, and why. */
-const configurationRefused = (done: string): string[] => [
+const configurationRefused = (done: string) => [
   `A file whose path passes through ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}, a folder a harness reads as its own configuration, is`,
   `refused, and not ${done}: the steps after you read your files in a folder of theirs, and would take it as their own.`,
 ];
@@ -142,7 +142,7 @@ export const HANDED_CLOSEOUT = 'closeout.json';
  * @param file The path the closeout declared, from the workspace root or absolute.
  * @param dir The step's files directory.
  */
-export function artifactPlace(file: string, dir: string): ArtifactPlace {
+export function artifactPlace(file: string, dir: string) {
   if (!path.isAbsolute(file)) {
     const rel = path.normalize(file);
     if (rel === '..' || rel.startsWith(`..${path.sep}`)) return 'escapes';
@@ -190,8 +190,8 @@ export type MissingArtifact = {
  * @param files Every file in the step's directory, with its size.
  * @param pruned What `nemia prune` removed of the run, and when; undefined for a run never pruned.
  */
-export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned): string[] {
-  const line = (why: MissingArtifact['why'], say: (names: string) => string): string[] => {
+export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned) {
+  const line = (why: MissingArtifact['why'], say: (names: string) => string) => {
     const names = missing.filter((m) => m.why === why).map((m) => m.path);
     return names.length ? [say(names.join(', '))] : [];
   };
@@ -250,7 +250,7 @@ export const REFUSING: ReadonlySet<MissingArtifact['why']> = new Set([
  * @param why Why the run does not have the file.
  * @param dir The step's files directory.
  */
-export function lackWords(why: string, dir: string): string {
+export function lackWords(why: string, dir: string) {
   const words: Record<string, string> = {
     'not there': 'nothing is at that path in the workspace',
     missing: `it is not a file in \`${dir}\``,
@@ -270,7 +270,7 @@ export function lackWords(why: string, dir: string): string {
  * @param named The file as the closeout named it.
  * @param there The files of the step's directory, by absolute path.
  */
-export function nearName(named: string, there: readonly string[]): string | undefined {
+export function nearName(named: string, there: readonly string[]) {
   const last = path.basename(named).toLowerCase();
   if (there.some((file) => file === named)) return undefined;
   return there.find((file) => path.basename(file).toLowerCase() === last);
@@ -283,7 +283,7 @@ export function nearName(named: string, there: readonly string[]): string | unde
  * @param dir The step's files directory.
  * @param there The files of the step's directory, by absolute path.
  */
-export const lackLines = (lacked: readonly { path: string; why: string }[], dir: string, there: readonly string[]): string[] =>
+export const lackLines = (lacked: readonly { path: string; why: string }[], dir: string, there: readonly string[]) =>
   lacked.map((file) => {
     const near = nearName(path.isAbsolute(file.path) ? file.path : path.join(dir, file.path), there);
     return `- \`${file.path}\`: ${lackWords(file.why, dir)}.${near ? ` There is \`${near}\`.` : ''}`;
@@ -296,7 +296,7 @@ export type HandedFiles = { there: string[]; gone: number };
  * Bytes, as a person reads them.
  * @param bytes The size, in bytes.
  */
-export const sizeOf = (bytes: number): string =>
+export const sizeOf = (bytes: number) =>
   bytes < 1024
     ? `${bytes} B`
     : bytes < 1024 ** 2
@@ -315,7 +315,7 @@ export const sizeOf = (bytes: number): string =>
  * @param steps The run's steps.
  * @param runArtifacts The folder of the run's artifacts.
  */
-export const handedMounts = (step: Pick<StepSpec, 'name' | 'harness'>, steps: readonly StepSpec[], runArtifacts: string): Mount[] => {
+export const handedMounts = (step: Pick<StepSpec, 'name' | 'harness'>, steps: readonly StepSpec[], runArtifacts: string) => {
   if (isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS)) return [];
   const upstream = upstreamOf(steps, step.name);
   return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
@@ -338,7 +338,7 @@ export function filesDue(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => { artifacts: readonly string[] } | undefined,
-): string[] {
+) {
   const counted = run.settlesCounted;
   if (run.pruned || !counted) return [];
   return steps
@@ -357,5 +357,5 @@ export function filesDue(
  * `..`, a backslash or a NUL in it — so an absolute path, one that climbs out, and one spelled with the other separator are none.
  * @param rel The path asked for, from the folder.
  */
-export const isFilePath = (rel: string): boolean =>
+export const isFilePath = (rel: string) =>
   rel.split('/').every((part) => Boolean(part) && part !== '.' && !/[\\\0]/.test(part) && !part.includes('..'));

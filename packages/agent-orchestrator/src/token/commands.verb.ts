@@ -14,15 +14,15 @@ import type { TokenHolder } from './token.ts';
 import { TokenDoor, holderOf, type PersonTokenFiled } from './token.store.ts';
 
 /** A text argument, or undefined where it was not given. */
-const textOf = (args: Args, key: string): string | undefined => (typeof args[key] === 'string' ? args[key] : undefined);
+const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? args[key] : undefined);
 
 /**
  * The token `record` is, as the api lists it: its name, its holder and when it was minted; never the token, nor its digest.
  * @param record The person's token as the store files it.
  */
-export function tokenOf(record: PersonTokenFiled): Token {
+export function tokenOf(record: PersonTokenFiled) {
   const holder = holderOf(record);
-  if (holder.kind === 'person') return { name: record.name, holder: 'person', createdAt: record.createdAt };
+  if (holder.kind === 'person') return { name: record.name, holder: 'person', createdAt: record.createdAt } satisfies Token;
   return {
     name: record.name,
     holder: 'agent',
@@ -30,7 +30,7 @@ export function tokenOf(record: PersonTokenFiled): Token {
     ...(holder.factory === null ? {} : { factory: holder.factory }),
     ...(holder.narrowed === null ? {} : { narrowed: holder.narrowed }),
     createdAt: record.createdAt,
-  };
+  } satisfies Token;
 }
 
 /**
@@ -39,7 +39,7 @@ export function tokenOf(record: PersonTokenFiled): Token {
  * `act` — a token is never widened, so none is above the agent's own floor.
  * @param args The command's parsed arguments.
  */
-export function holderAsked(args: Args): TokenHolder {
+export function holderAsked(args: Args) {
   const agent = textOf(args, 'agent');
   const factory = textOf(args, 'factory');
   const narrowed = textOf(args, 'narrowed');
@@ -50,9 +50,9 @@ export function holderAsked(args: Args): TokenHolder {
       throw new Invalid({
         message: `a factory or a narrowing says an agent's token, and this one names no agent: nemia token add <name> --agent <agent> [--factory <factory>] [--narrow read|act].`,
       });
-    return { kind: 'person' };
+    return { kind: 'person' } satisfies TokenHolder;
   }
-  return { kind: 'agent', agent, factory: factory ?? null, narrowed: narrowed ?? null };
+  return { kind: 'agent', agent, factory: factory ?? null, narrowed: narrowed ?? null } satisfies TokenHolder;
 }
 
 /** `nemia token add <name> [--agent <agent> [--factory <factory>] [--narrow read|act]]`: a standing token minted, answered once. */

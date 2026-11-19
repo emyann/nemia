@@ -8,7 +8,7 @@ import ts from 'typescript';
  * Every name `source` has, added to `into`: its identifiers, private and JSX names included (`#` dropped), and for each string, template
  * part and JSX text its whole text, every word of it, and each part of a hyphened word.
  */
-export const namesOf = (source: ts.SourceFile, into: Set<string> = new Set()): Set<string> => {
+export const namesOf = (source: ts.SourceFile, into: Set<string> = new Set()) => {
   const visit = (node: ts.Node) => {
     if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) into.add(node.text.replace(/^#/, ''));
     else if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node) || ts.isJsxText(node)) {

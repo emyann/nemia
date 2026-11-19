@@ -84,7 +84,7 @@ const sayBackoff = (o: Pick<DeliverOptions, 'retry' | 'retryCap'>) =>
   Schedule.min([Schedule.exponential(o.retry), Schedule.spaced(o.retryCap)]);
 
 /** `text` said to the subscription `name`'s task, said again on its backoff until the engine takes it, each failure a warning. */
-const told = (name: string, sub: Subscription, text: string, o: DeliverOptions): Effect.Effect<void, never, EngineService> =>
+const told = (name: string, sub: Subscription, text: string, o: DeliverOptions) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
     yield* e.say(sub.task, text).pipe(
@@ -122,7 +122,7 @@ class LevelUnread extends Data.TaggedError('LevelUnread')<{ readonly run: string
  * `next` kept: in memory, and through the door stamped with the subscription it is for. A write the door refuses is the deliverer's
  * own defect: its fiber dies, and the next read of the subscriptions starts it again from what was kept.
  */
-const keep = (d: Delivering, next: Delivery): Effect.Effect<void> =>
+const keep = (d: Delivering, next: Delivery) =>
   Ref.set(d.state, next).pipe(
     Effect.andThen(
       Effect.gen(function* () {
@@ -137,21 +137,21 @@ const keep = (d: Delivering, next: Delivery): Effect.Effect<void> =>
 type SaidOnce = (line: string) => Effect.Effect<void>;
 
 /** A `SaidOnce` over a set of its own: each line a warning the first time. */
-const saidOnce = (): SaidOnce => {
+const saidOnce = () => {
   const said = new Set<string>();
-  return (line) =>
+  return ((line) =>
     Effect.suspend(() => {
       if (said.has(line)) return Effect.void;
       said.add(line);
       return Effect.logWarning(line);
-    });
+    })) satisfies SaidOnce;
 };
 
 /**
  * Whether the subscription carries a line of the run `run`: unscoped, always; scoped, where the run's factory is at its floor now. A run
  * that does not read is not carried; a level that does not read fails (`LevelUnread`), and a defect is not caught.
  */
-const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread, StoreRoot> => {
+const carries = (d: Delivering, run: string) => {
   const floor = d.sub.scope?.atLeast;
   if (floor === undefined) return Effect.succeed(true);
   return Effect.gen(function* () {
@@ -169,7 +169,7 @@ const carries = (d: Delivering, run: string): Effect.Effect<boolean, LevelUnread
  * One read of the feed, its lines ending at `cursor`, delivered: a run's line the subscription does not carry passed, a daemon's carried
  * by every one; where a carried line wakes, the message said, then the cursor kept; else the routine lines folded into the digest.
  */
-const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Effect.Effect<void, LevelUnread, EngineService | StoreRoot> =>
+const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number) =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
     const carried = yield* Effect.filter(lines, (line) => (isRunLine(line) ? carries(d, line.run) : Effect.succeed(true)));
@@ -182,7 +182,7 @@ const onLines = (d: Delivering, lines: readonly FeedLine[], cursor: number): Eff
   });
 
 /** The digest said alone where it is due, then emptied. */
-const digestPass = (d: Delivering): Effect.Effect<void, never, EngineService> =>
+const digestPass = (d: Delivering) =>
   Effect.gen(function* () {
     const at = yield* Ref.get(d.state);
     if (!at.digest.length || !digestDue(at.since, d.sub.digestEvery, instantNow())) return;
@@ -195,23 +195,21 @@ const digestPass = (d: Delivering): Effect.Effect<void, never, EngineService> =>
  * What the deliverer does of one read of the feed it follows: a feed that does not read, a warning; its lines, delivered as one, under the
  * lock; a read with none, nothing.
  */
-const onRead =
-  (d: Delivering) =>
-  (items: NonEmptyReadonlyArray<Followed>): Effect.Effect<void, LevelUnread, EngineService | StoreRoot> =>
-    Effect.gen(function* () {
-      for (const item of items)
-        if (item.kind === 'unreadable') yield* Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`);
-      const lines = items.flatMap((item) => (item.kind === 'line' ? [item] : []));
-      const last = lines.at(-1);
-      if (last)
-        yield* d.lock.withPermit(
-          onLines(
-            d,
-            lines.map((item) => item.line),
-            last.cursor,
-          ),
-        );
-    });
+const onRead = (d: Delivering) => (items: NonEmptyReadonlyArray<Followed>) =>
+  Effect.gen(function* () {
+    for (const item of items)
+      if (item.kind === 'unreadable') yield* Effect.logWarning(`the subscription ${d.name} waits for the feed to read: ${item.error}`);
+    const lines = items.flatMap((item) => (item.kind === 'line' ? [item] : []));
+    const last = lines.at(-1);
+    if (last)
+      yield* d.lock.withPermit(
+        onLines(
+          d,
+          lines.map((item) => item.line),
+          last.cursor,
+        ),
+      );
+  });
 
 /** How many items of the feed a deliverer gathers while it says a message: the hub's own capacity (`feedHubLayer`). */
 const GATHERED = 1024;
@@ -220,7 +218,7 @@ const GATHERED = 1024;
  * The feed followed from the cursor, for ever, a read at a time; cut under it, read again from its start; a read whose level does not
  * read, said once and read again from the cursor kept a beat later.
  */
-const reading = (d: Delivering): Effect.Effect<never, never, EngineService | StoreRoot> =>
+const reading = (d: Delivering) =>
   Effect.suspend(() => Ref.get(d.state)).pipe(
     Effect.flatMap((at) =>
       followFeed(at.cursor, { beat: d.o.beat }).pipe(
@@ -241,18 +239,13 @@ const reading = (d: Delivering): Effect.Effect<never, never, EngineService | Sto
       ),
     ),
     Effect.forever,
-  );
+  ) satisfies Effect.Effect<never, never, EngineService | StoreRoot>;
 
 /**
  * The subscription `name` delivered, from where its deliverer's file says it was if the file was written for it, else from its `from`,
  * until interrupted.
  */
-const delivering = (
-  name: string,
-  sub: Subscription,
-  o: DeliverOptions,
-  say: SaidOnce,
-): Effect.Effect<never, never, EngineService | StoreRoot> =>
+const delivering = (name: string, sub: Subscription, o: DeliverOptions, say: SaidOnce) =>
   Effect.gen(function* () {
     const read = yield* (yield* SubscriptionDoor).deliveries.read(SubscriptionName.read(name)).pipe(Effect.orDie);
     if (read !== null && 'unread' in read) yield* say(read.unread);
@@ -270,7 +263,7 @@ const delivering = (
     const check = d.lock.withPermit(digestPass(d)).pipe(Effect.andThen(Metric.update(SUBSCRIPTION_DIGEST_CHECKS, 1)));
     yield* Effect.forkChild(Effect.forever(check.pipe(Effect.andThen(Effect.sleep(o.digestCheck)))));
     return yield* reading(d);
-  });
+  }) satisfies Effect.Effect<never, never, EngineService | StoreRoot>;
 
 /**
  * One read of the subscriptions: each gone stopped, then each deliverer's file whose subscription is gone dropped, then each new or changed
@@ -302,7 +295,7 @@ const reconcile = (fibers: FiberMap.FiberMap<string>, started: Map<string, strin
  * A read that throws is a warning, and the next is tried a beat later.
  * @param options The deliverer's pace (`every`, `beat`, `digestCheck`, `retry`, `retryCap`); each left out takes its default.
  */
-export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
+export const deliver = (options: Partial<DeliverOptions> = {}) => {
   const o = { ...DELIVER_DEFAULTS, ...options };
   return Effect.scoped(
     Effect.gen(function* () {
@@ -314,5 +307,5 @@ export const deliver = (options: Partial<DeliverOptions> = {}): Effect.Effect<ne
       );
       return yield* Effect.forever(pass.pipe(Effect.andThen(Effect.sleep(o.every))));
     }),
-  );
+  ) satisfies Effect.Effect<never, never, EngineService | StoreRoot>;
 };

@@ -7,7 +7,7 @@ export type StoryDrawn = { id: string; broken: string | null; height: number };
  * Each story of `stories` that did not draw, a line each: one that threw, by what it threw, and one that drew nothing.
  * @param stories Each story as it drew.
  */
-export const undrawn = (stories: readonly StoryDrawn[]): string[] =>
+export const undrawn = (stories: readonly StoryDrawn[]) =>
   stories.flatMap((one) => {
     if (one.broken !== null) return [`${one.id} threw: ${one.broken}`];
     return one.height > 0 ? [] : [`${one.id} draws nothing`];

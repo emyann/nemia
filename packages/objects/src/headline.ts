@@ -4,7 +4,7 @@
  * from it drops it. Pure.
  * @param text The body, as it is stored.
  */
-export const headline = (text: string): string => {
+export const headline = (text: string) => {
   const at = text.indexOf('\n');
   const first = at === -1 ? text : text.slice(0, at);
   return first.replace(/^#{1,6}\s+/, '');

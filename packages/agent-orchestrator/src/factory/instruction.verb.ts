@@ -12,7 +12,7 @@ import { defaultFactoryRefusal, DEFAULT_INSTRUCTION, instructionPathRefusal, typ
 import type { FactoryInstruction } from './instruction.store.ts';
 import { doorAtOnce, FactoryDoor, filedFactory } from './door/factories.store.ts';
 import { FactoryName } from './factory.model.ts';
-import { Conflict, Invalid, type Refusal } from '../refusal/refusal.ts';
+import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 
 export type { FactoryInstruction };
@@ -24,13 +24,13 @@ export type { FactoryInstruction };
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function factoryInstruction(home: string, name: string): FactoryInstruction {
+export function factoryInstruction(home: string, name: string) {
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal('instruction') });
   return doorAtOnce(home, (door) => door.instruction.read(FactoryName.read(name)));
 }
 
 /** The instruction of the factory `name`, read through the Factory door. */
-const instructionNow = (name: string): Effect.Effect<FactoryInstruction, Refusal> =>
+const instructionNow = (name: string) =>
   Effect.gen(function* () {
     return yield* (yield* FactoryDoor).instruction.read(FactoryName.read(name));
   });
@@ -59,10 +59,10 @@ export const InstructInput = Schema.Struct({
 export type InstructInput = typeof InstructInput.Type;
 
 /** Where `asked` says to keep the instruction: a path, the store, or none, the key cleared; nothing where it says none of them. */
-function placeAsked({ clear, store, path }: InstructionInput): { at: InstructionAt | undefined } | undefined {
-  if (clear === true) return { at: undefined };
-  if (store === true) return { at: { store: true } };
-  return path === undefined ? undefined : { at: { path } };
+function placeAsked({ clear, store, path }: InstructionInput) {
+  if (clear === true) return { at: undefined } satisfies { at: InstructionAt | undefined } | undefined;
+  if (store === true) return { at: { store: true } } satisfies { at: InstructionAt | undefined } | undefined;
+  return (path === undefined ? undefined : { at: { path } }) satisfies { at: InstructionAt | undefined } | undefined;
 }
 
 /**
@@ -71,7 +71,7 @@ function placeAsked({ clear, store, path }: InstructionInput): { at: Instruction
  * that is not one (`instructionPathRefusal`, `Invalid`), the factory (`filedFactory`), and one made from a template, whose instruction
  * is its tree's (`Invalid`).
  */
-const instructionPlaced = (name: string, at: InstructionAt | undefined): Effect.Effect<string, Refusal> =>
+const instructionPlaced = (name: string, at: InstructionAt | undefined) =>
   Effect.gen(function* () {
     if (at !== undefined && 'path' in at) {
       const bad = instructionPathRefusal(at.path);
@@ -93,7 +93,7 @@ const instructionPlaced = (name: string, at: InstructionAt | undefined): Effect.
  * The instruction of the factory `args` name, after its place is set as they ask (`placeAsked`), if they ask one, in its spec
  * (`instructionPlaced`). Refused, writing nothing: as `FACTORY_INSTRUCTION` says.
  */
-const placed = (args: InstructionInput): Effect.Effect<FactoryInstruction, Refusal> =>
+const placed = (args: InstructionInput) =>
   Effect.gen(function* () {
     const name = args.factory;
     const asked = placeAsked(args);
@@ -131,7 +131,7 @@ export const FACTORY_INSTRUCT: Served<Instructed, InstructInput> = {
  * The instruction of the factory `args` name, after its text in the store is written from their words or removed with `clear`, through
  * the Factory door. Refused, writing nothing: as `FACTORY_INSTRUCT` says.
  */
-export const instructed = ({ factory: name, words, clear }: InstructInput): Effect.Effect<Instructed, Refusal> =>
+export const instructed = ({ factory: name, words, clear }: InstructInput) =>
   Effect.gen(function* () {
     const door = (yield* FactoryDoor).instruction;
     const factory = FactoryName.read(name);

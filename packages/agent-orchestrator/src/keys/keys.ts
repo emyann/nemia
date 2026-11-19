@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
-import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepOutput, type StepSpec } from '../step/step.ts';
+import { CLOSEOUT_FIELDS, COUNTS, type OutputSchema, refuse, shapesKept, type StepSpec } from '../step/step.ts';
 import {
   declarationOf,
   DEFAULT_HARNESS,
@@ -30,7 +30,7 @@ import { isObject } from 'effect/Predicate';
  * @param step The step's name, which a refusal starts with.
  * @param harness The `harness:` line's value, undefined where the step has none.
  */
-export function harnessOf(step: string, harness: string | undefined): string | undefined {
+export function harnessOf(step: string, harness: string | undefined) {
   if (harness === undefined || HARNESSES.includes(harness)) return harness;
   if (harness === 'claude-detached') {
     refuse(
@@ -63,12 +63,7 @@ export function harnessOf(step: string, harness: string | undefined): string | u
  * @param word The line's value, undefined where the step has none.
  * @param harness The step's `harness:`, undefined for the default harness.
  */
-export function wordOf(
-  step: string,
-  key: 'permissionMode' | 'sandbox' | 'effort',
-  word: string | undefined,
-  harness: string | undefined,
-): string | undefined {
+export function wordOf(step: string, key: 'permissionMode' | 'sandbox' | 'effort', word: string | undefined, harness: string | undefined) {
   const on = harness ?? DEFAULT_HARNESS;
   if (key === 'sandbox' && word !== undefined && fenceKeyOf(on) !== 'sandbox') {
     const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
@@ -87,7 +82,7 @@ export function wordOf(
  * @param step The step's name, which a refusal starts with.
  * @param remote The `remote:` line's value, undefined where the step has none.
  */
-export function remoteOf(step: string, remote: string | undefined): boolean | undefined {
+export function remoteOf(step: string, remote: string | undefined) {
   if (remote === undefined) return undefined;
   if (remote === 'true') return true;
   if (remote === 'false') return false;
@@ -103,7 +98,7 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
  * @param key The count's key, among `COUNTS`.
  * @param value The line's value, undefined where the step has none.
  */
-export function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {
+export function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined) {
   if (value === undefined) return undefined;
   const { least, counts, example } = COUNTS[key];
   const n = /^\d+$/.test(value) ? Number(value) : NaN;
@@ -124,7 +119,7 @@ const CONTEXT_EXAMPLE = '`context: 200k`, or `context: 150000`';
  * after them, either case. What `context:` takes.
  * @param written The tokens as written.
  */
-export function tokensOf(written: string): number | undefined {
+export function tokensOf(written: string) {
   const m = /^(\d+)([km])?$/i.exec(written.trim());
   if (!m) return undefined;
   const n = Number(m[1]) * (m[2] ? (m[2].toLowerCase() === 'k' ? 1_000 : 1_000_000) : 1);
@@ -136,7 +131,7 @@ export function tokensOf(written: string): number | undefined {
  * otherwise.
  * @param tokens The context window, in tokens.
  */
-export const contextText = (tokens: number): string =>
+export const contextText = (tokens: number) =>
   Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
 
 /** The scopes of a subagent's own `memory:`, which a step file copied from a subagent's may say. */
@@ -148,7 +143,7 @@ const SUBAGENT_MEMORY: readonly string[] = ['user', 'project', 'local'];
  * @param step The step's name, which a refusal starts with.
  * @param memory The `memory:` line's value, undefined where the step has none.
  */
-export function memoryOf(step: string, memory: string | undefined): string | undefined {
+export function memoryOf(step: string, memory: string | undefined) {
   if (memory === undefined) return undefined;
   const why = memoryQuantityRefusal(memory);
   if (why === undefined) return memory;
@@ -169,7 +164,7 @@ export function memoryOf(step: string, memory: string | undefined): string | und
  * @param checkMemory The `checkMemory:` line's value, undefined where the step has none.
  * @param check The step's `check:` line, undefined where it has none.
  */
-export function checkMemoryOf(step: string, checkMemory: string | undefined, check: string | undefined): string | undefined {
+export function checkMemoryOf(step: string, checkMemory: string | undefined, check: string | undefined) {
   if (checkMemory === undefined) return undefined;
   if (check === undefined)
     return refuse(
@@ -188,7 +183,7 @@ export function checkMemoryOf(step: string, checkMemory: string | undefined, che
  * @param step The step's name, which a refusal starts with.
  * @param context The `context:` line's value, undefined where the step has none.
  */
-export function contextOf(step: string, context: string | undefined): number | undefined {
+export function contextOf(step: string, context: string | undefined) {
   if (context === undefined) return undefined;
   const tokens = tokensOf(context);
   if (tokens !== undefined) return tokens;
@@ -207,7 +202,7 @@ export function contextOf(step: string, context: string | undefined): number | u
 export function sessionContext(
   step: Pick<StepSpec, 'name' | 'resume' | 'context'>,
   steps: readonly Pick<StepSpec, 'name' | 'resume' | 'context'>[],
-): number | undefined {
+) {
   const seen = new Set<string>();
   let at: Pick<StepSpec, 'name' | 'resume' | 'context'> | undefined = step;
   while (at?.resume && !seen.has(at.name)) {
@@ -230,7 +225,7 @@ export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
  * equal.
  * @param written The amount as written.
  */
-export function dollarsOf(written: string): number | undefined {
+export function dollarsOf(written: string) {
   const value = written.trim();
   const n = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
   return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -243,7 +238,7 @@ export function dollarsOf(written: string): number | undefined {
  * @param step The step's name, which a refusal starts with.
  * @param budget The `budget:` line's value, undefined where the step has none.
  */
-export function budgetOf(step: string, budget: string | undefined): number | undefined {
+export function budgetOf(step: string, budget: string | undefined) {
   if (budget === undefined) return undefined;
   const amount = dollarsOf(budget);
   if (amount !== undefined) return amount;
@@ -260,7 +255,7 @@ export function budgetOf(step: string, budget: string | undefined): number | und
  * @param step The step's name, which a refusal starts with.
  * @param gate The `gate:` line's value, undefined where the step has none.
  */
-export function gateOf(step: string, gate: string | undefined): true | undefined {
+export function gateOf(step: string, gate: string | undefined) {
   if (gate === undefined) return undefined;
   if (gate === 'true') return true;
   if (gate === 'false') {
@@ -293,7 +288,7 @@ export const PLACES = ['git', 'folder'] as const satisfies readonly PlaceKind[];
  * @param step The step's name, which a refusal starts with.
  * @param place The `place:` line's value, undefined where the step has none.
  */
-export function placeNamed(step: string, place: string | undefined): (typeof PLACES)[number] | undefined {
+export function placeNamed(step: string, place: string | undefined) {
   if (place === undefined) return undefined;
   if ((PLACES as readonly string[]).includes(place)) return place as (typeof PLACES)[number];
   return refuse(
@@ -307,7 +302,7 @@ export function placeNamed(step: string, place: string | undefined): (typeof PLA
  * @param step The step's name, which a refusal starts with.
  * @param place The `place:` line's value, read past its former spelling; undefined where the file says none.
  */
-export function placeRequired(step: string, place: string | undefined): string {
+export function placeRequired(step: string, place: string | undefined) {
   if (place !== undefined) return place;
   return refuse(
     `${step}: says no \`place:\`, where the step works, and a step does not work on a repository unless it says so. Write \`place: git\` to work on branches of a repository, or \`place: folder\` to work in folders the run makes, with no git repository — every step of a workflow says the same.`,
@@ -337,7 +332,7 @@ export function workspaceOf(
   resume: string | undefined,
   retries: string | undefined,
   harness: string | undefined,
-): 'base' | undefined {
+) {
   if (workspace === undefined) return undefined;
   if (workspace === 'folder') {
     refuse(
@@ -382,7 +377,7 @@ export const DENIALS: readonly string[] = ['fail'];
  * @param denials The `denials:` line's value, undefined where the step has none.
  * @param harness The step's `harness:`, undefined for the default harness.
  */
-export function denialsOf(step: string, denials: string | undefined, harness: string | undefined): 'fail' | undefined {
+export function denialsOf(step: string, denials: string | undefined, harness: string | undefined) {
   if (denials === undefined) return undefined;
   if (denials !== 'fail') {
     refuse(
@@ -408,7 +403,7 @@ export const SLOTS: readonly string[] = ['none'];
  * @param step The step's name, which a refusal starts with.
  * @param slot The `slot:` line's value, undefined where the step has none.
  */
-export function slotOf(step: string, slot: string | undefined): 'none' | undefined {
+export function slotOf(step: string, slot: string | undefined) {
   if (slot === undefined) return undefined;
   if (slot === 'none') return 'none';
   return refuse(
@@ -422,7 +417,7 @@ export function slotOf(step: string, slot: string | undefined): 'none' | undefin
  * @param step The step's name, which a refusal starts with.
  * @param check The `check:` line's value, undefined where the step has none.
  */
-export function checkOf(step: string, check: string | undefined): string | undefined {
+export function checkOf(step: string, check: string | undefined) {
   if (check !== undefined && ['none', '""', "''"].includes(check)) {
     refuse(
       `${step}: \`check: ${check}\` would run \`${check}\` as a shell command, which exits 127 and fails the step every time. Delete the line — a step without \`check:\` runs no check.`,
@@ -447,11 +442,7 @@ export function checkOf(step: string, check: string | undefined): string | undef
  * @param read Reads a file of the workflow folder by its path, undefined where it is not there; undefined where the step was read
  * without its folder, which refuses an `output:`.
  */
-export function outputOf(
-  step: string,
-  file: string | undefined,
-  read: ((file: string) => string | undefined) | undefined,
-): StepOutput | undefined {
+export function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined) {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
   const beside = step.endsWith('.md') ? step : `${step}.md`;
@@ -519,7 +510,7 @@ export function outputOf(
 }
 
 /** Whether harness `harness` is one the runtime declares, taking none of the flags that carry a plugin and a prompt (`claudeFlags`). */
-const takesNoFlags = (harness: string | undefined): boolean => {
+const takesNoFlags = (harness: string | undefined) => {
   const declared = declarationOf(harness);
   return declared !== undefined && !declared.can.includes('claudeFlags');
 };
@@ -540,7 +531,7 @@ export function composedRefusal(
   skills: readonly string[] | undefined,
   harnessPrompt: HarnessPrompt | undefined,
   step: Pick<StepSpec, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
-): string | undefined {
+) {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
   if (step.resume && (listed || (harnessPrompt ?? 'keep') !== 'keep')) {
     return `${named}: ${listed ?? `\`harnessPrompt: ${harnessPrompt}\``} shapes the prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the prompt it was started with: it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
@@ -579,7 +570,7 @@ export function composedRefusal(
  * @param mcp The server names the `mcp:` line lists, undefined where there is none.
  * @param step The step's harness, which may be a remote agent.
  */
-export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<StepSpec, 'harness'>): string | undefined {
+export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<StepSpec, 'harness'>) {
   if (!mcp?.length || !isRemoteHarness(step.harness)) return undefined;
   return `${named}: \`mcp: ${mcp.join(', ')}\` names servers of the checkout's \`.mcp.json\` for the sessions a run starts here, and \`harness: ${step.harness}\` is a remote A2A agent, which loads the servers its operator configured and none of ours. Delete the line, or run the step on a harness of this machine.`;
 }
@@ -593,7 +584,7 @@ export const SERVER_NAME = /^[\w-]+$/;
  * @param file The agent's or the step's file, which a refusal starts with.
  * @param written The `mcp:` line's value, undefined where there is none.
  */
-export function serverNamesOf(file: string, written: string | undefined): string[] | undefined {
+export function serverNamesOf(file: string, written: string | undefined) {
   if (written === undefined) return undefined;
   const named = `${file}: \`mcp: ${written}\``;
   const shape =
@@ -613,7 +604,7 @@ export function serverNamesOf(file: string, written: string | undefined): string
  * @param file The agent's or the step's file, which a refusal starts with.
  * @param written The `skills:` line's value, undefined where there is none.
  */
-export function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
+export function skillNamesOf(file: string, written: string | undefined) {
   if (written === undefined) return undefined;
   const named = `${file}: \`skills: ${written}\``;
   const names = written
@@ -637,7 +628,7 @@ export function skillNamesOf(file: string, written: string | undefined): string[
  * @param file The step's name, which a refusal starts with.
  * @param written The `writable:` line's value, undefined where there is none.
  */
-export function writableNamesOf(file: string, written: string | undefined): string[] | undefined {
+export function writableNamesOf(file: string, written: string | undefined) {
   if (written === undefined) return undefined;
   const named = `${file}: \`writable: ${written}\``;
   const shape =
@@ -669,7 +660,7 @@ export const MOUNTED_READS: readonly string[] = ['inbox'];
  * @param file The step's name, which a refusal starts with.
  * @param written The `reads:` line's value, undefined where there is none.
  */
-export function readsNamesOf(file: string, written: string | undefined): string[] | undefined {
+export function readsNamesOf(file: string, written: string | undefined) {
   if (written === undefined) return undefined;
   const named = `${file}: \`reads: ${written}\``;
   const shape = `Each is what of the store a step may read, by its name, never a path, comma-separated: ${STORE_READS.join(', ')}.`;

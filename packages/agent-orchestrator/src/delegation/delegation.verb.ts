@@ -5,26 +5,27 @@
  */
 import { Effect } from 'effect';
 import { API_VERSION, PROPOSABLE_KINDS, RESOURCE_PLURALS, type Delegation, type DelegationWrite } from 'objects';
-import { Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { Forbidden, Invalid, Missing } from '../refusal/refusal.ts';
 import type { ProposalCaller } from '../caller/index.ts';
 import { DelegationDoor, type DelegationRecord } from './delegation.store.ts';
 
 /** A delegation's `resourceVersion`: a position, not a digest — when it was last written, which a write moves on. */
-const writtenPosition = (record: DelegationRecord): string => record.since;
+const writtenPosition = (record: DelegationRecord) => record.since;
 
 /**
  * A delegation as the object served: its agent's name in its factory's namespace, its grants, and when it was written.
  * @param record The delegation as the store holds it: its factory, its agent, when it was written and its grants.
  */
-export const delegationObject = (record: DelegationRecord): Delegation => ({
-  apiVersion: API_VERSION,
-  kind: 'Delegation',
-  metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: writtenPosition(record) },
-  spec: record.spec,
-});
+export const delegationObject = (record: DelegationRecord) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: 'Delegation',
+    metadata: { name: record.agent, namespace: record.factory, creationTimestamp: record.since, resourceVersion: writtenPosition(record) },
+    spec: record.spec,
+  }) satisfies Delegation;
 
 /** The refusal of an agent's session writing a delegation. */
-const personOnly = (factory: string, agent: string): Forbidden =>
+const personOnly = (factory: string, agent: string) =>
   new Forbidden({
     reason: 'person-only',
     message: `the person writes what an agent may approve, never an agent: ask them to write ${agent}'s delegation in ${factory}.`,
@@ -55,7 +56,7 @@ export const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOU
  * The resources of `spec` no proposal changes, refused where the delegation is written. Kubernetes' PolicyRule reads `*` as every
  * resource; a delegation names each resource it grants, so `*` is refused here as a typo is, rather than kept and granting nothing.
  */
-const undelegable = (spec: DelegationWrite): string[] =>
+const undelegable = (spec: DelegationWrite) =>
   [...new Set(spec.rules.flatMap((rule) => rule.resources))].filter((resource) => !DELEGABLE.includes(resource));
 
 export const delegationPut = Effect.fn('delegationPut')(function* (
@@ -63,7 +64,7 @@ export const delegationPut = Effect.fn('delegationPut')(function* (
   factory: string,
   agent: string,
   spec: DelegationWrite,
-): Effect.fn.Return<Delegation, Refusal> {
+) {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   const unknown = undelegable(spec);
   if (unknown.length > 0)
@@ -77,11 +78,7 @@ export const delegationPut = Effect.fn('delegationPut')(function* (
 });
 
 /** `agent`'s delegation in `factory` removed by `caller`, the person: whether one was there. */
-export const delegationRemove = Effect.fn('delegationRemove')(function* (
-  caller: ProposalCaller,
-  factory: string,
-  agent: string,
-): Effect.fn.Return<boolean, Refusal> {
+export const delegationRemove = Effect.fn('delegationRemove')(function* (caller: ProposalCaller, factory: string, agent: string) {
   if (caller.kind !== 'person') return yield* Effect.fail(personOnly(factory, agent));
   return yield* (yield* DelegationDoor).delegations.remove(factory, agent);
 });

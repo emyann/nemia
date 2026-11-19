@@ -9,7 +9,7 @@
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /** Whether anything of `text` is cut: something was before it was handed over, or it is longer than `max`. */
-const isCut = (text: string, max: number, cut: boolean): boolean => cut || text.length > max;
+const isCut = (text: string, max: number, cut: boolean) => cut || text.length > max;
 
 const endOfSpec = spec<(text: string, max: number, said: string, cut: boolean) => string>({
   requires: ({ input: [, max, said] }) => Number.isSafeInteger(max) && said.length + 1 < max,

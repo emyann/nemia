@@ -134,7 +134,7 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
 }
 
 /** When the run was called off, and who called it off where its record says (`Actor`); nothing for a run never called off. */
-function cancelledRow(run: RunDetail): ReactNode {
+function cancelledRow(run: RunDetail) {
   if (!run.cancelledAt) return undefined;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2">
@@ -148,7 +148,7 @@ function cancelledRow(run: RunDetail): ReactNode {
  * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
  * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
  */
-function startedRow(run: RunDetail): ReactNode {
+function startedRow(run: RunDetail) {
   if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
   const waited = waitedMs(run) ?? 0;
   return (

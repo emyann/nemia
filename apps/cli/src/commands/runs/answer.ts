@@ -25,16 +25,16 @@ import { answersOf } from './answers.ts';
  * Dollars as the store prints them: two places, or three figures under a cent.
  * @param usd The amount, in dollars.
  */
-export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+export const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A cap in dollars as a person wrote it: whole where it is whole. */
-const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));
+const budgetWord = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));
 
 /**
  * The step `command` acts on: the one typed; else, for a run's only loop, the step that loops, read off the run's frozen steps; refused,
  * exit 2, naming the step to type, where the run has no loop or more than one.
  */
-async function stepOf(command: string, args: Args, namespace: string, typed: string): Promise<string> {
+async function stepOf(command: string, args: Args, namespace: string, typed: string) {
   const step = textArg(args, 'step');
   if (step !== undefined) return step;
   const name = runOf(args);
@@ -50,7 +50,7 @@ async function stepOf(command: string, args: Args, namespace: string, typed: str
 }
 
 /** The way a retry was asked, as its line says it: `--model m`, else `--continue`, `--fresh` or `--recheck`. */
-const modeWord = (mode: string, model: string | undefined): string => (model !== undefined ? `--model ${model}` : `--${mode}`);
+const modeWord = (mode: string, model: string | undefined) => (model !== undefined ? `--model ${model}` : `--${mode}`);
 
 /**
  * What `nemia retry` printed of the ask it wrote: the round asked for, or the try, how, with what, and when it is filed.
@@ -69,7 +69,7 @@ export const retryLines = (
     message?: string;
     answered: boolean;
   },
-): string[] => {
+) => {
   if (typed.round)
     return [
       `${typed.runId}  asked: round ${n ?? ''} of ${looping ?? typed.step}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
@@ -87,7 +87,7 @@ export const retryLines = (
  * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer]... [--message] [--budget]`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function retry(args: Args): Promise<number> {
+export async function retry(args: Args) {
   const command = RETRY_WORDS.name;
   const runId = runOf(args);
   const round = switchArg(args, 'round');
@@ -130,7 +130,7 @@ export async function retry(args: Args): Promise<number> {
  * @param runId The run's id, said in the refusal's line to type.
  * @param step The step at its gate, said in the refusal's line to type.
  */
-export function budgetsOf(typed: readonly string[], runId: string, step: string): { step: string; usd: number }[] {
+export function budgetsOf(typed: readonly string[], runId: string, step: string) {
   return typed.map((value) => {
     const at = value.lastIndexOf('=');
     const name = at > 0 ? value.slice(0, at).trim() : '';
@@ -144,7 +144,7 @@ export function budgetsOf(typed: readonly string[], runId: string, step: string)
 }
 
 /** What the next tick files once a step is approved, in words. */
-const thenWords = ({ step, next }: RunApproved): string =>
+const thenWords = ({ step, next }: RunApproved) =>
   next === 'step'
     ? `the next tick files ${step}`
     : next === 'waiting'
@@ -158,7 +158,7 @@ const thenWords = ({ step, next }: RunApproved): string =>
  * @param runId The run's id.
  * @param answered Whether answers were given with the approval.
  */
-export const approveLines = (approved: RunApproved, runId: string, answered: boolean): string[] => {
+export const approveLines = (approved: RunApproved, runId: string, answered: boolean) => {
   const { step, try: tryNo, message, file, loop, caps, takenBack } = approved;
   if (takenBack)
     return [
@@ -181,7 +181,7 @@ export const approveLines = (approved: RunApproved, runId: string, answered: boo
  * <runId> <step> --off`, an approval taken back.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function approve(args: Args): Promise<number> {
+export async function approve(args: Args) {
   const command = APPROVE_WORDS.name;
   const runId = runOf(args);
   const namespace = await namespaceOfRun(command, runId);
@@ -201,7 +201,7 @@ export async function approve(args: Args): Promise<number> {
 }
 
 /** `text` in a fence longer than any run of backticks inside it, so what it quotes cannot close it. */
-const fenced = (text: string, info: string): string[] => {
+const fenced = (text: string, info: string) => {
   const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [`${fence}${info}`, text, fence];
 };
@@ -211,7 +211,7 @@ const fenced = (text: string, info: string): string[] => {
  * @param runId The run's id.
  * @param step The step the words were said to.
  */
-export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSaid, runId: string, step: string): string[] => [
+export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSaid, runId: string, step: string) => [
   kept
     ? `${runId}  kept for ${step}'s first try, at ${at} — not delivered: no session of ${step} runs yet, and its first try's brief carries the words`
     : `${runId}  said to ${step}, try ${tryNo ?? ''}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId ?? ''}: nemia decide ${runId} prints it under the step`,
@@ -225,7 +225,7 @@ export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSai
  * reaches here: its words' check refuses it (`SAY_WORDS`).
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function say(args: Args): Promise<number> {
+export async function say(args: Args) {
   const command = SAY_WORDS.name;
   const runId = runOf(args);
   const step = textArg(args, 'step') ?? '';

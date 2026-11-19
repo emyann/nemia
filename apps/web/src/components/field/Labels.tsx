@@ -4,8 +4,7 @@ import { CutField, CutTag, TextLink } from '@/components/look';
 import { CLOSED_LABEL_KEYS, type Labels as LabelMap } from '@/lib/api/labels';
 
 /** The labels of `map` in key order, each `key=value`. */
-const entriesOf = (map: Readonly<LabelMap>): Array<[string, string]> =>
-  Object.entries(map).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+const entriesOf = (map: Readonly<LabelMap>) => Object.entries(map).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
 /** One label, a cut tag reading `key=value`, linking to its label page. */
 function LabelTag({ name, value }: { name: string; value: string }) {

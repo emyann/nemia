@@ -26,31 +26,31 @@ export type Parsed =
 export type AddressKind = 'loopback' | 'wildcard' | 'private' | 'shared' | 'link-local' | 'unique-local' | 'public';
 
 /** Whether every part of `a` is a whole number in its range: an octet 0–255, a group 0–65535. */
-const wellFormed = (a: Parsed): boolean =>
+const wellFormed = (a: Parsed) =>
   a.v === 4
     ? a.octets.every((o) => Number.isInteger(o) && o >= 0 && o <= 255)
     : a.groups.every((g) => Number.isInteger(g) && g >= 0 && g <= 0xffff);
 
-const v4 = (a: Parsed, test: (o: readonly [number, number, number, number]) => boolean): boolean => a.v === 4 && test(a.octets);
+const v4 = (a: Parsed, test: (o: readonly [number, number, number, number]) => boolean) => a.v === 4 && test(a.octets);
 
-const v6 = (a: Parsed, test: (g: readonly [number, number, number, number, number, number, number, number]) => boolean): boolean =>
+const v6 = (a: Parsed, test: (g: readonly [number, number, number, number, number, number, number, number]) => boolean) =>
   a.v === 6 && test(a.groups);
 
-const isLoopback = (a: Parsed): boolean =>
+const isLoopback = (a: Parsed) =>
   v4(a, ([o]) => o === 127) ||
   v6(a, (g) => g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0 && g[6] === 0 && g[7] === 1);
 
-const isWildcard = (a: Parsed): boolean =>
+const isWildcard = (a: Parsed) =>
   v4(a, (o) => o[0] === 0 && o[1] === 0 && o[2] === 0 && o[3] === 0) ||
   v6(a, (g) => g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0 && g[6] === 0 && g[7] === 0);
 
-const isPrivate = (a: Parsed): boolean => v4(a, ([x, y]) => x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168));
+const isPrivate = (a: Parsed) => v4(a, ([x, y]) => x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168));
 
-const isShared = (a: Parsed): boolean => v4(a, ([x, y]) => x === 100 && y >= 64 && y <= 127);
+const isShared = (a: Parsed) => v4(a, ([x, y]) => x === 100 && y >= 64 && y <= 127);
 
-const isLinkLocal = (a: Parsed): boolean => v4(a, ([x, y]) => x === 169 && y === 254) || v6(a, ([g]) => g >= 0xfe80 && g <= 0xfebf);
+const isLinkLocal = (a: Parsed) => v4(a, ([x, y]) => x === 169 && y === 254) || v6(a, ([g]) => g >= 0xfe80 && g <= 0xfebf);
 
-const isUniqueLocal = (a: Parsed): boolean => v6(a, ([g]) => g >= 0xfc00 && g <= 0xfdff);
+const isUniqueLocal = (a: Parsed) => v6(a, ([g]) => g >= 0xfc00 && g <= 0xfdff);
 
 const addressKindSpec = spec<(address: Parsed) => AddressKind>({
   /** Every octet is a whole number from 0 to 255, every group one from 0 to 65535. */
@@ -94,7 +94,7 @@ export type AddressKindOf = Implementation<typeof addressKindSpec>;
 /** Whether a bind of a kind may be listened on: as asked, or refused until the person acknowledges a public one. */
 export type Exposure = 'listen' | 'unacknowledged';
 
-const exposed = (kind: AddressKind): boolean => kind === 'public' || kind === 'wildcard';
+const exposed = (kind: AddressKind) => kind === 'public' || kind === 'wildcard';
 
 const bindExposureSpec = spec<(kind: AddressKind, acknowledged: boolean) => Exposure>({
   ensures: {

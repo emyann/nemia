@@ -15,7 +15,7 @@ export class ReconcileRefused extends Schema.TaggedError<ReconcileRefused>()('Re
  * a caller built against a `reconcile` that took the ceiling's `slots` third would otherwise have them dropped without a word.
  * @param extra The arguments `reconcile` was handed past the task and the observation.
  */
-export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefined =>
+export const reconcileRefusalOf = (extra: readonly unknown[]) =>
   extra.length === 0
     ? undefined
     : `reconcile takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
@@ -27,7 +27,7 @@ export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefine
  * @param maxSteps The count of passes `settleTask` was handed, as the caller gave it.
  * @param extra The arguments `settleTask` was handed past its count of passes.
  */
-export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
+export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]) =>
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0
     ? undefined
     : // oxlint-disable-next-line typescript/no-base-to-string -- `String` is reached only once an object and a function are ruled out

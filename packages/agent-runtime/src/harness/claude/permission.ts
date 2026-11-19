@@ -24,11 +24,11 @@ export type { PermissionFacts };
 const said = (s: string | undefined): s is string => s !== undefined && s !== '';
 
 /** A rule the SDK suggests, as its settings spell one: `Bash(npm test:*)`, or the tool's name alone. */
-const ruleOf = (rule: { toolName: string; ruleContent?: string }): string =>
+const ruleOf = (rule: { toolName: string; ruleContent?: string }) =>
   said(rule.ruleContent) ? `${rule.toolName}(${rule.ruleContent})` : rule.toolName;
 
 /** One suggested update, in a line: the rules it adds and where, or what else it changes. */
-const updateOf = (u: PermissionUpdate): string =>
+const updateOf = (u: PermissionUpdate) =>
   u.type === 'addRules' || u.type === 'replaceRules' || u.type === 'removeRules'
     ? `${u.rules.map(ruleOf).join(', ')} (${u.destination})`
     : u.type === 'setMode'
@@ -38,7 +38,7 @@ const updateOf = (u: PermissionUpdate): string =>
 /** The three choices' lines, Always's naming what it saves. */
 const onceOption: AskOption = { label: PERMISSION_ONCE, description: 'Run this call, and ask again next time.' };
 const denyOption: AskOption = { label: PERMISSION_DENY, description: 'Refuse this call. Words of your own are what the session is told.' };
-const alwaysOption = (suggestions: PermissionUpdate[]): AskOption => ({
+const alwaysOption = (suggestions: PermissionUpdate[]) => ({
   label: PERMISSION_ALWAYS,
   description: `Run this call, and save what Claude Code suggests: ${suggestions.map(updateOf).join('; ')}.`,
 });

@@ -20,13 +20,13 @@ export type TallyCell = { sum: number | null; tries: number };
 export type TallyRow = { step: string; tally: string; total: TallyCell; days: Array<TallyCell & { day: string }> };
 
 /** The JSON-Schema types a schema entry says, `type` being a word or a list of words; none where it says none. */
-const typesOf = (entry: unknown): string[] => {
+const typesOf = (entry: unknown) => {
   const type = isObject(entry) ? entry.type : undefined;
   return (Array.isArray(type) ? type : [type]).filter((t): t is string => typeof t === 'string');
 };
 
 /** An entry's parts: its field, the key of the field's items it reads, and the value it counts them by; undefined in none of the forms. */
-function partsOf(entry: string): { field: string; key: string | undefined; value: string | undefined } | undefined {
+function partsOf(entry: string) {
   const [fieldKey, value, ...more] = entry.split('=');
   if (fieldKey === undefined) return undefined;
   const [field, key, ...deeper] = fieldKey.split('.');
@@ -35,13 +35,13 @@ function partsOf(entry: string): { field: string; key: string | undefined; value
 }
 
 /** The properties the items of an array entry of a schema declare; none where it declares none. */
-const itemPropertiesOf = (entry: unknown): Record<string, unknown> => {
+const itemPropertiesOf = (entry: unknown) => {
   const items = isObject(entry) ? entry.items : undefined;
   return isObject(items) && isObject(items.properties) ? items.properties : {};
 };
 
 /** Why `field.key=value` cannot be tallied against `output`, in words after the step's line, or undefined where it can. */
-function matchRefusal(entry: string, field: string, key: string, value: string, output: StepOutput): string | undefined {
+function matchRefusal(entry: string, field: string, key: string, value: string, output: StepOutput) {
   const named = `\`output: ${output.file}\``;
   if (value === '') return `\`${entry}\` names no value. Name the value of \`${key}\` whose items it counts: \`${field}.${key}=<value>\``;
   const declared = itemPropertiesOf(output.schema.properties[field])[key];
@@ -53,7 +53,7 @@ function matchRefusal(entry: string, field: string, key: string, value: string, 
 }
 
 /** Why `entry` cannot be tallied against `output`, in words after the step's line, or undefined where it can. */
-function entryRefusal(entry: string, output: StepOutput): string | undefined {
+function entryRefusal(entry: string, output: StepOutput) {
   const parts = partsOf(entry);
   const properties = output.schema.properties;
   const named = `\`output: ${output.file}\``;
@@ -81,7 +81,7 @@ function entryRefusal(entry: string, output: StepOutput): string | undefined {
  * @param written The `tally:` line as written, or undefined where the step has none.
  * @param output The step's `output:` schema, or undefined where it declares none.
  */
-export function tallyOf(step: string, written: string | undefined, output: StepOutput | undefined): string[] | undefined {
+export function tallyOf(step: string, written: string | undefined, output: StepOutput | undefined) {
   if (written === undefined) return undefined;
   const entries = written
     .split(',')
@@ -108,7 +108,7 @@ export function tallyOf(step: string, written: string | undefined, output: StepO
  * @param tally The tally's entry: a field, `field.flag` or `field.key=value`.
  * @param output The closeout's output, or undefined where it gave none.
  */
-export function tallyIn(tally: string, output: Record<string, unknown> | undefined): number | null {
+export function tallyIn(tally: string, output: Record<string, unknown> | undefined) {
   const [fieldKey, match] = tally.split('=');
   if (fieldKey === undefined) return null;
   const [field, key] = fieldKey.split('.');
@@ -123,7 +123,7 @@ export function tallyIn(tally: string, output: Record<string, unknown> | undefin
 }
 
 /** What a step's tries give one tally: the sum of the values measured, null with none, and their count. */
-const cellOf = (values: ReadonlyArray<number | null>): TallyCell => {
+const cellOf = (values: ReadonlyArray<number | null>) => {
   const known = values.filter((v): v is number => v !== null);
   return { sum: known.length ? known.reduce((n, v) => n + v, 0) : null, tries: known.length };
 };
@@ -137,7 +137,7 @@ type Tallied = { step: string; day: string; tallies: readonly TallyFact[] };
  * @param tries The tries, each with its tallies.
  * @param days The days of the rows' cells, in order.
  */
-export function tallyRowsOf(tries: readonly Tallied[], days: readonly string[]): TallyRow[] {
+export function tallyRowsOf(tries: readonly Tallied[], days: readonly string[]) {
   const rows = new Map<string, { step: string; tally: string; of: Array<{ day: string; value: number | null }> }>();
   for (const t of tries)
     for (const { tally, value } of t.tallies) {

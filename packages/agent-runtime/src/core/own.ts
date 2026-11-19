@@ -4,5 +4,4 @@
  * @param record The dictionary to read.
  * @param key The key to read it at.
  */
-export const own = <T>(record: Readonly<Record<string, T>>, key: string): T | undefined =>
-  Object.hasOwn(record, key) ? record[key] : undefined;
+export const own = <T>(record: Readonly<Record<string, T>>, key: string) => (Object.hasOwn(record, key) ? record[key] : undefined);

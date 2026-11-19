@@ -22,9 +22,10 @@ if (process.env.NODE_ENV === 'test') delete process.env.NODE_ENV;
 let hooked = false;
 
 /** The last test that runs of the describe at the file's head that holds `test`, or the test itself where it is at the head. */
-const lastOfHead = (test: RunnerTestCase): RunnerTestCase => {
+const lastOfHead = (test: RunnerTestCase) => {
   let head: RunnerTestCase | RunnerTestSuite = test;
   while (head.suite && head.suite !== test.file) head = head.suite;
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const runs = (task: RunnerTestCase | RunnerTestSuite): RunnerTestCase[] =>
     task.type === 'suite' ? task.tasks.flatMap((t) => runs(t)) : task.mode === 'run' ? [task] : [];
   return runs(head).at(-1) ?? test;

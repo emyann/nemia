@@ -23,7 +23,7 @@ import { deliveryKept, subscriptionDelivered } from './subscription.ts';
  * @param born When the subscription was made, an ISO timestamp.
  * @param error Why the deliverer's file did not read, or undefined where it read or there is none.
  */
-export const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefined, born: string, error?: string): Subscription => {
+export const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | undefined, born: string, error?: string) => {
   const { task, selectors, digestEvery, from, scope } = listed.subscription;
   const at = subscriptionDelivered({ task, from }, delivered);
   const spec = { task, selectors: [...selectors], digestEvery, ...(scope !== undefined ? { scope: { atLeast: scope.atLeast } } : {}) };
@@ -40,7 +40,7 @@ export const subscriptionObjectOf = (listed: Listed, delivered: DeliveryKept | u
     metadata: { name: listed.name, creationTimestamp: born, resourceVersion: versionOf(spec, status) },
     spec,
     status,
-  };
+  } satisfies Subscription;
 };
 
 /** The object of `listed`, its delivery read through the door, born at its file under `root` where one is given. */

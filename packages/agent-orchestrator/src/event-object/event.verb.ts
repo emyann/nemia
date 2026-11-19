@@ -25,7 +25,7 @@ import { continuedAfter, continueToken, pageSizeOf } from '../object/page.ts';
 export type EventQuery = ObjectQuery;
 
 /** A byte of the feed spelled as a name or a token carries it: a decimal with no sign and no leading zero. */
-const byteOf = (text: string): number | undefined => (/^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
+const byteOf = (text: string) => (/^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined);
 
 /** The Events of the lines after `cursor`, in feed order, each named by the cursor before it: every one, or the first `limit`. */
 const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: number) {
@@ -46,10 +46,10 @@ const eventsAfter = Effect.fn('eventsAfter')(function* (cursor: number, limit?: 
  */
 export const eventKept = (query: Pick<EventQuery, 'namespace' | 'labelSelector'>) => {
   const selectors = parseSelectors(query.labelSelector ?? []);
-  return (line: FeedLine, start: number, end: number): Event | undefined => {
+  return (line: FeedLine, start: number, end: number) => {
     if (!selects(selectors, line)) return undefined;
     const event = eventOf(line, start, end);
-    return query.namespace === undefined || event.metadata.namespace === query.namespace ? event : undefined;
+    return (query.namespace === undefined || event.metadata.namespace === query.namespace ? event : undefined) satisfies Event | undefined;
   };
 };
 

@@ -294,7 +294,7 @@ export const StoredEventsSchema = Schema.Array(StoredEventSchema);
 /** One entry of the store's feed as a store holds it: which task an event happened to. */
 export const StoredFeedEntrySchema = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest);
 
-const fieldOf = (value: unknown, key: PropertyKey): unknown =>
+const fieldOf = (value: unknown, key: PropertyKey) =>
   typeof value === 'object' && value !== null && key in value ? (value as Record<PropertyKey, unknown>)[key] : undefined;
 
 /**
@@ -316,14 +316,14 @@ export const noneOf = (known: { readonly discriminants: ReadonlyArray<PropertyKe
   );
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
-const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');
+const shown = (value: unknown) => quote(JSON.stringify(value) ?? 'undefined');
 
-const refusedPlace = (schema: Schema.Decoder<unknown>, value: unknown): RefusedPlace | undefined => {
+const refusedPlace = (schema: Schema.Decoder<unknown>, value: unknown) => {
   const decoded = Schema.decodeUnknownResult(schema)(value, { reportInput: true });
   return Result.isFailure(decoded) ? refusedIn(decoded.failure.issue)[0] : undefined;
 };
 
-const wordsOf = (place: RefusedPlace, holder: string): string =>
+const wordsOf = (place: RefusedPlace, holder: string) =>
   place._tag === 'MissingKey' ? 'is missing' : `is ${shown(place.input)}, where ${place.message ?? `${holder} ${place.expected}`}`;
 
 /**
@@ -335,16 +335,12 @@ const wordsOf = (place: RefusedPlace, holder: string): string =>
  * @param value The value the schema refuses.
  * @param holder What the value's writer is said as, in the words of what it holds there.
  */
-export const firstRefusal = (
-  schema: Schema.Decoder<unknown>,
-  value: unknown,
-  holder = 'the runtime writes',
-): { path: readonly PropertyKey[]; words: string } => {
+export const firstRefusal = (schema: Schema.Decoder<unknown>, value: unknown, holder = 'the runtime writes') => {
   const place = refusedPlace(schema, value);
   return place === undefined ? { path: [], words: `is not what ${holder}` } : { path: place.path, words: wordsOf(place, holder) };
 };
 
-const fieldNamed = (path: readonly PropertyKey[]): string => (path.length ? `\`${path.map(String).join('.')}\`` : 'shape');
+const fieldNamed = (path: readonly PropertyKey[]) => (path.length ? `\`${path.map(String).join('.')}\`` : 'shape');
 
 /**
  * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: `where` the entry is, and the
@@ -355,7 +351,7 @@ const fieldNamed = (path: readonly PropertyKey[]): string => (path.length ? `\`$
  * @param schema The schema the entry is read by: an event's, or a feed entry's when `feed` is set.
  * @param feed Whether the entry is a feed entry rather than a task's event.
  */
-export const entryWords = (where: string, entry: unknown, schema: Schema.Decoder<unknown>, feed: boolean): string => {
+export const entryWords = (where: string, entry: unknown, schema: Schema.Decoder<unknown>, feed: boolean) => {
   const place = refusedPlace(schema, entry);
   if (place === undefined) return `${where} is not what the runtime writes.`;
   const { path } = place;

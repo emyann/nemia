@@ -10,10 +10,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 const MAX_SAFE = 9_007_199_254_740_991;
 
 /** A generation a file can hold: a whole number from 1, with room for one more. */
-const held = (n: number): boolean => Number.isSafeInteger(n) && n >= 1 && n < MAX_SAFE;
+const held = (n: number) => Number.isSafeInteger(n) && n >= 1 && n < MAX_SAFE;
 
 /** The generation a file reads as: its own, or 1 for a file written before the counter. */
-const readAs = (before: number | null): number => before ?? 1;
+const readAs = (before: number | null) => before ?? 1;
 
 const generationAfterSpec = spec<(before: number | null, specChanged: boolean) => number>({
   requires: ({ input: [before] }) => before === null || held(before),

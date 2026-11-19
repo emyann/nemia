@@ -13,7 +13,7 @@ import { startedWhen } from './restart.ts';
  * Whether `a` is held back at its hook now: seen held (`held`), and not seen going on since (`released`).
  * @param a The attempt's fold.
  */
-export const heldNow = (a: Attempt): boolean => a.heldSince !== undefined && a.releasedAt === undefined;
+export const heldNow = (a: Attempt) => a.heldSince !== undefined && a.releasedAt === undefined;
 
 /**
  * A hold or a release written into the fold of its attempt `a`: a hold opens one, its moment kept and the last release cleared; a
@@ -21,7 +21,7 @@ export const heldNow = (a: Attempt): boolean => a.heldSince !== undefined && a.r
  * @param a The attempt's fold, written in place.
  * @param e The `held` or `released` entry.
  */
-export const holdInto = (a: Attempt, e: Extract<Event, { kind: 'held' | 'released' }>): void => {
+export const holdInto = (a: Attempt, e: Extract<Event, { kind: 'held' | 'released' }>) => {
   if (heldNow(a) === (e.kind === 'held')) return;
   if (e.kind === 'released') {
     a.releasedAt = e.at;
@@ -36,11 +36,10 @@ export const holdInto = (a: Attempt, e: Extract<Event, { kind: 'held' | 'release
 };
 
 /** When `a` was released from its last hold, on both clocks it was stamped on; none while held or never held. */
-const releasedWhen = (a: Attempt): Instant | undefined =>
-  a.releasedAt === undefined ? undefined : { at: Date.parse(a.releasedAt), mono: a.releasedMono };
+const releasedWhen = (a: Attempt) => (a.releasedAt === undefined ? undefined : { at: Date.parse(a.releasedAt), mono: a.releasedMono });
 
 /** The later of two moments, by `elapsedMs`; `to` when there is no `from`. */
-const laterOf = (from: Instant | undefined, to: Instant | undefined): Instant | undefined =>
+const laterOf = (from: Instant | undefined, to: Instant | undefined) =>
   from === undefined ? to : to === undefined || elapsedMs(from, to) <= 0 ? from : to;
 
 /**
@@ -48,7 +47,7 @@ const laterOf = (from: Instant | undefined, to: Instant | undefined): Instant | 
  * attempts' release from a hold, and the start of an attempt that continues a parked one (`Attempt.parked`). None for a turn with no
  * attempt.
  */
-const deadlineFrom = (state: State): Instant | undefined => {
+const deadlineFrom = (state: State) => {
   let from: Instant | undefined;
   let continues = true;
   for (const a of turnOf(state).attempts) {
@@ -65,7 +64,7 @@ const deadlineFrom = (state: State): Instant | undefined => {
  * @param state The task's fold.
  * @param now The moment of the pass, on the wall clock and the monotonic one when read.
  */
-export const deadlineOf = (state: State, now: Now): { ranFor: number; overdue: boolean } => {
+export const deadlineOf = (state: State, now: Now) => {
   const from = turnOf(state).attempts[0] === undefined ? undefined : deadlineFrom(state);
   if (from === undefined) return { ranFor: 0, overdue: false };
   const ranFor = elapsedMs(from, { at: now.at.getTime(), mono: now.mono });
@@ -80,8 +79,8 @@ export const deadlineOf = (state: State, now: Now): { ranFor: number; overdue: b
  * @param at The moment the entry is stamped, an ISO time.
  * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
-export const holdFacts = (last: Attempt, sighting: Sighting, at: string, mono?: Monotonic): Event[] => {
+export const holdFacts = (last: Attempt, sighting: Sighting, at: string, mono?: Monotonic) => {
   const held = heldNow(last);
-  if (held === (sighting.heldBack !== undefined)) return [];
-  return [{ kind: held ? 'released' : 'held', at, attempt: last.n, ...(mono ? { mono } : {}) }];
+  if (held === (sighting.heldBack !== undefined)) return [] satisfies Event[];
+  return [{ kind: held ? 'released' : 'held', at, attempt: last.n, ...(mono ? { mono } : {}) }] satisfies Event[];
 };

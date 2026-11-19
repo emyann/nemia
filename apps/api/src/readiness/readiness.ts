@@ -51,8 +51,10 @@ export const Facts = Context.Reference<(env: NodeJS.ProcessEnv) => ReadinessFact
 });
 
 /** A piece of a fix's follow as the stream's event: a chunk printed (`output`), or the fix ended (`ended`, the `Fix` as JSON). */
-const eventOf = (followed: FixFollowed): FixStreamEvent =>
-  followed.kind === 'output' ? { event: 'output', data: followed.text } : { event: 'ended', data: JSON.stringify(followed.fix) };
+const eventOf = (followed: FixFollowed) =>
+  (followed.kind === 'output'
+    ? { event: 'output', data: followed.text }
+    : { event: 'ended', data: JSON.stringify(followed.fix) }) satisfies FixStreamEvent;
 
 export const readinessHandlers = readsBounded(Api, 'readiness', (handlers) =>
   handlers

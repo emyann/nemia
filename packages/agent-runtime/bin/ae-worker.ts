@@ -92,7 +92,7 @@ import { monoNow } from '../src/core/engine/now.ts';
 import { processStart } from '../src/process/alive.ts';
 
 /** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
-const runFile = ((given: string | undefined): string => {
+const runFile = ((given: string | undefined) => {
   if (given !== undefined) return given;
   process.stderr.write('ae-worker: give the run file to work from, as `node bin/ae-worker.ts <runFile>`\n');
   process.exit(2);
@@ -125,7 +125,7 @@ const scopeBy = process.argv[3] === '--scope-by' ? process.argv.slice(4) : undef
 /** How often a worker handed `--scope-by` reads the run file for the pid of the worker it started. */
 const SCOPED_POLL_MS = 20;
 /** The run file as it reads now: `undefined` once it is gone. */
-const runFileNow = (): string | undefined => {
+const runFileNow = () => {
   try {
     return fs.readFileSync(runFile, 'utf8');
   } catch {
@@ -133,7 +133,7 @@ const runFileNow = (): string | undefined => {
   }
 };
 /** The pid `text`, a run file, says its worker published: 0 before any did, or where it cannot be read. */
-const publishedPid = (text: string): number => {
+const publishedPid = (text: string) => {
   try {
     const pid: unknown = (JSON.parse(text) as { pid?: unknown }).pid;
     return typeof pid === 'number' && Number.isInteger(pid) ? pid : 0;
@@ -159,7 +159,7 @@ const nameLaunched = (pid: number) => {
  * the process started exited and the run file still reads as handed, the scope refused. A file that changed with no pid on it is the
  * run spawned again under the name, and one gone, the run taken away: neither is this worker's to run.
  */
-const startedIn = async (scope: readonly string[]): Promise<boolean> => {
+const startedIn = async (scope: readonly string[]) => {
   const [program, ...args] = scope;
   if (program === undefined) return false;
   const inner = spawn(program, [...args, process.execPath, import.meta.filename, runFile], {
@@ -262,7 +262,7 @@ const vanished = () => {
  * Sends `signal` to the harness's process group, and whether it could: not for a group that has ended, nor for a harness that never
  * started, which has no pid and so no group.
  */
-const signalGroup = (signal: NodeJS.Signals | 0): boolean => {
+const signalGroup = (signal: NodeJS.Signals | 0) => {
   if (child.pid === undefined) return false;
   try {
     process.kill(-child.pid, signal);
@@ -404,7 +404,7 @@ stdout.on('end', () => {
   held = [];
 });
 /** The JSON object `line` holds, or `undefined` for a line that holds none. */
-const objectIn = (line: string): Record<string, unknown> | undefined => {
+const objectIn = (line: string) => {
   try {
     const o = JSON.parse(line) as unknown;
     return typeof o === 'object' && o !== null && !Array.isArray(o) ? (o as Record<string, unknown>) : undefined;
@@ -440,7 +440,7 @@ stdout.on('data', keep(whole?.stdout));
 stderr.on('data', keep(whole?.stderr));
 
 /** What this worker's cgroup says of its memory now, for a plan under a limit, the last read kept where this one finds nothing. */
-const memoryNow = (): Partial<typeof status> => (plan.memoryLimit === undefined ? {} : { memory: cgroupMemoryOf('self') ?? status.memory });
+const memoryNow = () => (plan.memoryLimit === undefined ? {} : { memory: cgroupMemoryOf('self') ?? status.memory });
 
 const beat = setInterval(() => write(memoryNow()), BEAT_MS);
 beat.unref?.();

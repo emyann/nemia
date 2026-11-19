@@ -46,34 +46,34 @@ export const POLL_SECONDS = 15;
 export type Ran = { status: number | null; out: string; err: string; missing: boolean };
 
 /** Run `cmd` with `args`, bounded in time and in what it prints, reading nothing from stdin. */
-export function run(cmd: string, args: string[]): Ran {
+export function run(cmd: string, args: string[]) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }
 
 /** What git printed for `args`, trimmed; refuses, saying what could not be told, when git fails. */
-export function git(what: string, ...args: string[]): string {
+export function git(what: string, ...args: string[]) {
   const ran = run('git', args);
   if (ran.status !== 0) throw new Refusal(`cannot tell ${what}, since \`git ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out.trim();
 }
 
 /** The number of seconds `name` holds, or `fallback` where it holds no number. */
-export function seconds(name: string, fallback: number): number {
+export function seconds(name: string, fallback: number) {
   const said = Number(process.env[name]);
   return Number.isFinite(said) && said >= 0 ? said : fallback;
 }
 
 /** Sleep `secs` seconds, the thread held, so the poll is one process and no timer outlives it. */
-export function sleep(secs: number): void {
+export function sleep(secs: number) {
   if (secs <= 0) return;
   const held = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(held, 0, 0, secs * 1000);
 }
 
 /** The refusal where there is no `gh`, `act` the script's act that GitHub's CLI does: what a person types to have it. */
-export const noGh = (act: string): string =>
+export const noGh = (act: string) =>
   `no \`gh\` on the PATH, and ${act} is GitHub's CLI's. Install it (https://cli.github.com) and run \`gh auth login\``;
 
 /**
@@ -81,7 +81,7 @@ export const noGh = (act: string): string =>
  * person's refusal, which exits `PERSONS_EXIT` so the run tries the step no more on it, and `landing.ts`, which has no tries of its
  * own, the plain one.
  */
-export function authed(act: string, refused: typeof Refusal = Refusal): void {
+export function authed(act: string, refused: typeof Refusal = Refusal) {
   const status = run('gh', ['auth', 'status']);
   if (status.missing) throw new refused(noGh(act));
   if (status.status !== 0) throw new refused(`\`gh\` is not authenticated here: run \`gh auth login\`. It said: ${status.err}`);
@@ -91,7 +91,7 @@ export function authed(act: string, refused: typeof Refusal = Refusal): void {
  * The remote's default branch, which a run's pull request is based on and which the checkout lands on, read through `ask`, the script's
  * own `gh`; `of` names what it is the base of, for the refusal where GitHub names none.
  */
-export function base(of: string, ask: (...args: string[]) => string): string {
+export function base(of: string, ask: (...args: string[]) => string) {
   const said = ask('repo', 'view', '--json', 'defaultBranchRef');
   let name: string | undefined;
   try {

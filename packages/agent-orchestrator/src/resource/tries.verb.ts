@@ -23,7 +23,6 @@ import {
   parseCloseout,
   roundIn,
   type Run,
-  type StepRecord,
   tryNote,
 } from '../run.ts';
 import { LOOP_REPLIES, outputFields, type StepSpec } from '../workflow.ts';
@@ -181,8 +180,10 @@ export type StepAttempts = {
  * A task's attempts on one turn, its current by default: a task held open and answered (`holdOpen`) is one try per turn under one id,
  * and an answer not yet started has no attempt on its turn, so the last attempt of the task is then the turn before's.
  */
-const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskView['state']['attempts'] =>
-  state ? state.attempts.filter((a) => (a.turn ?? 0) === (turn ?? state.inputs?.length ?? 0)) : [];
+const attemptsOn = (state: TaskView['state'] | undefined, turn?: number) =>
+  (state
+    ? state.attempts.filter((a) => (a.turn ?? 0) === (turn ?? state.inputs?.length ?? 0))
+    : []) satisfies TaskView['state']['attempts'] as TaskView['state']['attempts'];
 
 /**
  * How one try of a step signed off, off the engine's record of its turn's last attempt — as `closeoutOf` reads the current try's —
@@ -209,7 +210,7 @@ export function closeoutIn(
   views: Views,
   steps: readonly StepSpec[],
   turn?: number,
-): StepCloseout | null {
+) {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
@@ -235,11 +236,11 @@ export function closeoutIn(
     ...shapesServed(step, fields),
     questions: askedQuestions(step, c),
     raw: said,
-  };
+  } satisfies StepCloseout | null;
 }
 
 /** The shape of each of `fields` its step's output marked (`StepOutput.shapes`), as a closeout serves it: none where it marked none. */
-function shapesServed(step: StepSpec, fields: readonly string[]): Pick<StepCloseout, 'shapes'> {
+function shapesServed(step: StepSpec, fields: readonly string[]) {
   const marked = step.output?.shapes ?? {};
   const shapes = Object.fromEntries(fields.flatMap((field) => (marked[field] === undefined ? [] : [[field, marked[field]]])));
   return Object.keys(shapes).length ? { shapes } : {};
@@ -251,15 +252,15 @@ function shapesServed(step: StepSpec, fields: readonly string[]): Pick<StepClose
  * @param views The engine's views of the run's tasks, by task id.
  * @param turn The turn of its task the try was, the task's current one where absent.
  */
-export function unreadableIn(taskId: string | null, views: Views, turn?: number): StepUnreadable | null {
+export function unreadableIn(taskId: string | null, views: Views, turn?: number) {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   if (said === undefined) return null;
   const c = parseCloseout(said);
-  return 'error' in c ? { error: c.error, raw: said } : null;
+  return ('error' in c ? { error: c.error, raw: said } : null) satisfies StepUnreadable | null as StepUnreadable | null;
 }
 
 /** One of a closeout's `replies`, forgivingly: the harness held it to its schema, and an agent filled it in. */
-function replyOf(item: unknown): StepReply {
+function replyOf(item: unknown) {
   const text = (value: unknown) => (typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value));
   if (!item || typeof item !== 'object' || Array.isArray(item)) return { finding: text(item), answer: '', why: '' };
   const { finding, answer, why } = item as Record<string, unknown>;
@@ -273,7 +274,7 @@ function replyOf(item: unknown): StepReply {
  * @param before The tries the record keeps ahead of it.
  * @param at The earlier try.
  */
-export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number =>
+export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry) =>
   before.filter((t) => t.taskId === at.taskId && t.cause !== 'recheck').length;
 
 /**
@@ -310,41 +311,47 @@ export function triesOf(
   answers: readonly RetryAsk[],
   stderr: CheckStderr,
   releases: string,
-): StepTry[] {
+) {
   const { verdict: _stepVerdict, ...now } = current;
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
-  const turnAt = (t: EarlierTry, i: number): number => turnOfTry(earlier.slice(0, i), t);
-  const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
-  const askAt = (n: number): RetryAsk | undefined => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers);
-  const answerAt = (n: number): string | null => askAt(n)?.message ?? null;
-  const answeredBy = (n: number): Pick<StepTry, 'answeredBy'> => {
+  const turnAt = (t: EarlierTry, i: number) => turnOfTry(earlier.slice(0, i), t);
+  const recordAt = (n: number) => ({ taskId: null, tries: earlier.slice(0, n - 1) });
+  const askAt = (n: number) => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers);
+  const answerAt = (n: number) => (askAt(n)?.message ?? null) satisfies string | null as string | null;
+  const answeredBy = (n: number) => {
     const ask = askAt(n);
-    return ask?.message !== undefined && ask.actor ? { answeredBy: ask.actor } : {};
+    return (ask?.message !== undefined && ask.actor ? { answeredBy: ask.actor } : {}) satisfies Pick<StepTry, 'answeredBy'> as Pick<
+      StepTry,
+      'answeredBy'
+    >;
   };
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
-  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'> => {
+  const earlierSaid = (t: EarlierTry, i: number) => {
     const word = turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
     const { reason, on, via } = ENGINE_REASON[word];
     return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word };
   };
   return [
-    ...earlier.map((t, i): StepTry => ({
-      try: i + 1,
-      round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
-      cause: t.cause,
-      current: false,
-      taskId: t.taskId,
-      note: noteOf(i + 1),
-      ...earlierSaid(t, i),
-      attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
-      check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
-      closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
-      unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
-      answer: answerAt(i + 1),
-      ...answeredBy(i + 1),
-    })),
+    ...earlier.map(
+      (t, i) =>
+        ({
+          try: i + 1,
+          round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
+          cause: t.cause,
+          current: false,
+          taskId: t.taskId,
+          note: noteOf(i + 1),
+          ...earlierSaid(t, i),
+          attempts: attemptsIn(t.taskId, views, releases, turnAt(t, i)),
+          check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
+          closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
+          unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
+          answer: answerAt(i + 1),
+          ...answeredBy(i + 1),
+        }) satisfies StepTry,
+    ),
     {
       try: earlier.length + 1,
       round: roundIn(record),
@@ -356,7 +363,7 @@ export function triesOf(
       answer: answerAt(earlier.length + 1),
       ...answeredBy(earlier.length + 1),
     },
-  ];
+  ] satisfies StepTry[];
 }
 
 /**
@@ -370,7 +377,7 @@ export function triesOf(
  * @param releases The store's real releases folder.
  * @param turn The turn of its task the try was, the task's current one where absent.
  */
-export function attemptsIn(taskId: string | null, views: Views, releases: string, turn?: number): StepAttempts {
+export function attemptsIn(taskId: string | null, views: Views, releases: string, turn?: number) {
   const state = taskId ? views.get(taskId)?.state : undefined;
   const attempts = attemptsOn(state, turn);
   const latest = attempts.at(-1);
@@ -385,7 +392,7 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
             ...sessionRanOn(latest, state.harness ?? DEFAULT_HARNESS, releases),
           }
         : null,
-  };
+  } satisfies StepAttempts;
 }
 
 /**
@@ -393,7 +400,7 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
  * @param run The run's record, its steps and the workflow it froze.
  * @param workflows The workflow's steps as the folder holds them now.
  */
-export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null {
+export function driftOf(run: Run, workflows: readonly StepSpec[]) {
   const inFolder = new Set(workflows.map((s) => s.name));
   const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
   const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -427,7 +434,7 @@ export function gateOf(
   steps: readonly StepSpec[],
   closeoutOf: (step: string) => Closeout | undefined,
   spendOf: SpendOf,
-): StepGate | null {
+) {
   const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
   if (!hasGate(step, run) && accepted === undefined) return null;
   const given = approvalOf(run, step.name) ?? accepted;

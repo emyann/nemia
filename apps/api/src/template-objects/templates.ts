@@ -27,7 +27,7 @@ import { readsBounded } from '../objects/answer-bound.ts';
  * builtins are read then (`repoLayer`). `Missing` where Nemia builds in no template of that name, `Invalid` where it does not render with
  * its parameters' defaults.
  */
-async function renderedIn(s: Served, name: string): Promise<Served> {
+async function renderedIn(s: Served, name: string) {
   const tree = await s.inRequest(templateTree(name));
   const factory: Factory = {
     name: tree.name,
@@ -44,7 +44,7 @@ async function renderedIn(s: Served, name: string): Promise<Served> {
 const listPath = (name: string, plural: string) => `GET /api/templates/${name}/${plural}`;
 
 /** The one object read of the one served, or a defect: `servedNamed` refused the name before anything was read. */
-const theOne = <T>([one]: readonly T[], doc: string): T => {
+const theOne = <T>([one]: readonly T[], doc: string) => {
   if (one === undefined) throw new Error(`${doc} was served and then not read.`);
   return one;
 };

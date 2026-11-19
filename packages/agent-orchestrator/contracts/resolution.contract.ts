@@ -25,11 +25,11 @@ export type ResolutionOwner = { readonly kind: ResolutionKind; readonly name: st
 const HELD_FOLDERS: readonly string[] = ['agents', 'skills', 'carried'];
 
 /** Whether a tree path, by its segments, is a file directly in a workflow's folder. */
-const inAWorkflow = (segments: readonly string[]): boolean =>
+const inAWorkflow = (segments: readonly string[]) =>
   segments.length === 3 && segments[0] === 'workflows' && !HELD_FOLDERS.includes(segments[1] ?? '');
 
 /** The agent a file directly in the agents' folder belongs to, by its name: `<agent>.md` or `<agent>.schema.json`; none for another. */
-const agentOfFile = (file: string): string | null => {
+const agentOfFile = (file: string) => {
   const name = file.endsWith('.schema.json')
     ? file.slice(0, -'.schema.json'.length)
     : file.endsWith('.md')
@@ -39,21 +39,20 @@ const agentOfFile = (file: string): string | null => {
 };
 
 /** The agent whose file a tree path is, or none. */
-const agentAt = (segments: readonly string[]): string | null =>
+const agentAt = (segments: readonly string[]) =>
   segments.length === 3 && segments[0] === 'workflows' && segments[1] === 'agents' ? agentOfFile(segments[2] ?? '') : null;
 
 /** Whether a tree path is a file of a skill's folder, at any depth in it. */
-const inASkill = (segments: readonly string[]): boolean => segments.length >= 4 && segments[0] === 'workflows' && segments[1] === 'skills';
+const inASkill = (segments: readonly string[]) => segments.length >= 4 && segments[0] === 'workflows' && segments[1] === 'skills';
 
 /** Whether a tree path is a carried file. */
-const carried = (segments: readonly string[]): boolean => segments.length >= 3 && segments[0] === 'workflows' && segments[1] === 'carried';
+const carried = (segments: readonly string[]) => segments.length >= 3 && segments[0] === 'workflows' && segments[1] === 'carried';
 
 /** Whether a tree path is the factory's rules or its instruction. */
-const factoryText = (segments: readonly string[]): boolean =>
-  segments.length === 1 && (segments[0] === 'RULES.md' || segments[0] === 'NEMIA.md');
+const factoryText = (segments: readonly string[]) => segments.length === 1 && (segments[0] === 'RULES.md' || segments[0] === 'NEMIA.md');
 
 /** The hire a key of the wiring names, `<workflow>.<step>` for `hires.<workflow>/<step>`; none for another key. */
-const hireOfKey = (key: string | null): string | null => {
+const hireOfKey = (key: string | null) => {
   if (key === null || !key.startsWith('hires.')) return null;
   const step = key.slice('hires.'.length);
   const cut = step.indexOf('/');
@@ -61,11 +60,11 @@ const hireOfKey = (key: string | null): string | null => {
 };
 
 /** Whether a conflict is a step's hire in the wiring. */
-const aHire = (segments: readonly string[], key: string | null): boolean =>
+const aHire = (segments: readonly string[], key: string | null) =>
   segments.length === 1 && segments[0] === 'factory.json' && hireOfKey(key) !== null;
 
 /** Whether `owner` is the object `kind` named `name`. */
-const is = (owner: ResolutionOwner | null, kind: ResolutionKind, name: string | null | undefined): boolean =>
+const is = (owner: ResolutionOwner | null, kind: ResolutionKind, name: string | null | undefined) =>
   owner !== null && owner.kind === kind && owner.name === name;
 
 const resolvedBySpec = spec<(segments: readonly string[], key: string | null, text: boolean, factory: string) => ResolutionOwner | null>({

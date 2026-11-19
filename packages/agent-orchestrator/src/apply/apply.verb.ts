@@ -11,7 +11,7 @@ import type { ApplyAction } from '../../contracts/proposal-apply.contract.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { proposalApproval } from '../approval/index.ts';
 import { proposalApply, proposingRunOf, type RunState } from './apply.ts';
-import { currentOf, type ProposalNeeds, type ProposalPlace } from '../propose/current.verb.ts';
+import { currentOf, type ProposalPlace } from '../propose/current.verb.ts';
 import { verbOf } from '../propose/propose.verb.ts';
 import { factsOf, standingOf } from '../approval/standing.verb.ts';
 import { objectWritten } from './write.verb.ts';
@@ -44,25 +44,25 @@ const stillApproved = (place: ProposalPlace, factory: string, proposal: Proposal
   });
 
 /** `proposal` with its status changed by `status`. */
-const withStatus = (proposal: Proposal, status: Partial<Proposal['status']>): Proposal => ({
+const withStatus = (proposal: Proposal, status: Partial<Proposal['status']>) => ({
   ...proposal,
   status: { ...proposal.status, ...status },
 });
 
 /** The line that reads `object` of `factory` again: `nemia get <resource> <name>`, in the factory unless it is the Factory itself. */
-const readAgain = (factory: string, object: ProposedObject): string =>
+const readAgain = (factory: string, object: ProposedObject) =>
   object.kind === 'Factory'
     ? `nemia get ${RESOURCE_PLURALS.Factory} ${object.metadata.name}`
     : `nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}`;
 
 /** Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the lines that resolve them again; else none. */
-const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal): ResolvedAgain | undefined => {
+const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal) => {
   const kept = readResolutions(place.home, factory);
   return kept === undefined ? undefined : resolvedAgain(factory, proposal.metadata.name, kept.proposals ?? {}, kept.choices);
 };
 
 /** What to do once the proposal cannot apply: resolve its owner's conflicts again where it is a resolution's, else `otherwise`. */
-const doNext = (again: ResolvedAgain | undefined, otherwise: string): string =>
+const doNext = (again: ResolvedAgain | undefined, otherwise: string) =>
   again === undefined
     ? otherwise
     : `it resolves the upgrade's conflicts of ${again.owner}, so resolve them again on what the tree holds now: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
@@ -88,7 +88,7 @@ const moved = (
   changed: readonly ProposedObject[],
   action: Exclude<ApplyAction, 'apply' | 'wait'>,
   again: ResolvedAgain | undefined,
-): Proposal => {
+) => {
   if (action === 'stale') {
     const named = changed
       .map((o) => (again === undefined ? `${o.kind} ${o.metadata.name} (${readAgain(factory, o)})` : `${o.kind} ${o.metadata.name}`))
@@ -96,10 +96,13 @@ const moved = (
     return withStatus(proposal, {
       phase: 'stale',
       message: `${named || 'an object it carries'} changed since it was read: ${doNext(again, 'read it again and propose from what it holds now')}.`,
-    });
+    }) satisfies Proposal;
   }
   if (action === 'drop')
-    return withStatus(proposal, { phase: 'dropped', message: 'its run was called off before it ended well, so it is not applied.' });
+    return withStatus(proposal, {
+      phase: 'dropped',
+      message: 'its run was called off before it ended well, so it is not applied.',
+    }) satisfies Proposal;
   const { approvedBy: _lapsed, ...status } = proposal.status;
   return {
     ...proposal,
@@ -108,7 +111,7 @@ const moved = (
       phase: 'waiting',
       message: 'the approval it had no longer holds (its delegation, its rule or the level changed): it waits on the person again.',
     },
-  };
+  } satisfies Proposal;
 };
 
 /**
@@ -120,7 +123,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
   name: string,
   place: ProposalPlace,
   runState: RunStateOf,
-): Effect.fn.Return<Proposal | undefined, Refusal, ProposalNeeds> {
+) {
   const door = (yield* ProposalDoor).proposals;
   const proposal = yield* door.read(factory, name);
   if (proposal === undefined || proposal.status.phase !== 'approved') return proposal;

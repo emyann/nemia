@@ -18,7 +18,7 @@ export type WalkRow = readonly string[];
 export type OnTheLine = { readonly commit: string; readonly below: number };
 
 /** The walk's oldest row: the commit of the line nearest the tip, whose first parent is the tip itself or the base before it. */
-const oldest = (walk: readonly WalkRow[]): WalkRow | undefined => walk.at(-1);
+const oldest = (walk: readonly WalkRow[]) => walk.at(-1);
 
 const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) => OnTheLine | undefined>({
   /**
@@ -61,7 +61,7 @@ const cameOntoSpec = spec<(tip: string, head: string, walk: readonly WalkRow[]) 
 export type CameOnto = Implementation<typeof cameOntoSpec>;
 
 /** The same point of the line: the same commit, as many first parents below the line's newest. */
-const same = (a: OnTheLine | undefined, b: OnTheLine | undefined): boolean =>
+const same = (a: OnTheLine | undefined, b: OnTheLine | undefined) =>
   a !== undefined && b !== undefined && a.commit === b.commit && a.below === b.below;
 
 /**

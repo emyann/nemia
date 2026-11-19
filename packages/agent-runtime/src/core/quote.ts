@@ -15,7 +15,7 @@ export const WORDS_QUOTE = 200;
  * @param text The text to quote.
  * @param max The most characters of it to keep.
  */
-export const quote = (text: string, max = VALUE_QUOTE): string => (text.length > max ? `${text.slice(0, max)}…` : text);
+export const quote = (text: string, max = VALUE_QUOTE) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 /**
  * The first `max` of `items` (3 by default), each whole, joined by `separator`, then how many more there are: `, and 1,997 more`.
@@ -24,7 +24,7 @@ export const quote = (text: string, max = VALUE_QUOTE): string => (text.length >
  * @param separator What the items are joined by.
  * @param max The most items to name.
  */
-export const firstOf = (items: readonly string[], separator: string, max = 3): string =>
+export const firstOf = (items: readonly string[], separator: string, max = 3) =>
   items.length > max
     ? `${items.slice(0, max).join(separator)}, and ${(items.length - max).toLocaleString('en-US')} more`
     : items.join(separator);

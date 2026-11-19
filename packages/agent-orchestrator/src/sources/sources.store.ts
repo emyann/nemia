@@ -42,7 +42,7 @@ const sourcesIn = Effect.fnUntraced(function* (place: AgentSourcePlace, repo: st
 });
 
 /** The folder `at` with a leading `~` read as the api's machine's home, as a shell would have read it: a request over HTTP has no shell. */
-const homeOf = (at: string): string => (at === '~' || at.startsWith('~/') ? path.join(os.homedir(), at.slice(1)) : at);
+const homeOf = (at: string) => (at === '~' || at.startsWith('~/') ? path.join(os.homedir(), at.slice(1)) : at);
 
 /**
  * Every agent file the store knows of, read through the Agent door: each repository's a factory names, sorted, in its two places for

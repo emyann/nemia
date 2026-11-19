@@ -73,7 +73,7 @@ export function keysOf(event: RunEvent, run: string): QueryKey[];
  * @param event The event the line arrived as.
  * @param run The id of the run the line names, for a run's event; undefined for a daemon's, the store's and a factory's.
  */
-export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
+export function keysOf(event: FeedEvent, run?: string) {
   switch (event) {
     case 'daemon':
       return [['daemon']];
@@ -115,7 +115,7 @@ const INBOX = 'inbox';
  * and the feed names no factory, no page, no selector, no card and no stamp.
  * @param queryKey The key to invalidate.
  */
-export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boolean } => ({
+export const filterOf = (queryKey: QueryKey) => ({
   queryKey,
   exact: !(
     (queryKey.length === 1 && (queryKey[0] === OPEN || queryKey[0] === FINISHED || queryKey[0] === INBOX)) ||
@@ -129,7 +129,7 @@ export const filterOf = (queryKey: QueryKey): { queryKey: QueryKey; exact: boole
  * (`daemonQuery`), which every event reads again but none can say is gone.
  * @param key The query's key.
  */
-export const polled = (key: QueryKey): boolean =>
+export const polled = (key: QueryKey) =>
   (key.length === 1 && (key[0] === 'runs' || key[0] === OPEN || key[0] === 'ceilings' || key[0] === 'daemon')) ||
   (key.length === 2 && (key[0] === 'runs' || key[0] === OPEN) && typeof key[1] === 'string') ||
   key[0] === FINISHED;
@@ -141,7 +141,7 @@ let live = false;
  * How often a polled query is read: `fast` while the feed is not followed, and `FALLBACK_MS` while it is. A query's `refetchInterval`.
  * @param fast How often the query is read while the feed is not followed, in ms.
  */
-export const pace = (fast: number): number => (live ? FALLBACK_MS : fast);
+export const pace = (fast: number) => (live ? FALLBACK_MS : fast);
 
 /**
  * Where a stream of the feed opens: after an event this page was already sent, or at the feed's end. The board holds no history of the
@@ -151,7 +151,7 @@ export const pace = (fast: number): number => (live ? FALLBACK_MS : fast);
 export type FeedStart = 'end' | { after: string };
 
 /** Where a stream opens for a page that was last sent the event `after`, or none: a cursor resumes, and nothing to resume is the end. */
-const startAt = (after: string | undefined): FeedStart => (after === undefined ? 'end' : { after });
+const startAt = (after: string | undefined) => (after === undefined ? 'end' : { after });
 
 /** What `followFeed` tells the page: the queries to read again, and whether it follows. */
 type FeedSink = { invalidate: (keys: QueryKey[]) => void; status: (status: FeedStatus) => void };
@@ -168,7 +168,7 @@ const browserTimers: Timers = { set: (f, ms) => setTimeout(f, ms), clear: (t) =>
 const lineOf = Schema.decodeUnknownOption(Schema.fromJsonString(FeedStreamLine));
 
 /** Whether an `unreadable` event says the api reads again, decoded by `objects`' `FeedStreamUnreadable`: none where it does not decode. */
-const retryingOf = (data: string): boolean | undefined =>
+const retryingOf = (data: string) =>
   Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(FeedStreamUnreadable))(data))?.retrying;
 
 /**
@@ -176,7 +176,7 @@ const retryingOf = (data: string): boolean | undefined =>
  * and moves the daemon's standing alone, the store's its pause; a run's event whose line names no run moves nothing, since every key of
  * one is keyed by the run. None where the line does not decode.
  */
-const keysFor = (event: FeedEvent, data: string): QueryKey[] | undefined => {
+const keysFor = (event: FeedEvent, data: string) => {
   const line = Option.getOrUndefined(lineOf(data));
   if (line === undefined) return undefined;
   if (event === 'daemon' || event === 'store' || event === 'factory') return keysOf(event);
@@ -248,12 +248,7 @@ const gathered = (sink: FeedSink, frames: Frames, timers: Timers) => {
  * @param frames The frames a read of the gathered keys waits for.
  * @param timers The timers the reopening, the grace and the gathering are kept by: the browser's by default, or a test's own.
  */
-export function followFeed(
-  open: (start: FeedStart) => StreamLike,
-  sink: FeedSink,
-  frames: Frames,
-  timers: Timers = browserTimers,
-): () => void {
+export function followFeed(open: (start: FeedStart) => StreamLike, sink: FeedSink, frames: Frames, timers: Timers = browserTimers) {
   let stream: StreamLike;
   let stopped = false;
   let last: string | undefined;

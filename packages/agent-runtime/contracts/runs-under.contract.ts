@@ -37,7 +37,7 @@ export type Sizing = {
  * Two sets of resources say the same: both given or both absent, each with its limits and its requests given or absent alike, and
  * the same memory limit and the same memory request.
  */
-const same = (a: TaskResources | undefined, b: TaskResources | undefined): boolean =>
+const same = (a: TaskResources | undefined, b: TaskResources | undefined) =>
   (a === undefined) === (b === undefined) &&
   (a?.limits === undefined) === (b?.limits === undefined) &&
   (a?.requests === undefined) === (b?.requests === undefined) &&
@@ -45,14 +45,13 @@ const same = (a: TaskResources | undefined, b: TaskResources | undefined): boole
   a?.requests?.memory === b?.requests?.memory;
 
 /** A filing that names a memory request and no memory limit: the one a LimitRange's default limit lands on. */
-const asksAlone = (filed: TaskResources | undefined): boolean =>
-  filed?.requests?.memory !== undefined && filed.limits?.memory === undefined;
+const asksAlone = (filed: TaskResources | undefined) => filed?.requests?.memory !== undefined && filed.limits?.memory === undefined;
 
 /**
  * What a filing that names a request alone runs under: its request, beside the engine's default limit where it holds one; as filed where
  * it holds none.
  */
-const withDefaultLimit = (filed: TaskResources | undefined, defaults: TaskResources | undefined): TaskResources | undefined => {
+const withDefaultLimit = (filed: TaskResources | undefined, defaults: TaskResources | undefined) => {
   const limit = defaults?.limits?.memory;
   const request = filed?.requests?.memory;
   return limit === undefined || request === undefined ? filed : { limits: { memory: limit }, requests: { memory: request } };

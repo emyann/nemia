@@ -20,8 +20,8 @@ import type { StepSpec } from '../workflow.ts';
  * @param steps Its steps.
  * @param git What reads the branches off git.
  */
-export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchReader): BranchStanding[] =>
-  isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : [];
+export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchReader) =>
+  (isRepositoryRun(run) ? branchStandings(run, resultBranches(run, steps), git) : []) satisfies BranchStanding[];
 
 /**
  * Where the result branches a run's reading asks of stand (`branchesAsked`, off `status`, `assess`'s), as `git` says: what the tick's
@@ -32,18 +32,15 @@ export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchRea
  * @param status The run's status, as `assess` judged it.
  * @param git What reads the branches off git.
  */
-export const askedStandings = (run: Run, steps: readonly StepSpec[], status: Assessment['status'], git: BranchReader): BranchStanding[] =>
-  isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : [];
+export const askedStandings = (run: Run, steps: readonly StepSpec[], status: Assessment['status'], git: BranchReader) =>
+  (isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : []) satisfies BranchStanding[];
 
 /**
  * Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about.
  * @param run The run.
  * @param git What reads the branches off git.
  */
-export const landedOf =
-  (run: Run, git: BranchReader) =>
-  (branch: string): Landed =>
-    isRepositoryRun(run) ? git.landed(run, branch) : false;
+export const landedOf = (run: Run, git: BranchReader) => (branch: string) => (isRepositoryRun(run) ? git.landed(run, branch) : false);
 
 /**
  * Where each of a run's result branches stands against the base branch it was cut from, as `git` says it (`BranchStanding`): unread, where
@@ -56,14 +53,14 @@ export const landedOf =
  * @param branches Its result branches.
  * @param git What reads the branches off git.
  */
-export function branchStandings(run: RepositoryRun, branches: readonly string[], git: BranchReader): BranchStanding[] {
-  return [...new Set(branches)].map((branch): BranchStanding => {
+export function branchStandings(run: RepositoryRun, branches: readonly string[], git: BranchReader) {
+  return [...new Set(branches)].map((branch) => {
     const why = git.unread(run, branch);
-    if (why !== undefined) return { branch, where: 'unread', why };
-    if (git.landed(run, branch) !== false) return { branch, where: 'on' };
-    if (!git.has(run.repo, branch)) return { branch, where: 'gone' };
-    return { branch, where: 'ahead', commits: git.ahead(run, branch) };
-  });
+    if (why !== undefined) return { branch, where: 'unread', why } satisfies BranchStanding;
+    if (git.landed(run, branch) !== false) return { branch, where: 'on' } satisfies BranchStanding;
+    if (!git.has(run.repo, branch)) return { branch, where: 'gone' } satisfies BranchStanding;
+    return { branch, where: 'ahead', commits: git.ahead(run, branch) } satisfies BranchStanding;
+  }) satisfies BranchStanding[];
 }
 
 /**
@@ -100,7 +97,7 @@ export type BranchReader = {
  * @param run The run.
  * @param steps Its steps.
  */
-export function resultBranches(run: Run, steps: readonly StepSpec[]): string[] {
+export function resultBranches(run: Run, steps: readonly StepSpec[]) {
   return resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

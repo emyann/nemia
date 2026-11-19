@@ -44,17 +44,17 @@ const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; re
 ];
 
 /** The section a class is listed under: a command that reads bare and sets with some words is a read. */
-const sectionOf = (c: CommandClass): CommandClass => (typeof c === 'object' ? 'read' : c);
+const sectionOf = (c: CommandClass) => (typeof c === 'object' ? 'read' : c);
 
 /** Where an entry is served besides the shell: its tools on the MCP port (`toolsOf`), or why the command line alone runs it. */
-function servedLine(entry: Entry): readonly string[] {
+function servedLine(entry: Entry) {
   const tools = toolsOf(entry).map((t) => t.tool);
   if (tools.length > 0) return [`on the port: ${tools.join(', ')}`];
   return entry.only?.side === 'cli' ? [`CLI only: ${entry.only.why}`] : [];
 }
 
 /** An entry's help, for a command that reads bare the words that make it prompt the person, and where it is served (`servedLine`). */
-function helpLines(entry: Entry): readonly string[] {
+function helpLines(entry: Entry) {
   const bare = typeof entry.class === 'object' ? [`reads bare; prompts the person given ${entry.class.setsBy.join(', ')}`] : [];
   return [...entry.help, ...bare, ...servedLine(entry)];
 }
@@ -67,7 +67,7 @@ function helpLines(entry: Entry): readonly string[] {
  * @param table The command table, each entry with its class and help.
  * @param cliVerbs The command line's own verbs, each with its class and help.
  */
-export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]): string {
+export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]) {
   const served = table.filter((c) => c.only?.side !== 'api');
   const sections = SECTIONS.flatMap((s) => {
     const under = [...served, ...cliVerbs].filter((c) => sectionOf(c.class) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
@@ -96,4 +96,4 @@ export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb
 }
 
 /** The `verbs` skill as the command table says it today: what `nemia/skills/verbs/SKILL.md` holds. */
-export const verbsSkill = (): string => verbsSkillOf(TABLE, CLI_VERBS);
+export const verbsSkill = () => verbsSkillOf(TABLE, CLI_VERBS);

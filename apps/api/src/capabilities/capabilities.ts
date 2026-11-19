@@ -13,7 +13,7 @@ import { Context, Effect, Layer, Predicate } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
-import type { CapabilitiesWithSteps, CapabilityDescribed, CapabilityServer } from 'objects';
+import type { CapabilitiesWithSteps, CapabilityServer } from 'objects';
 
 /**
  * What the repository offers, read from its working folder: the parts of objects' `CapabilitiesWithSteps` that are the repository's own,
@@ -35,7 +35,7 @@ export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..
  * @param env The api's environment, read for HKB_REPO.
  * @param running The install the api runs from, or undefined where it runs no install.
  */
-export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string | undefined => {
+export const repoOf = (env: NodeJS.ProcessEnv, running?: Running) => {
   const given = env.HKB_REPO?.trim();
   if (given) return path.resolve(given);
   if (running?.kind !== 'install') return HOME_REPO;
@@ -43,7 +43,7 @@ export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string | unde
 };
 
 /** Whether `at` is a folder on disk, as written: an address (`https://…`) is not. */
-const isFolder = (at: string): boolean => {
+const isFolder = (at: string) => {
   if (!path.isAbsolute(at)) return false;
   try {
     return fs.statSync(at).isDirectory();
@@ -72,7 +72,7 @@ export async function capabilitiesOf(
     env = process.env,
     asker = makeMcpAsker(),
   }: { deadlineMs?: number; env?: NodeJS.ProcessEnv; asker?: AskServer } = {},
-): Promise<Capabilities> {
+) {
   const warnings: string[] = [];
   const settings = jsonAt(repo, SETTINGS, warnings, 'nothing is read as denied or enabled from it');
   const deny = stringsAt(settings, ['permissions', 'deny'], warnings);
@@ -81,7 +81,7 @@ export async function capabilitiesOf(
   const enabled = enabledBy(settings, warnings);
   const declared = declaredServers(jsonAt(repo, MCP_JSON, warnings, 'no MCP server is listed from it'), warnings);
   const mcp = await Promise.all(
-    declared.map(async (server): Promise<CapabilityServer> => {
+    declared.map(async (server) => {
       const entry = {
         name: server.name,
         source: MCP_JSON,
@@ -96,7 +96,7 @@ export async function capabilitiesOf(
         factoryState: null,
         checkedAt: null,
       };
-      if (server.invalid) return entry;
+      if (server.invalid) return entry satisfies CapabilityServer;
       if (!server.command)
         return {
           ...entry,
@@ -104,12 +104,12 @@ export async function capabilitiesOf(
             server.type === 'unknown'
               ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${HARNESS_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
               : `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
-        };
+        } satisfies CapabilityServer;
       if (!entry.enabled) {
         return {
           ...entry,
           notAsked: `Not enabled by ${SETTINGS}, so the api does not start it. Add "${server.name}" to enabledMcpjsonServers there to list its tools.`,
-        };
+        } satisfies CapabilityServer;
       }
       const stdio = { ...server, command: server.command };
       const launch = launchOf(repo, stdio, env);
@@ -119,7 +119,7 @@ export async function capabilitiesOf(
         return {
           ...entry,
           error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
-        };
+        } satisfies CapabilityServer;
       }
       const answer = await asker(repo, stdio, launch, deadlineMs);
       return {
@@ -127,7 +127,7 @@ export async function capabilitiesOf(
         tools: answer.tools?.map((tool) => ({ ...tool, denied: CLAUDE_RULES.denyingRule(deny, server.name, tool.name) })) ?? null,
         error: answer.error,
         checkedAt: answer.checkedAt,
-      };
+      } satisfies CapabilityServer;
     }),
   );
   return {
@@ -139,18 +139,18 @@ export async function capabilitiesOf(
     asked: ask.map((rule) => ({ rule, source: SETTINGS })),
     allowed: allow.map((rule) => ({ rule, source: SETTINGS })),
     warnings,
-  };
+  } satisfies Capabilities;
 }
 
 /** `.claude/skills/*\/SKILL.md`, by directory. A directory without a SKILL.md is not a skill. */
-function skillsOf(repo: string, warnings: string[]): CapabilityDescribed[] {
+function skillsOf(repo: string, warnings: string[]) {
   return namesIn(repo, '.claude/skills', warnings)
     .map((dir) => describedAt(repo, `.claude/skills/${dir}/SKILL.md`, dir, warnings))
     .filter((skill) => skill !== null);
 }
 
 /** `.claude/agents/*.md`, by file name. */
-function agentsOf(repo: string, warnings: string[]): CapabilityDescribed[] {
+function agentsOf(repo: string, warnings: string[]) {
   return namesIn(repo, '.claude/agents', warnings)
     .filter((file) => file.endsWith('.md'))
     .map((file) => describedAt(repo, `.claude/agents/${file}`, file.slice(0, -'.md'.length), warnings))
@@ -158,7 +158,7 @@ function agentsOf(repo: string, warnings: string[]): CapabilityDescribed[] {
 }
 
 /** The entries of a directory in the checkout, sorted. An absent directory has none. */
-function namesIn(repo: string, dir: string, warnings: string[]): string[] {
+function namesIn(repo: string, dir: string, warnings: string[]) {
   try {
     return fs.readdirSync(path.join(repo, dir)).sort();
   } catch (err) {
@@ -177,7 +177,7 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
  * @param fallback The name it is listed by where its frontmatter names none.
  * @param warnings The list a warning about the file is added to.
  */
-export function describedAt(repo: string, source: string, fallback: string, warnings: string[]): CapabilityDescribed | null {
+export function describedAt(repo: string, source: string, fallback: string, warnings: string[]) {
   let text: string;
   try {
     text = fs.readFileSync(path.join(repo, source), 'utf8');
@@ -194,7 +194,7 @@ export function describedAt(repo: string, source: string, fallback: string, warn
     warnings.push(`${err.message} Until it reads, it is listed as \`${fallback}\`, with no description.`);
     entries = [];
   }
-  const textOf = (key: string): string | null => {
+  const textOf = (key: string) => {
     const value = entries.find((entry) => entry.key === key)?.value;
     return typeof value === 'string' && value ? value : null;
   };
@@ -207,7 +207,7 @@ type Json = Record<string, unknown>;
  * A JSON object from a file in the checkout. Null when the file is absent; null and a warning saying what is left out when it does not
  * read.
  */
-function jsonAt(repo: string, file: string, warnings: string[], leftOut: string): Json | null {
+function jsonAt(repo: string, file: string, warnings: string[], leftOut: string) {
   let text: string;
   try {
     text = fs.readFileSync(path.join(repo, file), 'utf8');
@@ -228,7 +228,7 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
 }
 
 /** The list of strings at `keys` in `settings`. Absent is empty; anything but a list of strings is empty and a warning. */
-function stringsAt(settings: Json | null, keys: string[], warnings: string[]): string[] {
+function stringsAt(settings: Json | null, keys: string[], warnings: string[]) {
   let value: unknown = settings;
   for (const key of keys) value = Predicate.isObject(value) ? value[key] : undefined;
   if (value === undefined) return [];
@@ -238,11 +238,11 @@ function stringsAt(settings: Json | null, keys: string[], warnings: string[]): s
 }
 
 /** Whether `.claude/settings.json` turns a server of `.mcp.json` on, the way a session reads those keys. */
-function enabledBy(settings: Json | null, warnings: string[]): (name: string) => boolean {
+function enabledBy(settings: Json | null, warnings: string[]) {
   const listed = stringsAt(settings, ['enabledMcpjsonServers'], warnings);
   const disabled = stringsAt(settings, ['disabledMcpjsonServers'], warnings);
   const all = settings?.enableAllProjectMcpServers === true;
-  return (name) => !disabled.includes(name) && (all || listed.includes(name));
+  return ((name) => !disabled.includes(name) && (all || listed.includes(name))) satisfies (name: string) => boolean;
 }
 
 /**
@@ -261,21 +261,26 @@ type Declared = {
 };
 
 /** A server's written `type` as its transport, and the word as written: `stdio` for a command with none, `unknown` for a url with none. */
-const transportWritten = (written: unknown, command: string | null): Pick<Declared, 'type' | 'written'> =>
-  typeof written === 'string' ? { type: transportOf(written), written } : { type: command ? 'stdio' : 'unknown', written: null };
+const transportWritten = (written: unknown, command: string | null) =>
+  (typeof written === 'string'
+    ? { type: transportOf(written), written }
+    : { type: command ? 'stdio' : 'unknown', written: null }) satisfies Pick<Declared, 'type' | 'written'>;
 
-function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
-  if (!mcpJson) return [];
+function declaredServers(mcpJson: Json | null, warnings: string[]) {
+  if (!mcpJson) return [] satisfies Declared[];
   if (!Predicate.isObject(mcpJson.mcpServers)) {
     warnings.push(
       `${MCP_JSON} has no \`mcpServers\` object, so no MCP server is listed from it. Declare them as \`{ "mcpServers": { "<name>": { "command": "…" } } }\`.`,
     );
-    return [];
+    return [] satisfies Declared[];
   }
-  return Object.entries(mcpJson.mcpServers).map(([name, spec]): Declared => {
+  return Object.entries(mcpJson.mcpServers).map(([name, spec]) => {
     const bare: Declared = { name, type: 'stdio', written: null, command: null, args: [], env: {}, url: null, invalid: null };
     if (!Predicate.isObject(spec))
-      return { ...bare, invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.` };
+      return {
+        ...bare,
+        invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.`,
+      } satisfies Declared;
     const command = typeof spec.command === 'string' && spec.command ? spec.command : null;
     const url = typeof spec.url === 'string' && spec.url ? spec.url : null;
     const args = Array.isArray(spec.args) && spec.args.every((arg) => typeof arg === 'string') ? spec.args : null;
@@ -296,10 +301,12 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
       ...(spec.args === undefined || args ? [] : ['`args` that are not a list of strings']),
       ...(spec.env === undefined || env ? [] : ['an `env` whose values are not all strings']),
     ];
-    return wrong.length
-      ? { ...declared, invalid: `${MCP_JSON} gives ${name} ${wrong.join(' and ')}, so it is not started. Fix its entry.` }
-      : declared;
-  });
+    return (
+      wrong.length
+        ? { ...declared, invalid: `${MCP_JSON} gives ${name} ${wrong.join(' and ')}, so it is not started. Fix its entry.` }
+        : declared
+    ) satisfies Declared;
+  }) satisfies Declared[];
 }
 
 /** What starts a stdio server: the command, its args, and the whole environment it is given. */
@@ -316,9 +323,9 @@ const API_ONLY = new Set(['PORT', 'HKB_REPO']);
  * with `CLAUDE_PROJECT_DIR` the repository, under the entry's `env`. `missing` names each variable that is unset and
  * has no default: a session refuses such an entry too.
  */
-function launchOf(repo: string, server: Declared & { command: string }, env: NodeJS.ProcessEnv): Launch | { missing: string[] } {
+function launchOf(repo: string, server: Declared & { command: string }, env: NodeJS.ProcessEnv) {
   const missing = new Set<string>();
-  const expand = (text: string): string =>
+  const expand = (text: string) =>
     text.replace(/\$\{([^}:]+)(?::-([^}]*))?\}/g, (written, name: string, fallback: string | undefined) => {
       const value = env[name] ?? fallback;
       if (value === undefined) missing.add(name);
@@ -327,9 +334,11 @@ function launchOf(repo: string, server: Declared & { command: string }, env: Nod
   const command = expand(server.command);
   const args = server.args.map(expand);
   const own = Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, expand(value)]));
-  if (missing.size) return { missing: [...missing] };
+  if (missing.size) return { missing: [...missing] } satisfies Launch | { missing: string[] } as Launch | { missing: string[] };
   const inherited = Object.entries(env).filter((pair): pair is [string, string] => pair[1] !== undefined && !API_ONLY.has(pair[0]));
-  return { command, args, env: { ...Object.fromEntries(inherited), CLAUDE_PROJECT_DIR: repo, ...own } };
+  return { command, args, env: { ...Object.fromEntries(inherited), CLAUDE_PROJECT_DIR: repo, ...own } } satisfies
+    | Launch
+    | { missing: string[] } as Launch | { missing: string[] };
 }
 
 type Answer = { tools: Array<{ name: string; description: string | null }> | null; error: string | null; checkedAt: string };
@@ -341,14 +350,14 @@ export type AskServer = (repo: string, server: Started, launch: Launch, deadline
  * An MCP asker that has asked nothing yet, and keeps every answer it has for as long as it lives. Keyed by the repository, the server and
  * all it is started with, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
  */
-export function makeMcpAsker(): AskServer {
+export function makeMcpAsker() {
   const answers = new Map<string, Promise<Answer>>();
-  return (repo, server, launch, deadlineMs) => {
+  return ((repo, server, launch, deadlineMs) => {
     const key = JSON.stringify([repo, server.name, launch]);
     let answer = answers.get(key);
     if (!answer) answers.set(key, (answer = Effect.runPromise(serverAsk(repo, server, launch, deadlineMs))));
     return answer;
-  };
+  }) satisfies AskServer;
 }
 
 /** The MCP asker every request shares, one for an app (`live`, a fresh `makeMcpAsker`): each server asked once while the app runs. */
@@ -366,11 +375,11 @@ const SAID_LINES = 20;
 const STDERR_END_MS = 2_000;
 
 /** When `stream` ends — its end, its close or its error — or at once where there is none. */
-const endOf = (stream: { once(event: string, listener: () => void): unknown } | null): Promise<void> =>
+const endOf = (stream: { once(event: string, listener: () => void): unknown } | null) =>
   new Promise((resolve) => {
     if (stream === null) return resolve();
     for (const event of ['end', 'close', 'error']) stream.once(event, () => resolve());
-  });
+  }) satisfies Promise<void>;
 
 /** A server as the api starts it: its name, and the command and args `.mcp.json` writes, which an error quotes. */
 type Started = Pick<Declared, 'name' | 'args'> & { command: string };
@@ -393,7 +402,7 @@ type Started = Pick<Declared, 'name' | 'args'> & { command: string };
  * @param launch The command, arguments and environment the server is started with.
  * @param deadlineMs The most the ask takes, in milliseconds, before it is given up.
  */
-export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
+export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number) =>
   Effect.gen(function* () {
     let said = '';
     let listing: Promise<unknown> | undefined;
@@ -424,10 +433,10 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
         duration: deadlineMs,
         orElse: () => Effect.fail(new Error(`it did not list its tools within ${deadlineMs / 1000} s`)),
       }),
-      Effect.map((tools): Answer => ({ tools, error: null, checkedAt: new Date().toISOString() })),
+      Effect.map((tools) => ({ tools, error: null, checkedAt: new Date().toISOString() })),
       Effect.catch((err) =>
         stderrEnded(client, err, ended).pipe(
-          Effect.map((): Answer => {
+          Effect.map(() => {
             const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
             const printed = tail ? `\nWhat it printed on stderr:\n${tail}` : '';
             return { tools: null, error: `${whyNot(server, err)}${printed}`, checkedAt: new Date().toISOString() };
@@ -441,7 +450,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
  * A server that failed (`err`) stopped, and its stderr ended: at once for one that never started — no command to run, which printed
  * nothing — else once the stream says so, at most `STDERR_END_MS` after the server was stopped.
  */
-const stderrEnded = (client: Client, err: unknown, ended: Promise<void>): Effect.Effect<void> =>
+const stderrEnded = (client: Client, err: unknown, ended: Promise<void>) =>
   (err as NodeJS.ErrnoException)?.code === 'ENOENT'
     ? Effect.void
     : Effect.promise(() => client.close().catch(() => {})).pipe(
@@ -453,7 +462,7 @@ const stderrEnded = (client: Client, err: unknown, ended: Promise<void>): Effect
  * The tools a connected server lists, every page of them. A server that offers no tools — only prompts or resources — has no `tools/list`
  * to answer, and says so with -32601: it lists none, rather than a working server being reported as broken.
  */
-async function listTools(client: Client, transport: StdioClientTransport): Promise<NonNullable<Answer['tools']>> {
+async function listTools(client: Client, transport: StdioClientTransport) {
   await client.connect(transport);
   if (!client.getServerCapabilities()?.tools) return [];
   const tools: NonNullable<Answer['tools']> = [];
@@ -466,7 +475,7 @@ async function listTools(client: Client, transport: StdioClientTransport): Promi
   return tools;
 }
 
-function whyNot(server: Started, err: unknown): string {
+function whyNot(server: Started, err: unknown) {
   const started = `\`${[server.command, ...server.args].join(' ')}\``;
   if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
     return `${started} did not start: there is no command \`${server.command}\` on its PATH. Install it, or fix \`command\` for ${server.name} in ${MCP_JSON}.`;
@@ -474,6 +483,6 @@ function whyNot(server: Started, err: unknown): string {
   return `${started} did not list its tools: ${sentenceOf(err)}. Run it yourself to see why, or fix its entry in ${MCP_JSON}.`;
 }
 
-const absent = (err: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException)?.code ?? '');
+const absent = (err: unknown) => ['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException)?.code ?? '');
 
-const sentenceOf = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/\.$/, '');
+const sentenceOf = (err: unknown) => (err instanceof Error ? err.message : String(err)).replace(/\.$/, '');

@@ -31,11 +31,15 @@ const isDirectory = (p: string) => {
  * @param r The spawn asked for: its `cwd`, and its memory limit, where it has one.
  * @param at The slice a scope is made in and the program that makes it, each the default where unset.
  */
-export const startable = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number; argv?: string[]; scoped?: true } => {
+export const startable = (r: SpawnRequest, at: ScopeAt) => {
   if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
   const scope = scopeFor(r, at);
   if (scope !== undefined && 'refused' in scope) throw new Error(scope.refused);
-  return scope === undefined ? {} : { ...scope, scoped: true };
+  return (scope === undefined ? {} : { ...scope, scoped: true }) satisfies { memoryLimit?: number; argv?: string[]; scoped?: true } as {
+    memoryLimit?: number;
+    argv?: string[];
+    scoped?: true;
+  };
 };
 
 /**
@@ -62,7 +66,7 @@ export const startWorker = (
   cwd: string,
   scope: readonly string[] = [],
   { log, bareIfRefused = false }: { log?: string; bareIfRefused?: boolean } = {},
-): number | undefined => {
+) => {
   const handed = bareIfRefused && scope.length > 0;
   const [program, ...prefix] = handed ? [process.execPath] : [...scope, process.execPath];
   const env = withoutTelemetry(process.env);
@@ -77,7 +81,7 @@ export const startWorker = (
     child.on('error', () => {});
     child.unref();
     countSpawn();
-    return child.pid;
+    return child.pid satisfies number | undefined as number | undefined;
   } finally {
     if (typeof err === 'number') fs.closeSync(err);
   }

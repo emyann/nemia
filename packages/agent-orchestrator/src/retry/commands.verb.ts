@@ -19,17 +19,17 @@ import { writerText as textOf } from '../yours/yours.ts';
 type HowGiven = { readonly mode?: unknown; readonly model?: unknown; readonly message?: unknown; readonly budget?: unknown };
 
 /** `nemia retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
-function howOf({ mode, model, message, budget }: HowGiven): RetryHow {
+function howOf({ mode, model, message, budget }: HowGiven) {
   return {
     mode: mode === 'fresh' || mode === 'recheck' ? mode : 'continue',
     ...(typeof model === 'string' ? { model } : {}),
     ...(typeof message === 'string' ? { message } : {}),
     ...(typeof budget === 'number' ? { budget } : {}),
-  };
+  } satisfies RetryHow;
 }
 
 /** The refusal of `nemia retry --round` given what another round does not take: answers, words, or a way to try a step. */
-function roundRefusal(args: Args): string | null {
+function roundRefusal(args: Args) {
   const line = commandLine(RETRY, args, { round: true, budget: amountIn(args, 'budget') });
   if (typedOf(args).length || textOf(args, 'message') !== undefined || textOf(args, 'model') !== undefined)
     return `nemia retry --round asks for another round of a loop, which takes no answers, words or model: ${line}. To try one step again with them, name it without --round: nemia retry <runId> <step> --message "<answer>".`;
@@ -37,7 +37,7 @@ function roundRefusal(args: Args): string | null {
 }
 
 /** The refusal of `nemia retry` naming no step and no round: the step to try again, or `--round` for a loop's. */
-function stepRefusal(args: Args): string | null {
+function stepRefusal(args: Args) {
   if (textOf(args, 'step') !== undefined) return null;
   const runId = textOf(args, 'runId') ?? '<runId>';
   return `nemia retry takes the step to try again: nemia retry ${runId} <step>. For another round of a loop out of rounds, say --round: nemia retry ${runId} [<step>] --round.`;
@@ -59,7 +59,7 @@ export const RetryInput = Schema.Struct({
 export type RetryInput = typeof RetryInput.Type;
 
 /** The refusal of `nemia retry`'s arguments, before anything is read (`RETRY.check`). */
-const retryRefusal = (args: Args): string | null =>
+const retryRefusal = (args: Args) =>
   args.round === true
     ? roundRefusal(args)
     : (stepRefusal(args) ??
@@ -72,7 +72,7 @@ const retryRefusal = (args: Args): string | null =>
  * no name, a `model` beside a way that is not fresh (`--model` sets it), and a person's `answers` on a recheck, which files no session to
  * read them.
  */
-function askRefusal({ mode, model, answers }: RetryInput): string | null {
+function askRefusal({ mode, model, answers }: RetryInput) {
   const how = howOf({ mode });
   if (model !== undefined && !model.trim())
     return '`model` is blank, and names no model to run the new session on. Name one, as `nemia retry --model <m>` does — "model": "<m>" — or leave it out for the model the step runs on.';

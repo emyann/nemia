@@ -17,11 +17,11 @@ export const MEMORY_ROOT = '/memory';
 let generations = 0;
 
 /** A fresh Feed door over bytes in memory: no feed written. */
-export function feedDoorMemory(): Layer.Layer<never> {
+export function feedDoorMemory() {
   const generation = ++generations;
   const where = feedAt(MEMORY_ROOT);
   let bytes: Buffer | null = null;
-  const size = (): number => bytes?.length ?? 0;
+  const size = () => bytes?.length ?? 0;
   const layer: FeedLayer = {
     lines: {
       end: () => (bytes === null ? null : { cursor: bytes.length, generation }),

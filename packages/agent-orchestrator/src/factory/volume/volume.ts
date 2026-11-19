@@ -25,7 +25,7 @@ const SPELLED = '<path|url>:ro to read it, <path|url>:rw to work on it';
  * @param cwd The folder a relative path is resolved from.
  * @param home The store's root, under whose `clones/` a URL's clone is kept.
  */
-export function volumeOf(spelled: string, cwd: string, home: string): Volume | string {
+export function volumeOf(spelled: string, cwd: string, home: string) {
   const at = spelled.lastIndexOf(':');
   const mark = at < 0 ? undefined : spelled.slice(at + 1);
   const given = at < 0 ? spelled : spelled.slice(0, at);
@@ -40,7 +40,7 @@ export function volumeOf(spelled: string, cwd: string, home: string): Volume | s
 }
 
 /** Whether `inner` is `outer` or a folder under it. */
-const within = (inner: string, outer: string): boolean => {
+const within = (inner: string, outer: string) => {
   const rel = path.relative(outer, inner);
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
@@ -64,7 +64,7 @@ export function volumeRefusal(
   volume: Volume,
   storeRoot: string,
   isDirectory: (at: string) => boolean,
-): string | undefined {
+) {
   const at = path.resolve(volume.path);
   const store = path.resolve(storeRoot);
   const clone = volume.origin !== undefined;
@@ -87,7 +87,7 @@ export function volumeRefusal(
  * @param factory The factory: its volumes as its file holds them.
  * @param volume The volume added: its path, whether it is read-only, its origin where it is a clone, and the switches given.
  */
-export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): { volumes: Volume[]; was: boolean | null } {
+export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume) {
   const at = path.resolve(volume.path);
   const volumes = volumesNamed(factory.volumes);
   const before = volumes.find((v) => path.resolve(v.path) === at);
@@ -113,7 +113,7 @@ export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): {
  * @param step The step filed: its harness and its fence.
  * @param volumes The volumes its run mounts, or undefined where it mounts none.
  */
-export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined): Mount[] => {
+export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined) => {
   if (!volumes?.length || isRemoteHarness(step.harness)) return [];
   const unwriting = writesNothing(step);
   return volumes.map((v) => ({
@@ -132,7 +132,7 @@ export type NamedVolume = Volume & { readonly name: string };
  * dashes, each run of anything else one dash, none at either end; `volume` where nothing of it is left, the root's say.
  * @param at The volume's path.
  */
-export const volumeBase = (at: string): string =>
+export const volumeBase = (at: string) =>
   path
     .basename(path.resolve(at))
     .toLowerCase()
@@ -145,7 +145,7 @@ export const volumeBase = (at: string): string =>
  * in the order given.
  * @param volumes The volumes, each with the name its file stores, where it stores one.
  */
-export function volumesNamed(volumes: readonly Volume[]): NamedVolume[] {
+export function volumesNamed(volumes: readonly Volume[]) {
   const taken = volumes.flatMap((v) => (v.name === undefined ? [] : [v.name]));
   const given = new Map<string, string>();
   for (const v of [...volumes].filter((v) => v.name === undefined).sort((a, b) => a.path.localeCompare(b.path))) {
@@ -161,7 +161,7 @@ export function volumesNamed(volumes: readonly Volume[]): NamedVolume[] {
  * the one `volumesNamed` gives it; and its origin, where the first of its path is a clone.
  * @param factory The factory: its volumes as its file holds them.
  */
-export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVolume[] {
+export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>) {
   const stored = new Map<string, Volume>();
   for (const v of factory.volumes) {
     const at = path.resolve(v.path);
@@ -188,7 +188,7 @@ export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVol
  * @param volumes The factory's other volumes, each with the name its file stores, where it stores one.
  * @param at The added volume's path, resolved.
  */
-export function volumeNameAt(volumes: readonly Volume[], at: string): string {
+export function volumeNameAt(volumes: readonly Volume[], at: string) {
   const named = volumesNamed(volumes);
   const same = named.find((v) => v.path === at);
   if (same !== undefined) return same.name;

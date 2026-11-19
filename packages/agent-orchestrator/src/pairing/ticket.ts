@@ -34,21 +34,21 @@ export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const CODE_LENGTH = 8;
 
 /** A new short code, `CODE_LENGTH` characters of `CODE_ALPHABET` drawn from random bytes, unshown: no dash. */
-export const shortCode = (): string =>
+export const shortCode = () =>
   Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET.charAt(crypto.randomInt(CODE_ALPHABET.length))).join('');
 
 /**
  * A short code as a person is shown it: its two halves split by a dash, `XXXX-XXXX`.
  * @param code The short code as the store keeps it, with no dash.
  */
-export const codeShown = (code: string): string => `${code.slice(0, CODE_LENGTH / 2)}-${code.slice(CODE_LENGTH / 2)}`;
+export const codeShown = (code: string) => `${code.slice(0, CODE_LENGTH / 2)}-${code.slice(CODE_LENGTH / 2)}`;
 
 /**
  * A short code as a person typed it, read as the store keeps it: its dash and spaces taken off, in capitals. Undefined for a text that is
  * no code: of another length, or holding a character outside the alphabet.
  * @param typed The text the person typed.
  */
-export const codeRead = (typed: string): string | undefined => {
+export const codeRead = (typed: string) => {
   const bare = typed.replace(/[\s-]/g, '').toUpperCase();
   return bare.length === CODE_LENGTH && bare.split('').every((c) => CODE_ALPHABET.includes(c)) ? bare : undefined;
 };

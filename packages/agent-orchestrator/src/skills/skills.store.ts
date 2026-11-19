@@ -38,7 +38,7 @@ export type SkillRead = {
  * @param name The skill's name.
  * @param dir The skill's folder.
  */
-export function skillRead(name: string, dir: string): SkillRead {
+export function skillRead(name: string, dir: string) {
   const file = path.join(dir, 'SKILL.md');
   const none: SkillRead = { entry: null, error: null, preload: false, cost: null };
   const linked = skillLinkRefusal(dir);
@@ -66,7 +66,7 @@ export type GivenRead = { name: string; dir: string | null } & SkillRead;
  * @param skills The names the agent's `skills:` gives, in its order.
  * @param found Where a start finds skills (`skillsFor`).
  */
-export function givenSkills(skills: readonly string[], found: SkillsFound): GivenRead[] {
+export function givenSkills(skills: readonly string[], found: SkillsFound) {
   return skills.map((name) => {
     const at = found.at.get(name);
     const none = { name, dir: null, entry: null, preload: false, cost: null };
@@ -81,7 +81,7 @@ export function givenSkills(skills: readonly string[], found: SkillsFound): Give
  * folder that cannot be read.
  * @param dir The folder of skills.
  */
-export function skillFolders(dir: string): string[] {
+export function skillFolders(dir: string) {
   let names: string[];
   try {
     names = fs.readdirSync(dir).sort();
@@ -97,7 +97,7 @@ export function skillFolders(dir: string): string[] {
  * @param roots The folders of skills, looked in in their order.
  * @param name The skill's name.
  */
-export function skillDirIn(roots: readonly string[], name: string): string | null {
+export function skillDirIn(roots: readonly string[], name: string) {
   const dir = roots.map((root) => path.join(root, name)).find((at) => fs.lstatSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false }));
   return dir ?? null;
 }
@@ -107,7 +107,7 @@ export function skillDirIn(roots: readonly string[], name: string): string | nul
  * (`skillLinkRefusal`): `skillRead` says why.
  * @param dir The skill's folder.
  */
-export function skillText(dir: string): string {
+export function skillText(dir: string) {
   if (skillLinkRefusal(dir)) return '';
   try {
     return fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8');
@@ -122,13 +122,13 @@ export function skillText(dir: string): string {
  * skill is refused (`skillLinkRefusal`, which `skillRead` says) or no folder is there.
  * @param dir The skill's folder.
  */
-export function skillOthers(dir: string): SkillOther[] {
-  if (skillLinkRefusal(dir)) return [];
+export function skillOthers(dir: string) {
+  if (skillLinkRefusal(dir)) return [] satisfies SkillOther[];
   let files: ReturnType<typeof skillFiles>;
   try {
     files = skillFiles(dir);
   } catch {
-    return [];
+    return [] satisfies SkillOther[];
   }
   return files.flatMap((file) => {
     if ('refused' in file || file.path === 'SKILL.md') return [];
@@ -140,13 +140,14 @@ export function skillOthers(dir: string): SkillOther[] {
     }
     const text = textIn(bytes);
     return text === null ? [] : [{ path: file.path.split(path.sep).join('/'), text }];
-  });
+  }) satisfies SkillOther[];
 }
 
 /**
  * The text files of the skill folder `dir` but its SKILL.md, each a regular file of its own at any depth, by its path in it with `/`: what
  * a write that gives a skill's files replaces. A link, and a file that is not text or does not read, is never one.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function ownTextFiles(dir: string, under = ''): string[] {
   let entries: fs.Dirent[];
   try {
@@ -170,7 +171,7 @@ function ownTextFiles(dir: string, under = ''): string[] {
  * Why the files `files` cannot be written into the skill folder `dir`, or undefined where they can: a folder on the way to one, or the
  * file itself, that is a link, which a write would follow out of the skill, or a file where a folder is needed.
  */
-function filesPlaceRefusal(dir: string, files: readonly SkillOther[] = []): string | undefined {
+function filesPlaceRefusal(dir: string, files: readonly SkillOther[] = []) {
   for (const { path: file } of files) {
     const parts = file.split('/');
     for (const [i] of parts.entries()) {
@@ -193,8 +194,8 @@ function filesPlaceRefusal(dir: string, files: readonly SkillOther[] = []): stri
  * one that already holds its text, and each text file of the folder's own not given removed (`ownTextFiles`), with a folder it leaves
  * empty. A file that is not text, and a link, are left. The paths given, sorted; none, and nothing touched, where no files are given.
  */
-function filesWritten(dir: string, files: readonly SkillOther[] | undefined): string[] {
-  if (files === undefined) return [];
+function filesWritten(dir: string, files: readonly SkillOther[] | undefined) {
+  if (files === undefined) return [] satisfies string[];
   const given = new Set(files.map((file) => file.path));
   const dropped = ownTextFiles(dir).filter((file) => !given.has(file));
   for (const { path: file, text } of files) {
@@ -208,7 +209,7 @@ function filesWritten(dir: string, files: readonly SkillOther[] | undefined): st
     for (let up = path.dirname(path.join(dir, ...file.split('/'))); up !== dir && fs.readdirSync(up).length === 0; up = path.dirname(up))
       fs.rmdirSync(up);
   }
-  return [...given].sort();
+  return [...given].sort() satisfies string[];
 }
 
 /** What `copySkill` did: the skill's folder where it now is, and its files by their path in it. */
@@ -231,13 +232,7 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
  * @param to The folder of skills copied into.
  * @param name The skill's name.
  */
-export function copySkill(
-  home: string,
-  from: string,
-  to: string,
-  name: string,
-  { anywhere = false }: { anywhere?: boolean } = {},
-): SkillCopied {
+export function copySkill(home: string, from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}) {
   const refuse = refuseSkill;
   const at = path.resolve(to);
   const linkWhy = 'a copy follows a link, and would bring in whatever it points at, outside the skill.';
@@ -285,7 +280,7 @@ export function copySkill(
  * already taken or a skill that changed since it was read, and as a `WorkflowError`, an `Invalid`, for anything else judged. Nothing is
  * thrown for no words.
  */
-const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof Conflict): void => {
+const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof Conflict) => {
   if (!words) return;
   if (kind) throw new kind({ message: words });
   throw new WorkflowError(words);
@@ -296,7 +291,7 @@ const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof C
  * board lists — the store's, or that of a repository a factory names — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and
  * neither `at` nor the folder it is in is a link, which a write would follow out of the store.
  */
-function judgeSkillPlace(home: string, at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
+function judgeSkillPlace(home: string, at: string, name: string, anywhere: boolean, verb: string, linkWhy: string) {
   if (path.basename(at) !== SKILLS_FOLDER)
     refuseSkill(
       `${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`,
@@ -321,7 +316,7 @@ export type SkillChange = (SkillDraft & { readonly files?: readonly SkillOther[]
 export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
 
 /** The version of the skill just written into `dir` (`skillVersion`); refused as `Missing`, `notThere` said, where its SKILL.md is gone. */
-function versionWritten(dir: string, notThere: string): string {
+function versionWritten(dir: string, notThere: string) {
   const version = skillVersion(dir);
   if (version === null) throw new Missing({ message: `${notThere}: it was removed as it was written. Write it again.` });
   return version;
@@ -332,14 +327,14 @@ function versionWritten(dir: string, notThere: string): string {
  * skill — a file, or a folder whose SKILL.md is not a file of its own; or a skill at its version (`skillVersion`).
  * @param dir The skill's folder.
  */
-export function skillThere(dir: string): DefinitionThere {
-  if (!fs.lstatSync(dir, { throwIfNoEntry: false })) return { kind: 'none' };
+export function skillThere(dir: string) {
+  if (!fs.lstatSync(dir, { throwIfNoEntry: false })) return { kind: 'none' } satisfies DefinitionThere;
   const version = fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() ? skillVersion(dir) : null;
-  return version === null ? { kind: 'other' } : { kind: 'held', version };
+  return (version === null ? { kind: 'other' } : { kind: 'held', version }) satisfies DefinitionThere;
 }
 
 /** A version judged refused (`definitionVersionRefusal`), thrown as the refusal of its kind; nothing for none. */
-const refuseVersion = (refused: VersionRefused | null): void => {
+const refuseVersion = (refused: VersionRefused | null) => {
   if (refused !== null)
     refuseSkill(refused.message, refused.kind === 'Missing' ? Missing : refused.kind === 'Conflict' ? Conflict : undefined);
 };
@@ -367,7 +362,7 @@ export function writeSkill(
   to: string,
   change: SkillChange,
   { version, anywhere = false }: { version: string | null; anywhere?: boolean },
-): SkillWritten {
+) {
   const at = path.resolve(to);
   const name = change?.name;
   judgeSkillPlace(
@@ -389,7 +384,7 @@ export function writeSkill(
     if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink())
       refuseSkill(linkRefusal(place, "a skill's files are its own, and a write would follow the link. Remove it by hand."));
   }
-  const rendered = (was?: string): string => {
+  const rendered = (was?: string) => {
     try {
       return whole ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload);
     } catch (err) {

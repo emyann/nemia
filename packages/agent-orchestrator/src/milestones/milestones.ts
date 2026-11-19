@@ -5,7 +5,7 @@
  * (`milestonesNow`, `milestones.verb.ts`).
  */
 import type { Milestone, MilestoneState } from 'objects';
-import type { MilestoneFacts, MilestonesOf, MilestoneStates } from '../../contracts/milestones.contract.ts';
+import type { MilestoneFacts, MilestonesOf } from '../../contracts/milestones.contract.ts';
 
 export type { MilestoneFacts, MilestoneStates } from '../../contracts/milestones.contract.ts';
 
@@ -13,7 +13,7 @@ export type { MilestoneFacts, MilestoneStates } from '../../contracts/milestones
  * Each milestone's state: done where the store holds it, next for the first not done, later for any other.
  * @param f What the store holds now, one fact a milestone.
  */
-export const milestonesOf: MilestonesOf = (f: MilestoneFacts): MilestoneStates => {
+export const milestonesOf: MilestonesOf = (f: MilestoneFacts) => {
   const factoryNext = f.harness;
   const volumeNext = f.harness && f.factory;
   const landedNext = f.harness && f.factory && f.volume;
@@ -54,5 +54,5 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
  * give it.
  * @param factory The factory whose writable volume no harness's trust holds yet.
  */
-export const volumeWaitsOnTrust = (factory: string): string =>
+export const volumeWaitsOnTrust = (factory: string) =>
   `the factory ${factory} has a writable volume that waits on your trust: trust it from the factory's Settings, or type nemia factory trust ${factory}`;

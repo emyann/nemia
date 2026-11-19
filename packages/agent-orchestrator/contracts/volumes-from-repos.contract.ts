@@ -29,13 +29,13 @@ export type FormerKeys = {
 };
 
 /** The repositories the file names, none where it names none. */
-const reposOf = (file: FormerKeys): readonly string[] => file.repos ?? [];
+const reposOf = (file: FormerKeys) => file.repos ?? [];
 
 /** The former volumes, none where the file names none. */
-const formerOf = (file: FormerKeys): readonly FileVolume[] => file.volumes ?? [];
+const formerOf = (file: FormerKeys) => file.volumes ?? [];
 
 /** Whether `xs` names each of its strings once. */
-const distinct = (xs: readonly string[]): boolean => xs.every((x, i) => !xs.slice(0, i).includes(x));
+const distinct = (xs: readonly string[]) => xs.every((x, i) => !xs.slice(0, i).includes(x));
 
 const volumesFromReposSpec = spec<(file: FormerKeys) => readonly FileVolume[]>({
   requires: ({ input: [file] }) => {

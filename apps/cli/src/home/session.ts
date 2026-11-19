@@ -18,7 +18,7 @@ export const SESSION_PROGRAM = 'claude';
  * @param env The person's environment, which the session's adds to.
  * @param again The command that opens the session again, named where Claude Code is missing.
  */
-export function ownSessionRun(start: Extract<OwnSession, { kind: 'start' }>, env: NodeJS.ProcessEnv, again: string): Promise<number> {
+export function ownSessionRun(start: Extract<OwnSession, { kind: 'start' }>, env: NodeJS.ProcessEnv, again: string) {
   const argv = start.flags.flatMap((f) => [f.name, f.value]);
   const child = spawn(SESSION_PROGRAM, argv, { cwd: start.cwd, env: { ...env, ...start.env }, stdio: 'inherit' });
   const forward = (signal: NodeJS.Signals) => () => void child.kill(signal);
@@ -42,5 +42,5 @@ export function ownSessionRun(start: Extract<OwnSession, { kind: 'start' }>, env
       off();
       resolve(code ?? 128 + (signal === null ? 0 : os.constants.signals[signal]));
     });
-  });
+  }) satisfies Promise<number> as Promise<number>;
 }

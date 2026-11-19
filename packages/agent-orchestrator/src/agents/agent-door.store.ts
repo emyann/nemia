@@ -98,10 +98,10 @@ const agentChecked = checked(AgentRecord, (agent: { name: string }) => `${AGENTS
  * A draft as the door parses it, its `output:` line left out: the result schema it names is a file beside the agent, which the layer
  * reads — the one sent, or the one its folder holds — and judges as it writes; the model's `Agent` holds no output.
  */
-const unread = (draft: AgentDraft): AgentDraft => ({ ...draft, keys: { ...draft.keys, output: null } });
+const unread = (draft: AgentDraft) => ({ ...draft, keys: { ...draft.keys, output: null } });
 
 /** The refusal `definitionVersionRefusal` chose, as the refusal of its kind. */
-const refusalOf = (refused: VersionRefused): Refusal =>
+const refusalOf = (refused: VersionRefused) =>
   refused.kind === 'Missing'
     ? new Missing({ message: refused.message })
     : refused.kind === 'Conflict'
@@ -112,7 +112,7 @@ const refusalOf = (refused: VersionRefused): Refusal =>
  * The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts.
  * @param layer The layer the door acts on: the store's files, or the memory stand-in.
  */
-export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
+export function agentDoorOver(layer: AgentLayer) {
   const door = doorOf<AgentLayer, AgentName>(layer);
   const judged = (name: AgentName, does: 'write' | 'remove', version: string | undefined, at: AgentAt) =>
     Effect.flatMap(door.agents.there(name, at), (there) => {
@@ -164,7 +164,7 @@ export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
           return yield* door.custom.write(name, text, repo);
         }),
     },
-  };
+  } satisfies AgentDoorShape;
 }
 
 /**
@@ -173,7 +173,7 @@ export function agentDoorOver(layer: AgentLayer): AgentDoorShape {
  * read given no repository are read with no check of a place (`readCustomInstructions`).
  * @param home The store's root.
  */
-export function agentFiles(home: string): AgentLayer {
+export function agentFiles(home: string) {
   const skillsAt = (at: AgentAt) =>
     at.repo === undefined
       ? undefined
@@ -213,7 +213,7 @@ export function agentFiles(home: string): AgentLayer {
       write: (name, text, repo) => writeCustomInstructions(home, name, text, repo),
       clear: (name, repo) => clearCustomInstructions(home, name, repo),
     },
-  };
+  } satisfies AgentLayer;
 }
 
 /**
@@ -229,4 +229,4 @@ export const AgentDoor = Context.Reference<AgentDoorShape>('agent-orchestrator/A
  * The Agent door over the files of the store `root`, as a layer: for a program that names its root by the door.
  * @param root The store's root.
  */
-export const agentDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(AgentDoor)(agentDoorOver(agentFiles(root)));
+export const agentDoorFiles = (root: string) => Layer.succeed(AgentDoor)(agentDoorOver(agentFiles(root)));

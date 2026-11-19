@@ -34,7 +34,7 @@ export type Waiter = { signal: AbortSignal };
  *
  * @returns the bell, heard by no wait yet
  */
-export function bell(): Bell {
+export function bell() {
   const lookers = new Set<() => void>();
   return {
     ring: () => {
@@ -44,14 +44,14 @@ export function bell(): Bell {
       lookers.add(look);
       return () => lookers.delete(look);
     },
-  };
+  } satisfies Bell;
 }
 
 /**
  * What a wait waited for, as its test is told when it fails: `what` itself, or what it answers when asked now; a function that throws
  * still has the wait fail, saying so.
  */
-const told = (what: string | (() => string)): string => {
+const told = (what: string | (() => string)) => {
   if (typeof what === 'string') return what;
   try {
     return what();
@@ -79,7 +79,7 @@ export function until<T>(
   ok: () => T | PromiseLike<T>,
   what: string | (() => string),
   how: { bell?: Bell; everyMs?: number } = {},
-): Promise<Truthy<T>> {
+) {
   return new Promise<Truthy<T>>((resolve, reject) => {
     let settled = false;
     let asking = false;
@@ -102,7 +102,7 @@ export function until<T>(
       console.error(missed);
       settle(() => reject(new Error(missed)));
     };
-    const ask = async (): Promise<void> => {
+    const ask = async () => {
       if (settled) return;
       if (asking) {
         again = true;

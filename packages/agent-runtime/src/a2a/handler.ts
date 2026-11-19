@@ -21,19 +21,15 @@
 import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
 import type {
-  AgentCard,
   CancelTaskRequest,
   DeleteTaskPushNotificationConfigRequest,
   GetExtendedAgentCardRequest,
   GetTaskPushNotificationConfigRequest,
   GetTaskRequest,
   ListTaskPushNotificationConfigsRequest,
-  ListTaskPushNotificationConfigsResponse,
   ListTasksRequest,
-  ListTasksResponse,
   Message,
   SendMessageRequest,
-  StreamResponse,
   SubscribeToTaskRequest,
   Task,
   TaskPushNotificationConfig,
@@ -106,7 +102,7 @@ export type RuntimeExtensionParams = { methods: SessionMethod[]; say: boolean };
  * @param harness The name of the harness, the card's name.
  * @param ops The harness's driver: the verbs it has are the ones the card offers.
  */
-export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
+export const cardOf = (harness: string, ops: RunnerOps) => ({
   name: harness,
   description: `The \`${harness}\` harness: one agent session per task, started by a message and polled until it ends.`,
   supportedInterfaces: [],
@@ -227,7 +223,7 @@ export interface SessionMethods {
 type Snapshot = { id: number; contextId: string; status: TaskState; tasks: Task[] };
 
 /** Drops the oldest of the `open` listings, the first one kept. */
-const dropOldest = (open: Map<number, Snapshot>): void => {
+const dropOldest = (open: Map<number, Snapshot>) => {
   const oldest = open.keys().next();
   if (!oldest.done) open.delete(oldest.value);
 };
@@ -246,7 +242,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   }
 
   /** A driver's verb, run: its value, or its words as a `HarnessFailed`. A defect is thrown as it is. */
-  private async run<A>(e: Effect.Effect<A, RunnerError>): Promise<A> {
+  private async run<A>(e: Effect.Effect<A, RunnerError>) {
     try {
       return await Effect.runPromise(e);
     } catch (cause) {
@@ -254,12 +250,14 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     }
   }
 
-  async getAgentCard(): Promise<AgentCard> {
+  async getAgentCard() {
     return cardOf(this.harness, this.ops);
   }
 
-  async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext): Promise<AgentCard> {
-    throw new ExtendedAgentCardNotConfiguredError(`the \`${this.harness}\` harness has no extended card: its card is the whole of it.`);
+  async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext) {
+    return Promise.reject(
+      new ExtendedAgentCardNotConfiguredError(`the \`${this.harness}\` harness has no extended card: its card is the whole of it.`),
+    );
   }
 
   /**
@@ -267,7 +265,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * session starts, or the harness says why not: `WORKING`; `REJECTED` when it vouched nothing started; `SUBMITTED`, with
    * its words, when a session may yet exist. The answer is the spawn's, never the session's end.
    */
-  async sendMessage(params: SendMessageRequest, _context: ServerCallContext): Promise<Message | Task> {
+  async sendMessage(params: SendMessageRequest, _context: ServerCallContext) {
     if (params.configuration?.returnImmediately !== true) {
       throw new UnsupportedOperationError('this agent answers once the session starts: send returnImmediately and poll getTask.');
     }
@@ -298,7 +296,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * is a spawn under a name of its own, once the session has ended: spawned while it runs, a second process would resume
    * the same conversation beside it.
    */
-  private async follow(m: Message): Promise<Task> {
+  private async follow(m: Message) {
     const refused = followUpRefusal(m);
     if (refused) throw new RequestMalformedError(refused);
     if (!this.ops.say) {
@@ -319,7 +317,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   }
 
   // oxlint-disable-next-line require-yield -- the SDK's handler types this as a stream, and this agent refuses to stream
-  async *sendMessageStream(_params: SendMessageRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+  async *sendMessageStream(_params: SendMessageRequest, _context: ServerCallContext) {
     throw new UnsupportedOperationError('this agent does not stream: send the message with returnImmediately and poll getTask.');
   }
 
@@ -330,7 +328,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * the journal is read for that, once, for a session listed `completed` or listed not at all. `listTasks` still says
    * `COMPLETED` of it, the harness's word, which is what `observe` reads.
    */
-  async getTask(params: GetTaskRequest, _context: ServerCallContext): Promise<Task> {
+  async getTask(params: GetTaskRequest, _context: ServerCallContext) {
     const seen = (await this.run(this.ops.observe)).get(params.id);
     const parts = nameParts(params.id);
     if (seen && (seen.state !== 'completed' || !parts)) return taskOfSighting(params.id, seen);
@@ -350,7 +348,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * One that finished on its own cannot be: `TaskNotCancelableError`, unless its harness still holds its process (`held`), as it
    * holds a long-lived session listed done between turns, which is stopped. A stop the harness failed throws its words.
    */
-  async cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
+  async cancelTask(params: CancelTaskRequest, _context: ServerCallContext) {
     const seen = (await this.run(this.ops.observe)).get(params.id);
     if (!seen) throw new TaskNotFoundError(`no session \`${params.id}\` for the \`${this.harness}\` harness to stop: it lists none.`);
     if (!isLive(seen.state) && seen.state !== 'canceled' && seen.held !== true) {
@@ -367,7 +365,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * token, `<listing>:<offset>`, whatever other listings were made since. A token of a listing whose last page was served, or that was
    * dropped, is refused rather than served a list that moved under it.
    */
-  async listTasks(params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
+  async listTasks(params: ListTasksRequest, _context: ServerCallContext) {
     if (params.statusTimestampAfter !== undefined) {
       throw new UnsupportedOperationError(
         'this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.',
@@ -420,7 +418,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return { tasks, nextPageToken: next, pageSize: size, totalSize: snap.tasks.length };
   }
 
-  async findSession(params: { name: string }, _context: ServerCallContext): Promise<{ sessionId: string } | null> {
+  async findSession(params: { name: string }, _context: ServerCallContext) {
     if (!this.ops.find) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness cannot find a session by name: list its sessions (listTasks).`);
     }
@@ -431,14 +429,14 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return found ? { sessionId: found.sessionId } : null;
   }
 
-  async sessionLogs(params: { sessionId: string }, _context: ServerCallContext): Promise<{ logs: string }> {
+  async sessionLogs(params: { sessionId: string }, _context: ServerCallContext) {
     if (typeof params.sessionId !== 'string' || !params.sessionId) {
       throw new RequestMalformedError('the request names no session: send the id its harness lists it under as `sessionId`.');
     }
     return { logs: await this.run(this.ops.logs(params.sessionId)) };
   }
 
-  async sessionOutput(params: OutputRequest, _context: ServerCallContext): Promise<{ output: string | null }> {
+  async sessionOutput(params: OutputRequest, _context: ServerCallContext) {
     if (!this.ops.output) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness keeps no stream whole: its session's logs are what it printed (sessionLogs).`,
@@ -458,7 +456,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return { output: (await this.run(this.ops.output(params.name, params.stream, params.lastBytes))) ?? null };
   }
 
-  async interruptSession(params: { session: { name: string; sessionId: string } }, _context: ServerCallContext): Promise<void> {
+  async interruptSession(params: { session: { name: string; sessionId: string } }, _context: ServerCallContext) {
     if (!this.ops.interrupt) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness cannot end a turn without ending its session: only a session on streaming input takes it.`,
@@ -470,10 +468,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     await this.run(this.ops.interrupt(params.session));
   }
 
-  async releaseSession(
-    params: { session: Sighting; task: { worktree?: string | boolean } },
-    _context: ServerCallContext,
-  ): Promise<{ usage: Usage | null }> {
+  async releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }, _context: ServerCallContext) {
     if (!this.ops.release) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness has nothing to let go of: its registry is the record.`);
     }
@@ -494,7 +489,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * nothing found: a caller polls again, as it would a session not registered yet. The read itself answers in the
    * harness's words.
    */
-  async sessionTranscript(params: TranscriptRequest, _context: ServerCallContext): Promise<Transcript | null> {
+  async sessionTranscript(params: TranscriptRequest, _context: ServerCallContext) {
     if (!this.ops.transcript) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).`,
@@ -526,10 +521,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return this.run(this.ops.transcript(sessionId, params.after));
   }
 
-  async observeSessions(
-    params: { expected: readonly ExpectedSession[] },
-    _context: ServerCallContext,
-  ): Promise<{ tasks: Task[]; unread: string[]; why: string[]; unreadWhy: Record<string, string> }> {
+  async observeSessions(params: { expected: readonly ExpectedSession[] }, _context: ServerCallContext) {
     if (!this.ops.observeFor) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness lists its sessions in full, told nothing: list them (listTasks).`,
@@ -547,14 +539,14 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     };
   }
 
-  async harnessQuota(_params: Record<string, never>, _context: ServerCallContext): Promise<HarnessQuota> {
+  async harnessQuota(_params: Record<string, never>, _context: ServerCallContext) {
     if (!this.ops.quota) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness reports no quota: no subscription's use can be asked of it.`);
     }
     return this.run(this.ops.quota);
   }
 
-  async forgetSession(params: ForgetRequest, _context: ServerCallContext): Promise<SessionForgotten> {
+  async forgetSession(params: ForgetRequest, _context: ServerCallContext) {
     if (!this.ops.forget) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps nothing of a session to forget.`);
     }
@@ -569,7 +561,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return this.run(this.ops.forget(params.session, { dry: params.dry }));
   }
 
-  async sessionKept(params: KeptRequest, _context: ServerCallContext): Promise<Record<string, SessionKept>> {
+  async sessionKept(params: KeptRequest, _context: ServerCallContext) {
     if (!this.ops.kept) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness says nothing of where it keeps a session's files.`);
     }
@@ -581,7 +573,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return this.run(this.ops.kept(params.sessions));
   }
 
-  async compactSessions(params: { dry: boolean }, _context: ServerCallContext): Promise<SessionsCompacted> {
+  async compactSessions(params: { dry: boolean }, _context: ServerCallContext) {
     if (!this.ops.compact) {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps every capture whole: it has none to compact.`);
     }
@@ -593,36 +585,27 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     return this.run(this.ops.compact({ dry: params.dry }));
   }
 
-  async createTaskPushNotificationConfig(
-    _params: TaskPushNotificationConfig,
-    _context: ServerCallContext,
-  ): Promise<TaskPushNotificationConfig> {
-    throw this.noPush();
+  async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext) {
+    return Promise.reject(this.noPush());
   }
 
-  async getTaskPushNotificationConfig(
-    _params: GetTaskPushNotificationConfigRequest,
-    _context: ServerCallContext,
-  ): Promise<TaskPushNotificationConfig> {
-    throw this.noPush();
+  async getTaskPushNotificationConfig(_params: GetTaskPushNotificationConfigRequest, _context: ServerCallContext) {
+    return Promise.reject(this.noPush());
   }
 
-  async listTaskPushNotificationConfigs(
-    _params: ListTaskPushNotificationConfigsRequest,
-    _context: ServerCallContext,
-  ): Promise<ListTaskPushNotificationConfigsResponse> {
-    throw this.noPush();
+  async listTaskPushNotificationConfigs(_params: ListTaskPushNotificationConfigsRequest, _context: ServerCallContext) {
+    return Promise.reject(this.noPush());
   }
 
-  async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext): Promise<void> {
-    throw this.noPush();
+  async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext) {
+    return Promise.reject(this.noPush());
   }
 
   /**
    * `SubscribeToTask`: the session followed live, where the driver follows it (`subscription`), and let go of as the follower goes
    * away, where the call says so (`goneOf`).
    */
-  async *resubscribe(params: SubscribeToTaskRequest, context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+  async *resubscribe(params: SubscribeToTaskRequest, context: ServerCallContext) {
     try {
       yield* subscription(this.harness, this.ops, params, goneOf(context));
     } catch (cause) {

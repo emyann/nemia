@@ -78,14 +78,12 @@ export const SPAWN_WAIT_MS = 1_000;
  * Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments.
  * @param harness The name of the remote harness, said in the refusal.
  */
-export const remoteRefuses =
-  (harness: string) =>
-  (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-    const keys = Object.keys(task.config ?? {});
-    return keys.length
-      ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
-      : undefined;
-  };
+export const remoteRefuses = (harness: string) => (task: Omit<SpawnRequest, 'name'>) => {
+  const keys = Object.keys(task.config ?? {});
+  return keys.length
+    ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
+    : undefined;
+};
 
 /** What a send came to: the agent's answer, its refusal, a failure on the way, or a stop that cut it. */
 type Answer = { task: Task } | { message: Message } | { refused: string } | { failed: unknown } | { canceled: true };
@@ -162,11 +160,11 @@ export const remoteOps = (
   credentials?: Credentials,
   requestMs = REQUEST_MS,
   o: RemoteOptions = {},
-): SeamOps => {
+) => {
   const sendMs = o.sendMs ?? SEND_MS;
   const spawnWaitMs = o.spawnWaitMs ?? SPAWN_WAIT_MS;
   const inFlight = new Map<string, AbortController>();
-  const sendingLive = (e: Entry): boolean =>
+  const sendingLive = (e: Entry) =>
     e.sending !== undefined &&
     sendHeld(e, instantNow(), sendMs) &&
     (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
@@ -175,16 +173,14 @@ export const remoteOps = (
   const connection = connectionOf(harness, agent, credentials, requestMs, sendMs);
   const { client, ask, sends } = connection;
 
-  const failure =
-    (verb: string) =>
-    (cause: unknown): RunnerError =>
-      cause instanceof RunnerError
-        ? cause
-        : cause instanceof Refusal
-          ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
-          : new RunnerError({ verb, message: `the \`${harness}\` harness: ${wordsOf(cause)}` });
+  const failure = (verb: string) => (cause: unknown) =>
+    cause instanceof RunnerError
+      ? cause
+      : cause instanceof Refusal
+        ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
+        : new RunnerError({ verb, message: `the \`${harness}\` harness: ${wordsOf(cause)}` });
 
-  const sendOf = async (r: SpawnRequest, intent: Entry, stop: AbortSignal): Promise<Answer> => {
+  const sendOf = async (r: SpawnRequest, intent: Entry, stop: AbortSignal) => {
     const signal = AbortSignal.any([stop]);
     sends.add(signal);
     try {
@@ -199,21 +195,21 @@ export const remoteOps = (
           { signal },
         ),
       );
-      return 'status' in answer ? { task: answer } : { message: answer };
+      return ('status' in answer ? { task: answer } : { message: answer }) satisfies Answer;
     } catch (e) {
-      if (stop.aborted) return { canceled: true };
-      if (sendRefused(e)) return { refused: `${wordsOf(e)}${untaken(e) ? '' : ' Nothing was started.'}` };
-      return { failed: e };
+      if (stop.aborted) return { canceled: true } satisfies Answer;
+      if (sendRefused(e)) return { refused: `${wordsOf(e)}${untaken(e) ? '' : ' Nothing was started.'}` } satisfies Answer;
+      return { failed: e } satisfies Answer;
     }
   };
 
-  const doubtOf = (name: string, e: unknown): string =>
+  const doubtOf = (name: string, e: unknown) =>
     late(e)
       ? `the agent did not answer the send of \`${name}\` within ${sendMs / 1000} s`
       : `the send of \`${name}\` failed on the way (${wordsOf(e)})`;
   const NOT_TWICE = 'whether the agent made a Task of it is not known, and it is not sent twice.';
 
-  const record = (intent: Entry, answer: Answer, inPass: boolean): void => {
+  const record = (intent: Entry, answer: Answer, inPass: boolean) => {
     const { sending: _, ...sent } = intent;
     const released = !inPass && !fs.existsSync(fileOf(intent.name));
     if (released) {
@@ -270,7 +266,7 @@ export const remoteOps = (
     if (inPass) throw new Doubt(`${doubt}: ${NOT_TWICE}`, { cause: answer.failed });
   };
 
-  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
+  const spawn = (r: SpawnRequest) =>
     Effect.tryPromise({
       catch: failure('spawn'),
       try: async () => {
@@ -323,7 +319,7 @@ export const remoteOps = (
       },
     });
 
-  const sightingOf = async (e: Entry & { taskId: string }): Promise<Sighting | undefined> => {
+  const sightingOf = async (e: Entry & { taskId: string }) => {
     if (e.ended && e.seen) return e.seen;
     let task: Task;
     try {
@@ -341,11 +337,12 @@ export const remoteOps = (
     return s;
   };
 
-  const submittedOf = (e: Entry): Sighting => ({
-    sessionId: e.messageId,
-    state: 'submitted',
-    ...(e.contextId ? { nativeId: e.contextId } : {}),
-  });
+  const submittedOf = (e: Entry) =>
+    ({
+      sessionId: e.messageId,
+      state: 'submitted',
+      ...(e.contextId ? { nativeId: e.contextId } : {}),
+    }) satisfies Sighting;
 
   const observe: Effect.Effect<Map<string, Sighting>, RunnerError> = Effect.tryPromise({
     catch: failure('observe'),
@@ -367,7 +364,7 @@ export const remoteOps = (
       },
     );
 
-  const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>
+  const stop = (sessionId: string) =>
     Effect.tryPromise({
       catch: failure('stop'),
       try: async () => {
@@ -381,7 +378,7 @@ export const remoteOps = (
       },
     });
 
-  const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
+  const logs = (sessionId: string) =>
     Effect.tryPromise({
       catch: failure('logs'),
       try: async () => {
@@ -405,7 +402,7 @@ export const remoteOps = (
       },
     });
 
-  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
+  const find = (name: string) =>
     Effect.try({
       catch: failure('find'),
       try: () => {
@@ -414,7 +411,7 @@ export const remoteOps = (
       },
     });
 
-  const release = (session: Sighting): Effect.Effect<void, RunnerError> =>
+  const release = (session: Sighting) =>
     Effect.tryPromise({
       catch: failure('release'),
       try: async () => {
@@ -427,7 +424,7 @@ export const remoteOps = (
       },
     });
 
-  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> =>
+  const say = (session: { name: string; sessionId: string }, text: string) =>
     Effect.tryPromise({
       catch: failure('say'),
       try: async () => {
@@ -471,5 +468,5 @@ export const remoteOps = (
     transcriptOf,
     ...entryVerbsOf(harness, dir),
     refuses: remoteRefuses(harness),
-  };
+  } satisfies SeamOps as SeamOps;
 };

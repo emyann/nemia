@@ -19,7 +19,7 @@ export type DefinitionOrigin = ObjectsDefinitionOrigin;
 export type DefinitionServed = { readonly origin: DefinitionOrigin; readonly shadowedBy: DefinitionOrigin | null };
 
 /** Whether no origin is held twice, as a lookup reads each root once. */
-const distinct = (held: readonly DefinitionOrigin[]): boolean => held.every((o, i) => !held.slice(0, i).includes(o));
+const distinct = (held: readonly DefinitionOrigin[]) => held.every((o, i) => !held.slice(0, i).includes(o));
 
 const definitionServedSpec = spec<(held: readonly DefinitionOrigin[], asked: DefinitionOrigin | undefined) => DefinitionServed | null>({
   requires: ({ input: [held] }) => distinct(held),
@@ -56,11 +56,11 @@ export type DefinitionFound = { readonly name: string; readonly origin: Definiti
 export type DefinitionListed = DefinitionServed & { readonly name: string };
 
 /** Whether `origin` holds a definition named `name` among `found`. */
-const holds = (found: readonly DefinitionFound[], name: string, origin: DefinitionOrigin): boolean =>
+const holds = (found: readonly DefinitionFound[], name: string, origin: DefinitionOrigin) =>
   found.some((f) => f.name === name && f.origin === origin);
 
 /** The first origin, in the order a factory looks a name up, that holds `name` among `found`; undefined where none does. */
-const firstHolder = (found: readonly DefinitionFound[], name: string): DefinitionOrigin | undefined =>
+const firstHolder = (found: readonly DefinitionFound[], name: string) =>
   holds(found, name, 'factory')
     ? 'factory'
     : holds(found, name, 'repo')

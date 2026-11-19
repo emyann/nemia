@@ -132,17 +132,17 @@ const factoryChecked = checked(FactoryModel, (factory: Factory) => `the factory 
 const nameChecked = checked(FactoryName.OnCreate, (name: string) => `a factory under ${JSON.stringify(name)}`);
 
 /** Whether `name` is the default factory's. */
-const isDefault = (name: string): boolean => name === DEFAULT_NAMESPACE;
+const isDefault = (name: string) => name === DEFAULT_NAMESPACE;
 
 /** `act` on the factory `name`, or, the default factory's, `Conflict` in `refusal`'s words: what the door refuses of the default. */
-const notDefault = <A>(name: string, refusal: string, act: Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
+const notDefault = <A>(name: string, refusal: string, act: Effect.Effect<A, Refusal>) =>
   isDefault(name) ? Effect.fail(new Conflict({ message: refusal })) : act;
 
 /** The refusal of the default factory's folder, which no move takes: it is no file, and its runs and cards are the store's own. */
 const DEFAULT_FOLDER_REFUSAL = `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds every run and card that names no factory, and has no folder of its own to move. Move a factory nemia factory ls lists. Nothing was moved.`;
 
 /** `act` on the factory `name`, refused for the default factory as `nemia factory <verb>` is (`defaultFactoryRefusal`). */
-const notDefaultBy = <A>(name: string, verb: FactoryWrite, act: Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
+const notDefaultBy = <A>(name: string, verb: FactoryWrite, act: Effect.Effect<A, Refusal>) =>
   notDefault(name, defaultFactoryRefusal(verb), act);
 
 /**
@@ -151,15 +151,14 @@ const notDefaultBy = <A>(name: string, verb: FactoryWrite, act: Effect.Effect<A,
  * other write of it, or a read of the rules and instruction it keeps none of, refused `Conflict`.
  * @param layer The layer of reads and writes the door is over: the store's files, or memory in a test.
  */
-export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
+export function factoryDoorOver(layer: FactoryLayer) {
   const door = doorOf<FactoryLayer, FactoryName>(layer);
   return {
     ...door,
     factories: {
       list: () => Effect.map(door.factories.list(), (names) => [DEFAULT_NAMESPACE, ...names.filter((name) => !isDefault(name))]),
       listed: door.factories.listed,
-      read: (name): Effect.Effect<FactoryRecord, Refusal> =>
-        isDefault(name) ? Effect.succeed(DEFAULT_FACTORY_RECORD) : door.factories.read(name),
+      read: (name) => (isDefault(name) ? Effect.succeed(DEFAULT_FACTORY_RECORD) : door.factories.read(name)),
       create: (factory) =>
         notDefaultBy(
           factory.name,
@@ -206,7 +205,7 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
       place: (name, files) => notDefault(name, DEFAULT_FOLDER_REFUSAL, Effect.andThen(nameChecked(name), door.folder.place(name, files))),
       remove: (name) => notDefault(name, DEFAULT_FOLDER_REFUSAL, door.folder.remove(name)),
     },
-  };
+  } satisfies FactoryDoorShape;
 }
 
 /**
@@ -215,7 +214,7 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
  * @param name The factory's name.
  * @param file The file in the factory's first folder its instruction is read from.
  */
-export const folderKeptRefusal = (name: string, file: string): Conflict =>
+export const folderKeptRefusal = (name: string, file: string) =>
   new Conflict({
     message: `${name}'s instruction is read from ${file}, in the factory's first folder, and the store writes no file there: edit it in the folder, or keep it in the store first — nemia factory instruction ${name} --store. Nothing was written.`,
   });
@@ -233,7 +232,7 @@ export function instructionRead(
   storeFile: string,
   words: (at: ReturnType<typeof instructionAt>) => { words: string | null; error: string | null },
   stored: (file: string) => boolean,
-): FactoryInstruction {
+) {
   const at = instructionAt(factory, storeFile);
   return {
     name: factory.name,
@@ -242,16 +241,16 @@ export function instructionRead(
     file: at.file,
     ...words(at),
     stored: stored(factory.tree === undefined ? storeFile : at.file),
-  };
+  } satisfies FactoryInstruction;
 }
 
 /**
  * The level a factory's file held before a write, as `read` reads it: none where it held none, and none where it does not read, which a
  * write replaces whole, so the write counts as a change.
  */
-const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile | undefined => {
+const levelHeld = (read: () => FactoryLevelFile | undefined) => {
   try {
-    return read();
+    return read() satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
   } catch {
     return undefined;
   }
@@ -264,16 +263,16 @@ const levelHeld = (read: () => FactoryLevelFile | undefined): FactoryLevelFile |
  * (`rewriteFactoryAt`) and by a level written that changes it, of a factory that has a file.
  * @param home The store's root.
  */
-export function factoryFiles(home: string): FactoryLayer {
+export function factoryFiles(home: string) {
   const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
-  const instructionOf = (name: string, notDone: string): FactoryInstruction =>
+  const instructionOf = (name: string, notDone: string) =>
     instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) =>
       storeKeeps(home, name, file),
-    );
-  const storeKept = (name: string, notDone: string): FactoryInstruction => {
+    ) satisfies FactoryInstruction as FactoryInstruction;
+  const storeKept = (name: string, notDone: string) => {
     const before = instructionOf(name, notDone);
     if (!before.store) throw folderKeptRefusal(name, before.file);
-    return before;
+    return before satisfies FactoryInstruction;
   };
   return {
     factories: {
@@ -320,7 +319,7 @@ export function factoryFiles(home: string): FactoryLayer {
       place: (name, files) => folderPlacedAt(home, name, files),
       remove: (name) => folderRemovedAt(home, name),
     },
-  };
+  } satisfies FactoryLayer;
 }
 
 /**
@@ -339,7 +338,7 @@ export const FactoryDoor = Context.Reference<FactoryDoorShape>('agent-orchestrat
  * @param name The factory's name, as the person typed it.
  * @param verb The `nemia factory` verb that asks, named in the default factory's refusal.
  */
-export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Factory, Refusal> =>
+export const filedFactory = (name: string, verb: FactoryWrite) =>
   Effect.gen(function* () {
     const record = yield* (yield* FactoryDoor).factories
       .read(FactoryName.read(name))
@@ -355,7 +354,7 @@ export const filedFactory = (name: string, verb: FactoryWrite): Effect.Effect<Fa
  * The factory `name` filed, read through the door; none for no name and for the default, which has no spec of its own.
  * @param name The factory's name, or undefined where none is named.
  */
-export const factoryOrNone = (name: string | undefined): Effect.Effect<Factory | undefined, Refusal> =>
+export const factoryOrNone = (name: string | undefined) =>
   name === undefined
     ? Effect.succeed(undefined)
     : Effect.gen(function* () {
@@ -369,7 +368,7 @@ export const factoryOrNone = (name: string | undefined): Effect.Effect<Factory |
  * @param home The store's root the door's default is rooted at.
  * @param use What to do with the door.
  */
-export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
+export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>) =>
   Effect.provideService(
     Effect.gen(function* () {
       return yield* use(yield* FactoryDoor);
@@ -384,8 +383,8 @@ export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.
  * @param home The store's root.
  * @param use What to do with the door.
  */
-export const doorAtOnce = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>): A =>
-  Effect.runSync(use(factoryDoorOver(factoryFiles(home))));
+export const doorAtOnce = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>) =>
+  Effect.runSync(use(factoryDoorOver(factoryFiles(home)))) satisfies A as A;
 
 /** A tree's check, said beside the door that reads the factory it is of. */
 export { treeChecked };
@@ -411,7 +410,7 @@ export {
  * out.
  * @param home The store's root.
  */
-export const listedAtOnce = (home: string): readonly FactoryListing[] => doorAtOnce(home, (door) => door.factories.listed());
+export const listedAtOnce = (home: string) => doorAtOnce(home, (door) => door.factories.listed());
 
 /**
  * The factory a start in the store `home` goes to, named or found from the folder `at` (`startFactoryAt`), the default factory only where
@@ -422,13 +421,11 @@ export const listedAtOnce = (home: string): readonly FactoryListing[] => doorAtO
  * @param fix The start's words for naming a factory, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
  * @param defaultStarts Whether a start that finds no factory goes to the default one.
  */
-export const startFactoryAtOnce = (
-  home: string,
-  named: string | undefined,
-  at: string,
-  fix: string,
-  defaultStarts: boolean,
-): { factory?: Factory; repo?: string } => startFactoryAt(home, named, at, fix, defaultStarts);
+export const startFactoryAtOnce = (home: string, named: string | undefined, at: string, fix: string, defaultStarts: boolean) =>
+  startFactoryAt(home, named, at, fix, defaultStarts) satisfies { factory?: Factory; repo?: string } as {
+    factory?: Factory;
+    repo?: string;
+  };
 
 /**
  * The factory `name` of the store `home`, as a start or a filing in it reads it: refused as `readFactoryAt` refuses it, `notDone` saying
@@ -437,14 +434,15 @@ export const startFactoryAtOnce = (
  * @param name The factory's name.
  * @param notDone What the caller did not do, said at the end of a refusal.
  */
-export const readFactoryAtOnce = (home: string, name: string, notDone: string): Factory => readFactoryAt(home, name, notDone);
+export const readFactoryAtOnce = (home: string, name: string, notDone: string) =>
+  readFactoryAt(home, name, notDone) satisfies Factory as Factory;
 
 /**
  * The factory `name` filed in the store `home`, read through the door at once; none for the default, which has no spec of its own.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const filedAtOnce = (home: string, name: string): Factory | undefined =>
+export const filedAtOnce = (home: string, name: string) =>
   doorAtOnce(home, (door) =>
     Effect.map(door.factories.read(FactoryName.read(name)), (record) => (isDefaultFactory(record) ? undefined : record)),
   );
@@ -456,7 +454,7 @@ export const filedAtOnce = (home: string, name: string): Factory | undefined =>
  * @param name The factory's name.
  * @param who The command that writes into the tree, named in a refusal.
  */
-export const templatedAtOnce = (home: string, name: string, who: string): { factory: Factory; tree: string } => {
+export const templatedAtOnce = (home: string, name: string, who: string) => {
   const factory = treeChecked(name, filedAtOnce(home, name), who);
   return { factory, tree: factory.tree };
 };
@@ -467,13 +465,14 @@ export const templatedAtOnce = (home: string, name: string, who: string): { fact
  * @param name The factory's name.
  * @param who The command that writes into the tree, named in a refusal.
  */
-export const templatedTreeOf = (home: string, name: string, who: string): string => templatedAtOnce(home, name, who).tree;
+export const templatedTreeOf = (home: string, name: string, who: string) => templatedAtOnce(home, name, who).tree;
 
 /**
  * The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`.
  * @param root The store's root.
  */
-export const factoryDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root)));
+export const factoryDoorFiles = (root: string) =>
+  Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root))) satisfies Layer.Layer<never> as Layer.Layer<never>;
 
 /**
  * The factory `name` filed in the store `home`, read through the door at once, for `verb`: refused as `filedFactory` refuses it, the
@@ -482,5 +481,5 @@ export const factoryDoorFiles = (root: string): Layer.Layer<never> => Layer.succ
  * @param name The factory's name.
  * @param verb The `nemia factory` verb that asks, named in the default factory's refusal.
  */
-export const factoryAtOnce = (home: string, name: string, verb: FactoryWrite): Factory =>
+export const factoryAtOnce = (home: string, name: string, verb: FactoryWrite) =>
   Effect.runSync(Effect.provide(filedFactory(name, verb), factoryDoorFiles(home)));

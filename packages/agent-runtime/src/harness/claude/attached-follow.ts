@@ -49,13 +49,13 @@ export type Pushes = {
 const refusal = (message: string) => new RunnerError({ verb: 'follow', message: `claude: ${message}`, refused: true });
 
 /** The moment a text block open under `key` is said with, whole, to a follower that has just joined. */
-const openWhole = (open: { key: string; text: string }): Followed => ({ ...open, kind: 'partial', append: false, last: false });
+const openWhole = (open: { key: string; text: string }) => ({ ...open, kind: 'partial', append: false, last: false }) satisfies Followed;
 
 /**
  * Whether the follow of `name` is over: there is no run of it, it has ended, another process holds it, or it is parked with no
  * session of that name in this process's hands — a holder's let-go, after which only another process can say anything of it.
  */
-const over = (source: PushSource, name: string, run: AttachedRun | undefined): boolean =>
+const over = (source: PushSource, name: string, run: AttachedRun | undefined) =>
   run === undefined || !isOpen(run.state) || !heldHere(run) || (run.state === 'parked' && !source.holds(name));
 
 /** The transcript of the session `name`'s Claude Code, read from `cursor`: the file `opsOf.transcript` reads, and its cursor. */
@@ -71,7 +71,7 @@ const momentsOf = (
   read: { events: TranscriptEvent[]; cursor: TranscriptCursor } | undefined,
   state: SessionState,
   next: SessionState,
-): Followed[] => [
+) => [
   ...said,
   ...(read?.events.length ? [{ kind: 'events', events: read.events, cursor: read.cursor } as const] : []),
   ...(next === state ? [] : [{ kind: 'state', state: next } as const]),
@@ -88,30 +88,30 @@ const momentsOf = (
  * `pending`, never dropped between the two.
  * @param source The engine's store root, where a session's files are read, and whether the holder holds a session by its name.
  */
-export const pushesOf = (source: PushSource): Pushes => {
+export const pushesOf = (source: PushSource) => {
   const sessions = new Map<string, Fanned>();
   const runOf = (name: string) => readRun(filesOf(source.root, name).run);
 
-  const fannedOf = (name: string): Fanned => {
+  const fannedOf = (name: string) => {
     const there = sessions.get(name);
-    if (there) return there;
+    if (there) return there satisfies Fanned as Fanned;
     const made: Fanned = { at: {}, followers: new Set() };
     sessions.set(name, made);
-    return made;
+    return made satisfies Fanned as Fanned;
   };
 
-  const woke = (fanned: Fanned, said: readonly Followed[]): void => {
+  const woke = (fanned: Fanned, said: readonly Followed[]) => {
     for (const f of fanned.followers) {
       f.pending.push(...said);
       Queue.offerUnsafe(f.wake, undefined);
     }
   };
 
-  const forget = (name: string, fanned: Fanned): void => {
+  const forget = (name: string, fanned: Fanned) => {
     if (fanned.followers.size === 0 && fanned.at.open === undefined) sessions.delete(name);
   };
 
-  const push = (name: string, m: unknown): void => {
+  const push = (name: string, m: unknown) => {
     const line = (m ?? {}) as { type?: unknown; event?: unknown };
     if (line.type === 'stream_event') {
       const fanned = fannedOf(name);
@@ -127,23 +127,25 @@ export const pushesOf = (source: PushSource): Pushes => {
     forget(name, fanned);
   };
 
-  const left = (name: string, me: Follower): void => {
+  const left = (name: string, me: Follower) => {
     const fanned = sessions.get(name);
     if (fanned === undefined) return;
     fanned.followers.delete(me);
     forget(name, fanned);
   };
 
-  const joined = (name: string, me: Follower): [Followed[], SessionState] | undefined => {
+  const joined = (name: string, me: Follower) => {
     const run = runOf(name);
     if (run === undefined) return undefined;
     const fanned = fannedOf(name);
     fanned.followers.add(me);
     const state = attachedStateOf(run);
-    return [[{ kind: 'state', state }, ...(fanned.at.open ? [openWhole(fanned.at.open)] : [])], state];
+    return [[{ kind: 'state', state }, ...(fanned.at.open ? [openWhole(fanned.at.open)] : [])], state] satisfies
+      | [Followed[], SessionState]
+      | undefined;
   };
 
-  const follow = (name: string): Stream.Stream<Followed, RunnerError> =>
+  const follow = (name: string) =>
     Stream.callback<Followed, RunnerError>((queue) =>
       Effect.gen(function* () {
         const wake = yield* Queue.sliding<void>(1);
@@ -172,5 +174,5 @@ export const pushesOf = (source: PushSource): Pushes => {
       }).pipe(Effect.catch((e) => Queue.fail(queue, e))),
     );
 
-  return { push, follow, following: (name) => sessions.get(name)?.followers.size ?? 0 };
+  return { push, follow, following: (name) => sessions.get(name)?.followers.size ?? 0 } satisfies Pushes;
 };

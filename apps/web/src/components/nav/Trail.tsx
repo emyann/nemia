@@ -37,15 +37,17 @@ export function Trail({ levels }: { levels: readonly TrailLevel[] }) {
  *
  * @param factory the factory the page sits in, none at the store's level
  */
-export const factoryLevel = (factory: string | undefined): TrailLevel[] =>
-  factory === undefined ? [] : [{ name: factory, to: linkOptions({ to: '/factories/$factory', params: { factory } }) }];
+export const factoryLevel = (factory: string | undefined) =>
+  (factory === undefined
+    ? []
+    : [{ name: factory, to: linkOptions({ to: '/factories/$factory', params: { factory } }) }]) satisfies TrailLevel[] as TrailLevel[];
 
 /**
  * The Runs level: the factory's runs under its path, else every factory's.
  *
  * @param factory the factory the page sits in, none at the store's level
  */
-export const runsLevel = (factory: string | undefined): TrailLevel => ({
+export const runsLevel = (factory: string | undefined) => ({
   name: 'Runs',
   to: factory === undefined ? linkOptions({ to: '/runs' }) : linkOptions({ to: '/factories/$factory/runs', params: { factory } }),
 });
@@ -57,7 +59,7 @@ export const runsLevel = (factory: string | undefined): TrailLevel => ({
  * @param runId the run's id
  * @param name what the run is called, its id while it is still read
  */
-export const runLevel = (factory: string | undefined, runId: string, name: string): TrailLevel => ({
+export const runLevel = (factory: string | undefined, runId: string, name: string) => ({
   name,
   to:
     factory === undefined
@@ -70,7 +72,7 @@ export const runLevel = (factory: string | undefined, runId: string, name: strin
  *
  * @param factory the factory the page sits in, none at the store's level
  */
-export const inboxLevel = (factory: string | undefined): TrailLevel => ({
+export const inboxLevel = (factory: string | undefined) => ({
   name: 'Inbox',
   to: factory === undefined ? linkOptions({ to: '/inbox' }) : linkOptions({ to: '/factories/$factory/inbox', params: { factory } }),
 });

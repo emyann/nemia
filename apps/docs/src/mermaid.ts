@@ -27,7 +27,7 @@ const SCROLL = '<figcaption>The diagram is wider than the page: scroll it sidewa
  * font. The colours it derives are the site stylesheet's (`src/styles/accent.css`), and the figure carries the width it is drawn at
  * (`--drawn-width`), below three quarters of which the stylesheet never scales it; one still wider than the column says to scroll it.
  */
-const figureOf = (svg: string): string => {
+const figureOf = (svg: string) => {
   const width = /<svg[^>]*\swidth="([\d.]+)"/.exec(svg)?.[1] ?? '0';
   const caption = Number(width) * 0.75 > COLUMN ? SCROLL : '';
   return `<figure class="diagram" style="--drawn-width: ${width}px">${caption}${svg.replace(/<style>[\s\S]*?<\/style>\n?/g, '')}</figure>`;
@@ -41,7 +41,7 @@ const NAMED = /(?:^|\s)diagram=([a-z][\w-]*)(?=\s|$)/;
  * @param markdown The text of a markdown doc to look in.
  * @param name The diagram's name, as its markers spell it.
  */
-export const diagramIn = (markdown: string, name: string): string | undefined => {
+export const diagramIn = (markdown: string, name: string) => {
   const lines = markdown.split('\n');
   const begin = lines.findIndex((l) => l.startsWith(`<!-- diagram:${name}:begin`));
   const end = lines.findIndex((l, i) => i > begin && l === `<!-- diagram:${name}:end -->`);
@@ -51,7 +51,7 @@ export const diagramIn = (markdown: string, name: string): string | undefined =>
 };
 
 /** The package docs a marker may sit in: each package's `README.md` and the markdown under its `docs/`, by absolute path. */
-const packageDocs = (root: string): string[] =>
+const packageDocs = (root: string) =>
   fs.readdirSync(path.join(root, 'packages')).flatMap((pkg) => {
     const dir = path.join(root, 'packages', pkg);
     const docs = path.join(dir, 'docs');
@@ -65,7 +65,7 @@ const packageDocs = (root: string): string[] =>
  * @param root The repository's root folder, whose package docs are searched and from which a doc's path is said.
  * @param name The diagram's name, as its markers spell it.
  */
-export const diagramFrom = (root: string, name: string): string => {
+export const diagramFrom = (root: string, name: string) => {
   const found = packageDocs(root).flatMap((file) => {
     const block = diagramIn(fs.readFileSync(file, 'utf8'), name);
     return block === undefined ? [] : [{ file: path.relative(root, file), block }];
@@ -86,7 +86,7 @@ const RENDERED = new Set(['sequenceDiagram', 'erDiagram']);
  * What a diagram's lines read as: its graph for a flowchart or a state diagram, which the parser reads, else its whole SVG, as for a
  * sequence or an entity-relation diagram.
  */
-const readAs = (lines: string[]): string =>
+const readAs = (lines: string[]) =>
   RENDERED.has(lines[0])
     ? renderMermaidSVG(lines.join('\n'))
     : JSON.stringify(parseMermaid(lines.join('\n')), (_key, value: unknown) => (value instanceof Map ? [...value] : value));
@@ -95,7 +95,7 @@ const readAs = (lines: string[]): string =>
  * The lines of a diagram, after its header, that the renderer reads as nothing: taken away, each leaves what it draws the same.
  * @param source The diagram's Mermaid text, its header on its first line.
  */
-export const unreadLines = (source: string): string[] => {
+export const unreadLines = (source: string) => {
   const lines = source
     .split('\n')
     .map((l) => l.trim())
@@ -105,7 +105,7 @@ export const unreadLines = (source: string): string[] => {
 };
 
 /** The SVG of one `mermaid` fence of the page at `page`, or an error naming the page, the diagram and what to change. */
-const drawn = (root: string, page: string, code: Code): Html => {
+const drawn = (root: string, page: string, code: Code) => {
   const name = NAMED.exec(code.meta ?? '')?.[1];
   const what = name ? `the diagram ${name}` : 'a mermaid fence';
   if (name && code.value.trim()) throw new Error(`${page}: ${what} is read from its markers: leave its fence empty`);
@@ -119,14 +119,14 @@ const drawn = (root: string, page: string, code: Code): Html => {
     const source = name ? diagramFrom(root, name) : code.value;
     const unread = unreadLines(source);
     if (unread.length > 0) throw new Error(`these lines are read as nothing, and left out: ${unread.join(' | ')}`);
-    return { type: 'html', value: figureOf(renderMermaidSVG(source, COLOURS)) };
+    return { type: 'html', value: figureOf(renderMermaidSVG(source, COLOURS)) } satisfies Html;
   } catch (error) {
     throw new Error(`${page}: ${what} does not draw: ${(error as Error).message}`, { cause: error });
   }
 };
 
 /** Replaces each `mermaid` fence under `node` by what `draw` makes of it, depth first. */
-const drawEach = (node: Parent, draw: (code: Code) => Html): void => {
+const drawEach = (node: Parent, draw: (code: Code) => Html) => {
   node.children.forEach((child, i) => {
     if (child.type === 'code' && child.lang === 'mermaid') node.children[i] = draw(child);
     else if ('children' in child) drawEach(child, draw);
@@ -139,5 +139,5 @@ const drawEach = (node: Parent, draw: (code: Code) => Html): void => {
  */
 export const remarkMermaid =
   ({ root }: { root: string }) =>
-  (tree: Root, file: { path?: string }): void =>
+  (tree: Root, file: { path?: string }) =>
     drawEach(tree, (code) => drawn(root, path.relative(root, file.path ?? 'a page'), code));

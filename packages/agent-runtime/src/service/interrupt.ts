@@ -31,7 +31,7 @@ const STOP = 'Stop the task (`ae stop`) to end its session, or leave the turn to
  * Why the harness `name` is refused an interrupt: it declares none, or its runner has none.
  * @param name The harness's name.
  */
-export const notInterruptible = (name: string): string =>
+export const notInterruptible = (name: string) =>
   `the \`${name}\` harness cannot end a turn without ending its session: only a session on streaming input takes it. ${STOP}`;
 
 /** `interrupt`'s refusal, in its words. */

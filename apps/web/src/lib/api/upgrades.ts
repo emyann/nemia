@@ -30,7 +30,7 @@ export const upgradesQuery = queryOptions({
  * The server upgraded (or taken back) to the release `tag`, as the upgrade typed at its machine does: the upgrade as filed.
  * @param tag The tag of the release to upgrade to, or go back to.
  */
-export const startUpgrade = (tag: string): Promise<Upgrade> =>
+export const startUpgrade = (tag: string) =>
   call(
     (c) => c.upgrades.start({ payload: { tag } }),
     write(Upgrade, 'The upgrade may have started: read Settings again before starting it again.'),
@@ -41,7 +41,7 @@ export const startUpgrade = (tag: string): Promise<Upgrade> =>
  * `Upgrade`.
  * @param id The upgrade's id, as its start answered.
  */
-export const upgradeOutputPath = (id: string): string => `/api/upgrades/${encodeURIComponent(id)}/output`;
+export const upgradeOutputPath = (id: string) => `/api/upgrades/${encodeURIComponent(id)}/output`;
 
 /** The data of the stream's events: `output` is text as printed, never JSON, so only `ended` is decoded. */
 type UpgradeStreamData = { ended: Upgrade };

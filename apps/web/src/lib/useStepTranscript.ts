@@ -29,7 +29,7 @@ export type { Following } from './following.ts';
  * @param taskId The task whose conversation is read (`sessionToRead`), or null where the step has none to read.
  * @param waiting Whether the step waits on a person.
  */
-export function useStepTranscript(runId: string, step: string, taskId: string | null, waiting = false): Following {
+export function useStepTranscript(runId: string, step: string, taskId: string | null, waiting = false) {
   const [state, setState] = useState<Following>(() => unread(taskId !== null));
   const read = useRef(taskId);
   const client = useQueryClient();

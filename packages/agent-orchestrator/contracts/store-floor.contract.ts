@@ -14,14 +14,14 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type Version = { readonly major: number; readonly minor: number; readonly patch: number };
 
 /** Whether `a` is an older release than `b`. */
-const older = (a: Version, b: Version): boolean =>
+const older = (a: Version, b: Version) =>
   a.major < b.major || (a.major === b.major && (a.minor < b.minor || (a.minor === b.minor && a.patch < b.patch)));
 
 /** Whether `a` and `b` are one release. */
-const same = (a: Version, b: Version): boolean => a.major === b.major && a.minor === b.minor && a.patch === b.patch;
+const same = (a: Version, b: Version) => a.major === b.major && a.minor === b.minor && a.patch === b.patch;
 
 /** A version's three numbers are whole and not negative. */
-const whole = (v: Version): boolean =>
+const whole = (v: Version) =>
   Number.isInteger(v.major) && Number.isInteger(v.minor) && Number.isInteger(v.patch) && v.major >= 0 && v.minor >= 0 && v.patch >= 0;
 
 const goingBackSpec = spec<(target: Version, floor: Version | null) => boolean>({

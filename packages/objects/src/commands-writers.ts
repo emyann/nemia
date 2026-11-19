@@ -14,26 +14,28 @@ export const FROM: Positional = { key: 'from', takes: 'required', kind: 'name' }
  * `--factory`, the factory made from a template whose tree a writer named on `factory` writes into: taken on both sides, once.
  * @param command The writer's command name, as the flag's refusals say it.
  */
-export const factoryFlag = (command: string): Flag => ({
-  flag: '--factory',
-  kind: 'text',
-  key: 'factory',
-  takes: `--factory takes the name of a factory made from a template, whose tree is written: ${CLI} ${command} factory … --factory <name>`,
-  twice: `${CLI} ${command} takes --factory once: one tree is written.`,
-});
+export const factoryFlag = (command: string) =>
+  ({
+    flag: '--factory',
+    kind: 'text',
+    key: 'factory',
+    takes: `--factory takes the name of a factory made from a template, whose tree is written: ${CLI} ${command} factory … --factory <name>`,
+    twice: `${CLI} ${command} takes --factory once: one tree is written.`,
+  }) satisfies Flag;
 
 /**
  * `--version`, the version `what` was read at, which a refusal of a write without it names: taken on both sides, once.
  * @param command The writer's command name, as the flag's refusals say it.
  * @param what What the version is of, as its refusal says it.
  */
-export const versionFlag = (command: string, what: string): Flag => ({
-  flag: '--version',
-  kind: 'text',
-  key: 'version',
-  takes: `--version takes the version ${what} was read at, which a write without it names: ${CLI} ${command} … --version <version>`,
-  twice: `${CLI} ${command} takes --version once: one write is checked against one version.`,
-});
+export const versionFlag = (command: string, what: string) =>
+  ({
+    flag: '--version',
+    kind: 'text',
+    key: 'version',
+    takes: `--version takes the version ${what} was read at, which a write without it names: ${CLI} ${command} … --version <version>`,
+    twice: `${CLI} ${command} takes --version once: one write is checked against one version.`,
+  }) satisfies Flag;
 
 /**
  * A text flag the command line alone takes, under `key`, once: a path its runner reads, never sent to the api.
@@ -42,14 +44,15 @@ export const versionFlag = (command: string, what: string): Flag => ({
  * @param takes What the path names, as the refusal of a value left out says it.
  * @param why Why the api never takes it, said beside the flag.
  */
-export const cliPath = (command: string, key: string, takes: string, why: string): Flag => ({
-  flag: `--${key}`,
-  kind: 'text',
-  key,
-  takes: `--${key} takes ${takes}: ${CLI} ${command} … --${key} <path>`,
-  twice: `${CLI} ${command} takes --${key} once.`,
-  only: { side: 'cli', why },
-});
+export const cliPath = (command: string, key: string, takes: string, why: string) =>
+  ({
+    flag: `--${key}`,
+    kind: 'text',
+    key,
+    takes: `--${key} takes ${takes}: ${CLI} ${command} … --${key} <path>`,
+    twice: `${CLI} ${command} takes --${key} once.`,
+    only: { side: 'cli', why },
+  }) satisfies Flag;
 
 /**
  * The spec of a writer named `command`, used as `usage` says: its positionals and flags; any other argument refused in its words.
@@ -58,11 +61,12 @@ export const cliPath = (command: string, key: string, takes: string, why: string
  * @param positionals The positionals the writer takes, in order.
  * @param flags The flags the writer takes.
  */
-export const writerSpec = (command: string, usage: string, positionals: readonly Positional[], flags: readonly Flag[]): Spec => ({
-  positionals,
-  flags,
-  unknown: (arg) => `${CLI} ${command} takes no ${arg}: ${CLI} ${command} ${usage}`,
-});
+export const writerSpec = (command: string, usage: string, positionals: readonly Positional[], flags: readonly Flag[]) =>
+  ({
+    positionals,
+    flags,
+    unknown: (arg) => `${CLI} ${command} takes no ${arg}: ${CLI} ${command} ${usage}`,
+  }) satisfies Spec;
 
 const WORKFLOWS_WRITE_USAGE = '(user | factory) <name> --folder <draft> [--factory <name>] [--version <v>]';
 

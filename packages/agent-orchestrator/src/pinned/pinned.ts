@@ -20,7 +20,7 @@ type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly StepSpec[] 
  * @param step The step, whose agent and its skills are read.
  * @param pins The run's pins, of every agent and skill it resolved.
  */
-export const stepPins = (step: StepSpec, pins: readonly Pin[]): Pin[] => {
+export const stepPins = (step: StepSpec, pins: readonly Pin[]) => {
   const agent = step.agent;
   if (!agent) return [];
   const names = new Set(agent.skills ?? []);
@@ -34,7 +34,7 @@ export const stepPins = (step: StepSpec, pins: readonly Pin[]): Pin[] => {
  * @param f The run's pins and the steps it is filed from.
  * @param step The step filed, or undefined where the steps given do not hold it.
  */
-export const filedOn = (f: PinsRead, step: StepSpec | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
+export const filedOn = (f: PinsRead, step: StepSpec | undefined) => {
   if (!step) return {};
   const own = stepPins(step, f.run.pinned ?? []);
   return { ...(own.length ? { pinned: own } : {}), closeoutHash: closeoutHashOf(step, f.reads.steps), declared: outputFields(step) };
@@ -70,8 +70,10 @@ export const filedFields: FiledFields = (filed, now, gave) => {
  * @param f The run's pins and the steps it is filed from.
  * @param record The filing step's own record, or undefined where it has none.
  */
-export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRead, record: StepRecord | undefined): string | undefined =>
-  record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
+export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRead, record: StepRecord | undefined) =>
+  (record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined) satisfies
+    | string
+    | undefined as string | undefined;
 
 /**
  * A run as its record is read, each step's record written before `declared` was kept given the fields its try was filed with, where they
@@ -80,7 +82,7 @@ export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRea
  * (`readRun`), so nothing is carried: the digest is compared here, outside what a pass judges, since a judgement reads no hash. Pure.
  * @param run The run as its record is read: its steps' records and its frozen workflow.
  */
-export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R): R => {
+export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R) => {
   const steps = run.workflow;
   if (!steps) return run;
   const kept = Object.entries(run.steps).map(([name, record]) => {
@@ -101,7 +103,7 @@ export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R):
  * @param run The run, whose record of the step is read.
  * @param said The step's closeout, or undefined where it has none.
  */
-export const filedOwed = (step: StepSpec, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
+export const filedOwed = (step: StepSpec, run: Pick<Run, 'steps'>, said: Closeout | undefined) => {
   const record = run.steps[step.name];
   const declared = record?.declared;
   const moved = declared === undefined && record?.closeoutHash !== undefined;

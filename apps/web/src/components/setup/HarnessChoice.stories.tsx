@@ -10,26 +10,27 @@ const meta: Meta = { title: 'Store/HarnessChoice' };
 export default meta;
 
 /** A harness's two pieces as the read answers them, its install in `installed` and its sign-in missing, with `signIn`'s fixes. */
-const pieces = (name: string, title: string, installed: boolean, signIn: ReadinessPiece['fixes']): ReadinessPiece[] => [
-  {
-    name,
-    area: 'harness',
-    state: installed ? 'met' : 'missing',
-    message: installed ? `${title} is installed: 1.2.3, the version this release was tested with` : `${title} is installed`,
-    fixes: installed
-      ? [{ message: 'deactivate it', command: `tool doctor fix ${name} --index 1`, startable: true, index: 1, kind: 'removes' }]
-      : [{ message: `install ${title} 1.2.3`, command: `tool doctor fix ${name}`, startable: true, index: 0 }],
-    harness: { name, part: 'install' },
-  },
-  {
-    name: `${name}-sign-in`,
-    area: 'harness',
-    state: 'missing',
-    message: `${title} is signed in`,
-    fixes: signIn,
-    harness: { name, part: 'sign-in' },
-  },
-];
+const pieces = (name: string, title: string, installed: boolean, signIn: ReadinessPiece['fixes']) =>
+  [
+    {
+      name,
+      area: 'harness',
+      state: installed ? 'met' : 'missing',
+      message: installed ? `${title} is installed: 1.2.3, the version this release was tested with` : `${title} is installed`,
+      fixes: installed
+        ? [{ message: 'deactivate it', command: `tool doctor fix ${name} --index 1`, startable: true, index: 1, kind: 'removes' }]
+        : [{ message: `install ${title} 1.2.3`, command: `tool doctor fix ${name}`, startable: true, index: 0 }],
+      harness: { name, part: 'install' },
+    },
+    {
+      name: `${name}-sign-in`,
+      area: 'harness',
+      state: 'missing',
+      message: `${title} is signed in`,
+      fixes: signIn,
+      harness: { name, part: 'sign-in' },
+    },
+  ] satisfies ReadinessPiece[];
 
 /** Two harnesses, neither installed: one signed in by a command typed on the server, one by a device code the server starts. */
 const NONE = harnessChoices([

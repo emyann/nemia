@@ -3,7 +3,7 @@ import { paint } from '@/lib/meaning';
 import { cn } from '@/components/ui/ds/utils';
 
 /** The hue of a session at work, thinned to `percent` of itself over nothing. */
-const thin = (percent: number): string => `color-mix(in srgb, ${paint.alive} ${percent}%, transparent)`;
+const thin = (percent: number) => `color-mix(in srgb, ${paint.alive} ${percent}%, transparent)`;
 
 /** The look's glow, from the top left corner of the ground. */
 const GLOW = `radial-gradient(900px 420px at 0% 0%, ${thin(7)}, transparent 70%)`;

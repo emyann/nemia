@@ -19,6 +19,6 @@ export type LifecycleTransition = { state: LifecycleState; event: Event['kind'];
  * @param taskId The task's id.
  * @param events The task's journal, in the order it was written.
  */
-export function pathOf(taskId: string, events: readonly Event[]): LifecycleTransition[] {
+export function pathOf(taskId: string, events: readonly Event[]) {
   return events.map((event, i) => ({ state: lifecycleOf(fold(taskId, events.slice(0, i + 1))), event: event.kind, at: event.at }));
 }

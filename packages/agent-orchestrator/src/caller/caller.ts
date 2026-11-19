@@ -26,16 +26,16 @@ export const PERSON: ProposalCaller = { kind: 'person' };
  * The name a caller's proposals are minted under: its agent, or `person`.
  * @param caller Who calls: the person, or an agent by its name.
  */
-export const proposerOf = (caller: ProposalCaller): string => (caller.kind === 'agent' ? caller.agent : 'person');
+export const proposerOf = (caller: ProposalCaller) => (caller.kind === 'agent' ? caller.agent : 'person');
 
 /**
  * The actor a write by `caller` records: the person, under the name of the token presented where one was; an agent under its name, with
  * the standing token's name where it presented one, else its session's run and step where it has them. A key with no value is left out.
  * @param caller Who calls: the person or an agent, with the token it presented and its session's run and step where it has them.
  */
-export function actorOf(caller: ProposalCaller): Actor {
+export function actorOf(caller: ProposalCaller) {
   const token = caller.token ?? undefined;
-  if (caller.kind === 'person') return token === undefined ? { kind: 'person' } : { kind: 'person', token };
+  if (caller.kind === 'person') return (token === undefined ? { kind: 'person' } : { kind: 'person', token }) satisfies Actor;
   const run = caller.run ?? undefined;
   const step = caller.step ?? undefined;
   return {
@@ -44,5 +44,5 @@ export function actorOf(caller: ProposalCaller): Actor {
     ...(token === undefined ? {} : { token }),
     ...(token === undefined && run !== undefined ? { run } : {}),
     ...(token === undefined && step !== undefined ? { step } : {}),
-  };
+  } satisfies Actor;
 }

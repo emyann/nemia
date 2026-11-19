@@ -53,7 +53,7 @@ export const NEMIA_DIGEST_EVERY = 1440;
  * A task of hers filed at `at`: `nemia-` and the time's digits.
  * @param at When the keeper files her, an ISO time.
  */
-export const nemiaTaskId = (at: string): string => `nemia-${at.replace(/[^0-9]/g, '')}`;
+export const nemiaTaskId = (at: string) => `nemia-${at.replace(/[^0-9]/g, '')}`;
 
 /**
  * The harness's settings her session is filed with, as JSON: her ask and deny rules (`rules`); `NEMIA_DAEMON_START=off` (`DEMAND_OFF`),
@@ -67,7 +67,7 @@ export function nemiaSettings(
   rules: { readonly ask: readonly string[]; readonly deny: readonly string[] },
   bin: string | undefined,
   searchPath: string,
-): string {
+) {
   const rest = searchPath.split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
   return JSON.stringify({
     permissions: { ask: [...rules.ask], deny: [...rules.deny] },
@@ -82,7 +82,7 @@ export const LEVEL_FORM = FACTORY_LEVEL_FORM;
  * Why `word` is no level `nemia level` sets, or undefined where it is one. Pure.
  * @param word The level as the person typed it.
  */
-export function levelRefusal(word: string): string | undefined {
+export function levelRefusal(word: string) {
   if ((LEVELS as readonly string[]).includes(word)) return undefined;
   return `${JSON.stringify(word)} is no level: ${LEVEL_FORM}.`;
 }
@@ -105,10 +105,10 @@ export type NemiaState = 'resting' | 'due' | 'untrusted' | 'filed' | 'kept' | 't
 export const NEMIA_REST_AFTER = '15 minutes';
 
 /** Whether her task is open: filed, not settled, and no stop asked. */
-const isOpen = (task: HerTask | undefined): boolean => task !== undefined && !task.settled && !task.stopRequested;
+const isOpen = (task: HerTask | undefined) => task !== undefined && !task.settled && !task.stopRequested;
 
 /** Whether her subscription tells her task `task` with her floor and her selectors as they ship. */
-const proper = (task: string | undefined, s: HerSubscription | undefined): boolean =>
+const proper = (task: string | undefined, s: HerSubscription | undefined) =>
   s !== undefined && task !== undefined && s.task === task && s.scoped && s.selected;
 
 /**
@@ -133,23 +133,24 @@ export const nemiaDue: NemiaDue = (keeping, task, subscribed) => {
 };
 
 /** Whether a word of the person's waits for her: a message in her outbox or an answer to her question. */
-const waiting = (k: Keeping): boolean => k.owed === true || k.answered === true;
+const waiting = (k: Keeping) => k.owed === true || k.answered === true;
 
 /**
  * What is owed where no task of hers is open, its subscription aside: her folder trusted where needed and a task filed, where she is
  * wanted and her last task (`filed`) was put to rest or the person spoke after it ended; else a task ended from outside marked once.
  */
-const dueClosed = (k: Keeping, filed: boolean): NemiaAct[] => {
+const dueClosed = (k: Keeping, filed: boolean) => {
   const spoke = k.rested === true || k.heard === true;
-  if ((k.above || waiting(k)) && (!filed || spoke)) return [...(k.trusted === false ? (['trust'] as const) : []), 'file'];
-  return filed && !spoke && k.stoppedMarked !== true ? ['markStopped'] : [];
+  if ((k.above || waiting(k)) && (!filed || spoke))
+    return [...(k.trusted === false ? (['trust'] as const) : []), 'file'] satisfies NemiaAct[];
+  return (filed && !spoke && k.stoppedMarked !== true ? ['markStopped'] : []) satisfies NemiaAct[];
 };
 
 /** Whether the conversation is quiet long enough for her to rest: idle, nothing waiting, no question of hers open. */
-const quietNow = (k: Keeping): boolean => k.quiet === true && k.idle === true && !waiting(k) && k.asking !== true && k.closing !== true;
+const quietNow = (k: Keeping) => k.quiet === true && k.idle === true && !waiting(k) && k.asking !== true && k.closing !== true;
 
 /** What the keeper says to her open session: custom words changed, and what the chat owes where her session is up; its idle mark. */
-const spoken = (k: Keeping): NemiaAct[] => {
+const spoken = (k: Keeping) => {
   const up = k.up === true;
   return [
     ...(k.stale === true ? (['sayCustom'] as const) : []),
@@ -183,7 +184,7 @@ const NEXT_BEAT = 'the keeper gives the trust at its next beat, and files her se
  * The runtime's words `refused` without the hand step they end on (running the harness in her folder once, at its prompt), which the
  * keeper takes in the person's place: cut with the `: ` or `, or ` before it. Pure.
  */
-const withoutHandStep = (refused: string, not: TrustNotGiven): string => {
+const withoutHandStep = (refused: string, not: TrustNotGiven) => {
   const at = refused.lastIndexOf(`run ${not.harness} in ${not.folder} once `);
   if (at < 0) return refused;
   const head = refused.slice(0, at);
@@ -198,7 +199,7 @@ const withoutHandStep = (refused: string, not: TrustNotGiven): string => {
  * @param not The trust as it reads after the write.
  * @param threw The words of the error the write threw, or undefined where it answered.
  */
-export function trustRefused(not: TrustNotGiven, threw?: string): string {
+export function trustRefused(not: TrustNotGiven, threw?: string) {
   if (threw !== undefined)
     return `${not.harness}'s trust of her folder ${not.folder} could not be written in ${not.file} (${threw}): make that file readable and writable by the user the store runs as; ${NEXT_BEAT}`;
   if (not.never !== null)
@@ -213,7 +214,7 @@ export function trustRefused(not: TrustNotGiven, threw?: string): string {
  * @param folder Her folder in the store.
  * @param threw The words of the error making it threw.
  */
-export const folderUnmade = (folder: string, threw: string): string =>
+export const folderUnmade = (folder: string, threw: string) =>
   `her folder ${folder} could not be made (${threw}): make the store's folder writable by the user the store runs as; the keeper makes her folder at its next beat, gives it the trust and files her session`;
 
 /**
@@ -221,7 +222,7 @@ export const folderUnmade = (folder: string, threw: string): string =>
  * @param body Her builtin instruction.
  * @param custom The person's custom words for her, or undefined where there are none.
  */
-export const nemiaPrompt = (body: string, custom: string | undefined): string =>
+export const nemiaPrompt = (body: string, custom: string | undefined) =>
   `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
 
 /** The custom words her session was last filed or told with, as the keeper records them: `words` absent for none. */
@@ -235,7 +236,7 @@ export type ToldCustom = { words?: string };
  * @param now The person's custom words now, or undefined where there are none.
  * @param filed Her filed instruction, or undefined where none was written.
  */
-export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined): boolean =>
+export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined) =>
   told === undefined ? now !== undefined && !(filed ?? '').endsWith(`\n\n${now}\n`) : told.words !== now;
 
 /**
@@ -243,7 +244,7 @@ export const customChanged = (told: ToldCustom | undefined, now: string | undefi
  * started with, or, where undefined, that they were removed and she has none. Pure.
  * @param custom The person's custom words now, or undefined where they were removed.
  */
-export const toldCustom = (custom: string | undefined): string =>
+export const toldCustom = (custom: string | undefined) =>
   custom === undefined
     ? 'The person removed their custom instruction for you: you now have none, and the one you were started with no longer holds.'
     : `The person's custom instruction for you changed. It now reads as below, and replaces the one you were started with:\n\n${custom}`;
@@ -300,19 +301,20 @@ export const NEMIA_VERBS: NemiaVerb[] = [
 ];
 
 /** Her machine as plain data, a fresh copy each call. */
-export const nemiaGraph = (): NemiaGraph => ({
-  initial: 'resting',
-  states: [...STATES],
-  final: [],
-  edges: EDGES.map((e) => ({ ...e })),
-  verbs: NEMIA_VERBS.map((v) => ({ ...v, from: [...v.from] })),
-});
+export const nemiaGraph = () =>
+  ({
+    initial: 'resting',
+    states: [...STATES],
+    final: [],
+    edges: EDGES.map((e) => ({ ...e })),
+    verbs: NEMIA_VERBS.map((v) => ({ ...v, from: [...v.from] })),
+  }) satisfies NemiaGraph;
 
 /**
  * Her machine as a Mermaid state diagram, edges then verbs, held in the package's `docs/features.md` between `diagram:nemia` markers.
  * @param graph Her machine as plain data, `nemiaGraph()` when absent.
  */
-export const nemiaDiagram = (graph: NemiaGraph = nemiaGraph()): string =>
+export const nemiaDiagram = (graph: NemiaGraph = nemiaGraph()) =>
   [
     'stateDiagram-v2',
     `  [*] --> ${graph.initial}`,

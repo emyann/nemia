@@ -22,7 +22,7 @@ import { Actor } from 'objects';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
-import { pauseModeOf, pauseMove, putEvent, type PauseEvent, type PauseMode, type PauseMove } from '../pause-machine/pause-machine.ts';
+import { pauseModeOf, pauseMove, putEvent, type PauseEvent } from '../pause-machine/pause-machine.ts';
 import { pauseLapsed, RESUME_LINE, type Pause, type PauseHolder } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
@@ -36,14 +36,14 @@ const PAUSE_FILE = 'cordon';
  * The pause's file: one for the whole store.
  * @param home The store's root.
  */
-export const pauseFile = (home: string): string => path.join(home, PAUSE_FILE);
+export const pauseFile = (home: string) => path.join(home, PAUSE_FILE);
 
 /**
  * Whether a pause stands on the store: its file is there, whatever it holds. What a reader that needs no word of the pause asks — the
  * runtime's admission, a run's stamp — in place of the file's path.
  * @param home The store's root.
  */
-export const pauseStands = (home: string): boolean => fs.existsSync(pauseFile(home));
+export const pauseStands = (home: string) => fs.existsSync(pauseFile(home));
 
 /** A field of the file as it was written: one line of words, or absent. */
 const Said = Schema.optional(Schema.String);
@@ -61,17 +61,16 @@ const isPauseFile = Schema.is(
 );
 
 /** The caller the file names as who put the pause, where it reads as an actor: none where it names none or one that does not read. */
-const actorRead = (value: unknown): Actor | undefined => Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
+const actorRead = (value: unknown) => Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
 
 /** The pause's holder as the file names it: a pid and, where written, its start. One that does not read is none, so the pause stands. */
 const isHolder = Schema.is(Schema.Struct({ pid: Schema.Int.check(Schema.isGreaterThan(0)), procStart: Schema.optional(Schema.Int) }));
 
 /** A timeout as the file holds it: whole milliseconds from 0, or none. */
-const timeoutRead = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+const timeoutRead = (value: unknown) => (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined);
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
-const jsonOr = (text: string): unknown => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
+const jsonOr = (text: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** The pause's file as one read gave it: the pause, the process that holds it where the file names one, and the text read. */
 export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string };
@@ -81,7 +80,7 @@ export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string }
  * that does not read as the pause gives its fields empty, so a person's hand edit never lets new work start.
  * @param home The store's root.
  */
-export function readPauseFile(home: string): PauseFileRead | null {
+export function readPauseFile(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(pauseFile(home), 'utf8');
@@ -111,13 +110,13 @@ export function readPauseFile(home: string): PauseFileRead | null {
  * The store's pause, or null when none stands (`readPauseFile`, its holder left in the file).
  * @param home The store's root.
  */
-export const readPause = (home: string): Pause | null => readPauseFile(home)?.pause ?? null;
+export const readPause = (home: string) => readPauseFile(home)?.pause ?? null;
 
 /**
  * The mode the store's pause stands in, read from its file now (`pauseModeOf`).
  * @param home The store's root.
  */
-export const modeAt = (home: string): PauseMode => pauseModeOf(readPause(home));
+export const modeAt = (home: string) => pauseModeOf(readPause(home));
 
 /** What each refusal of the machine is thrown as, by what the caller was doing. */
 const REFUSED: Readonly<Record<'Conflict' | 'Missing', (message: string) => Conflict | Missing>> = {
@@ -126,14 +125,14 @@ const REFUSED: Readonly<Record<'Conflict' | 'Missing', (message: string) => Conf
 };
 
 /** The move the machine answers `event` on the store as it stands, a refusal thrown as its kind with `refusal`'s words. */
-function moved(home: string, event: PauseEvent, refusal: () => string): Exclude<PauseMove, { kind: 'refused' }> {
+function moved(home: string, event: PauseEvent, refusal: () => string) {
   const move = pauseMove(modeAt(home), event);
   if (move.kind === 'refused') throw REFUSED[move.as](refusal());
   return move;
 }
 
 /** Who the machine says runs this process, or undefined where it cannot say. */
-function osUser(): string | undefined {
+function osUser() {
   try {
     return os.userInfo().username || undefined;
   } catch {
@@ -159,7 +158,7 @@ export function putPause(
   now: Date = new Date(),
   timeoutMs?: number,
   heldBy?: PauseHolder,
-): Pause {
+) {
   const by = said.by ?? osUser() ?? 'someone';
   const pause: Pause = {
     at: now.toISOString(),
@@ -168,7 +167,7 @@ export function putPause(
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(said.actor ? { actor: said.actor } : {}),
   };
-  const standing = (): string => {
+  const standing = () => {
     const stands = readPause(home);
     return `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`;
   };
@@ -180,7 +179,7 @@ export function putPause(
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     throw new Conflict({ message: standing() });
   }
-  return pause;
+  return pause satisfies Pause as Pause;
 }
 
 /**
@@ -189,7 +188,7 @@ export function putPause(
  * pause stands on.
  * @param home The store's root.
  */
-export function cutPause(home: string): Pause {
+export function cutPause(home: string) {
   const nothing = 'the store is not paused: there is nothing to cut (nemia pause --now puts one).';
   const move = moved(home, 'cut', () => nothing);
   const stands = readPauseFile(home);
@@ -207,13 +206,13 @@ export function cutPause(home: string): Pause {
  * lifted (`since`); overwritten by the next such lift.
  * @param home The store's root.
  */
-export const resumedFile = (home: string): string => path.join(home, `${PAUSE_FILE}.lifted`);
+export const resumedFile = (home: string) => path.join(home, `${PAUSE_FILE}.lifted`);
 
 /**
  * Who last lifted the store's pause by hand (`resumedFile`): undefined where no file is there, or it does not read as one.
  * @param home The store's root.
  */
-export function readResumed(home: string): { since: string; actor: Actor } | undefined {
+export function readResumed(home: string) {
   let read: unknown;
   try {
     read = jsonOr(fs.readFileSync(resumedFile(home), 'utf8'));
@@ -232,7 +231,7 @@ export function readResumed(home: string): { since: string; actor: Actor } | und
  * @param home The store's root.
  * @param actor Who lifts the pause, or undefined where it is not known, in which case no lift is written beside it.
  */
-export function resumePause(home: string, actor?: Actor): Pause {
+export function resumePause(home: string, actor?: Actor) {
   const nothing = 'the store is not paused: there is nothing to resume (nemia pause puts one).';
   moved(home, 'resume', () => nothing);
   const pause = readPause(home);
@@ -254,7 +253,7 @@ export function resumePause(home: string, actor?: Actor): Pause {
  * @param home The store's root.
  * @param identify What the process table says now of the holder the file names: whether it still runs as the same process.
  */
-export function liftLapsedPause(home: string, identify: (holder: PauseHolder) => Identity): { pause: Pause; heldBy: PauseHolder } | null {
+export function liftLapsedPause(home: string, identify: (holder: PauseHolder) => Identity) {
   const read = readPauseFile(home);
   if (read === null || read.heldBy === undefined) return null;
   if (!pauseLapsed(identify(read.heldBy))) return null;

@@ -63,7 +63,7 @@ export const shellCommand = assume(commandOf, {
 const said = (s: string | undefined): s is string => s !== undefined && s !== '';
 
 /** Whether the SDK's offer lets a person save a rule: not suppressed, and a rule suggested. */
-const alwaysAllowed = (offer: PermissionOffer): boolean =>
+const alwaysAllowed = (offer: PermissionOffer) =>
   offer.suppressAlwaysAllowRule !== true && offer.suggestions !== undefined && offer.suggestions.length > 0;
 
 /**
@@ -72,14 +72,13 @@ const alwaysAllowed = (offer: PermissionOffer): boolean =>
  * suggestions it can read; that the updates and the call's input are returned as the SDK gave them is held by
  * `test/attached-asks.boundary.test.ts`, which compares them whole on what the stand-in receives.
  */
-const sameRules = (given: PermissionUpdate[] | undefined, suggested: PermissionUpdate[]): boolean =>
+const sameRules = (given: PermissionUpdate[] | undefined, suggested: PermissionUpdate[]) =>
   given !== undefined &&
   given.length === suggested.length &&
   given.every((u, i) => u.type === suggested.at(i)?.type && u.destination === suggested.at(i)?.destination);
 
 /** Whether the ask's one question offers the choice `label`. */
-const offers = (ask: PermissionAsk, label: string): boolean =>
-  (ask.questions.at(0)?.options ?? []).some((option) => option.label === label);
+const offers = (ask: PermissionAsk, label: string) => (ask.questions.at(0)?.options ?? []).some((option) => option.label === label);
 
 const permissionAskSpec = spec<
   (id: string, at: string, tool: string, input: Record<string, unknown>, offer: PermissionOffer) => PermissionAsk

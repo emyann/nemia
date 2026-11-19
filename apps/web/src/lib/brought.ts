@@ -3,7 +3,7 @@
  * of it (`broughtFacts`) and which of the run's page's own parts answers it (`broughtPart`, proved by `contracts/brought.contract.ts`).
  * Pure: the drawing is `components/nemia/chat/ChatBrought.tsx`.
  */
-import type { BroughtFacts, BroughtPart, BroughtPartOf } from '../../contracts/brought.contract.ts';
+import type { BroughtFacts, BroughtPartOf } from '../../contracts/brought.contract.ts';
 import { askedOf, offersOf } from './asks.ts';
 import { gateOfStep } from './gate.ts';
 import type { RunDetail } from './runView';
@@ -16,7 +16,7 @@ export type { BroughtPart } from '../../contracts/brought.contract.ts';
  * session the harness blocked; the Decide section's row where it offers one; the note of a try asked already; else its state alone.
  * @param facts What the run's page reads of the step (`broughtFacts`).
  */
-export const broughtPart: BroughtPartOf = (facts: BroughtFacts): BroughtPart => {
+export const broughtPart: BroughtPartOf = (facts: BroughtFacts) => {
   if (!facts.found) return 'missing';
   if (facts.atGate) return 'gate';
   if (facts.offer === 'continue') return 'continue';
@@ -29,13 +29,13 @@ export const broughtPart: BroughtPartOf = (facts: BroughtFacts): BroughtPart => 
  * @param run The run's detail.
  * @param step The step's name, as the message's link gives it.
  */
-export function broughtFacts(run: RunDetail, step: string): BroughtFacts {
+export function broughtFacts(run: RunDetail, step: string) {
   const found = run.steps.find((s) => s.name === step);
-  if (!found) return { found: false, atGate: false, offer: null, asked: false };
+  if (!found) return { found: false, atGate: false, offer: null, asked: false } satisfies BroughtFacts;
   return {
     found: true,
     atGate: gateOfStep(run, found) !== null,
     offer: offersOf(run).find((offer) => offer.step === step)?.case ?? null,
     asked: askedOf(run, step) !== null,
-  };
+  } satisfies BroughtFacts;
 }

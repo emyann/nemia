@@ -28,10 +28,10 @@ export type SelectedRun = { readonly state: RunState; readonly outcome: RunOutco
 const FIELD = 'status.outcome';
 
 /** Whether `word` is a finished run's outcome. */
-const isOutcome = (word: string): boolean => word === 'succeeded' || word === 'failed' || word === 'cancelled' || word === 'undecided';
+const isOutcome = (word: string) => word === 'succeeded' || word === 'failed' || word === 'cancelled' || word === 'undecided';
 
 /** Whether `text` is the field, `operator`, then an outcome. */
-const spelled = (text: string, operator: string): boolean =>
+const spelled = (text: string, operator: string) =>
   text.startsWith(FIELD + operator) && isOutcome(text.slice(FIELD.length + operator.length));
 
 const runOutcomeSelectorSpec = spec<(text: string) => RunOutcomeSelector | null>({

@@ -7,19 +7,7 @@
  * story makes its own store (`firstCardStore`); `filed` holds what the page wrote, in order.
  */
 import { delay, http, HttpResponse } from 'msw';
-import type {
-  Card,
-  CardStarted,
-  Factory,
-  FactoryCommands,
-  FactoryList,
-  FactoryVolume,
-  Milestones,
-  Quota,
-  Stats,
-  Workflow,
-  WorkflowList,
-} from 'objects';
+import type { Card, CardStarted, Factory, FactoryList, FactoryVolume, Milestones, Quota, Workflow, WorkflowList } from 'objects';
 import { UNSET } from '../../src/lib/builder';
 
 /** The factory the card is filed in. */
@@ -46,7 +34,7 @@ const QUOTA: Quota = {
 };
 
 /** `acme`'s lines, with the host its template follows where `follows`. */
-const commandsOf = (follows: boolean): FactoryCommands => ({
+const commandsOf = (follows: boolean) => ({
   attach: `nemia factory attach ${ACME} <workflow>`,
   rm: `nemia factory rm ${ACME}`,
   add: `nemia factory add ${ACME}`,
@@ -61,16 +49,16 @@ const commandsOf = (follows: boolean): FactoryCommands => ({
 });
 
 /** A factory named `name` as the api serves it, offering `workflows` and given `volumes`. */
-const factoryFixture = (name: string, workflows: string[], volumes: FactoryVolume[]): Factory => ({
+const factoryFixture = (name: string, workflows: string[], volumes: FactoryVolume[]) => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
   spec: { hires: {}, volumes, workflows },
   status: { conditions: [], untrusted: [] },
-});
+}) satisfies Factory;
 
 /** The stats of a workflow's landed runs: `landed` of them, each about 14 minutes and $3.20, or none. */
-const statsOf = (landed: number): Stats => ({
+const statsOf = (landed: number) => ({
   from: null,
   to: '2026-11-18',
   by: null,
@@ -82,7 +70,7 @@ const statsOf = (landed: number): Stats => ({
 });
 
 /** The milestones, the landing `done` or next. */
-const milestonesOf = (landed: boolean): Milestones => ({
+const milestonesOf = (landed: boolean) => ({
   milestones: [
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'done', message: 'a factory is filed' },
@@ -93,10 +81,10 @@ const milestonesOf = (landed: boolean): Milestones => ({
       message: landed ? 'a run landed' : 'start a first card, and merge its change into the base branch',
     },
   ],
-});
+}) satisfies Milestones;
 
 /** The body of a request, as a record. */
-const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
+const bodyOf = async (request: Request) => {
   const body: unknown = await request.json();
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 };
@@ -113,7 +101,7 @@ const listedStep = (name: string, workspace: 'base' | null) => ({
 });
 
 /** The workflow `name` as `acme` lists it on its repository: an `implement` step, then `land`, its ending step. */
-const workflowFixture = (name: string): Workflow => ({
+const workflowFixture = (name: string) => ({
   apiVersion: 'nemia/v1',
   kind: 'Workflow',
   metadata: { name, namespace: ACME, creationTimestamp: '2026-11-01T00:00:00.000Z', resourceVersion: `${name}-1` },
@@ -138,7 +126,7 @@ const workflowFixture = (name: string): Workflow => ({
     error: null,
     unfilled: null,
   },
-});
+}) satisfies Workflow;
 
 /** What a store of a story holds: the workflows `acme` offers, its first volume's origin, how many quick runs landed, and more. */
 type Held = {

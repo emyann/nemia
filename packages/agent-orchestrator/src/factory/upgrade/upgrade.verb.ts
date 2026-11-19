@@ -112,19 +112,19 @@ const sameVersionOf = Effect.fn('sameVersionOf')(function* (
 });
 
 /** The switch an upgrade onto `render` is, from the base the status `status` names, both templates by name; none where it is no switch. */
-const switchOf = (status: Status | undefined, render: RenderedAt): Switched | undefined =>
+const switchOf = (status: Status | undefined, render: RenderedAt) =>
   status?.template !== undefined && mergeBaseOf(status.template, render.name) === 'none'
     ? { from: status.template, to: render.name }
     : undefined;
 
 /** The words under `key`, or none. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** The `--set` words `args` give, in order. */
-const setsGiven = (args: Args): string[] => (Array.isArray(args.sets) ? args.sets.map(String) : []);
+const setsGiven = (args: Args) => (Array.isArray(args.sets) ? args.sets.map(String) : []);
 
 /** A version as a template declares it: three numbers, `x.y.z`. */
 const VERSION = /^\d+\.\d+\.\d+$/;
@@ -133,12 +133,7 @@ const VERSION = /^\d+\.\d+\.\d+$/;
  * The templated factory `factory`, read through the door, rendered once: its base, the version it holds where its status names it, and
  * the status. Refused: one made from no template, one not rendered.
  */
-function rendered(
-  home: string,
-  factory: Factory,
-  verb: string,
-  notDone: string,
-): { factory: Templated; from: string | undefined; base: Entry[]; status: Status | undefined } {
+function rendered(home: string, factory: Factory, verb: string, notDone: string) {
   const name = factory.name;
   if (factory.template === undefined)
     throw new Invalid({
@@ -250,7 +245,7 @@ const unnamedBase = Effect.fn('unnamedBase')(function* (verb: string, factory: T
  * The upgrade `asked`, refused where it asks the version its base holds again — already applied, or a template changed under it — rather
  * than a change of its parameters alone, or a downgrade not asked for (`upgradeAsked`).
  */
-function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades: boolean, args: Args): Asked {
+function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades: boolean, args: Args) {
   const { factory, from, to } = asked;
   if (asked.switched !== undefined) return asked;
   if (to === from && asked.same !== 'params')
@@ -272,7 +267,7 @@ function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades:
  * `--template` where one was given, each `--set`, `--plan` where the upgrade changes the factory's parameters — a `--set` given or a
  * parameter dropped — or is a switch (`planRequired`), and `--downgrade` where it is one of the same template.
  */
-function nextOf(home: string, asked: Asked, args: Args): PlanNext {
+function nextOf(home: string, asked: Asked, args: Args) {
   const { factory, from, to, source, render } = asked;
   const digest = planDigest(home, factory.name, render, source, asked.switched?.from);
   const words = [
@@ -291,11 +286,11 @@ function nextOf(home: string, asked: Asked, args: Args): PlanNext {
  * Whether the upgrade `asked` as `args` give it changes the factory's parameters, or is a switch, whose every line asks a choice, so is
  * held to its preview's `--plan`.
  */
-const planRequired = (asked: Asked, args: Args): boolean =>
+const planRequired = (asked: Asked, args: Args) =>
   asked.switched !== undefined || setsGiven(args).length > 0 || asked.render.dropped.length > 0;
 
 /** The line that previews the upgrade `asked` as `args` give it. */
-const previewLine = (asked: Asked, args: Args): string =>
+const previewLine = (asked: Asked, args: Args) =>
   `nemia factory diff ${[
     asked.factory.name,
     '--to',
@@ -310,7 +305,7 @@ const previewLine = (asked: Asked, args: Args): string =>
  * The upgrade `asked`, held to the plan a person previewed: refused where it changes the factory's parameters and no `--plan` is given
  * (`Invalid`), and where a `--plan` given is not the plan of the upgrade now (`Conflict`); each naming the preview to run.
  */
-function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone: string): Asked {
+function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone: string) {
   const plan = textOf(args, 'plan');
   const preview = previewLine(asked, args);
   if (plan === undefined) {
@@ -327,7 +322,7 @@ function planHeld(home: string, asked: Asked, args: Args, verb: string, notDone:
 }
 
 /** The merge of the factory's tree with its base and `render`, three ways; or, for a switch, with `render` alone, with no common base. */
-const mergeOf = (home: string, name: string, base: readonly Entry[], render: RenderedAt, switched: Switched | undefined): TreeMerge =>
+const mergeOf = (home: string, name: string, base: readonly Entry[], render: RenderedAt, switched: Switched | undefined) =>
   switched === undefined
     ? mergeTrees(base, entriesIn(treeDir(home, name)), render.entries)
     : switchTrees(entriesIn(treeDir(home, name)), render.entries);
@@ -393,7 +388,7 @@ export const FACTORY_UPGRADE: Served<Upgraded> = {
 };
 
 /** The text of the file `given` resolves a conflict with, refused where it is not there (`Invalid`). */
-function fileText(given: string): string {
+function fileText(given: string) {
   const file = path.resolve(given);
   if (!fs.existsSync(file) || !fs.statSync(file).isFile())
     throw new Invalid({
@@ -406,17 +401,17 @@ function fileText(given: string): string {
  * The person's choice the resolve `args` give: ours, theirs, the words of `text` — what the api is sent — or the text of `--file`,
  * refused where it is not there (`Invalid`); none of them refused as the command line refuses it.
  */
-function choiceOf(args: Args): Choice {
-  if (args.ours === true) return 'ours';
-  if (args.theirs === true) return 'theirs';
+function choiceOf(args: Args) {
+  if (args.ours === true) return 'ours' satisfies Choice as Choice;
+  if (args.theirs === true) return 'theirs' satisfies Choice as Choice;
   const text = textOf(args, 'text');
-  if (text !== undefined) return { text };
+  if (text !== undefined) return { text } satisfies Choice as Choice;
   const file = textOf(args, 'file');
   if (file === undefined)
     throw new Invalid({
       message: FACTORY_RESOLVE_WORDS.spec.oneWay ?? 'nemia factory resolve takes one choice: --ours, --theirs, --text or --file.',
     });
-  return { text: fileText(file) };
+  return { text: fileText(file) } satisfies Choice as Choice;
 }
 
 /**

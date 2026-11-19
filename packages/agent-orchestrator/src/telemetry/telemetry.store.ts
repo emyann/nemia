@@ -28,7 +28,7 @@ export const lineLogger = Logger.make<unknown, void>(({ message, logLevel, date 
  * export gives the exporter's `Flusher` besides.
  * @param env The process's environment.
  */
-export function telemetryLayer(env: Readonly<Record<string, string | undefined>>): Layer.Layer<never> | Layer.Layer<OtlpExporter.Flusher> {
+export function telemetryLayer(env: Readonly<Record<string, string | undefined>>) {
   const lines = Logger.layer([lineLogger]);
   const otlp = otlpOf(env);
   if (!otlp) return lines;
@@ -79,5 +79,5 @@ export const seriesBorn = Effect.fnUntraced(function* (series: ReadonlyArray<Met
  */
 export const forStep =
   (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec) =>
-  <A, E, R>(filing: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  <A, E, R>(filing: Effect.Effect<A, E, R>) =>
     filing.pipe(Effect.annotateLogs(stepLabels(run, step)), Effect.annotateSpans(stepLabels(run, step)));

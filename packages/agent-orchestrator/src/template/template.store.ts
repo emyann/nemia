@@ -18,21 +18,13 @@ import { readKeys } from '../former/former.ts';
 import { MAP_KEYS } from '../frontmatter/frontmatter.ts';
 import { givenSkillOf } from '../keys/index.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import {
-  entriesOf,
-  isBuiltinPlace,
-  isBuiltinSkill,
-  lookupRoots,
-  packageSkillFolders,
-  skillFiles,
-  type Places,
-} from '../skills/read.store.ts';
+import { entriesOf, isBuiltinPlace, isBuiltinSkill, lookupRoots, packageSkillFolders, skillFiles } from '../skills/read.store.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
 import { walkFolder, type TemplateTree } from './door/templates.store.ts';
 import { templateNameRefusal, type Problem } from './door/templates.ts';
-import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
+import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source } from './index.ts';
 
 export type { Problem } from './door/templates.ts';
 
@@ -41,7 +33,7 @@ export type { Problem } from './door/templates.ts';
  * Undefined for a text that does not parse, or parses to anything else, which the lint refuses at the file (`checkTemplate`).
  * @param text The file's text.
  */
-export const sharedLinesOf = (text: string): string[] | undefined => {
+export const sharedLinesOf = (text: string) => {
   let read: unknown;
   try {
     read = parse(text);
@@ -55,7 +47,7 @@ export const sharedLinesOf = (text: string): string[] | undefined => {
 type Parsed = { doc: Document.Parsed | undefined; lines: LineCounter };
 
 /** The document `file` holds, parsed, or the problems of it: one that does not parse, at its line, or a second document, the first kept. */
-function parseDocument(file: string, text: string, problems: Problem[]): Parsed | undefined {
+function parseDocument(file: string, text: string, problems: Problem[]) {
   const lines = new LineCounter();
   const docs = parseAllDocuments(text, { lineCounter: lines, uniqueKeys: true, prettyErrors: true });
   if (!Array.isArray(docs)) return { doc: undefined, lines };
@@ -74,23 +66,19 @@ function parseDocument(file: string, text: string, problems: Problem[]): Parsed 
 }
 
 /** Where in `parsed` the value at `at` stands: its own line, or the nearest that holds it, where it is missing. */
-function lineOf(parsed: Parsed, at: ReadonlyArray<string | number>): { line?: number; col?: number } {
+function lineOf(parsed: Parsed, at: ReadonlyArray<string | number>) {
   const { doc } = parsed;
-  if (!doc) return {};
+  if (!doc) return {} satisfies { line?: number; col?: number } as { line?: number; col?: number };
   for (let i = at.length; i >= 0; i--) {
     const node: unknown = i === 0 ? doc.contents : doc.getIn(at.slice(0, i), true);
     const range = (node as { range?: [number, number, number] } | null)?.range;
-    if (range) return parsed.lines.linePos(range[0]);
+    if (range) return parsed.lines.linePos(range[0]) satisfies { line?: number; col?: number } as { line?: number; col?: number };
   }
-  return {};
+  return {} satisfies { line?: number; col?: number } as { line?: number; col?: number };
 }
 
 /** The template `name` of the tree `files`, read: its files, each document parsed, and what stops one being read, at its line. */
-function readTemplateFolder(
-  name: string,
-  files: readonly TreeFile[],
-  problems: Problem[],
-): { folder: ReadFolder; parsed: Map<string, Parsed> } {
+function readTemplateFolder(name: string, files: readonly TreeFile[], problems: Problem[]) {
   const parsed = new Map<string, Parsed>();
   for (const file of files) {
     if (!documentFile(file.path, name)) continue;
@@ -102,13 +90,13 @@ function readTemplateFolder(
 }
 
 /** The names of Nemia's own skills, the place's and the builtin ones (`packageSkillFolders`), each present to a template that names it. */
-export const packageSkillNames = (): string[] => packageSkillFolders().map(([name]) => name);
+export const packageSkillNames = () => packageSkillFolders().map(([name]) => name) satisfies string[];
 
 /**
  * A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line.
  * @param p The problem.
  */
-export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
+export const problemLine = (p: Problem) => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
 
 /** A template as read and checked: every problem, sorted, its documents read (`folder`), and the version its manifest gives. */
 export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unknown };
@@ -120,11 +108,11 @@ export type CheckedTemplate = TemplateTree & { folder: ReadFolder; version: unkn
  * @param tree The template's tree as read: its files and the problems the read found.
  * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
  */
-export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]): CheckedTemplate {
+export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]) {
   const problems = [...tree.problems];
   const { folder, parsed } = readTemplateFolder(tree.name, tree.files, problems);
   const byPath = new Map(tree.files.map((f) => [f.path, f]));
-  const text = (file: string): string => {
+  const text = (file: string) => {
     const found = byPath.get(file);
     return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
   };
@@ -155,17 +143,17 @@ export type OpenTemplate = CheckedTemplate & {
  * @param tree The template's tree as read.
  * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
  */
-export function openedTree(source: string, tree: TemplateTree, packageSkills: readonly string[]): OpenTemplate {
+export function openedTree(source: string, tree: TemplateTree, packageSkills: readonly string[]) {
   const checked = checkedTree(tree, packageSkills);
   const byPath = new Map(checked.files.map((f) => [f.path, f]));
-  const file = (at: string): TreeFile => {
+  const file = (at: string) => {
     const found = byPath.get(at);
     if (found === undefined)
       throw new Invalid({ message: `${at} is no file of the template ${source}: name a file of the template, by its path in it.` });
     return found;
   };
-  const text = (at: string): string => Buffer.from(file(at).bytes).toString('utf8');
-  return { ...checked, file, text, lines: (at) => sharedLinesOf(text(at)) };
+  const text = (at: string) => Buffer.from(file(at).bytes).toString('utf8');
+  return { ...checked, file, text, lines: (at) => sharedLinesOf(text(at)) } satisfies OpenTemplate;
 }
 
 /**
@@ -173,22 +161,22 @@ export function openedTree(source: string, tree: TemplateTree, packageSkills: re
  * @param name The template's name.
  * @param files The folder's files as read.
  */
-export function folderTreeOf(name: string, files: TreeFile[]): TemplateTree {
+export function folderTreeOf(name: string, files: TreeFile[]) {
   const problems = pathRefusals(name, files);
   return { name, files, problems, digest: problems.length ? undefined : contentDigest(name, files) };
 }
 
 /** The files of the workflow folder `dir` but its steps, by path from it; a link refused by name. */
-function othersOf(dir: string, refusals: string[]): string[] {
+function othersOf(dir: string, refusals: string[]) {
   const problems: Problem[] = [];
   const steps = new Set(stepFiles(entriesOf(dir)));
   const others = walkFolder(dir, problems).filter((file) => !steps.has(file));
   refusals.push(...problems.map((p) => `${path.join(dir, p.file)}: ${p.message}`));
-  return others;
+  return others satisfies string[];
 }
 
 /** The step `file` of a workflow as its file writes it, its own keys by the names the parser reads; or why it does not read. */
-function stepSource(dir: string, file: string, refusals: string[]): StepSource[] {
+function stepSource(dir: string, file: string, refusals: string[]) {
   const at = path.join(dir, file);
   try {
     if (fs.lstatSync(at).isSymbolicLink()) throw new Error(`${at} is a link, and a step's file is its own: copy what it points at here.`);
@@ -202,7 +190,7 @@ function stepSource(dir: string, file: string, refusals: string[]): StepSource[]
 }
 
 /** The workflows `names` of the repository's folder of workflows `root`, each read; a name it holds no workflow of refused, by name. */
-function workflowSources(root: string, names: readonly string[], factory: string | undefined, refusals: string[]): Source['workflows'] {
+function workflowSources(root: string, names: readonly string[], factory: string | undefined, refusals: string[]) {
   const held = new Set(workflowsIn(root));
   return names.flatMap((name) => {
     if (!held.has(name)) {
@@ -223,7 +211,7 @@ function workflowSources(root: string, names: readonly string[], factory: string
  * @param home The store's root folder.
  * @param from The repository's folder exported from.
  */
-export function lookupsOf(home: string, from: string): { workflowDir: string; places: Places; agentDirs: string[] } {
+export function lookupsOf(home: string, from: string) {
   const workflowDir = path.join(path.resolve(from), 'workflows', '_');
   const places = placesOf(home, path.resolve(from));
   return { workflowDir, places, agentDirs: lookupRoots(workflowDir, places).map((r) => path.join(r, 'agents')) };
@@ -239,7 +227,7 @@ export type ExportFound = {
 };
 
 /** The loader's answer for an agent and a skill, over what the doors found (`ExportFound`), the first root that has a name winning. */
-function lookups({ agents, skills }: ExportFound): Pick<Source, 'agent' | 'skill'> {
+function lookups({ agents, skills }: ExportFound) {
   return {
     agent: (name) => {
       const at = agents.find(({ found }) => found.has(name));
@@ -261,15 +249,11 @@ function lookups({ agents, skills }: ExportFound): Pick<Source, 'agent' | 'skill
       if (givenSkillOf(name)?.folder !== undefined) return { named: dir };
       return isBuiltinPlace(dir) ? 'place' : isBuiltinSkill(dir) ? 'builtin' : { dir };
     },
-  };
+  } satisfies Pick<Source, 'agent' | 'skill'>;
 }
 
 /** The factory's parts a draft holds, as its door read them; one whose repositories do not hold `from` refused. */
-function factorySource(
-  parts: FactoryParts,
-  from: string,
-  refusals: string[],
-): { source: NonNullable<Source['factory']>; workflows: string[] } {
+function factorySource(parts: FactoryParts, from: string, refusals: string[]) {
   const { factory, instruction, rules } = parts;
   const { name } = factory;
   const outside = outsideRefusal(factory, from);
@@ -296,6 +280,7 @@ function factorySource(
 }
 
 /** The files of the file or folder `from`, under `at` in a tree, each with its mode; a link refused by name. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function copiedFiles(from: string, at: string): TreeFile[] {
   const stat = fs.lstatSync(from);
   if (stat.isSymbolicLink())
@@ -309,11 +294,11 @@ function copiedFiles(from: string, at: string): TreeFile[] {
 }
 
 /** The files of the skill folder `dir` under `at` (`skillFiles`), each a regular file with its mode; refused with its link refusal. */
-function skillTree(dir: string, at: string): TreeFile[] {
+function skillTree(dir: string, at: string) {
   return skillFiles(dir).map((file) => {
     if ('refused' in file) throw new WorkflowError(file.refused);
     return { path: `${at}/${file.path}`, mode: fs.statSync(file.real).mode & 0o777, bytes: fs.readFileSync(file.real) };
-  });
+  }) satisfies TreeFile[];
 }
 
 /** The mode a document or a text of a draft is written with: a plain file's. */
@@ -324,7 +309,7 @@ const PLAIN = 0o644;
  * real files (`skillFiles`); a path given twice holds what was given last. Reads the copies and skills the draft names.
  * @param draft The draft, as `draftOf` made it.
  */
-export function treeOfDraft(draft: Draft): TreeFile[] {
+export function treeOfDraft(draft: Draft) {
   const files = new Map<string, TreeFile>();
   for (const file of draft.files) {
     const made =
@@ -372,11 +357,7 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
  * @param packageSkills Nemia's own skills, the place's and the builtin ones, a template may name.
  * @param found The agents and skills the Agent and Skill doors found over `lookupsOf`'s roots.
  */
-export function exportTree(
-  ask: ExportAsk,
-  packageSkills: readonly string[],
-  found: ExportFound,
-): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
+export function exportTree(ask: ExportAsk, packageSkills: readonly string[], found: ExportFound) {
   const dir = path.resolve(ask.dir);
   const from = path.resolve(ask.from);
   const name = path.basename(dir);
@@ -404,7 +385,7 @@ export function exportTree(
 const VERSION_PART = /^[0-9A-Za-z][0-9A-Za-z.+-]*$/;
 
 /** The archive pack writes where `--out` names none, `<name>-<version>.tgz` in `cwd`; a version that is no file-name part refused. */
-function defaultOut(dir: string, name: string, version: unknown): string {
+function defaultOut(dir: string, name: string, version: unknown) {
   const text = String(version);
   if (!VERSION_PART.test(text))
     throw new Invalid({
@@ -417,7 +398,7 @@ function defaultOut(dir: string, name: string, version: unknown): string {
  * The folder `dir`, as a template's place, or refused where it is no folder (Missing): what pack packs.
  * @param dir The folder's path.
  */
-export function folderAsked(dir: string): string {
+export function folderAsked(dir: string) {
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     throw new Missing({ message: `${dir} is no folder: name a template's folder, the one that holds its nemia.yaml.` });
   return path.resolve(dir);
@@ -427,7 +408,7 @@ export function folderAsked(dir: string): string {
  * The archive `archive`, as a template's place, or refused where it is no file (Missing): what unpack reads.
  * @param archive The archive's path.
  */
-export function archiveAsked(archive: string): string {
+export function archiveAsked(archive: string) {
   if (!fs.statSync(archive, { throwIfNoEntry: false })?.isFile())
     throw new Missing({ message: `${archive} is no file: name an archive nemia template pack wrote.` });
   return path.resolve(archive);
@@ -443,7 +424,7 @@ export type PackAsk = { dir: string; out?: string; cwd: string };
  * @param ask The folder packed, the archive's path where one is given (`out`), and the working folder it resolves from (`cwd`).
  * @param read The folder, read and checked.
  */
-export function packOut(ask: PackAsk, read: CheckedTemplate): string {
+export function packOut(ask: PackAsk, read: CheckedTemplate) {
   if (read.problems.length)
     throw new Invalid({
       message: `${ask.dir} was not packed, since it does not pass:\n${read.problems.map((p) => `  ${problemLine(p)}`).join('\n')}`,

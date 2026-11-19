@@ -16,7 +16,7 @@ let idleIoRuns: boolean | undefined;
  * Whether a command run at `niceness` can be put in the idle IO class too: `nice -n <niceness> ionice -c3 true`, the form the
  * command is run in, exits 0. Asked once a process; a machine without `ionice`, or one that refuses the class, answers false.
  */
-const idleIoProbe = (niceness: number): boolean => {
+const idleIoProbe = (niceness: number) => {
   idleIoRuns ??= spawnSync('nice', ['-n', String(niceness), 'ionice', '-c3', 'true'], { stdio: 'ignore' }).status === 0;
   return idleIoRuns;
 };

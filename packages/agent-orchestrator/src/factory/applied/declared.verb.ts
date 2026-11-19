@@ -38,7 +38,7 @@ export const originSetsAt = Effect.fn('originSetsAt')(function* (source: string,
 });
 
 /** The host `volume` was cloned from, as `originParams` takes it: absent where it was given by its path. */
-const hostOf = (volume: Volume): { originHost?: string } => {
+const hostOf = (volume: Volume) => {
   const host = originHostOf(volume.origin);
   return host === undefined ? {} : { originHost: host };
 };

@@ -10,8 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Option, Result, Schema } from 'effect';
-import { CURRENT, RELEASE_FILE, RELEASE_PLATFORMS, type Current, type ReleaseFile, type Running } from './release.ts';
-import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
+import { CURRENT, RELEASE_FILE, RELEASE_PLATFORMS, type ReleaseFile, type Running } from './release.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
 const ReleaseFileSchema = Schema.Struct({
@@ -27,14 +26,14 @@ const ReleaseFileSchema = Schema.Struct({
  * The store's releases folder.
  * @param root The store's folder.
  */
-export const releasesDir = (root: string): string => path.join(root, 'releases');
+export const releasesDir = (root: string) => path.join(root, 'releases');
 
 /**
  * The store's releases folder as a real path, which an image a session recorded is compared with (`sessionRelease`): through
  * `fs.realpathSync`, so a store reached through a link compares as the folder it is; resolved as it stands where it does not exist yet.
  * @param home The store's folder.
  */
-export function realReleasesDir(home: string): string {
+export function realReleasesDir(home: string) {
   const dir = releasesDir(home);
   try {
     return fs.realpathSync(dir);
@@ -48,13 +47,13 @@ export function realReleasesDir(home: string): string {
  * @param tag The release's tag.
  * @param root The store's folder.
  */
-export const releaseDir = (tag: string, root: string): string => path.join(releasesDir(root), tag);
+export const releaseDir = (tag: string, root: string) => path.join(releasesDir(root), tag);
 
 /**
  * What the `release.json` at the root of `dir` says, or undefined where there is none or it does not read as one.
  * @param dir The folder whose `release.json` is read: a release's tree or the code's root.
  */
-export function releaseFileOf(dir: string): ReleaseFile | undefined {
+export function releaseFileOf(dir: string) {
   let text: string;
   try {
     text = fs.readFileSync(path.join(dir, RELEASE_FILE), 'utf8');
@@ -73,16 +72,16 @@ export function releaseFileOf(dir: string): ReleaseFile | undefined {
  * The code whose root is `root`: an install where a `release.json` sits there, else a checkout.
  * @param root The root of the code this process runs from.
  */
-export function runningAt(root: string): Running {
+export function runningAt(root: string) {
   const file = releaseFileOf(root);
-  return file === undefined ? { kind: 'checkout', root } : { kind: 'install', root, ...file };
+  return (file === undefined ? { kind: 'checkout', root } : { kind: 'install', root, ...file }) satisfies Running;
 }
 
 /**
  * The release the store's pointer names, with its real folder, or null where there is no pointer or it names no built release.
  * @param root The store's folder.
  */
-export function currentRelease(root: string): Current | null {
+export function currentRelease(root: string) {
   let dir: string;
   try {
     dir = fs.realpathSync(path.join(releasesDir(root), CURRENT));
@@ -102,7 +101,7 @@ const scriptsIn = Schema.decodeUnknownOption(
  * The scripts of the `package.json` at the root of `dir`, or none where it has none.
  * @param dir The folder whose `package.json` is read.
  */
-export function scriptsOf(dir: string): Readonly<Record<string, unknown>> {
+export function scriptsOf(dir: string) {
   try {
     const read = scriptsIn(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
     return Option.isSome(read) ? (read.value.scripts ?? {}) : {};
@@ -120,7 +119,7 @@ export type Building = { readonly dir: string; readonly tree: string; readonly t
  * @param stamp The time the build started, as a file name may hold it, which names the log.
  * @param root The store's folder.
  */
-export function buildingOf(tag: string, stamp: string, root: string): Building {
+export function buildingOf(tag: string, stamp: string, root: string) {
   const releases = releasesDir(root);
   const dir = path.join(releases, `.building-${tag}-${process.pid}`);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -135,7 +134,7 @@ export function buildingOf(tag: string, stamp: string, root: string): Building {
  * @param env The environment of this process, which the commands' is made from.
  * @param trial The build's trial store, which `WF_ROOT` and `AE_ROOT` are put in.
  */
-export function trialEnv(env: NodeJS.ProcessEnv, trial: string): NodeJS.ProcessEnv {
+export function trialEnv(env: NodeJS.ProcessEnv, trial: string) {
   const { HKB_REPO: _repo, WF_ROOT: _wf, AE_ROOT: _ae, ...rest } = env;
   return { ...rest, WF_ROOT: path.join(trial, 'workflows'), AE_ROOT: path.join(trial, 'engine') };
 }
@@ -147,7 +146,7 @@ export function trialEnv(env: NodeJS.ProcessEnv, trial: string): NodeJS.ProcessE
  * @param env The environment it runs over.
  * @param log The file its output is appended to.
  */
-export function ranInto(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv, log: string): number | string {
+export function ranInto(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv, log: string) {
   fs.appendFileSync(log, `$ ${argv.join(' ')}\n`);
   const fd = fs.openSync(log, 'a');
   try {
@@ -165,7 +164,7 @@ export function ranInto(argv: readonly string[], cwd: string, env: NodeJS.Proces
  * The size of `log` in bytes, 0 where it is not there yet: where what a command appends to it starts (`lastLineFrom`).
  * @param log The log's path.
  */
-export const logSize = (log: string): number => fs.statSync(log, { throwIfNoEntry: false })?.size ?? 0;
+export const logSize = (log: string) => fs.statSync(log, { throwIfNoEntry: false })?.size ?? 0;
 
 /**
  * The last line with words in it that `log` holds past its first `from` bytes and the line `ranInto` names the command by, trimmed: where
@@ -173,7 +172,7 @@ export const logSize = (log: string): number => fs.statSync(log, { throwIfNoEntr
  * @param log The log's path.
  * @param from The size of the log in bytes before the command ran (`logSize`).
  */
-export function lastLineFrom(log: string, from: number): string | undefined {
+export function lastLineFrom(log: string, from: number) {
   const [, ...printed] = fs.readFileSync(log).subarray(from).toString('utf8').split('\n');
   return printed
     .map((line) => line.trim())
@@ -186,7 +185,7 @@ export function lastLineFrom(log: string, from: number): string | undefined {
  * @param tree The built tree.
  * @param file What the tree's `release.json` says.
  */
-export const writeReleaseFile = (tree: string, file: ReleaseFile): void =>
+export const writeReleaseFile = (tree: string, file: ReleaseFile) =>
   fs.writeFileSync(path.join(tree, RELEASE_FILE), `${JSON.stringify(file, null, 2)}\n`);
 
 /**
@@ -195,7 +194,7 @@ export const writeReleaseFile = (tree: string, file: ReleaseFile): void =>
  * @param tag The release's tag.
  * @param root The store's folder.
  */
-export function placeRelease(tree: string, tag: string, root: string): boolean {
+export function placeRelease(tree: string, tag: string, root: string) {
   const at = releaseDir(tag, root);
   if (fs.existsSync(at)) return false;
   fs.renameSync(tree, at);
@@ -206,14 +205,14 @@ export function placeRelease(tree: string, tag: string, root: string): boolean {
  * Takes a build's folder away, its tree and trial store with it.
  * @param building The build whose folder is taken away.
  */
-export const removeBuilding = (building: Building): void => fs.rmSync(building.dir, { recursive: true, force: true });
+export const removeBuilding = (building: Building) => fs.rmSync(building.dir, { recursive: true, force: true });
 
 /**
  * Points `releases/current` at `releases/<tag>`: a relative link made beside it, then renamed over it, so the pointer is never absent.
  * @param tag The release's tag the pointer is to name.
  * @param root The store's folder.
  */
-export function switchCurrent(tag: string, root: string): void {
+export function switchCurrent(tag: string, root: string) {
   const releases = releasesDir(root);
   const hidden = path.join(releases, `${CURRENT_LINK}${process.pid}`);
   fs.rmSync(hidden, { force: true });
@@ -228,7 +227,7 @@ const REMOVING = '.removing-';
 const LOGS = '.logs';
 
 /** The names under the store's `releases/`, or none where it does not exist. */
-function namesIn(home: string): string[] {
+function namesIn(home: string) {
   try {
     return fs.readdirSync(releasesDir(home));
   } catch {
@@ -241,7 +240,7 @@ function namesIn(home: string): string[] {
  * a build, a release moved aside) — whose `release.json` reads, by its folder's name and when it was built.
  * @param home The store's folder.
  */
-export function installedReleases(home: string): Installed[] {
+export function installedReleases(home: string) {
   return namesIn(home).flatMap((name) => {
     if (name.startsWith('.') || name === CURRENT) return [];
     const dir = path.join(releasesDir(home), name);
@@ -258,7 +257,7 @@ export function installedReleases(home: string): Installed[] {
  * @param home The store's folder.
  * @param live Whether a pid is a live process.
  */
-export const pidEntries = (home: string, live: (pid: number) => boolean): PidEntry[] =>
+export const pidEntries = (home: string, live: (pid: number) => boolean) =>
   namesIn(home).flatMap((name) => {
     if (!name.startsWith(BUILDING) && !name.startsWith(CURRENT_LINK)) return [];
     const pid = Number(name.slice(name.lastIndexOf('-') + 1));
@@ -270,7 +269,7 @@ export const pidEntries = (home: string, live: (pid: number) => boolean): PidEnt
  * @param home The store's folder.
  * @param live Whether a pid is a live process.
  */
-export const buildUnderWay = (home: string, live: (pid: number) => boolean): boolean =>
+export const buildUnderWay = (home: string, live: (pid: number) => boolean) =>
   pidEntries(home, live).some((e) => e.live && e.name.startsWith(BUILDING));
 
 /**
@@ -278,7 +277,7 @@ export const buildUnderWay = (home: string, live: (pid: number) => boolean): boo
  * folder does not exist.
  * @param home The store's folder.
  */
-export function buildLogs(home: string): BuildLog[] {
+export function buildLogs(home: string) {
   const dir = path.join(releasesDir(home), LOGS);
   let names: string[];
   try {
@@ -297,7 +296,7 @@ export function buildLogs(home: string): BuildLog[] {
  * @param home The store's folder.
  * @param name The log's file name under `releases/.logs/`.
  */
-export const buildLogPath = (home: string, name: string): string => path.join(releasesDir(home), LOGS, name);
+export const buildLogPath = (home: string, name: string) => path.join(releasesDir(home), LOGS, name);
 
 /**
  * Moves the leftover `releases/<name>` (a `pidEntries` entry) aside to `releases/.removing-<name>-<pid>`, a link as a link, for the
@@ -305,7 +304,7 @@ export const buildLogPath = (home: string, name: string): string => path.join(re
  * @param home The store's folder.
  * @param name The leftover's name under `releases/`.
  */
-export function asideLeftover(home: string, name: string): string | false {
+export function asideLeftover(home: string, name: string) {
   const aside = path.join(releasesDir(home), `${REMOVING}${name}-${process.pid}`);
   try {
     fs.renameSync(path.join(releasesDir(home), name), aside);
@@ -324,7 +323,7 @@ export function asideLeftover(home: string, name: string): string | false {
  * @param tag The release's tag.
  * @param live Whether a pid is a live process, which tells a live build.
  */
-export function removeRelease(home: string, tag: string, live: (pid: number) => boolean): string | false {
+export function removeRelease(home: string, tag: string, live: (pid: number) => boolean) {
   const dir = releaseDir(tag, home);
   let real: string;
   try {
@@ -342,7 +341,7 @@ export function removeRelease(home: string, tag: string, live: (pid: number) => 
  * The releases moved aside and not yet deleted: one a sweep was stopped on, which the next deletes.
  * @param home The store's folder.
  */
-export const leftRemovals = (home: string): string[] =>
+export const leftRemovals = (home: string) =>
   namesIn(home)
     .filter((name) => name.startsWith(REMOVING))
     .map((name) => path.join(releasesDir(home), name));

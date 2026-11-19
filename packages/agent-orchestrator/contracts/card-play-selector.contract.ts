@@ -14,7 +14,7 @@ export type CardPlaySelector = { readonly inPlay: boolean };
 const FIELD = 'status.inPlay';
 
 /** Whether `text` is one of the spellings that ask for the cards whose `inPlay` is `value`: `=` or `==` it, or `!=` the other. */
-const asks = (text: string, value: boolean): boolean =>
+const asks = (text: string, value: boolean) =>
   value
     ? text === FIELD + '=true' || text === FIELD + '==true' || text === FIELD + '!=false'
     : text === FIELD + '=false' || text === FIELD + '==false' || text === FIELD + '!=true';

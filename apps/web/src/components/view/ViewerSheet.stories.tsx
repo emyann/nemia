@@ -4,7 +4,6 @@ import type { Run } from 'objects';
 import { expect, screen, waitFor, within } from 'storybook/test';
 import { runLinesQuery, runObjectQuery, stepToldQuery, stepTriesQuery } from '@/lib/api/run';
 import { stepFileQuery } from '@/lib/api/steps';
-import type { StepArtifact } from '@/lib/api/tries';
 import { barValue } from '@/lib/bar';
 import { stepStamp } from '@/lib/lifecyclePath';
 import { seeded } from '../../../.storybook/fixtures/proposals';
@@ -22,7 +21,7 @@ const STEP = FLOOR_RUN.status.steps[0];
 const servedAt = (rel: string) => `/api/runs/${FLOOR_RUN.metadata.name}/steps/${STEP.name}/files/${encodeURIComponent(rel)}`;
 
 /** A text file of the step's folder, served. */
-const served = (rel: string, size: number): StepArtifact => ({
+const served = (rel: string, size: number) => ({
   path: `/wf/runs/${FLOOR_RUN.metadata.name}/${STEP.name}/${rel}`,
   relativePath: rel,
   name: rel,

@@ -5,7 +5,7 @@
  * label that marks the card and its run, and the stated estimate. Level-triggered: each reads what the store holds now, never a flag of
  * the browser's, so a step done at a terminal shows as done on the board.
  */
-import type { CostLineOf, FirstBeatOf, FirstRunRead, FirstWorkflowOf, NextStepsOf, RunCost } from '../../contracts/first-card.contract.ts';
+import type { CostLineOf, FirstBeatOf, FirstWorkflowOf, NextStepsOf, RunCost } from '../../contracts/first-card.contract.ts';
 import type { RunView } from './api/judged.ts';
 
 /** The workflow a first card runs in, where its factory offers it: one that lands a small change with a review and no spec. */
@@ -76,7 +76,7 @@ export const firstBeatOf: FirstBeatOf = (run) => {
  * an ending step (`workspace: base`), which is what lands; a run of a workflow with none lands nothing — or ended.
  * @param run The run's view, as its page reads it.
  */
-export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>): FirstRunRead => {
+export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>) => {
   const [key = '', value] = FIRST_CARD_LABEL.split('=');
   return {
     first: run.labels[key] === value,
@@ -101,10 +101,7 @@ export const nextStepsOf: NextStepsOf = (factory) =>
  * @param workflow The workflow the card runs in.
  * @param steps The workflow's steps as the factory lists it; undefined where they were not read.
  */
-export const firstGatesOf = (
-  workflow: string,
-  steps: readonly { name: string; spec: { workspace?: string | null } }[] | undefined,
-): string[] =>
+export const firstGatesOf = (workflow: string, steps: readonly { name: string; spec: { workspace?: string | null } }[] | undefined) =>
   workflow === FIRST_WORKFLOW
     ? [FIRST_GATE]
     : (steps ?? [])

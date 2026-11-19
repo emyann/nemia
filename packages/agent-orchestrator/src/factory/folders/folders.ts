@@ -5,8 +5,8 @@
  * by `folders.verb.ts`.
  */
 import path from 'node:path';
-import type { FolderEntry, FolderNamesShown, FolderNamesShownOf } from '../../../contracts/folder-names.contract.ts';
-import type { FolderReach, FolderReachOf } from '../../../contracts/folder-reach.contract.ts';
+import type { FolderEntry, FolderNamesShownOf } from '../../../contracts/folder-names.contract.ts';
+import type { FolderReachOf } from '../../../contracts/folder-reach.contract.ts';
 
 export type { FolderEntry, FolderNamesShown } from '../../../contracts/folder-names.contract.ts';
 export type { FolderReach } from '../../../contracts/folder-reach.contract.ts';
@@ -18,7 +18,7 @@ export const FOLDER_NAMES_MOST = 50;
 export const REPOSITORIES = 'repositories';
 
 /** Whether the absolute path `inner` is `outer` or under it, by whole segments. */
-const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : outer + '/');
+const under = (inner: string, outer: string) => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : outer + '/');
 
 /**
  * Where the folder `real` stands for the listing: in a store, under a root, or outside every root.
@@ -26,7 +26,7 @@ const under = (inner: string, outer: string): boolean => inner === outer || inne
  * @param roots The roots the listing reads under.
  * @param stores The stores no listing reads.
  */
-export const folderReach: FolderReachOf = (real: string, roots: readonly string[], stores: readonly string[]): FolderReach => {
+export const folderReach: FolderReachOf = (real: string, roots: readonly string[], stores: readonly string[]) => {
   if (stores.some((s) => under(real, s))) return 'store';
   return roots.some((r) => under(real, r)) ? 'within' : 'outside';
 };
@@ -38,7 +38,7 @@ export const folderReach: FolderReachOf = (real: string, roots: readonly string[
  * @param prefix What the person typed after the last slash.
  * @param most The most names answered.
  */
-export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEntry[], prefix: string, most: number): FolderNamesShown => {
+export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEntry[], prefix: string, most: number) => {
   const found = entries
     .filter((e) => e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.')))
     .map((e) => e.name);
@@ -51,7 +51,7 @@ export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEnt
  * path ending in a slash lists that folder whole.
  * @param typed The path as typed, absolute.
  */
-export const typedFolder = (typed: string): { readonly dir: string; readonly prefix: string } => {
+export const typedFolder = (typed: string) => {
   const cut = typed.lastIndexOf('/');
   return { dir: path.resolve(typed.slice(0, cut + 1) || '/'), prefix: typed.slice(cut + 1) };
 };
@@ -63,7 +63,7 @@ const REPOSITORY_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/;
  * Why `name` names no repository Nemia makes in its store, or undefined where it does.
  * @param name The name as typed.
  */
-export const repositoryNameRefusal = (name: string): string | undefined =>
+export const repositoryNameRefusal = (name: string) =>
   REPOSITORY_NAME.test(name) && !name.includes('..')
     ? undefined
     : `\`${name}\` is not a repository's name: a name is lowercase letters, digits, dots, dashes and underscores, starting with a letter or a digit, 64 at most — acme or my-app, say.`;

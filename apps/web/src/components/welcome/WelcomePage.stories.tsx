@@ -24,7 +24,7 @@ export default meta;
 type Story = StoryObj<typeof WelcomePage>;
 
 /** The page in `canvas` once its read is in. */
-const loaded = async (canvas: HTMLElement): Promise<HTMLElement> => {
+const loaded = async (canvas: HTMLElement) => {
   await waitFor(() => expect(canvas.querySelector('[data-welcome]')).not.toBeNull(), { timeout: 5000 });
   return canvas.querySelector<HTMLElement>('[data-welcome]')!;
 };

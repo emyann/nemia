@@ -33,14 +33,14 @@ type Named = { readonly metadata: { readonly name: string; readonly labels?: Rea
  * @param status The object's status, as it encodes.
  * @param parts The sub-resources read beside them, or undefined where the object has none.
  */
-export const versionOf = (spec: unknown, status: unknown, parts?: unknown): string =>
+export const versionOf = (spec: unknown, status: unknown, parts?: unknown) =>
   valueVersion(parts === undefined ? { spec, status } : { spec, status, parts });
 
 /**
  * When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`.
  * @param file The path of the file read.
  */
-export const bornAt = (file: string): string => {
+export const bornAt = (file: string) => {
   try {
     const stat = fs.statSync(file);
     return (stat.birthtimeMs > 0 ? stat.birthtime : stat.mtime).toISOString();
@@ -54,7 +54,7 @@ export const bornAt = (file: string): string => {
  * @param selectors The list's label selectors, as asked.
  * @param what What the list holds, named in the refusal (a card, a run).
  */
-export const selectorsRefused = (selectors: readonly string[], what: string): Invalid | undefined => {
+export const selectorsRefused = (selectors: readonly string[], what: string) => {
   const refusal = selectorsRefusal(selectors);
   return refusal === undefined
     ? undefined
@@ -73,21 +73,19 @@ export type ListedBy<T> = { readonly key: (item: T) => string; readonly labels: 
  * @param what What the list holds, named in the selector's refusal.
  * @param by How an item is read: its key, sorted and paged by, and its labels.
  */
-export const pageListed = <T>(
-  items: readonly T[],
-  query: Omit<ObjectQuery, 'namespace'>,
-  what: string,
-  by: ListedBy<T>,
-): Effect.Effect<Paged<T>, Invalid> => {
+export const pageListed = <T>(items: readonly T[], query: Omit<ObjectQuery, 'namespace'>, what: string, by: ListedBy<T>) => {
   const selectors = query.labelSelector ?? [];
   const refused = selectorsRefused(selectors, what);
-  if (refused !== undefined) return Effect.fail(refused);
+  if (refused !== undefined) return Effect.fail(refused) satisfies Effect.Effect<Paged<T>, Invalid> as Effect.Effect<Paged<T>, Invalid>;
   const parsed = parseSelectors(selectors);
   const kept = items
     .filter((o) => selectsLabels(parsed, by.labels(o)))
     .sort((a, b) => (by.key(a) < by.key(b) ? -1 : by.key(a) > by.key(b) ? 1 : 0));
   const page = pageOf(kept, by.key, { limit: query.limit ?? null, continue: query.continue });
-  return page instanceof Invalid ? Effect.fail(page) : Effect.succeed(page);
+  return (page instanceof Invalid ? Effect.fail(page) : Effect.succeed(page)) satisfies Effect.Effect<Paged<T>, Invalid> as Effect.Effect<
+    Paged<T>,
+    Invalid
+  >;
 };
 
 /** A list's metadata: how many objects are after the page, and the token of the next one. */
@@ -99,16 +97,18 @@ export type ListedMeta = { remainingItemCount: number; continue?: string };
  * @param page The page's count of what is after it and its next token, if any.
  * @param items The page's objects, as served.
  */
-export const listOf = <const K extends string, T>(
-  kind: K,
-  page: Omit<Paged<unknown>, 'items'>,
-  items: T[],
-): { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] } => ({
-  apiVersion: API_VERSION,
-  kind: `${kind}List`,
-  metadata: { remainingItemCount: page.remainingItemCount, ...(page.continue !== undefined ? { continue: page.continue } : {}) },
-  items,
-});
+export const listOf = <const K extends string, T>(kind: K, page: Omit<Paged<unknown>, 'items'>, items: T[]) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: `${kind}List`,
+    metadata: { remainingItemCount: page.remainingItemCount, ...(page.continue !== undefined ? { continue: page.continue } : {}) },
+    items,
+  }) satisfies { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] } as {
+    apiVersion: typeof API_VERSION;
+    kind: `${K}List`;
+    metadata: ListedMeta;
+    items: T[];
+  };
 
 /** An object's name and labels, as a list of objects reads them. */
 const byMetadata: ListedBy<Named> = { key: (o) => o.metadata.name, labels: (o) => o.metadata.labels ?? {} };
@@ -120,10 +120,8 @@ const byMetadata: ListedBy<Named> = { key: (o) => o.metadata.name, labels: (o) =
  * @param query The list's query: its limit, its continue token and its label selectors.
  * @param what The kind as a person reads it, named in the selector's refusal.
  */
-export const objectsListed = <const K extends string, T extends Named>(
-  kind: K,
-  items: readonly T[],
-  query: ObjectQuery,
-  what: string,
-): Effect.Effect<{ apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] }, Invalid> =>
-  Effect.map(pageListed(items, query, what, byMetadata), (page) => listOf(kind, page, [...page.items]));
+export const objectsListed = <const K extends string, T extends Named>(kind: K, items: readonly T[], query: ObjectQuery, what: string) =>
+  Effect.map(pageListed(items, query, what, byMetadata), (page) => listOf(kind, page, [...page.items])) satisfies Effect.Effect<
+    { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] },
+    Invalid
+  > as Effect.Effect<{ apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] }, Invalid>;

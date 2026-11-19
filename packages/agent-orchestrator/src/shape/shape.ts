@@ -9,17 +9,19 @@
  * `value`'s own fields, as a fresh record, where it is an object that is no list; else undefined.
  * @param value Any value, read as JSON is.
  */
-export const fieldsOf = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
+export const fieldsOf = (value: unknown) =>
+  (typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined) satisfies
+    | Record<string, unknown>
+    | undefined as Record<string, unknown> | undefined;
 
 /**
  * `value`'s items, as a fresh list, where it is a list; else undefined.
  * @param value Any value, read as JSON is.
  */
-export const itemsOf = (value: unknown): unknown[] | undefined => (Array.isArray(value) ? Array.from<unknown>(value) : undefined);
+export const itemsOf = (value: unknown) => (Array.isArray(value) ? Array.from<unknown>(value) : undefined);
 
 /** A value's JSON with every object's keys sorted, so two schemas compare whatever order their keys were written in. */
-const canonical = (value: unknown): string =>
+const canonical = (value: unknown) =>
   JSON.stringify(value, (_key, v: unknown) => {
     const fields = fieldsOf(v);
     if (!fields) return v;
@@ -34,14 +36,14 @@ const canonical = (value: unknown): string =>
  * a pass that reads every step's fields writes out only the field's own schema.
  * @param known The schemas, as a shape's module declares them.
  */
-export const knownSchemas = (known: readonly unknown[]): string[] => known.map(canonical);
+export const knownSchemas = (known: readonly unknown[]) => known.map(canonical);
 
 /**
  * Whether a field's schema is one of `known`, its `description` aside.
  * @param schema A field's JSON schema.
  * @param known The schemas it is compared with, as `knownSchemas` wrote them.
  */
-export const sameSchema = (schema: unknown, known: readonly string[]): boolean => {
+export const sameSchema = (schema: unknown, known: readonly string[]) => {
   const fields = fieldsOf(schema);
   if (!fields) return false;
   const { description: _, ...rest } = fields;

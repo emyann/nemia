@@ -17,7 +17,7 @@ import { API_VERSION, type APIResource, DEFAULT_NAMESPACE } from 'objects';
 import type { ApplyOf } from '../../contracts/apply.contract.ts';
 import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
-import { type Applied, KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
+import { KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
 import { isObject } from 'effect/Predicate';
 
 /**
@@ -46,7 +46,7 @@ Each prints <plural>/<name> created, configured or unchanged.
  * that leaves out a key the api serves as null (a workflow's `readme`) says what it says.
  * @param value The value to write as JSON.
  */
-export const canonical = (value: unknown): string =>
+export const canonical = (value: unknown) =>
   JSON.stringify(value, (_key, v: unknown) =>
     typeof v === 'object' && v !== null && !Array.isArray(v)
       ? Object.fromEntries(
@@ -58,7 +58,7 @@ export const canonical = (value: unknown): string =>
   );
 
 /** A record of strings, or undefined where `value` is none. */
-const stringsOf = (value: unknown): Record<string, string> | undefined =>
+const stringsOf = (value: unknown) =>
   isObject(value) && Object.values(value).every((v) => typeof v === 'string')
     ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, String(v)]))
     : undefined;
@@ -70,7 +70,7 @@ const stringsOf = (value: unknown): Record<string, string> | undefined =>
  * @param file The file's name as typed, named in the refusal.
  * @param verb The verb that read it, named in the refusal: `apply` where it is left out.
  */
-export function objectsOf(text: string, file: string, verb = 'apply'): unknown[] {
+export function objectsOf(text: string, file: string, verb = 'apply') {
   const objects: unknown[] = [];
   for (const doc of parseAllDocuments(text)) {
     if (!('errors' in doc)) continue;
@@ -89,7 +89,7 @@ export function objectsOf(text: string, file: string, verb = 'apply'): unknown[]
 }
 
 /** What `args` ask of apply: the file, and the namespace `-n` names. */
-function parsed(args: readonly string[]): { file: string; namespace: string | undefined } {
+function parsed(args: readonly string[]) {
   let file: string | undefined;
   let namespace: string | undefined;
   for (let at = 0; at < args.length; at++) {
@@ -110,7 +110,7 @@ function parsed(args: readonly string[]): { file: string; namespace: string | un
 type Said = 'created' | 'configured' | 'unchanged';
 
 /** The kinds' own resources of `resources`, by their kinds: what a refusal names. */
-const kindsOf = (resources: readonly APIResource[]): string =>
+const kindsOf = (resources: readonly APIResource[]) =>
   resources
     .filter((r) => !r.name.includes('/'))
     .map((r) => r.kind)
@@ -133,7 +133,7 @@ export type Read = {
  * @param namespace The namespace `-n` names, undefined where it names none.
  * @param verb The verb that reads it, named in a refusal: `apply` where it is left out.
  */
-export function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined, verb = 'apply'): Read {
+export function readOf(object: unknown, resources: readonly APIResource[], namespace: string | undefined, verb = 'apply') {
   if (!isObject(object)) throw new Refused(`nemia ${verb}: a document is no object: each holds apiVersion, kind, metadata and spec`);
   const { apiVersion, kind, metadata, spec } = object;
   if (apiVersion !== API_VERSION)
@@ -163,7 +163,7 @@ export function readOf(object: unknown, resources: readonly APIResource[], names
  * The object `read` names as it is served, or null where none is: in its namespace, else across all where the kind is read so.
  * @param verb The verb that asks, named in a refusal: `apply` where it is left out.
  */
-export async function servedOf({ resource, name, where }: Read, verb = 'apply'): Promise<Served | null> {
+export async function servedOf({ resource, name, where }: Read, verb = 'apply') {
   const calls = KIND_CALLS[resource.kind];
   const call =
     !resource.namespaced || (where === undefined && calls.get.all !== undefined)
@@ -177,7 +177,7 @@ export async function servedOf({ resource, name, where }: Read, verb = 'apply'):
  * Why apply does not write `read`, as `action` says, naming the command that does (`madeBy`: the Card's `nemia inbox add`, the
  * Proposal's `nemia propose`) or that says the kind's verbs.
  */
-function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', madeBy: string | undefined): Refused {
+function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', madeBy: string | undefined) {
   if (action === 'no-update')
     return new Refused(
       madeBy !== undefined
@@ -192,7 +192,7 @@ function refusal({ resource, name }: Read, action: 'no-create' | 'no-update', ma
 }
 
 /** Whether what the file says of `read` is what `served` holds: its spec, and its labels where the kind's write carries them. */
-const sameAs = (read: Read, spec: unknown, served: Served, labels: boolean): boolean => {
+const sameAs = (read: Read, spec: unknown, served: Served, labels: boolean) => {
   const said = stringsOf(read.meta.labels);
   return (
     canonical(spec) === canonical(served.spec) &&
@@ -204,7 +204,7 @@ const sameAs = (read: Read, spec: unknown, served: Served, labels: boolean): boo
  * What a write of `read` names: its name, the namespace it is served in (else the one it or `-n` names, else `default`), its labels, and
  * the version the file says it was read at, else the one just read: with none in the file, the last writer wins, as `kubectl apply`'s.
  */
-const appliedAt = ({ name, meta, where }: Read, served: Served | null): Applied => ({
+const appliedAt = ({ name, meta, where }: Read, served: Served | null) => ({
   name,
   namespace: served?.metadata.namespace ?? where ?? DEFAULT_NAMESPACE,
   labels: stringsOf(meta.labels),
@@ -212,7 +212,7 @@ const appliedAt = ({ name, meta, where }: Read, served: Served | null): Applied 
 });
 
 /** `object` applied, among `resources`, with `-n`'s `namespace`: what happened to it, or a `Refused` naming what to type. */
-async function applied(object: unknown, resources: readonly APIResource[], namespace: string | undefined): Promise<string> {
+async function applied(object: unknown, resources: readonly APIResource[], namespace: string | undefined) {
   const read = readOf(object, resources, namespace);
   const { resource, name } = read;
   const served = await servedOf(read);
@@ -240,7 +240,7 @@ async function applied(object: unknown, resources: readonly APIResource[], names
  * @param file The file's name as typed, `-` for stdin.
  * @param verb The verb that reads it, named in the refusal: `apply` where it is left out.
  */
-export function textOf(file: string, verb = 'apply'): string {
+export function textOf(file: string, verb = 'apply') {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (err) {
@@ -255,7 +255,7 @@ export function textOf(file: string, verb = 'apply'): string {
  * (`Refused`): 2 for a usage refusal, 1 for a stale version (`Conflict`), 0 where none was refused.
  * @param args The words typed after `apply`: `-f` and `-n` with their values, or `--help`.
  */
-export async function apply(args: readonly string[]): Promise<number> {
+export async function apply(args: readonly string[]) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(APPLY_HELP);
     return 0;

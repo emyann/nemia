@@ -54,7 +54,7 @@ export const ACME_COMMANDS: FactoryCommands = {
 };
 
 /** The milestones with the volume in `state`: the harness and the factory done, the landing later. */
-const milestones = (volume: 'done' | 'next', waiting = false): Milestones => ({
+const milestones = (volume: 'done' | 'next', waiting = false) => ({
   milestones: [
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
     { name: 'factory', state: 'done', message: 'a factory is filed' },
@@ -70,7 +70,7 @@ const milestones = (volume: 'done' | 'next', waiting = false): Milestones => ({
     },
     { name: 'landed', state: volume === 'done' ? 'next' : 'later', message: 'start a first card, and merge its change into the base branch' },
   ],
-});
+}) satisfies Milestones;
 
 /** The readiness read, holding one missing need of `acme`'s workflow: the host's sign-in its template declares, with its typed fix. */
 const READINESS: Readiness = {
@@ -94,16 +94,16 @@ const READINESS: Readiness = {
 type Held = { volumes: FactoryVolume[]; untrusted: FactoryUntrusted[] };
 
 /** `acme` as the api serves it from `held`. */
-const factoryHeld = (held: Held): Factory => ({
+const factoryHeld = (held: Held) => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name: ACME, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
   spec: { hires: {}, volumes: held.volumes },
   status: { conditions: [], untrusted: held.untrusted },
-});
+}) satisfies Factory;
 
 /** The body of a request, as a record. */
-const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
+const bodyOf = async (request: Request) => {
   const body: unknown = await request.json();
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 };

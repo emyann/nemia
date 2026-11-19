@@ -72,19 +72,19 @@ const HOUR = 3_600_000;
 const DAY = 86_400_000;
 
 /** The start of the span of `size` ms that `ms` falls in, as ISO. */
-const floorTo = (ms: number, size: number): string => new Date(Math.floor(ms / size) * size).toISOString();
+const floorTo = (ms: number, size: number) => new Date(Math.floor(ms / size) * size).toISOString();
 
 /**
  * The UTC day of an ISO time or a day: its file's name.
  * @param t An ISO time, or a UTC day.
  */
-export const dayOf = (t: string): string => t.slice(0, 10);
+export const dayOf = (t: string) => t.slice(0, 10);
 
 /**
  * The label keys of `l` that are not `SERIES_LABEL_KEYS`, in their order: none for a label set a line may carry.
  * @param l A line's label set.
  */
-export const strangeLabels = (l: Record<string, unknown>): string[] =>
+export const strangeLabels = (l: Record<string, unknown>) =>
   Object.keys(l).filter((k) => !(SERIES_LABEL_KEYS as readonly string[]).includes(k));
 
 /**
@@ -92,56 +92,59 @@ export const strangeLabels = (l: Record<string, unknown>): string[] =>
  * has one; each part's names that did not read, zero where all did; the bytes free and the size. An entry that did not read has no
  * sample of bytes, never a zero.
  */
-const diskSamples = (disk: DiskReading): Sample[] => [
-  ...disk.entries.flatMap((entry): Sample[] =>
-    entry.bytes === undefined
-      ? []
-      : [
-          {
-            s: 'disk.bytes',
-            l: {
-              part: entry.part,
-              ...(entry.kind === undefined ? {} : { kind: entry.kind }),
-              ...(entry.factory === undefined ? {} : { factory: entry.factory }),
-            },
-            v: entry.bytes,
-          },
-        ],
-  ),
-  ...unreadByPart(disk.entries).map(({ part, unread }): Sample => ({ s: 'disk.unread', l: { part }, v: unread })),
-  { s: 'disk.free', l: {}, v: disk.free },
-  { s: 'disk.size', l: {}, v: disk.size },
-];
+const diskSamples = (disk: DiskReading) =>
+  [
+    ...disk.entries.flatMap(
+      (entry) =>
+        (entry.bytes === undefined
+          ? []
+          : [
+              {
+                s: 'disk.bytes',
+                l: {
+                  part: entry.part,
+                  ...(entry.kind === undefined ? {} : { kind: entry.kind }),
+                  ...(entry.factory === undefined ? {} : { factory: entry.factory }),
+                },
+                v: entry.bytes,
+              },
+            ]) satisfies Sample[],
+    ),
+    ...unreadByPart(disk.entries).map(({ part, unread }) => ({ s: 'disk.unread', l: { part }, v: unread }) satisfies Sample),
+    { s: 'disk.free', l: {}, v: disk.free },
+    { s: 'disk.size', l: {}, v: disk.size },
+  ] satisfies Sample[];
 
 /** The machine's load at each check's start a pass kept, a sample a check; none for a pass that kept no load. */
-const checkLoads = (load: number | undefined, checks: RecentPass['checks']): Sample[] =>
-  load === undefined ? [] : (checks ?? []).map((l): Sample => ({ s: 'check.load', l, v: load }));
+const checkLoads = (load: number | undefined, checks: RecentPass['checks']) =>
+  (load === undefined ? [] : (checks ?? []).map((l) => ({ s: 'check.load', l, v: load }) satisfies Sample)) satisfies Sample[];
 
 /**
  * What one kept pass is sampled into: every series it carries a figure of, none for a figure an older tick did not keep.
  * @param p The kept pass.
  */
-export const samplesOf = (p: RecentPass): Sample[] => [
-  { s: 'pass.ms', l: {}, v: p.ms },
-  ...PHASES.map((phase): Sample => ({ s: 'pass.phase.ms', l: { phase }, v: p.phases[phase] })),
-  { s: 'pass.reads', l: {}, v: p.reads },
-  { s: 'store.runs', l: {}, v: p.runs },
-  { s: 'sessions.queued', l: {}, v: p.queued },
-  { s: 'sessions.admitted', l: {}, v: p.admitted },
-  ...(p.waitMs === undefined ? [] : [{ s: 'admission.wait.ms', l: {}, v: p.waitMs } satisfies Sample]),
-  ...(p.load === undefined ? [] : [{ s: 'machine.load', l: {}, v: p.load } satisfies Sample]),
-  ...checkLoads(p.load, p.checks),
-  ...Object.entries(p.quota ?? {}).flatMap(([harness, windows]) =>
-    Object.entries(windows).map(([window, v]): Sample => ({ s: 'quota.used', l: { harness, window }, v })),
-  ),
-  ...(p.disk === undefined ? [] : diskSamples(p.disk)),
-];
+export const samplesOf = (p: RecentPass) =>
+  [
+    { s: 'pass.ms', l: {}, v: p.ms },
+    ...PHASES.map((phase) => ({ s: 'pass.phase.ms', l: { phase }, v: p.phases[phase] }) satisfies Sample),
+    { s: 'pass.reads', l: {}, v: p.reads },
+    { s: 'store.runs', l: {}, v: p.runs },
+    { s: 'sessions.queued', l: {}, v: p.queued },
+    { s: 'sessions.admitted', l: {}, v: p.admitted },
+    ...(p.waitMs === undefined ? [] : [{ s: 'admission.wait.ms', l: {}, v: p.waitMs } satisfies Sample]),
+    ...(p.load === undefined ? [] : [{ s: 'machine.load', l: {}, v: p.load } satisfies Sample]),
+    ...checkLoads(p.load, p.checks),
+    ...Object.entries(p.quota ?? {}).flatMap(([harness, windows]) =>
+      Object.entries(windows).map(([window, v]) => ({ s: 'quota.used', l: { harness, window }, v }) satisfies Sample),
+    ),
+    ...(p.disk === undefined ? [] : diskSamples(p.disk)),
+  ] satisfies Sample[] as Sample[];
 
 /** A series and its labels as one key, the labels in `SERIES_LABEL_KEYS`' order. */
-const keyOf = (s: string, l: Labels): string => JSON.stringify([s, ...SERIES_LABEL_KEYS.map((k) => l[k] ?? null)]);
+const keyOf = (s: string, l: Labels) => JSON.stringify([s, ...SERIES_LABEL_KEYS.map((k) => l[k] ?? null)]);
 
 /** The bounds of a series, none for a gauge or a name not kept. */
-const boundsOf = (s: string): readonly number[] | undefined => {
+const boundsOf = (s: string) => {
   const series = (SERIES as Record<string, { kind: string; bounds?: readonly number[] }>)[s];
   return series?.kind === 'histogram' ? series.bounds : undefined;
 };
@@ -150,17 +153,17 @@ const boundsOf = (s: string): readonly number[] | undefined => {
 type NonEmpty<T> = readonly [T, ...T[]];
 
 /** The last item of `items`, which holds one at least. */
-const lastOf = <T>(items: NonEmpty<T>): T => items.at(-1) ?? items[0];
+const lastOf = <T>(items: NonEmpty<T>) => items.at(-1) ?? items[0];
 
 /** The value at `q` of sorted `values`, by nearest rank: the last for a `q` above 1. */
-const rank = (sorted: NonEmpty<number>, q: number): number => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? lastOf(sorted);
+const rank = (sorted: NonEmpty<number>, q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? lastOf(sorted);
 
 /**
  * The counts of `values` in the buckets of `bounds`, each in the first whose bound it does not pass, one past the last for the rest.
  * @param values The values counted.
  * @param bounds The buckets' upper bounds, in ascending order, each taken in its bucket.
  */
-export const bucketsOf = (values: readonly number[], bounds: readonly number[]): number[] => {
+export const bucketsOf = (values: readonly number[], bounds: readonly number[]) => {
   const b = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const v of values) {
     const at = bounds.findIndex((le) => v <= le);
@@ -171,7 +174,7 @@ export const bucketsOf = (values: readonly number[], bounds: readonly number[]):
 };
 
 /** One line of `values` (in their order) over the span from `t`: exact percentiles and its buckets for a histogram. */
-const lineOf = (t: string, s: string, l: Labels, values: NonEmpty<number>): RollupLine => {
+const lineOf = (t: string, s: string, l: Labels, values: NonEmpty<number>) => {
   const [head, ...tail] = values;
   const copy: [number, ...number[]] = [head, ...tail];
   const sorted = copy.sort((a, b) => a - b);
@@ -190,7 +193,7 @@ const lineOf = (t: string, s: string, l: Labels, values: NonEmpty<number>): Roll
 };
 
 /** `items` grouped by `key`, in the order each key was first met. */
-const grouped = <T>(items: readonly T[], key: (item: T) => string): Array<NonEmpty<T>> => {
+const grouped = <T>(items: readonly T[], key: (item: T) => string) => {
   const groups = new Map<string, NonEmpty<T>>();
   for (const item of items) {
     const k = key(item);
@@ -205,7 +208,7 @@ const grouped = <T>(items: readonly T[], key: (item: T) => string): Array<NonEmp
  * @param ring The passes the ring holds.
  * @param due The minutes to roll, each as an ISO time at its start.
  */
-export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[]): RollupLine[] =>
+export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[]) =>
   due.flatMap((minute) =>
     grouped(ring.filter((p) => floorTo(Date.parse(p.at), MINUTE) === minute).flatMap(samplesOf), (x) => keyOf(x.s, x.l)).map(
       ([first, ...rest]) => lineOf(minute, first.s, first.l, [first.v, ...rest.map((x) => x.v)]),
@@ -221,7 +224,7 @@ export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[])
  * @param now The pass's instant, in epoch ms.
  * @param kept How many passes the ring holds when full.
  */
-export const minutesDue = (ring: readonly RecentPass[], last: string | undefined, now: number, kept: number): string[] => {
+export const minutesDue = (ring: readonly RecentPass[], last: string | undefined, now: number, kept: number) => {
   const current = floorTo(now, MINUTE);
   const minutes = [...new Set(ring.map((p) => floorTo(Date.parse(p.at), MINUTE)))].sort();
   const partial = ring.length >= kept ? minutes[0] : undefined;
@@ -236,11 +239,7 @@ export const minutesDue = (ring: readonly RecentPass[], last: string | undefined
  * @param lastHour The last hour line kept, as an ISO time, or undefined where none is.
  * @param now The pass's instant, in epoch ms.
  */
-export const hoursDue = (
-  lastMinute: string | undefined,
-  lastHour: string | undefined,
-  now: number,
-): { after: string | undefined; before: string } | null => {
+export const hoursDue = (lastMinute: string | undefined, lastHour: string | undefined, now: number) => {
   if (lastMinute === undefined) return null;
   const hour = floorTo(Date.parse(lastMinute), HOUR);
   const current = floorTo(now, HOUR);
@@ -255,7 +254,7 @@ export const hoursDue = (
  * @param max The most value of the line.
  * @param q The fraction of the samples at or below the value, from 0 to 1: 0.5 for the median.
  */
-export const percentileOf = (b: readonly number[], bounds: readonly number[], min: number, max: number, q: number): number => {
+export const percentileOf = (b: readonly number[], bounds: readonly number[], min: number, max: number, q: number) => {
   const n = b.reduce((x, y) => x + y, 0);
   const target = q * n;
   let below = 0;
@@ -271,7 +270,7 @@ export const percentileOf = (b: readonly number[], bounds: readonly number[], mi
 };
 
 /** Lines of one series and label set merged into one over the span from `t`: counts and sums added, extremes folded, buckets added. */
-const merged = (t: string, lines: NonEmpty<RollupLine>): RollupLine => {
+const merged = (t: string, lines: NonEmpty<RollupLine>) => {
   const [first] = lines;
   const min = Math.min(...lines.map((x) => x.min));
   const max = Math.max(...lines.map((x) => x.max));
@@ -300,7 +299,7 @@ const merged = (t: string, lines: NonEmpty<RollupLine>): RollupLine => {
  * @param lines The lines merged.
  * @param size The span each line is merged into, in ms.
  */
-export const mergeLines = (lines: readonly RollupLine[], size: number): RollupLine[] =>
+export const mergeLines = (lines: readonly RollupLine[], size: number) =>
   grouped(lines, (x) => `${floorTo(Date.parse(x.t), size)}${keyOf(x.s, x.l)}`).map((xs) => merged(floorTo(Date.parse(xs[0].t), size), xs));
 
 /**
@@ -308,7 +307,7 @@ export const mergeLines = (lines: readonly RollupLine[], size: number): RollupLi
  * @param minutes The minute lines read.
  * @param due The hours to roll (`hoursDue`).
  */
-export const rollHours = (minutes: readonly RollupLine[], due: { after: string | undefined; before: string }): RollupLine[] =>
+export const rollHours = (minutes: readonly RollupLine[], due: { after: string | undefined; before: string }) =>
   mergeLines(
     minutes.filter((x) => x.t < due.before && (due.after === undefined || floorTo(Date.parse(x.t), HOUR) > due.after)),
     HOUR,
@@ -320,7 +319,7 @@ export const rollHours = (minutes: readonly RollupLine[], due: { after: string |
  * @param now The pass's instant, in epoch ms.
  * @param keep The retention, in days, or undefined to keep every day.
  */
-export const daysPast = (days: readonly string[], now: number, keep: number | undefined): string[] => {
+export const daysPast = (days: readonly string[], now: number, keep: number | undefined) => {
   if (keep === undefined) return [];
   const oldest = dayOf(new Date(Date.parse(dayOf(new Date(now).toISOString())) - keep * DAY).toISOString());
   return days.filter((d) => d < oldest);
@@ -342,7 +341,7 @@ export type Range = keyof typeof RANGES;
 export const isRange = (text: string): text is Range => Object.hasOwn(RANGES, text);
 
 /** The days of `days` a reach of `back` milliseconds at `now` reads, oldest first: every one for an endless reach. */
-const daysBack = (back: number, days: readonly string[], now: number): string[] =>
+const daysBack = (back: number, days: readonly string[], now: number) =>
   Number.isFinite(back) ? days.filter((d) => d >= dayOf(new Date(now - back).toISOString())) : [...days];
 
 /**
@@ -351,7 +350,7 @@ const daysBack = (back: number, days: readonly string[], now: number): string[] 
  * @param days The UTC days its tier holds a file of, oldest first.
  * @param now The read's instant, in epoch ms.
  */
-export const daysOfRange = (range: Range, days: readonly string[], now: number): string[] => daysBack(RANGES[range].back, days, now);
+export const daysOfRange = (range: Range, days: readonly string[], now: number) => daysBack(RANGES[range].back, days, now);
 
 /**
  * The days of `tier` a memo may keep at `now`, of those its tier holds (`days`): the ones its widest range reaches (`RANGES`), so a day
@@ -360,7 +359,7 @@ export const daysOfRange = (range: Range, days: readonly string[], now: number):
  * @param days The UTC days the tier holds a file of, oldest first.
  * @param now The read's instant, in epoch ms.
  */
-export const memoDays = (tier: Tier, days: readonly string[], now: number): string[] =>
+export const memoDays = (tier: Tier, days: readonly string[], now: number) =>
   daysBack(Math.max(...Object.values(RANGES).flatMap((r) => (r.tier === tier ? [r.back] : []))), days, now);
 
 /** One point of a series: its span's start, and of the samples in it how many, their mean, least, most and last, and its percentiles. */
@@ -378,7 +377,7 @@ export type SeriesRead = {
 const SPAN_WORD = { [MINUTE]: 'minute', [HOUR]: 'hour', [DAY]: 'day' } as const satisfies Record<number, SeriesRead['span']>;
 
 /** A line as a point. */
-const pointOf = (x: RollupLine): SeriesPoint => ({
+const pointOf = (x: RollupLine) => ({
   t: x.t,
   n: x.n,
   mean: x.n ? x.sum / x.n : 0,
@@ -394,7 +393,7 @@ const pointOf = (x: RollupLine): SeriesPoint => ({
  * @param lines The lines of its tier's days.
  * @param now The read's instant, in epoch ms.
  */
-export const seriesOf = (range: Range, lines: readonly RollupLine[], now: number): SeriesRead => {
+export const seriesOf = (range: Range, lines: readonly RollupLine[], now: number) => {
   const { back, span } = RANGES[range];
   const from = Number.isFinite(back) ? new Date(now - back).toISOString() : (lines[0]?.t ?? new Date(now).toISOString());
   const inRange = lines.filter((x) => x.t >= from).sort((a, b) => a.t.localeCompare(b.t));
@@ -428,7 +427,7 @@ export type Health = {
 };
 
 /** The lines of one series, every label set, merged into one, or none. */
-const whole = (lines: readonly RollupLine[], s: SeriesName): RollupLine | undefined => {
+const whole = (lines: readonly RollupLine[], s: SeriesName) => {
   const [first, ...rest] = lines.flatMap((x) => (x.s === s ? [{ ...x, l: {} }] : []));
   return first ? merged(first.t, [first, ...rest]) : undefined;
 };
@@ -437,7 +436,7 @@ const whole = (lines: readonly RollupLine[], s: SeriesName): RollupLine | undefi
  * The period's health (`Health`) from its lines, oldest first.
  * @param lines The period's hour lines, oldest first.
  */
-export const healthOf = (lines: readonly RollupLine[]): Health => {
+export const healthOf = (lines: readonly RollupLine[]) => {
   const pass = whole(lines, 'pass.ms');
   const load = whole(lines, 'machine.load');
   return {
@@ -467,4 +466,4 @@ export const healthOf = (lines: readonly RollupLine[]): Health => {
 export type SeriesMemo = Map<string, { stamp: string; lines: RollupLine[] }>;
 
 /** A memo with nothing kept. */
-export const seriesMemo = (): SeriesMemo => new Map();
+export const seriesMemo = () => new Map() satisfies SeriesMemo as SeriesMemo;

@@ -27,11 +27,11 @@ const PACKAGE = path.join(import.meta.dirname, '..', '..');
  * The code this process runs: the root above the package whose `package.json` names the daemon (`daemonEntry`), an install where its
  * `release.json` sits there, else a checkout; the package's own folder, as a checkout, where no root names the daemon.
  */
-export function runningRelease(): Running {
+export function runningRelease() {
   try {
-    return runningAt(daemonEntry(PACKAGE).checkout);
+    return runningAt(daemonEntry(PACKAGE).checkout) satisfies Running;
   } catch {
-    return { kind: 'checkout', root: PACKAGE };
+    return { kind: 'checkout', root: PACKAGE } satisfies Running;
   }
 }
 
@@ -42,7 +42,7 @@ export function runningRelease(): Running {
  * @param home The store's folder.
  * @param running The code this process runs.
  */
-export function latestRelease(home: string, running: Running): Latest | undefined {
+export function latestRelease(home: string, running: Running) {
   if (running.kind !== 'install') return undefined;
   const latest = readLatest(home);
   if (latest === undefined) return undefined;
@@ -79,7 +79,7 @@ export type InFlight = {
  * running on its release either way — with its harness (`DEFAULT_HARNESS` where the task names none) and whether that is a remote agent.
  * @param views The engine's tasks.
  */
-export const inFlight = (views: readonly TaskView[]): InFlight[] =>
+export const inFlight = (views: readonly TaskView[]) =>
   views.flatMap((v) => {
     const last = v.state.attempts.at(-1);
     if (last === undefined || last.ended !== null) return [];
@@ -93,7 +93,7 @@ export const inFlight = (views: readonly TaskView[]): InFlight[] =>
  * @param views The engine's tasks.
  * @param releases The store's real releases folder.
  */
-export const sessionsAtWork = (views: readonly TaskView[], releases: string): SessionCount[] =>
+export const sessionsAtWork = (views: readonly TaskView[], releases: string) =>
   sessionCounts(inFlight(views).flatMap((s) => (s.settled ? [] : [sessionRanOn(s.attempt, s.harness, releases)])));
 
 /** Reads the three releases and the sessions at work off the engine's records, and words them (`versionLines`). */
@@ -101,14 +101,14 @@ export const versions = Effect.fn('versions')(function* (home: string) {
   const e = yield* EngineService;
   const listed = yield* asked('version', e.list());
   const sessions = sessionsAtWork(listed.views, realReleasesDir(home));
-  return yield* tried((): Versions => {
+  return yield* tried(() => {
     const running = runningRelease();
     const current = currentRelease(home);
     const lease = daemonStanding(home);
     const daemon = lease.kind === 'ticking' ? { pid: lease.file.pid, release: lease.file.release ?? null } : null;
     const latest = latestRelease(home, running);
     const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions, latest);
-    return { version: PACKAGE_VERSION, running, current, daemon, sessions, ...(latest ? { latest } : {}), lines };
+    return { version: PACKAGE_VERSION, running, current, daemon, sessions, ...(latest ? { latest } : {}), lines } satisfies Versions;
   });
 });
 

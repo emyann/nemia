@@ -16,7 +16,7 @@ const LONGEST_LABEL = 256;
 export const TASK_LABEL = 'task';
 
 /** Why a label's value cannot be carried, or `undefined`: anything but a text of 1 to 256 characters with no control character. */
-const labelValueRefusalOf = (key: string, value: unknown): string | undefined => {
+const labelValueRefusalOf = (key: string, value: unknown) => {
   if (typeof value === 'string' && value.length > 0 && value.length <= LONGEST_LABEL && !/\p{Cc}/u.test(value)) return undefined;
   return `the label \`${key}\` is ${JSON.stringify(value)}, which is no label's value. Give a text of 1 to ${LONGEST_LABEL} characters with no control character.`;
 };
@@ -26,7 +26,7 @@ const labelValueRefusalOf = (key: string, value: unknown): string | undefined =>
  * lowercase word (`LABEL_KEY`) other than `task`, which the runtime says itself, with a value `labelValueRefusalOf` takes.
  * @param labels The task's labels as the caller gave them, or undefined where it gave none.
  */
-export const labelsRefusalOf = (labels: unknown): string | undefined => {
+export const labelsRefusalOf = (labels: unknown) => {
   if (labels === undefined) return undefined;
   if (typeof labels !== 'object' || labels === null || Array.isArray(labels)) {
     return `\`labels: ${JSON.stringify(labels)}\` is not a set of labels. Give an object of names to texts, like { "team": "a" }, or leave it out.`;

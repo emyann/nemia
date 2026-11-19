@@ -24,10 +24,10 @@ export type Unapproved = {
 };
 
 /** Whether `list` holds no value twice: none is among those before it. */
-const once = (list: readonly string[]): boolean => list.every((one, at) => !list.slice(0, at).includes(one));
+const once = (list: readonly string[]) => list.every((one, at) => !list.slice(0, at).includes(one));
 
 /** Whether `out` holds exactly the values of `from` that `keep` keeps, and nothing else. */
-const exactly = (out: readonly string[], from: readonly string[], keep: (one: string) => boolean): boolean =>
+const exactly = (out: readonly string[], from: readonly string[], keep: (one: string) => boolean) =>
   from.every((one) => out.includes(one) === keep(one)) && out.every((one) => from.includes(one));
 
 const unapprovedSpec = spec<

@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type { RunDetail, StepView } from '../../lib/runView';
 import { spentTitle } from '../../lib/cost';
 import { instantWhole } from '../../lib/instant';
@@ -186,7 +185,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
  * An instant the engine wrote down, as a log's timestamp: its time to the second on a 12-hour clock (`timeToTheSecond`), in this
  * browser's time zone, whole on hover (`instantWhole`); `none` where there is none.
  */
-function instant(at: string | null, none: string): ReactNode {
+function instant(at: string | null, none: string) {
   if (at === null) return <span className="text-muted-foreground">{none}</span>;
   const date = new Date(at);
   return (

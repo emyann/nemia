@@ -30,9 +30,9 @@ export type WorkflowSpecRead = {
  * block that holds anything but a fence map, or a fence key also set at the top level, is carried as it reads, for the write to refuse
  * in the parser's words; so is a key that names no harness.
  */
-const fenceRead = (keys: Record<string, unknown>): Record<string, unknown> =>
+const fenceRead = (keys: Record<string, unknown>) =>
   Object.fromEntries(
-    Object.entries(keys).flatMap(([key, value]): [string, unknown][] => {
+    Object.entries(keys).flatMap(([key, value]) => {
       if (!isHarnessBlock(key) || !isMap(value)) return [[key, value]];
       const { fence, ...rest } = value;
       if (Object.keys(rest).length > 0 || !isMap(fence) || Object.keys(fence).some((k) => Object.hasOwn(keys, k))) return [[key, value]];
@@ -45,7 +45,7 @@ const fenceRead = (keys: Record<string, unknown>): Record<string, unknown> =>
  * @param name The name a refusal of the frontmatter calls the file by: a step's or a skill's.
  * @param text The file's text.
  */
-export const fileParts = (name: string, text: string): { keys: Record<string, unknown>; body: string } => {
+export const fileParts = (name: string, text: string) => {
   const { block, body } = splitFrontmatter(name, text);
   const keys: unknown = block === null ? {} : frontmatterValues(block);
   return { keys: typeof keys === 'object' && keys !== null ? (keys as Record<string, unknown>) : {}, body };
@@ -56,7 +56,7 @@ export const fileParts = (name: string, text: string): { keys: Record<string, un
  * it: the block read as the loader reads it (`readFrontmatter`, every scalar the string written), whether the file writes the map in flow
  * or as a block. A key written as a line is left out, carried as it reads.
  */
-const mapTexts = (name: string, block: string | null): Record<string, string> =>
+const mapTexts = (name: string, block: string | null) =>
   block === null
     ? {}
     : Object.fromEntries(
@@ -70,7 +70,7 @@ const mapTexts = (name: string, block: string | null): Record<string, string> =>
  * list of steps or of names, which a file writes `a, b`, as its names; a context window written `200k` as its tokens. Any other value as
  * it reads, the proposal's check judging it; a map on a key the loader reads as text is `mapTexts`'.
  */
-const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unknown> =>
+const servedKeys = (keys: Readonly<Record<string, unknown>>) =>
   Object.fromEntries(
     Object.entries(keys).map(([key, value]) => {
       const form = (STEP_KEY_FORM as Readonly<Record<string, string>>)[key];
@@ -92,7 +92,7 @@ const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unk
  * folder`, where `place:` is not written beside it, and `main` as `base`. A spec carries no word nothing writes, so a step read and
  * proposed back is written as the same step, its file kept.
  */
-const spelledNow = (keys: Record<string, unknown>): Record<string, unknown> => {
+const spelledNow = (keys: Record<string, unknown>) => {
   if (keys.workspace === 'main') return { ...keys, workspace: 'base' };
   if (keys.workspace !== 'folder' || keys.place !== undefined) return keys;
   const { workspace: _workspace, ...rest } = keys;
@@ -104,7 +104,7 @@ const spelledNow = (keys: Record<string, unknown>): Record<string, unknown> => {
  * has any, so a Workflow written with neither reads back as it was written.
  * @param files The text files directly in the workflow's folder, in any order.
  */
-export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
+export function workflowSpecOf(files: readonly FolderText[]) {
   const byName = [...files].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const readme = byName.find((f) => isReadme(f.name));
   const steps = byName
@@ -122,7 +122,7 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
  * A step as the object says it, as the Workflow door takes it: its keys, `output` as the file it names, and its body.
  * @param step The step as the Workflow object says it.
  */
-export const stepDraftOf = (step: WorkflowStep): StepDraft => {
+export const stepDraftOf = (step: WorkflowStep) => {
   const draft: Record<string, unknown> = { after: [] };
   for (const [key, value] of Object.entries(step.keys)) {
     if (value === null || value === undefined) continue;

@@ -19,32 +19,23 @@ import type {
   GetTaskPushNotificationConfigRequest,
   GetTaskRequest,
   ListTaskPushNotificationConfigsRequest,
-  ListTaskPushNotificationConfigsResponse,
   ListTasksRequest,
-  ListTasksResponse,
   SendMessageRequest,
-  StreamResponse,
   SubscribeToTaskRequest,
   Task,
   TaskPushNotificationConfig,
-  SendMessageResult,
 } from '@a2a-js/sdk';
 import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
 import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { Event, Sighting, Usage } from '../core/index.ts';
+import type { Event, Sighting } from '../core/index.ts';
 import { Journal } from '../core/engine/index.ts';
 import {
   Runner,
   RunnerError,
   type ExpectedSession,
-  type HarnessQuota,
-  type Observation,
   type RunnerOps,
-  type SessionForgotten,
-  type SessionKept,
-  type SessionsCompacted,
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
@@ -78,101 +69,99 @@ export class InProcessTransport implements Transport {
     this.handler = handler;
   }
 
-  get protocolName(): string {
+  get protocolName() {
     return 'in-process';
   }
 
-  get protocolVersion(): string {
+  get protocolVersion() {
     return A2A_PROTOCOL_VERSION;
   }
 
-  getExtendedAgentCard(params: GetExtendedAgentCardRequest): Promise<AgentCard> {
+  getExtendedAgentCard(params: GetExtendedAgentCardRequest) {
     return this.handler.getAuthenticatedExtendedAgentCard(params, new ServerCallContext());
   }
 
-  sendMessage(params: SendMessageRequest): Promise<SendMessageResult> {
+  sendMessage(params: SendMessageRequest) {
     return this.handler.sendMessage(params, new ServerCallContext());
   }
 
-  async *sendMessageStream(params: SendMessageRequest): AsyncGenerator<StreamResponse, void, undefined> {
+  async *sendMessageStream(params: SendMessageRequest) {
     yield* this.handler.sendMessageStream(params, new ServerCallContext());
   }
 
-  createTaskPushNotificationConfig(params: TaskPushNotificationConfig): Promise<TaskPushNotificationConfig> {
+  createTaskPushNotificationConfig(params: TaskPushNotificationConfig) {
     return this.handler.createTaskPushNotificationConfig(params, new ServerCallContext());
   }
 
-  getTaskPushNotificationConfig(params: GetTaskPushNotificationConfigRequest): Promise<TaskPushNotificationConfig> {
+  getTaskPushNotificationConfig(params: GetTaskPushNotificationConfigRequest) {
     return this.handler.getTaskPushNotificationConfig(params, new ServerCallContext());
   }
 
-  listTaskPushNotificationConfig(params: ListTaskPushNotificationConfigsRequest): Promise<ListTaskPushNotificationConfigsResponse> {
+  listTaskPushNotificationConfig(params: ListTaskPushNotificationConfigsRequest) {
     return this.handler.listTaskPushNotificationConfigs(params, new ServerCallContext());
   }
 
-  deleteTaskPushNotificationConfig(params: DeleteTaskPushNotificationConfigRequest): Promise<void> {
+  deleteTaskPushNotificationConfig(params: DeleteTaskPushNotificationConfigRequest) {
     return this.handler.deleteTaskPushNotificationConfig(params, new ServerCallContext());
   }
 
-  getTask(params: GetTaskRequest): Promise<Task> {
+  getTask(params: GetTaskRequest) {
     return this.handler.getTask(params, new ServerCallContext());
   }
 
-  cancelTask(params: CancelTaskRequest): Promise<Task> {
+  cancelTask(params: CancelTaskRequest) {
     return this.handler.cancelTask(params, new ServerCallContext());
   }
 
-  listTasks(params: ListTasksRequest): Promise<ListTasksResponse> {
+  listTasks(params: ListTasksRequest) {
     return this.handler.listTasks(params, new ServerCallContext());
   }
 
-  async *resubscribeTask(params: SubscribeToTaskRequest): AsyncGenerator<StreamResponse, void, undefined> {
+  async *resubscribeTask(params: SubscribeToTaskRequest) {
     yield* this.handler.resubscribe(params, new ServerCallContext());
   }
 
-  findSession(params: { name: string }): Promise<{ sessionId: string } | null> {
+  findSession(params: { name: string }) {
     return this.handler.findSession(params, new ServerCallContext());
   }
 
-  sessionLogs(params: { sessionId: string }): Promise<{ logs: string }> {
+  sessionLogs(params: { sessionId: string }) {
     return this.handler.sessionLogs(params, new ServerCallContext());
   }
 
-  interruptSession(params: { session: { name: string; sessionId: string } }): Promise<void> {
+  interruptSession(params: { session: { name: string; sessionId: string } }) {
     return this.handler.interruptSession(params, new ServerCallContext());
   }
 
-  sessionOutput(params: OutputRequest): Promise<{ output: string | null }> {
+  sessionOutput(params: OutputRequest) {
     return this.handler.sessionOutput(params, new ServerCallContext());
   }
 
-  releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
+  releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }) {
     return this.handler.releaseSession(params, new ServerCallContext());
   }
 
-  sessionTranscript(params: TranscriptRequest): Promise<Transcript | null> {
+  sessionTranscript(params: TranscriptRequest) {
     return this.handler.sessionTranscript(params, new ServerCallContext());
   }
 
-  observeSessions(params: {
-    expected: readonly ExpectedSession[];
-  }): Promise<{ tasks: Task[]; unread: string[]; why: string[]; unreadWhy?: Record<string, string> }> {
+  observeSessions(params: { expected: readonly ExpectedSession[] }) {
     return this.handler.observeSessions(params, new ServerCallContext());
   }
 
-  harnessQuota(params: Record<string, never>): Promise<HarnessQuota> {
+  harnessQuota(params: Record<string, never>) {
     return this.handler.harnessQuota(params, new ServerCallContext());
   }
 
-  forgetSession(params: ForgetRequest): Promise<SessionForgotten> {
+  forgetSession(params: ForgetRequest) {
     return this.handler.forgetSession(params, new ServerCallContext());
   }
 
-  sessionKept(params: KeptRequest): Promise<Record<string, SessionKept>> {
+  sessionKept(params: KeptRequest) {
     return this.handler.sessionKept(params, new ServerCallContext());
   }
 
-  compactSessions(params: { dry: boolean }): Promise<SessionsCompacted> {
+  compactSessions(params: { dry: boolean }) {
     return this.handler.compactSessions(params, new ServerCallContext());
   }
 }
@@ -191,11 +180,11 @@ const seamOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Pro
  * @param ops The harness's driver, which its handler calls.
  * @param events Reads the events journaled for a task, by its id.
  */
-export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): Client =>
+export const clientOf = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>) =>
   seamOf(harness, ops, events).client;
 
 /** What a card says of the runtime extension: the methods its agent answers, and whether a session takes words. */
-const extensionOf = (card: AgentCard): RuntimeExtensionParams => {
+const extensionOf = (card: AgentCard) => {
   const params = card.capabilities?.extensions.find((e) => e.uri === RUNTIME_EXTENSION)?.params as
     | Partial<RuntimeExtensionParams>
     | undefined;
@@ -206,7 +195,7 @@ const extensionOf = (card: AgentCard): RuntimeExtensionParams => {
  * A client call as a driver's verb: its value, or the harness's words — or the seam's own refusal, in A2A's words — as a
  * `RunnerError`. Anything else thrown is a defect, and dies as one, as it would have reaching the driver directly.
  */
-const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerError> =>
+const call = <A>(verb: string, f: () => Promise<A>) =>
   Effect.tryPromise({ try: f, catch: (cause) => cause }).pipe(
     Effect.catch((cause) =>
       cause instanceof HarnessFailed || cause instanceof A2AError
@@ -216,38 +205,26 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
   );
 
 /** `find` through the seam: the session running under a name, `undefined` when none does. */
-const findThrough =
-  (transport: InProcessTransport) =>
-  (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
-    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
+const findThrough = (transport: InProcessTransport) => (name: string) =>
+  call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
 
 /** `forget` through the seam: what the harness keeps of a session, removed, or with `dry` only listed. */
-const forgetThrough =
-  (transport: InProcessTransport) =>
-  (session: { name: string; nativeId?: string }, options: { dry: boolean }): Effect.Effect<SessionForgotten, RunnerError> =>
-    call('forget', () => transport.forgetSession({ session, dry: options.dry }));
+const forgetThrough = (transport: InProcessTransport) => (session: { name: string; nativeId?: string }, options: { dry: boolean }) =>
+  call('forget', () => transport.forgetSession({ session, dry: options.dry }));
 
 /** `kept` through the seam: where the harness keeps what it has of each session asked, by the session's name. */
-const keptThrough =
-  (transport: InProcessTransport) =>
-  (sessions: readonly { name: string; nativeId?: string }[]): Effect.Effect<Record<string, SessionKept>, RunnerError> =>
-    call('kept', () => transport.sessionKept({ sessions }));
+const keptThrough = (transport: InProcessTransport) => (sessions: readonly { name: string; nativeId?: string }[]) =>
+  call('kept', () => transport.sessionKept({ sessions }));
 
 /** `output` through the seam: one stream of the session under a name, whole or its last bytes; `undefined` when none was kept. */
-const outputThrough =
-  (transport: InProcessTransport) =>
-  (name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Effect.Effect<string | undefined, RunnerError> =>
-    call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
+const outputThrough = (transport: InProcessTransport) => (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
+  call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
 
 /**
  * What the driver left unread (`observeSessions`), and why each session alone was: only words that are a string, for a name among
  * `unread`. An answer without them, a driver's from before they were answered, is none.
  */
-const unreadOf = (
-  unread: readonly string[],
-  why: readonly string[],
-  said: Record<string, unknown> | undefined,
-): Omit<Observation, 'seen'> => {
+const unreadOf = (unread: readonly string[], why: readonly string[], said: Record<string, unknown> | undefined) => {
   const names = new Set(unread);
   const unreadWhy = new Map(
     Object.entries(said ?? {}).flatMap(([name, words]) => (names.has(name) && typeof words === 'string' ? [[name, words] as const] : [])),
@@ -259,7 +236,7 @@ const unreadOf = (
  * The verbs the card offers that ask the transport alone, each left off when the card does not list its method; `follow` when it
  * says the agent streams.
  */
-const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport, streaming: boolean): Partial<RunnerOps> => ({
+const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport, streaming: boolean) => ({
   ...(streaming ? { follow: followThrough((params) => transport.resubscribeTask(params)) } : {}),
   ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
   ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
@@ -285,40 +262,38 @@ export type SeamOps = RunnerOps & {
  * A spawn through `harness`'s client: the request sent as a user message, and the answer read — `WORKING` started, `REJECTED` refused,
  * any other a spawn whose session may yet exist, in the harness's words when it gave some.
  */
-const spawnThrough =
-  (harness: string, client: Client) =>
-  (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
-    call('spawn', () =>
-      client.sendMessage({
-        tenant: '',
-        message: messageOf(r, randomUUID()),
-        metadata: undefined,
-        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-      }),
-    ).pipe(
-      Effect.flatMap((answer) => {
-        const state = 'status' in answer ? answer.status?.state : undefined;
-        if (state === TaskState.TASK_STATE_WORKING) return Effect.void;
-        const words = 'status' in answer ? wordsOf(answer) : undefined;
-        if (state === TaskState.TASK_STATE_REJECTED) {
-          return Effect.fail(
-            new RunnerError({
-              verb: 'spawn',
-              message: words ?? `the \`${harness}\` harness refused \`${r.name}\` and said nothing.`,
-              refused: true,
-            }),
-          );
-        }
+const spawnThrough = (harness: string, client: Client) => (r: SpawnRequest) =>
+  call('spawn', () =>
+    client.sendMessage({
+      tenant: '',
+      message: messageOf(r, randomUUID()),
+      metadata: undefined,
+      configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+    }),
+  ).pipe(
+    Effect.flatMap((answer) => {
+      const state = 'status' in answer ? answer.status?.state : undefined;
+      if (state === TaskState.TASK_STATE_WORKING) return Effect.void;
+      const words = 'status' in answer ? wordsOf(answer) : undefined;
+      if (state === TaskState.TASK_STATE_REJECTED) {
         return Effect.fail(
           new RunnerError({
             verb: 'spawn',
-            message:
-              words ??
-              `the \`${harness}\` harness answered the spawn of \`${r.name}\` with ${state === undefined ? 'a message, not a task' : TaskState[state]}: whether a session started is not known.`,
+            message: words ?? `the \`${harness}\` harness refused \`${r.name}\` and said nothing.`,
+            refused: true,
           }),
         );
-      }),
-    );
+      }
+      return Effect.fail(
+        new RunnerError({
+          verb: 'spawn',
+          message:
+            words ??
+            `the \`${harness}\` harness answered the spawn of \`${r.name}\` with ${state === undefined ? 'a message, not a task' : TaskState[state]}: whether a session started is not known.`,
+        }),
+      );
+    }),
+  );
 
 /**
  * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
@@ -337,14 +312,14 @@ const spawnThrough =
  * @param ops The harness's driver, which the handler beneath the client calls.
  * @param events Reads the events journaled for a task, by its id.
  */
-export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
+export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>) => {
   const { card, transport, client } = seamOf(harness, ops, events);
   const offered = extensionOf(card);
   let names = new Map<string, string>();
 
   const spawn = spawnThrough(harness, client);
 
-  const sightingsOf = (verb: string, tasks: readonly Task[], seen: Map<string, Sighting>): Effect.Effect<void, RunnerError> => {
+  const sightingsOf = (verb: string, tasks: readonly Task[], seen: Map<string, Sighting>) => {
     for (const t of tasks) {
       const s = sightingOf(t);
       if (!s)
@@ -379,7 +354,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     return seen;
   });
 
-  const observeFor = (expected: readonly ExpectedSession[]): Effect.Effect<Observation, RunnerError> =>
+  const observeFor = (expected: readonly ExpectedSession[]) =>
     Effect.gen(function* () {
       const seen = new Map<string, Sighting>();
       const { tasks, unread, why, unreadWhy: said } = yield* call('observe', () => transport.observeSessions({ expected }));
@@ -388,7 +363,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       return { seen, ...unreadOf(unread, why, said) };
     });
 
-  const stop = (sessionId: string): Effect.Effect<void, RunnerError> =>
+  const stop = (sessionId: string) =>
     Effect.gen(function* () {
       if (!names.has(sessionId)) yield* observe;
       const name = names.get(sessionId);
@@ -411,16 +386,15 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       );
     });
 
-  const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
-    call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
+  const logs = (sessionId: string) => call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
 
-  const interrupt = (session: { name: string; sessionId: string }): Effect.Effect<void, RunnerError> =>
+  const interrupt = (session: { name: string; sessionId: string }) =>
     call('interrupt', () => transport.interruptSession({ session })).pipe(Effect.asVoid);
 
-  const release = (session: Sighting, task: { worktree?: string | boolean }): Effect.Effect<Usage | void, RunnerError> =>
+  const release = (session: Sighting, task: { worktree?: string | boolean }) =>
     call('release', () => transport.releaseSession({ session, task })).pipe(Effect.map((r) => r.usage ?? undefined));
 
-  const say = (session: { name: string; sessionId: string }, text: string): Effect.Effect<void, RunnerError> =>
+  const say = (session: { name: string; sessionId: string }, text: string) =>
     call('say', () =>
       client.sendMessage({
         tenant: '',
@@ -451,7 +425,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
  * for. A2A has no call for either, and an adapter that rebuilt the ops without them would drop the verb silently
  * (`Engine.answerAsk` then refuses every answer), which is why they are carried in one place.
  */
-const carried = (ops: RunnerOps): Pick<SeamOps, 'answer' | 'refuses' | 'bridgeAsked'> => ({
+const carried = (ops: RunnerOps) => ({
   ...(ops.answer ? { answer: ops.answer } : {}),
   ...(ops.refuses ? { refuses: ops.refuses } : {}),
   ...(ops.bridgeAsked ? { bridgeAsked: ops.bridgeAsked } : {}),
@@ -462,9 +436,8 @@ const carried = (ops: RunnerOps): Pick<SeamOps, 'answer' | 'refuses' | 'bridgeAs
  * goes by it yet, and `transcript` by its id, whose `null` is a defect — the handler answers none only for a name it did not find.
  */
 const transcriptsThrough = (transport: InProcessTransport) => ({
-  transcriptOf: (name: string, after?: TranscriptCursor): Effect.Effect<Transcript | null, RunnerError> =>
-    call('transcript', () => transport.sessionTranscript({ name, after })),
-  transcript: (sessionId: string, after?: TranscriptCursor): Effect.Effect<Transcript, RunnerError> =>
+  transcriptOf: (name: string, after?: TranscriptCursor) => call('transcript', () => transport.sessionTranscript({ name, after })),
+  transcript: (sessionId: string, after?: TranscriptCursor) =>
     call('transcript', () => transport.sessionTranscript({ sessionId, after })).pipe(
       Effect.flatMap((read) =>
         read ? Effect.succeed(read) : Effect.die(new Error(`the seam read no transcript for session \`${sessionId}\`, asked by id`)),
@@ -480,7 +453,7 @@ const transcriptsThrough = (transport: InProcessTransport) => ({
  * @param ops The driver whose session verbs the seam carries.
  * @param harness The name the harness goes by on its card and in its errors; `runner` where none is given.
  */
-export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runner, never, Journal> =>
+export const a2aRunner = (ops: RunnerOps, harness = 'runner') =>
   Layer.unwrap(
     Effect.gen(function* () {
       const journal = yield* Journal;

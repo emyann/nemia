@@ -29,13 +29,13 @@ export const STATE_GONE_KEY = 'ae/follower-gone';
  * The signal of a follower that went away, where the call carries one; none on the in-process road, which has no socket.
  * @param context The call's context, whose state may hold the signal under `STATE_GONE_KEY`.
  */
-export const goneOf = (context: ServerCallContext): AbortSignal | undefined => {
+export const goneOf = (context: ServerCallContext) => {
   const gone = context.state.get(STATE_GONE_KEY);
   return gone instanceof AbortSignal ? gone : undefined;
 };
 
 /** `gone` as the effect that completes once it aborts: what a follow of a silent session is interrupted on. */
-const aborted = (gone: AbortSignal): Effect.Effect<void> =>
+const aborted = (gone: AbortSignal) =>
   Effect.promise(
     () =>
       new Promise<void>((resolve) => {
@@ -45,36 +45,30 @@ const aborted = (gone: AbortSignal): Effect.Effect<void> =>
   );
 
 /** An update of the artifact `artifactId`, named `name`, of the Task `taskId`: its one part, and whether it adds to the last. */
-const artifactUpdate = (
-  taskId: string,
-  artifactId: string,
-  name: string,
-  content: Part['content'],
-  append: boolean,
-  lastChunk: boolean,
-): StreamResponse => ({
-  payload: {
-    $case: 'artifactUpdate',
-    value: {
-      taskId,
-      contextId: '',
-      artifact: {
-        artifactId,
-        name,
-        description: '',
-        parts: [{ content, metadata: undefined, filename: '', mediaType: '' }],
+const artifactUpdate = (taskId: string, artifactId: string, name: string, content: Part['content'], append: boolean, lastChunk: boolean) =>
+  ({
+    payload: {
+      $case: 'artifactUpdate',
+      value: {
+        taskId,
+        contextId: '',
+        artifact: {
+          artifactId,
+          name,
+          description: '',
+          parts: [{ content, metadata: undefined, filename: '', mediaType: '' }],
+          metadata: undefined,
+          extensions: [],
+        },
+        append,
+        lastChunk,
         metadata: undefined,
-        extensions: [],
       },
-      append,
-      lastChunk,
-      metadata: undefined,
     },
-  },
-});
+  }) satisfies StreamResponse as StreamResponse;
 
 /** One moment of a followed session as what `SubscribeToTask` answers of the Task `taskId`. */
-const responseOf = (taskId: string, m: Followed): StreamResponse => {
+const responseOf = (taskId: string, m: Followed) => {
   if (m.kind === 'state')
     return {
       payload: {
@@ -86,29 +80,46 @@ const responseOf = (taskId: string, m: Followed): StreamResponse => {
           metadata: undefined,
         },
       },
-    };
+    } satisfies StreamResponse as StreamResponse;
   if (m.kind === 'events')
-    return artifactUpdate(taskId, TRANSCRIPT, TRANSCRIPT, { $case: 'data', value: { events: m.events, cursor: m.cursor } }, true, false);
-  return artifactUpdate(taskId, m.key, PARTIAL, { $case: 'text', value: m.text }, m.append, m.last);
+    return artifactUpdate(
+      taskId,
+      TRANSCRIPT,
+      TRANSCRIPT,
+      { $case: 'data', value: { events: m.events, cursor: m.cursor } },
+      true,
+      false,
+    ) satisfies StreamResponse as StreamResponse;
+  return artifactUpdate(
+    taskId,
+    m.key,
+    PARTIAL,
+    { $case: 'text', value: m.text },
+    m.append,
+    m.last,
+  ) satisfies StreamResponse as StreamResponse;
 };
 
 /**
  * What a `SubscribeToTask` answer says, as the moment a driver gives; none for an answer that is not one (a message).
  * @param r One answer of `SubscribeToTask`.
  */
-export const followedOf = (r: StreamResponse): Followed[] => {
+export const followedOf = (r: StreamResponse) => {
   const p = r.payload;
-  const state = (s: SessionState | undefined): Followed[] => (s ? [{ kind: 'state', state: s }] : []);
-  if (p?.$case === 'task') return state(sightingOf(p.value)?.state ?? nameOf(p.value.status?.state ?? 0));
-  if (p?.$case === 'statusUpdate') return state(nameOf(p.value.status?.state ?? 0));
-  if (p?.$case !== 'artifactUpdate' || !p.value.artifact) return [];
+  const state = (s: SessionState | undefined) => (s ? [{ kind: 'state', state: s }] : []) satisfies Followed[];
+  if (p?.$case === 'task')
+    return state(sightingOf(p.value)?.state ?? nameOf(p.value.status?.state ?? 0)) satisfies Followed[] as Followed[];
+  if (p?.$case === 'statusUpdate') return state(nameOf(p.value.status?.state ?? 0)) satisfies Followed[] as Followed[];
+  if (p?.$case !== 'artifactUpdate' || !p.value.artifact) return [] satisfies Followed[] as Followed[];
   const { artifact, append, lastChunk } = p.value;
   const content = artifact.parts[0]?.content;
   if (artifact.name === TRANSCRIPT && content?.$case === 'data') {
     const { events, cursor } = content.value as { events: Extract<Followed, { kind: 'events' }>['events']; cursor: string };
-    return [{ kind: 'events', events, cursor }];
+    return [{ kind: 'events', events, cursor }] satisfies Followed[] as Followed[];
   }
-  return [{ kind: 'partial', key: artifact.artifactId, text: content?.$case === 'text' ? content.value : '', append, last: lastChunk }];
+  return [
+    { kind: 'partial', key: artifact.artifactId, text: content?.$case === 'text' ? content.value : '', append, last: lastChunk },
+  ] satisfies Followed[] as Followed[];
 };
 
 /**
@@ -125,18 +136,13 @@ export const followedOf = (r: StreamResponse): Followed[] => {
  * @param params The request, whose `id` is the session's.
  * @param gone The signal of a follower that went away, or undefined where the call carries none.
  */
-export async function* subscription(
-  harness: string,
-  ops: RunnerOps,
-  params: SubscribeToTaskRequest,
-  gone?: AbortSignal,
-): AsyncGenerator<StreamResponse, void, undefined> {
+export async function* subscription(harness: string, ops: RunnerOps, params: SubscribeToTaskRequest, gone?: AbortSignal) {
   if (!ops.follow) throw new UnsupportedOperationError('this agent does not stream: poll getTask.');
   const followed = gone === undefined ? ops.follow(params.id) : ops.follow(params.id).pipe(Stream.interruptWhen(aborted(gone)));
   let first = true;
   for await (const m of Stream.toAsyncIterable(followed)) {
     if (!first) {
-      yield responseOf(params.id, m);
+      yield responseOf(params.id, m) satisfies StreamResponse;
       continue;
     }
     first = false;
@@ -149,7 +155,9 @@ export async function* subscription(
       throw new UnsupportedOperationError(
         `session \`${params.id}\` has ended (${m.state}): there is nothing to follow. Read its transcript (sessionTranscript).`,
       );
-    yield { payload: { $case: 'task', value: taskOfSighting(params.id, { sessionId: params.id, state: m.state }) } };
+    yield {
+      payload: { $case: 'task', value: taskOfSighting(params.id, { sessionId: params.id, state: m.state }) },
+    } satisfies StreamResponse;
   }
 }
 
@@ -160,8 +168,7 @@ export async function* subscription(
  * @param subscribe The client's `SubscribeToTask`, called with the session's name as the Task's id.
  */
 export const followThrough =
-  (subscribe: (params: SubscribeToTaskRequest) => AsyncGenerator<StreamResponse, void, undefined>) =>
-  (name: string): Stream.Stream<Followed, RunnerError> =>
+  (subscribe: (params: SubscribeToTaskRequest) => AsyncGenerator<StreamResponse, void, undefined>) => (name: string) =>
     Stream.fromAsyncIterable(
       subscribe({ tenant: '', id: name }),
       (cause) =>
@@ -170,4 +177,7 @@ export const followThrough =
           message: cause instanceof Error ? cause.message : String(cause),
           ...(cause instanceof UnsupportedOperationError ? { refused: true } : {}),
         }),
-    ).pipe(Stream.map(followedOf), Stream.flattenIterable);
+    ).pipe(Stream.map(followedOf), Stream.flattenIterable) satisfies Stream.Stream<Followed, RunnerError> as Stream.Stream<
+      Followed,
+      RunnerError
+    >;

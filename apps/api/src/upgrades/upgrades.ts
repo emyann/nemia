@@ -28,8 +28,10 @@ import { UpgradeStarts } from './starts.ts';
  * A piece of an upgrade's follow as the stream's event: a chunk printed (`output`), or the upgrade ended (`ended`, the `Upgrade` as
  * JSON).
  */
-const eventOf = (followed: UpgradeFollowed): UpgradeStreamEvent =>
-  followed.kind === 'output' ? { event: 'output', data: followed.text } : { event: 'ended', data: JSON.stringify(followed.upgrade) };
+const eventOf = (followed: UpgradeFollowed) =>
+  (followed.kind === 'output'
+    ? { event: 'output', data: followed.text }
+    : { event: 'ended', data: JSON.stringify(followed.upgrade) }) satisfies UpgradeStreamEvent;
 
 export const upgradesHandlers = readsBounded(Api, 'upgrades', (handlers) =>
   handlers

@@ -16,7 +16,7 @@ const GROWN = 2 - Math.SQRT2;
  * @param cut how long a cut is along each side of the box, in pixels
  * @param inset how far inside the box the outline runs, in pixels
  */
-export function cutPoints(cut: number, inset = 0): string {
+export function cutPoints(cut: number, inset = 0) {
   const far = (length: number) => (length === 0 ? '100%' : `calc(100% - ${Number(length.toFixed(2))}px)`);
   const near = (length: number) => `${Number(length.toFixed(2))}px`;
   const [a, b] = [inset, inset + cut - inset * GROWN];
@@ -35,7 +35,7 @@ export function cutPoints(cut: number, inset = 0): string {
  *
  * @param cut how long the cut of each of the two corners is, in pixels
  */
-export const cutShape = (cut: number): string => `polygon(${cutPoints(cut)})`;
+export const cutShape = (cut: number) => `polygon(${cutPoints(cut)})`;
 
 /**
  * The clip that leaves a box a band along its edge, `width` pixels wide, in the cut shape: the ring of a shape `cut` pixels cut that
@@ -45,7 +45,7 @@ export const cutShape = (cut: number): string => `polygon(${cutPoints(cut)})`;
  * @param gap the room between the shape and its ring, in pixels
  * @param width how wide the ring is, in pixels
  */
-export function cutRing(cut: number, gap: number, width: number): string {
+export function cutRing(cut: number, gap: number, width: number) {
   const outer = cutPoints(cut + (gap + width) * GROWN);
   const inner = cutPoints(cut + (gap + width) * GROWN, width);
   const [from, hole] = [outer.split(', ')[0], inner.split(', ')[0]];

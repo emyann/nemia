@@ -112,14 +112,14 @@ function ChangeRow({ change, phase }: { change: ProposalChange; phase: ProposalP
 }
 
 /** Who proposed `proposal`, in words: the agent, of a run's step where one made it, else the person. */
-const proposerOf = (proposal: Proposal): string => {
+const proposerOf = (proposal: Proposal) => {
   const by = proposal.status.proposedBy;
   const who = by.agent ?? 'you';
   return by.run ? `${who}, in ${by.step ? `${by.step} of ` : ''}${by.run}` : who;
 };
 
 /** Who approved `proposal`, in words, or null while none has. */
-const approverOf = (proposal: Proposal): string | null => {
+const approverOf = (proposal: Proposal) => {
   const by = proposal.status.approvedBy;
   if (!by) return null;
   if (by.by === 'person') return 'you';

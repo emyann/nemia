@@ -18,7 +18,7 @@ export type SentInput = { readonly name: string; readonly text?: string; readonl
  * Why the first of `inputs` that cannot be handed to a run cannot, naming what to send; null where each can. Pure.
  * @param inputs The inputs sent, each by its file's name with its text or its bytes in base64.
  */
-export function sentInputRefusal(inputs: readonly SentInput[]): string | null {
+export function sentInputRefusal(inputs: readonly SentInput[]) {
   for (const { name, text, base64, from } of inputs) {
     if (name !== path.basename(name) || name === '' || name === '.' || name === '..' || name.includes('\\'))
       return `an input is sent by its file's own name, and ${JSON.stringify(name)} names a folder: send the file's name alone, as nemia start --input <file> sends it.`;
@@ -32,7 +32,7 @@ export function sentInputRefusal(inputs: readonly SentInput[]): string | null {
  * `inputs` written into a folder of their own, each by its name: the folder, and the paths of the files written, in the order sent.
  * @param inputs The inputs sent, each by its file's name with its text, its bytes in base64, or the path of a file kept for it.
  */
-export function sentInputsWritten(inputs: readonly SentInput[]): { dir: string; files: string[] } {
+export function sentInputsWritten(inputs: readonly SentInput[]) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-inputs-'));
   const files = inputs.map((input) => {
     const file = path.join(dir, input.name);
@@ -47,4 +47,4 @@ export function sentInputsWritten(inputs: readonly SentInput[]): { dir: string; 
  * The folder `sentInputsWritten` wrote, removed.
  * @param dir The folder `sentInputsWritten` answered.
  */
-export const sentInputsRemoved = (dir: string): void => fs.rmSync(dir, { recursive: true, force: true });
+export const sentInputsRemoved = (dir: string) => fs.rmSync(dir, { recursive: true, force: true });

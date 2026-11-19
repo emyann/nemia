@@ -25,10 +25,10 @@ type RenderedAt = { version: string; params: FactoryTemplate['params']; entries:
 export type AdoptionRead = { adoption: Adoption; rules: string | null };
 
 /** The digest of the folder `dir`, or null where it is not there. */
-const folderDigest = (dir: string): string | null => (fs.existsSync(dir) ? digestOf(entriesIn(dir)) : null);
+const folderDigest = (dir: string) => (fs.existsSync(dir) ? digestOf(entriesIn(dir)) : null);
 
 /** The card `text` in the inbox's `file` as a takeover reads it, or none where it is no card or does not read: no start reads it either. */
-function cardIn(file: string, text: string): ReturnType<typeof parseInboxCard> | undefined {
+function cardIn(file: string, text: string) {
   if (!file.endsWith('.md') || file.includes('/')) return undefined;
   try {
     return parseInboxCard(file, text);
@@ -87,7 +87,7 @@ export const adoptionAt = Effect.fn('adoptionAt')(function* (home: string, facto
  * @param source The template's source as the person named it: a folder, an archive or a builtin's name.
  * @param from The name of the template the base holds, given only on an upgrade that switches onto another; undefined otherwise.
  */
-export function planDigest(home: string, name: string, render: RenderedAt, source: string, from?: string): string {
+export function planDigest(home: string, name: string, render: RenderedAt, source: string, from?: string) {
   const file = path.join(factoriesDirAt(home), `${name}.json`);
   const hash = createHash('sha256');
   hash.update(JSON.stringify([source, render.version, render.params, digestOf(render.entries)]));
@@ -104,7 +104,7 @@ export function planDigest(home: string, name: string, render: RenderedAt, sourc
  * @param name The factory's name.
  * @param entries The render's files, staged as the factory's base and tree.
  */
-export function stageAdoption(home: string, name: string, entries: readonly Entry[]): void {
+export function stageAdoption(home: string, name: string, entries: readonly Entry[]) {
   stageFolder(appliedDir(home, name), entries, true);
   stageFolder(treeDir(home, name), entries, false);
 }

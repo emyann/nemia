@@ -7,14 +7,15 @@ import { seeded } from '../../../.storybook/fixtures/proposals';
 import { LibraryPage } from './LibraryPage';
 
 /** One item of the library, the user library's and used by no factory. */
-const item = (kind: LibraryItem['kind'], name: string, description: string | null): LibraryItem => ({
-  kind,
-  name,
-  description,
-  origin: 'user',
-  factories: [],
-  builtinChanged: false,
-});
+const item = (kind: LibraryItem['kind'], name: string, description: string | null) =>
+  ({
+    kind,
+    name,
+    description,
+    origin: 'user',
+    factories: [],
+    builtinChanged: false,
+  }) satisfies LibraryItem;
 
 /** The library: a skill, an agent, a server, which says nothing of itself, and Nemia's workflow, used by one factory. */
 const ITEMS: LibraryItem[] = [

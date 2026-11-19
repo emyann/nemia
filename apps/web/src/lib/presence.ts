@@ -96,13 +96,13 @@ const FACE_ORDER: readonly Fact[] = [
  * The expression her face wears for `presence`: the first in the owner's order that holds, else idle.
  * @param presence What holds of her now.
  */
-export const faceOf = (presence: Presence): FaceExpression => FACE_ORDER.find((fact) => fact.holds(presence))?.face ?? 'idle';
+export const faceOf = (presence: Presence) => FACE_ORDER.find((fact) => fact.holds(presence))?.face ?? 'idle';
 
 /**
  * The cue of every presence that holds, in the owner's order; none when she is only up.
  * @param presence What holds of her now.
  */
-export const cuesOf = (presence: Presence): Cue[] => FACE_ORDER.filter((fact) => fact.holds(presence)).map((fact) => fact.cue(presence));
+export const cuesOf = (presence: Presence) => FACE_ORDER.filter((fact) => fact.holds(presence)).map((fact) => fact.cue(presence));
 
 /** Where her face in the rail stands: her chat closed, her sheet open, or the page itself her chat's own (`/chat`). */
 export type FaceAt = 'closed' | 'open' | 'page';
@@ -116,5 +116,5 @@ const FACE_DOES: Record<FaceAt, string> = { closed: "Open Nemia's chat.", open: 
  * @param presence What holds of her now.
  * @param at Where her face in the rail stands: her chat closed, her sheet open, or her chat's own page.
  */
-export const dockWords = (presence: Presence, at: FaceAt): string =>
+export const dockWords = (presence: Presence, at: FaceAt) =>
   `${FACE_DOES[at]} ${FACE_ORDER.find((fact) => fact.holds(presence))?.says(presence) ?? 'Her session is up.'}`;

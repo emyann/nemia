@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/ds';
 type Change = { kind: 'save'; words: string } | { kind: 'clear' } | { kind: 'store' } | { kind: 'path'; path: string } | { kind: 'reset' };
 
 /** The write a change sends, answered with the instruction as it then reads. */
-function sent(name: string, change: Change): Promise<Instruction> {
+function sent(name: string, change: Change) {
   if (change.kind === 'save') return writeInstruction(name, change.words);
   if (change.kind === 'clear') return clearInstruction(name);
   if (change.kind === 'store') return placeInstruction(name, { store: true });

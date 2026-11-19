@@ -34,16 +34,16 @@ export type CardWriteAsk = {
 export type CardWriteRefusal = 'started' | 'stale' | 'queued' | 'repo' | 'empty';
 
 /** Whether the write hands back a version the card no longer has. */
-const stale = (ask: CardWriteAsk): boolean => ask.versionSent !== undefined && ask.versionSent !== ask.versionNow;
+const stale = (ask: CardWriteAsk) => ask.versionSent !== undefined && ask.versionSent !== ask.versionNow;
 
 /** Whether the write changes `queued:`, setting it, moving it or taking it off. */
-const requeues = (ask: CardWriteAsk): boolean => ask.queuedSent !== ask.queuedNow;
+const requeues = (ask: CardWriteAsk) => ask.queuedSent !== ask.queuedNow;
 
 /** Whether the write sets a `repo:` the card has none of, or another than the one it has: taking one off sets none. */
-const placesByRepo = (ask: CardWriteAsk): boolean => ask.repoSent !== undefined && ask.repoSent !== ask.repoNow;
+const placesByRepo = (ask: CardWriteAsk) => ask.repoSent !== undefined && ask.repoSent !== ask.repoNow;
 
 /** Whether the write sends no body. */
-const empty = (ask: CardWriteAsk): boolean => ask.body === undefined || ask.body === '';
+const empty = (ask: CardWriteAsk) => ask.body === undefined || ask.body === '';
 
 const cardWriteRefusalSpec = spec<(ask: CardWriteAsk) => CardWriteRefusal | null>({
   ensures: {

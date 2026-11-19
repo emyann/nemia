@@ -15,7 +15,7 @@ import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
  * @param now The instant it is now, which sets whether the weekday is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function clockWord(at: Date, now: Date, timeZone?: string): string {
+export function clockWord(at: Date, now: Date, timeZone?: string) {
   if (unreadable(at, now)) return UNREADABLE;
   const zone = zoneOf(timeZone);
   const time = timeOfDay(at, timeZone);
@@ -32,7 +32,7 @@ export type WindowWords = { key: string; label: string; used: string; resets: st
  * @param now The instant it is now, against which the reset is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function windowWords(w: QuotaWindow, now: Date, timeZone?: string): WindowWords {
+export function windowWords(w: QuotaWindow, now: Date, timeZone?: string) {
   const at = w.resetsAt ? clockWord(new Date(w.resetsAt), now, timeZone) : null;
   return {
     key: w.key,
@@ -44,7 +44,7 @@ export function windowWords(w: QuotaWindow, now: Date, timeZone?: string): Windo
 }
 
 /** `3m`, `1m 30s`: a keep, as the hover says how often the api asks, to the minute where it is whole and to the second where not. */
-const keepWord = (ms: number): string => durationWords(ms, ms % 60_000 === 0 ? 'minute' : 'second');
+const keepWord = (ms: number) => durationWords(ms, ms % 60_000 === 0 ? 'minute' : 'second');
 
 /**
  * The last good reading beside a state with no windows of its own: its windows, and `as of 11:20 AM, 25 minutes ago`. Null when there is
@@ -53,7 +53,7 @@ const keepWord = (ms: number): string => durationWords(ms, ms % 60_000 === 0 ? '
  * @param now The instant it is now, against which the reading's time is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: WindowWords[]; asOf: string } | null {
+export function lastWords(q: Quota, now: Date, timeZone?: string) {
   if (q.state === 'fresh' || !q.last?.windows.length) return null;
   const at = new Date(q.last.askedAt);
   return {
@@ -68,7 +68,7 @@ export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: Wi
  * @param q The quota, as the api judged it.
  * @param now The instant it is now, against which the reading's age is said.
  */
-export function readingAge(q: Quota, now: Date): string | null {
+export function readingAge(q: Quota, now: Date) {
   if (q.heard) return `as of a session's turn ${agoWords(new Date(q.heard.at), now)}`;
   return q.askedAt ? `read ${agoWords(new Date(q.askedAt), now)}` : null;
 }
@@ -79,7 +79,7 @@ export function readingAge(q: Quota, now: Date): string | null {
  * @param now The instant it is now, against which each time is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
+export function quotaTitle(q: Quota, now: Date, timeZone?: string) {
   const every = q.keepMs > 0 ? `asked again at most every ${keepWord(q.keepMs)} while a board is open` : 'asked again on every read';
   const how =
     q.state === 'unanswered' && q.againAt

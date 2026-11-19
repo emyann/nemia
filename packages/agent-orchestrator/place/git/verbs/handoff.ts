@@ -4,11 +4,11 @@
  * `{ commit }`, or `{ commit: null }` when nothing is uncommitted, so it may run on every pass. The repository's hooks and signing are
  * honoured: refuses, in git's words, when git will not commit — a hook that refused it, a signature that failed, no repository there.
  */
-import { failedWords, git, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, git, isDirectory, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The verb's body. */
-export function* handoff({ workspace, step, why }: PlaceRequests['handoff']): Asking<Reply<'handoff'>> {
+export function* handoff({ workspace, step, why }: PlaceRequests['handoff']) {
   if (!isDirectory(workspace)) return refused(`${workspace} is not a directory, so nothing of ${step} is there to hand off`);
   try {
     if (!(yield* git(workspace, ['status', '--porcelain']))) return { commit: null };

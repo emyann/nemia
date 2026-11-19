@@ -3,7 +3,7 @@
  * (`RunnerOps.compact`), or counted.
  */
 import { Effect, Schema } from 'effect';
-import type { RunnerError, SessionsCompacted } from '../harness/index.ts';
+import type { SessionsCompacted } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
 
 /** Why `compact` did nothing: an argument other than nothing or `{ yes }`, a boolean. */
@@ -13,7 +13,7 @@ export class CompactRefused extends Schema.TaggedError<CompactRefused>()('Compac
 export type CompactReport = { compacted: boolean; harnesses: Record<string, SessionsCompacted> };
 
 /** Whether `args` are what `compact` takes: nothing, or one `{ yes }` whose `yes` is absent or a boolean, and no other key. */
-const taken = (args: readonly unknown[]): boolean => {
+const taken = (args: readonly unknown[]) => {
   if (args.length === 0) return true;
   if (args.length > 1) return false;
   const [options] = args;
@@ -30,7 +30,7 @@ const taken = (args: readonly unknown[]): boolean => {
  * @param runners The engine's harnesses, each by its name.
  */
 export const compactVerbOf = (runners: Record<string, SeamOps>) =>
-  Effect.fn('Engine.compact')(function* (options?: { yes?: boolean }): Effect.fn.Return<CompactReport, CompactRefused | RunnerError> {
+  Effect.fn('Engine.compact')(function* (options?: { yes?: boolean }) {
     const args = [...arguments];
     if (!taken(args)) {
       return yield* Effect.fail(

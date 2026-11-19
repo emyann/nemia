@@ -26,7 +26,7 @@ export const PERMISSION_DENIED =
  * @param tool The tool's name, as the call names it.
  * @param input The call's input.
  */
-export const commandOf = (tool: string, input: Record<string, unknown>): string | undefined => {
+export const commandOf = (tool: string, input: Record<string, unknown>) => {
   const command = input['command'];
   return tool === 'Bash' && typeof command === 'string' ? command : undefined;
 };

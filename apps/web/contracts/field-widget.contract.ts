@@ -42,11 +42,10 @@ export type FieldWidget =
  * when it is not null). Read of a list that names each word once, as a schema's `type` does; said without counting a filter, which the
  * verifier knows only as none or some.
  */
-const only = (types: readonly JsonType[], t: JsonType): boolean =>
-  types.some((x) => x === t) && types.every((x) => x === t || x === 'null');
+const only = (types: readonly JsonType[], t: JsonType) => types.some((x) => x === t) && types.every((x) => x === t || x === 'null');
 
 /** Whether the types but null are exactly one type. */
-const oneType = (types: readonly JsonType[]): boolean =>
+const oneType = (types: readonly JsonType[]) =>
   only(types, 'string') ||
   only(types, 'number') ||
   only(types, 'integer') ||
@@ -55,11 +54,11 @@ const oneType = (types: readonly JsonType[]): boolean =>
   only(types, 'object');
 
 /** Whether the types but null are exactly one scalar. */
-const scalar = (types: readonly JsonType[]): boolean =>
+const scalar = (types: readonly JsonType[]) =>
   only(types, 'string') || only(types, 'number') || only(types, 'integer') || only(types, 'boolean');
 
 /** The widgets that stand for a shape, and are drawn for no field that names none. */
-const shaped = (w: FieldWidget): boolean => w === 'questions' || w === 'budgets' || w === 'link' || w === 'commit';
+const shaped = (w: FieldWidget) => w === 'questions' || w === 'budgets' || w === 'link' || w === 'commit';
 
 const widgetOfSpec = spec<(field: FieldRead) => FieldWidget>({
   ensures: {

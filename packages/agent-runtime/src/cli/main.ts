@@ -75,7 +75,7 @@ const isDirectory = (p: string) => {
  * One frontmatter line, its comment cut: its key and its value, trimmed. Refuses a line that is not `key: value`, then a
  * retired key, then a key taken away (`TAKEN_BRIEF_KEYS`), then a key not in `BRIEF_KEYS`.
  */
-const metaEntry = (line: string): [BriefKey, string] => {
+const metaEntry = (line: string) => {
   const i = line.indexOf(':');
   if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
   const key = line.slice(0, i).trim();
@@ -83,14 +83,14 @@ const metaEntry = (line: string): [BriefKey, string] => {
   const taken = Object.hasOwn(TAKEN_BRIEF_KEYS, key) ? TAKEN_BRIEF_KEYS[key] : undefined;
   if (taken !== undefined) throw refuse(`${taken} Delete the \`${key}:\` line.`);
   if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
-  return [key, line.slice(i + 1).trim()];
+  return [key, line.slice(i + 1).trim()] satisfies [BriefKey, string];
 };
 
 /**
  * A brief's frontmatter, each key to its value, and its prompt. Refuses, in this order: frontmatter never closed, a line
  * `metaEntry` refuses, a key given twice, a key with no value, and a brief with no prompt.
  */
-const briefParts = (text: string): { meta: Map<BriefKey, string>; brief: string } => {
+const briefParts = (text: string) => {
   const source = text.replace(/\r\n/g, '\n');
   const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
   if (!m && source.startsWith('---\n'))
@@ -112,7 +112,7 @@ const briefParts = (text: string): { meta: Map<BriefKey, string>; brief: string 
 };
 
 /** A `deadlineSeconds` value as its seconds, or `undefined` when there is none. Refuses one that is not a number above 0. */
-const secondsOf = (deadlineSeconds: string | undefined): number | undefined => {
+const secondsOf = (deadlineSeconds: string | undefined) => {
   if (deadlineSeconds === undefined) return undefined;
   if (!(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
     throw refuse(
@@ -123,7 +123,7 @@ const secondsOf = (deadlineSeconds: string | undefined): number | undefined => {
 };
 
 /** A `budgetUsd` value as its dollars, or `undefined` when there is none. Refuses one that is not digits and a point, above 0. */
-const dollarsOf = (budgetUsd: string | undefined): number | undefined => {
+const dollarsOf = (budgetUsd: string | undefined) => {
   if (budgetUsd === undefined) return undefined;
   if (!(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
     throw refuse(
@@ -137,7 +137,7 @@ const dollarsOf = (budgetUsd: string | undefined): number | undefined => {
  * A `contextTokens` value as its tokens, or `undefined` when there is none. Refuses one that is not a whole number in
  * digits, and writes `200k` or `1M` back as its digits in the refusal.
  */
-const tokensOf = (contextTokens: string | undefined): number | undefined => {
+const tokensOf = (contextTokens: string | undefined) => {
   if (contextTokens === undefined) return undefined;
   if (/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens))) return Number(contextTokens);
   const [, digits, unit] = /^(\d+)\s*([kKmM])$/.exec(contextTokens) ?? [];
@@ -150,14 +150,14 @@ const tokensOf = (contextTokens: string | undefined): number | undefined => {
  * A `true` or `false` value of `key` as a boolean, or `undefined` when there is none. Refuses anything else, saying what
  * `key: true` does in `use`.
  */
-const trueOrFalse = (key: 'queued' | 'holdOpen', value: string | undefined, use: string): boolean | undefined => {
+const trueOrFalse = (key: 'queued' | 'holdOpen', value: string | undefined, use: string) => {
   if (value === undefined) return undefined;
   if (value !== 'true' && value !== 'false') throw refuse(`\`${key}: ${value}\` is not true or false. Write \`${key}: true\` ${use}.`);
   return value === 'true';
 };
 
 /** A `restartPolicy` value as the policy it names, or `undefined` when there is none. Refuses any word but `Always`. */
-const restartOf = (value: string | undefined): 'Always' | undefined => {
+const restartOf = (value: string | undefined) => {
   if (value === undefined || value === 'Always') return value;
   throw refuse(
     `\`restartPolicy: ${value}\` is not a restart policy. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end.`,
@@ -165,7 +165,7 @@ const restartOf = (value: string | undefined): 'Always' | undefined => {
 };
 
 /** A `cwd` value as the directory it resolves to, or `undefined` when there is none. Refuses one that is not a directory. */
-const directoryOf = (cwd: string | undefined): string | undefined => {
+const directoryOf = (cwd: string | undefined) => {
   if (cwd === undefined) return undefined;
   if (!isDirectory(path.resolve(cwd))) {
     throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
@@ -177,7 +177,7 @@ const directoryOf = (cwd: string | undefined): string | undefined => {
  * The JSON Schema a `closeoutSchema` value names, or `undefined` when there is none. Refuses a file that cannot be read, is
  * not JSON, or is not a JSON object.
  */
-const schemaAt = (schemaPath: string | undefined): object | undefined => {
+const schemaAt = (schemaPath: string | undefined) => {
   if (schemaPath === undefined) return undefined;
   let schemaText: string;
   try {
@@ -200,7 +200,7 @@ const schemaAt = (schemaPath: string | undefined): object | undefined => {
 };
 
 /** A `tools` value as its names, trimmed, or `undefined` when there is none. Refuses a list with an empty name in it. */
-const toolsOf = (tools: string | undefined): string[] | undefined => {
+const toolsOf = (tools: string | undefined) => {
   const toolList = tools?.split(',').map((t) => t.trim());
   if (toolList?.some((t) => !t)) {
     throw refuse(`\`tools: ${tools}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`);
@@ -209,7 +209,7 @@ const toolsOf = (tools: string | undefined): string[] | undefined => {
 };
 
 /** A `worktree` value as the harness takes it: `true` to let it name one, a name, or `undefined` for none, which `false` also is. */
-const worktreeOf = (worktree: string | undefined): true | string | undefined =>
+const worktreeOf = (worktree: string | undefined) =>
   worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree;
 
 /**
@@ -245,7 +245,7 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  * @param text The brief: its frontmatter, then its words.
  * @param fallbackCwd Where the session works when the frontmatter names no `cwd`: where `ae` runs.
  */
-export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
+export function parseBrief(text: string, fallbackCwd: string) {
   const { meta, brief } = briefParts(text);
   const deadlineSeconds = secondsOf(meta.get('deadlineSeconds'));
   const budgetUsd = dollarsOf(meta.get('budgetUsd'));
@@ -289,7 +289,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     ...(queued !== undefined ? { queued } : {}),
     ...(restartPolicy ? { restartPolicy } : {}),
     ...(Object.keys(config).length ? { config } : {}),
-  };
+  } satisfies TaskSpec;
 }
 
 const HELP = `ae — an engine for agent sessions
@@ -368,7 +368,7 @@ const AE_MAX_CONCURRENT_RETIRED =
  * The words and the `--budget <usd>` of `ae answer`, taken from the arguments after its id; refuses, with exit code 2, a budget
  * that is not dollars above 0 in digits.
  */
-const answerArgs = (rest: string[]): { words: string; budget: string | undefined } => {
+const answerArgs = (rest: string[]) => {
   const at = rest.indexOf('--budget');
   const budget = at === -1 ? undefined : rest[at + 1];
   if (at !== -1 && !(budget !== undefined && /^\d*\.?\d+$/.test(budget) && Number(budget) > 0)) {
@@ -386,14 +386,14 @@ const answerArgs = (rest: string[]): { words: string; budget: string | undefined
  * Prints the stream `stream` of task `id` whole, as `engine.output` answers it, or says on stderr that none is kept; the engine
  * refuses a stream that is neither `stdout` nor `stderr`.
  */
-const printOutput = async (engine: EngineShape, id: string, stream: string): Promise<void> => {
+const printOutput = async (engine: EngineShape, id: string, stream: string) => {
   const text = await run('output', engine.output(id, stream as 'stdout' | 'stderr'));
   if (text === undefined) return console.error(`${id}: no ${stream} kept: no attempt has run yet, or its run kept no streams`);
   process.stdout.write(text);
 };
 
 /** `ae show <id>`: task `id`'s journal, line by line, then its folder, the head of its brief, its limits and its attempts. */
-const show = async (engine: EngineShape, id: string): Promise<void> => {
+const show = async (engine: EngineShape, id: string) => {
   const v = await run('view', engine.view(id));
   if (!v.state.brief && !v.state.attempts.length) return console.log(`no such task: ${id}`);
   const { entries } = await run('feed', engine.feed(0));
@@ -407,7 +407,7 @@ const show = async (engine: EngineShape, id: string): Promise<void> => {
  * `ae file <brief.md|"text">`: the brief at the path `arg`, or `arg` itself as one, parsed and filed; the help, given nothing. `ae start`
  * is its old spelling, still taken, so scripts already written keep working.
  */
-const fileBrief = async (engine: EngineShape, arg: string | undefined): Promise<void> => {
+const fileBrief = async (engine: EngineShape, arg: string | undefined) => {
   if (!arg) return console.log(HELP);
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : arg;
   const spec = parseBrief(text, process.cwd());
@@ -417,7 +417,7 @@ const fileBrief = async (engine: EngineShape, arg: string | undefined): Promise<
 };
 
 /** `ae tick`: one pass, and a line for what it did, each move it refused and each task it left out. */
-const tickOnce = async (engine: EngineShape): Promise<void> => {
+const tickOnce = async (engine: EngineShape) => {
   const r = await run('tick', engine.tick());
   const load = runningText(r.running) || 'idle';
   console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
@@ -430,7 +430,7 @@ const tickOnce = async (engine: EngineShape): Promise<void> => {
  * Exported only for the tests that import it.
  * @param rest The arguments after `sweep`.
  */
-export const sweepAsked = (rest: readonly string[]): { yes: boolean } => {
+export const sweepAsked = (rest: readonly string[]) => {
   const other = rest.filter((a) => a !== '--yes');
   if (other.length)
     throw Object.assign(new Error(`sweep: takes \`--yes\` to remove, or nothing to count; it was handed ${other.join(' ')}.`), {
@@ -447,13 +447,13 @@ const bodies = (n: number) => `${n} bod${n === 1 ? 'y' : 'ies'}`;
  * @param report What `Engine.sweep` answered.
  * @param yes Whether `--yes` was given, so the bodies were removed.
  */
-export const sweepLine = (report: SweepReport, yes: boolean): string =>
+export const sweepLine = (report: SweepReport, yes: boolean) =>
   yes
     ? `${bodies(report.removed)} removed (${report.removedBytes} bytes), ${report.kept} kept`
     : `${bodies(report.removable)} no journal names (${report.bytes} bytes): \`ae sweep --yes\` removes them; ${report.kept} kept`;
 
 /** `ae sweep [--yes]`: the bodies no journal and no feed entry names, counted, and removed given `--yes` (`Engine.sweep`). */
-const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+const sweepBodies = async (engine: EngineShape, rest: readonly string[]) => {
   const { yes } = sweepAsked(rest);
   console.log(sweepLine(await run('sweep', engine.sweep({ yes })), yes));
 };
@@ -464,7 +464,7 @@ const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promis
  * Exported only for the tests that import it.
  * @param rest The arguments after `forget`.
  */
-export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: boolean } => {
+export const forgetAsked = (rest: readonly string[]) => {
   const taskIds = rest.filter((a) => a !== '--yes');
   const flags = taskIds.filter((a) => a.startsWith('-'));
   if (!taskIds.length || flags.length)
@@ -483,7 +483,7 @@ export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: 
  * Exported only for the tests that import it.
  * @param report What `Engine.forget` answered.
  */
-export const forgetLines = (report: ForgetReport): string[] => {
+export const forgetLines = (report: ForgetReport) => {
   const lines: string[] = [];
   for (const t of report.tasks) {
     const files = t.sessions.flatMap((s) => s.files);
@@ -502,17 +502,17 @@ export const forgetLines = (report: ForgetReport): string[] => {
 };
 
 /** `ae forget <id>... [--yes]`: what settled tasks keep, counted, and removed given `--yes` (`Engine.forget`). */
-const forgetTasks = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+const forgetTasks = async (engine: EngineShape, rest: readonly string[]) => {
   const { taskIds, yes } = forgetAsked(rest);
   for (const line of forgetLines(await run('forget', engine.forget(taskIds, { yes })))) console.log(line);
 };
 
 /** The line `ae feed` prints after a read from `after` when lines after it were forgotten, else none. */
-const forgottenLine = (forgotten: number | undefined, after: number): string[] =>
+const forgottenLine = (forgotten: number | undefined, after: number) =>
   forgotten ? [`${forgotten} lines of forgotten tasks were here, after cursor ${after}`] : [];
 
 /** `ae feed [cursor]`: the entries after `after`, what was forgotten after it, what was skipped, and the cursor to resume from. */
-const printFeed = async (engine: EngineShape, after: number): Promise<void> => {
+const printFeed = async (engine: EngineShape, after: number) => {
   const { entries, cursor, refused = [], forgotten } = await run('feed', engine.feed(after));
   for (const line of forgottenLine(forgotten, after)) console.log(line);
   for (const e of entries) console.log(entryLine(e.taskId, e.event));
@@ -521,7 +521,7 @@ const printFeed = async (engine: EngineShape, after: number): Promise<void> => {
 };
 
 /** `ae ls`: a line per task, and on stderr each journal left out and why. */
-const listTasks = async (engine: EngineShape): Promise<void> => {
+const listTasks = async (engine: EngineShape) => {
   const { views, unreadable } = await run('list', engine.list());
   if (!views.length && !unreadable.length) return console.log('no tasks');
   for (const v of views) console.log(taskLine(v));
@@ -529,11 +529,10 @@ const listTasks = async (engine: EngineShape): Promise<void> => {
 };
 
 /** The engine's verb `verb`, `effect`, as a Promise: a refusal rejected in the runtime's words (`refusalWords`), else as it failed. */
-const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
-  Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
+const run = <A, E>(verb: string, effect: Effect.Effect<A, E>) => Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
 
 /** `ae compact [--yes]`: the captures of ended sessions, counted, and rewritten to what their readers read given `--yes`. */
-const compactCaptures = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+const compactCaptures = async (engine: EngineShape, rest: readonly string[]) => {
   const { yes } = compactAsked(rest);
   for (const line of compactLines(await run('compact', engine.compact({ yes })))) console.log(line);
 };
@@ -555,7 +554,7 @@ const WRITING: Readonly<Record<string, (engine: EngineShape, id: string, words: 
  * The first word of `argv` handled as a verb written to a session (`WRITING`): false where it names none, so the caller goes on to the
  * rest; true once it was handled, the help printed where it named no task.
  */
-const wroteToSession = async (engine: EngineShape, argv: readonly string[]): Promise<boolean> => {
+const wroteToSession = async (engine: EngineShape, argv: readonly string[]) => {
   const [verb, id, ...words] = argv;
   const write = verb !== undefined && Object.hasOwn(WRITING, verb) ? WRITING[verb] : undefined;
   if (write && id) await write(engine, id, words);
@@ -580,7 +579,7 @@ const keepingVerb = (verb: string | undefined) =>
  * Exported only for the tests that import it.
  * @param options The engine's options, its store's `root` among them.
  */
-export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
+export const engineAt = (options: EngineOptions) =>
   ManagedRuntime.make(EngineService.layer(options))
     .runPromise(
       Effect.gen(function* () {
@@ -592,7 +591,7 @@ export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
     });
 
 /** `ae up`: the engine ticking every `every` ms until the process stops, a line for each pass that acted and each task left out anew. */
-const up = async (engine: EngineShape, every: number): Promise<void> => {
+const up = async (engine: EngineShape, every: number) => {
   console.log(`up — ticking every ${every}ms, ^C to stop`);
   let leftOut = new Set<string>();
   await new Promise<void>(() => {
@@ -617,7 +616,7 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
  * Refuses, with exit code 2, to run with `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`); then runs the verb `argv` names where
  * it needs no engine — `admission`, the hook's (`admissionHook`), which `bin/ae.ts` runs before any engine loads. Answers whether it ran.
  */
-function engineless(argv: string[]): boolean {
+function engineless(argv: string[]) {
   if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
   switch (argv[0]) {
     case 'admission':
@@ -642,7 +641,7 @@ function engineless(argv: string[]): boolean {
  * - `admission` is the hook's, served with no engine (`engineless`).
  * @param argv The command line's arguments after `ae`: the verb, then its own.
  */
-export async function main(argv: string[]): Promise<void> {
+export async function main(argv: string[]) {
   const [verb, arg] = argv;
   if (engineless(argv)) return;
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');

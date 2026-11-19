@@ -52,7 +52,7 @@ export type Next = { follow: FollowedAttempt } | 'wait' | 'finished';
  * @param at The attempt followed so far, or undefined where none has been followed.
  * @param now The step as it was read: its task, its last attempt, and whether that is live and the task settled.
  */
-export const nextOf = (at: FollowedAttempt | undefined, now: StepNow): Next => {
+export const nextOf = (at: FollowedAttempt | undefined, now: StepNow) => {
   if (now.taskId === null) return 'wait';
   const other = at === undefined || at.taskId !== now.taskId || at.attempt < now.attempt;
   if (other && now.live) return { follow: { taskId: now.taskId, attempt: now.attempt } };

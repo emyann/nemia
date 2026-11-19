@@ -8,7 +8,7 @@ import { asked } from '../../objects.ts';
 import { said, textArg } from '../requests.ts';
 
 /** Who holds `t`, in a few words: `yours`, or the agent's with its factory and narrowing. */
-const heldBy = (t: Token): string =>
+const heldBy = (t: Token) =>
   t.holder === 'person'
     ? 'yours'
     : `${t.agent ?? 'an agent'}'s, ${t.factory === undefined ? 'store-wide' : `in ${t.factory}`}${t.narrowed === undefined ? '' : `, narrowed to ${t.narrowed}`}`;
@@ -17,7 +17,7 @@ const heldBy = (t: Token): string =>
  * `nemia token add`'s runner: the token, shown this once, and the header it is sent in.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function tokenAdd(args: Args): Promise<number> {
+export async function tokenAdd(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const agent = textArg(args, 'agent');
   const factory = textArg(args, 'factory');
@@ -40,7 +40,7 @@ export async function tokenAdd(args: Args): Promise<number> {
 }
 
 /** `nemia token ls`' runner: a line a token, or that none is kept. */
-export async function tokenLs(): Promise<number> {
+export async function tokenLs() {
   const { tokens } = await asked(TOKEN_LS_WORDS.name, (c) => c.tokens.list());
   said(
     tokens.length
@@ -54,7 +54,7 @@ export async function tokenLs(): Promise<number> {
  * `nemia token rm`'s runner: the token retired.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function tokenRm(args: Args): Promise<number> {
+export async function tokenRm(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const t = await asked(TOKEN_RM_WORDS.name, (c) => c.tokens.retire({ params: { name } }));
   said([`token ${t.name} retired: a request presenting it is refused from now on`]);

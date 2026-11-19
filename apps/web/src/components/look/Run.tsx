@@ -60,14 +60,15 @@ const HUE: Record<RunTone, FrameHue> = { alive: 'alive', yours: 'yours', failure
 const CUT = { sm: 9, md: 12, lg: 24, xl: 28 } as const;
 
 /** What a finished run says now: its last step at rest, and how it ended. */
-const endedOf = (run: PartRun): Now => ({
-  step: run.steps.at(-1)?.name ?? '',
-  tone: 'rest',
-  agent: null,
-  round: null,
-  budget: null,
-  words: [run.outcome ? ENDED[run.outcome].word : ENDED.succeeded.word],
-});
+const endedOf = (run: PartRun) =>
+  ({
+    step: run.steps.at(-1)?.name ?? '',
+    tone: 'rest',
+    agent: null,
+    round: null,
+    budget: null,
+    words: [run.outcome ? ENDED[run.outcome].word : ENDED.succeeded.word],
+  }) satisfies Now;
 
 /** What the part reads once for every size: the run's step now (`nowOf`, or how it ended), its tone, its slots and its ladder. */
 function readOf({ run, size, layout = 'card' }: Pick<RunProps, 'run' | 'size' | 'layout'>) {

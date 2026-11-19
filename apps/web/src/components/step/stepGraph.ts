@@ -17,18 +17,19 @@ import { stepPartOf } from '../../lib/stepPart';
  * @param run the run, as the api gives it
  * @param index the step's place in the run's steps
  */
-export const stepData = (run: RunDetail, index: number): StepNodeData => ({
-  step: run.steps[index],
-  index,
-  runCancelled: run.cancelledAt !== null,
-  runHeld: run.holding != null,
-  waitingOnYou: run.waitingOnYou.includes(run.steps[index].name),
-  node: nodeKinds(run.graph).get(run.steps[index].name) ?? null,
-  routes: routesOf(run.graph, run.steps[index].name),
-  routed: routedOf(run.steps[index].message),
-  taken: takenRoutes(run.steps).get(run.steps[index].name) ?? null,
-  gave: stepPartOf(run, run.steps[index].name, new Date()).gave,
-});
+export const stepData = (run: RunDetail, index: number) =>
+  ({
+    step: run.steps[index],
+    index,
+    runCancelled: run.cancelledAt !== null,
+    runHeld: run.holding != null,
+    waitingOnYou: run.waitingOnYou.includes(run.steps[index].name),
+    node: nodeKinds(run.graph).get(run.steps[index].name) ?? null,
+    routes: routesOf(run.graph, run.steps[index].name),
+    routed: routedOf(run.steps[index].message),
+    taken: takenRoutes(run.steps).get(run.steps[index].name) ?? null,
+    gave: stepPartOf(run, run.steps[index].name, new Date()).gave,
+  }) satisfies StepNodeData;
 
 /** The minimap in the chips' colours, so a glance at it says what the nodes say: each state's fill is its meaning's (`statePaint`). */
 export const stepMinimapFill: Record<StepState, string> = statePaint;
@@ -37,7 +38,7 @@ export const stepMinimapFill: Record<StepState, string> = statePaint;
  * An edge as React Flow takes it: drawn by `StateEdge` from what it says, with an arrow at its target in its colour, sized in
  * pixels so a heavier line does not draw a bigger arrow. Nobody picks or focuses one.
  */
-function drawn(id: string, source: string, target: string, state: EdgeState, loop: boolean, untaken = false): StateFlowEdge {
+function drawn(id: string, source: string, target: string, state: EdgeState, loop: boolean, untaken = false) {
   return {
     id,
     source,
@@ -47,7 +48,7 @@ function drawn(id: string, source: string, target: string, state: EdgeState, loo
     markerEnd: { type: MarkerType.ArrowClosed, color: edgeStroke(state, loop), width: 20, height: 20, markerUnits: 'userSpaceOnUse' },
     selectable: false,
     focusable: false,
-  };
+  } satisfies StateFlowEdge;
 }
 
 /**
@@ -69,7 +70,7 @@ export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'
  * @param facts what the graph's edges are drawn from
  * @param packets the packets steps handed along edges, none by default
  */
-export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []): StateFlowEdge[] {
+export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []) {
   const runCancelled = facts.cancelledAt !== null;
   const runHeld = facts.holding != null;
   const steps = facts.steps.map((s) => ({
@@ -83,7 +84,7 @@ export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []
     const edge = e.packet && plain.data ? { ...plain, data: { ...plain.data, packet: e.packet } } : plain;
     const labelled = e.label ? { ...edge, label: e.label } : edge;
     return e.kind === 'loop' ? { ...labelled, sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : labelled;
-  });
+  }) satisfies StateFlowEdge[] as StateFlowEdge[];
 }
 
 /**
@@ -92,8 +93,8 @@ export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []
  *
  * @param runs the runs on the Factory's floor
  */
-export function afterEdges(runs: Parameters<typeof runEdges>[0]): StateFlowEdge[] {
-  return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
+export function afterEdges(runs: Parameters<typeof runEdges>[0]) {
+  return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false)) satisfies StateFlowEdge[];
 }
 
 /**
@@ -103,7 +104,7 @@ export function afterEdges(runs: Parameters<typeof runEdges>[0]): StateFlowEdge[
  * @param runs the runs on the Factory's floor
  * @param focus the run whose context is drawn, null for none
  */
-export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: string | null): StateFlowEdge[] {
+export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: string | null) {
   return contextEdges(runs, focus).map((e) => ({
     id: e.id,
     source: e.source,
@@ -113,5 +114,5 @@ export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: strin
     className: 'context-edge',
     selectable: false,
     focusable: false,
-  }));
+  })) satisfies StateFlowEdge[] as StateFlowEdge[];
 }

@@ -74,39 +74,39 @@ export const jsonType = assume(saysJson, { pure: true });
 export const formType = assume(saysForm, { pure: true });
 
 /** The methods that write nothing, which the guard never stands in front of. */
-const reads = (method: string): boolean => method === 'GET' || method === 'HEAD';
+const reads = (method: string) => method === 'GET' || method === 'HEAD';
 
 /**
  * Whether a request is addressed to this machine: its `Host` absent, the loopback on any port, or a name the exposed store is served at.
  */
-const here = (r: WriteRequest): boolean => r.host === undefined || loopback(r.host) || r.served;
+const here = (r: WriteRequest) => r.host === undefined || loopback(r.host) || r.served;
 
 /** Whether `site` is the board's own page or no browser at all. */
-const ours = (site: string | undefined): boolean => site === undefined || site === 'same-origin';
+const ours = (site: string | undefined) => site === undefined || site === 'same-origin';
 
 /** Whether `contentType` says a JSON body, its parameters (`; charset=utf-8`) and its case left out. */
-const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
+const json = (contentType: string | undefined) => contentType !== undefined && saysJson(contentType);
 
 /** Whether `contentType` says a form of files (`multipart/form-data`), its boundary and its case left out. */
-const form = (contentType: string | undefined): boolean => contentType !== undefined && saysForm(contentType);
+const form = (contentType: string | undefined) => contentType !== undefined && saysForm(contentType);
 
 /** Whether a write sends a form of files with a bearer token, which no page on another site can send without asking first. */
-const tokenForm = (r: WriteRequest): boolean => r.bearer && form(r.contentType);
+const tokenForm = (r: WriteRequest) => r.bearer && form(r.contentType);
 
 /** Whether a write presents a token by the board's cookie. */
-const byCookie = (r: WriteRequest): boolean => r.cookie;
+const byCookie = (r: WriteRequest) => r.cookie;
 
 /**
  * Whether a write sends a form of files by the board's cookie alone with the header a script sets (`scripted`), which no form sends
  * and a page of another origin cannot set without the browser asking the api first.
  */
-const boardForm = (r: WriteRequest): boolean => !r.bearer && byCookie(r) && r.scripted && form(r.contentType);
+const boardForm = (r: WriteRequest) => !r.bearer && byCookie(r) && r.scripted && form(r.contentType);
 
 /**
  * Whether a write may come from where it says it does: this machine, from no other site; with the board's cookie, from no other site at
  * whatever host; or with a bearer token, from anywhere.
  */
-const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || ((here(r) || byCookie(r)) && ours(r.site));
+const fromWhereItMay = (r: WriteRequest) => r.bearer || ((here(r) || byCookie(r)) && ours(r.site));
 
 const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
   ensures: {

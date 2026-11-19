@@ -13,7 +13,6 @@
  * (`docs/harness.md`, *The claude.ai bridge*).
  */
 import { Result, Schema } from 'effect';
-import type { Sighting } from '../../core/index.ts';
 
 /**
  * What a session's claude.ai bridge came to, as the SDK's control request answered it: its link and the facts a resume re-attaches
@@ -57,7 +56,7 @@ export const BRIDGE_ABSENT =
  * Exported only for the tests that import it.
  * @param why What did not decode in the answer, in the decoder's words.
  */
-export const bridgeUnread = (why: string): string =>
+export const bridgeUnread = (why: string) =>
   `the \`enableRemoteControl\` control request answered what this runtime does not read (${why}): the session runs on with no bridge.`;
 
 /**
@@ -65,7 +64,7 @@ export const bridgeUnread = (why: string): string =>
  * Exported only for the tests that import it.
  * @param why What the control request failed with, in its error's words.
  */
-export const bridgeFailed = (why: string): string => `the claude.ai bridge was not opened (${why}): the session runs on without one.`;
+export const bridgeFailed = (why: string) => `the claude.ai bridge was not opened (${why}): the session runs on without one.`;
 
 /** How a resume re-attaches the bridge the run file kept, and whether its claude.ai session outlives this process. */
 type Options = { reattachSessionId?: string; keepSessionOnExit?: boolean };
@@ -84,7 +83,7 @@ type Enable = (enabled: boolean, name?: string, options?: Options) => Promise<un
  * The control request read off `q`, or `undefined` where the SDK does not carry it. The one cast of the undeclared method, kept here so
  * it spreads no further.
  */
-const enableOf = (q: unknown): Enable | undefined => {
+const enableOf = (q: unknown) => {
   const found = (q as { enableRemoteControl?: unknown } | null | undefined)?.enableRemoteControl;
   return typeof found === 'function' ? (found as Enable).bind(q as object) : undefined;
 };
@@ -94,14 +93,14 @@ const enableOf = (q: unknown): Enable | undefined => {
  * Exported only for the tests that import it.
  * @param q The SDK's `query()` object, unchecked.
  */
-export const bridgeable = (q: unknown): boolean => enableOf(q) !== undefined;
+export const bridgeable = (q: unknown) => enableOf(q) !== undefined;
 
 /**
  * Whether the bridge is due on the session's message `m`: its `system`/`init`, the first message a session gives, so a bridge asked
  * for is up before a job's one turn can end. False on any other message, and on what is no message.
  * @param m A message of the session's stream, unchecked.
  */
-export const bridgeDue = (m: unknown): boolean => {
+export const bridgeDue = (m: unknown) => {
   const line = m as { type?: unknown; subtype?: unknown } | null | undefined;
   return line?.type === 'system' && line.subtype === 'init';
 };
@@ -114,7 +113,7 @@ export const bridgeDue = (m: unknown): boolean => {
  * @param name The session's name, the bridge's name on claude.ai.
  * @param ask Whether the claude.ai session outlives the process, and the one a resume re-attaches.
  */
-export const enableBridge = async (q: unknown, name: string, ask: BridgeAsk): Promise<AttachedBridge> => {
+export const enableBridge = async (q: unknown, name: string, ask: BridgeAsk) => {
   const enable = enableOf(q);
   if (enable === undefined) return { why: BRIDGE_ABSENT };
   let answer: unknown;
@@ -138,7 +137,7 @@ export const enableBridge = async (q: unknown, name: string, ask: BridgeAsk): Pr
  * message: a value a harness gives, read as it is and never trusted to be a string.
  * @param m A message of the session's stream, unchecked.
  */
-export const bridgeStateOf = (m: unknown): string | undefined => {
+export const bridgeStateOf = (m: unknown) => {
   const line = m as { type?: unknown; subtype?: unknown; state?: unknown } | null | undefined;
   if (line?.type !== 'system' || line.subtype !== 'bridge_state') return undefined;
   return typeof line.state === 'string' ? line.state : undefined;
@@ -148,7 +147,7 @@ export const bridgeStateOf = (m: unknown): string | undefined => {
  * The bridge a session's file kept, as a sighting says it: the link where one was opened, else why there is none, else nothing.
  * @param bridge The bridge facts the file kept; absent where no bridge was asked for.
  */
-export const bridgeOf = (bridge: AttachedBridge | undefined): Pick<Sighting, 'bridge'> => {
+export const bridgeOf = (bridge: AttachedBridge | undefined) => {
   if (bridge === undefined) return {};
   if (bridge.url !== undefined) return { bridge: { url: bridge.url } };
   return bridge.why === undefined ? {} : { bridge: { url: null, why: bridge.why } };

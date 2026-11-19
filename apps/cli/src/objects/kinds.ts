@@ -97,7 +97,7 @@ export type KindCalls = {
 const query = (labelSelector: readonly string[], page: PageAsked) => (labelSelector.length ? { ...page, labelSelector } : page);
 
 /** `spec` read by `decode`, or why it is not one: the decoder's own words. */
-function decoded<S>(decode: (spec: unknown) => S, spec: unknown): { spec: S } | string {
+function decoded<S>(decode: (spec: unknown) => S, spec: unknown) {
   try {
     return { spec: decode(spec) };
   } catch (err) {
@@ -111,7 +111,7 @@ function writable<S>(
   how: Omit<Writes, 'prepared'>,
   writesOf: (spec: S) => Omit<Prepared, 'spec'>,
   kept: (spec: S, served: Served | null) => S = (spec) => spec,
-): Writes {
+) {
   return {
     ...how,
     prepared: (raw, served) => {
@@ -120,7 +120,7 @@ function writable<S>(
       const spec = kept(read.spec, served);
       return { spec, ...writesOf(spec) };
     },
-  };
+  } satisfies Writes as Writes;
 }
 
 /**
@@ -128,10 +128,10 @@ function writable<S>(
  * inbox queue`'s and the tick's, so a file that says another time is sent as it is and refused by the api, naming that command, and a
  * file written by hand with no `queued` keeps the card's.
  */
-const queuedAsServed = (spec: CardSpec, served: Served | null): CardSpec => {
-  if (spec.queued !== undefined) return spec;
+const queuedAsServed = (spec: CardSpec, served: Served | null) => {
+  if (spec.queued !== undefined) return spec satisfies CardSpec as CardSpec;
   const was = typeof served?.spec === 'object' && served.spec !== null && 'queued' in served.spec ? served.spec.queued : undefined;
-  return typeof was === 'string' ? { ...spec, queued: was } : spec;
+  return (typeof was === 'string' ? { ...spec, queued: was } : spec) satisfies CardSpec as CardSpec;
 };
 
 /** A namespace's object by its name, and the list of a namespace's. */
@@ -297,12 +297,11 @@ const versioned = (a: Applied) => (a.resourceVersion !== undefined ? { resourceV
  * `call` answering null where the api has no such object (`Missing`), for apply's read before its write.
  * @param call What is asked of the typed client for the object.
  */
-export const orNone =
-  <A>(call: Call<A>): Call<A | null> =>
-  (client) =>
+export const orNone = <A>(call: Call<A>) =>
+  ((client) =>
     call(client).pipe(
       Effect.catchIf(
         (err): err is Missing => err instanceof Missing,
         () => Effect.succeed(null),
       ),
-    );
+    )) satisfies Call<A | null>;

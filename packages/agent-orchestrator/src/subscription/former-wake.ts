@@ -57,11 +57,10 @@ export const FORMER_DEFAULT_WAKE: readonly string[] = [
 export const FORMER_NEMIA_WAKE: readonly string[] = [...FORMER_DEFAULT_WAKE, 'denied:'];
 
 /** `reasons` as one selector of the feed's lines: `reason=X` for one of them, `reason in (X,Y)` for several. */
-const reasonSelector = (reasons: readonly Reason[]): string =>
-  reasons.length === 1 ? `reason=${reasons[0]}` : `reason in (${reasons.join(',')})`;
+const reasonSelector = (reasons: readonly Reason[]) => (reasons.length === 1 ? `reason=${reasons[0]}` : `reason in (${reasons.join(',')})`);
 
 /** The word as the table keys one, whatever the case and the spaces a person typed it with: the prose match folded both. */
-const asKeyed = (word: string): string => word.trim().toLowerCase();
+const asKeyed = (word: string) => word.trim().toLowerCase();
 
 /**
  * The selectors a stored wake list `wake` comes to, and the words of it none names (`unconverted`): `waits=person` where a word of it read
@@ -73,7 +72,7 @@ const asKeyed = (word: string): string => word.trim().toLowerCase();
  * selectors takes every line, where an empty wake list took none.
  * @param wake The wake list a subscription's file stored.
  */
-export function selectorsOfWake(wake: readonly string[]): { selectors: string[]; unconverted: string[] } {
+export function selectorsOfWake(wake: readonly string[]) {
   const asked = wake.map(asKeyed);
   const named = Object.entries(FORMER_WAKE).flatMap(([word, selecting]) => (asked.includes(word) ? [selecting] : []));
   const waits = named.some((selecting) => selecting.waits === true);
@@ -96,7 +95,7 @@ const RETIRED: readonly string[] = ['--wake', '--wake-word'];
  * @param command The command `arg` was typed to, as its message names it.
  * @param arg The argument the command did not know.
  */
-export function retiredWakeRefusal(command: string, arg: string): string | undefined {
+export function retiredWakeRefusal(command: string, arg: string) {
   const flag = firstPiece(arg, '=');
   if (!RETIRED.includes(flag)) return undefined;
   return (

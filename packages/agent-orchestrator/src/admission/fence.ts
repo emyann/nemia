@@ -12,8 +12,8 @@ type Entry = { readonly name: string; readonly class: CommandClass };
 export type Fence = { allow: string[]; ask: string[]; deny: string[] };
 
 /** The rule on a command typed bare, and with any words after it. */
-const bare = (name: string): string => `Bash(nemia ${name})`;
-const any = (name: string): string => `Bash(nemia ${name}:*)`;
+const bare = (name: string) => `Bash(nemia ${name})`;
+const any = (name: string) => `Bash(nemia ${name}:*)`;
 
 /**
  * Her fence off `table`, each command by its class, a command the api alone serves too, as its name is the one the command line would
@@ -32,7 +32,7 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
  * before it allows, and refuses before it asks.
  * @param table The command table, each entry with its name and its class.
  */
-export function nemiaFence(table: readonly Entry[]): Fence {
+export function nemiaFence(table: readonly Entry[]) {
   const unasked = (name: string) => [bare(name), any(name)];
   const fence: Fence = { allow: [], ask: [], deny: [] };
   for (const entry of [...table, ...CLIENT_CLASSES]) {
@@ -65,7 +65,7 @@ export const ASSIGNED = 'Bash(*=* nemia *)';
  * @param fence Her fence, as `nemiaFence` derives it.
  * @param allows The rules the person allowed in her folder's local settings.
  */
-export const widened = (fence: Fence, allows: readonly string[]): Fence => ({
+export const widened = (fence: Fence, allows: readonly string[]) => ({
   ...fence,
   ask: fence.ask.filter((rule) => !allows.includes(rule)),
 });

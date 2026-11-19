@@ -63,7 +63,7 @@ export type Hiring = { refused: string | null; agents: HireableAgent[] };
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
 
 /** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
-const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
+const factoryNamed = (factory: string | null | undefined) => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
 
 /**
  * The address of the page of the workflow `run` was started from, read on the repository `served` (the request's, none where it reads
@@ -78,16 +78,19 @@ export function workflowPageOf(
   run: { workflowDir: string; repo?: string | null; factory?: string | null },
   served: string | undefined,
   home: string,
-): WorkflowPageAddress | null {
+) {
   const dir = path.resolve(run.workflowDir);
   const workflow = path.basename(dir);
   const parent = path.dirname(dir);
   const factory = factoryNamed(run.factory);
   const repo = run.repo ? path.resolve(run.repo) : null;
-  if (parent === path.join(path.resolve(home), 'workflows')) return { from: 'user', workflow, factory, repo: factory ? repo : null };
-  if (repo === null || parent !== path.join(repo, 'workflows')) return null;
-  if (factory) return { from: 'repo', workflow, factory, repo };
-  return served !== undefined && repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;
+  if (parent === path.join(path.resolve(home), 'workflows'))
+    return { from: 'user', workflow, factory, repo: factory ? repo : null } satisfies WorkflowPageAddress | null;
+  if (repo === null || parent !== path.join(repo, 'workflows')) return null satisfies WorkflowPageAddress | null;
+  if (factory) return { from: 'repo', workflow, factory, repo } satisfies WorkflowPageAddress | null;
+  return (
+    served !== undefined && repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null
+  ) satisfies WorkflowPageAddress | null;
 }
 
 /** What a step's page reads of a run: its folder and factory, the steps it has, and what its row says. */
@@ -97,7 +100,7 @@ export type StepRun = Pick<Run, 'id' | 'brief' | 'createdAt' | 'workflowDir' | '
  * A run as a step's page reads it (`StepRun`): the fields `recentRunsOf` reads, and no part of a frozen step's body.
  * @param run The run, as its record reads.
  */
-export const stepRun = (run: Run): StepRun => ({
+export const stepRun = (run: Run) => ({
   id: run.id,
   brief: run.brief,
   createdAt: run.createdAt,
@@ -115,7 +118,7 @@ export const stepRun = (run: Run): StepRun => ({
  * @param step The step's name.
  * @param factory The factory whose runs alone are kept, or null for every factory's.
  */
-export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string, factory: string | null): RecentRun[] {
+export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string, factory: string | null) {
   const folder = path.resolve(dir);
   return runs
     .filter((run) => path.resolve(run.workflowDir) === folder)
@@ -148,7 +151,7 @@ export function hiredInOf(
   step: string,
   from: WorkflowSource,
   repo: string | undefined,
-): HiredIn[] {
+) {
   return factories.flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(workflow)) return [];
     if (from === 'repo' && (repo === undefined || !workedOn(factory).includes(path.resolve(repo)))) return [];
@@ -161,7 +164,7 @@ export function hiredInOf(
  * Why no agent is offered to hire into a step when the agents beside its workflow do not read: the listing's own `message`.
  * @param message Why the agents did not read, as the listing says it.
  */
-export const unreadAgentsRefusal = (message: string): string =>
+export const unreadAgentsRefusal = (message: string) =>
   `The agents beside this workflow could not be read, so none is offered to hire into this step: ${message}. The Agents page says which.`;
 
 /**
@@ -183,7 +186,7 @@ export async function hiringOf(
   hired: string | null,
   from: WorkflowSource,
   agents: () => Promise<readonly Pick<AgentReading, 'name' | 'from' | 'description' | 'error'>[]>,
-): Promise<Hiring> {
+) {
   const refused = hireRefusalOf(factory, workflow, hired === null ? (step.agent?.name ?? null) : null);
   if (refused !== null) return { refused, agents: [] };
   return agents().then(
@@ -205,12 +208,12 @@ export async function hiringOf(
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder.
  */
-export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string | undefined, home: string): SkillFrom[] {
+export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string | undefined, home: string) {
   return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
     const at = found.at.get(name);
     if (typeof at !== 'string') return { name, from: null, foundIn: null };
     return { name, from: sourceOf(at, repo, home), foundIn: foundInOf(at, repo, home) };
-  });
+  }) satisfies SkillFrom[];
 }
 
 /**
@@ -230,11 +233,7 @@ export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: strin
  * @param s The request's services, its caller and the place it is answered in.
  * @param asked The step's name, as the path gives it.
  */
-export async function stepPage(
-  s: Served,
-  { name, from, dir }: { name: string; from: WorkflowSource; dir: string },
-  asked: string,
-): Promise<WorkflowStepPage> {
+export async function stepPage(s: Served, { name, from, dir }: { name: string; from: WorkflowSource; dir: string }, asked: string) {
   const { home, factory, memo } = s;
   const repo = repoLayer(s);
   const input = { name, step: asked, dir, ...(repo !== undefined && { repo }), ...(factory && { factory: factory.name }) };
@@ -266,5 +265,5 @@ export async function stepPage(
     hiring: await hiringOf(factory, name, found, hired, from, agents),
     skillsFrom: skillsFromOf(layers, defs.skills, repo, home),
     recentRuns: recentRunsOf(keptRuns(home, memo.records.step, stepRun, s.config.verifyRest), dir, found.name, factory?.name ?? null),
-  };
+  } satisfies WorkflowStepPage;
 }

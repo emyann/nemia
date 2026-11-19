@@ -9,7 +9,7 @@ import type { Args } from '../command/command.ts';
 import { selectorsIn, type Kept, type Served } from '../command/entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -18,7 +18,7 @@ const textOf = (args: Args, key: string): string | undefined => {
 const KEYS = STATS_KEYS as readonly QueryKey[];
 
 /** What a person asked of the stats, by query key: each flag's value given. */
-const givenOf = (args: Args): Partial<Record<QueryKey, string>> =>
+const givenOf = (args: Args) =>
   Object.fromEntries(KEYS.flatMap((key) => (textOf(args, key) === undefined ? [] : [[key, textOf(args, key)]])));
 
 /**

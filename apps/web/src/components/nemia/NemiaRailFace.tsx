@@ -26,7 +26,7 @@ const DOT = { yours: 'bg-yours', alive: 'bg-alive', failure: 'bg-failure', none:
  * What the face's press target looks like, over the kit's button or link: a rounded box the face fills, with no room of its own around
  * it, ringed on surface while `ringed`; the kit draws the focus.
  */
-const pressed = (ringed: boolean): string =>
+const pressed = (ringed: boolean) =>
   cn(
     'relative inline-flex h-auto shrink-0 cursor-pointer rounded-xl p-0',
     ringed && 'ring-2 ring-on-surface ring-offset-3 ring-offset-surface',

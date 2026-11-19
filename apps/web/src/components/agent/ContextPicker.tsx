@@ -119,11 +119,8 @@ export function ConcludedPreview({ run }: { run: string }) {
   );
 }
 
-/** A run to read as the list draws it: its id, its title, where it stands in a word, and what to do about its wait on hover. */
-type Listed = { id: string; title: string; standing: string; advice: string | undefined };
-
 /** A run to read, as the list draws it. */
-const listedOf = (run: RunView): Listed => ({ id: run.id, title: titleOf(run), standing: standingOf(run), advice: run.waiting?.advice });
+const listedOf = (run: RunView) => ({ id: run.id, title: titleOf(run), standing: standingOf(run), advice: run.waiting?.advice });
 
 /** Show older, under a picker's list: asks for the next, older page of the finished runs (`usePickerRuns`'s `older`). */
 export function ShowOlder({ onPress }: { onPress: () => void }) {

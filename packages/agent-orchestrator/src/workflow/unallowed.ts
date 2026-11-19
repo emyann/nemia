@@ -23,7 +23,7 @@ type Unallowed = { readonly tool: string; readonly tools: readonly string[]; rea
  * The fence word step `step` runs its sessions in on `reach` — its own, else the word a task naming none runs in — where that word
  * refuses what no allow rule reaches; `undefined` where it asks about such a call instead, or where the harness takes no rule at all.
  */
-function refusingWord(step: StepSpec, reach: FenceReach): string | undefined {
+function refusingWord(step: StepSpec, reach: FenceReach) {
   if (reach.by !== 'mode') return undefined;
   const word = step.permissionMode ?? reach.given;
   return reach.refusing.includes(word) ? word : undefined;
@@ -33,7 +33,7 @@ function refusingWord(step: StepSpec, reach: FenceReach): string | undefined {
  * The tools a rule on `tool` reaches: an `Edit` rule, bare or with a path, every file-editing tool (`EDITING_TOOLS`), since the
  * harness checks a write against `Edit` rules alone, whatever tool made it; any other rule its own tool.
  */
-const namedBy = (tool: string): readonly string[] => (tool === 'Edit' ? EDITING_TOOLS : [tool]);
+const namedBy = (tool: string) => (tool === 'Edit' ? EDITING_TOOLS : [tool]);
 
 /**
  * The first tool of step `step`'s `tools:` that nothing its session gets allows, with what it was judged against: the step's resolved
@@ -44,7 +44,7 @@ const namedBy = (tool: string): readonly string[] => (tool === 'Edit' ? EDITING_
  * `undefined` for a step with no `tools:` line, which is given every tool, for one whose fence word asks rather than refuses, and for
  * one on a remote agent, whose operator holds its fence.
  */
-function unallowedIn(step: StepSpec, allows: readonly string[]): Unallowed | undefined {
+function unallowedIn(step: StepSpec, allows: readonly string[]) {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const reach = isRemoteHarness(harness) ? undefined : fenceReach(harness);
   const word = reach === undefined ? undefined : refusingWord(step, reach);
@@ -58,10 +58,10 @@ function unallowedIn(step: StepSpec, allows: readonly string[]): Unallowed | und
 }
 
 /** Where step `step`'s fence is written: its agent's file, or `undefined` for a step that is its own fence. */
-const fenceFile = (step: StepSpec): string | undefined => (step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`);
+const fenceFile = (step: StepSpec) => (step.agent === undefined ? undefined : `${AGENTS_FOLDER}/${step.agent.name}.md`);
 
 /** The allow lists the refusal says held no rule for the tool, in the order a session gets them. */
-function lists(step: StepSpec, found: Unallowed): string {
+function lists(step: StepSpec, found: Unallowed) {
   const file = fenceFile(step);
   const own = file === undefined ? "not this step's `allowedTools:`" : `not ${file}'s \`allowedTools:\`, not this step's`;
   return found.checkout
@@ -70,7 +70,7 @@ function lists(step: StepSpec, found: Unallowed): string {
 }
 
 /** Where the allow belongs, and what taking the tool off instead costs: an agent's file reaches every step of it, a step's line one. */
-function fixes(step: StepSpec, found: Unallowed): string {
+function fixes(step: StepSpec, found: Unallowed) {
   const file = fenceFile(step);
   const editing = EDITING_TOOLS.includes(found.tool);
   const narrowed = editing
@@ -88,7 +88,7 @@ function fixes(step: StepSpec, found: Unallowed): string {
  * Why step `step` is given the tool `found.tool` it can never call, in words that name the step, the tool, the word it runs in, where
  * its fence is written and the fixes; `untrusted` is appended where it says something.
  */
-const said = (step: StepSpec, found: Unallowed, untrusted: string | undefined): string =>
+const said = (step: StepSpec, found: Unallowed, untrusted: string | undefined) =>
   `${step.name}: \`tools: ${found.tools.join(', ')}\` gives its session \`${found.tool}\`, and it runs in \`${found.word}\`, in which a ` +
   `call no allow rule reaches is refused and never asked about: nothing its session gets allows \`${found.tool}\` — ` +
   `${lists(step, found)}. Every call of it would be refused, looking in the feed like a fence doing its job. ${fixes(step, found)}` +
@@ -110,7 +110,7 @@ export function unallowedRefusal(
   steps: readonly StepSpec[],
   allows: readonly string[],
   untrusted: () => string | undefined = () => undefined,
-): string | undefined {
+) {
   for (const step of steps) {
     const found = unallowedIn(step, allows);
     if (found !== undefined) return said(step, found, untrusted());

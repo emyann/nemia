@@ -138,10 +138,10 @@ export type RunRead = {
  * The UTC day of a time, `YYYY-MM-DD`.
  * @param at A time, as `Date` reads it.
  */
-export const dayOf = (at: string): string => new Date(at).toISOString().slice(0, 10);
+export const dayOf = (at: string) => new Date(at).toISOString().slice(0, 10);
 
 /** A sum of what is known, null where nothing is. */
-const knownSum = (values: ReadonlyArray<number | null | undefined>): number | null => {
+const knownSum = (values: ReadonlyArray<number | null | undefined>) => {
   const known = values.filter((v): v is number => typeof v === 'number');
   return known.length ? known.reduce((n, v) => n + v, 0) : null;
 };
@@ -150,7 +150,7 @@ const knownSum = (values: ReadonlyArray<number | null | undefined>): number | nu
  * The keys a run's facts carry.
  * @param run The run's record.
  */
-export const keysOf = (run: Run): RunKeys => ({
+export const keysOf = (run: Run) => ({
   run: run.id,
   factory: runNamespace(run.factory),
   workflow: path.basename(run.workflowDir),
@@ -158,17 +158,17 @@ export const keysOf = (run: Run): RunKeys => ({
 });
 
 /** The deadline in ms a try's check was filed with, where its step lands the run on that check (`landsOnCheck`); else null. */
-function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry): number | null {
+function landingDeadlineOf(r: RunRead, step: StepSpec, t: TimelineTry) {
   if (!t.check || !isRepositoryRun(r.run) || !landsOnCheck(step, r.run)) return null;
   const seconds = r.deadlineOf(t.check.taskId);
   return seconds === null ? null : seconds * 1000;
 }
 
 /** A fact per try of `r`'s run that ended (`TryFact`). */
-function tryFactsOf(r: RunRead): TryFact[] {
+function tryFactsOf(r: RunRead) {
   const keys = keysOf(r.run);
   return r.steps.flatMap((step) =>
-    (r.timeline.steps[step.name] ?? []).flatMap((t): TryFact[] => {
+    (r.timeline.steps[step.name] ?? []).flatMap((t) => {
       const end = tryEndOf(t);
       if (!end) return [];
       const denied = t.session ? r.deniedOf(t.session.taskId) : null;
@@ -200,7 +200,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
 }
 
 /** For each `loop:` step whose loop ended accepted — its closeout said `again: false`, or a person accepted it — the rounds it ran. */
-const roundsOf = (r: RunRead): number[] =>
+const roundsOf = (r: RunRead) =>
   r.steps
     .filter((s) => s.loop)
     .filter(
@@ -212,7 +212,7 @@ const roundsOf = (r: RunRead): number[] =>
     .filter((n) => n > 0);
 
 /** Every session's cost together, null unless each session of the run was measured. */
-function runCostOf(t: Timeline): number | null {
+function runCostOf(t: Timeline) {
   const sessions = Object.values(t.steps)
     .flat()
     .filter((one) => one.session);
@@ -224,7 +224,7 @@ function runCostOf(t: Timeline): number | null {
  * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
  * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
-function doneStep(r: RunRead, step: StepSpec): boolean {
+function doneStep(r: RunRead, step: StepSpec) {
   const record = r.run.steps[step.name];
   if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
   if (askedAgain(step, r.run, r.closeoutOf)) return false;
@@ -238,7 +238,7 @@ function doneStep(r: RunRead, step: StepSpec): boolean {
  * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked, a loop that asked for
  * another round nobody accepted — and a run still going.
  */
-function finishedAt(r: RunRead, ending: StepSpec | undefined): string | null {
+function finishedAt(r: RunRead, ending: StepSpec | undefined) {
   if (r.run.cancelledAt) return null;
   if (ending && (r.run.steps[ending.name]?.landed || landsOnCheck(ending, r.run))) {
     const last = r.timeline.steps[ending.name]?.at(-1);
@@ -256,7 +256,7 @@ function finishedAt(r: RunRead, ending: StepSpec | undefined): string | null {
 }
 
 /** The fact of a finished run (`RunFact`); none for a run that has not finished. */
-function runFactOf(r: RunRead): RunFact[] {
+function runFactOf(r: RunRead) {
   const ending = r.steps.find((s) => endsOnBase(s));
   const at = finishedAt(r, ending);
   if (!at) return [];
@@ -281,7 +281,7 @@ function runFactOf(r: RunRead): RunFact[] {
  * What one run's timeline gives: a fact per try that ended, and the run's own once it finished.
  * @param r The run's record and its timeline, as read.
  */
-export const factsOf = (r: RunRead): Pick<Facts, 'tries' | 'runs'> => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
+export const factsOf = (r: RunRead) => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
  * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed, null where no run recorded
@@ -343,7 +343,7 @@ export type SlowLanding = RunKeys & { day: string; step: string; try: number; ch
  * Each try whose landing check passed in more than half its filed deadline (`SlowLanding`), in the order of the tries.
  * @param tries The facts of the tries, in their order.
  */
-export const slowLandingsOf = (tries: readonly TryFact[]): SlowLanding[] =>
+export const slowLandingsOf = (tries: readonly TryFact[]) =>
   tries.flatMap(({ run, factory, workflow, repo, day, step, try: n, check, checkMs, landingDeadlineMs: deadlineMs }) =>
     check === 'passed' && checkMs !== null && deadlineMs !== null && checkMs > deadlineMs / 2
       ? [{ run, factory, workflow, repo, day, step, try: n, checkMs, deadlineMs, share: checkMs / deadlineMs }]
@@ -385,7 +385,7 @@ export type Stats = {
   health: Health;
 };
 
-const mean = (values: ReadonlyArray<number | null>): number | null => {
+const mean = (values: ReadonlyArray<number | null>) => {
   const known = values.filter((v): v is number => v !== null);
   return known.length ? known.reduce((n, v) => n + v, 0) / known.length : null;
 };
@@ -394,7 +394,7 @@ const mean = (values: ReadonlyArray<number | null>): number | null => {
  * The headline numbers of a set of facts (`Headline`).
  * @param f The facts of the tries and of the runs.
  */
-export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>): Headline {
+export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>) {
   const landed = f.runs.filter((r) => r.landed === true);
   return {
     runs: f.runs.length,
@@ -412,7 +412,7 @@ export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>): Headline {
 }
 
 /** Each name given, with how many times it is given: most first, then by name. */
-function countsOf(names: readonly string[]): Array<{ name: string; count: number }> {
+function countsOf(names: readonly string[]) {
   const counts = new Map<string, number>();
   for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
   return [...counts]
@@ -421,7 +421,7 @@ function countsOf(names: readonly string[]): Array<{ name: string; count: number
 }
 
 /** Each step's totals, per agent (`StepRow`), in the order of the tries: run by run, and a run's steps in its workflow's order. */
-function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
+function stepRowsOf(tries: readonly TryFact[]) {
   const rows = new Map<string, [TryFact, ...TryFact[]]>();
   for (const t of tries) {
     const key = JSON.stringify([t.step, t.agent]);
@@ -459,10 +459,10 @@ const DAY_MS = 86_400_000;
  * @param day A day, `YYYY-MM-DD`.
  * @param n How many days after it, negative for before.
  */
-export const dayPlus = (day: string, n: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
+export const dayPlus = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 
 /** Every day from `from` to `to`, both included. */
-function daysBetween(from: string, to: string): string[] {
+function daysBetween(from: string, to: string) {
   const days: string[] = [];
   for (let day = from; day <= to; day = dayPlus(day, 1)) days.push(day);
   return days;
@@ -472,14 +472,14 @@ function daysBetween(from: string, to: string): string[] {
 type Kept = Pick<Facts, 'tries' | 'runs'> & { marks: Mark[] };
 
 /** The facts and marks that fall between two days, both included. */
-const within = (f: Kept, from: string, to: string): Kept => ({
+const within = (f: Kept, from: string, to: string) => ({
   tries: f.tries.filter((t) => t.day >= from && t.day <= to),
   runs: f.runs.filter((r) => r.day >= from && r.day <= to),
   marks: f.marks.filter((m) => m.day >= from && m.day <= to),
 });
 
 /** The numbers of a set of facts and marks (`Group`): the tiles against `today`, the rest over the days from `from` to `to`. */
-function groupOf(f: Kept, from: string | null, to: string, today: string): Group {
+function groupOf(f: Kept, from: string | null, to: string, today: string) {
   const kept = within(f, from ?? '0000-00-00', to);
   const tile = (a: string, b: string) => ({ ...headlineOf(within(f, a, b)), from: a, to: b });
   return {
@@ -494,20 +494,20 @@ function groupOf(f: Kept, from: string | null, to: string, today: string): Group
 }
 
 /** The values a try's or a run's fact, or a mark, has for a key: a run's or a mark's, for a step or an agent, every one it has. */
-function valuesOf(fact: TryFact | RunFact | Mark, key: ByKey): Array<string | null> {
+function valuesOf(fact: TryFact | RunFact | Mark, key: ByKey) {
   if ('steps' in fact) return key === 'step' ? fact.steps : key === 'agent' ? fact.agents : [fact[key]];
   return [fact[key]];
 }
 
 /** The facts and marks that have `value` for `key`. */
-const having = (f: Kept, key: ByKey, value: string | null): Kept => ({
+const having = (f: Kept, key: ByKey, value: string | null) => ({
   tries: f.tries.filter((t) => valuesOf(t, key).includes(value)),
   runs: f.runs.filter((r) => valuesOf(r, key).includes(value)),
   marks: f.marks.filter((m) => valuesOf(m, key).includes(value)),
 });
 
 /** The order of the groups: by key, the group with none last. */
-const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1);
+const byKey = (a: string | null, b: string | null) => (a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1);
 
 /**
  * The stats of a store's facts for a query (`Stats`), as of `now`. The marks are found over every run that froze (`marksOf`), so a run
@@ -533,11 +533,11 @@ export function statsOf(
   unreadable: readonly string[] = [],
   healthOver: (from: string | null, to: string) => Health = () => healthOf([]),
   taken: (run: string) => boolean = () => true,
-): Stats {
+) {
   const filters = Object.fromEntries(BY_KEYS.flatMap((k) => (query[k] === undefined ? [] : [[k, query[k]]]))) as Partial<
     Record<ByKey, string>
   >;
-  const of = <F extends { run: string }>(rows: readonly F[]): F[] => rows.filter((row) => taken(row.run));
+  const of = <F extends { run: string }>(rows: readonly F[]) => rows.filter((row) => taken(row.run));
   const every: Kept = { tries: of(facts.tries), runs: of(facts.runs), marks: of(marksOf(facts.frozen)) };
   const kept = Object.entries(filters).reduce((f, [k, v]) => having(f, k as ByKey, v ?? null), every);
   const today = now.toISOString().slice(0, 10);
@@ -559,7 +559,7 @@ export function statsOf(
 }
 
 /** Whether `text` is a real UTC day, `YYYY-MM-DD`. */
-const isDay = (text: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text)) && dayOf(text) === text;
+const isDay = (text: string) => /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text)) && dayOf(text) === text;
 
 /** A key of what a person gives a query: the days, the key to go by, and a filter per key. */
 export type QueryKey = 'from' | 'to' | 'by' | ByKey;
@@ -571,7 +571,7 @@ export type QueryKey = 'from' | 'to' | 'by' | ByKey;
  * @param given What the person gave, by the query's key.
  * @param nameOf What the person calls a key, as a refusal names it.
  */
-export function statsQueryOf(given: Partial<Record<QueryKey, string>>, nameOf: (key: QueryKey) => string): StatsQuery {
+export function statsQueryOf(given: Partial<Record<QueryKey, string>>, nameOf: (key: QueryKey) => string) {
   const by = given.by;
   if (by !== undefined && !(BY_KEYS as readonly string[]).includes(by))
     throw new Invalid({ message: `${nameOf('by')} takes one of ${BY_KEYS.join(', ')}, not ${JSON.stringify(by)}.` });

@@ -14,8 +14,7 @@ import type {
 } from '../../contracts/proposal-approval.contract.ts';
 
 /** Whether `caller` acts in `factory`: the person anywhere, a factory's session in its own, a store-wide session (Nemia's) in any. */
-const actsIn = (caller: Caller, factory: string): boolean =>
-  caller.kind === 'person' || caller.factory === null || caller.factory === factory;
+const actsIn = (caller: Caller, factory: string) => caller.kind === 'person' || caller.factory === null || caller.factory === factory;
 
 /**
  * Whether `caller` may propose in `factory`: the person anywhere, a factory's session in its own, a store-wide session in any.
@@ -29,13 +28,13 @@ export const mayPropose: MayPropose = (caller, factory) => actsIn(caller, factor
  * @param grant A grant of a delegation, or a rule: its resources, its names and its verbs.
  * @param change One change of a proposal: its resource, its name and its verb.
  */
-export const covers = (grant: Grant, change: Change): boolean =>
+export const covers = (grant: Grant, change: Change) =>
   grant.resources.includes(change.resource) &&
   (grant.resourceNames.length === 0 || grant.resourceNames.includes(change.name)) &&
   grant.verbs.includes(change.verb);
 
 /** Whether `rule` takes the proposal: every change covered, its proposer among those it names, and a widening said outright. */
-const ruleTakes = (rule: ProposalRule, p: ProposalFacts): boolean =>
+const ruleTakes = (rule: ProposalRule, p: ProposalFacts) =>
   p.changes.every((change) => covers(rule, change)) &&
   (rule.proposedBy.length === 0 || (p.proposedBy !== null && rule.proposedBy.includes(p.proposedBy))) &&
   (!p.widens || rule.widens);

@@ -94,7 +94,7 @@ const keptFor = Effect.fnUntraced(function* (run: Run, stepName: string, text: s
  * fails with carrying exit code 2 — as a `Conflict` in its words; anything else it fails with, a failure to deliver among them, the
  * program dies of.
  */
-const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Conflict> =>
+const toldBy = (e: Engine, taskId: string, text: string) =>
   Effect.exit(asked('say', e.say(taskId, text))).pipe(
     Effect.flatMap((exit) => {
       if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
@@ -118,7 +118,7 @@ const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Co
  * @param what What was asked for, as the refusal names it: `try 2 of review`.
  * @param again The command that asks again once the file is deleted.
  */
-export function strayAsk(where: string, stray: string | null, what: string, again: string): string | null {
+export function strayAsk(where: string, stray: string | null, what: string, again: string) {
   if (stray === null) return null;
   return `${what} cannot be asked for: ${where} is already there, and it is not an ask — ${stray}. No tick honours it, and nemia ls shows nothing asked, so waiting would be for ever. Delete it (rm ${where}), then ask again: ${again}.`;
 }

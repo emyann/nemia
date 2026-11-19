@@ -21,7 +21,7 @@ export class CommandRefused extends Error {
  * Dollars written as digits above zero (`5`, `2.50`), or undefined: no unit, no sign, no exponent.
  * @param written The amount as typed, blanks around it allowed.
  */
-export function dollarsOf(written: string): number | undefined {
+export function dollarsOf(written: string) {
   const value = written.trim();
   const n = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
   return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -161,7 +161,7 @@ const usage = (message: string): never => {
  * @param form The command's form, which ends the refusal.
  * @param flag The flag's spelling, as the refusal names it.
  */
-export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
+export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget') {
   const amount = text === undefined ? undefined : dollarsOf(text);
   if (amount === undefined)
     return usage(
@@ -171,7 +171,7 @@ export function amountOf(text: string | undefined, takes: string, form: string, 
 }
 
 /** The value of `flag`, given `value` — joined with `=` or the argument after it — or refused in the flag's words. */
-function valueOf(spec: Spec, flag: Flag, value: string | undefined, joined: boolean): string | number {
+function valueOf(spec: Spec, flag: Flag, value: string | undefined, joined: boolean) {
   if (flag.kind === 'amount') return amountOf(value, flag.takes ?? '', flag.form ?? '', flag.flag);
   if (value === undefined || (flag.kind === 'name' && (!value || value.startsWith('--')))) return usage(flag.takes ?? '');
   if (!joined && spec.apart && spec.flags.some((f) => f.flag === value)) usage(spec.apart(value, flag.flag));
@@ -179,14 +179,14 @@ function valueOf(spec: Spec, flag: Flag, value: string | undefined, joined: bool
 }
 
 /** The flag `name` is, given joined with `=` or not: a switch and a name are given apart, so `--model=x` is no flag. */
-const flagOf = (spec: Spec, name: string, joined: boolean): Flag | undefined =>
+const flagOf = (spec: Spec, name: string, joined: boolean) =>
   spec.flags.find((f) => f.flag === name && !(joined && (f.kind === 'switch' || f.kind === 'name')));
 
 /** Whether `flag`, given again, is refused as given twice: a value flag that is no way and takes one value. */
-const once = (flag: Flag): boolean => flag.kind !== 'switch' && !flag.way && !flag.many && flag.key !== undefined;
+const once = (flag: Flag) => flag.kind !== 'switch' && !flag.way && !flag.many && flag.key !== undefined;
 
 /** `value` put under `flag`'s key: beside the values given before it, for a flag given once for each. */
-function put(args: Filling, flag: Flag, key: string, value: string | number): void {
+function put(args: Filling, flag: Flag, key: string, value: string | number) {
   const before = args[key];
   args[key] = flag.many ? [...(Array.isArray(before) ? before : []), String(value)] : value;
 }
@@ -202,15 +202,21 @@ type Word =
   | { readonly is: 'help' };
 
 /** The word `arg` is, at `i` of `argv`, and the index of the last argument it took: a flag's value given apart is the one after it. */
-function wordAt(spec: Spec, argv: readonly string[], i: number, arg: string): { word: Word; last: number } {
+function wordAt(spec: Spec, argv: readonly string[], i: number, arg: string) {
   const joined = arg.startsWith('--') && arg.includes('=');
   const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
   const flag = flagOf(spec, name, joined);
-  if (flag === undefined && arg === '--help') return { word: { is: 'help' }, last: i };
-  if (flag === undefined) return { word: arg.startsWith('--') ? { is: 'stray', arg } : { is: 'positional', arg, operand: false }, last: i };
-  if (flag.kind === 'switch' || flag.key === undefined) return { word: { is: 'flag', flag, arg, value: undefined, joined }, last: i };
-  if (joined) return { word: { is: 'flag', flag, arg, value: arg.slice(name.length + 1), joined }, last: i };
-  return { word: { is: 'flag', flag, arg, value: argv[i + 1], joined }, last: i + 1 };
+  if (flag === undefined && arg === '--help') return { word: { is: 'help' }, last: i } satisfies { word: Word; last: number };
+  if (flag === undefined)
+    return { word: arg.startsWith('--') ? { is: 'stray', arg } : { is: 'positional', arg, operand: false }, last: i } satisfies {
+      word: Word;
+      last: number;
+    };
+  if (flag.kind === 'switch' || flag.key === undefined)
+    return { word: { is: 'flag', flag, arg, value: undefined, joined }, last: i } satisfies { word: Word; last: number };
+  if (joined)
+    return { word: { is: 'flag', flag, arg, value: arg.slice(name.length + 1), joined }, last: i } satisfies { word: Word; last: number };
+  return { word: { is: 'flag', flag, arg, value: argv[i + 1], joined }, last: i + 1 } satisfies { word: Word; last: number };
 }
 
 /**
@@ -218,17 +224,21 @@ function wordAt(spec: Spec, argv: readonly string[], i: number, arg: string): { 
  * word after it, or joined with `=` — before, between or after the positionals; `--help`; a word starting `--` that is no flag of it; and
  * every other word a positional. `--` ends the flags: each word after it is a positional (an operand), whatever it starts with.
  */
-function wordsOf(spec: Spec, argv: readonly string[]): Word[] {
+function wordsOf(spec: Spec, argv: readonly string[]) {
   const words: Word[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--') return [...words, ...argv.slice(i + 1).map((operand): Word => ({ is: 'positional', arg: operand, operand: true }))];
+    if (arg === '--')
+      return [
+        ...words,
+        ...argv.slice(i + 1).map((operand) => ({ is: 'positional', arg: operand, operand: true }) satisfies Word),
+      ] satisfies Word[];
     if (arg === undefined) continue;
     const read = wordAt(spec, argv, i, arg);
     words.push(read.word);
     i = read.last;
   }
-  return words;
+  return words satisfies Word[];
 }
 
 /**
@@ -236,7 +246,7 @@ function wordsOf(spec: Spec, argv: readonly string[]): Word[] {
  * unless it is one of them, where it starts with no `-`; else the optional one's, once, where it starts with no `--` — an operand, given
  * after `--`, whatever it starts with. Returns whether one took it.
  */
-function placed(spec: Spec, arg: string, operand: boolean, args: Filling): boolean {
+function placed(spec: Spec, arg: string, operand: boolean, args: Filling) {
   const many = spec.positionals.find((p) => p.takes === 'many');
   if (many && (operand || !arg.startsWith('-'))) {
     const before = args[many.key];
@@ -251,7 +261,7 @@ function placed(spec: Spec, arg: string, operand: boolean, args: Filling): boole
 }
 
 /** `word`, a flag of the command, read into `args` with its value, or refused in its words; returns whether it was one of the ways. */
-function readFlag(spec: Spec, word: Extract<Word, { is: 'flag' }>, args: Filling): boolean {
+function readFlag(spec: Spec, word: Extract<Word, { is: 'flag' }>, args: Filling) {
   const { flag } = word;
   if (once(flag) && flag.key !== undefined && args[flag.key] !== undefined) usage(flag.twice ?? spec.unknown(word.arg));
   Object.assign(args, flag.sets);
@@ -268,7 +278,7 @@ function readFlag(spec: Spec, word: Extract<Word, { is: 'flag' }>, args: Filling
  * (`missing`), but for an operand given after `--`, or empty, but for a text whose spec says its refusal, which its handler is given to
  * refuse in its own words.
  */
-const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined): boolean =>
+const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined) =>
   word?.is === 'positional' &&
   ((!word.operand && spec.missing !== undefined && word.arg.startsWith('-')) ||
     (!word.arg && (spec.missing === undefined || p.kind !== 'text')));
@@ -278,7 +288,7 @@ const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined): boolean 
  * them (`nemia say <runId> <step> --as <name> <words>`, the retired `--as` read to be refused), each with its value, and every word
  * after those its text, flags included; a flag it has none of where a required argument stands is refused in its words.
  */
-function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args | undefined {
+function parseRest(spec: Spec, rest: Positional, argv: readonly string[]) {
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
   const stray = spec.missing === undefined || spec.flagFirst ? head.find((a) => strayFlag(spec, a)) : undefined;
@@ -299,7 +309,7 @@ function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args 
 }
 
 /** A word that is a flag no command takes: neither one of `spec`'s, nor `--help`. */
-const strayFlag = (spec: Spec, arg: string): boolean =>
+const strayFlag = (spec: Spec, arg: string) =>
   arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
 
 /**
@@ -312,7 +322,7 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
  * @param spec The command's positionals, flags and its own refusals.
  * @param argv The command line's words after the command's name.
  */
-export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
+export function parseArgv(spec: Spec, argv: readonly string[]) {
   const rest = spec.positionals.find((p) => p.takes === 'rest');
   if (rest) return parseRest(spec, rest, argv);
   const required = spec.positionals.filter((p) => p.takes === 'required');
@@ -333,7 +343,7 @@ export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined
  * `words` read into the arguments after the `required` positionals, already `given`: each flag with its value, and each positional past
  * the required put under the one that takes it (`placed`), else refused in the spec's words; two ways given are refused.
  */
-function readWords(spec: Spec, words: readonly Word[], required: number, given: Filling, argv: readonly string[]): Args {
+function readWords(spec: Spec, words: readonly Word[], required: number, given: Filling, argv: readonly string[]) {
   const args = { ...given };
   let ways = 0;
   let seen = 0;
@@ -347,11 +357,10 @@ function readWords(spec: Spec, words: readonly Word[], required: number, given: 
 }
 
 /** How the usage says a positional not given: `<step>`, `[<step>]` where it is optional, `[<runId> ...]` where it takes many. */
-const unsaid = (p: Positional): string =>
-  p.takes === 'many' ? `[<${p.key}> ...]` : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`;
+const unsaid = (p: Positional) => (p.takes === 'many' ? `[<${p.key}> ...]` : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`);
 
 /** The words that say `flag` given `value`: a switch alone where true, a value flag once per value; none for a value not given. */
-const flagWords = (flag: Flag, value: Args[string]): string[] => {
+const flagWords = (flag: Flag, value: Args[string]) => {
   if (value === undefined || value === false) return [];
   if (flag.kind === 'switch') return [flag.flag];
   return (Array.isArray(value) ? value : [value]).flatMap((v) => [flag.flag, String(v)]);
@@ -365,7 +374,7 @@ const flagWords = (flag: Flag, value: Args[string]): string[] => {
  * @param args The positionals given, by their keys.
  * @param flags The flags to say, by their keys; none by default.
  */
-export function commandLine(command: Pick<CommandWords, 'name' | 'spec'>, args: Args, flags: Args = {}): string {
+export function commandLine(command: Pick<CommandWords, 'name' | 'spec'>, args: Args, flags: Args = {}) {
   const said = (value: Args[string]) => (Array.isArray(value) ? value.join(' ') : String(value));
   const words = command.spec.positionals
     .filter((p) => p.takes !== 'rest')
@@ -381,7 +390,7 @@ const HELP_INDENT = ' '.repeat(31);
  * The commands' lines of `nemia`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve.
  * @param table The commands, in the order the help lists them.
  */
-export const helpOf = (table: readonly Pick<CommandWords, 'name' | 'usage' | 'help' | 'only'>[]): string =>
+export const helpOf = (table: readonly Pick<CommandWords, 'name' | 'usage' | 'help' | 'only'>[]) =>
   table
     .filter((c) => c.only?.side !== 'api')
     .flatMap((c) => [`  ${CLI} ${[c.name, c.usage].filter(Boolean).join(' ')}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)])

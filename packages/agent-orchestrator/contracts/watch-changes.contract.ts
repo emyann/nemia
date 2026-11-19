@@ -22,13 +22,13 @@ export type Versioned = { readonly key: string; readonly version: string };
 export type WatchChange = { readonly type: WatchChangeType; readonly key: string };
 
 /** Whether no key is in `objects` twice, as a list names each object once. */
-const distinct = (objects: readonly Versioned[]): boolean => objects.every((o, i) => !objects.slice(0, i).some((p) => p.key === o.key));
+const distinct = (objects: readonly Versioned[]) => objects.every((o, i) => !objects.slice(0, i).some((p) => p.key === o.key));
 
 /** Whether `objects` holds the object of `key`. */
-const holds = (objects: readonly Versioned[], key: string): boolean => objects.some((o) => o.key === key);
+const holds = (objects: readonly Versioned[], key: string) => objects.some((o) => o.key === key);
 
 /** The version `objects` holds of `key`, undefined where it holds none. */
-const versionIn = (objects: readonly Versioned[], key: string): string | undefined => objects.find((o) => o.key === key)?.version;
+const versionIn = (objects: readonly Versioned[], key: string) => objects.find((o) => o.key === key)?.version;
 
 const watchChangesSpec = spec<(sent: readonly Versioned[], now: readonly Versioned[]) => WatchChange[]>({
   requires: ({ input: [sent, now] }) => distinct(sent) && distinct(now),

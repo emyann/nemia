@@ -25,7 +25,7 @@ export type WatchStart =
   | { readonly kind: 'refused'; readonly reason: WatchStartRefusal };
 
 /** Whether the watch asked a `resourceVersion`: an empty one asks none, as Kubernetes reads it. */
-const asks = (asked: string | undefined): boolean => asked !== undefined && asked !== '';
+const asks = (asked: string | undefined) => asked !== undefined && asked !== '';
 
 const watchStartSpec = spec<(asked: string | undefined, follows: boolean, byte: number | undefined) => WatchStart>({
   requires: ({ input: [asked, , byte] }) => byte === undefined || ((byte ?? 0) >= 0 && asks(asked)),

@@ -12,12 +12,13 @@ export default meta;
 const PANEL = { width: 460, padding: 16, background: 'var(--card)' };
 
 /** One line of a turn, over what every line has. */
-const line = (over: Partial<ConversationLine> & { id: string }): ConversationLine => ({
-  tool: 'Read',
-  sentence: 'Read the inbox',
-  state: 'done',
-  ...over,
-});
+const line = (over: Partial<ConversationLine> & { id: string }) =>
+  ({
+    tool: 'Read',
+    sentence: 'Read the inbox',
+    state: 'done',
+    ...over,
+  }) satisfies ConversationLine;
 
 const AT_WORK = {
   kind: 'work' as const,

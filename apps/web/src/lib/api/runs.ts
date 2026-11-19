@@ -6,31 +6,32 @@
  * (`runsSelectedQuery`); and a run's named actions, each in the run's namespace. No page reads every run (`test/structure.test.ts`).
  */
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
-import type { Run, RunHeld, RunList, RunRemoved, RunUnjudged } from 'objects';
+import type { Run, RunList, RunUnjudged } from 'objects';
 import { Concluded as ConcludedAnswer, type RunClock, type RunOutcome, type StepCost } from 'objects';
 import { pace } from '../feed.ts';
 import { selectorKey } from './selector.ts';
 import { call, read, runs, type RunListQuery } from './objects.ts';
 import { factoryIn } from './namespace.ts';
-import { runViewOf, type RunRow, type RunView, type UnjudgedRun } from './judged.ts';
+import { runViewOf, type RunView, type UnjudgedRun } from './judged.ts';
 import type { FinishedPageRead, ReadsOnToday } from '../../../contracts/finished-today.contract.ts';
 
 export type { RunClock, RunOutcome, StepCost } from 'objects';
 
 /** A run the list could not judge, as the board reads it. */
-const unjudgedOf = (run: RunUnjudged): UnjudgedRun => ({ id: run.name, factory: factoryIn(run.namespace), unjudged: run.error });
+const unjudgedOf = (run: RunUnjudged) =>
+  ({ id: run.name, factory: factoryIn(run.namespace), unjudged: run.error }) satisfies UnjudgedRun as UnjudgedRun;
 
 /** In name order, as the list's. */
-const byName = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const byName = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
  * Every run of a list: each run judged (`runViewOf`) and each it could not judge (`UnjudgedRun`), in name order as the list's.
  * @param list The RunList as the api serves it.
  */
-export const rowsOf = (list: RunList): RunRow[] => [...list.items.map(runViewOf), ...(list.unjudged ?? []).map(unjudgedOf)].sort(byName);
+export const rowsOf = (list: RunList) => [...list.items.map(runViewOf), ...(list.unjudged ?? []).map(unjudgedOf)].sort(byName);
 
 /** Every run of `query`, the RunList whole: a plain list, no page and no state, so no run's frame is measured. */
-const everyRun = (query: RunListQuery = {}): Promise<RunRow[]> => runs.listAll(query).then(rowsOf);
+const everyRun = (query: RunListQuery = {}) => runs.listAll(query).then(rowsOf);
 
 /**
  * The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), every page of them, under `['runs']`: the labels page's,
@@ -71,7 +72,7 @@ export type OpenRuns = {
 };
 
 /** A run's view with the frame's parts its by-state list carries, each none where a plain list answered. */
-const listedOf = (run: Run): ListedRun => ({
+const listedOf = (run: Run) => ({
   ...runViewOf(run),
   wallMs: run.status.wallMs ?? 0,
   finishedAt: run.status.finishedAt ?? null,
@@ -79,7 +80,7 @@ const listedOf = (run: Run): ListedRun => ({
 });
 
 /** A waiting run's view, with its steps' costs and the start of its wait. */
-const waitingOf = (run: Run): WaitingRun => ({
+const waitingOf = (run: Run) => ({
   ...listedOf(run),
   stepCosts: run.status.stepCosts ?? null,
   waitingSince: run.status.waitingSince ?? null,
@@ -89,7 +90,7 @@ const waitingOf = (run: Run): WaitingRun => ({
 const NO_COUNTS = { waiting: 0, inFlight: 0, finished: 0 };
 
 /** Each run of a by-state list in its state, judged or not, in name order. */
-const statedOf = (list: RunList): Array<{ id: string; state: Run['status']['state']; run: Run | RunUnjudged }> =>
+const statedOf = (list: RunList) =>
   [
     ...list.items.map((run) => ({ id: run.metadata.name, state: run.status.state, run })),
     ...(list.unjudged ?? []).map((run) => ({ id: run.name, state: run.state ?? ('inFlight' as const), run })),
@@ -98,14 +99,14 @@ const statedOf = (list: RunList): Array<{ id: string; state: Run['status']['stat
 /** A run of a by-state list read as the frame reads it: `read` for a run judged, `UnjudgedRun` for one not. */
 const frameOf =
   <R>(read: (run: Run) => R) =>
-  (run: Run | RunUnjudged): R | UnjudgedRun =>
+  (run: Run | RunUnjudged) =>
     'error' in run ? unjudgedOf(run) : read(run);
 
 /**
  * The frame (`OpenRuns`) off the list of the runs not finished: each run in its state's part, the counts and `asOf` the list's.
  * @param list The list of the runs not finished, as the api serves it asked by state.
  */
-export function openOf(list: RunList): OpenRuns {
+export function openOf(list: RunList) {
   const stated = statedOf(list);
   return {
     asOf: list.metadata.asOf ?? new Date().toISOString(),
@@ -125,11 +126,11 @@ export const FINISHED_SELECTOR = 'status.state=finished';
 export const UNDECIDED_SELECTOR = 'status.outcome=undecided';
 
 /** A list of runs, of every factory or of `factory` alone (its namespace, `default` the runs of none). */
-const listOf = (factory: string | undefined, query: RunListQuery): Promise<RunList> =>
+const listOf = (factory: string | undefined, query: RunListQuery) =>
   factory === undefined ? runs.listAll(query) : runs.list(factory, query);
 
 /** `query` with the label selector `selector` says, none for none. */
-const labelled = (query: RunListQuery, selector: string | undefined): RunListQuery =>
+const labelled = (query: RunListQuery, selector: string | undefined) =>
   selector === undefined || selector.trim() === '' ? query : { ...query, labelSelector: selector.trim() };
 
 /**
@@ -163,7 +164,7 @@ export type FinishedPage = { asOf: string; total: number; runs: FinishedRun[]; c
  * list could not judge has no finish to say and is no row of it; the count holds it.
  * @param list The list of the finished runs, as the api serves it asked by state.
  */
-export function finishedOf(list: RunList): FinishedPage {
+export function finishedOf(list: RunList) {
   return {
     asOf: list.metadata.asOf ?? new Date().toISOString(),
     total: list.metadata.counts?.finished ?? list.items.length,
@@ -224,26 +225,26 @@ export const finishedRunsQuery = (factory: string | undefined, older: readonly s
  * @param page The page read: when each of its runs finished, in epoch ms, and whether a page follows it.
  * @param dayStart When the day began, in epoch ms.
  */
-export const readsOnToday: ReadsOnToday = (page: FinishedPageRead, dayStart: number): boolean =>
+export const readsOnToday: ReadsOnToday = (page: FinishedPageRead, dayStart: number) =>
   page.next && page.finishedMs.length > 0 && page.finishedMs.every((ms) => ms >= dayStart);
 
 /** How many finished runs a page of a picker, or of the strip's read of today, holds. */
 const PICKED_SIZE = 50;
 
 /** A page of the finished runs as `readsOnToday` reads it. */
-const pageRead = (page: FinishedPage): FinishedPageRead => ({
+const pageRead = (page: FinishedPage) => ({
   finishedMs: page.runs.map((run) => Date.parse(run.finishedAt)),
   next: page.continue !== null,
 });
 
 /** One page of the finished runs of every factory or of `factory`, `PICKED_SIZE` a page, from `from`, the first page for none. */
-const finishedPage = (factory: string | undefined, from: string | undefined): Promise<FinishedPage> =>
+const finishedPage = (factory: string | undefined, from: string | undefined) =>
   listOf(factory, { fieldSelector: FINISHED_SELECTOR, limit: PICKED_SIZE, ...(from === undefined ? {} : { continue: from }) }).then(
     finishedOf,
   );
 
 /** The runs finished at or after `dayStart`, newest first, read a page at a time while `readsOnToday` says so. */
-async function finishedSince(factory: string | undefined, dayStart: number): Promise<FinishedRun[]> {
+async function finishedSince(factory: string | undefined, dayStart: number) {
   const kept: FinishedRun[] = [];
   let page = await finishedPage(factory, undefined);
   for (;;) {
@@ -299,7 +300,7 @@ export const concludedQuery = (id: string) =>
  * @param namespace The run's namespace: its factory's, `default` for a run of none.
  * @param id The run's id.
  */
-export const removeRun = (namespace: string, id: string): Promise<RunRemoved> =>
+export const removeRun = (namespace: string, id: string) =>
   runs.delete(namespace, id, 'The run may be removed: look on the Runs page before removing it again.');
 
 /**
@@ -308,7 +309,7 @@ export const removeRun = (namespace: string, id: string): Promise<RunRemoved> =>
  * @param namespace The run's namespace: its factory's, `default` for a run of none.
  * @param id The run's id.
  */
-export const liftHold = (namespace: string, id: string): Promise<RunHeld> =>
+export const liftHold = (namespace: string, id: string) =>
   runs.unhold(namespace, id, "The hold may be lifted: look at the run's page before lifting it again.");
 
 /**
@@ -320,7 +321,7 @@ export const liftHold = (namespace: string, id: string): Promise<RunHeld> =>
  * @param until The ids of the runs whose landing lifts the hold.
  * @param why Why the run is held, as the person said it; blank for no words.
  */
-export const putHold = (namespace: string, id: string, until: readonly string[], why: string): Promise<RunHeld> =>
+export const putHold = (namespace: string, id: string, until: readonly string[], why: string) =>
   runs.hold(namespace, id, { until, ...(why.trim() ? { why } : {}) }, 'The run may be held: look at its page before holding it again.');
 
 /**
@@ -340,7 +341,7 @@ type Pruned = { id: string; pruned: true; lines: string[]; left: number };
  * @param id The run's id.
  * @param how What the prune gives back beyond the worktrees: the run's files, and a run nobody merged.
  */
-export async function pruneRun(namespace: string, id: string, how: PruneHow): Promise<Pruned> {
+export async function pruneRun(namespace: string, id: string, how: PruneHow) {
   const answer = await runs.prune(namespace, id, how, 'The run may be pruned: look at its page before pruning it again.');
-  return { id, pruned: true, lines: [...answer.lines], left: answer.left.length };
+  return { id, pruned: true, lines: [...answer.lines], left: answer.left.length } satisfies Pruned;
 }

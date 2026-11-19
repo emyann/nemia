@@ -21,7 +21,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type FiledWith = { declared?: readonly string[]; moved: boolean };
 
 /** The same fields in the same order: the order is the schema's, and `nemia decide` prints them in it. */
-const sameList = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 const filedFieldsSpec = spec<(filed: FiledWith, now: readonly string[], gave: readonly string[]) => string[]>({
   ensures: {

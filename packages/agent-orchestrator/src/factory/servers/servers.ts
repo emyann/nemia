@@ -44,7 +44,7 @@ export type FactoryServers = Readonly<Record<string, FactoryServer>>;
  * (`mcp__<name>__<tool>`).
  * @param name The server's name as given.
  */
-export const serverNameRefusal = (name: string): string | undefined => {
+export const serverNameRefusal = (name: string) => {
   if (!name) return "A server is named, and this name is empty. Give the name an agent's `mcp:` line will ask for.";
   if (SERVER_NAME.test(name)) return undefined;
   return `\`${name}\` is not a server's name: letters, digits, - and _ — github or local_docs, say.`;
@@ -65,7 +65,7 @@ export const serverNameRefusal = (name: string): string | undefined => {
  * beyond that.
  * @param server The server as given, of any shape, read from a file or a request.
  */
-export const factoryServerRefusal = (server: unknown): string | undefined => {
+export const factoryServerRefusal = (server: unknown) => {
   if (typeof server !== 'object' || server === null || Array.isArray(server)) {
     return `A server is { "type": "http", "url": "https://…" }, with optional \`headers\` and \`oauth\`; this is ${JSON.stringify(server)}.`;
   }
@@ -101,7 +101,7 @@ export const factoryServerRefusal = (server: unknown): string | undefined => {
  * Why a whole record cannot be written, or `undefined`: the first name or server it refuses, in the record's order.
  * @param servers The record's servers by name, each of any shape.
  */
-export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>): string | undefined => {
+export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>) => {
   for (const [name, server] of Object.entries(servers)) {
     const bad = serverNameRefusal(name) ?? factoryServerRefusal(server);
     if (bad) return name ? `\`${name}\`: ${bad}` : bad;
@@ -124,15 +124,12 @@ export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>
  * @param named The servers the agent's `mcp:` line names, or undefined where it names none.
  * @param record The factory's servers by name, or undefined where it records none.
  */
-export const splitServers = (
-  named: readonly string[] | undefined,
-  record: FactoryServers | undefined,
-): { mcp?: Record<string, FactoryServer>; checkout: string[] } => {
+export const splitServers = (named: readonly string[] | undefined, record: FactoryServers | undefined) => {
   if (!named?.length) return { checkout: [] };
-  const mine = named.flatMap((name): Array<[string, FactoryServer]> => {
-    if (record === undefined || !Object.hasOwn(record, name)) return [];
+  const mine = named.flatMap((name) => {
+    if (record === undefined || !Object.hasOwn(record, name)) return [] satisfies Array<[string, FactoryServer]>;
     const server = record[name];
-    return server === undefined ? [] : [[name, server]];
+    return (server === undefined ? [] : [[name, server]]) satisfies Array<[string, FactoryServer]>;
   });
   const checkout = named.filter((name) => !mine.some(([own]) => own === name));
   return { ...(mine.length ? { mcp: Object.fromEntries(mine) } : {}), checkout };
@@ -154,5 +151,5 @@ export const headerWritten: HeaderWrittenOf = (sent, stored) => {
  * `headers` as a read serves them: each value as `HEADER_MASK`, so no read carries a header's value out of the store.
  * @param headers A server's headers by name, as the record holds them.
  */
-export const maskedHeaders = (headers: Readonly<Record<string, string>>): Record<string, string> =>
+export const maskedHeaders = (headers: Readonly<Record<string, string>>) =>
   Object.fromEntries(Object.keys(headers).map((name) => [name, HEADER_MASK]));

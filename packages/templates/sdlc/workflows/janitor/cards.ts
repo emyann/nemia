@@ -33,7 +33,7 @@ const KINDS = ['fence', 'body', 'skill', 'on-purpose'];
 const DAY_MS = 86_400_000;
 
 /** A title as two cards are compared on: no heading mark, no case, its spacing one space. */
-const normal = (title: string): string =>
+const normal = (title: string) =>
   title
     .replace(/^#+\s*/, '')
     .replace(/\s+/g, ' ')
@@ -41,7 +41,7 @@ const normal = (title: string): string =>
     .toLowerCase();
 
 /** The closeout at `file`, parsed; refuses a missing argument, a file that does not read, or one that is not a JSON object. */
-function readCloseout(file: string | undefined): Record<string, unknown> {
+function readCloseout(file: string | undefined) {
   if (!file) throw new Refusal('no closeout reached the check: WF_CLOSEOUT is empty, so there are no cards to file');
   let parsed: unknown;
   try {
@@ -55,14 +55,14 @@ function readCloseout(file: string | undefined): Record<string, unknown> {
 }
 
 /** The day `day` names, as milliseconds since the epoch; refuses one that is not a `YYYY-MM-DD` day. */
-function dayOf(day: unknown, what: string): number {
+function dayOf(day: unknown, what: string) {
   const ms = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T00:00:00Z`) : NaN;
   if (Number.isNaN(ms)) throw new Refusal(`${what} is ${JSON.stringify(day)}, not a day: say it YYYY-MM-DD, in UTC`);
   return ms;
 }
 
 /** The closeout's `key`, checked as a period whose last day is not before its first: its days, in milliseconds. */
-function periodOf(closeout: Record<string, unknown>, key: string): Period & { start: number; end: number; days: number } {
+function periodOf(closeout: Record<string, unknown>, key: string) {
   const p = (closeout[key] ?? {}) as Period;
   const start = dayOf(p.from, `${key}.from`);
   const end = dayOf(p.to, `${key}.to`);
@@ -71,7 +71,7 @@ function periodOf(closeout: Record<string, unknown>, key: string): Period & { st
 }
 
 /** Refuses an `against` that is not as long as `period`, or does not end the day before it starts. */
-function checkPeriods(closeout: Record<string, unknown>): { period: Period; against: Period } {
+function checkPeriods(closeout: Record<string, unknown>) {
   const period = periodOf(closeout, 'period');
   const against = periodOf(closeout, 'against');
   if (against.days !== period.days)
@@ -88,7 +88,7 @@ function checkPeriods(closeout: Record<string, unknown>): { period: Period; agai
  * Card `i` of the list, checked field by field; refuses a field that is not text, a title of more than one line, a kind not known, no
  * factory or workflow.
  */
-function cardOf(value: unknown, i: number): Card {
+function cardOf(value: unknown, i: number) {
   const c = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const wrong = FIELDS.filter((k) => typeof c[k] !== 'string');
   if (wrong.length) throw new Refusal(`card #${i + 1}: ${wrong.join(', ')} must be text`);
@@ -106,7 +106,7 @@ function cardOf(value: unknown, i: number): Card {
 }
 
 /** The closeout's cards, checked whole; refuses a closeout with no list, and two cards with the same title. */
-function cardsOf(closeout: Record<string, unknown>): Card[] {
+function cardsOf(closeout: Record<string, unknown>) {
   if (!Array.isArray(closeout.cards))
     throw new Refusal('the closeout names no `cards` list: sign off with one, empty when nothing is to correct');
   const cards = closeout.cards.map(cardOf);
@@ -120,7 +120,7 @@ function cardsOf(closeout: Record<string, unknown>): Card[] {
 }
 
 /** The first line of a card's body, past its frontmatter: what `nemia inbox` lists as its title. */
-function firstLine(text: string): string {
+function firstLine(text: string) {
   const body = text
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
@@ -129,16 +129,16 @@ function firstLine(text: string): string {
 }
 
 /** The titles of the cards in the inbox, compared as `normal` makes them. */
-function inboxTitles(): Set<string> {
+function inboxTitles() {
   const root = process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows');
   const dir = path.join(root, 'inbox');
-  if (!fs.existsSync(dir)) return new Set();
+  if (!fs.existsSync(dir)) return new Set() satisfies Set<string>;
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
-  return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8')))));
+  return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8'))))) satisfies Set<string>;
 }
 
 /** The card's text as `nemia inbox add` files it: its title first, then the correction, the evidence and who filed it. */
-const textOf = (card: Card, { period, against }: { period: Period; against: Period }): string =>
+const textOf = (card: Card, { period, against }: { period: Period; against: Period }) =>
   [
     card.title.trim(),
     '',
@@ -151,7 +151,7 @@ const textOf = (card: Card, { period, against }: { period: Period; against: Peri
   ].join('\n');
 
 /** Files `card` through `nemia inbox add`, from a file in `dir`; refuses, naming the card, when the command fails. */
-function file(card: Card, text: string, dir: string, i: number): void {
+function file(card: Card, text: string, dir: string, i: number) {
   const at = path.join(dir, `card-${i + 1}.md`);
   fs.writeFileSync(at, text);
   const args = ['inbox', 'add', at, '--workflow', card.workflow.trim()];
@@ -170,7 +170,7 @@ function file(card: Card, text: string, dir: string, i: number): void {
 }
 
 /** Checks the closeout, then files each card the inbox has no title of. */
-function main(): void {
+function main() {
   const closeout = readCloseout(process.argv[2]);
   const periods = checkPeriods(closeout);
   const cards = cardsOf(closeout);

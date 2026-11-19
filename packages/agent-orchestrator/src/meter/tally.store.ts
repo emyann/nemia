@@ -48,10 +48,10 @@ type Meter = Tallies & { stack: Frame[]; mark: number };
 
 /** The meter of the pass whose async context this is, or none outside a pass. */
 const passes = new AsyncLocalStorage<Meter>();
-const open = (): Meter | undefined => passes.getStore();
+const open = () => passes.getStore();
 
-const empty = (): Tally => ({ ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 });
-const top = (m: Meter): Kind => m.stack.at(-1)?.kind ?? 'assess';
+const empty = () => ({ ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 });
+const top = (m: Meter) => m.stack.at(-1)?.kind ?? 'assess';
 
 /** The time from the last mark to `now`, charged to the kind on top — `assess` with none — and the mark moved to `now`. */
 const charge = (m: Meter, now: number) => {
@@ -64,7 +64,7 @@ const charge = (m: Meter, now: number) => {
  * to the overhead, with the mark moved to that same closing reading, so no time falls between the kinds and the overhead. Throws as `f`
  * does, counted all the same.
  */
-const counting = <T>(m: Meter, f: () => T): T => {
+const counting = <T>(m: Meter, f: () => T) => {
   const now = performance.now();
   charge(m, now);
   try {
@@ -94,7 +94,7 @@ const leave = (m: Meter, frame: Frame) =>
  * @param kind The phase the time of `f` is charged to.
  * @param f The work to count.
  */
-export function within<T>(kind: Kind, f: () => T): T {
+export function within<T>(kind: Kind, f: () => T) {
   const m = open();
   if (!m) return f();
   const frame: Frame = { kind };
@@ -117,7 +117,7 @@ export function within<T>(kind: Kind, f: () => T): T {
  * @param kind The phase the program's time is charged to.
  * @param program The work to count.
  */
-export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R>) =>
   Effect.suspend(() => {
     const m = open();
     if (!m) return program;
@@ -133,7 +133,7 @@ export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R
  * A read of `bytes`, counted to the kind at work — `assess` in none — while a pass is metered.
  * @param bytes The bytes read.
  */
-export const countRead = (bytes: number): void => {
+export const countRead = (bytes: number) => {
   const m = open();
   if (!m) return;
   const t = m.kinds[top(m)];
@@ -142,19 +142,19 @@ export const countRead = (bytes: number): void => {
 };
 
 /** A process started, counted to the kind at work while a pass is metered. */
-export const countSpawn = (): void => {
+export const countSpawn = () => {
   const m = open();
   if (m) m.kinds[top(m)].spawned++;
 };
 
 /** One run record read. */
-export const countRecord = (): void => {
+export const countRecord = () => {
   const m = open();
   if (m) m.records++;
 };
 
 /** One run at rest, answered from the tick's memo (`rest.ts`). */
-export const countRested = (): void => {
+export const countRested = () => {
   const m = open();
   if (m) m.rested++;
 };
@@ -163,7 +163,7 @@ export const countRested = (): void => {
  * What the pass saw (`Seen`), each figure given taking the place of the one before, while a pass is metered.
  * @param seen The figures the pass saw, each one given taking the place of the one before.
  */
-export const noteSeen = (seen: Partial<Seen>): void => {
+export const noteSeen = (seen: Partial<Seen>) => {
   const m = open();
   if (m) m.seen = { ...m.seen, ...seen };
 };
@@ -172,7 +172,7 @@ export const noteSeen = (seen: Partial<Seen>): void => {
  * A check the pass filed, by what it belongs to (`CheckLabels`), while a pass is metered.
  * @param labels The factory, workflow, step and agent the check filed belongs to.
  */
-export const noteFiledCheck = (labels: CheckLabels): void => {
+export const noteFiledCheck = (labels: CheckLabels) => {
   const m = open();
   if (m) m.checks.push({ factory: labels.factory, workflow: labels.workflow, step: labels.step, agent: labels.agent });
 };
@@ -188,7 +188,7 @@ export const addRuntime = (
   kind: Kind,
   io: { bytes: number; reads: number; spawned: number },
   observed: { ms: number; spawned: number; calls: number },
-): void => {
+) => {
   const m = open();
   if (!m) return;
   const t = m.kinds[kind];
@@ -209,7 +209,7 @@ export const addRuntime = (
  * before it is charged first, and the mark moved past it after. Outside a pass, `f` itself.
  * @param f The counting to run outside every phase.
  */
-export function aside<T>(f: () => T): T {
+export function aside<T>(f: () => T) {
   const m = open();
   return m ? counting(m, f) : f();
 }
@@ -219,7 +219,7 @@ export function aside<T>(f: () => T): T {
  * Outside a pass, `program` itself.
  * @param program The counting to run outside every phase.
  */
-export const asideEffect = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+export const asideEffect = <A, E, R>(program: Effect.Effect<A, E, R>) =>
   Effect.suspend(() => {
     const m = open();
     if (!m) return program;
@@ -236,10 +236,10 @@ export const asideEffect = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Ef
   });
 
 /** Whether a pass is being metered in this async context. */
-export const metering = (): boolean => open() !== undefined;
+export const metering = () => open() !== undefined;
 
 /** A meter opened at `t0` with nothing counted. */
-const opened = (t0: number): Meter => ({
+const opened = (t0: number) => ({
   kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>,
   records: 0,
   rested: 0,
@@ -251,7 +251,7 @@ const opened = (t0: number): Meter => ({
 });
 
 /** What `m`, opened at `t0`, counted up to now: the pass's time in ms and its counts, the time since the last mark charged first. */
-const counted = (m: Meter, t0: number): { ms: number; tallies: Tallies } => {
+const counted = (m: Meter, t0: number) => {
   const end = performance.now();
   charge(m, end);
   return {
@@ -265,19 +265,24 @@ const counted = (m: Meter, t0: number): { ms: number; tallies: Tallies } => {
  * A pass inside a pass is not metered again: it runs as part of the outer one and answers with no counts.
  * @param f The pass to run and meter.
  */
-export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: number; tallies?: Tallies }> {
+export async function metered<T>(f: () => Promise<T>) {
   const t0 = performance.now();
-  if (open()) return { value: await f(), ms: performance.now() - t0 };
+  if (open())
+    return { value: await f(), ms: performance.now() - t0 } satisfies { value: T; ms: number; tallies?: Tallies } as {
+      value: T;
+      ms: number;
+      tallies?: Tallies;
+    };
   const m = opened(t0);
   const value = await passes.run(m, f);
-  return { value, ...counted(m, t0) };
+  return { value, ...counted(m, t0) } satisfies { value: T; ms: number; tallies?: Tallies } as { value: T; ms: number; tallies?: Tallies };
 }
 
 /**
  * `program` on a fiber of its own, started in `m`'s async context with the caller's services, which yields to no other fiber of the
  * process but where it waits: fails, dies and is interrupted with the caller.
  */
-const inPass = <A, E, R>(m: Meter, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+const inPass = <A, E, R>(m: Meter, program: Effect.Effect<A, E, R>) =>
   Effect.flatMap(Effect.context<R>(), (context) => {
     const fiber = passes.run(m, () => Effect.runForkWith(Context.add(context, References.PreventSchedulerYield, true))(program));
     return Effect.onInterrupt(Fiber.join(fiber), () => Fiber.interrupt(fiber));
@@ -288,19 +293,23 @@ const inPass = <A, E, R>(m: Meter, program: Effect.Effect<A, E, R>): Effect.Effe
  * pass already metered, which counts it as its own. Fails, dies and is interrupted as `program` is, and leaves no meter open in any case.
  * @param program The pass to run and meter.
  */
-export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<{ value: A; ms: number; tallies?: Tallies }, E, R> =>
+export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>) =>
   Effect.suspend(() => {
     const t0 = performance.now();
     if (open()) return Effect.map(program, (value) => ({ value, ms: performance.now() - t0 }));
     const m = opened(t0);
     return Effect.map(inPass(m, program), (value) => ({ value, ...counted(m, t0) }));
-  });
+  }) satisfies Effect.Effect<{ value: A; ms: number; tallies?: Tallies }, E, R> as Effect.Effect<
+    { value: A; ms: number; tallies?: Tallies },
+    E,
+    R
+  >;
 
 /**
  * `fs.readFileSync(file, 'utf8')`, its bytes counted: throws as it does.
  * @param file The path of the file to read.
  */
-export const readText = (file: string): string => {
+export const readText = (file: string) => {
   const buf = fs.readFileSync(file);
   countRead(buf.length);
   return buf.toString('utf8');

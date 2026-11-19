@@ -44,27 +44,26 @@ const REFUSALS = [
  * Whether the agent answered a request without taking it, said by the error itself or by its cause.
  * @param e What a request threw.
  */
-export const untaken = (e: unknown): boolean => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
+export const untaken = (e: unknown) => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
 /**
  * Whether a request was not answered within its bound, said by the error itself or by its cause.
  * @param e What a request threw.
  */
-export const late = (e: unknown): boolean => e instanceof Late || (e instanceof Error && e.cause instanceof Late);
+export const late = (e: unknown) => e instanceof Late || (e instanceof Error && e.cause instanceof Late);
 /**
  * Whether the agent refused a send before it did anything with it: an answer that did not take it, or an A2A error of `REFUSALS`.
  * @param e What the send threw.
  */
-export const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => e instanceof E);
+export const sendRefused = (e: unknown) => untaken(e) || REFUSALS.some((E) => e instanceof E);
 
 /**
  * The message of an error, or anything else thrown as a string.
  * @param e What was thrown.
  */
-export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+export const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
  * What `e` says: whole when the runtime said it, else another party's words, quoted to `WORDS_QUOTE` characters.
  * @param e What was thrown.
  */
-export const wordsOf = (e: unknown): string =>
-  untaken(e) || late(e) || e instanceof Doubt ? messageOf(e) : quote(messageOf(e), WORDS_QUOTE);
+export const wordsOf = (e: unknown) => (untaken(e) || late(e) || e instanceof Doubt ? messageOf(e) : quote(messageOf(e), WORDS_QUOTE));

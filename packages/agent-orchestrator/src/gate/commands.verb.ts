@@ -35,13 +35,13 @@ export const ApproveInput = Schema.Struct({
 export type ApproveInput = typeof ApproveInput.Type;
 
 /** The caps an approval gives, as `<step>=<amount>`: the `--budget`s typed, then the `budgets` sent by step and dollars (`budgetArgs`). */
-const budgetsTyped = ({ budget, budgets }: ApproveInput): readonly string[] => [...(budget ?? []), ...budgetArgs(budgets ?? [])];
+const budgetsTyped = ({ budget, budgets }: ApproveInput) => [...(budget ?? []), ...budgetArgs(budgets ?? [])];
 
 /**
  * The budgets an approval gives, each `<step>=<amount>` read as the step's name and dollars above zero (`dollarsOf`), or why one is not:
  * in words that show the line to type. Which steps they may name is the approval's (`approveRun`).
  */
-function givenBudgets(input: ApproveInput): StepBudget[] | string {
+function givenBudgets(input: ApproveInput) {
   const { runId, step } = input;
   const given: StepBudget[] = [];
   for (const typed of budgetsTyped(input)) {
@@ -63,7 +63,7 @@ type Next = 'step' | 'waiting' | 'nothing';
  * line that ends it, with the words it needs. Refused as what was typed, as `nemia accept` refused it, once the run is there to say which
  * yes is given; a run that is not there is refused as missing first.
  */
-function loopRefusal({ runId, step, answer, answers, message }: ApproveInput): string | null {
+function loopRefusal({ runId, step, answer, answers, message }: ApproveInput) {
   const line = `nemia approve ${runId} ${step ?? '[<step>]'} --message "<why>"`;
   if (answer?.length || answers?.length)
     return `${step ?? `${runId}'s loop`} is out of rounds, not at a gate, and ending a loop takes your words, not answers to questions: ${line}. To go round once more instead: nemia retry ${runId} ${step ?? '[<step>]'} --round.`;
@@ -71,7 +71,7 @@ function loopRefusal({ runId, step, answer, answers, message }: ApproveInput): s
 }
 
 /** The refusal of `--budget` on ending a loop out of rounds, which sets no cap, or null. */
-function budgetsLoopRefusal(input: ApproveInput): string | null {
+function budgetsLoopRefusal(input: ApproveInput) {
   const { runId, step } = input;
   return budgetsTyped(input).length
     ? `${step ?? `${runId}'s loop`} is out of rounds, not at a gate, and ending a loop sets no step's cap: nemia approve ${runId} ${step ?? '[<step>]'} --message "<why>". To raise a step's cap, retry it with one: nemia retry ${runId} <step> --budget <amount>.`

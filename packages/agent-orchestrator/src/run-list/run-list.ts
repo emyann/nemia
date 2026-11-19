@@ -6,7 +6,7 @@
  * list asked by `status.state=finished` or by an outcome answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with
  * the `continue` token that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
-import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_OUTCOMES, RUN_STATES, type RunOutcome, type RunState } from 'objects';
+import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_OUTCOMES, RUN_STATES } from 'objects';
 import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';
 import type { RunNamespace } from '../../contracts/run-namespace.contract.ts';
 import type {
@@ -16,7 +16,7 @@ import type {
   SelectorTakes,
 } from '../../contracts/run-outcome-selector.contract.ts';
 import type { RunStateSelector, RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
-import { badLimit, listPage, type PageAsked, type Paged } from '../object/page.ts';
+import { badLimit, listPage, type PageAsked } from '../object/page.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { nameFirst } from './name-order.ts';
 
@@ -32,7 +32,7 @@ export const runNamespace: RunNamespace = (factory) => factory ?? DEFAULT_NAMESP
 const FIELD = 'status.state';
 
 /** `word` as a run's state, or null where it is none. */
-const stateOf = (word: string): RunState | null => RUN_STATES.find((s) => s === word) ?? null;
+const stateOf = (word: string) => RUN_STATES.find((s) => s === word) ?? null;
 
 /**
  * The selector `text` spells (`RunStateSelector`): `status.state`, then `==`, `!=` or `=`, then a run's state; null for anything else.
@@ -51,7 +51,7 @@ export const runStateSelector: RunStateSelectorOf = (text) => {
 const OUTCOME_FIELD = 'status.outcome';
 
 /** `word` as a finished run's outcome, or null where it is none. */
-const outcomeOf = (word: string): RunOutcome | null => RUN_OUTCOMES.find((o) => o === word) ?? null;
+const outcomeOf = (word: string) => RUN_OUTCOMES.find((o) => o === word) ?? null;
 
 /**
  * The selector `text` spells on a finished run's outcome (`RunOutcomeSelector`): `status.outcome`, then `==`, `!=` or `=`, then an
@@ -91,17 +91,17 @@ export type Finished = { readonly name: string; readonly finishedAt: string };
 const FINISHED_MARK = 'f.';
 
 /** Where `run` stands in the finished order (`FinishedKey`). */
-const keyOf = (run: Finished): FinishedKey => ({ finishedMs: Date.parse(run.finishedAt), name: run.name });
+const keyOf = (run: Finished) => ({ finishedMs: Date.parse(run.finishedAt), name: run.name });
 
 /**
  * The `continue` token that asks for the finished runs after `run`: `f.`, then the base64url of `[finishedAt, name]` as JSON.
  * @param run The last finished run a page answered: its name and when its work stopped.
  */
-export const finishedToken = (run: Finished): string =>
+export const finishedToken = (run: Finished) =>
   FINISHED_MARK + Buffer.from(JSON.stringify([run.finishedAt, run.name]), 'utf8').toString('base64url');
 
 /** The token's refusal: it names the fix. */
-const badFinishedToken = (token: string): Invalid =>
+const badFinishedToken = (token: string) =>
   new Invalid({
     message: `continue ${JSON.stringify(token)} is no token of the finished runs' list (fieldSelector=status.state=finished, or status.outcome=<outcome>): pass the continue its last page's metadata answered, as it is, or leave continue out to read from the newest`,
   });
@@ -110,7 +110,7 @@ const badFinishedToken = (token: string): Invalid =>
  * The place `token` was made of (`finishedToken`), or `Invalid` where it is none: a name-order token among them.
  * @param token The `continue` token a page's metadata answered.
  */
-export const finishedAfter = (token: string): Finished | Invalid => {
+export const finishedAfter = (token: string) => {
   const body = token.slice(FINISHED_MARK.length);
   if (!token.startsWith(FINISHED_MARK) || !/^[A-Za-z0-9_-]+$/.test(body)) return badFinishedToken(token);
   let read: unknown;
@@ -135,11 +135,7 @@ export const finishedAfter = (token: string): Finished | Invalid => {
  * @param asked What the page asks: its limit and its `continue` token, each where given.
  * @param bounds The least, the most and the default count of a page. Left out, `LIST_PAGE`.
  */
-export const finishedPageOf = <T extends Finished>(
-  sorted: readonly T[],
-  asked: PageAsked,
-  bounds: PageBounds = LIST_PAGE,
-): Paged<T> | Invalid => {
+export const finishedPageOf = <T extends Finished>(sorted: readonly T[], asked: PageAsked, bounds: PageBounds = LIST_PAGE) => {
   const after = asked.continue === undefined ? undefined : finishedAfter(asked.continue);
   if (after instanceof Invalid) return after;
   const found = after === undefined ? 0 : sorted.findIndex((run) => finishedBefore(keyOf(after), keyOf(run)));
@@ -160,5 +156,5 @@ export const finishedPageOf = <T extends Finished>(
  * @param a The first finished run.
  * @param b The finished run it is compared with.
  */
-export const byFinishedPlace = (a: Finished, b: Finished): number =>
+export const byFinishedPlace = (a: Finished, b: Finished) =>
   finishedBefore(keyOf(a), keyOf(b)) ? -1 : finishedBefore(keyOf(b), keyOf(a)) ? 1 : 0;

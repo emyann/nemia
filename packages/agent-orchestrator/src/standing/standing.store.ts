@@ -17,7 +17,7 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
  * `$WF_ROOT/standing.json`, where the tick keeps what its last pass read of where the branches stand.
  * @param home The store's root.
  */
-export const standingFile = (home: string): string => path.join(home, 'standing.json');
+export const standingFile = (home: string) => path.join(home, 'standing.json');
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -58,19 +58,19 @@ const REWRITTEN =
  * written whole and renamed.
  * @param home The store's root.
  */
-export function readStanding(home: string): StandingFile | undefined {
+export function readStanding(home: string) {
   let text: string;
   try {
     text = fs.readFileSync(standingFile(home), 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined satisfies StandingFile | undefined as StandingFile | undefined;
     throw err;
   }
   const parsed = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
   if (Option.isNone(parsed)) throw new Invalid({ message: `${standingFile(home)} is not JSON: ${REWRITTEN}` });
   const json = parsed.value;
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
-  if (Result.isSuccess(decoded)) return decoded.success;
+  if (Result.isSuccess(decoded)) return decoded.success satisfies StandingFile | undefined as StandingFile | undefined;
   const { path: at, words } = firstRefusal(StandingFileSchema, json);
   throw new Invalid({ message: `${standingFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
 }
@@ -80,9 +80,9 @@ export function readStanding(home: string): StandingFile | undefined {
  * how old what it shows of them is by (`standingLine`). Refused as `readStanding` refuses a file that does not read.
  * @param home The store's root.
  */
-export const listedStanding = (home: string): { at: string } | { none: true } => {
+export const listedStanding = (home: string) => {
   const file = readStanding(home);
-  return file ? { at: file.at } : { none: true };
+  return (file ? { at: file.at } : { none: true }) satisfies { at: string } | { none: true };
 };
 
 /**
@@ -92,7 +92,7 @@ export const listedStanding = (home: string): { at: string } | { none: true } =>
  * @param at When the pass read them, an ISO time.
  * @param places What the pass read of each repository, place and base.
  */
-export function writeStanding(home: string, at: string, places: readonly StoodRead[]): void {
+export function writeStanding(home: string, at: string, places: readonly StoodRead[]) {
   const file: StandingFile = { v: 1, at, places };
   fs.mkdirSync(home, { recursive: true });
   writeWhole(standingFile(home), JSON.stringify(file));

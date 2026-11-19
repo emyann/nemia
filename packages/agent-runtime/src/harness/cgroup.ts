@@ -28,7 +28,7 @@ export type CgroupMemory = { limitBytes: number; peakBytes?: number; oomKills: n
  * @param parent The slice the scope is put in, or undefined for the user manager's default.
  * @param program The program that makes the scope, `systemd-run` unless a test stands another in.
  */
-export const scopeArgv = (limitBytes: number | undefined, parent?: string, program = 'systemd-run'): string[] => [
+export const scopeArgv = (limitBytes: number | undefined, parent?: string, program = 'systemd-run') => [
   program,
   '--user',
   '--scope',
@@ -54,7 +54,7 @@ const probed = new Map<string, string | undefined>();
  * @param parent The slice the probe's scope is put in, or undefined for the user manager's default.
  * @param program The program that makes the scope, `systemd-run` unless a test stands another in.
  */
-export const scopeRefusal = (parent?: string, program = 'systemd-run'): string | undefined => {
+export const scopeRefusal = (parent?: string, program = 'systemd-run') => {
   const key = `${program}\u0000${parent ?? ''}`;
   if (probed.has(key)) return probed.get(key);
   const read = 'cat "/sys/fs/cgroup$(sed -n "s/^0:://p" /proc/self/cgroup)/memory.max"';
@@ -77,7 +77,7 @@ export const scopeRefusal = (parent?: string, program = 'systemd-run'): string |
  * `undefined` off cgroup v2, or for a process gone.
  * @param pid The process whose cgroup is read, or `self` for the runtime's own.
  */
-export const cgroupNow = (pid: number | 'self'): string | undefined => {
+export const cgroupNow = (pid: number | 'self') => {
   try {
     const line = fs
       .readFileSync(`/proc/${pid}/cgroup`, 'utf8')
@@ -90,7 +90,7 @@ export const cgroupNow = (pid: number | 'self'): string | undefined => {
 };
 
 /** A file of a cgroup's as a whole number, or `undefined` where it is not there or holds no number (`max`). */
-const numberIn = (file: string): number | undefined => {
+const numberIn = (file: string) => {
   try {
     const n = Number(fs.readFileSync(file, 'utf8').trim());
     return Number.isSafeInteger(n) ? n : undefined;
@@ -105,8 +105,8 @@ const numberIn = (file: string): number | undefined => {
  * for `oom`: each line is matched by its whole key. A line missing, or no number, reads 0.
  * @param text The contents of a cgroup's `memory.events` file.
  */
-export const memoryEventsOf = (text: string): { oomKills: number; oom: number } => {
-  const count = (key: string): number => {
+export const memoryEventsOf = (text: string) => {
+  const count = (key: string) => {
     const line = text.split('\n').find((l) => l.startsWith(`${key} `));
     return line === undefined ? 0 : Number(line.slice(key.length + 1)) || 0;
   };
@@ -119,7 +119,7 @@ export const memoryEventsOf = (text: string): { oomKills: number; oom: number } 
  * where the process is gone, the host is off cgroup v2, or the cgroup has no limit.
  * @param pid The process whose cgroup is read, or `self` for the runtime's own.
  */
-export const cgroupMemoryOf = (pid: number | 'self'): CgroupMemory | undefined => {
+export const cgroupMemoryOf = (pid: number | 'self') => {
   const folder = cgroupNow(pid);
   if (folder === undefined) return undefined;
   const limitBytes = numberIn(`${folder}/memory.max`);
@@ -156,7 +156,7 @@ export const scopeToEnd: ScopeToEnd = (recorded, own) =>
  * The pids `cgroup.procs` of the cgroup `folder` lists: none where the folder is gone, or unreadable.
  * @param folder The cgroup's folder, under the cgroup mount.
  */
-export const scopeLeftIn = (folder: string): number[] => {
+export const scopeLeftIn = (folder: string) => {
   try {
     return fs
       .readFileSync(`${folder}/cgroup.procs`, 'utf8')
@@ -178,7 +178,7 @@ export type ScopeLeft = { folder: string; pids: number[] };
  * @param recorded The cgroup folder the session's run file recorded, or undefined where it recorded none.
  * @param spared The pid of the detached run's worker that has written its end, or undefined to spare none.
  */
-export const scopeLeft = (recorded: string | undefined, spared?: number): ScopeLeft | undefined => {
+export const scopeLeft = (recorded: string | undefined, spared?: number) => {
   if (recorded === undefined || !scopeToEnd(recorded, cgroupNow('self'))) return undefined;
   const pids = scopeLeftIn(recorded).filter((pid) => pid !== spared);
   return pids.length > 0 ? { folder: recorded, pids } : undefined;
@@ -193,7 +193,7 @@ export const scopeLeft = (recorded: string | undefined, spared?: number): ScopeL
  * @param signal The signal to end it with: `SIGTERM` to ask, `SIGKILL` to end it at once.
  * @param spared The pid `SIGTERM` passes over, the worker that has written its end, or undefined to spare none.
  */
-export const endScopeIn = (folder: string, signal: 'SIGTERM' | 'SIGKILL', spared?: number): number[] => {
+export const endScopeIn = (folder: string, signal: 'SIGTERM' | 'SIGKILL', spared?: number) => {
   const pids = scopeLeftIn(folder);
   if (pids.length === 0) return pids;
   if (signal === 'SIGKILL') {

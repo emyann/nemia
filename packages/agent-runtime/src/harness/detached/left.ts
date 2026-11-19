@@ -44,12 +44,12 @@ const AskedSchema = Schema.Struct({
   at: Schema.Finite,
   mono: Schema.optional(Schema.Struct({ boot: Schema.String, ms: Schema.Finite })),
 });
-const decodeAsked = Schema.decodeUnknownOption(AskedSchema);
+const decodeAsked = Schema.decodeUnknownOption(Schema.fromJsonString(AskedSchema));
 
 /** The first ask `file` keeps; `undefined` where there is no file, or it is empty (as a stop wrote it before) or unreadable. */
 const askedIn = (file: string): Instant | undefined => {
   try {
-    const decoded = decodeAsked(JSON.parse(fs.readFileSync(file, 'utf8')));
+    const decoded = decodeAsked(fs.readFileSync(file, 'utf8'));
     return Option.isSome(decoded) ? decoded.value : undefined;
   } catch {
     return undefined;

@@ -58,7 +58,7 @@ export function writeFixRecord(home: string, record: FixRecord): void {
 export function readFixRecord(home: string, id: string): FixRecord | undefined {
   if (id === '' || id.includes('/') || id.startsWith('.')) return undefined;
   try {
-    return Schema.decodeUnknownSync(FixRecord)(JSON.parse(fs.readFileSync(fixFile(home, id), 'utf8')));
+    return Schema.decodeUnknownSync(Schema.fromJsonString(FixRecord))(fs.readFileSync(fixFile(home, id), 'utf8'));
   } catch {
     return undefined;
   }

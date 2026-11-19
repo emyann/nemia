@@ -6,6 +6,7 @@
  * daemon's start makes (`adoptBundled`): where the tools folder has no program of a harness, the one a release carries is copied into
  * it, so sessions run at once while its pin's install is filed.
  */
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -183,11 +184,13 @@ export function carryHarnesses(
 /** The key of a bundling package's `package.json` that names the version of the program its platform package carries. */
 const BUNDLED_VERSION_KEY = 'claudeCodeVersion';
 
+/** A `package.json`'s text decoded as a record of its keys. */
+const packageIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
+
 /** The `package.json` at `dir` read as a record, or undefined where it does not read as one. */
 const packageOf = (dir: string): Record<string, unknown> | undefined => {
   try {
-    const read: unknown = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    return typeof read === 'object' && read !== null ? (read as Record<string, unknown>) : undefined;
+    return Option.getOrUndefined(packageIn(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')));
   } catch {
     return undefined;
   }

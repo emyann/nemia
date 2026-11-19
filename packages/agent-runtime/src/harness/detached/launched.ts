@@ -47,12 +47,9 @@ export const workerSeen = (file: string): WorkerSeen => {
   } catch {
     return 'unknown';
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return 'unknown';
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return 'unknown';
+  const parsed = json.value;
   const decoded = decodeLaunched(parsed);
   if (Option.isNone(decoded)) return 'unknown';
   const { pid, start, boot } = decoded.value;

@@ -319,6 +319,23 @@ const REFUSALS: readonly Refusal[] = [
     names: ['.mcp.json', 'not valid JSON'],
   },
   {
+    name: 'everyMcpServer: a file whose `mcpServers` is no map, which Claude Code would start the session without, before a session exists',
+    refused: () => {
+      const cwd = tmp('no-map');
+      const file = path.join(cwd, '.mcp.json');
+      fs.writeFileSync(file, '{"mcpServers": 5}');
+      try {
+        everyMcpServer(cwd, undefined);
+        return undefined;
+      } catch (err) {
+        const words = (err as Error).message;
+        assert.ok(words.includes(file), `the file in: ${words}`);
+        return words;
+      }
+    },
+    names: ['.mcp.json', '`mcpServers`'],
+  },
+  {
     name: 'mcpRefuses: oauth that names no client',
     refused: () => refusesOne({ ...REMOTE, oauth: { callbackPort: 8791 } }),
     names: ['names no client', 'Set `clientId`'],

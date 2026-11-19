@@ -4,6 +4,7 @@
  * address (`?view=<step>/<path>`, `lib/viewAddress.ts`), mounted once at the root: a link that opens it pushes the address, so Back
  * closes it, and its Close takes the key out of the address. The run is the page's (`/runs/<run>…`) or the bar's (`?bar=`).
  */
+import { Option, Schema } from 'effect';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useMatches, useNavigate, useRouterState } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -179,9 +180,5 @@ export function TextFile({ file, viewer }: { file: Served; viewer: Exclude<Viewe
 
 /** The JSON a text holds, or the text itself where it holds none. */
 function parsed(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+  return Option.getOrElse(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text), () => text);
 }

@@ -15,7 +15,7 @@
  * file of its own renamed over it, its times kept, and only when the reader reads the kept text as it read the whole (`keepCapture`);
  * what was read is then kept under the kept capture's key. `SAID_VERSION` stays the readers': a capture kept so reads the same.
  */
-import { Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { UsageSchema } from '../../core/event-schema.ts';
@@ -57,24 +57,34 @@ type Said = { read: HarnessOutput } | { wrong: string };
 /** What this process has read of each run's capture, by the run's name, with the key it read it at. */
 export type SaidMemo = Map<string, SaidKey & { said: Said }>;
 
+/**
+ * What a session said as it ended, as a reading keeps it and a remote agent's registry entry holds it: its payload, and when it
+ * was said where that is known.
+ */
+export const StatementRead = {
+  closeout: Schema.optional(Schema.Struct({ payload: Schema.Unknown, at: Schema.optional(Schema.Finite) })),
+};
+
 /** A kept output: the key it was read at, and what the reader read (`HarnessOutput`, field for field). */
 const KeptSchema = Schema.Struct({
   version: Schema.Finite,
   size: Schema.Finite,
   mtimeMs: Schema.Finite,
   read: Schema.Struct({
-    closeout: Schema.optional(Schema.Struct({ payload: Schema.Unknown })),
+    ...StatementRead,
     usage: Schema.optional(UsageSchema),
     ownTokens: Schema.optional(UsageSchema),
     limit: Schema.optional(Schema.String),
-    denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
-    skills: Schema.optional(Schema.Array(Schema.String)),
-    files: Schema.optional(Schema.Array(Schema.String)),
+    denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
+    skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    files: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+    ranOn: Schema.optional(Schema.String),
+    harnessVersion: Schema.optional(Schema.String),
     ranIn: Schema.optional(Schema.String),
   }),
 });
 
-const isKept = Schema.is(KeptSchema);
+const keptIn = Schema.decodeUnknownOption(Schema.fromJsonString(KeptSchema));
 
 /** Whether a kept output of `version` is taken: the shipped readers' own, or one of `SAID_EXTENDED`. */
 const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_EXTENDED.includes(version);
@@ -86,14 +96,16 @@ const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_E
  * @param key The capture's size and modification time now, which the kept reading must have been read at.
  */
 export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
-  let parsed: unknown;
+  let text: string;
   try {
-    parsed = JSON.parse(readText(file));
+    text = readText(file);
   } catch {
     return undefined;
   }
-  if (!isKept(parsed) || !isTaken(parsed.version) || parsed.size !== key.size || parsed.mtimeMs !== key.mtimeMs) return undefined;
-  return parsed.read as HarnessOutput;
+  const kept = Option.getOrUndefined(keptIn(text));
+  if (!kept || !isTaken(kept.version) || kept.size !== key.size || kept.mtimeMs !== key.mtimeMs) return undefined;
+  const read: HarnessOutput = kept.read;
+  return read;
 };
 
 /**

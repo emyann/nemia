@@ -7,7 +7,7 @@
  * has to the reader. A field that is there has the shape the runtime reads, or the line is refused with words that name it, its
  * first wrong field and the fix (`decodeLine`): a refused line is never read as saying nothing.
  */
-import { Result, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Count = Schema.Natural;
@@ -209,12 +209,9 @@ export const decodeLine = <K extends LineKind>(
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], where: string): Line<K> | undefined => {
-  let entry: unknown;
-  try {
-    entry = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return undefined;
+  const entry = json.value;
   const read = decodeLine(entry, kinds, where);
   if (read && 'wrong' in read) throw new Error(read.wrong);
   return read?.line;
@@ -228,12 +225,9 @@ export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], wh
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
 export const writtenAt = (text: string, where: string): number | undefined => {
-  let entry: unknown;
-  try {
-    entry = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return undefined;
+  const entry = json.value;
   if (typeof entry !== 'object' || entry === null) return undefined;
   const kind = kindOf(entry, KINDS);
   if (kind !== undefined) {

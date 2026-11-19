@@ -362,12 +362,12 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       fs.mkdirSync(path.join(checkout, '.git'));
       const agents = path.join(checkout, 'workflows', 'agents');
       fs.mkdirSync(agents, { recursive: true });
-      refused(() => writeAgent(ROOT, agents, scribe, v), 'Invalid', 'the store knows', 'nemia factory add <name> --repo <repo>');
+      refused(() => writeAgent(ROOT, agents, scribe, v), 'Invalid', 'the store knows', 'nemia factory volume add <factory> <repo>:rw');
       assert.equal(fs.existsSync(path.join(agents, 'scribe.md')), false, 'a .git beside it makes no repository known');
       writeAgent(ROOT, agents, scribe, { version: null, repo: checkout });
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
       fs.rmSync(path.join(agents, 'scribe.md'));
-      addFactoryAt(ROOT, { name: 'agent-known', repos: [checkout] });
+      addFactoryAt(ROOT, { name: 'agent-known', volumes: [checkout].map((r) => `${r}:rw`) });
       writeAgent(ROOT, agents, scribe, v);
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },

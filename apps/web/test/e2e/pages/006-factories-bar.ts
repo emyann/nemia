@@ -119,7 +119,7 @@ async function contents(page: Page): Promise<void> {
   await blockOf(page, broken).click();
   const why = await expectFactory(page, broken, `a click on ${broken}'s block shows it`);
   await expectVisible(
-    why.locator('[data-error]', { hasText: /^Its file does not read: [\s\S]*repos/ }),
+    why.locator('[data-error]', { hasText: /^Its file does not read: [\s\S]*volumes/ }),
     'and why its file does not read, whole',
   );
   await settled(page);

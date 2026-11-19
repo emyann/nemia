@@ -73,7 +73,7 @@ const factoryOf = (name: string, more: { spec?: Partial<Factory['spec']>; status
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: meta(name),
-  spec: { repos: [], hires: {}, volumes: [], ...more.spec },
+  spec: { hires: {}, volumes: [], ...more.spec },
   status: { conditions: [], untrusted: [], ...more.status },
 });
 
@@ -181,13 +181,16 @@ test("a factory's row: the default's sentence, one that does not read, one with 
       factoryOf('broken', { status: { error: 'factory.yaml does not parse\nat line 3' } }),
       factoryOf('acme', {
         spec: {
-          repos: ['/r/one', '/r/two'],
+          volumes: [
+            { name: 'one', path: '/r/one', readOnly: false },
+            { name: 'two', path: '/r/two', readOnly: false },
+            { name: 'cache', path: '/v', readOnly: true },
+          ],
           workflows: ['quick', 'build'],
           hires: { review: 'reviewer', implement: 'implementer' },
           template: { source: 'starter', version: '1.2.0', params: {} },
           revisions: 'follow',
           costLines: { build: 80 },
-          volumes: [{ name: 'cache', path: '/v', readOnly: true }],
         },
         status: {
           applied: '1.2.0',

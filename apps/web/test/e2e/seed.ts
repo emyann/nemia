@@ -943,7 +943,13 @@ export const FACTORIES = {
 } as const;
 
 /**
- * Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with no `repos`;
+ * The volumes of a factory's file that work on `paths`, each writable, as the store writes them.
+ * @param paths The repositories, by their whole paths.
+ */
+export const worked = (paths: readonly string[]): { path: string; readOnly: false }[] => paths.map((path) => ({ path, readOnly: false }));
+
+/**
+ * Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with `volumes` no list;
  * and, in the harness's own file under the store's `claude/`, the trust of each place, as filing a factory gives it, so no page says a
  * place is untrusted but the one that takes a trust away.
  */
@@ -951,9 +957,13 @@ export function seedFactories(root: string, repo: string): void {
   const dir = path.join(root, 'factories');
   const { hiring, bare, others, broken } = FACTORIES;
   const hires = { [hiring.hire]: WORKFLOWS.good.agent.name };
-  write(path.join(dir, `${hiring.name}.json`), JSON.stringify({ repos: [repo], workflows: [WORKFLOWS.good.name], hires }, null, 2));
-  for (const name of [bare, ...others]) write(path.join(dir, `${name}.json`), JSON.stringify({ repos: [path.join(root, name)] }, null, 2));
-  write(path.join(dir, `${broken}.json`), JSON.stringify({ workflows: [WORKFLOWS.good.name] }, null, 2));
+  write(
+    path.join(dir, `${hiring.name}.json`),
+    JSON.stringify({ volumes: worked([repo]), workflows: [WORKFLOWS.good.name], hires }, null, 2),
+  );
+  for (const name of [bare, ...others])
+    write(path.join(dir, `${name}.json`), JSON.stringify({ volumes: worked([path.join(root, name)]) }, null, 2));
+  write(path.join(dir, `${broken}.json`), JSON.stringify({ volumes: 'none', workflows: [WORKFLOWS.good.name] }, null, 2));
   const places = [repo, ...[bare, ...others].map((name) => path.join(root, name))];
   const projects = Object.fromEntries(places.map((place) => [place, { hasTrustDialogAccepted: true }]));
   write(path.join(root, 'claude', '.claude.json'), `${JSON.stringify({ projects }, null, 2)}\n`);
@@ -1004,9 +1014,9 @@ export function checkoutIn(root: string, workflows: readonly string[], hires: Re
 export function onSeveralRepos(root: string): { second: string; back: () => void } {
   const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
   const found = fs.readFileSync(file, 'utf8');
-  const read = JSON.parse(found) as { repos: string[] };
+  const read = JSON.parse(found) as { volumes: { path: string; readOnly: boolean }[] };
   const second = path.join(root, FACTORIES.bare);
-  fs.writeFileSync(file, JSON.stringify({ ...read, repos: [...read.repos, second] }, null, 2));
+  fs.writeFileSync(file, JSON.stringify({ ...read, volumes: [...read.volumes, ...worked([second])] }, null, 2));
   return { second, back: () => fs.writeFileSync(file, found) };
 }
 

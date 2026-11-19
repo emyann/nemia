@@ -59,7 +59,7 @@ const refusedKind = async (args: Record<string, unknown>): Promise<string> => {
 
 test('`nemia policy reach`: which steps at their gate her rules can approve in a factory and a run, why not, and what would', async (t) => {
   const repo = repoWithWorkflows();
-  createFactoryAt(ROOT, { name: 'f', repos: [repo], workflows: [], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'f', volumes: [{ path: repo, readOnly: false }], workflows: [], hires: {}, schedules: {} });
   for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
   writeFactoryLevel(ROOT, 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
 

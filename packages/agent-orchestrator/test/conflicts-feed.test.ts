@@ -102,7 +102,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     exportTemplate({ dir, from: repo });
     fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n\nWrite the tests first.\n');
     for (const name of ['acme', 'quiet']) {
-      await handedTo('factory', 'apply', name, '--template', dir, '--repo', repo);
+      await handedTo('factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`);
       reconciled(factory(name));
     }
     await pass();

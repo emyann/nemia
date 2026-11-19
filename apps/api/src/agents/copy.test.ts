@@ -21,7 +21,7 @@ import { listedIn } from '../../test/definitions.ts';
 import { story } from 'test-kit/checkpoints';
 const repo = scratch('nemia-api-copy-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-addFactory({ name: 'elsewhere', repos: [repo] });
+addFactory({ name: 'elsewhere', volumes: [repo].map((r) => `${r}:rw`) });
 
 type LibraryAgent = import('./agents.ts').LibraryAgent;
 

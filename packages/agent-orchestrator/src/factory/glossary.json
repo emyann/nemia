@@ -11,7 +11,7 @@
   "terms": [
     {
       "term": "Factory",
-      "meaning": "a named grouping in the store: the repositories a body of work is on, the workflows it offers and the repository each works on, and the agents it hires into their steps.",
+      "meaning": "a named grouping in the store: its volumes, the writable ones the repositories a body of work is on, the workflows it offers and the repository each works on, and the agents it hires into their steps.",
       "type": "Factory",
       "see": {
         "label": "Factories",
@@ -25,12 +25,90 @@
     },
     {
       "term": "Volume",
-      "meaning": "a folder of the person's machine a factory mounts for every local step of its runs, beside its repositories, marked read-only (`:ro`) or writable (`:rw`) as docker compose marks one; kept in the factory's own file, never in its template. A writable one is writable only where a step's fence writes, and is not the run's workspace: nothing commits or lands what a step writes there.",
+      "meaning": "a folder of the machine the store is on, or a git URL it clones, that a factory mounts for every local step of its runs, marked read-only (`:ro`) or writable (`:rw`) as docker compose marks one; a factory's file holds its volumes and nothing else of where it works, never its template. A writable one is a repository the factory works on (`workedOn`): a run works in one of them, the others mounted read-only. A read-only one is a folder every step reads. A factory may have none, and starts no run until it has a writable one.",
       "type": "Volume",
       "see": {
         "label": "Factories",
         "href": "/factories/#its-volumes"
-      }
+      },
+      "retired": [
+        {
+          "spelling": "repos",
+          "card": "factory: a factory is a home, its writable volumes the repositories it works on",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/factory/from-repos/from-repos.ts",
+              "why": "reads a file an earlier release wrote, once, to move it to volumes"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/from-repos/from-repos.test.ts",
+              "why": "the files of an earlier release it moves"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.verb.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.test.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.verb.test.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/factory.store.ts",
+              "why": "reads the keys of a file an earlier release wrote, to refuse it naming nemia up and to move it once"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/servers/servers.ts",
+              "why": "`actions,repos` names toolsets of GitHub's MCP server in a header's example, no factory's key"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/servers/servers.verb.ts",
+              "why": "`actions,repos` names toolsets of GitHub's MCP server in a header's example, no factory's key"
+            }
+          ]
+        },
+        {
+          "spelling": "origins",
+          "card": "factory: a factory is a home, its writable volumes the repositories it works on",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/factory/from-repos/from-repos.ts",
+              "why": "reads a file an earlier release wrote, once, to move it to volumes"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/from-repos/from-repos.test.ts",
+              "why": "the files of an earlier release it moves"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.verb.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.test.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/move/move.verb.test.ts",
+              "why": "a move keeps `--repo <source>=` until its follow-up card unifies it with `--volume`"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/factory/factory.store.ts",
+              "why": "reads the keys of a file an earlier release wrote, to refuse it naming nemia up and to move it once"
+            }
+          ]
+        }
+      ]
     },
     {
       "term": "Volume name",
@@ -190,7 +268,7 @@
     },
     {
       "term": "Clone",
-      "meaning": "a factory's repository named by its git URL: kept in the store under `clones/<host>/<path>` (`cloneTarget`, proved by `packages/agent-orchestrator/contracts/clone-target.contract.ts`, in `packages/agent-orchestrator/src/factory/clones/clones.ts`), its URL recorded beside it in the factory's `origins`, cloned by the place's `clone` when the factory is added or applied, on the api's machine where that is asked over the api (`factories.create`, `factories.apply`), and again by the daemon's sweep when its folder is gone (`clonesOnce`). The machine's own git credentials make it; Nemia holds none.",
+      "meaning": "a factory's repository named by its git URL: kept in the store under `clones/<host>/<path>` (`cloneTarget`, proved by `packages/agent-orchestrator/contracts/clone-target.contract.ts`, in `packages/agent-orchestrator/src/factory/clones/clones.ts`), its URL recorded on its volume as its `origin`, cloned by the place's `clone` when the factory is added or applied, on the api's machine where that is asked over the api (`factories.create`, `factories.apply`), and again by the daemon's sweep when its folder is gone (`clonesOnce`). The machine's own git credentials make it; Nemia holds none.",
       "type": "CloneTarget"
     },
     {

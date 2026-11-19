@@ -244,7 +244,7 @@ test('REFUSED: a github that is no boolean, at apply, naming the --set that fixe
   fs.mkdirSync(repo);
   spawnSync('git', ['init', '-q'], { cwd: repo, env });
   await assert.rejects(
-    handled(env, FACTORY_APPLY, ['x', '--template', COPY, '--repo', repo, '--no-trust', '--set', 'github=yes']),
+    handled(env, FACTORY_APPLY, ['x', '--template', COPY, '--volume', `${repo}:rw`, '--no-trust', '--set', 'github=yes']),
     /--set github=(?:true|false)\b/,
   );
   assert.equal(fs.existsSync(path.join(env.WF_ROOT!, 'factories', 'x')), false, 'and no factory is filed');

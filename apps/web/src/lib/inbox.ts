@@ -303,7 +303,7 @@ export function cardRepo(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factor
   const factory = factories?.find((f) => f.name === entry.factory && !f.default && f.error === null);
   if (!factory) return null;
   if (entry.workflow !== null && isName(entry.workflow)) return startRepo(factory, entry.workflow);
-  const [only, ...more] = factory.repos;
+  const [only, ...more] = factory.worksOn;
   return only !== undefined && !more.length ? { repo: only } : null;
 }
 

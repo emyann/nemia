@@ -9,7 +9,18 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { AGENTS, AgentDoor, fillsOf, hireRefusalOf, keptRuns, listedAtOnce, Missing, SkillDoor, WORKFLOWS_STEP } from 'agent-orchestrator';
+import {
+  AGENTS,
+  AgentDoor,
+  fillsOf,
+  hireRefusalOf,
+  keptRuns,
+  listedAtOnce,
+  Missing,
+  SkillDoor,
+  WORKFLOWS_STEP,
+  workedOn,
+} from 'agent-orchestrator';
 import type { AgentReading, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
 import type { SkillsFound, StepSpec } from 'agent-orchestrator/workflow';
@@ -140,7 +151,7 @@ export function hiredInOf(
 ): HiredIn[] {
   return factories.flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(workflow)) return [];
-    if (from === 'repo' && (repo === undefined || !factory.repos.some((r) => path.resolve(r) === path.resolve(repo)))) return [];
+    if (from === 'repo' && (repo === undefined || !workedOn(factory).includes(path.resolve(repo)))) return [];
     const agent = fillsOf(factory.hires, workflow)[step];
     return agent === undefined ? [] : [{ factory: factory.name, agent }];
   });

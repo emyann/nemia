@@ -32,6 +32,7 @@ import {
   setInstructionAt,
   setScheduleAt,
 } from '../src/factory/factory.store.ts';
+import { volumeBase } from '../src/factory/volume/volume.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { detached } from './factory-planted.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -106,7 +107,7 @@ function aTeam(): { build: string; dev: string } {
 function fresh(attached: readonly string[] = ['build']): { repo: string; build: string; dev: string } {
   const team = aTeam();
   const repo = aRepo();
-  addFactoryAt(ROOT, { name: 'pipao', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   for (const workflow of attached) attachWorkflowAt(ROOT, { factory: 'pipao', workflow });
   return { repo, ...team };
 }
@@ -119,7 +120,7 @@ function hired(factory = 'pipao'): void {
 
 /** A factory `name` filed on `repos`, with `build` attached and every step of it hired. */
 function filed(name: string, ...repos: string[]): void {
-  addFactoryAt(ROOT, { name, repos });
+  addFactoryAt(ROOT, { name, volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'build' });
   hired(name);
 }
@@ -253,15 +254,25 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test(
-    '`nemia factory add` files <name>.json, each repository absolute and named once, no workflows key, a plain directory enough',
+    '`nemia factory add` files <name>.json, each writable volume absolute and named once, in the order given, no workflows key',
     async () => {
-      await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
+      await typedFrom(ROOT, [
+        'factory',
+        'add',
+        'pipao',
+        '--volume',
+        `${a}:rw`,
+        '--volume',
+        `${path.relative(ROOT, a)}:rw`,
+        '--volume',
+        `${b}:rw`,
+      ]);
       assert.deepEqual(factoryFiles(), ['pipao.json']);
-      assert.deepEqual(fileOf('pipao'), { repos: [a, b], generation: 1 }, 'an add writes no workflows key, and its generation 1');
-      assert.ok(!fs.existsSync(path.join(a, '.git')));
+      const volumes = [a, b].map((r) => ({ path: r, readOnly: false, name: volumeBase(r) }));
+      assert.deepEqual(fileOf('pipao'), { volumes, generation: 1 }, 'an add writes no workflows key, and its generation 1');
       assert.deepEqual(readFactoryAt(ROOT, 'pipao'), {
         name: 'pipao',
-        repos: [a, b],
+        volumes,
         workflows: [],
         hires: {},
         schedules: {},
@@ -298,7 +309,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await typedFrom(ROOT, ['factory', 'fire', 'pipao', '--step', 'intake/frame']);
       await typedFrom(ROOT, ['factory', 'detach', 'pipao', 'intake']);
       assert.deepEqual(fileOf('pipao'), {
-        repos: [a, b],
+        volumes: [a, b].map((r) => ({ path: r, readOnly: false, name: volumeBase(r) })),
         later: { kept: true },
         workflows: ['build', 'notes'],
         hires: { 'build/implement': 'implementer', 'build/review': 'reviewer' },
@@ -419,15 +430,19 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     '`nemia factory volume add` writes a marked volume into the file, a second of its path replacing it; REFUSED unmarked or on default',
     async () => {
       const f = path.basename(file, '.json');
-      const [notes, scratchpad] = [scratch('wf-volume-notes-'), scratch('wf-volume-pad-')];
-      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]);
+      const [notes, pad] = [scratch('wf-volume-notes-'), scratch('wf-volume-pad-')];
+      stand().world.repository(pad, { 'README.md': 'x\n' });
+      const before = (fileOf(f) as { volumes: unknown[] }).volumes;
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]), 'Invalid', `${notes}:ro`);
       await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]);
-      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${scratchpad}:rw`]);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${pad}:ro`]);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${pad}:rw`]);
       const volumes = [
-        { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() },
-        { path: scratchpad, readOnly: false, name: path.basename(scratchpad).toLowerCase() },
-      ].sort((x, y) => x.path.localeCompare(y.path));
-      assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes);
+        ...before,
+        { path: notes, readOnly: true, name: volumeBase(notes) },
+        { path: pad, readOnly: false, name: volumeBase(pad) },
+      ];
+      assert.deepEqual((fileOf(f) as { volumes: unknown }).volumes, volumes, 'a new one last, one of its path replaced in place');
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
       await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
       await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
@@ -438,31 +453,45 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const listed = listedHere().filter((l) => l.includes(' volume '));
       assert.deepEqual(
         listed.map((l) => l.trim().split(' ').slice(0, 3).join(' ')),
-        volumes.map((v) => `volume ${v.path} ${v.readOnly ? ':ro' : ':rw'}`),
+        [`volume ${notes} :ro`],
+        'the read-only volumes listed apart; the writable ones are what it works on',
       );
+      assert.ok(listedHere().some((l) => l.includes(pad)));
     },
   );
 
   await s.test(
-    'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started',
+    'a run started then mounts the volumes, frozen on its record and said at its start; a volume removed after changes no run started; REFUSED the repository a run in play works on, taken off or made read-only',
     async () => {
       const f = path.basename(file, '.json');
-      const volumes = (readFactoryAt(ROOT, f).volumes ?? []).map(({ path: at, readOnly }) => ({ path: at, readOnly }));
+      const filed = readFactoryAt(ROOT, f).volumes;
+      const readOnly = filed.filter((v) => v.readOnly).map(({ path: at }) => ({ path: at, readOnly: true }));
       const out = await startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
-      assert.deepEqual(runRecord(ROOT, id).volumes, volumes);
-      const writable = volumes.find((v) => !v.readOnly);
-      assert.ok(writable);
+      assert.deepEqual(runRecord(ROOT, id).volumes, readOnly, 'a run mounts the read-only volumes; the writable ones are its repositories');
       assert.deepEqual(
-        [out.facts.volumes ?? [], (out.facts.writableVolumes ?? []).map((w) => w.path)],
-        [volumes.filter((v) => v.readOnly).map((v) => v.path), [writable.path]],
-        'the start says the volumes it mounts, read-only and writable',
+        [out.facts.volumes ?? [], out.facts.writableVolumes ?? []],
+        [readOnly.map((v) => v.path), []],
+        'the start says the volumes it mounts',
       );
       const before = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-      for (const v of volumes) await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]);
-      assert.equal('volumes' in fileOf(f), false, 'the key is gone once none is left');
+      const unwired = filed.filter((v) => v.readOnly || ![a, b].includes(v.path));
+      for (const v of unwired) await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]);
+      assert.deepEqual(
+        readFactoryAt(ROOT, f).volumes.map((v) => v.path),
+        [a, b],
+      );
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), before);
-      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, writable.path]), 'Missing', writable.path);
+      const gone = unwired[0]?.path ?? '';
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, gone]), 'Missing', gone);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', 'nemia factory attach');
+      assert.equal(runRecord(ROOT, id).repo, a, 'the run works on the repository build is wired to');
+      await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(b)]);
+      const wired = fs.readFileSync(file, 'utf8');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, a]), 'Conflict', id, `nemia cancel ${id}`);
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${a}:ro`]), 'Conflict', id, `nemia cancel ${id}`);
+      assert.equal(fs.readFileSync(file, 'utf8'), wired, 'nothing written');
+      await typedFrom(ROOT, ['factory', 'attach', f, path.basename(build), '--repo', path.basename(a)]);
     },
   );
 
@@ -569,7 +598,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
 
   await s.test('a factory of one repository gives the run its repository, from any directory', async () => {
     const c = aRepo();
-    await typedFrom(ROOT, ['factory', 'add', 'mono', '--repo', c]);
+    await typedFrom(ROOT, ['factory', 'add', 'mono', '--volume', `${c}:rw`]);
     attachWorkflowAt(ROOT, { factory: 'mono', workflow: 'build' });
     hired('mono');
     assert.equal(repoFor(ROOT, 'mono', undefined, ROOT), c);
@@ -596,7 +625,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   await s.test(
     'with WF_DEFAULT_FACTORY_STARTS=1, a start no factory holds is in the default factory: plain sessions, no factory recorded',
     async () => {
-      fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"], "hires": {"build/implement": "shipper"}}\n');
+      fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"volumes": [], "hires": {"build/implement": "shipper"}}\n');
       const loose = aRepo();
       for (const factory of [undefined, 'default']) {
         const started = await runPlaced(
@@ -716,15 +745,14 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     await startRefused(() => start('nope'), 'Missing', 'nope', 'pipao');
   });
 
-  await s.test("REFUSED: a repository outside the factory, naming the factory's list, the --repo and the add", async () => {
+  await s.test("REFUSED: a repository outside the factory, naming the factory's list, the --repo and the volume's add", async () => {
     const other = aRepo();
     const said = await startRefused(
       () => runPlaced(startRun({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' })),
       'Invalid',
       other,
-      'pipao',
       `--repo ${repo}`,
-      `nemia factory add <name> --repo ${other}`,
+      `nemia factory volume add pipao ${other}:rw`,
     );
     assert.ok(!said.includes('default factory'), "only the factory's own fix");
   });
@@ -796,7 +824,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
       loose,
       '--factory <name>',
       'pipao',
-      'nemia factory add <name> --repo <root>',
+      'nemia factory add <name> --volume <root>:rw',
     );
   });
 
@@ -889,7 +917,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       fs.mkdirSync(skilled);
       fs.writeFileSync(path.join(skilled, 'implement.md'), '---\nplace: git\nskills: review-a-change\n---\nBuild what was asked.\n');
       fs.writeFileSync(path.join(skilled, 'review.md'), '---\nafter: implement\nplace: git\n---\nReview it.\n');
-      addFactoryAt(ROOT, { name: 'acme', repos: [repo] });
+      addFactoryAt(ROOT, { name: 'acme', volumes: [repo].map((r) => `${r}:rw`) });
       attachWorkflowAt(ROOT, { factory: 'acme', workflow: 'skilled' });
       hireAgentAt(ROOT, { factory: 'acme', agent: 'implementer', step: 'skilled/implement' });
       hireAgentAt(ROOT, { factory: 'acme', agent: 'reviewer', step: 'skilled/review' });
@@ -957,7 +985,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       'nosuch',
       'pipao',
     );
-    addFactoryAt(ROOT, { name: 'devs', repos: [repo] });
+    addFactoryAt(ROOT, { name: 'devs', volumes: [repo].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'devs', workflow: 'dev' });
     const unattached = aCard('unattached', '---\nfactory: devs\n---\nBuild it.\n');
     await startRefused(
@@ -1049,7 +1077,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     return repo;
   };
   const [a, b] = [withTeam(aRepo()), withTeam(aRepo())];
-  addFactoryAt(ROOT, { name: 'f', repos: [a, b] });
+  addFactoryAt(ROOT, { name: 'f', volumes: [a, b].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'f', workflow: 'dev' });
 
   await s.test('REFUSED: a card of a factory of two repositories that names none for its workflow, naming the attach', async () => {
@@ -1094,7 +1122,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
 
   await s.test('a factory of one repository: a card naming none starts on it, with no --repo on the attach', async () => {
     const c = withTeam(aRepo());
-    addFactoryAt(ROOT, { name: 'g', repos: [c] });
+    addFactoryAt(ROOT, { name: 'g', volumes: [c].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'g', workflow: 'dev' });
     aCard('in-g', '---\nworkflow: dev\nfactory: g\n---\nOne repository.\n');
     const run = runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', 'in-g'])));
@@ -1103,7 +1131,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
 
   await s.test("a card's workflow by name that only yours holds starts from yours, on the factory's repository", async () => {
     const d = aRepo();
-    addFactoryAt(ROOT, { name: 'h', repos: [d] });
+    addFactoryAt(ROOT, { name: 'h', volumes: [d].map((r) => `${r}:rw`) });
     attachWorkflowAt(ROOT, { factory: 'h', workflow: 'dev' });
     const yours = path.join(ROOT, 'workflows');
     fs.cpSync(path.dirname(dev), yours, { recursive: true });
@@ -1114,5 +1142,29 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     } finally {
       fs.rmSync(yours, { recursive: true, force: true });
     }
+  });
+});
+
+test('a factory with no writable volume: a start refused naming the volume add, then one given a repository starts on it', async (t) => {
+  const s = story(t);
+  const { build } = aTeam();
+  const [notes, repo] = [scratch('wf-volume-notes-'), aRepo()];
+  await typedFrom(ROOT, ['factory', 'add', 'empty']);
+  attachWorkflowAt(ROOT, { factory: 'empty', workflow: 'build' });
+  hired('empty');
+  const startIn = () => startTypedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'empty', '--no-worktree']);
+
+  await s.test('REFUSED: no volume at all, naming the volume add with :rw', async () => {
+    await startRefused(startIn, 'Invalid', 'nemia factory volume add empty <path|url>:rw');
+  });
+  await s.test('REFUSED: a read-only volume alone works on nothing, naming the same add', async () => {
+    await typedFrom(ROOT, ['factory', 'volume', 'add', 'empty', `${notes}:ro`]);
+    await startRefused(startIn, 'Invalid', 'nemia factory volume add empty <path|url>:rw');
+  });
+  await s.test('given one writable volume, a start works on it, and mounts the read-only one', async () => {
+    await typedFrom(ROOT, ['factory', 'volume', 'add', 'empty', `${repo}:rw`]);
+    const record = runRecord(ROOT, startedId(await startIn()));
+    assert.equal(record.repo, repo);
+    assert.deepEqual(record.volumes, [{ path: notes, readOnly: true }]);
   });
 });

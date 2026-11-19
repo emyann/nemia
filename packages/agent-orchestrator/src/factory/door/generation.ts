@@ -26,21 +26,20 @@ export const generationOf = (factory: Pick<Factory, 'generation'>): number => fa
 /** What of a factory is its spec, the desired state its runs read: its file's keys that say what it works on and how, in one key. */
 const specKey = (factory: Factory): string =>
   JSON.stringify([
-    factory.repos,
     factory.workflows,
     factory.hires,
-    (factory.volumes ?? []).map((v) => [v.path, v.readOnly]),
+    factory.volumes.map((v) => [v.path, v.readOnly, v.origin ?? null]),
     factory.harnessSettings ?? null,
     factory.costLines ?? null,
-    factory.origins ?? null,
     factory.workflowRepos ?? null,
     factory.revisions ?? null,
     factory.template ?? null,
   ]);
 
 /**
- * Whether `now` changes the spec of `was`: its repositories, workflows, hires, volumes (each by its path and mark: a name given changes no
- * mount), harness settings, cost lines, origins, workflows' repositories, revisions policy or template. Its schedules, its instruction's
+ * Whether `now` changes the spec of `was`: its workflows, hires, volumes (each by its path, its mark and its origin, in order: a name
+ * given changes no mount), harness settings, cost lines, workflows' repositories, revisions policy or template. Its schedules, its
+ * instruction's
  * place and its name are no part of it; its level is, and is written beside it (`factories.store.ts`).
  * @param was The factory as its file held it.
  * @param now The factory as it is to be written.

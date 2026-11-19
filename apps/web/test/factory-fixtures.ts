@@ -302,10 +302,12 @@ export const factoryObject = (over: FactoryOver = {}): Factory => ({
   kind: 'Factory',
   metadata: { ...meta('mill'), generation: 2, ...over.metadata },
   spec: {
-    repos: ['/work/mill'],
     workflows: ['build'],
     hires: { 'build/implement': 'implementer' },
-    volumes: [{ name: 'notes', path: '/home/me/notes', readOnly: true }],
+    volumes: [
+      { name: 'notes', path: '/home/me/notes', readOnly: true },
+      { name: 'mill', path: '/work/mill', readOnly: false },
+    ],
     ...over.spec,
   },
   status: { observedGeneration: 2, conditions: [], untrusted: [], ...over.status },
@@ -323,7 +325,7 @@ export const factoryCommands = (name = 'mill', over: Partial<FactoryCommands> = 
   trust: `nemia factory trust ${name}`,
   volume: `nemia factory volume ${name} <path>`,
   unschedule: { build: `nemia unschedule ${name} build` },
-  volumeRm: { notes: `nemia factory volume rm ${name} notes` },
+  volumeRm: { notes: `nemia factory volume rm ${name} notes`, mill: `nemia factory volume rm ${name} mill` },
   ...over,
 });
 

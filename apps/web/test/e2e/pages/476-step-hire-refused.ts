@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
 import { expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { AGENTS, WORKFLOWS } from '../seed.ts';
+import { AGENTS, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -28,7 +28,7 @@ export default {
     const madeFile = path.join(store!, 'workflows', 'agents', `${MADE.name}.md`);
     const refused = await page.context().newPage();
     try {
-      fs.writeFileSync(factoryFile, JSON.stringify({ repos: [path.join(store!, 'checkout')], workflows: [] }, null, 2));
+      fs.writeFileSync(factoryFile, JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [] }, null, 2));
       const { problems } = watch(refused);
       const creator = `/agents/new?into=${FACTORY}&workflow=${yours.name}&step=plan`;
       await refused.goto(new URL(creator, page.url()).href, { waitUntil: 'load' });

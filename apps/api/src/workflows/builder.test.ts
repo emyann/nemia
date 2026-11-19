@@ -40,7 +40,7 @@ import {
  */
 const repo = scratch('nemia-api-builder-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-addFactory({ name: 'builder', repos: [repo] });
+addFactory({ name: 'builder', volumes: [repo].map((r) => `${r}:rw`) });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */

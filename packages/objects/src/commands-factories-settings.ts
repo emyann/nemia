@@ -4,6 +4,7 @@
  * each with its long help and the forms `nemia factory --help` lists. Pure.
  */
 import { type Args, type CommandWords, dollarsOf, type Spec } from './command.ts';
+import { NO_TRUST } from './commands-factories-templated.ts';
 
 /**
  * The harness whose settings a factory gives, and the settings it may give: what the orchestrator's `SETTINGS_HARNESS` and `SETTABLE`
@@ -11,9 +12,6 @@ import { type Args, type CommandWords, dollarsOf, type Spec } from './command.ts
  */
 export const FACTORY_SETTINGS_HARNESS = 'claude';
 export const FACTORY_SETTABLE = ['attribution', 'includeGitInstructions', 'language'] as const;
-
-/** What a writable volume is not, said wherever a person reads one. */
-export const NOT_THE_WORKSPACE = "a step's writes there are not the run's workspace: nothing commits, lands or reverts them";
 
 /**
  * Why the command line takes a volume's write by its arguments: the api serves it as the Factory's `addVolume` and `removeVolume`,
@@ -24,34 +22,37 @@ const VOLUME_HERE = {
   why: "the api serves it as the Factory's `addVolume` and `removeVolume` of `objects`' Api, calling this handler: a volume is a folder of the machine the store runs on, named there by its whole path",
 } as const;
 
-const VOLUME_ADD_USAGE = '<factory> <path>:ro|:rw';
+const VOLUME_ADD_USAGE = '<factory> <path|url>:ro|:rw [--no-trust]';
 const VOLUME_RM_USAGE = '<factory> <path>';
 
 /** The forms of `nemia factory volume`, as `nemia factory --help` lists them beside the factory's others. */
-export const VOLUME_FORMS = `nemia factory volume add <factory> <path>:ro|:rw  (nemia factory volume add --help)
+export const VOLUME_FORMS = `nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust]  (nemia factory volume add --help)
 nemia factory volume rm <factory> <path>`;
 
-/** `nemia factory volume add --help`: what a volume is, and what it is not. */
+/** `nemia factory volume add --help`: what a volume is, read-only or writable. */
 const VOLUME_HELP = `${VOLUME_FORMS}
 
-A volume is a folder of this machine a factory mounts for every local step of its runs, beside its
-repositories, as a container is given one: <path>:ro read-only, <path>:rw writable. The mark is
-required, since a volume left unmarked would be writable without anyone having said so.
+A volume is a folder or repository this factory reaches, by its whole path, or a git URL Nemia clones
+under its store: <path|url>:ro read-only, <path|url>:rw writable. The mark is required, since a volume
+left unmarked would be writable without anyone having said so. A factory may have none, and is given
+its volumes after it is made, one add each.
 
-A writable volume is writable only for a step whose fence writes, and read-only for every other. It is
-not the run's workspace: nothing commits, lands or reverts what a step writes there, and every run of
-the factory reaches it at once. A volume never makes the factory work on its folder: where a start, a
-card or a schedule lands is unchanged.
+A writable volume is a git repository the factory works on: a run works in it, on a branch of its own,
+and lands there. Where it has several, the wiring (nemia factory attach <factory> <workflow> --repo
+<folder name>) says which a workflow works on; a run mounts its other ones read-only. A writable volume
+is trusted for its steps as it is added, unless --no-trust. A read-only volume is mounted for every
+local step of every run, and may be any folder.
 
 Kept in the factory's own file (factories/<name>.json, "volumes"), never in a template, and kept by
 nemia factory adopt and upgrade. Copied onto a run at its start, so a run in flight keeps what it began
 with. A second add of one path replaces it; nemia factory lists them under the factory.
 
-Refused, and nothing written: no :ro or :rw, a folder that is no directory, one of the factory's
-repositories, a writable folder inside one or holding one, a folder at or inside the store, a
-writable one holding the store, the default factory, and a volume rm of a path it does not mount.
-A start is refused where a step's harness cannot hold a volume's mount, as one that holds only
-read-only mounts cannot hold a writable one.`;
+Refused, and nothing written: no :ro or :rw, a folder that is no directory, a writable one that is no
+git repository, a writable folder inside another writable one or holding one, a folder at or inside the
+store but a clone, a writable one holding the store, the default factory, a volume rm of a path it does
+not reach, and of a writable one a run not ended works on or the wiring names for a workflow. A start
+is refused where a step's harness cannot hold a volume's mount, and in a factory with no writable
+volume.`;
 
 /** `nemia factory volume add`: a folder mounted for every local step of a factory's runs, read-only or writable. */
 export const FACTORY_VOLUME_ADD_WORDS = {
@@ -59,15 +60,15 @@ export const FACTORY_VOLUME_ADD_WORDS = {
   served: [{ endpoint: 'factories.addVolume' }],
   usage: VOLUME_ADD_USAGE,
   help: [
-    "mount a folder of this machine for every local step of a factory's runs,",
-    "read-only (:ro) or writable (:rw); a writable one is not a run's workspace",
+    'give a factory a volume: a folder or a git URL, read-only (:ro) or writable',
+    '(:rw), a writable one a repository it works on, trusted unless --no-trust',
   ],
   spec: {
     positionals: [
       { key: 'factory', takes: 'required', kind: 'name' },
       { key: 'volume', takes: 'required', kind: 'name' },
     ],
-    flags: [],
+    flags: [NO_TRUST],
     unknown: (arg) =>
       arg.startsWith('-')
         ? `nemia factory volume add does not take ${arg}: nemia factory volume add ${VOLUME_ADD_USAGE}.`

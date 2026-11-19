@@ -29,6 +29,6 @@ export function queueFactoryRefusal(
     return defaultStartRefusal(`\`factory: <name>\` in ${file}`, names).replace(NOT_STARTED, NOT_QUEUED);
   }
   if (card.factory !== undefined || unfactoredStarts) return null;
-  const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --repo <root>';
+  const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --volume <root>:rw';
   return `${file}: this card names no factory, and a queued card is started on its own only in the factory named for it. Write \`factory: <name>\` in its frontmatter — ${which}, then queue it again: nemia inbox queue ${card.name}. ${NOT_QUEUED}`;
 }

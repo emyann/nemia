@@ -5,7 +5,7 @@
  * (`factoryOnTarget`); its folder as the target places it (`folderOnTarget`), but what stays with the source's store (`FOLDER_STAYS`);
  * and a card that follows it (`cardMoved`). Pure.
  */
-import { folderName, DEFAULT_INSTRUCTION, type Factory, type Volume } from '../factory.ts';
+import { folderName, DEFAULT_INSTRUCTION, workedOn, type Factory, type Volume } from '../factory.ts';
 import type { TreeFile } from '../../archive/archive.ts';
 import { cardText, parseInboxCard } from '../../inbox/index.ts';
 import type { RepoOnTargetOf, VolumeOnTargetOf } from '../../../contracts/factory-move.contract.ts';
@@ -60,8 +60,9 @@ export const volumeKey = (volume: Pick<Volume, 'name' | 'path'>): string => volu
 
 /**
  * What the target decided of a factory before it files it: its tree (`treeDir`, for a templated one), each source repository's folder on
- * the target by its path on the source (`repos`), the URL of each folder it clones (`origins`), each volume's path by its key
- * (`volumeKey`; one not named keeps its path), whether the instruction's words the export carried are kept in its store
+ * the target by its path on the source (`repos`, its writable volumes), the URL of each folder it clones (`origins`), each read-only
+ * volume's path by its key (`volumeKey`; one not named keeps its path), whether the instruction's words the export carried are kept in its
+ * store
  * (`instructionKept`), and where it keeps the template it was given (`template`).
  */
 export type OnTarget = {
@@ -76,12 +77,12 @@ export type OnTarget = {
 /**
  * The folder names of `source`'s repositories that change on the target, the old to the new (`onTarget.repos`): what a workflow's
  * repository and a schedule's are named by.
- * @param source The factory on the source, by its repositories.
+ * @param source The factory on the source, by its volumes.
  * @param repos Each repository's folder on the target, by its path on the source.
  */
-export const renamedFolders = (source: Pick<Factory, 'repos'>, repos: Readonly<Record<string, string>>): Record<string, string> =>
+export const renamedFolders = (source: Pick<Factory, 'volumes'>, repos: Readonly<Record<string, string>>): Record<string, string> =>
   Object.fromEntries(
-    source.repos.flatMap((repo) => {
+    workedOn(source).flatMap((repo) => {
       const moved = repos[repo];
       return moved === undefined || folderName(moved) === folderName(repo) ? [] : [[folderName(repo), folderName(moved)] as const];
     }),
@@ -92,17 +93,32 @@ const renamedIn = (values: Readonly<Record<string, string>>, renamed: Readonly<R
   Object.fromEntries(Object.entries(values).map(([key, value]) => [key, renamed[value] ?? value]));
 
 /**
- * The factory `source` as the target files it: on its repositories (`onTarget.repos`, each named once) and the origins of those it cloned,
- * from its own tree, its volumes at their decided paths with their names and marks kept, the workflows' repositories and the schedules'
+ * The volume `volume` of a factory on the source as the target files it: a writable one at its repository's folder there
+ * (`onTarget.repos`), with the URL it was cloned from where the target cloned it (`onTarget.origins`) and none where it was given a
+ * folder; a read-only one at its decided path (`onTarget.volumes`); its name and its mark kept.
+ */
+const volumeOnTargetOf = (volume: Volume, onTarget: OnTarget): Volume => {
+  const { origin: _origin, ...own } = volume;
+  if (volume.readOnly) return { ...own, path: onTarget.volumes[volumeKey(volume)] ?? volume.path };
+  const at = onTarget.repos[volume.path] ?? volume.path;
+  const origin = onTarget.origins[at];
+  return { ...own, path: at, ...(origin === undefined ? {} : { origin }) };
+};
+
+/**
+ * The factory `source` as the target files it: its writable volumes on its repositories there (`onTarget.repos`, each named once) with
+ * the origins of those it cloned, from its own tree, its read-only volumes at their decided paths, each with its name and mark kept, the
+ * workflows' repositories and the schedules'
  * renamed where a repository's folder name changed, its instruction kept in the store where the export carried its words, its template
  * read where the target kept it, and no generation, which the door counts again. Everything else as read.
  * @param source The factory as the source's file holds it.
  * @param onTarget What the target decided of it.
  */
 export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
-  const { generation: _counted, tree: _tree, origins: _origins, ...kept } = source;
+  const { generation: _counted, tree: _tree, ...kept } = source;
   const renamed = renamedFolders(source, onTarget.repos);
-  const repos = [...new Set(source.repos.map((repo) => onTarget.repos[repo] ?? repo))];
+  const moved = source.volumes.map((volume) => volumeOnTargetOf(volume, onTarget));
+  const volumes = moved.filter((v, i) => moved.findIndex((w) => w.path === v.path) === i);
   const schedules = Object.fromEntries(
     Object.entries(source.schedules).map(([workflow, schedule]) => [
       workflow,
@@ -111,14 +127,10 @@ export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
   );
   return {
     ...kept,
-    repos,
+    volumes,
     schedules,
-    ...(Object.keys(onTarget.origins).length ? { origins: onTarget.origins } : {}),
     ...(source.template !== undefined && onTarget.tree !== undefined ? { tree: onTarget.tree } : {}),
     ...(source.template === undefined ? {} : { template: { ...source.template, source: onTarget.template ?? source.template.source } }),
-    ...(source.volumes === undefined
-      ? {}
-      : { volumes: source.volumes.map((volume) => ({ ...volume, path: onTarget.volumes[volumeKey(volume)] ?? volume.path })) }),
     ...(source.workflowRepos === undefined ? {} : { workflowRepos: renamedIn(source.workflowRepos, renamed) }),
     ...(onTarget.instructionKept ? { instruction: { store: true } } : {}),
   };

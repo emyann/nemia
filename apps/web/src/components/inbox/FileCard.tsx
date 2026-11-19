@@ -171,7 +171,7 @@ function FactoryField({
 function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: string | null; onWorkflow: (name: string) => void }) {
   const offered = factory.workflows ?? [];
   const on = picked === null ? null : startRepo(factory, picked);
-  const [only, ...more] = factory.repos;
+  const [only, ...more] = factory.worksOn;
   return (
     <div className="grid gap-3 @md/page:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <div className="space-y-1.5">
@@ -207,7 +207,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
               : only !== undefined && !more.length
                 ? only
                 : only === undefined
-                  ? `${factory.name} names no repository.`
+                  ? `${factory.name} has no volume to work on: ${factory.commands.volume}`
                   : `The factory's, for the workflow its start runs.`}
           </p>
         )}

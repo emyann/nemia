@@ -184,7 +184,10 @@ const templateCell = ({ spec: { template }, status }: Factory): string =>
 /** The cells of `factory`'s row, in `FACTORY_COLUMNS`' order. */
 const factoryCells = (factory: Factory): readonly string[] => [
   factory.metadata.name,
-  factory.spec.repos.join(', '),
+  factory.spec.volumes
+    .filter((v) => !v.readOnly)
+    .map((v) => v.path)
+    .join(', '),
   factoryNote(factory),
   factory.spec.workflows === undefined ? 'all' : [...factory.spec.workflows].sort().join(', '),
   sortedEntries(factory.spec.hires, (step, agent) => `${step} ← ${agent}`),

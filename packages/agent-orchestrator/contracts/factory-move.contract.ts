@@ -3,7 +3,7 @@
  * volume the source's factory names, before anything is written there. Runs do not move; the factory's file, its folder and its cards do.
  *
  * A repository (`repoOnTarget`) is given to the target as `nemia factory add --repo` would be given it, a git URL that the target clones
- * under its own store or a folder of the target's machine by its whole path (`factoryRepos` then reads that value): the one the person
+ * under its own store or a folder of the target's machine by its whole path (the target's file then reads that value): the one the person
  * typed for it (`--repo <source folder>=<url|path>`) over every other, else the URL the source recorded as its origin, so a clone
  * follows its origin. A repository with neither, a folder of the source's machine that names no URL, is refused, naming the flag that
  * gives it one: the source's path means nothing on the target's machine.

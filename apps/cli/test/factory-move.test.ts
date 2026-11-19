@@ -8,7 +8,7 @@
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -60,14 +60,15 @@ configWritten({ contexts: [{ name: 'far', server: target.url, token: TOKEN }], c
 /** The same machine, a command run under the context `far`: the target's store. */
 const there: NodeJS.ProcessEnv = { ...here, NEMIA_CONTEXT: 'far' };
 
-/** The repository `mill` works on at the source, a plain folder with no origin, and the folder the target is given for it. */
+/** The repository `mill` works on at the source, with no origin, and the folder the target is given for it. */
 const MILL = scratch('nemia-move-mill-');
 const MILL_THERE = scratch('nemia-move-mill-there-');
 /** The repository of `lone`, a factory whose move gives none for it. */
 const LONE = scratch('nemia-move-lone-');
+for (const repo of [MILL, MILL_THERE, LONE]) execFileSync('git', ['init', '-q'], { cwd: repo });
 
-await typed(here, ['factory', 'add', 'mill', '--repo', MILL, '--no-trust']);
-await typed(here, ['factory', 'add', 'lone', '--repo', LONE, '--no-trust']);
+await typed(here, ['factory', 'add', 'mill', '--volume', `${MILL}:rw`, '--no-trust']);
+await typed(here, ['factory', 'add', 'lone', '--volume', `${LONE}:rw`, '--no-trust']);
 
 /** Whether `nemia factory ls` on `env` lists the factory `name`. */
 const lists = async (env: NodeJS.ProcessEnv, name: string): Promise<boolean> =>

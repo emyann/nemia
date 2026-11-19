@@ -184,7 +184,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const t = team();
       const repo = aRepo();
       const factory = `factory-${t.name}`;
-      addFactoryAt(ROOT, { name: factory, repos: [repo] });
+      addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
       attachWorkflowAt(ROOT, { factory, workflow: t.name });
       writeRules(ROOT, { name: factory }, 'Never push on a Friday.');
       const parent = await started(team().dir, repo, { isolate: true });
@@ -264,7 +264,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const t = team();
       const repo = aRepo();
       const factory = `follows-${t.name}`;
-      addFactoryAt(ROOT, { name: factory, repos: [repo] });
+      addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
       attachWorkflowAt(ROOT, { factory, workflow: t.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
@@ -303,7 +303,7 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
       const t = team();
       const repo = aRepo();
       const factory = `follows-done-${t.name}`;
-      addFactoryAt(ROOT, { name: factory, repos: [repo] });
+      addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
       attachWorkflowAt(ROOT, { factory, workflow: t.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
@@ -870,7 +870,7 @@ test('a step that ended is judged by the fields it was filed with: a run that fo
   fs.writeFileSync(path.join(team0.dir, 'review.md'), `---\nplace: git\nagent: ${team0.agent}\nafter: build\n---\nReview it.\n`);
   const repo = aRepo();
   const factory = `follows-filed-${team0.name}`;
-  addFactoryAt(ROOT, { name: factory, repos: [repo] });
+  addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory, workflow: team0.name });
   followed(ROOT, factory, 'follow');
   const run = await started(team0.dir, repo, { factory });
@@ -986,7 +986,7 @@ test('a memo is keyed by what it reads: one folder read once, and again for anot
   const alone = await resolveCalls(() => resolve(one, AT, aPass()));
   const elsewhere = { ...one, repo: aRepo() };
   const factory = `factory-${t.name}`;
-  addFactoryAt(ROOT, { name: factory, repos: [one.repo!] });
+  addFactoryAt(ROOT, { name: factory, volumes: [one.repo!].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory, workflow: t.name });
   writeRules(ROOT, { name: factory }, 'Never push on a Friday.');
   const hired = { ...one, factory };
@@ -1227,7 +1227,7 @@ test('a held run is read and pinned as one that files again once the hold lifts;
   const t = team();
   const repo = aRepo();
   const factory = `held-${t.name}`;
-  addFactoryAt(ROOT, { name: factory, repos: [repo] });
+  addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory, workflow: t.name });
   followed(ROOT, factory, 'follow');
   const run = await started(t.dir, repo, { factory });

@@ -468,7 +468,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm
   fs.writeFileSync(withRepo, `---\nworkflow: dev\nrepo: ${ROOT}\n---\nShow the flag.\n`);
   const byPath = path.join(dir, 'by-path.md');
   fs.writeFileSync(byPath, '---\nworkflow: ../workflows/dev\n---\nShow the flag.\n');
-  addFactoryAt(ROOT, { name: 'f', repos: [aRepoWith('dev')] });
+  addFactoryAt(ROOT, { name: 'f', volumes: [aRepoWith('dev')].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'f', workflow: 'dev' });
   const adds: Record<string, [() => unknown, ...named: string[]]> = {
     'an empty idea': [() => add(''), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],

@@ -100,7 +100,7 @@ const aStore = (t: TestContext, now: string, cap?: string): string => {
   ENV.WF_MAX_RUNS = cap;
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) });
   const repo = aTeamRepo();
-  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
   return repo;
 };
@@ -282,7 +282,7 @@ test("an old schedule's repository is read and ignored: its run starts on the re
   aStore(t, '2026-10-04T12:00:00Z');
   const named = aTeamRepo();
   const wired = aTeamRepo();
-  addFactoryAt(ROOT, { name: 'duo', repos: [named, wired] });
+  addFactoryAt(ROOT, { name: 'duo', volumes: [named, wired].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev' });
   const e = runtime();
 

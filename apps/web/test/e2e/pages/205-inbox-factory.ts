@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { cardsPath, photograph, heldIn, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
+import { FACTORIES, hiringStarts, WORKFLOWS, worked } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
 
@@ -45,7 +45,7 @@ async function wiredOnTwo(page: Page, factoryFile: string, theme: string): Promi
   const second = path.join(store!, FACTORIES.bare);
   const found = JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as object;
   const write = (workflowRepos: Record<string, string>) =>
-    fs.writeFileSync(factoryFile, JSON.stringify({ ...found, repos: [checkout, second], workflowRepos }, null, 2));
+    fs.writeFileSync(factoryFile, JSON.stringify({ ...found, volumes: worked([checkout, second]), workflowRepos }, null, 2));
 
   write({});
   let item = await openStart(page);

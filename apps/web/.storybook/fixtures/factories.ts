@@ -29,7 +29,7 @@ export const block = (name: string, error: string | null = null): FactoryBlock =
 /** The factory the start's stories start in, offering `build` and `quick`: on one repository, or on two where `repos` says so. */
 export const offering = (repos: readonly string[] = ['/work/nemia']): Factory => ({
   ...factoryView(FACTORY),
-  repos: [...repos],
+  worksOn: [...repos],
   workflows: ['build', 'quick'],
 });
 
@@ -71,8 +71,8 @@ export const rendered: FactoryTemplate = {
 
 /** A folder the factory's runs read, and one they write. */
 export const volumes: FactoryVolume[] = [
-  { path: '/srv/notes', readOnly: true, commands: { rm: `nemia volume rm notes -n ${FACTORY}` } },
-  { path: '/srv/scratch', readOnly: false, commands: { rm: `nemia volume rm scratch -n ${FACTORY}` } },
+  { path: '/srv/notes', readOnly: true, origin: null, commands: { rm: `nemia volume rm notes -n ${FACTORY}` } },
+  { path: '/srv/scratch', readOnly: false, origin: null, commands: { rm: `nemia volume rm scratch -n ${FACTORY}` } },
 ];
 
 /**

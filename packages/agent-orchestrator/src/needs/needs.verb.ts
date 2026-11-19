@@ -7,6 +7,7 @@
  * since the last sweep. Level-triggered: each sweep reads every check again, and a reading is never a transition.
  * A controller: it reads the store's factories and folders and runs the checks.
  */
+import { workedOn } from '../factory/factory.ts';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { Context, Effect, Layer, type Duration } from 'effect';
@@ -217,7 +218,7 @@ const harnessChecks = (memo: NeedsMemo): CheckAt[] => memo.harnessNeeds.map(harn
  * The repository a factory's repository needs are checked and fixed in: its first; none for a factory that does not read.
  * @param factory The factory as listed, or its error where it does not read.
  */
-export const factoryRepository = (factory: FactoryListing): string | undefined => ('error' in factory ? undefined : factory.repos[0]);
+export const factoryRepository = (factory: FactoryListing): string | undefined => ('error' in factory ? undefined : workedOn(factory)[0]);
 
 /**
  * Where a repository need is checked for a repository: its check, run in that repository.
@@ -253,7 +254,7 @@ export type FactoryWorkflow = {
 export const factoryWorkflows = (factories: readonly FactoryListing[]): FactoryWorkflow[] =>
   factories.flatMap((f) => {
     if ('error' in f) return [];
-    const root = f.tree ?? f.repos[0];
+    const root = f.tree ?? workedOn(f)[0];
     if (root === undefined) return [];
     const repository = factoryRepository(f);
     return f.workflows.map((workflow) => ({

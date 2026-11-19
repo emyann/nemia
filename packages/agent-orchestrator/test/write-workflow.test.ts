@@ -159,7 +159,7 @@ test("a draft naming its agent that sends the resolved denies, as the board list
 
 test("written where the board lists workflows from — the store's workflows/ and a known repository's — and anywhere else with `{ anywhere: true }`", () => {
   const repo = scratch('wf-write-repo-');
-  addFactoryAt(ROOT, { name: 'write-known', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'write-known', volumes: [repo].map((r) => `${r}:rw`) });
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'a repository a factory names is known with no .git read');
   fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
   fs.writeFileSync(
@@ -224,7 +224,7 @@ test('REFUSED at shipped defaults, with the folder as it was, before a byte is w
   const nowhere = [
     "is not a workflow in the store's workflows/",
     '<repo>/workflows/<name>',
-    'nemia factory add <name> --repo <repo>',
+    'nemia factory volume add <factory> <repo>:rw',
     '{ anywhere: true }',
   ];
   const file = path.join(STORE, 'a-file');

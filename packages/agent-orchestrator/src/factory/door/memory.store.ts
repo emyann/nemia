@@ -219,6 +219,7 @@ export function factoryDoorMemory(): Layer.Layer<never> {
         factories.set(factory.name, structuredClone({ ...factory, generation: 1 }));
         return file;
       },
+      moveVolumes: () => ({ moved: [], left: [] }),
       rewrite: (factory) => {
         const was = held(factory.name, 'Nothing was written.');
         factories.set(factory.name, structuredClone(generationWritten(was, factory)));

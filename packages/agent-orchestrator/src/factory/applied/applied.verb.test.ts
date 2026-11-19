@@ -114,7 +114,7 @@ const filed = (): string[] => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTOR
 
 /** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
 const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
-  main(['factory', 'apply', name, '--template', dir, '--repo', repo, ...rest], noEngine());
+  main(['factory', 'apply', name, '--template', dir, '--volume', `${repo}:rw`, ...rest], noEngine());
 
 /** The factory `name`, read as the controller reads it. */
 const templated = (name: string) =>
@@ -137,7 +137,7 @@ test('what apply and a start of a templated factory refuse, by kind and exit 2, 
       );
       await assert.rejects(apply('refused', dir, repo), refusedWith('Invalid', /budget has no default, and no --set gives it/));
       await assert.rejects(
-        main(['factory', 'apply', 'refused', '--repo', repo], noEngine()),
+        main(['factory', 'apply', 'refused', '--volume', `${repo}:rw`], noEngine()),
         refusedNaming('Invalid', '--template <name|folder|archive>'),
       );
       fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
@@ -481,9 +481,9 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       await main(['factory', 'volume', 'add', 'wired', `${notes}:ro`], noEngine());
       const file = JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'));
       const volume = { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() };
-      assert.deepEqual(file.volumes, [volume], "a volume is the factory's own, in its file, under the name its folder gives it");
+      assert.deepEqual(file.volumes.at(-1), volume, "a volume is the factory's own, in its file, under the name its folder gives it");
       assert.equal(fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8'), tree, 'and never in its tree');
-      assert.deepEqual(readFactoryAt(ROOT, 'wired').volumes, [volume]);
+      assert.deepEqual(readFactoryAt(ROOT, 'wired').volumes.at(-1), volume);
     },
   );
   await t.test(
@@ -516,7 +516,7 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       t.mock.method(console, 'log', () => {});
       const { dir, repo } = template();
       await apply('written', dir, repo, '--set', 'budget=7');
-      await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
+      await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());
       const drafts = scratch('wf-applied-drafts-');
       const beside = path.join(drafts, 'workflows', 'lean');
       fs.cpSync(path.join(repo, 'workflows', 'dev'), beside, { recursive: true });
@@ -568,12 +568,15 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       const workspace = path.join(scratch('wf-applied-ws-'), 'one');
       assert.ok('answer' in stand().place.askNow('make', { repo, at: workspace, run: 'r', leaf: 'one', from: 'main', also: [] }));
       const plain = scratch('wf-applied-plain-');
+      stand().world.repository(plain, {});
 
       const quiet = (await apply('quiet', dir, repo, '--set', 'budget=3', '--no-trust')) as { trusts: readonly PlaceTrust[] };
       assert.deepEqual(trustedIn(config), []);
       assert.deepEqual(quiet.trusts, [], 'nothing asked, so nothing said');
 
-      const trusting = (await apply('trusting', dir, workspace, '--repo', plain, '--set', 'budget=3')) as { trusts: readonly PlaceTrust[] };
+      const trusting = (await apply('trusting', dir, workspace, '--volume', `${plain}:rw`, '--set', 'budget=3')) as {
+        trusts: readonly PlaceTrust[];
+      };
       assert.deepEqual(trustedIn(config).sort(), [plain, repo].sort());
       const wrote = trusting.trusts.flatMap((one) => ('wrote' in one && one.wrote ? [one] : []));
       assert.deepEqual(
@@ -600,7 +603,7 @@ const trustedIn = (dir: string): string[] => {
 const applyNamed = (builtins: string, name: string, given: string, repo: string, ...sets: string[]) =>
   runEngine(
     noEngine(),
-    withBuiltins(FACTORY_APPLY.handler({ name, template: given, repos: [repo], sets, noTrust: true }), builtins).pipe(
+    withBuiltins(FACTORY_APPLY.handler({ name, template: given, volumes: [`${repo}:rw`], sets, noTrust: true }), builtins).pipe(
       Effect.provide(stand().layer),
       Effect.provide(configGiven(ROOT, ENV)),
     ),

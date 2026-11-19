@@ -171,7 +171,10 @@ function cardOn(name: string, dir: string, queued: boolean): void {
 /** A factory's file: its repositories, the workflows it attaches and its hires. */
 function factoryOf(name: string, repos: string[], workflows: string[], hires: Record<string, string>): void {
   fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'factories', `${name}.json`), JSON.stringify({ repos, workflows, hires }));
+  fs.writeFileSync(
+    path.join(ROOT, 'factories', `${name}.json`),
+    JSON.stringify({ volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows, hires }),
+  );
 }
 
 test('a folder of yours removed through the entry is gone, with every file it held named', async () => {

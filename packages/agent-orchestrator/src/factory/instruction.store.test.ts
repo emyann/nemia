@@ -58,7 +58,7 @@ function filed(extra: Record<string, unknown> = {}): string {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.mkdirSync(FACTORIES, { recursive: true });
-  fs.writeFileSync(recordOf('pipao'), JSON.stringify({ repos: [repo], ...extra }));
+  fs.writeFileSync(recordOf('pipao'), JSON.stringify({ volumes: [{ path: repo, readOnly: false }], ...extra }));
   return repo;
 }
 
@@ -198,7 +198,7 @@ test('a rules or instruction file that cannot be told is read with why, and neve
   });
   await t.test('instruction: a record whose instruction is no path nor the store is listed with why, never thrown', () => {
     filed({ instruction: 5 });
-    fs.writeFileSync(recordOf('half'), JSON.stringify({ repos: ['/x'], instruction: { store: false } }));
+    fs.writeFileSync(recordOf('half'), JSON.stringify({ volumes: [{ path: '/x', readOnly: false }], instruction: { store: false } }));
     assert.deepEqual(
       readFactoriesAt(ROOT).map((l) => ('error' in l ? [l.name, l.error.includes('`instruction')] : [l.name, 'read'])),
       [

@@ -25,7 +25,7 @@
     },
     {
       "term": "generation",
-      "meaning": "the count of changes to an object's spec, for a kind whose spec a person edits (`ObjectMeta`, `packages/objects/src/meta.ts`): a Factory's goes up by one when its repositories, workflows, hires, volumes, harness settings, revisions, template or level change, and a change to its status, or to its schedules alone, leaves it (`Factory`, `packages/objects/src/factory.ts`)."
+      "meaning": "the count of changes to an object's spec, for a kind whose spec a person edits (`ObjectMeta`, `packages/objects/src/meta.ts`): a Factory's goes up by one when its volumes, workflows, hires, harness settings, revisions, template or level change, and a change to its status, or to its schedules alone, leaves it (`Factory`, `packages/objects/src/factory.ts`)."
     },
     {
       "term": "List",
@@ -94,7 +94,7 @@
     },
     {
       "term": "Factory",
-      "meaning": "a factory served as an object, which no namespace holds since it is the namespace its parts are in: its spec is what its file says (repositories, workflows, hires, volumes, harness settings, revisions, template, level), its status what the controller last observed (conditions, the applied version, an upgrade waiting, places not trusted, why its file does not read), its `resourceVersion` moving on a change of its spec, its status, its rules or its instruction, at `/api/factories/<name>` (`Factory`, `packages/objects/src/factory.ts`).",
+      "meaning": "a factory served as an object, which no namespace holds since it is the namespace its parts are in: its spec is what its file says (volumes, the writable ones the repositories it works on, workflows, hires, harness settings, revisions, template, level), its status what the controller last observed (conditions, the applied version, an upgrade waiting, places not trusted, why its file does not read), its `resourceVersion` moving on a change of its spec, its status, its rules or its instruction, at `/api/factories/<name>` (`Factory`, `packages/objects/src/factory.ts`).",
       "type": "Factory"
     },
     {
@@ -114,7 +114,7 @@
     },
     {
       "term": "Volume",
-      "meaning": "a folder of the person's machine a factory mounts for every local step, served as an object in the factory's namespace by its stored name and read-only over the api: its spec its path and whether steps only read it, its status whether it is there, why a run would refuse it, and the runs in play that mount it (`Volume`, `packages/objects/src/volume.ts`).",
+      "meaning": "a folder of the machine the api runs on, or a git URL it clones, that a factory mounts for every local step, served as an object in the factory's namespace by its stored name and read-only over the api: its spec its path, whether steps only read it, a writable one being a repository the factory works on, and the URL it was cloned from (`origin`), its status whether it is there, why a run would refuse it, and the runs in play that mount it (`Volume`, `packages/objects/src/volume.ts`).",
       "type": "Volume"
     },
     {
@@ -168,11 +168,26 @@
           "spelling": "yours",
           "card": "library: a store-wide library a factory adds definitions from",
           "kept": [
-            { "path": "packages/objects/src/card.ts", "why": "stored cards hold the retired `from` literal, read and ignored, so the schema still accepts it" },
-            { "path": "packages/objects/src/commands-factories-manual.ts", "why": "another sense: the person's own to edit, in a manual's prose" },
-            { "path": "packages/objects/src/commands-rest-pairing.ts", "why": "another sense: a token of the person's own, minted at a pairing" },
-            { "path": "packages/objects/src/commands-rest-tokens.ts", "why": "another sense: a token of the person's own, not an agent's" },
-            { "path": "packages/objects/src/commands-runs-answer.ts", "why": "another sense: words said as the person, never as an agent" }
+            {
+              "path": "packages/objects/src/card.ts",
+              "why": "stored cards hold the retired `from` literal, read and ignored, so the schema still accepts it"
+            },
+            {
+              "path": "packages/objects/src/commands-factories-manual.ts",
+              "why": "another sense: the person's own to edit, in a manual's prose"
+            },
+            {
+              "path": "packages/objects/src/commands-rest-pairing.ts",
+              "why": "another sense: a token of the person's own, minted at a pairing"
+            },
+            {
+              "path": "packages/objects/src/commands-rest-tokens.ts",
+              "why": "another sense: a token of the person's own, not an agent's"
+            },
+            {
+              "path": "packages/objects/src/commands-runs-answer.ts",
+              "why": "another sense: words said as the person, never as an agent"
+            }
           ]
         }
       ]

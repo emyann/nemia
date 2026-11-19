@@ -16,7 +16,7 @@ import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import { yoursOrRefused } from '../yours/yours.ts';
-import { workflowNameRefusal } from '../factory/factory.ts';
+import { workflowNameRefusal, workedOn } from '../factory/factory.ts';
 import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
 import type { Factory } from '../factory/factory.ts';
@@ -62,7 +62,7 @@ const placesOf = ({ repo }: Pick<Where, 'repo'>, home: string | undefined): Plac
  */
 export function factoryWriteOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
   const { factory, tree } = templatedAtOnce(home, name, 'nemia workflows write');
-  return { places: { repo: factory.repos[0] ?? tree, home }, fills: factoryFills(home, factory, workflow).fills };
+  return { places: { repo: workedOn(factory)[0] ?? tree, home }, fills: factoryFills(home, factory, workflow).fills };
 }
 
 /**
@@ -90,13 +90,13 @@ export function factoryDraftOf(home: string, name: string, workflow: string): { 
  */
 export function factoryDraftIn(
   home: string,
-  factory: Pick<Factory, 'name' | 'hires' | 'tree' | 'repos'>,
+  factory: Pick<Factory, 'name' | 'hires' | 'tree' | 'volumes'>,
   workflow: string,
   repo?: string,
 ): { places: Places; fills: Fills } {
   const { fills } = factoryFills(home, factory, workflow);
   if (factory.tree === undefined) return { places: repo === undefined ? { home } : { repo, home }, fills };
-  return { places: { repo: repo ?? factory.repos[0] ?? factory.tree, home: factory.tree }, fills };
+  return { places: { repo: repo ?? workedOn(factory)[0] ?? factory.tree, home: factory.tree }, fills };
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */
@@ -226,7 +226,7 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
     .map((card) => stillNeeded.card(card.name, dir));
   const factories = (yield* (yield* FactoryDoor).factories.listed()).flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(name)) return [];
-    if (factory.repos.some((repo) => isDirectory(path.join(repo, 'workflows', name)))) return [];
+    if (workedOn(factory).some((repo) => isDirectory(path.join(repo, 'workflows', name)))) return [];
     const hires = Object.keys(factory.hires).filter((step) => step.startsWith(`${name}/`));
     return [stillNeeded.factory(factory.name, name, hires.sort())];
   });

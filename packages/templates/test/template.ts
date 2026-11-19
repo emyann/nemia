@@ -104,7 +104,15 @@ export async function rendered(factories: readonly Applied[]): Promise<Record<st
     const repo = path.join(root, 'repos', name);
     fs.mkdirSync(repo, { recursive: true });
     spawnSync('git', ['init', '-q'], { cwd: repo, env });
-    await handled(env, FACTORY_APPLY, [name, '--template', template, '--repo', repo, '--no-trust', ...sets.flatMap((s) => ['--set', s])]);
+    await handled(env, FACTORY_APPLY, [
+      name,
+      '--template',
+      template,
+      '--volume',
+      `${repo}:rw`,
+      '--no-trust',
+      ...sets.flatMap((s) => ['--set', s]),
+    ]);
   }
   const folderOf = (name: string): string => path.join(env.WF_ROOT!, 'factories', name);
   const statusOf = (name: string): Pick<Tree, 'conditions'> | undefined => {

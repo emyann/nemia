@@ -19,7 +19,7 @@ type LibraryAddList = import('objects').LibraryAddList;
 type Skill = import('objects').Skill;
 type SkillList = import('objects').SkillList;
 
-addFactory({ name: 'shop', repos: [scratch('nemia-api-adds-repo-')] });
+addFactory({ name: 'shop', volumes: [scratch('nemia-api-adds-repo-')].map((r) => `${r}:rw`) });
 
 const ADDS = '/api/namespaces/shop/libraryadds';
 const RECORD = path.join(root, 'factories', 'shop', 'library.json');

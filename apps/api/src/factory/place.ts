@@ -9,7 +9,7 @@
  */
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
-import { filedAtOnce, Invalid, listedAtOnce, outsideRefusal, type Factory } from 'agent-orchestrator';
+import { filedAtOnce, Invalid, listedAtOnce, outsideRefusal, volumeAddLine, workedOn, type Factory } from 'agent-orchestrator';
 
 /**
  * What a request is answered in: its repository, none where it has none; its factory, none for the default factory; and whether the
@@ -31,7 +31,7 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
  * store at `home` whose file reads, in the order the Factory door lists them (`listedAtOnce`).
  */
 function knownRepos(home: string): string[] {
-  return [...new Set(listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo)))))];
+  return [...new Set(listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : workedOn(listing))))];
 }
 
 /**
@@ -46,7 +46,7 @@ const holdingOf = (named: string, known: readonly string[]): string | undefined 
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
 const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
   new Invalid({
-    message: `${repo}: the default factory reads only a repository a factory in the store works on — ${known.length ? known.join(', ') : 'there is none'} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --repo ${repo}.`,
+    message: `${repo}: the default factory reads only a repository a factory in the store works on — ${known.length ? known.join(', ') : 'there is none'} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --volume ${repo}:rw.`,
   });
 
 /**
@@ -54,9 +54,12 @@ const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
  * one, and the `nemia factory add` that files a factory on `repo`.
  */
 const outsideRepo = (factory: Factory, repo: string): Invalid => {
-  const repos = factory.repos.map((r) => path.resolve(r)).sort();
+  const repos = [...workedOn(factory)].sort();
+  const named = repos.length
+    ? `works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or`
+    : 'works on no repository yet:';
   return new Invalid({
-    message: `${repo}: the factory ${factory.name} works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or file a factory on this one: nemia factory add <name> --repo ${repo}.`,
+    message: `${repo}: the factory ${factory.name} ${named} give it this one to work on: nemia factory volume add ${factory.name} ${repo}:rw.`,
   });
 };
 
@@ -94,8 +97,8 @@ function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
     if (outsideRefusal(factory, named) !== undefined) throw outsideRepo(factory, named);
     return { repo: named, factory, named: true };
   }
-  const [only, ...more] = factory.repos;
-  return { repo: only !== undefined && !more.length ? path.resolve(only) : undefined, factory, named: true };
+  const [only, ...more] = workedOn(factory);
+  return { repo: only !== undefined && !more.length ? only : undefined, factory, named: true };
 }
 
 /**
@@ -107,14 +110,18 @@ function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
 export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
   if (place.repo !== undefined) return place.repo;
   if (place.factory !== undefined) {
-    const repos = place.factory.repos.map((r) => path.resolve(r)).sort();
+    const repos = [...workedOn(place.factory)].sort();
+    if (!repos.length)
+      throw new Invalid({
+        message: `the factory ${place.factory.name} works on no repository yet: give it one, ${volumeAddLine(place.factory.name)}.`,
+      });
     throw new Invalid({
       message: `the factory ${place.factory.name} works on ${repos.join(', ')}: name the one to read, ?factory=${place.factory.name}&repo=${repos[0] ?? '<path>'}.`,
     });
   }
   throw new Invalid({
     message:
-      'the default factory reads no repository: name a factory to read in, ?factory=<name>, or file one on this repository: nemia factory add <name> --repo <path>.',
+      'the default factory reads no repository: name a factory to read in, ?factory=<name>, or file one on this repository: nemia factory add <name> --volume <path>:rw.',
   });
 }
 
@@ -126,6 +133,6 @@ export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
  * @param place The repository and factory the request is answered in.
  */
 export function repoLayer(place: Pick<Place, 'repo' | 'factory'>): string | undefined {
-  if (place.repo !== undefined || place.factory === undefined || !place.factory.repos.length) return place.repo;
+  if (place.repo !== undefined || place.factory === undefined || !workedOn(place.factory).length) return place.repo;
   return repoNeeded(place);
 }

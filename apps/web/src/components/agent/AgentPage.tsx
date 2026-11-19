@@ -241,7 +241,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
  */
 const repoOfPlace = (place: { factory?: string; repo?: string }, factories: readonly Factory[] | undefined): string | undefined => {
   if (place.repo !== undefined) return place.repo;
-  const repos = factories?.find((f) => f.name === place.factory)?.repos ?? [];
+  const repos = factories?.find((f) => f.name === place.factory)?.worksOn ?? [];
   return repos.length === 1 ? repos[0] : undefined;
 };
 

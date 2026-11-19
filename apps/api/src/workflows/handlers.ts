@@ -156,10 +156,11 @@ const specAt = (dir: string): WorkflowSpec => {
 
 /**
  * A folder sent as its files (`POST /api/workflows/read`), judged by the package's reader on the request's repository and yours, and
- * answered as a GET of the same folder answers its spec, as its files hold it (`workflowSpecOf`): its name and its spec, writing nothing. On a request that reads no repository (the default
- * factory with no `?repo=`), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Read for a
- * factory (`?factory=`), as a run of it there reads it (`factoryDraftIn`): each step the factory hires an agent into read as if its file
- * named that agent, and a templated factory's agents looked for in its tree. Refused `Invalid` without a name, and as the reader refuses.
+ * answered as a GET of the same folder answers its spec, as its files hold it (`workflowSpecOf`): its name and its spec, writing nothing.
+ * On a request that reads no repository (the default factory with no `?repo=`), its steps' agents and skills are looked for in yours alone:
+ * a read names no repository it needs. Read for a factory (`?factory=`), as a run of it there reads it (`factoryDraftIn`): each step the
+ * factory hires an agent into read as if its file named that agent, and a templated factory's agents looked for in its tree. Refused
+ * `Invalid` without a name, and as the reader refuses.
  */
 async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
   if (name === undefined)

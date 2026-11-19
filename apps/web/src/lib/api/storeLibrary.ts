@@ -64,7 +64,7 @@ export function libraryItemsOf(
     ...skills.map(itemOf('Skill')).sort(byName),
     ...agents.map(itemOf('Agent')).sort(byName),
     ...servers.map(serverItem).sort(byName),
-    ...workflows.map(itemOf('Workflow')).sort(byName),
+    ...workflows.map((one) => itemOf('Workflow')({ metadata: one.metadata, status: one.status })).sort(byName),
   ];
 }
 

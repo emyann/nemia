@@ -105,9 +105,9 @@ const agentsFoundIn = <A, E, R>(against: readonly Entry[] | undefined, program: 
 /**
  * A Workflow of the factory's tree written or removed. Its README is written as the api's write writes it (`workflowSpecReadme`): its
  * `readme` as given where it opens with a frontmatter of its own, so a Workflow read as served and proposed back writes it byte for byte,
- * its instruction under the folder's frontmatter where it does not. A spec that gives `files` gives the whole set of the folder's other text files,
- * so one it leaves out is removed (`whole`); one that gives none leaves them as they are. Its steps are judged against the agents of
- * `against` where it is given (`agentsFoundIn`), the tree an upgrade composes, else against the factory's tree.
+ * its instruction under the folder's frontmatter where it does not. A spec that gives `files` gives the whole set of the folder's other
+ * text files, so one it leaves out is removed (`whole`); one that gives none leaves them as they are. Its steps are judged against the
+ * agents of `against` where it is given (`agentsFoundIn`), the tree an upgrade composes, else against the factory's tree.
  */
 const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject, against?: readonly Entry[]) =>
   Effect.gen(function* () {

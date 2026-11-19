@@ -117,7 +117,7 @@ function workflowSpecRefusal(object: ProposedObject, label: string): string | un
   return (
     `${label}: its spec carries ${apart.join(' and ')}, which a Workflow's files say in its README (spec.readme, frontmatter and all) and ` +
     `its read serves under status: read it as its files hold it (nemia get workflows ${object.metadata.name}) and propose that spec, ` +
-    'with the needs in the README\'s frontmatter.'
+    "with the needs in the README's frontmatter."
   );
 }
 

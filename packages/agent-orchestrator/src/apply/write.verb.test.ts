@@ -153,7 +153,8 @@ test("a Workflow given its instruction alone writes it under the README's own fr
 test('a Workflow whose readme carries its own frontmatter is written as given, its needs those it declares', async () => {
   const { home, readme } = plantedNeeds('wf-apply-needs-composed-');
   const { version, spec } = await servedDev(home);
-  const given = '---\nneeds:\n  - name: git-identity\n    message: a git identity\n    check: git config user.name\n---\n# dev\n\nComposed.\n';
+  const given =
+    '---\nneeds:\n  - name: git-identity\n    message: a git identity\n    check: git config user.name\n---\n# dev\n\nComposed.\n';
   const object = devProposed(version, { ...spec, readme: given });
   assert.equal(previewOf(object, spec).readme, given, 'the preview shows the readme as given');
   await ran(objectWritten({ home }, FACTORY, object));

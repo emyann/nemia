@@ -156,7 +156,7 @@ test('a workflow README is read whole, in any case, and none is null', () => {
   assert.equal(workflowReadme(path.join(scratch('wf-none-'), 'no-such-folder')), null, 'no folder: null');
 });
 
-test('a README to write is written as given with a frontmatter of its own, and under the disk\'s frontmatter without one', () => {
+test("a README to write is written as given with a frontmatter of its own, and under the disk's frontmatter without one", () => {
   const tool = { name: 'tool', message: 'the tool', check: 'command -v tool' };
   const other = { name: 'other', message: 'another tool', check: 'command -v other' };
   const onDisk = '---\nowner: ops\nneeds:\n  - name: tool\n    message: the tool\n    check: command -v tool\n---\n# dev\n';

@@ -28,7 +28,7 @@ const readmeWrittenSpec = spec<(diskBlock: string, given: ReadmeGiven | undefine
     },
     instructionKeepsTheDisksFrontmatter: {
       description:
-        "A README given with no frontmatter of its own is written under the frontmatter the README on disk opens with, its instruction as given",
+        'A README given with no frontmatter of its own is written under the frontmatter the README on disk opens with, its instruction as given',
       condition: ({ input: [diskBlock, given], output }) =>
         given === undefined || given.ownFrontmatter || output === diskBlock + given.text,
     },

@@ -456,9 +456,9 @@ export type WorkflowStepStatus = typeof WorkflowStepStatus.Type;
 
 /**
  * What Nemia reads of a workflow: its origin and what shadows it, its folder (`dir`), its description, the machine needs its README's
- * frontmatter declares (`needs`), its README without its frontmatter (`readmeBody`), its typed graph, each step resolved in graph order, the schema
- * files beside its steps, whether every step works in a folder (`folderTeam`), why it does not load (`error`, null where it does) and why a
- * run of it cannot start in the factory (`unfilled`, null where it can), and its revision.
+ * frontmatter declares (`needs`), its README without its frontmatter (`readmeBody`), its typed graph, each step resolved in graph order,
+ * the schema files beside its steps, whether every step works in a folder (`folderTeam`), why it does not load (`error`, null where it
+ * does) and why a run of it cannot start in the factory (`unfilled`, null where it can), and its revision.
  */
 export const WorkflowStatus = Schema.Struct({
   ...definitionStatus,

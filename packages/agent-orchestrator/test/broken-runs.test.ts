@@ -107,7 +107,7 @@ const LEFT_OUT = (id: string) => `${id} is not advanced while its workflow folde
 const JOURNAL_OUT = (id: string) => `${id} is not advanced while a task it reads is unreadable: `;
 
 /** What `nemia argv` printed, a line each, and what it threw, over `engine`. */
-const printedBy = async (t: test.TestContext, argv: string[], engine: Parameters<typeof stage.main>[1]) => {
+const printedBy = async (t: unknown, argv: string[], engine: Parameters<typeof stage.main>[1]) => {
   const out: string[] = [];
   const err: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void out.push(...a.map(String).join(' ').split('\n')));
@@ -201,10 +201,10 @@ describe('one broken run does not stop the others: each left out and said once, 
       runs.good = (await started('the good one')).id;
 
       const wrote: string[] = [];
-      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((line: string) => {
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
         wrote.push(String(line));
         return true;
-      });
+      }) as never);
       const now = await pass().finally(() => stderr.mockRestore());
 
       assert.deepEqual(now.runs.find((a) => a.run.id === runs.good)?.filed, ['work'], 'the good run filed its step');

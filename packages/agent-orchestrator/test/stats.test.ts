@@ -12,6 +12,7 @@
  * given as `ENV`.
  */
 import { beforeAll, describe, test, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -98,7 +99,7 @@ const agent = (name: string) => ({ name, keys: [], body: '', given: {} });
 const planted: string[] = [];
 
 /** Takes out, once the story `t` ends, every run it planted: the next story reads a store with none of them. */
-const plantedFor = (t: TestContext) =>
+const plantedFor = (t: Finishes) =>
   t.onTestFinished(() => {
     for (const file of planted.splice(0)) fs.rmSync(file, { recursive: true, force: true });
   });

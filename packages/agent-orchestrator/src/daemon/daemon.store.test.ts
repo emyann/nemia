@@ -1017,7 +1017,7 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
   });
   test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async (t) => {
     const errors: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation((line: string) => errors.push(line) > 0);
+    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => errors.push(line) > 0) as never);
     fs.rmSync(recentFile(ROOT), { force: true });
     try {
       assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');

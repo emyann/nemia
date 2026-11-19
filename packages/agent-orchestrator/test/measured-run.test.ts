@@ -18,6 +18,7 @@
  * its memo in full.
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -135,7 +136,7 @@ const pageRows = (id: string) =>
  * What a story measures by, new for each: the wall at 10:00 on the fixtures' day, moved on by `later`; the stage's engine as a whole-store
  * pass asks it (`ticking`); a registry of its own for the metrics; and its daemons, the first first, `life` the one making the passes now.
  */
-const measuring = (t: TestContext) => {
+const measuring = (t: Finishes) => {
   let now = Date.parse('2026-10-06T10:00:00.000Z');
   vi.useFakeTimers({ toFake: ['Date'], now });
   const later = (minutes: number) => vi.setSystemTime((now += minutes * MIN));

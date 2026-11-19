@@ -183,9 +183,9 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `factory-${t.task.name}`;
+      const factory = `factory-${t.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.name });
       writeRules(ROOT, { name: factory }, 'Never push on a Friday.');
       const parent = await started(team().dir, repo, { isolate: true });
       const run = await started(t.dir, repo, { after: [parent.id], isolate: true, factory });
@@ -260,9 +260,9 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `follows-${t.task.name}`;
+      const factory = `follows-${t.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
@@ -298,9 +298,9 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     async () => {
       const t = team();
       const repo = aRepo();
-      const factory = `follows-done-${t.task.name}`;
+      const factory = `follows-done-${t.name}`;
       addFactoryAt(ROOT, { name: factory, repos: [repo] });
-      attachWorkflowAt(ROOT, { factory, workflow: t.task.name });
+      attachWorkflowAt(ROOT, { factory, workflow: t.name });
       followed(ROOT, factory, 'follow');
       const run = await started(t.dir, repo, { factory });
       const b = board();
@@ -366,7 +366,7 @@ describe('a folder edited around a run: what it pins, what the ledger numbers, a
     assert.deepEqual(
       drift.map((d) => [d.kind, d.name, d.pinned, d.now]),
       [
-        ['workflow', t.task.name, 1, 2],
+        ['workflow', t.name, 1, 2],
         ['agent', t.agent, 1, 2],
       ],
       'the verb answers with the drift it was asked on, per kind',

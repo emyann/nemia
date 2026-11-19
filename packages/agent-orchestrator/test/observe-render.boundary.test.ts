@@ -241,10 +241,10 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
   });
   const write = fs.writeFileSync;
   let tries = 0;
-  vi.spyOn(fs, 'writeFileSync').mockImplementation((file: fs.PathOrFileDescriptor, data: string) => {
+  vi.spyOn(fs, 'writeFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, data: string) => {
     if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
     write(file, data);
-  });
+  }) as never);
   const said = await take('nemia-render-3-third0', 0).then(
     () => 'taken',
     (err: Error & { exitCode?: number }) => `${err.exitCode}: ${err.message}`,

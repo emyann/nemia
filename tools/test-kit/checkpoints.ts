@@ -62,6 +62,9 @@ export function story<T extends Skips>(test: Teller<T>): Story<T> {
   };
 }
 
+/** What a helper that tears down what it made reads of a test, or of a `describe`'s setup (`Held`): where it files the teardown. */
+export type Finishes = { onTestFinished: (fn: () => void | Promise<void>) => void };
+
 /** The teardowns a `describe`'s setup filed, run once its tests are done. */
 export type Held = {
   /** Files `fn` to run when the describe's tests are done, after those filed before it. */

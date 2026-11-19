@@ -68,10 +68,10 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.match(said[0], /Only the tick writes a record/);
 
     const wrote: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation((line: string) => {
+    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
       wrote.push(line);
       return true;
-    });
+    }) as never);
     assert.equal(files.runs.find('r-bad'), undefined);
     assert.equal(files.runs.find('r-bad'), undefined);
     assert.equal(wrote.length, 1, `said once a process, not ${wrote.length} times`);

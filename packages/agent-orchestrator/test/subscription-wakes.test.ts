@@ -25,6 +25,7 @@
  * next one's deliverer to follow.
  */
 import { beforeAll, describe, test, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -201,7 +202,7 @@ const kept = (t: TestContext, w: World, name: string, subscription: Subscription
 };
 
 /** A subscription of `task`'s on `w` for test `t`, by the default selector, from the feed's end, which it answers (`kept`). */
-const subscribed = (t: TestContext, w: World, name: string, task: string): number => {
+const subscribed = (t: Finishes, w: World, name: string, task: string): number => {
   const from = feedSize(w);
   kept(t, w, name, { task, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
   return from;
@@ -218,7 +219,7 @@ const digestChecks = (): number => Effect.runSync(Metric.value(SUBSCRIPTION_DIGE
  * run's factory there rather than off the files.
  */
 const delivering = (
-  t: TestContext,
+  t: Finishes,
   e: Parameters<typeof over>[0],
   w: World,
   rt?: ManagedRuntime.ManagedRuntime<never, never>,
@@ -378,9 +379,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;
@@ -686,9 +685,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;
@@ -875,9 +872,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;
@@ -1088,9 +1083,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;
@@ -1302,9 +1295,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;
@@ -1515,9 +1506,7 @@ describe(
         import('agent-runtime').CompactReport,
         import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
       >;
-      feed: (
-        after?: import('agent-runtime').Cursor,
-      ) => Effect.Effect<
+      feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
         {
           entries: import('agent-runtime').FeedEntry[];
           cursor: import('agent-runtime').Cursor;

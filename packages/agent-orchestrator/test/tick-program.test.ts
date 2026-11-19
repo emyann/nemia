@@ -145,7 +145,7 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
   fs.rmSync(path.join(ROOT, 'metrics'), { recursive: true, force: true });
   fs.writeFileSync(path.join(ROOT, 'metrics'), 'not a folder');
   const said: string[] = [];
-  vi.spyOn(process.stderr, 'write').mockImplementation((text: string) => said.push(text) > 0);
+  vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
   const pass = await runWith(e, tickRun({ repo: ROOT, quota: () => ({ h: { w: 12 } }) }));
   vi.restoreAllMocks();
   fs.rmSync(path.join(ROOT, 'metrics'), { force: true });

@@ -13,7 +13,7 @@
  * The labels a step's task is filed with are read off the engine's stand-in, in the measured run's story. The test place does not
  * model the shipped engine nor a process. Its store is its own at `ROOT`, given to each engine the client builds.
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test, type TestContext, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -145,7 +145,7 @@ const HANDED: Row[] = [
     name: 'REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr, once, as the engine is built',
     check: async (t) => {
       withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
-      const said = t.mock.method(console, 'error', () => {});
+      const said = vi.spyOn(console, 'error').mockImplementation(() => {});
       engineNow();
       const lines = said.mock.calls.map((c) => String(c[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
       assert.equal(lines.length, 1, lines.join('\n'));

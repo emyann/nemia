@@ -293,11 +293,11 @@ describe("write, rename and remove an agent at its version, as the board's Agent
   );
 });
 
-test('REFUSED: a write or a removal the store will not make, by its kind and what it names, and the store as it was', async (t) => {
+describe('REFUSED: a write or a removal the store will not make, by its kind and what it names, and the store as it was', () => {
   const v = { version: null };
-  const ok = <T>(name: string, fn: () => T) => t.test(name, () => (fresh(), void fn()));
+  const ok = <T>(name: string, fn: () => T) => test(name, () => (fresh(), void fn()));
 
-  await ok("what the parser refuses, in the parser's words: a context, a schema not there, wiring, `agent:`", () => {
+  ok("what the parser refuses, in the parser's words: a context, a schema not there, wiring, `agent:`", () => {
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { context: 'lots' } }, v),
       'Invalid',
@@ -320,7 +320,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       "`agent` is a step's key",
     );
   });
-  await ok("a name that is no agent's: a file name, a path out of agents/", () => {
+  ok("a name that is no agent's: a file name, a path out of agents/", () => {
     refused(() => writeAgent(ROOT, AGENTS, { ...scribe, name: 'x.md' }, v), 'Invalid', "`x.md` is not an agent's name");
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, name: '../dev/plan' }, v),
@@ -329,7 +329,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       'an agent is a file in agents/',
     );
   });
-  await ok('outside the two places the board lists agents from, and outside a folder of agents; let through `anywhere`', () => {
+  ok('outside the two places the board lists agents from, and outside a folder of agents; let through `anywhere`', () => {
     const elsewhere = path.join(ROOT, 'elsewhere', 'agents');
     fs.mkdirSync(elsewhere, { recursive: true });
     refused(
@@ -346,7 +346,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     assert.ok(fs.existsSync(path.join(elsewhere, 'scribe.md')));
     fs.rmSync(path.join(ROOT, 'elsewhere'), { recursive: true });
   });
-  await ok(
+  ok(
     'at shipped defaults: into the workflows/ of a checkout no factory names; written once one names it, or the caller does as `repo`',
     () => {
       const checkout = scratch('wf-agent-checkout-');
@@ -363,7 +363,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },
   );
-  await ok('through a link, a write and a removal, by name', () => {
+  ok('through a link, a write and a removal, by name', () => {
     const outside = path.join(ROOT, 'outside.md');
     fs.writeFileSync(outside, 'mine\n');
     fs.symlinkSync(outside, path.join(AGENTS, 'scribe.md'));
@@ -371,7 +371,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version: 'x' }), 'Invalid', 'scribe.md is a link');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'mine\n');
   });
-  await ok('a result schema through a link, and what the link points at left as it was', () => {
+  ok('a result schema through a link, and what the link points at left as it was', () => {
     const outside = path.join(ROOT, 'outside.schema.json');
     fs.writeFileSync(outside, '{"mine":true}\n');
     fs.symlinkSync(outside, path.join(AGENTS, 'scribe.schema.json'));
@@ -384,7 +384,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     assert.equal(fs.readFileSync(outside, 'utf8'), '{"mine":true}\n');
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
   });
-  await ok('a result schema not its own: another file than its line names, a path, another agent’s, no schema of fields', () => {
+  ok('a result schema not its own: another file than its line names, a path, another agent’s, no schema of fields', () => {
     refused(
       () => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: 'other.schema.json', text: FIELDS } }),
       'Invalid',
@@ -413,7 +413,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       '`output: scribe.schema.json` is not a schema of fields',
     );
   });
-  await ok('at shipped defaults: a card sent with its agent, or sent as an own `undefined`, which is generated from its skills', () => {
+  ok('at shipped defaults: a card sent with its agent, or sent as an own `undefined`, which is generated from its skills', () => {
     const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
     const sent = { version: null, card: { file: 'scribe.skills.json', text } };
     const sentEmpty = { version: null, card: undefined };
@@ -421,7 +421,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     refused(() => writeAgent(ROOT, AGENTS, scribe, sentEmpty), 'Invalid', '`card` is not written with an agent');
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);
   });
-  await ok('a remove or a rename of an agent a step still names, naming the steps — one in a folder that does not load too', () => {
+  ok('a remove or a rename of an agent a step still names, naming the steps — one in a folder that does not load too', () => {
     const reviewer = agentVersion(AGENTS, 'reviewer')!;
     const err = refused(
       () => removeAgent(ROOT, AGENTS, 'reviewer', { version: reviewer }),
@@ -452,7 +452,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       'broken/a, dev/review',
     );
   });
-  await ok('a rename onto another agent, and a new agent renamed from another', () => {
+  ok('a rename onto another agent, and a new agent renamed from another', () => {
     const { version } = writeAgent(ROOT, AGENTS, scribe, v);
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'reviewer' }, { version, from: 'scribe' }),

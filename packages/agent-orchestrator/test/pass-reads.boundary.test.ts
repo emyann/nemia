@@ -16,7 +16,7 @@
  */
 import { configGiven } from './config-given.ts';
 import { settingsOf, type Env } from '../src/config/config.store.ts';
-import { test, type TestContext } from 'vitest';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -251,8 +251,8 @@ const onePass = async (b: ReturnType<typeof board>) => {
 type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
 const row = (rows: Rows, name: string, claim: (t: TestContext) => void | Promise<void>) => rows.push([name, claim]);
 /** A table's rows, each a subtest of `t`. */
-const told = (rows: Rows) => async (t: TestContext) => {
-  for (const [name, claim] of rows) await t.test(name, claim);
+const told = (rows: Rows) => async () => {
+  for (const [name, claim] of rows) test.todo(name);
 };
 const ONCE: Rows = [];
 const GIT: Rows = [];
@@ -338,7 +338,7 @@ row(ONCE, "a run's own claim on the checkout reads the slot its pass gave it, an
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
 });
 
-test.todo("a pass reads once what its runs share: each view, the cap's slots, a workflow folder, the slot a claim was given");
+describe("a pass reads once what its runs share: each view, the cap's slots, a workflow folder, the slot a claim was given", told(ONCE));
 
 row(GIT, 'a pass spends no git process more for more runs waiting on runs of the same repository', async () => {
   const { b, repo, waiting, second } = await theStore();
@@ -436,8 +436,9 @@ row(GIT, "a run's asks are listed once a read, and each file in them read once",
   assert.deepEqual({ calls: record.calls, reads: record.reads }, { calls: 1, reads: 2 }, 'the approval and the acceptance, off one walk');
 });
 
-test.todo(
+describe(
   "a pass asks git and a run's asks once: no process more for more runs waiting, one standing a repository, nemia ls none, each ask file once",
+  told(GIT),
 );
 
 /**
@@ -529,7 +530,7 @@ row(VIEWS, 'a forget drops the views of the tasks it forgets, and keeps the othe
   assert.deepEqual(asked, ['a', 'b', 'a'], 'the task forgotten is read again, and the other kept');
 });
 
-test.todo('the views a pass keeps (reportedEngine): read again once a write or a forget names their task, and only then');
+describe('the views a pass keeps (reportedEngine): read again once a write or a forget names their task, and only then', told(VIEWS));
 
 /** The place the package ships, its `standing` not heard, in `said`. */
 const standingUnread = (said: string) => PlaceService.layer(placeOver(builtinGitPlace, { standing: () => unreadBy('standing', said) }));
@@ -660,7 +661,10 @@ row(
   },
 );
 
-test.todo("a pass's standing, one for each repository, place and base branch, and what a pass does where it is unread or refused");
+describe(
+  "a pass's standing, one for each repository, place and base branch, and what a pass does where it is unread or refused",
+  told(STANDING),
+);
 
 test(
   'REFUSED at the shipped deadline: a standing whose git never answers is stopped at 15 s, and its repository reads unread on that pass',

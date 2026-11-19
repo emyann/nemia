@@ -1886,9 +1886,7 @@ describe('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and
       import('agent-runtime').CompactReport,
       import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
     >;
-    feed: (
-      after?: import('agent-runtime').Cursor,
-    ) => Effect.Effect<
+    feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
       {
         entries: import('agent-runtime').FeedEntry[];
         cursor: import('agent-runtime').Cursor;

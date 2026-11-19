@@ -3,6 +3,7 @@
  * series it names (`seriesOf`).
  */
 import type { TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -10,7 +11,7 @@ import type { AddressInfo } from 'node:net';
  * A collector that answers every post with `{}` and keeps it, by path (`posts`), closed after the test: its address (`url`), and a wait
  * for the first post to `path` whose body has `word` (`posted`).
  */
-export async function collector(t: TestContext) {
+export async function collector(t: Finishes) {
   const posts: { path: string; body: string }[] = [];
   const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
   const server = http.createServer((req, res) => {

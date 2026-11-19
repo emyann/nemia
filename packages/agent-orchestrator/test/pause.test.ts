@@ -227,9 +227,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
       import('agent-runtime').CompactReport,
       import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
     >;
-    feed: (
-      after?: import('agent-runtime').Cursor,
-    ) => Effect.Effect<
+    feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
       {
         entries: import('agent-runtime').FeedEntry[];
         cursor: import('agent-runtime').Cursor;

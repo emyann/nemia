@@ -12,6 +12,7 @@
 
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -175,7 +176,7 @@ const aStarted = (repo: string, brief: string, workflowDir = oneStep(), more: Pa
   stage.runPlaced(startRun({ brief, repo, workflowDir, ...more }));
 
 /** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const typed = async (t: TestContext, ...argv: string[]) => {
+const typed = async (t: Finishes, ...argv: string[]) => {
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
     printed.push(a.join(' '));

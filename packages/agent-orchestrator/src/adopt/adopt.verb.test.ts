@@ -7,6 +7,7 @@
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -90,7 +91,7 @@ function repoAndTemplate(): { repo: string; dir: string } {
 }
 
 /** A hand-made factory `name` on `repo`, offering the team's `dev`. */
-async function madeByHand(t: TestContext, name: string, repo: string): Promise<void> {
+async function madeByHand(t: Finishes, name: string, repo: string): Promise<void> {
   await printedBy(t, 'factory', 'add', name, '--repo', repo, '--no-trust');
   await printedBy(t, 'factory', 'attach', name, 'dev');
 }

@@ -38,7 +38,7 @@ describe('processesNow reads this user processes with the variables asked for, a
     t.onTestFinished(() => {
       child.kill('SIGKILL');
     });
-    pid = child.pid;
+    pid = child.pid!;
     assert.equal(typeof pid, 'number', 'the child had a pid');
     if (pid === undefined) return;
     return t.end;

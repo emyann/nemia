@@ -10,7 +10,7 @@
  * A store of its own at `ROOT`, given as `ENV`.
  */
 import { type Env, settingsOf } from '../config/config.store.ts';
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test, type TestContext, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { testEngine } from 'agent-runtime/testing';
@@ -142,7 +142,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
       appendLines(ROOT, 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
       const said: string[] = [];
-      t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
       assert.deepEqual(
         readDay(ROOT, 'minute', '2026-10-05').map((x) => x.sum),
         [2, 3],
@@ -167,7 +167,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
         ].join(''),
       );
       const said: string[] = [];
-      t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
       assert.deepEqual(
         readDay(ROOT, 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
         [

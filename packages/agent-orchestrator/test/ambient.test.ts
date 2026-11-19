@@ -10,7 +10,7 @@
  * points `WF_ROOT`, `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and
  * `os.homedir()` answers a throwaway too.
  */
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -119,7 +119,7 @@ test('with the switch the test script puts, a ticking command typed in a test st
       `const { main } = await import('${main}');`,
       "test('doctor fix', async (t) => {",
       '  const said = [];',
-      "  t.mock.method(console, 'error', (...a) => said.push(a.join(' ')));",
+      "  vi.spyOn(console, 'error').mockImplementation((...a) => said.push(a.join(' ')));",
       "  await main(['doctor', 'fix', 'no-piece']).catch(() => undefined);",
       "  assert.ok(said.some((l) => l.includes('NEMIA_DAEMON_START=off here, so this command starts no daemon')), said.join('\\n'));",
       `  assert.deepEqual(fs.readdirSync(${JSON.stringify(store)}).filter((f) => f.startsWith('daemon.')), []);`,

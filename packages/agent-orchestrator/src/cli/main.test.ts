@@ -125,7 +125,7 @@ const typed = typedIn(ENV);
 test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async (t: TestContext) => {
   const out: string[] = [];
   const err: string[] = [];
-  vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string) => err.push(chunk) > 0);
+  vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => err.push(chunk) > 0) as never);
   vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => out.push(a.join(' ')));
   await aliased([]);
   assert.deepEqual(err, [`${WF_HINT}\n`]);

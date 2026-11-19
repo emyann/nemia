@@ -16,6 +16,7 @@
  * from its memo, and a difference throws.
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -94,7 +95,7 @@ const aTeamRepo = (): string => {
  * A store with no runs, cards, tries, pause or factories, then the factory `solo` on a repository of its own, attaching the team's `dev`,
  * and the clock at `now`. The cap as given: `undefined` unsets it.
  */
-const aStore = (t: TestContext, now: string, cap?: string): string => {
+const aStore = (t: Finishes, now: string, cap?: string): string => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }

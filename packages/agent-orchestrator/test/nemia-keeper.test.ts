@@ -14,6 +14,7 @@
  * `src/nemia/nemia.test.ts`; the stretches and what a write asks, `src/level/level.test.ts`.
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -135,7 +136,7 @@ const keptAnew = async (t: TestContext): Promise<string> => {
 };
 
 /** `Date` mocked for the story told in `t`, at `now`: her task is named for the moment she is raised, and a raise ends on the wall. */
-const mockedAt = (t: TestContext, now: string) => vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
+const mockedAt = (t: Finishes, now: string) => vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(now) });
 
 describe("Nemia kept and let go: trusted late, filed long-lived in auto with the daemon's bin first, subscribed once, stopped from outside, let go at manual", () => {
   beforeAll(() => {

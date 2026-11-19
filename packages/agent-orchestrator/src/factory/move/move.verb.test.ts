@@ -233,15 +233,16 @@ describe('the import files the factory on the target, clones its repositories, a
     cards: { name: string; was: string }[];
     untrusted: string[];
   };
-  let record!: import('../factory.model.ts').FactoryRecord;
+  let record!: Exclude<import('../factory.model.ts').FactoryRecord, import('../factory.model.ts').DefaultFactory>;
   beforeAll(async () => {
     src = side('wf-move-src-');
     ({ origin } = planted(src));
     exp = await exported(src);
     dst = side('wf-move-dst-');
     answered = answer(await imported(dst, exp));
-    record = done(dst.factories.factories.read(NAME));
-    if (isDefaultFactory(record)) return assert.fail('read as the default');
+    const read = done(dst.factories.factories.read(NAME));
+    if (isDefaultFactory(read)) return assert.fail('read as the default');
+    record = read;
   });
   test('its repository is the target’s clone of its origin, cloned there', () => {
     assert.deepEqual(record.repos, [path.join(dst.root, 'clones', 'localhost', ...new URL(origin).pathname.split('/').filter(Boolean))]);

@@ -935,12 +935,12 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
-  vi.spyOn(fs, 'mkdirSync').mockImplementation((at: string, ...rest: unknown[]) => {
+  vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
-  });
+  }) as never);
   await runWith(b.e, advanceRun(runRecord(ROOT, q.run.id)));
-  (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mockRestore();
+  vi.mocked(fs.mkdirSync).mockRestore();
   assert.ok(
     !fs.existsSync(asks),
     'a spent ask the pass moves into `done/` as `nemia rm` removes the directory: no asks directory made again',

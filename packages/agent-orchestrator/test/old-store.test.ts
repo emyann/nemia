@@ -67,7 +67,7 @@ const written = (id: string): Record<string, unknown> & { workflow: Array<Record
 const holdsAny = (object: unknown, ...keys: string[]): boolean => keys.some((key) => Object.hasOwn(object as object, key));
 
 /** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
-const listed = async (t: { mock: test.TestContext['mock'] }): Promise<RunsListed> => {
+const listed = async (t: unknown): Promise<RunsListed> => {
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     return (await stage.main(['ls'])) as RunsListed;

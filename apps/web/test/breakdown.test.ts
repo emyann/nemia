@@ -21,6 +21,7 @@ import {
 import { durationWords } from '../src/lib/duration.ts';
 import { presentWait } from '../src/lib/runWords.ts';
 import { detail, runList, runObject, step, summary, waitingRun } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 const [S, M] = [1_000, 60_000];
 
@@ -77,7 +78,6 @@ const AS_OF = '2026-10-12T12:00:00.000Z';
  * again (`openOf`); the run at its last gate where none is given.
  */
 async function decoded(run: WaitingRun = answered()) {
-  const before = globalThis.fetch;
   const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
   const steps = run.steps.map((own) => step({ ...own, timeline: [] }));
   const object = runObject(detail({ id: run.id, steps }), {
@@ -94,7 +94,7 @@ async function decoded(run: WaitingRun = answered()) {
     waitingOnYouWords,
   });
   const list = runList([object], { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 } });
-  globalThis.fetch = async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
+  apiAnswers(async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } }));
   const client = new QueryClient();
   try {
     const [waiting] = (await client.fetchQuery(openRunsQuery())).waiting;
@@ -102,7 +102,6 @@ async function decoded(run: WaitingRun = answered()) {
     return waiting;
   } finally {
     client.clear();
-    globalThis.fetch = before;
   }
 }
 

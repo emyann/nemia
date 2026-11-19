@@ -53,6 +53,7 @@ import type { StreamLike } from '../src/lib/follow.ts';
 import type { AskQuestion, ChatEvent, ChatPresence, PermissionFacts } from '../src/lib/api/chat.ts';
 import type { ChatKept } from '../src/lib/chatOutbox.ts';
 import type { FactoryLevel } from '../src/lib/api/nemia.ts';
+import { apiAnswers } from './network.ts';
 
 const at = (second: number) => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
 
@@ -206,15 +207,14 @@ describe('chatOutbox: a message the api would not take is kept in this browser, 
         createElement(ChatKeptMessage, { kept, onAgain: () => undefined, onEdit: () => undefined, onDiscard: () => undefined }),
       );
     const WHY = 'The words came with no token: sign in on the token page.';
-    const before = globalThis.fetch;
     let requests = 0;
     let answer: () => Promise<Response> = async () => new Response(null, { status: 204 });
     let counted: (() => void) | undefined;
-    globalThis.fetch = async () => {
+    apiAnswers(async () => {
       requests += 1;
       counted?.();
       return answer();
-    };
+    });
     const json = { 'content-type': 'application/json' };
     const failureOf = (text: string) =>
       sendChat(text).then(
@@ -261,7 +261,6 @@ describe('chatOutbox: a message the api would not take is kept in this browser, 
         assert.equal(again.refused, undefined);
       }
     } finally {
-      globalThis.fetch = before;
       counted = undefined;
     }
   });
@@ -897,13 +896,11 @@ describe('broughtOf and chatItems: a step her words link to is brought, drawn un
 
 describe('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', () => {
   let reading!: (typeof import('../src/lib/useNemiaChat.ts'))['reading'];
-  let fetchBefore!: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   let sourceBefore!: unknown;
   let state!: ChatFollowed;
   beforeAll(async () => {
     const t = teardowns();
     ({ reading } = await import('../src/lib/useNemiaChat.ts'));
-    fetchBefore = globalThis.fetch;
     sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
     Object.assign(globalThis, {
       EventSource: class extends Stream {
@@ -915,7 +912,6 @@ describe('reading her chat: one stream opened after the first read, from its cur
       },
     });
     t.onTestFinished(() => {
-      globalThis.fetch = fetchBefore;
       Object.assign(globalThis, { EventSource: sourceBefore });
     });
     state = unreadChat(true);
@@ -933,11 +929,11 @@ describe('reading her chat: one stream opened after the first read, from its cur
   const told = story(test);
   let open = () => {};
   told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
-    globalThis.fetch = async () =>
+    apiAnswers(async () =>
       new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
-      });
+      }));
     open = reading({ setState, tryAgain: () => {} });
     await until(() => state.live);
     for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
@@ -950,9 +946,9 @@ describe('reading her chat: one stream opened after the first read, from its cur
   told.test('a read made again that fails is the end, and leaves no retrying notice beside its error', async () => {
     open();
     assert.equal(streams[0]?.readyState, 2, 'what stops the reading closes its stream');
-    globalThis.fetch = async () => {
+    apiAnswers(async () => {
       throw new TypeError('fetch failed');
-    };
+    });
     const closed = reading({ setState, tryAgain: () => {} });
     await until(() => state.error !== null);
     closed();

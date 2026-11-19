@@ -9,6 +9,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 import { at, routedWith, runWith, textsOf, threeTries } from './markup.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -90,14 +91,10 @@ type Sent = { method: string; path: string };
 
 /** Every request answered `body` as JSON with `status` for the length of the test; what each was sent as is kept in the list returned. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
-  const before = globalThis.fetch;
   const sent: Sent[] = [];
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     sent.push({ method: init?.method ?? 'GET', path: String(input) });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent satisfies Sent[];
 }

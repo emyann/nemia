@@ -8,6 +8,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { WriteRefusal } from '../src/lib/api/read.ts';
 import { files } from '../src/lib/api/objects.ts';
+import { apiAnswers } from './network.ts';
 
 /** An upload's answer: the file kept under `id`. */
 const kept = (id: string, name: string) => ({ id, name, mediaType: 'image/png', size: 1, createdAt: '2026-11-16T10:00:00.000Z' });
@@ -18,15 +19,11 @@ const kept = (id: string, name: string) => ({ id, name, mediaType: 'image/png', 
  * @param answers What each request is answered, in order.
  */
 function answering(t: { onTestFinished: (fn: () => void) => void }, answers: Array<[number, unknown]>) {
-  const before = globalThis.fetch;
   const asked: string[] = [];
-  globalThis.fetch = async (url: string | URL | Request) => {
+  apiAnswers(async (url: string | URL | Request) => {
     asked.push(String(url));
     const [status, body] = answers[asked.length - 1] ?? [500, { error: 'no answer stubbed' }];
     return new Response(JSON.stringify(body), { status });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return asked;
 }

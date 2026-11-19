@@ -21,6 +21,7 @@ import {
   workflow,
   workflowObject,
 } from './library.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /**
  * Every read answered by `answer` of the path and query it asks, as JSON, for the length of the test; a status of its own where `answer`
@@ -28,15 +29,11 @@ import {
  */
 function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (asked: string) => unknown, status = 200) {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
-    const url = new URL(input instanceof Request ? input.url : String(input), 'http://board.invalid');
+  apiAnswers(async (input) => {
+    const url = new URL(input, 'http://board.invalid');
     const path = `${url.pathname}${url.search}`;
     asked.push(path);
     return new Response(JSON.stringify(answer(path)), { status, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return asked satisfies string[];
 }
@@ -63,7 +60,6 @@ const without = <T extends object>(value: T, ...keys: string[]) =>
 describe("a step's page and a list of workflows are read in the place named, under a key of that place", () => {
   test("a step's page is read in the place named, keyed by it, with what a run of it will be told, its hires and its recent runs", async (t) => {
     const asked: string[] = [];
-    const before = globalThis.fetch;
     const page = stepPage({
       factory: 'f',
       hired: 'writer',
@@ -82,12 +78,9 @@ describe("a step's page and a list of workflows are read in the place named, und
       ],
       recentRuns: [{ id: 'r-1', brief: 'Do it', createdAt: '2026-10-01T00:00:00Z', factory: 'f', filed: false }],
     });
-    globalThis.fetch = async (input) => {
+    apiAnswers(async (input) => {
       asked.push(String(input));
       return new Response(JSON.stringify(page), { headers: { 'content-type': 'application/json' } });
-    };
-    t.onTestFinished(() => {
-      globalThis.fetch = before;
     });
     const placed = stepQuery('user', 'w', 'review', { factory: 'f' });
     const read = await (placed.queryFn as unknown as () => Promise<WorkflowStepPage>)();

@@ -8,6 +8,7 @@ import { QueryClient } from '@tanstack/react-query';
 import type { Factory } from 'objects';
 import { loadWorkflowsIn, rereadWorkflows } from '../src/lib/placed.ts';
 import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** A factory as the objects list it, on `repos`. */
 const factory = (name: string, repos: string[]) =>
@@ -19,8 +20,7 @@ const factory = (name: string, repos: string[]) =>
  */
 function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]) {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     const url = String(input);
     const workflows = /^\/api\/namespaces\/[^/]+\/workflows(\?|$)/.test(url);
     const body = url.startsWith('/api/factories/')
@@ -34,9 +34,6 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, factories: F
             : [];
     if (workflows || (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/'))) asked.push(url);
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return asked satisfies string[];
 }

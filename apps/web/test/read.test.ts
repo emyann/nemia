@@ -13,14 +13,11 @@ import { openRunsQuery, rowsOf, runsSelectedQuery, type OpenRuns } from '../src/
 import { agentOf, judged, runViewOf, sinceOf, type RunRow } from '../src/lib/api/judged.ts';
 import type { StepView } from '../src/lib/runView.ts';
 import { detail, runList, runObject, step } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
-  });
+  apiAnswers(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 }
 
 type TimelineTry = StepView['timeline'][number];
@@ -124,14 +121,10 @@ describe("runViewOf: the one view of a run off its object — its factory from i
 
 test('every run is the plain RunList whole, a label selector going with it, each run it could not judge a row in name order', async (t) => {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     asked.push(String(input));
     const list = runList([runObject(detail({ id: 'r-2' }))], {}, [{ name: 'r-1', namespace: 'default', error: 'unread' }]);
     return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   const rows = await readRuns();
   assert.deepEqual(
@@ -151,7 +144,6 @@ test('every run is the plain RunList whole, a label selector going with it, each
 
 test("the frame is the RunList of the runs not finished, split by each run's state, with the list's counts and asOf", async (t) => {
   const asked: string[] = [];
-  const before = globalThis.fetch;
   const clock = { wallMs: 5, sessionsMs: 1, checksMs: 1, personMs: 1, slotMs: 1, restMs: 1 };
   const stepCosts = [
     { step: 'plan', cost: { usd: 1.5, measured: 1, unmeasured: 0, said: '$1.50' } },
@@ -166,12 +158,9 @@ test("the frame is the RunList of the runs not finished, split by each run's sta
     { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting: 1, inFlight: 2, finished: 7 } },
     [{ name: 'r-2', error: 'unread', state: 'inFlight' }],
   );
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     asked.push(String(input));
     return new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   const open = await readOpen();
   assert.equal(open.asOf, '2026-10-12T12:00:00.000Z');

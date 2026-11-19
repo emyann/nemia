@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { finishedTodayQuery, readsOnToday, type FinishedRun } from '../src/lib/api/runs.ts';
 import { detail, runList, runObject } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** The day the strip counts, from its midnight. */
 const DAY_START = Date.parse('2026-09-13T00:00:00.000Z');
@@ -18,15 +19,11 @@ const finishedRun = (id: string, finishedAt: string) =>
 /** Each page the api answers, by the `continue` it was asked with ('' for the first), and the URLs it was asked. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Record<string, unknown>) {
   const asked: string[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input: string | URL | Request) => {
+  apiAnswers(async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://board');
     asked.push(url.pathname + url.search);
     const body = pages[url.searchParams.get('continue') ?? ''];
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return asked satisfies string[];
 }

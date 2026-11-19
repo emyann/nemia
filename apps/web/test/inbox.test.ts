@@ -56,6 +56,7 @@ import {
   workflowKey,
   type CardRefusal,
 } from '../src/lib/inbox.ts';
+import { apiAnswers } from './network.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}) =>
   ({
@@ -104,14 +105,10 @@ const entryOf = (name: string, card = true) => ({ name, file: card ? `${name}.md
 
 /** The api answering each request with `answer()`, for the length of the test: the requests the board sent. */
 function sending(t: { onTestFinished: (fn: () => void) => void }, answer: () => Response) {
-  const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
+  apiAnswers(async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), init });
     return answer();
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }

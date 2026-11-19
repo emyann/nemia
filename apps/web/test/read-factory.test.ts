@@ -44,14 +44,11 @@ import {
   scheduleObject,
   stepReach,
 } from './factory.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
-  });
+  apiAnswers(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 }
 
 const readInbox = inboxAllQuery(undefined).queryFn as unknown as () => Promise<InboxEntry[]>;
@@ -101,14 +98,10 @@ describe("get, the Factory's and the inbox's reads: each decodes what the api gi
     assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
   });
   test('the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined', async (t) => {
-    const before = globalThis.fetch;
     const asked: string[] = [];
-    globalThis.fetch = async (input) => {
-      asked.push(new URL(input instanceof Request ? input.url : String(input), 'http://board').search);
+    apiAnswers(async (input) => {
+      asked.push(new URL(input, 'http://board').search);
       return new Response(JSON.stringify(capabilities()), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
-    t.onTestFinished(() => {
-      globalThis.fetch = before;
     });
     const place = { factory: 'mill', repo: undefined, bar: 'gauges' } as { factory?: string; repo?: string };
     const read = capabilitiesQuery(place).queryFn as unknown as () => Promise<Capabilities>;
@@ -144,8 +137,7 @@ type Sent = { method: string; url: string; body: unknown };
 /** Every request answered by `answer` of its path, its JSON with a 200, for the length of the test; what each sent, in `sent`. */
 function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: string, method: string) => unknown) {
   const sent: Sent[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
     sent.push({
@@ -156,9 +148,6 @@ function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: 
         : undefined,
     });
     return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent satisfies Sent[];
 }

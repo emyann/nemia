@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`; `WF_MAX_RUNS` is read off it on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers
  * from its memo, and a difference throws.
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -137,7 +137,7 @@ describe('a weekly schedule over the weeks: one run a due fire, once after downt
   });
   const s = story(test);
   let latest = '';
-  s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async (t) => {
+  s.test('a pass on the fire itself, to the second, starts one run for it, on the factory, the fire on its record', async () => {
     vi.setSystemTime(Date.parse(MONDAY) + 400);
     const first = await runWith(e, tickRun());
     const [run] = listRuns(ROOT);
@@ -148,11 +148,11 @@ describe('a weekly schedule over the weeks: one run a due fire, once after downt
     );
     assert.deepEqual(runRecord(ROOT, run.id).scheduled, { factory: 'solo', workflow: 'dev', due: MONDAY }, 'read back off the record');
   });
-  s.test('the next pass starts none', async (t) => {
+  s.test('the next pass starts none', async () => {
     vi.setSystemTime(Date.parse(MONDAY) + 30_000);
     assert.deepEqual([(await runWith(e, tickRun())).scheduled, scheduledDues()], [undefined, [MONDAY]]);
   });
-  s.test('a daemon down across three fires starts one run, for the latest, then none', async (t) => {
+  s.test('a daemon down across three fires starts one run, for the latest, then none', async () => {
     vi.setSystemTime(Date.parse('2026-10-27T12:00:00Z'));
     latest = startedBy(await runWith(e, tickRun())) ?? '';
     assert.equal((await runWith(e, tickRun())).scheduled, undefined);
@@ -177,7 +177,7 @@ describe('a due fire waits behind the run cap and behind the queue, then starts'
     return t.end;
   });
   const s = story(test);
-  s.test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a due fire starts nothing', async (t) => {
+  s.test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a due fire starts nothing', async () => {
     await main(['start', 'By hand', '--workflows', 'dev', '--factory', 'solo', '--repo', repo], e);
     await runWith(e, tickRun());
     vi.setSystemTime(Date.parse(MONDAY) + 30_000);
@@ -190,7 +190,7 @@ describe('a due fire waits behind the run cap and behind the queue, then starts'
     assert.deepEqual(scheduledDues(), [MONDAY]);
     ENV.WF_MAX_RUNS = undefined;
   });
-  s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async (t) => {
+  s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async () => {
     fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card.md'), '---\nworkflow: dev\nfactory: solo\n---\nBuild it.\n');
     await verb(['inbox', 'queue', 'a-card'], e);
@@ -218,15 +218,15 @@ describe('a schedule written after its latest fire waits for its next; refused b
   });
   const s = story(test);
   let why = '';
-  s.test('written after its latest fire, it starts nothing before its next', async (t) => {
+  s.test('written after its latest fire, it starts nothing before its next', async () => {
     vi.setSystemTime(Date.parse('2026-10-05T15:00:00Z'));
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled, undefined);
   });
-  s.test('at its next fire it starts', async (t) => {
+  s.test('at its next fire it starts', async () => {
     vi.setSystemTime(Date.parse('2026-10-12T13:00:05Z'));
     assert.equal((await runWith(e, tickRun({ repo }))).scheduled?.due, '2026-10-12T13:00:00.000Z');
   });
-  s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async (t) => {
+  s.test('REFUSED at shipped defaults: its workflow detached by hand, its next fire is refused and kept refused for it', async () => {
     fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), workflows: [] }, null, 2));
     vi.setSystemTime(Date.parse('2026-10-19T13:00:30Z'));
     const refused = await runWith(e, tickRun({ repo }));
@@ -239,7 +239,7 @@ describe('a schedule written after its latest fire waits for its next; refused b
   s.test('that fire is tried no more and said no more', async () => {
     assert.deepEqual([(await runWith(e, tickRun({ repo }))).scheduled, scheduledDues()], [undefined, ['2026-10-12T13:00:00.000Z']]);
   });
-  s.test('and its next fire is tried again', async (t) => {
+  s.test('and its next fire is tried again', async () => {
     vi.setSystemTime(Date.parse('2026-10-26T13:00:05Z'));
     const next = await runWith(e, tickRun({ repo }));
     assert.equal(next.scheduled && 'refused' in next.scheduled ? next.scheduled.due : undefined, '2026-10-26T13:00:00.000Z');
@@ -297,7 +297,7 @@ describe("an old schedule's repository is read and ignored: its run starts on th
     return t.end;
   });
   const s = story(test);
-  s.test('REFUSED: a workflow the wiring places on neither repository is refused on its fire, naming the attach', async (t) => {
+  s.test('REFUSED: a workflow the wiring places on neither repository is refused on its fire, naming the attach', async () => {
     planted('duo', 'dev', {
       cron: '0 9 * * 1',
       tz: 'America/Montreal',
@@ -311,7 +311,7 @@ describe("an old schedule's repository is read and ignored: its run starts on th
     assert.match(at?.refused ?? '', /nemia factory attach duo dev --repo/);
     assert.deepEqual(scheduledDues(), []);
   });
-  s.test('wired to the other repository, its next fire starts on that one, not on the one the schedule names', async (t) => {
+  s.test('wired to the other repository, its next fire starts on that one, not on the one the schedule names', async () => {
     attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev', repo: path.basename(wired) });
     planted('duo', 'dev', {
       cron: '0 9 * * 1',

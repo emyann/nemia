@@ -642,7 +642,7 @@ describe("what a run accepts of a closeout's files, and what it refuses", () => 
     ]);
     assert.deepEqual(artifactFiles(ROOT, { id }, 'review'), [], 'a step never filed has no directory, and lists nothing');
   });
-  test("REFUSED: an absolute path outside the step's files directory, never read — however it gets out", async (sub) => {
+  test("REFUSED: an absolute path outside the step's files directory, never read — however it gets out", async () => {
     const { id, files } = await filed();
     const secret = path.join(ROOT, 'secret.txt');
     fs.writeFileSync(secret, "not a step's to name\n");

@@ -214,7 +214,7 @@ const aRepo = (): string => {
   return repo;
 };
 
-test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async (t) => {
+test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async () => {
   let draws = 0;
   vi.spyOn(Math, 'random').mockImplementation(() => (draws++ === 0 ? 0.5 : draws / 97));
   const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
@@ -864,7 +864,7 @@ test('a step whose harness blocked its session says what the harness waits for �
   assert.doesNotMatch(await decided(), /answer it in Claude Code/, 'no word, no line');
 });
 
-test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async (t) => {
+test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async () => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -897,7 +897,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
 
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 
-test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async (t) => {
+test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'done.txt' });

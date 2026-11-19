@@ -443,7 +443,7 @@ const BELOW_ONE_RESPONSE = 0.00001;
 test.skipIf(skip)(
   'a job given a budget below what one response costs stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
   { timeout: 12 * 60_000 },
-  async (t) => {
+  async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('budget-board') }));
     const ids = {
       capped: await Effect.runPromise(
@@ -505,7 +505,7 @@ const FINISHED_CLOSEOUT = {
 test.skipIf(skip)(
   'M1 under the engine: a job on claude in `default` settles on its own and its attempt carries what it was denied; a job at shipped defaults asked for nothing it may not do carries no denials',
   { timeout: 15 * 60_000 },
-  async (t) => {
+  async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m1-board') }));
     const probe = tmp('m1-engine');
     const ids = {
@@ -563,7 +563,7 @@ const M14_BRIEF = [
 test.skipIf(skip)(
   'M14: a job denied a call says so before its result — its capture holds the permission_denied line while it works, and the engine journals the denial on the attempt in flight',
   { timeout: 15 * 60_000 },
-  async (t) => {
+  async () => {
     console.log(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m14-board');
     const engine = builtEngine(EngineService.layer({ root }));
@@ -622,7 +622,7 @@ test.skipIf(skip)(
 test.skipIf(skip)(
   "M3, M5: a job resumed from a job remembers it and is charged its own spend, not its parent's again; a budget on a resume caps its own spend",
   { timeout: 40 * 60_000 },
-  async (t) => {
+  async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m2-board') }));
     const cwd = tmp('m2');
     const settled = async (id: string) => {
@@ -672,7 +672,7 @@ test.skipIf(skip)(
 test.skipIf(skip)(
   "M7: a job resumed from a job that was denied is not charged its parent's denials — the result of a resume says only what the resume was denied, unlike its cost",
   { timeout: 20 * 60_000 },
-  async (t) => {
+  async () => {
     const engine = builtEngine(EngineService.layer({ root: tmp('m7-board') }));
     const probe = tmp('m7');
     const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: DENIED_CONFIG };
@@ -748,7 +748,7 @@ const oneAllowedCheckout = (label: string) => {
 test.skipIf(skip)(
   "M11: a job in dontAsk honours the checkout's settings — the allowed command runs, the unlisted one is denied, and the job records the denial",
   { timeout: 15 * 60_000 },
-  async (t) => {
+  async () => {
     const version = execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim();
     console.log(`claude --version: ${version}`);
     const engine = builtEngine(EngineService.layer({ root: tmp('m11-board') }));
@@ -799,7 +799,7 @@ const M12_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } },
 test.skipIf(skip)(
   'M12: a job held open signs and waits with no process, an answer resumes its session under its own cap and it remembers, a close settles it',
   { timeout: 15 * 60_000 },
-  async (t) => {
+  async () => {
     console.log(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
     const engine = builtEngine(EngineService.layer({ root }));
@@ -878,7 +878,7 @@ const hasCodex = (() => {
 test.skipIf(live ? (hasCodex ? false : 'no `codex` on PATH') : 'set AE_LIVE=1 to run against Codex (spends from its subscription)')(
   'M13: a Codex task held open signs and waits with no process; its answer resumes the thread that signed — whether under the same thread id, and in the same rollout, is what it records',
   { timeout: 15 * 60_000 },
-  async (t) => {
+  async () => {
     console.log(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m13-board');
     const engine = builtEngine(EngineService.layer({ root, harnesses: { codex } }));

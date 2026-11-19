@@ -171,7 +171,7 @@ describe("a person queues cards, reads their order and the tick's tries, and tak
   const s = story(test);
   s.test(
     "GET /api/cards carries a queued card's time, and the tick's last try of its start, as the package lists them, and its order is the package's",
-    async (t) => {
+    async () => {
       clear();
       vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
       const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
@@ -224,7 +224,7 @@ describe("a person queues cards, reads their order and the tick's tries, and tak
   );
   s.test(
     'the queue verb queues a card as `nemia inbox queue` does, behind those queued before; unqueue takes it back as `--off` does, and a second writes nothing',
-    async (t) => {
+    async () => {
       clear();
       vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
       const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;

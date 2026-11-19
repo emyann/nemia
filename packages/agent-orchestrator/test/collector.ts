@@ -2,7 +2,6 @@
  * A scratch OTLP collector on loopback for a test that exports (`collector`), and what a body posted to its `/v1/metrics` says of the
  * series it names (`seriesOf`).
  */
-import type { TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';

@@ -1,16 +1,16 @@
 /**
- * The package's Vitest config loads `test/ambient.ts` first into every test file's process (`setupFiles`), so a test that reads `WF_MAX_RUNS` or
- * `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set. Proven on fixtures run
- * by a Vitest of their own with the config's setup files (`test-kit/probe`), with the daemon's ceilings in their environment: one that relies on a
- * default fails naming the sentinel, and one that deletes the variable first passes. And a command that ticks, typed in such a file on a
- * store no daemon holds, starts none: the seat turns the start off (`NEMIA_DAEMON_START=off`). And a collector the shell or the daemon
- * names is not one a test file exports to: the seat drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And the daemon's per-session variables
- * (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) are dropped too, so a step's own run reads what CI reads. And a harness's
- * own files are never the person's: the seat sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither store is the person's: the seat
- * points `WF_ROOT`, `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads pins a throwaway one and
- * `os.homedir()` answers a throwaway too.
+ * The package's Vitest config loads `test/ambient.ts` first into every test file's process (`setupFiles`), so a test that reads
+ * `WF_MAX_RUNS` or `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set.
+ * Proven on fixtures run by a Vitest of their own with the config's setup files (`test-kit/probe`), with the daemon's ceilings in their
+ * environment: one that relies on a default fails naming the sentinel, and one that deletes the variable first passes. And a command that
+ * ticks, typed in such a file on a store no daemon holds, starts none: the seat turns the start off (`NEMIA_DAEMON_START=off`). And a
+ * collector the shell or the daemon names is not one a test file exports to: the seat drops `OTEL_EXPORTER_OTLP_ENDPOINT`. And the
+ * daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) are dropped too, so a step's own run reads
+ * what CI reads. And a harness's own files are never the person's: the seat sets `CLAUDE_CONFIG_DIR` to a scratch folder. And neither
+ * store is the person's: the seat points `WF_ROOT`, `AE_ROOT` and `HOME` at scratch folders, so a module that pins a root as it loads
+ * pins a throwaway one and `os.homedir()` answers a throwaway too.
  */
-import { test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -53,11 +53,11 @@ const probed = (dir: string, file: string, env: NodeJS.ProcessEnv, seated = true
 function runFixture(reader: 'maxRuns' | 'maxConcurrent', name: string, expected: number, names: boolean) {
   const dir = scratch('wf-ambient-');
   const text = [
-      "import assert from 'node:assert/strict';",
-      `import { ${reader} } from '${CONFIG}';`,
-      names ? `delete process.env.${name};` : '',
-      `test('the default', () => assert.equal(${reader}(process.env), ${expected}));`,
-      '',
+    "import assert from 'node:assert/strict';",
+    `import { ${reader} } from '${CONFIG}';`,
+    names ? `delete process.env.${name};` : '',
+    `test('the default', () => assert.equal(${reader}(process.env), ${expected}));`,
+    '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, WF_MAX_RUNS: '6', WF_MAX_CONCURRENT: '50' };
   return probed(dir, text, env);
@@ -104,19 +104,19 @@ test('with the switch the test script puts, a ticking command typed in a test st
   const store = scratch('wf-ambient-store-');
   const main = path.join(PACKAGE, 'src', 'cli', 'main.ts');
   const text = [
-      "import assert from 'node:assert/strict';",
-      "import fs from 'node:fs';",
-      `process.env.WF_ROOT = ${JSON.stringify(store)};`,
-      "if (process.env.NEMIA_DAEMON_START !== 'off') throw new Error('NEMIA_DAEMON_START is not off: nothing was typed, so no daemon started');",
-      `const { main } = await import('${main}');`,
-      "test('doctor fix', async () => {",
-      '  const said = [];',
-      "  vi.spyOn(console, 'error').mockImplementation((...a) => said.push(a.join(' ')));",
-      "  await main(['doctor', 'fix', 'no-piece']).catch(() => undefined);",
-      "  assert.ok(said.some((l) => l.includes('NEMIA_DAEMON_START=off here, so this command starts no daemon')), said.join('\\n'));",
-      `  assert.deepEqual(fs.readdirSync(${JSON.stringify(store)}).filter((f) => f.startsWith('daemon.')), []);`,
-      '});',
-      '',
+    "import assert from 'node:assert/strict';",
+    "import fs from 'node:fs';",
+    `process.env.WF_ROOT = ${JSON.stringify(store)};`,
+    "if (process.env.NEMIA_DAEMON_START !== 'off') throw new Error('NEMIA_DAEMON_START is not off: nothing was typed, so no daemon started');",
+    `const { main } = await import('${main}');`,
+    "test('doctor fix', async () => {",
+    '  const said = [];',
+    "  vi.spyOn(console, 'error').mockImplementation((...a) => said.push(a.join(' ')));",
+    "  await main(['doctor', 'fix', 'no-piece']).catch(() => undefined);",
+    "  assert.ok(said.some((l) => l.includes('NEMIA_DAEMON_START=off here, so this command starts no daemon')), said.join('\\n'));",
+    `  assert.deepEqual(fs.readdirSync(${JSON.stringify(store)}).filter((f) => f.startsWith('daemon.')), []);`,
+    '});',
+    '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, WF_MAX_RUNS: '6', WF_MAX_CONCURRENT: '50' };
   delete env.NEMIA_DAEMON_START;
@@ -134,11 +134,11 @@ const NAMED = 'http://127.0.0.1:9';
 function runExporter(seated: boolean, expected: string) {
   const dir = scratch('wf-ambient-');
   const text = [
-      "import assert from 'node:assert/strict';",
-      `import { otlpOf } from '${TELEMETRY}';`,
-      'const seen = { address: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null, exports: otlpOf(process.env)?.url ?? null };',
-      `test('the collector', () => assert.deepEqual(seen, ${expected}));`,
-      '',
+    "import assert from 'node:assert/strict';",
+    `import { otlpOf } from '${TELEMETRY}';`,
+    'const seen = { address: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? null, exports: otlpOf(process.env)?.url ?? null };',
+    `test('the collector', () => assert.deepEqual(seen, ${expected}));`,
+    '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: NAMED };
   return probed(dir, text, env, seated);
@@ -168,10 +168,10 @@ test("REFUSED under the daemon's per-session and serving variables: a test file 
   const out = path.join(dir, 'seen.json');
   const names = Object.keys(DAEMONS);
   const text = [
-      "import fs from 'node:fs';",
-      `const seen = Object.fromEntries(${JSON.stringify(names)}.map((n) => [n, process.env[n] ?? null]));`,
-      `test('the daemon', () => fs.writeFileSync(${JSON.stringify(out)}, JSON.stringify(seen)));`,
-      '',
+    "import fs from 'node:fs';",
+    `const seen = Object.fromEntries(${JSON.stringify(names)}.map((n) => [n, process.env[n] ?? null]));`,
+    `test('the daemon', () => fs.writeFileSync(${JSON.stringify(out)}, JSON.stringify(seen)));`,
+    '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, ...DAEMONS };
   const seen = (seated: boolean): unknown => {
@@ -191,9 +191,9 @@ function runConfigured(seated: boolean, own: string) {
   const dir = scratch('wf-ambient-');
   const out = path.join(dir, 'seen.txt');
   const text = [
-      "import fs from 'node:fs';",
-      `test('the folder', () => fs.writeFileSync(${JSON.stringify(out)}, process.env.CLAUDE_CONFIG_DIR ?? ''));`,
-      '',
+    "import fs from 'node:fs';",
+    `test('the folder', () => fs.writeFileSync(${JSON.stringify(out)}, process.env.CLAUDE_CONFIG_DIR ?? ''));`,
+    '',
   ].join('\n');
   const env: Record<string, string | undefined> = { ...process.env, CLAUDE_CONFIG_DIR: own };
   const ran = probed(dir, text, env, seated);

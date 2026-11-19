@@ -365,7 +365,7 @@ describe('the keep, the backoff and the wait: their shipped lengths, and the HKB
       assert.equal((await read({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad }, now })).keepMs, QUOTA_KEEP_MS, bad);
     }
   });
-  test('HKB_QUOTA_WAIT_MS sets how long a read waits for its ask: at a keep of 0, a read outlasts an ask slower than the 2 s default', async (t) => {
+  test('HKB_QUOTA_WAIT_MS sets how long a read waits for its ask: at a keep of 0, a read outlasts an ask slower than the 2 s default', async () => {
     fresh();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0', HKB_QUOTA_WAIT_MS: '30000' };
@@ -618,7 +618,7 @@ describe('The board polls the quota: one ask through the harness, kept, asked ag
 });
 
 describe('REFUSED: never two asks at once — reads that come while an ask is in flight join it or queue behind it, whatever the wall clock does', () => {
-  test('REFUSED: reads of the harness the route reads that come while an ask is in flight join it: one ask for all of them, the route among them', async (t) => {
+  test('REFUSED: reads of the harness the route reads that come while an ask is in flight join it: one ask for all of them, the route among them', async () => {
     fresh();
     vi.useFakeTimers({ toFake: ['Date'], now: NOW });
     const before = asks() + fake.asked;
@@ -674,7 +674,7 @@ describe('REFUSED: never two asks at once — reads that come while an ask is in
       'the three reads are answered by the one ask they share',
     );
   });
-  test('REFUSED: at a keep of 0, a read after the wall clock stepped back behind the start of the held ask asks again', async (t) => {
+  test('REFUSED: at a keep of 0, a read after the wall clock stepped back behind the start of the held ask asks again', async () => {
     fresh();
     vi.useFakeTimers({ toFake: ['Date'], now: NOW });
     const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
@@ -685,7 +685,7 @@ describe('REFUSED: never two asks at once — reads that come while an ask is in
     assert.equal((await read({ env })).state, 'unanswered', 'the read is answered by an ask begun after it');
     assert.equal(fake.asked, before + 1, 'asked again, however far back the wall clock went');
   });
-  test('REFUSED: at a keep of 0, a read that comes while an ask is in flight, with the wall clock stepped back behind its start, queues behind it and does not join it', async (t) => {
+  test('REFUSED: at a keep of 0, a read that comes while an ask is in flight, with the wall clock stepped back behind its start, queues behind it and does not join it', async () => {
     fresh();
     vi.useFakeTimers({ toFake: ['Date'], now: NOW });
     const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };

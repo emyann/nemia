@@ -71,7 +71,8 @@ const told = (what: string | (() => string)): string => {
  *   stuck in, asked once, when the wait fails
  * @param how `bell`, rung by the event's source, and `everyMs`, the pace of a read where the event is a state
  * @returns the first truthy answer of `ok`
- * @throws `never came: <what>` once `t.signal` aborts, said also on the test's log, since the runner reports its own timeout; or what `ok` threw
+ * @throws `never came: <what>` once `t.signal` aborts, said also on the test's log, since the runner reports its own timeout; or what `ok`
+ * threw
  */
 export function until<T>(
   t: Waiter,

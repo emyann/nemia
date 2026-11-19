@@ -428,7 +428,7 @@ test("idle resolves with the feed's stream open, which never ends — and only o
   );
 });
 
-test('idle counts its quiet on a clock that does not step: the wall clock stepped a minute ahead once it waits still leaves it its half a second', async (t) => {
+test('idle counts its quiet on a clock that does not step: the wall clock stepped a minute ahead once it waits still leaves it its half a second', async () => {
   const { page } = await servedPage('<p>ok</p>');
   await opened(page, FEED_STREAM);
   const wall = Date.now.bind(Date);

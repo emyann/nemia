@@ -162,14 +162,14 @@ const bare = (given: { open?: Pick<OpenRuns, 'waiting' | 'inFlight'>; finished?:
   });
 
 describe('stripOf and readoutOf: the factory in view, its agents at work, and the readout', () => {
-  test("the numbers are those of the reads handed, the factory in view's when it names one, the default's those of none", (guard) => {
+  test("the numbers are those of the reads handed, the factory in view's when it names one, the default's those of none", () => {
     console.log(`stripOf: waitsOnYou, inFlight, landed: each counts what its read hands in, never a run of another factory.`);
     const kit = strip('kit');
     assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.landed], [1, 0, 0]);
     const home = strip('default');
     assert.deepEqual([home.inFlight, home.waitsOnYou, home.landed], [1, 2, 1]);
   });
-  test('the agents at work are counted once each against those hired in view, their steps longest at work first', (guard) => {
+  test('the agents at work are counted once each against those hired in view, their steps longest at work first', () => {
     console.log(`stripOf: agents: agentsOf(rows, hiredIn(...)); rows: rows.slice(0, ROWS_SHOWN), rowsOf(open, now) sorted longest first.`);
     const s = strip();
     assert.deepEqual(s.agents, { count: 2, hired: 2 }, 'ada at work on two steps is one agent; hired: ada and otto');
@@ -179,14 +179,14 @@ describe('stripOf and readoutOf: the factory in view, its agents at work, and th
     );
     assert.deepEqual(strip('default').agents, { count: 1, hired: 1 }, 'none hired in the default factory, and ada at work there');
   });
-  test('an agent at work that no factory in view hires counts in the total too, so the count is never past it', (guard) => {
+  test('an agent at work that no factory in view hires counts in the total too, so the count is never past it', () => {
     console.log(`stripOf: agents: agentsOf, the hired and those at work together.`);
     const kit = (hires: Record<string, string>) => bare({ open: open([], [flying, kitFlying]), factories: [factory('kit', hires)] });
     assert.deepEqual(kit({ 'build/land': 'otto' }).agents, { count: 2, hired: 2 }, 'ada at work by its step file, otto hired');
     assert.deepEqual(kit({ 'build/land': 'otto', 'build/plan': 'iris' }).agents, { count: 2, hired: 3 }, 'and iris hired, idle');
     assert.equal(bare({ factories: [factory('kit', {})] }).agents.hired, null, 'no agent hired and none at work: no total');
   });
-  test('three rows are shown, and the rest said as how many more', (guard) => {
+  test('three rows are shown, and the rest said as how many more', () => {
     console.log(`stripOf: rows: rows.slice(0, ROWS_SHOWN); more: rows.length - ROWS_SHOWN.`);
     const many = Array.from({ length: 5 }, (_, i) =>
       listed(atWorkBy(summary([['s', 'running']], { id: `r-${i}` }), 's', `agent-${i}`, NOW - (i + 1) * MIN)),
@@ -194,7 +194,7 @@ describe('stripOf and readoutOf: the factory in view, its agents at work, and th
     const s = bare({ open: open([], many) });
     assert.deepEqual([s.rows.length, s.more, s.rows[0].agent], [3, 2, 'agent-4']);
   });
-  test('the readout says each count against its cap, and drops the cap where the machine has none', (guard) => {
+  test('the readout says each count against its cap, and drops the cap where the machine has none', () => {
     console.log(`stripOf: runs: the list's in flight against ceilings.cap; sessions: sessionsOf(open) against ceilings.last.sessions.`);
     const s = strip();
     assert.equal(readoutOf(s), '2 OF 7 RUNS · 3 OF 50 SESSIONS');
@@ -208,7 +208,7 @@ describe('stripOf and readoutOf: the factory in view, its agents at work, and th
     });
     assert.equal(readoutOf(uncapped), '2 RUNS · 3 SESSIONS');
   });
-  test("a run that waits on a person and still works is in Wait on you, and its session and its agent's row count", (guard) => {
+  test("a run that waits on a person and still works is in Wait on you, and its session and its agent's row count", () => {
     console.log(`stripOf: sessions: sessionsOf(open), open the waiting with the in flight; rows: rowsOf(open, now).`);
     const twoSteps = summary(
       [
@@ -284,7 +284,7 @@ const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunVi
 });
 
 describe('stripOf: what counts today, landed, failed, waiting and spent', () => {
-  test("a run finished at or after the day's start counts today, landed or failed; one before it counts for nothing", (guard) => {
+  test("a run finished at or after the day's start counts today, landed or failed; one before it counts for nothing", () => {
     console.log(
       `stripOf: finishedToday: finishedAt >= dayStart; landed: outcome 'succeeded'; failed: outcome 'failed'; perLanding: today's priced landings.`,
     );
@@ -293,33 +293,33 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     assert.equal(s.failed, 1, 'failed on the stroke of midnight');
     assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
   });
-  test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', (guard) => {
+  test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', () => {
     console.log(`stripOf: priced: landed with a cost; perLanding: the mean of the priced.`);
     const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
     const s = bare({ finished: [landedToday, unpriced] });
     assert.deepEqual([s.landed, s.perLanding], [2, 6]);
   });
-  test('a step not at work is no row, though its task started: one that asks a person waits on them', (guard) => {
+  test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
     console.log(`stripOf: rows and sessions: working(run, step), by stepState.`);
     const working = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
     const asks = listed({ ...working, steps: working.steps.map((s) => ({ ...s, ...coded('needs-human') })) });
     const s = bare({ open: open([], [asks]) });
     assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
   });
-  test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', (guard) => {
+  test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', () => {
     console.log(
       `stripOf: landed and failed: by the list's outcome, never the status (both runs say succeeded); spentUsd: finishedToday in worked.`,
     );
     const s = bare({ finished: [cancelledToday, undecided] });
     assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
   });
-  test('a run counts in Wait on you or In flight as the list puts it, one that moves and waits with the waiting alone', (guard) => {
+  test('a run counts in Wait on you or In flight as the list puts it, one that moves and waits with the waiting alone', () => {
     console.log(`stripOf: waitsOnYou: open.waiting; inFlight: open.inFlight.`);
     const s = strip();
     assert.equal(s.waitsOnYou, 2, 'the run at its gate and the one that moves and waits');
     assert.equal(s.inFlight, 2, 'the two that move and wait on nobody');
   });
-  test('a run the list could not judge counts where the list puts it, in Wait on you or In flight and the readout, and in no other number', (guard) => {
+  test('a run the list could not judge counts where the list puts it, in Wait on you or In flight and the readout, and in no other number', () => {
     console.log(
       `stripOf: waitsOnYou: open.waiting.length and inFlight, runs.count: open.inFlight.length, the unjudged among them; open: judged alone.`,
     );
@@ -327,7 +327,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     assert.deepEqual([s.waitsOnYou, s.inFlight, s.runs.count], [2, 3, 3]);
     assert.deepEqual([s.spentUsd, s.sessions.count, s.rows.length], [2 + 4, 2, 2], 'the judged runs alone are worked and at work');
   });
-  test('a run called off that still moves is in flight while the list says so, and its work today is spent', (guard) => {
+  test('a run called off that still moves is in flight while the list says so, and its work today is spent', () => {
     console.log(
       `stripOf: inFlight: open.inFlight, never the board's own rule (which left a called-off run out); worked: open runs worked today.`,
     );
@@ -342,7 +342,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     const s = bare({ open: open([], [calledOff]) });
     assert.deepEqual([s.inFlight, s.runs.count, s.spentUsd], [1, 1, 9]);
   });
-  test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", (guard) => {
+  test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", () => {
     console.log(
       `stripOf: spentUsd: open runs workedToday with finishedToday; workedToday: at work now, or its last task ended since dayStart.`,
     );
@@ -364,7 +364,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
     assert.equal(dollars(12.684), '$12.68', 'to the cent above $10 too, as every page says an amount');
     assert.equal(dollars(230.4), '$230.40');
   });
-  test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", (guard) => {
+  test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
     console.log(`stripOf: spentTokens: tokensOf(worked), the same runs as spentUsd.`);
     const today = { ...landedToday, tokens: tokensOf(800, 1) };
     const yesterday = { ...landedYesterday, tokens: tokensOf(8_000_000) };
@@ -384,7 +384,7 @@ describe('stripOf: what counts today, landed, failed, waiting and spent', () => 
       "yesterday's run is in no count; the run with a cost and no tokens is one session more that measured none",
     );
   });
-  test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', (guard) => {
+  test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', () => {
     console.log(`stripOf: spentTokens: tokensOf's partSum and its null where no run measured any.`);
     const parted = { ...landedToday, tokens: tokensOf(800) };
     const whole = { ...cancelledToday, tokens: tokensOf(80, 0, { cacheRead: null, cacheWrite: null, uncached: null }) };

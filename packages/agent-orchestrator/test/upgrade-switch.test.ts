@@ -249,7 +249,7 @@ describe('a switch onto another template: previewed with no common base, held to
   });
 });
 
-test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async (t) => {
+test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--repo', dirs.repo]);
@@ -281,7 +281,7 @@ test('a base whose status names no template is refused a switch until a pass nam
   assert.equal(readStatus(ROOT, 'later')?.template, undefined);
 });
 
-test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async (t) => {
+test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--repo', dirs.repo]);
@@ -305,7 +305,7 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
   assert.deepEqual(headOf(await previewOf(...diff.slice(2))), ['team', '0.1.0', 'other', '1.0.0']);
 });
 
-test('a factory whose template changed under its version is named after that template, and switched from it with no base', async (t) => {
+test('a factory whose template changed under its version is named after that template, and switched from it with no base', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const dirs = templates();
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--repo', dirs.repo]);

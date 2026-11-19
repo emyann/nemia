@@ -211,7 +211,7 @@ time(
   },
 );
 
-time('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async (t) => {
+time('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async () => {
   emptyStore();
   await started(3);
   let clock = 0;

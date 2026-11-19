@@ -631,7 +631,7 @@ describe('what a poll costs: the journals of the runs still moving, and no more,
   );
   s.test(
     "a refused check's verdict on a poll is its exit; the RunList reads its output and logs once, for the step's check, and a warm poll neither, once a pass has read where its branch stands",
-    async (t) => {
+    async () => {
       aRefusedRun('r-verdict');
       await aPass();
       const output = vi.spyOn(e, 'output');

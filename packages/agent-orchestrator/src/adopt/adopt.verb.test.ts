@@ -6,8 +6,7 @@
  * takeover stopped between its writes is finished by the next. Then what `nemia factory adopt` refuses, each with nothing written.
  * The test's own store is at `ROOT`, its settings given as `ENV`.
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
-import type { Finishes } from 'test-kit/checkpoints';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -132,7 +131,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
   let runBefore = '';
   s.test(
     'a factory made by hand: a repository, a schedule, an instruction, a later key, a filed card, a run in flight and one finished',
-    async (t) => {
+    async () => {
       ({ repo, dir } = repoAndTemplate());
       await madeByHand('crew', repo);
       await printedBy('factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
@@ -156,7 +155,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
     digest = planned.digest;
     assert.ok(planned.line.includes(`nemia factory adopt crew --template ${dir} --plan ${digest}`), planned.line);
   });
-  s.test('nemia factory adopt --plan stages the render and gives the file the template, every other key kept', async (t) => {
+  s.test('nemia factory adopt --plan stages the render and gives the file the template, every other key kept', async () => {
     await printedBy('factory', 'adopt', 'crew', '--template', dir, '--plan', digest);
     const file = fileOf('crew');
     const template = file.template as { source: string; version: string; params: Record<string, unknown> };
@@ -189,7 +188,7 @@ describe('a hand-made factory taken over by a template: previewed, written, its 
       ],
     );
   });
-  s.test('a takeover stopped after staging, before the file, is finished by the next', async (t) => {
+  s.test('a takeover stopped after staging, before the file, is finished by the next', async () => {
     const { template: _gone, ...rest } = fileOf('crew');
     fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify(rest, null, 2)}\n`);
     const { digest: again } = await previewed('crew', dir);
@@ -210,7 +209,7 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
     assert.deepEqual(bytesUnder(ROOT), before, `${argv.join(' ')} wrote nothing`);
   };
   const planOf = async (_t: unknown, name: string) => (await previewed(name, dir)).digest;
-  test('no --plan: Invalid, naming the preview', async (t) => {
+  test('no --plan: Invalid, naming the preview', async () => {
     await madeByHand('noplan', repo);
     await nothingWritten(['factory', 'adopt', 'noplan', '--template', dir], refusedWith('Invalid', /nemia factory diff noplan/));
   });
@@ -223,7 +222,7 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
       refusedWith('Conflict', /nemia factory diff stale/),
     );
   });
-  test('a factory made from a template already: Conflict, naming the upgrade', async (t) => {
+  test('a factory made from a template already: Conflict, naming the upgrade', async () => {
     await printedBy('factory', 'apply', 'made', '--template', dir, '--repo', repo, '--no-trust');
     await nothingWritten(
       ['factory', 'adopt', 'made', '--template', dir, '--plan', 'sha256:0'],
@@ -264,13 +263,13 @@ describe('what nemia factory adopt refuses, each with nothing written', () => {
       refusedWith('Conflict', /factories\/leftover\/tree/),
     );
   });
-  test('a template that does not pass its check: Invalid', async (t) => {
+  test('a template that does not pass its check: Invalid', async () => {
     await madeByHand('broken', repo);
     const bad = path.join(scratch('wf-adopt-bad-'), 'bad');
     fs.mkdirSync(bad);
     await nothingWritten(['factory', 'adopt', 'broken', '--template', bad, '--plan', 'sha256:0'], refusedWith('Invalid'));
   });
-  test('a --set of a parameter the template does not declare: Invalid, naming it', async (t) => {
+  test('a --set of a parameter the template does not declare: Invalid, naming it', async () => {
     await madeByHand('unset', repo);
     await nothingWritten(
       ['factory', 'adopt', 'unset', '--template', dir, '--set', 'nothing=1', '--plan', 'sha256:0'],

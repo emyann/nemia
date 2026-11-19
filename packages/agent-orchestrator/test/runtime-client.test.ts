@@ -47,7 +47,7 @@ describe("the runtime's failures as the client reads them: a refusal exit 2 led 
   });
 });
 
-test('REFUSED: a program run through runWith says no Info line, and still says its warnings and errors on the console', async (t) => {
+test('REFUSED: a program run through runWith says no Info line, and still says its warnings and errors on the console', async () => {
   const said: string[] = [];
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const)
     vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void said.push(args.map(String).join(' ')));

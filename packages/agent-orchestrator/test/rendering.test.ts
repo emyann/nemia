@@ -5,7 +5,7 @@
  * skill or an agent is found (`lookupRoots`, `skillsFor`), and how a codex step's sandbox reaches Codex (`modeOf`). What `nemia start`
  * writes and the tick files from it is told as a story in `agent-session.test.ts`.
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,7 +58,7 @@ function refusal(fn: () => unknown): string {
 }
 
 /** Each row of `all` a subtest of `t`: its name, and what it asserts. */
-async function rows(all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
+function rows(all: ReadonlyArray<readonly [string, () => void]>): void {
   for (const [name, body] of all) test(name, body);
 }
 

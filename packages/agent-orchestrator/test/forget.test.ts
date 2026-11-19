@@ -15,7 +15,7 @@
  * `ROOT`, given as `ENV`, whose `WF_DEFAULT_FACTORY_STARTS` starts runs in repositories no factory holds.
 
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -235,7 +235,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
   });
   s.test(
     '`nemia prune --artifacts` lists its files and what `nemia rm` would forget of the engine, asked dry; `--yes` removes them alone',
-    async (t) => {
+    async () => {
       const shot = path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
       fs.mkdirSync(path.dirname(shot), { recursive: true });
       fs.writeFileSync(shot, 'p'.repeat(32 * 1024));
@@ -259,7 +259,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
   );
   s.test(
     '`nemia rm` forgets its tasks — its first try, its second and its check — in one call, its record and every file, keeps its branch, and says so',
-    async (t) => {
+    async () => {
       const branch = runRecord(ROOT, id).steps.implement.branch!;
       const before = board().forgets.length;
       const said = await typed('rm', id);
@@ -285,14 +285,14 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
       assert.ok(hasBranch(repo, branch), 'its branch is kept');
     },
   );
-  s.test('a second `nemia rm` finds no such run: the Missing of the api, exit 2, its line saying so', async (t) => {
+  s.test('a second `nemia rm` finds no such run: the Missing of the api, exit 2, its line saying so', async () => {
     const again = await typed('rm', id);
     assert.equal(again.error?.exitCode, 2);
     names(again.printed.join('\n'), `${id}  no such run — nothing to forget`);
   });
   s.test(
     "`nemia rm --delete-branches` deletes a branch merged into its run's base and keeps one that is not; `--force-unmerged` deletes that too; a `--no-worktree` run's base is never touched",
-    async (t) => {
+    async () => {
       const at = aRepo();
       const merged = await aParent(at, { work: 'merged.txt' });
       world().stage(at, merged.branch);
@@ -390,7 +390,7 @@ describe('after a landing: the sweep frees the run, `nemia prune --artifacts --y
   });
   s.test(
     'a run whose tasks the engine no longer knows is forgotten; so is a record that froze no workflow and whose folder is gone; a run with no record is no such run, and what was left under its id removed',
-    async (t) => {
+    async () => {
       const legacyDir = fs.mkdtempSync(path.join(ROOT, 'legacy-'));
       fs.writeFileSync(path.join(legacyDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
       const legacy: Run = {
@@ -461,7 +461,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
   const ids: Record<string, string> = {};
   s.test(
     'REFUSED: a step in flight, a step ready, an unspent ask and a child not started — each on its line, exit 2 — while a run beside them is forgotten',
-    async (t) => {
+    async () => {
       repo = aRepo();
       const running = await stage.runPlaced(startRun({ brief: 'still running', repo, workflowDir: folder() }));
       await pass(running.id);
@@ -596,7 +596,7 @@ describe('`nemia rm` refused, then allowed: each run that holds it named on its 
   );
   s.test(
     "REFUSED: a name that is a live run's id with one of its files' suffix — exit 2, told the id to give — and its record, cancellation and ask stay",
-    async (t) => {
+    async () => {
       const live = await aParent(aRepo());
       const id = live.run.id;
       markCancelled(ROOT, id);
@@ -701,7 +701,7 @@ describe('REFUSED before any run is read: what `nemia rm` does not take, each re
   test('a flag it does not take', () => refused([p.run.id, '--force'], '--force', 'nemia rm <runId>'));
   test('a switch with no run to forget', () => refused(['--delete-branches'], 'nemia rm <runId>', 'nemia ls'));
   for (const id of ['..', '.', 'runs/../..', '', 'R-XYZ', 'r_xyz', 'r.xyz'])
-    test(`an id that is not a name, ${JSON.stringify(id)}: its line says what an id is, and the store is where it was`, async (t) => {
+    test(`an id that is not a name, ${JSON.stringify(id)}: its line says what an id is, and the store is where it was`, async () => {
       const { printed, error } = await typed('rm', id);
       assert.equal(error?.exitCode, 2, '`..` would be the store itself');
       assert.equal(printed.length, 1);
@@ -714,7 +714,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
   const s = story(test);
   s.test(
     "`nemia rm` of a run whose step waits for a word closes its task, which has not settled: it waits with the run's marker; a second `nemia rm` exits 0 and says so",
-    async (t) => {
+    async () => {
       const run = await stage.runPlaced(startRun({ brief: 'a word asked', repo: aRepo(), workflowDir: oneStep('harness: claude') }));
       await pass(run.id);
       const task = `${run.id}-implement`;
@@ -772,7 +772,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
   );
   s.test(
     'an engine that refuses to forget whole: `nemia rm` removes the run, exits 0 and says so, the marker kept; each pass asks again and warns; once it forgets, a pass lifts it',
-    async (t) => {
+    async () => {
       const p = await aParent(aRepo(), { work: 'done.txt' });
       const task = `${p.run.id}-implement`;
       const marker = markerOf(p.run.id);
@@ -802,7 +802,7 @@ describe('the engine refuses to forget: a task left unsettled waits with its mar
   );
   s.test(
     'a settled task the engine refuses by name is said refused, not waiting, the rest forgotten in a second call; each pass warns and asks again, and lifts the marker once it clears',
-    async (t) => {
+    async () => {
       const run = await stage.runPlaced(
         startRun({ brief: 'tried twice', repo: aRepo(), workflowDir: oneStep('harness: codex\ncheck: "true"') }),
       );

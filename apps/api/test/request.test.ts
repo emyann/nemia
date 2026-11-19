@@ -229,7 +229,7 @@ describe("a request's trace shows its programs: the package's spans are children
       assert.equal(spans.filter((s) => s.name === 'factoriesListed').length, 1, `${url}: ${JSON.stringify(countsOf(spans))}`);
     }
   });
-  test('the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs, but one judge per run judged', async (t) => {
+  test('the spans GET /api/runs and GET /api/cards export are bounded whatever the number of runs, but one judge per run judged', async () => {
     planted(0, 5);
     const runsFew = await spansOf('/api/runs');
     const cardsFew = await spansOf('/api/cards');

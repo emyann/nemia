@@ -92,7 +92,7 @@ const forget = (dir: string, taskId: string) => {
 
 describe('a long brief is kept once by the tasks that share it, read back key for key, and swept once nothing names it', () => {
   let dir!: string;
-  let layer!: Layer.Layer<Journal, never>;
+  let layer!: Layer.Layer<Journal>;
   let ref!: string;
   let schemaRef!: string;
   let orphan!: string;

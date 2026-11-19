@@ -628,7 +628,7 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
     return t.end;
   });
   const daemonFile = () => (fs.existsSync(daemon) ? fs.readFileSync(daemon, 'utf8') : undefined);
-  test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async (c) => {
+  test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async () => {
     const { e } = stoppedBy(stop);
     ENV.WF_MAX_CONCURRENT = '4';
     ENV.WF_MEMORY_RESERVED = '2Gi';
@@ -686,7 +686,7 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
     ['WF_VERIFY_REST=true, by a pass', { WF_VERIFY_REST: 'true' }, 'pass', ['WF_VERIFY_REST=true', 'WF_VERIFY_REST=1'], false],
   ];
   for (const [name, env, argv, facts, engineAskedFirst] of rows)
-    test(`REFUSED: ${name}`, async (c) => {
+    test(`REFUSED: ${name}`, async () => {
       await started('first', at(1));
       const held = daemonFile();
       const { e, own } = stoppedBy(stop);
@@ -873,7 +873,7 @@ describe('a card becomes a run: filed with its factory and its gate, queued, it 
     );
     await runWith(b.e, cancelRun(started.id));
   });
-  s.test('`nemia up` logs a card it starts as `nemia tick` does, a time before it', async (c) => {
+  s.test('`nemia up` logs a card it starts as `nemia tick` does, a time before it', async () => {
     aCard('up-card-a1b2', { workflow: 'dev', queued: at(30), factory: 'solo' }, 'Show the flag');
     let passes = 0;
     const stop = new Error('the test stops the daemon');

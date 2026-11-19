@@ -443,7 +443,7 @@ const caseSensitive = (() => {
   return apart;
 })();
 
-test('the files of the steps the folder no longer has go before a byte of the new ones is written', (t) => {
+test('the files of the steps the folder no longer has go before a byte of the new ones is written', () => {
   const dir = devIn('order');
   const [implement, review] = loadWorkflows(dir) as [StepSpec, StepSpec];
   const order: string[] = [];

@@ -136,7 +136,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: 'lines go to the file of their UTC day, and a line that does not read is left out, its file said once',
-    check: (t) => {
+    check: () => {
       appendLines(ROOT, 'minute', [line('2026-10-04T23:59:00.000Z', 1), line('2026-10-05T00:00:00.000Z', 2)]);
       assert.deepEqual(days(ROOT, 'minute'), ['2026-10-04', '2026-10-05']);
       fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
@@ -153,7 +153,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: "a label's word is read in its closed set: a phase stored under its former word reads as today's, and a word of no set is left out",
-    check: (t) => {
+    check: () => {
       const stored = (v: number, l: Record<string, string>) => `${JSON.stringify(line(`2026-10-06T0${v}:00:00.000Z`, v, l))}\n`;
       fs.mkdirSync(tierDir(ROOT, 'hour'), { recursive: true });
       fs.writeFileSync(

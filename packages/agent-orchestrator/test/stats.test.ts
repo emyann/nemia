@@ -11,7 +11,7 @@
  * `src/stats/stats-memo.test.ts`; the words the client prints of them, `apps/cli`'s `rest-lines.test.ts`. Its store is its own at `ROOT`,
  * given as `ENV`.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { beforeAll, describe, test } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';

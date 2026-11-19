@@ -122,7 +122,7 @@ function _tickProgramTypes(e: Engine) {
   void runEngine(e, tickRun());
 }
 
-test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
+test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async () => {
   const old = new Date(Date.now() - 3_600_000).toISOString();
   recordRecentPass(
     ROOT,

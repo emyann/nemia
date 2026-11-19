@@ -726,7 +726,7 @@ test.skipIf(process.getuid?.() === 0 && 'root writes a folder it may not write')
   },
 );
 
-test('a card gone between its start and the taking off of its `queued:` line is not written back, and the run stands', async (t) => {
+test('a card gone between its start and the taking off of its `queued:` line is not written back, and the run stands', async () => {
   emptyInbox();
   const repo = aRepoWith('dev');
   const file = path.join(INBOX, 'gone-a1b2.md');

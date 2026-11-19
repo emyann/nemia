@@ -44,7 +44,7 @@ const planned = (): string => {
   return dir;
 };
 
-test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked` for one waiting on an answer — REFUSED: `failed` for either, kept for a run in which a step broke', async (t) => {
+test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked` for one waiting on an answer — REFUSED: `failed` for either, kept for a run in which a step broke', async () => {
   const b = engine();
   const e = engineOf(b.layer);
   const stopped = async (gates: string[], phase: EnginePhase, closeout?: unknown) => {

@@ -87,7 +87,7 @@ const pipao = (...workflows: string[]): string => {
   return repo;
 };
 
-test('REFUSED: two adds of one name, the second while the first is between its write and its link, file one and refuse the other', (t) => {
+test('REFUSED: two adds of one name, the second while the first is between its write and its link, file one and refuse the other', () => {
   const first = fresh();
   const second = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const link = fs.linkSync;

@@ -10,8 +10,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -535,20 +534,10 @@ describe('REFUSED: `nemia retry --round` and `nemia approve`, and their former s
     });
   refused(['retry', 'no-such-run', 'review', 'again', '--round'], 'Invalid', 'does not take again', '--round');
   refused(['retry', 'no-such-run', '--round', '--budget', 'lots'], 'Invalid', 'lots is not one', '--budget <amount>');
-  refused(
-    ['approve', 'no-such-run', 'review', '--message', ' '],
-    'Invalid',
-    '--message is empty',
-    'nemia approve no-such-run review',
-  );
+  refused(['approve', 'no-such-run', 'review', '--message', ' '], 'Invalid', '--message is empty', 'nemia approve no-such-run review');
   refused(['approve', 'no-such-run', 'review'], 'Missing', 'no such run: no-such-run');
   refused(['round', 'no-such-run', 'review', 'again'], 'Invalid', 'does not take again', '--round');
-  refused(
-    ['accept', 'no-such-run', 'review', '--message', ' '],
-    'Invalid',
-    '--message is empty',
-    'nemia approve no-such-run review',
-  );
+  refused(['accept', 'no-such-run', 'review', '--message', ' '], 'Invalid', '--message is empty', 'nemia approve no-such-run review');
   test('a cancelled run: a round would never be honoured, and no ask is written', async () => {
     const id = await startedLoop(looped('rounds: 1\n'));
     markCancelled(ROOT, id);

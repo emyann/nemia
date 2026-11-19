@@ -50,7 +50,10 @@ test('checkpoints run in order, each named as filed, and share the state the sto
   await done();
   assert.deepEqual(seen, ['first', 'second']);
   assert.equal(shared, 2);
-  assert.deepEqual(filed.map((f) => f.name), ["first", "second"]);
+  assert.deepEqual(
+    filed.map((f) => f.name),
+    ['first', 'second'],
+  );
   assert.ok(filed.every((f) => f.skip === undefined && f.threw === undefined));
   assert.equal(s.failed(), undefined);
 });

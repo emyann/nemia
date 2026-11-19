@@ -69,7 +69,7 @@ describe('a task held open signs and waits with its session released; answered a
   let root!: string;
   let sessions!: Map<string, Sighting>;
   let ops!: import('../src/index.ts').RunnerOps;
-  let harness!: Layer.Layer<Runner, never>;
+  let harness!: Layer.Layer<Runner>;
   let engine!: import('../src/index.ts').EngineShape;
   beforeAll(() => {
     const t = teardowns();

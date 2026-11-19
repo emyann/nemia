@@ -304,7 +304,7 @@ describe("each verb's program, given its services, answers what its plain face a
     assert.equal(await rejection(runWith(failing, tickRun({ repo: ROOT })), 'a pass whose runtime rejected'), boom);
     assert.equal((await tickOn(e, { repo: ROOT })).runs.length, 1, 'the next pass reads the store as before');
   });
-  test('the programs of `nemia retry`, with `--round` and without, `nemia approve`, of a loop and at a gate, `nemia say` and `nemia cancel` answer what their plain faces answer', async (tt: TestContext) => {
+  test('the programs of `nemia retry`, with `--round` and without, `nemia approve`, of a loop and at a gate, `nemia say` and `nemia cancel` answer what their plain faces answer', async () => {
     const at = Date.parse('2026-09-30T08:00:00.000Z');
     const same = async <A extends object>(what: string, program: () => Promise<A>, face: () => Promise<A>) => {
       vi.useFakeTimers({ toFake: ['Date'], now: at });

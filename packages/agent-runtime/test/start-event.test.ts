@@ -138,9 +138,6 @@ describe(
   'the start event: the session id the worker reads off whole stdout lines, the first start alone, and a start refused by its line and field',
   WAITED,
   () => {
-    for (const row of ROWS)
-      test(row.name, (c) => {
-        row.holds(c);
-      });
+    for (const row of ROWS) test(row.name, (c) => row.holds(c));
   },
 );

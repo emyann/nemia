@@ -57,7 +57,9 @@ export const main = (argv: string[]): number => {
       return 2;
     }
     const { WF_TEST_SHARD: _shard, VITEST: _vitest, NODE_ENV: _mode, ...env } = process.env;
-    const bins = [path.join(args.dir, 'node_modules', '.bin'), path.join(REPO, 'node_modules', '.bin'), env.PATH ?? ''].join(path.delimiter);
+    const bins = [path.join(args.dir, 'node_modules', '.bin'), path.join(REPO, 'node_modules', '.bin'), env.PATH ?? ''].join(
+      path.delimiter,
+    );
     const ran = spawnSync(command, { cwd: args.dir, env: { ...env, PATH: bins }, shell: '/bin/sh', stdio: 'inherit' });
     const code = ran.status ?? 1;
     if (!fs.existsSync(lcov) || !fs.existsSync(istanbul)) {

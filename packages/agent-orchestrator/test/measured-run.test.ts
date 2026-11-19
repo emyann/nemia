@@ -17,8 +17,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges every run a pass answers from
  * its memo in full.
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
-import type { Finishes } from 'test-kit/checkpoints';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -136,7 +135,7 @@ const pageRows = (id: string) =>
  * What a story measures by, new for each: the wall at 10:00 on the fixtures' day, moved on by `later`; the stage's engine as a whole-store
  * pass asks it (`ticking`); a registry of its own for the metrics; and its daemons, the first first, `life` the one making the passes now.
  */
-const measuring = (t: Finishes) => {
+const measuring = () => {
   let now = Date.parse('2026-10-06T10:00:00.000Z');
   vi.useFakeTimers({ toFake: ['Date'], now });
   const later = (minutes: number) => vi.setSystemTime((now += minutes * MIN));
@@ -193,7 +192,7 @@ describe('A measured run, end to end: a gate answered, two tries with checks, a 
   let plan!: string;
   beforeAll(async () => {
     const t = teardowns();
-    ({ b, later, lives, life, tick, spansOf, snapshot, counted, summed, spawn, sign, exits } = measuring(t));
+    ({ b, later, lives, life, tick, spansOf, snapshot, counted, summed, spawn, sign, exits } = measuring());
     repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stage.place().world.repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
     workflowDir = folder(MEASURED);
@@ -584,7 +583,7 @@ describe('A run measured as its record says: a lone gate approved, a run called 
   let repo!: string;
   beforeAll(() => {
     const t = teardowns();
-    ({ b, later, tick, spansOf, counted, spawn, sign } = measuring(t));
+    ({ b, later, tick, spansOf, counted, spawn, sign } = measuring());
     repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stage.place().world.repository(repo, {});
     return t.end;

@@ -67,7 +67,7 @@ const written = (id: string): Record<string, unknown> & { workflow: Array<Record
 const holdsAny = (object: unknown, ...keys: string[]): boolean => keys.some((key) => Object.hasOwn(object as object, key));
 
 /** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
-const listed = async (t: unknown): Promise<RunsListed> => {
+const listed = async (): Promise<RunsListed> => {
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     return (await stage.main(['ls'])) as RunsListed;
@@ -230,8 +230,8 @@ describe('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `
     await pass();
     assert.equal(b.tasks.get('tides-review')?.spec.config?.permissionMode, 'bypassPermissions', 'not Codex’s default');
   });
-  s.test('`nemia ls` lists every run of the old store, and none unreadable', async (c) => {
-    const { runs } = await listed(c);
+  s.test('`nemia ls` lists every run of the old store, and none unreadable', async () => {
+    const { runs } = await listed();
     const ids = runs.map((r) => r.run.id);
     for (const id of ['tides', 'notes', 'drafts']) assert.ok(ids.includes(id), ids.join(', '));
     assert.deepEqual(

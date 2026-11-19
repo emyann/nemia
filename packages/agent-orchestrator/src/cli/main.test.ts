@@ -122,7 +122,7 @@ const typedIn =
 /** `typedIn` this file's store, `ENV`. */
 const typed = typedIn(ENV);
 
-test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async (t: TestContext) => {
+test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async () => {
   const out: string[] = [];
   const err: string[] = [];
   vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => err.push(chunk) > 0) as never);

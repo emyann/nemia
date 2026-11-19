@@ -202,7 +202,7 @@ test("a live holder's lock moved aside is put back, and no container is removed"
   assert.deepEqual(leftBeside(), []);
 });
 
-test('REFUSED: a lock placed while a live one is being put back stays, and the breaker says to run again once both have ended', (t) => {
+test('REFUSED: a lock placed while a live one is being put back stays, and the breaker says to run again once both have ended', () => {
   fresh();
   const live: Lock = { pid: process.pid, name: 'nemia-render-1-live00' };
   const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
@@ -230,7 +230,7 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
   assert.deepEqual(calls(), []);
 });
 
-test('REFUSED: a lock this user cannot move, at the bound, naming its holder and its file', async (t) => {
+test('REFUSED: a lock this user cannot move, at the bound, naming its holder and its file', async () => {
   fresh();
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));

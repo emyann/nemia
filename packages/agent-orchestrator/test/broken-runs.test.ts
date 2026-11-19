@@ -192,7 +192,7 @@ describe('one broken run does not stop the others: each left out and said once, 
   });
   s.test(
     'a journal no runtime wrote, a folder gone and a torn record leave their runs out, each said once, while a run beside them files',
-    async (c) => {
+    async () => {
       spoil(runRecord(ROOT, runs.journal).steps.work.taskId!);
       spoil(runRecord(ROOT, runs.checked).steps.work.check!.taskId);
       spoil(runRecord(ROOT, runs.tried).steps.work.tries![0].taskId);

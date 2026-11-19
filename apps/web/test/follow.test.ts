@@ -151,7 +151,7 @@ describe('follow: the transport and the protocol of a followed conversation, eac
     stream.fire('error');
     assert.deepEqual([now().live, now().error], [false, 'The api refused to follow it any further.']);
   });
-  test('REFUSED: a stream that said it is over is closed once the api has ended its response, or after the grace, never the moment its last event came', (t) => {
+  test('REFUSED: a stream that said it is over is closed once the api has ended its response, or after the grace, never the moment its last event came', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 
     const over = followed();

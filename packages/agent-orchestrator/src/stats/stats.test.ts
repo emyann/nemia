@@ -237,7 +237,7 @@ const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?:
 type Row = { name: string; check: () => void };
 
 /** Runs `rows` as subtests of `t`, in order. */
-const rowsOf = async (rows: readonly Row[]) => {
+const rowsOf = (rows: readonly Row[]): void => {
   for (const row of rows) test(row.name, row.check);
 };
 

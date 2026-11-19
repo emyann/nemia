@@ -304,13 +304,13 @@ describe('REFUSED at shipped defaults: nemia agents, its card and its custom wor
     );
     assert.equal(await refusedBy(() => custom({ name: 'ghost', repo, clear: true }), undefined), ghost, 'and clearing them');
   });
+  row(
+    'custom words given --file and --clear both',
+    ['agents', 'custom', 'scribe', '--file', path.join(repo, 'both.md'), '--clear', '--repo', repo],
+    undefined,
+    'nemia agents custom takes --file or --clear, not both',
+  );
   test('custom words that are blank', async () => {
-    await row(
-      'custom words given --file and --clear both',
-      ['agents', 'custom', 'scribe', '--file', path.join(repo, 'both.md'), '--clear', '--repo', repo],
-      undefined,
-      'nemia agents custom takes --file or --clear, not both',
-    );
     await refusedBy(() => custom({ name: 'scribe', repo, words: ' \n\n' }), undefined, 'the custom instructions for scribe are blank');
   });
   test('custom words with a frontmatter block', async () => {

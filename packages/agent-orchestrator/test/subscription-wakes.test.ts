@@ -1526,7 +1526,7 @@ describe(
         onError?: (e: unknown) => void;
       }) => Effect.Effect<{ stop: () => void }>;
     };
-    let door!: Layer.Layer<never, never>;
+    let door!: Layer.Layer<never>;
     let d!: ReturnType<typeof delivering>;
     beforeAll(() => {
       const t = teardowns();

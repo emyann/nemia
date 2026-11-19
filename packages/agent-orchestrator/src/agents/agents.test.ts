@@ -4,7 +4,7 @@
  * the agent it names, and refused where the two cannot run together; the folder of agents beside the workflows; and the card an agent is
  * listed by (`agentCard`, `cardSkills`, `skillEntryOf`). A refusal is asserted by its kind, its exit code and what it names.
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,13 +64,13 @@ function refusal(fn: () => unknown): string {
 /** A refusal row: its name, what is refused, and what the refusal names — the file, the line, the fix. */
 type Refused = readonly [name: string, refused: () => unknown, ...facts: string[]];
 
-/** Each row of `rows` a subtest of `t`, refused as `refusal` says and naming each of its facts. */
-async function refusedRows(rows: readonly Refused[]): Promise<void> {
+/** Each row of `all` a test of the describe it is called in, refused as `refusal` says and naming each of its facts. */
+function refusedRows(rows: readonly Refused[]): void {
   for (const [name, refused, ...facts] of rows) test(name, () => names(refusal(refused), ...facts));
 }
 
-/** Each row of `rows` a subtest of `t`: its name, and what it asserts. */
-async function rows(all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
+/** Each row of `all` a test of the describe it is called in: its name, and what it asserts. */
+function rows(all: ReadonlyArray<readonly [string, () => void]>): void {
   for (const [name, body] of all) test(name, body);
 }
 

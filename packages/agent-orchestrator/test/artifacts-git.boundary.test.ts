@@ -269,7 +269,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
 });
 
-test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and the decision names each', async (t) => {
+test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and the decision names each', async () => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));

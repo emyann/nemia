@@ -8,7 +8,6 @@
  * A branch is told by its arms, each with its own count across every process, as istanbul keeps them (`branch.arm`), mapped back to
  * the source by Vitest: an arm is taken when any test took it.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 
 /**

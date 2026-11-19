@@ -139,7 +139,7 @@ type Previewed = {
 /** The upgrade `nemia factory diff <args>` previews. */
 const previewOf = async (...args: string[]): Promise<Previewed> => (await main(['factory', 'diff', ...args], noEngine())) as Previewed;
 
-test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async (t) => {
+test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--repo', repo], noEngine());
@@ -174,7 +174,7 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
 });
 
 describe('an upgrade with no conflict, up or down: filed alone, then merged by the controller', () => {
-  test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async (t) => {
+  test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('lowered');
     released(dir, '0.0.9', 5);
@@ -183,7 +183,7 @@ describe('an upgrade with no conflict, up or down: filed alone, then merged by t
     assert.equal(reconciled(templated('lowered')).version, '0.0.9');
     assert.match(textIn(treeDir(ROOT, 'lowered'), REVIEW), /^rounds: 5$/m);
   });
-  test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async (t) => {
+  test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('clean');
     const file = path.join(FACTORIES, 'clean.json');
@@ -233,7 +233,7 @@ describe('a switch onto a template of another name is judged by no version: neit
     ['level', '0.1.0'],
     ['below', '0.0.9'],
   ] as const)
-    test(`the other template at ${version}, the base at 0.1.0: previewed, then filed with its plan and no --downgrade`, async (t) => {
+    test(`the other template at ${version}, the base at 0.1.0: previewed, then filed with its plan and no --downgrade`, async () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
       const { dir } = await applied(name);
       const other = path.join(scratch('wf-upgrade-other-'), 'renamed');
@@ -253,7 +253,7 @@ describe('a switch onto a template of another name is judged by no version: neit
     });
 });
 
-test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async (t) => {
+test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('onto');
   const other = path.join(scratch('wf-upgrade-other-'), 'team');
@@ -320,7 +320,7 @@ test('an upgrade onto a template that declares other parameters: --set given, th
   assert.match(textIn(appliedDir(ROOT, 'onto'), REVIEW), /^budget: 9$/m, 'rendered with the --set');
 });
 
-test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async (t) => {
+test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('schemed');
   const IMPLEMENT = 'workflows/dev/implement.md';
@@ -344,7 +344,7 @@ test("a step's own closeout schema carried by an upgrade: its line merged into a
 });
 
 describe("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", () => {
-  test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async (t) => {
+  test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('ruled');
     assert.equal(fs.existsSync(path.join(treeDir(ROOT, 'ruled'), RULES)), false, 'the template had none, and the tree has none');
@@ -363,7 +363,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
       error: null,
     });
   });
-  test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a Factory proposal that a pass leaves fresh', async (t) => {
+  test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a Factory proposal that a pass leaves fresh', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('both');
     await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
@@ -389,7 +389,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
     assert.equal(merged.upgrade, undefined);
     assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Theirs: never push on a Friday.\n');
   });
-  test('rules changed by the person and by the template on different lines, from a common base, merge by line', async (t) => {
+  test('rules changed by the person and by the template on different lines, from a common base, merge by line', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const lines = ['Never push on a Friday.', '', 'Write the tests first.', '', 'Ask before a migration.', ''];
     const { dir } = await applied('lined', lines.join('\n'));
@@ -408,7 +408,7 @@ describe("a factory's rules carried by an upgrade: taken where the tree has none
   });
 });
 
-test('choices made for another version are not merged, and the next resolve drops them', async (t) => {
+test('choices made for another version are not merged, and the next resolve drops them', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('stale');
   rewrite(treeDir(ROOT, 'stale'), REVIEW, 'rounds: 3', 'rounds: 4');
@@ -446,7 +446,7 @@ test('choices made for another version are not merged, and the next resolve drop
   );
 });
 
-test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with text its step does not read; the choice stays a draft", async (t) => {
+test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with text its step does not read; the choice stays a draft", async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('unread');
   rewrite(treeDir(ROOT, 'unread'), REVIEW, 'rounds: 3', 'rounds: 4');
@@ -464,7 +464,7 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
 const planIn = (preview: Previewed): { plan: string; line: string } => ({ plan: preview.next.digest, line: preview.next.line });
 
 describe('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', () => {
-  test("it merges with no conflict, and the factory's file records the new value", async (t) => {
+  test("it merges with no conflict, and the factory's file records the new value", async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     await applied('reset');
     const file = path.join(FACTORIES, 'reset.json');
@@ -507,7 +507,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
     assert.match(textIn(appliedDir(ROOT, 'reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 3$/m, 'the base is the new render');
     await assert.rejects(upgrade(), refusedWith('Conflict', /reset is already applied at 0\.1\.0/));
   });
-  test('REFUSED Conflict, nothing written: a --set at the version applied, where the template changed under it', async (t) => {
+  test('REFUSED Conflict, nothing written: a --set at the version applied, where the template changed under it', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('edited');
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
@@ -521,7 +521,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
       );
     assert.deepEqual(bytesUnder(FACTORIES), before);
   });
-  test('a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes', async (t) => {
+  test('a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     await applied('clash');
     const set = async (value: number) => {
@@ -563,7 +563,7 @@ describe('a parameter set again at the version applied: previewed, filed with it
   });
 });
 
-test('a status lost while an upgrade waits leaves the version unknown, and an upgrade naming the base version brings it back', async (t) => {
+test('a status lost while an upgrade waits leaves the version unknown, and an upgrade naming the base version brings it back', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('lost');
   const old = path.join(scratch('wf-upgrade-old-'), 'team');
@@ -593,7 +593,7 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   assert.match(textIn(treeDir(ROOT, 'lost'), REVIEW), /^rounds: 5$/m);
 });
 
-test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async (t) => {
+test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   await applied('stuck');
   rewrite(treeDir(ROOT, 'stuck'), REVIEW, 'budget: 7', 'budget: 8');
@@ -660,7 +660,7 @@ describe('--template names a builtin template by its name: an upgrade records th
   });
 });
 
-test("a conflict's resolution is checked against the tree the upgrade composes: a tally reading a field the same upgrade adds to an agent's schema", async (t) => {
+test("a conflict's resolution is checked against the tree the upgrade composes: a tally reading a field the same upgrade adds to an agent's schema", async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('tallied');
   const [given, schema] = ['agents/reviewer/output.schema.json', 'workflows/agents/reviewer.schema.json'];

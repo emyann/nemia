@@ -894,7 +894,7 @@ describe('broughtOf and chatItems: a step her words link to is brought, drawn un
 describe('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', () => {
   let reading!: (
     { setState, tryAgain }: { setState: import('react').Dispatch<import('react').SetStateAction<ChatFollowed>>; tryAgain: () => void },
-    sharing?: import('../src/lib/sharedStream.ts').Sharing | undefined,
+    sharing?: import('../src/lib/sharedStream.ts').Sharing,
   ) => () => void;
   let fetchBefore!: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   let sourceBefore!: unknown;

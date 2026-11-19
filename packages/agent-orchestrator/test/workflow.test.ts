@@ -5,7 +5,7 @@
  * entries, the former names and `renderStep` are tables beside the parser (`src/workflow/step-file.test.ts`); the structure of a
  * workflow is `src/workflow/validate.test.ts`; a step's name and `parseFolder`, `src/folder/folder.test.ts`.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -393,7 +393,7 @@ const outputFolder = (files: Record<string, string | object | null> = {}) => {
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-async function table(rows: readonly Row[]): Promise<void> {
+function table(rows: readonly Row[]): void {
   for (const { row, run, naming } of rows)
     test(row, () => {
       if (!naming) return void run();

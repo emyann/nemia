@@ -15,7 +15,7 @@
  * named for the moment she is filed, a raise's end and the quiet before her rest are the story's own. What the keeper owes on a beat is
  * the laws of `contracts/nemia-keep.contract.ts`; the stretches and what a write asks, `src/level/level.test.ts`.
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -145,7 +145,7 @@ const letGo = async (): Promise<void> => {
  * Her task kept anew in the story told in `t`: any she has let go, then the store's level at semi-auto, a moment later, a fresh task
  * filed, subscribed and at work. Its id.
  */
-const keptAnew = async (t: TestContext): Promise<string> => {
+const keptAnew = async (): Promise<string> => {
   withPipao();
   await letGo();
   vi.advanceTimersByTime(2);
@@ -158,7 +158,6 @@ const keptAnew = async (t: TestContext): Promise<string> => {
   return task;
 };
 
-
 describe("Nemia kept and let go: trusted late, filed long-lived in auto with the daemon's bin first, subscribed once, stopped from outside, let go at manual", () => {
   heldDate(Date.parse('2026-10-05T16:00:00.000Z'));
   const s = story(test);
@@ -170,7 +169,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
       assert.equal(fs.existsSync(levelFile(ROOT)), false, 'never automatic: the keeper writes no level');
     }
   });
-  s.test('semi-auto while her folder is not trusted: the keeper trusts it and files her in the same beat, no person asked', async (t) => {
+  s.test('semi-auto while her folder is not trusted: the keeper trusts it and files her in the same beat, no person asked', async () => {
     const config = path.join(CONFIG, `.${DEFAULT_HARNESS}.json`);
     fs.rmSync(config);
     fs.rmSync(nemiaDir(ROOT), { recursive: true, force: true });
@@ -199,7 +198,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
   });
   s.test(
     "REFUSED: a harness's file that does not read leaves her untrusted and unfiled, in words naming the fix and no command; mended, the next beat trusts and files her",
-    async (t) => {
+    async () => {
       const config = path.join(CONFIG, `.${DEFAULT_HARNESS}.json`);
       fs.writeFileSync(config, '{ not json');
       vi.advanceTimersByTime(1);
@@ -252,7 +251,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
   );
   s.test(
     "at semi-auto the keeper files her task long-lived in auto, the daemon's bin first on her path, every store write asked but her memory",
-    async (t) => {
+    async () => {
       const b = stage.board();
       writeCustom('Answer in French. Times in Montreal.\n');
       const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -379,7 +378,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
   );
   s.test(
     'a task stopped from outside is marked and not filed again; a level set then files one continuing her session; manual drops her subscription and keeps the conversation',
-    async (t) => {
+    async () => {
       const b = stage.board();
       b.settle(first, 'stopped');
       assert.deepEqual(await beat(), ['drop', 'markStopped']);
@@ -421,7 +420,7 @@ describe("Nemia kept and let go: trusted late, filed long-lived in auto with the
 describe('A factory raised for a stretch keeps her, the store at manual; its end passing stops her with no write; an end, a default, an untrusted folder', () => {
   heldDate(Date.parse('2026-10-06T08:00:00.000Z'));
   const s = story(test);
-  s.test("a factory raised for an hour keeps her; once the raise's end passes she stops operating, with no write", async (t) => {
+  s.test("a factory raised for an hour keeps her; once the raise's end passes she stops operating, with no write", async () => {
     withPipao();
     const raised = await level({ factory: 'pipao', level: 'semi-auto', for: '1h' });
     assert.equal(raised.level, 'manual', "the store's own level is untouched");
@@ -444,7 +443,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
     const after = await level({});
     assert.deepEqual(after.factories.find((row) => row.factory === 'pipao')?.raise, null);
   });
-  s.test('a raise ended early ends her operating at the next beat; a raise to a level the factory has by default is refused', async (t) => {
+  s.test('a raise ended early ends her operating at the next beat; a raise to a level the factory has by default is refused', async () => {
     vi.advanceTimersByTime(1);
     const raised = await level({ factory: 'pipao', level: 'semi-auto', for: '2h' });
     assert.deepEqual(await beat(), ['subscribe'], 'her task still open from the conversation: subscribed again');
@@ -463,7 +462,7 @@ describe('A factory raised for a stretch keeps her, the store at manual; its end
   });
   s.test(
     "a factory's raise or default above manual while her folder is not trusted is written, and the keeper trusts it and files her at once",
-    async (t) => {
+    async () => {
       fs.rmSync(levelFile(ROOT), { force: true });
       fs.rmSync(factoryLevelFile(ROOT, 'pipao'), { force: true });
       const b = stage.board();
@@ -499,9 +498,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
     return t.end;
   });
   const s = story(test);
-  s.test('a custom instruction written while she is kept is told to her open task, never by a filing or a stop', async (t) => {
+  s.test('a custom instruction written while she is kept is told to her open task, never by a filing or a stop', async () => {
     const b = stage.board();
-    const task = await keptAnew(t);
+    const task = await keptAnew();
     const [filings, stops, told] = [b.filings.length, b.stopped.length, b.said.length];
     writeCustom('Answer in Spanish.\n');
     assert.deepEqual(await beat(), ['sayCustom']);
@@ -522,9 +521,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
     assert.deepEqual(await beat(), []);
     assert.equal(b.said.length, told + 2);
   });
-  s.test("the person's chat words are delivered once she is kept and her session is live, and once only", async (t) => {
+  s.test("the person's chat words are delivered once she is kept and her session is live, and once only", async () => {
     const b = stage.board();
-    const task = await keptAnew(t);
+    const task = await keptAnew();
     const told = b.said.length;
     appendOutbox(nemiaDir(ROOT), { id: 'kept-o1', at: new Date().toISOString(), text: 'Hi' });
     assert.deepEqual(await beat(), [], 'kept, her session not live: kept for later');
@@ -538,9 +537,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
   });
   s.test(
     'REFUSED: a sayCustom the runtime refuses leaves her filed instruction and what she was told as they were, owed again on the next beat',
-    async (t) => {
+    async () => {
       const b = stage.board();
-      const task = await keptAnew(t);
+      const task = await keptAnew();
       const filed = fs.readFileSync(promptFile(ROOT), 'utf8');
       const record = fs.readFileSync(toldFile(ROOT), 'utf8');
       const told = b.said.length;
@@ -565,9 +564,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
   );
   s.test(
     'REFUSED: custom words that do not read are told to no one while she is kept, naming the clear; at manual her chat and her rest are never held by them',
-    async (t) => {
+    async () => {
       const b = stage.board();
-      await keptAnew(t);
+      await keptAnew();
       const filed = fs.readFileSync(promptFile(ROOT), 'utf8');
       const told = b.said.length;
       writeCustom('---\ntools: Bash\n---\nUse Bash.\n');
@@ -602,9 +601,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
       fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
     },
   );
-  s.test('REFUSED: her shipped instruction changed while she is kept tells her nothing, with custom words or with none', async (t) => {
+  s.test('REFUSED: her shipped instruction changed while she is kept tells her nothing, with custom words or with none', async () => {
     const b = stage.board();
-    await keptAnew(t);
+    await keptAnew();
     const told = b.said.length;
     fs.writeFileSync(promptFile(ROOT), 'An older instruction of hers.\n');
     assert.deepEqual(await beat(), [], 'no custom words then or now: nothing to tell');
@@ -618,10 +617,10 @@ describe("Kept, she is told what changed: the person's custom words once, never 
   });
   s.test(
     'a session kept before the keeper recorded what she was told is judged by the words her instruction ends with, never told a removal',
-    async (t) => {
+    async () => {
       const b = stage.board();
       writeCustom('Answer in Italian.\n');
-      await keptAnew(t);
+      await keptAnew();
       const told = b.said.length;
       fs.rmSync(toldFile(ROOT));
       assert.deepEqual(await beat(), [], 'her instruction ends with the words as they read: nothing to tell');
@@ -636,10 +635,10 @@ describe("Kept, she is told what changed: the person's custom words once, never 
       assert.deepEqual(await beat(), [], 'a record that does not read is none');
     },
   );
-  s.test('her task filed with custom words records them, so their removal is told to her', async (t) => {
+  s.test('her task filed with custom words records them, so their removal is told to her', async () => {
     const b = stage.board();
     writeCustom('Answer in Polish.\n');
-    await keptAnew(t);
+    await keptAnew();
     assert.equal(fs.readFileSync(toldFile(ROOT), 'utf8'), '{"words":"Answer in Polish."}\n', 'filed with them');
     const told = b.said.length;
     fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
@@ -649,9 +648,9 @@ describe("Kept, she is told what changed: the person's custom words once, never 
     await level({ level: 'manual' });
     assert.deepEqual(await beat(), ['drop']);
   });
-  s.test('her custom words held by the Agent door alone, none on disk, are told to her and written into her instruction', async (t) => {
+  s.test('her custom words held by the Agent door alone, none on disk, are told to her and written into her instruction', async () => {
     const b = stage.board();
-    const task = await keptAnew(t);
+    const task = await keptAnew();
     const agents = agentDoorMemory();
     Effect.runSync(
       Effect.provide(
@@ -749,14 +748,14 @@ describe('She answers her chat at any level: a message files her, she rests once
     b.settle(one, 'working');
     assert.deepEqual(await beat(), ['sayOutbox'], 'the message said to her');
   });
-  s.test('her session idle: the keeper marks it once', async (t) => {
+  s.test('her session idle: the keeper marks it once', async () => {
     b.settle(one, 'idle');
     vi.advanceTimersByTime(1_000);
     assert.deepEqual(await beat(), ['markIdle']);
     assert.equal(readSession(ROOT)?.idleSince, new Date().toISOString());
     assert.deepEqual(await beat(), []);
   });
-  s.test('quiet a millisecond short of fifteen minutes she stays; at fifteen she is put to rest, the record marked', async (t) => {
+  s.test('quiet a millisecond short of fifteen minutes she stays; at fifteen she is put to rest, the record marked', async () => {
     vi.advanceTimersByTime(QUIET - 1);
     assert.deepEqual(await beat(), [], 'a millisecond short');
     vi.advanceTimersByTime(1);
@@ -767,7 +766,7 @@ describe('She answers her chat at any level: a message files her, she rests once
     const now = await level({});
     assert.deepEqual([now.rests, now.stopped], [true, false], 'resting, not stopped');
   });
-  s.test('a new message files a second task continuing the first’s session; the record lists both', async (t) => {
+  s.test('a new message files a second task continuing the first’s session; the record lists both', async () => {
     vi.advanceTimersByTime(1);
     say('c-o2', 'Still there?');
     assert.deepEqual(await beat(), ['file']);
@@ -776,7 +775,7 @@ describe('She answers her chat at any level: a message files her, she rests once
     assert.equal(lastSpec().resumeFrom, '0123456789abcdef', 'her last session continued, with her memory');
     assert.deepEqual(nemiaChatPlace(ROOT).tasks, [one, two], 'her chat spans both');
   });
-  s.test('a factory raised: subscribed, and quiet past fifteen minutes she never rests', async (t) => {
+  s.test('a factory raised: subscribed, and quiet past fifteen minutes she never rests', async () => {
     await level({ factory, level: 'semi-auto' });
     b.settle(two, 'working');
     assert.deepEqual(await beat(), ['subscribe']);
@@ -795,7 +794,7 @@ describe('She answers her chat at any level: a message files her, she rests once
   });
   s.test(
     'a stop from outside is marked; a message written before it does not file her again, one after does, and so does a level set',
-    async (t) => {
+    async () => {
       vi.advanceTimersByTime(1);
       say('c-o3', 'One more thing.');
       assert.deepEqual(await beat(), ['file']);

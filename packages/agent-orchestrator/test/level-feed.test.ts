@@ -94,7 +94,7 @@ describe("a factory's level said on the feed: each change of the level in force 
       ['acme', STORE, 'person', `acme is at auto until ${until}, then semi-auto`],
     ]);
   });
-  s.test('the hour passes, nobody writing: the next pass says acme fell back to semi-auto, and the one after nothing', async (t) => {
+  s.test('the hour passes, nobody writing: the next pass says acme fell back to semi-auto, and the one after nothing', async () => {
     vi.advanceTimersByTime(HOUR - 1);
     await pass();
     assert.equal(levelSaid().length, 3, 'a millisecond short of its end, the raise stands');

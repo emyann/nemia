@@ -25,8 +25,8 @@ const PACKAGE = path.join(TEST, '..');
 const ROOT = path.join(PACKAGE, '..', '..');
 
 /**
- * A test's signal, as `until` reads it, and what it said on the test's log (`console.error`, spied), with what it said kept and its abort in the test's hands: aborted once the test
- * `of` ends, so a wait it left pending holds no process open.
+ * A test's signal, as `until` reads it, and what it said on the test's log (`console.error`, spied), with what it said kept and its abort
+ * in the test's hands: aborted once the test `of` ends, so a wait it left pending holds no process open.
  */
 const waiter = (of: TestContext) => {
   const control = new AbortController();

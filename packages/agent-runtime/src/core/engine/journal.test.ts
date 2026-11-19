@@ -285,7 +285,7 @@ describe("upgrade: a journal an older runtime wrote, or a consumer's own store h
     assert.equal('budgetUsd' in old.state, false, 'the cap included');
     assert.deepEqual((await Effect.runPromise(engine.view('t-new'))).state.config, { model: 'haiku' });
   });
-  test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async (t) => {
+  test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async () => {
     const dir = legacyStore({
       t: [{ ...LEGACY, config: { model: 'haiku' } }],
       bare: [{ ...TODAY, config: undefined, model: undefined }],
@@ -378,7 +378,7 @@ describe("upgrade: a journal an older runtime wrote, or a consumer's own store h
     );
     assert.equal(state.config?.budgetUsd, 1);
   });
-  test("an input's cap is laid under a config it already has, never over it: config is the newer word", async (t) => {
+  test("an input's cap is laid under a config it already has, never over it: config is the newer word", async () => {
     const [input] = await run(legacyStore({ t: [{ ...CAPPED[4], config: { budgetUsd: 2 } }] }), readOf('t'));
     assert.deepEqual(input, { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 2 } });
   });

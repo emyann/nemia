@@ -385,7 +385,7 @@ describe("the store paused, then paused at once, then resumed: nothing new start
   );
   s.test(
     'a pass under the pause files nothing new — no try asked, no check of a step signed off — and the due schedule starts nothing',
-    async (t) => {
+    async () => {
       vi.setSystemTime(Date.parse(MONDAY) + 30_000);
       b.settle(task('session'), 'working');
       filings = [...b.filings];

@@ -4,7 +4,7 @@
  * `renderStep` writes and refuses; and the frontmatter's own syntax. A refusal is a `WorkflowError` with exit 2, opening on the step
  * it is about and naming the line and its fix; its sentence is the code's to word. Reading a folder from disk is `test/workflow.test.ts`.
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
@@ -58,7 +58,7 @@ const readLooping = (file: string) => (file === 'review.schema.json' ? JSON.stri
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-async function table(rows: readonly Row[]): Promise<void> {
+function table(rows: readonly Row[]): void {
   for (const { row, run, naming } of rows)
     test(row, () => {
       if (!naming) return void run();

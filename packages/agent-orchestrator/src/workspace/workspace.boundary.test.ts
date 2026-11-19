@@ -503,7 +503,7 @@ test('a link inside a package is copied as written and never followed: one out o
   assert.deepEqual(fs.readdirSync(outside), ['secret.txt'], 'nothing was made where it leads');
 });
 
-test("where a hardlink cannot be made — another filesystem — main's packages are linked, and the answer says why; any other failure is a failure", async (t) => {
+test("where a hardlink cannot be made — another filesystem — main's packages are linked, and the answer says why; any other failure is a failure", async () => {
   const exdev = () => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   };
@@ -712,7 +712,7 @@ const lockfileGainsY = (wt: string) => {
   npmLockfile(wt);
 };
 
-test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async (t) => {
+test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async () => {
   const { wt } = await aRunWorktree();
   assert.equal(worktreeParts(wt), null, 'a tree hardlinked at the cut has what its lockfile names');
   lockfileGainsY(wt);

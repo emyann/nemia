@@ -1,12 +1,12 @@
 /**
- * The api's tests observe the harness `test/harness.ts` installs, and never this machine's Claude Code: the Vitest config loads it as
- * its first setup file before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
- * api's engine runs is the harness's.
+ * The api's tests observe the harness `test/harness.ts` installs, and never this machine's Claude Code: the Vitest config loads it as its
+ * first setup file before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the
+ * `claude` the api's engine runs is the harness's.
  */
 import { askEnded, asks, away, bin, engineRoot, recorded, realHome, root, configUnharnessed, unharnessed, usageAnswer } from './harness.ts';
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

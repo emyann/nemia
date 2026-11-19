@@ -280,7 +280,7 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
 });
 
-test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async (t) => {
+test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async () => {
   const run = await isolated(aNodeRepo());
   vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });

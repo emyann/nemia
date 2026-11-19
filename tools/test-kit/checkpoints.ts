@@ -91,7 +91,8 @@ export function teardowns(): Held {
 
 /**
  * `Date` faked for every test of the describe this is called in, from `now`, and carried from one test to the next: the kit's seat
- * restores the real timers after each test (the describe's own `beforeAll`, run after this one's, reads it faked too), where a story's checkpoints, under `node:test` subtests of one test, shared one clock.
+ * restores the real timers after each test (the describe's own `beforeAll`, run after this one's, reads it faked too), where a story's
+ * checkpoints, under `node:test` subtests of one test, shared one clock.
  * @param now the moment the describe's first test starts at, in milliseconds since the epoch.
  */
 export function heldDate(now: number): void {

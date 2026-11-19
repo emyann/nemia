@@ -273,7 +273,7 @@ describe("She is written to: the person's words kept while she is down, said onc
     assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.equal(saidTo(id).length, 2);
   });
-  s.test('two entries of one text claim two saids in order, never one twice', async (sub) => {
+  s.test('two entries of one text claim two saids in order, never one twice', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-15T12:00:00.000Z') });
     const { id, dir } = await filed('twice', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'yes' });

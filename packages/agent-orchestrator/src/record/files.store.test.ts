@@ -56,7 +56,7 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.equal(files.runs.find(''), undefined, 'no id at all');
     assert.ok(fs.existsSync(outside), 'and the file outside runs/ is untouched');
   });
-  test('a record that does not read as a run is undefined, said with its fix, and said once a process on stderr, as `runs.list` says it', (c) => {
+  test('a record that does not read as a run is undefined, said with its fix, and said once a process on stderr, as `runs.list` says it', () => {
     put('r-bad', '{"id": "r-bad"');
     const said: string[] = [];
     assert.equal(

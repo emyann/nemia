@@ -608,7 +608,7 @@ describe('the conformance walk: each verb through the client reaches the driver 
     unreadWhy = undefined;
     assert.equal(Object.hasOwn(await Effect.runPromise(runner.observeFor!(expected)), 'unreadWhy'), false, 'read: no words');
   });
-  test('REFUSED: observeFor through the seam keeps only words that are a string, for a name the driver left unread, and an answer without them is none', async (t) => {
+  test('REFUSED: observeFor through the seam keeps only words that are a string, for a name the driver left unread, and an answer without them is none', async () => {
     const ops: RunnerOps = {
       ...testOps({ sessions: new Map() }),
       observeFor: (expected) => Effect.sync(() => ({ seen: new Map(), unread: new Set(expected.map((e) => e.name)) })),

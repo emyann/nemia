@@ -256,7 +256,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
     return t.end;
   });
   const s = story(test);
-  s.test('a dry prune lists its worktree with its size, asking the engine nothing: nothing touched', async (t) => {
+  s.test('a dry prune lists its worktree with its size, asking the engine nothing: nothing touched', async () => {
     const { run, wt } = await aFinished(b, { merged: true });
     const dry = await typed(b.e, 'prune', run.id);
     assert.equal(dry.error, undefined, 'a dry run with nobody at a terminal is no refusal');
@@ -273,7 +273,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
   });
   s.test(
     'with --yes its worktree is removed, its record, closeout, branch, files and asks kept; `nemia ls` and `nemia decide`, once a pass has read where it stands, say it is pruned; a tick files nothing; a second prune has nothing to do; `nemia rm` still forgets it',
-    async (t) => {
+    async () => {
       const { run, repo, wt, branch } = await aFinished(b, { merged: true });
       fs.mkdirSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'), { recursive: true });
       fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
@@ -323,7 +323,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
   );
   s.test(
     '`--artifacts`: its worktree and its files listed with their sizes until --yes, then removed — a link among them as a link — what freed said; its record, asks, inputs and prompts kept; `nemia decide`, once a pass has read where it stands, says the files went',
-    async (t) => {
+    async () => {
       const shotOf = (id: string) => path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
       const run0 = await aFinished(b, { merged: true, closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
       const id = run0.run.id;
@@ -493,7 +493,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
   );
   s.test(
     '`nemia prune` with no run reads the runs that are over: one not over and one with nothing to prune are not said, the rest listed with the total',
-    async (t) => {
+    async () => {
       const merged = await aFinished(b, { merged: true });
       const running = await runPlaced(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
       await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
@@ -524,7 +524,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
     return t.end;
   });
   const s = story(test);
-  s.test('REFUSED: a run not over is told to cancel first, exit 2', async (t) => {
+  s.test('REFUSED: a run not over is told to cancel first, exit 2', async () => {
     const run = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
@@ -592,7 +592,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
   });
   s.test(
     'REFUSED: whatever holds `nemia rm` — a step at its gate, named with its approval, and an ask no pass has spent on a run landed as a pass read it, with the file that takes it back — until each is answered',
-    async (tt) => {
+    async () => {
       const { run, wt } = await atItsGate(b);
       assert.equal((await runWith(b.e, decideRun(run.id))).decision.kind, 'awaiting', 'over, as `decide` reads it: not refused as running');
       const atGate = await runWith(b.e, prune(run.id, { yes: true, unmerged: true }));
@@ -867,7 +867,7 @@ describe('REFUSED before anything is read: what `nemia prune` does not take, and
   beforeAll(() => {
     b = board();
   });
-  test('REFUSED: a flag it does not take, and one near a flag it does, exit 2, naming the flag', async (t) => {
+  test('REFUSED: a flag it does not take, and one near a flag it does, exit 2, naming the flag', async () => {
     const flag = await typed(b.e, 'prune', '--force');
     assert.equal(flag.error?.exitCode, 2);
     names(flag.error?.message, 'nemia prune does not take --force');

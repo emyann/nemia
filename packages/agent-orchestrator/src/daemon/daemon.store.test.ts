@@ -95,7 +95,7 @@ const monoAgo = (m: number) => ({ boot: BOOT, ms: Number(process.hrtime.bigint()
 const NOW = Date.parse('2026-10-02T12:00:00.000Z');
 
 /** Seeds `Date` at `NOW` for the rest of the test; `t.mock` lets it go when the test ends. */
-const seeded = (t: TestContext) => vi.useFakeTimers({ toFake: ['Date'], now: NOW });
+const seeded = () => vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 
 /** `ms` after `NOW`, as the daemon writes a stamp. */
 const at = (ms: number) => new Date(NOW + ms).toISOString();
@@ -221,7 +221,7 @@ test(
   async (t) => {
     assert.equal(daemonFile(ROOT), FILE);
     clear();
-    seeded(t);
+    seeded();
     const beats: string[] = [];
     const kinds = new Set<string>();
     const e = engineOf(() => {
@@ -257,7 +257,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   const s = story(test);
   s.test('nobody holds the store: a hand tick never writes the lease, and ls says who ticks, last on every path', async (t) => {
     clear();
-    seeded(t);
+    seeded();
     assert.equal(
       (
         await typed(
@@ -288,7 +288,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   });
   s.test('nemia up takes the store: its pid, where and how often it ticks, each pass completed, and lets it go as it stops', async (t) => {
     clear();
-    seeded(t);
+    seeded();
     const seen: ReturnType<typeof read>[] = [];
     const e = engineOf((pass) => {
       seen.push(read());
@@ -340,7 +340,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   });
   s.test('nemia up holds the attached sessions while it holds the store, and lets them go before the store', async (t) => {
     clear();
-    seeded(t);
+    seeded();
     const held: string[] = [];
     const e = engineOf(() => {
       held.push(`pass, store ${read().stoppedAt ? 'let go' : 'held'}`);
@@ -399,8 +399,8 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   });
   s.test(
     'REFUSED: a second nemia up, and a nemia tick by hand, beside a live daemon that passed recently, the store untouched',
-    async (t) => {
-      seeded(t);
+    async () => {
+      seeded();
       for (const over of [{}, { passedAt: null, startedAt: minutesAgo(0.1) }, { passedAt: minutesAgo(14) }]) {
         const text = holdBy(LIVE, over);
         const e = engineOf();
@@ -432,7 +432,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
       );
     },
   );
-  s.test('REFUSED: a live daemon is not read stalled when the wall clock steps forward past its window', async (t) => {
+  s.test('REFUSED: a live daemon is not read stalled when the wall clock steps forward past its window', async () => {
     const text = holdBy(LIVE, { startedMono: monoAgo(30), passedMono: monoAgo(0.05), beatMono: monoAgo(0.05) });
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 20 * 60_000 });
     const e = engineOf();
@@ -444,7 +444,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
     clear();
   });
   s.test('a daemon silent past its window on the monotonic clock is taken over, though the wall clock reads it fresh', async (t) => {
-    seeded(t);
+    seeded();
     holdBy(LIVE, { startedMono: monoAgo(46), passedMono: monoAgo(16) });
     let during: ReturnType<typeof read> | undefined;
     const up = engineOf(() => {
@@ -461,7 +461,7 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   s.test(
     'a holder stale, gone, stopped or unreadable is taken over by nemia up, and not refused to a nemia tick, which writes nothing',
     async (t) => {
-      seeded(t);
+      seeded();
       const matches = (pattern: RegExp) => (line: string) => pattern.test(line);
       const cases = [
         {
@@ -625,8 +625,8 @@ describe('one daemon per store: taken, beaten, refused to a second, taken over w
   );
   s.test(
     'REFUSED both ways round: an api holding the store refuses a nemia up and a nemia tick, and a nemia up holding it refuses an api',
-    async (t) => {
-      seeded(t);
+    async () => {
+      seeded();
       const text = holdBy(LIVE, { by: 'api', url: 'http://127.0.0.1:8787' });
       const e = engineOf();
       await assert.rejects(
@@ -1015,7 +1015,7 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
     const { runs: _runs, tasks: _tasks, queued: _queued, admitted: _admitted, ...older } = COST;
     assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote');
   });
-  test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async (t) => {
+  test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async () => {
     const errors: string[] = [];
     vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => errors.push(line) > 0) as never);
     fs.rmSync(recentFile(ROOT), { force: true });
@@ -1223,7 +1223,7 @@ test("`up` births the daemon's series and the caller's at zero and exports them 
 });
 
 test("REFUSED: a daemon refused the lease births no series, so the live daemon's are never read as reset", async (t) => {
-  seeded(t);
+  seeded();
   const c = await collector(t);
   holdBy(LIVE);
   const e = engineOf();

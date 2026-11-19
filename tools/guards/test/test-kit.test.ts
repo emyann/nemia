@@ -93,10 +93,10 @@ const tmpdirCalls = (text: string): string[] =>
     .flatMap((line, i) => (/\btmpdir\s*\(|\bmkdtemp\w*\s*\(.*\bmachineTempDir\s*\(/.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
 
 /**
- * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp
- * directory of its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it
- * builds into a folder of its own), the served board's command, and the stories' pictures (`stories/shoot.ts`), each a script and no
- * test file, outside which Vitest's hooks throw, and each removes its store or its folder and stops its servers on its own exit and signals.
+ * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp directory of
+ * its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it builds into a
+ * folder of its own), the served board's command, and the stories' pictures (`stories/shoot.ts`), each a script and no test file, outside
+ * which Vitest's hooks throw, and each removes its store or its folder and stops its servers on its own exit and signals.
  */
 const ROOTS_BY_HAND = [
   'packages/agent-runtime/test/fixtures/leak-unguarded.ts',

@@ -922,7 +922,7 @@ test(
   },
 );
 
-test("`wf --help` says which feed is whose: nemia watch, whose words are the client's, and ae watch", async (t) => {
+test("`wf --help` says which feed is whose: nemia watch, whose words are the client's, and ae watch", async () => {
   const out: string[] = [];
   vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     out.push(args.join(' '));

@@ -515,7 +515,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
     const record = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'theirs'), 'utf8'));
     assert.deepEqual([record.choices, record.proposals], [{ [SCRIPT_LINE]: 'theirs' }, undefined]);
   });
-  s.test("from a live session of the factory, the proposal is its agent's", async (t) => {
+  s.test("from a live session of the factory, the proposal is its agent's", async () => {
     const token = await liveToken('theirs', 'theirs-session');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     await resolveIn(token, 'theirs', SCRIPT_LINE, '--theirs');

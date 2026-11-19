@@ -916,7 +916,7 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
   );
 });
 
-test('a hold a pass reads while it files its checks stops the rest of that pass, though it is lifted the instant after: the other check and the ready step are filed on the next pass', async (t: TestContext) => {
+test('a hold a pass reads while it files its checks stops the rest of that pass, though it is lifted the instant after: the other check and the ready step are filed on the next pass', async () => {
   const b = stage.board();
   const repo = aRepo();
   const other = await aRunning(b, repo);
@@ -970,7 +970,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   );
 });
 
-test('REFUSED at shipped defaults: a hold put again while the tick or --off lifts one is left standing, and a hold put first by another wins whole', async (t) => {
+test('REFUSED at shipped defaults: a hold put again while the tick or --off lifts one is left standing, and a hold put first by another wins whole', async () => {
   const b = stage.board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -1232,7 +1232,7 @@ test("REFUSED as a typed failure: each refusal of `hold` and `unhold` is its pro
   assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before, 'the first hold stands as it was');
 });
 
-test('a defect is no refusal: `hold` and `unhold` die of what the engine or the filesystem throws, which no `Effect.catch` recovers, and `runWith` rejects with it as it was thrown', async (t) => {
+test('a defect is no refusal: `hold` and `unhold` die of what the engine or the filesystem throws, which no `Effect.catch` recovers, and `runWith` rejects with it as it was thrown', async () => {
   const b = stage.board();
   const repo = aRepo();
   const target = await aRunning(b, repo);

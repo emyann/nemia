@@ -12,7 +12,7 @@
  * names, with a workflow and an MCP server of its own, which the api must never read nor start.
  */
 import { config, root } from '../../test/harness.ts';
-import { describe, test, vi, type TestContext } from 'vitest';
+import { describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -654,7 +654,7 @@ describe('a person schedules a workflow in a factory: listed with its next fire 
   const schedulesOf = async (name: string) => (await get<ScheduleList>(`/api/namespaces/${name}/schedules`)).body.items;
   s.test(
     'GET /api/namespaces/<factory>/schedules answers a ScheduleList with each next fire and last scheduled run, as the package lists them, and the line that takes each back',
-    async (sub: TestContext) => {
+    async () => {
       vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-08T12:00:00Z') });
       setSchedule({ factory: 'solo', workflow: 'alpha', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
       const record = path.join(root, 'runs', 'r-scheduled.json');

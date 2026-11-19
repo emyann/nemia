@@ -20,9 +20,7 @@ const readsProject = (harness: string): boolean => harness === 'claude';
 /** The strings of `value` where it is an array, `[]` for anything else: a file's own JSON, which arrives as it is. */
 /** A project configuration's `permissions.allow`, as `projectAllows` reads it: anything there, its strings the rules. */
 const allowsIn = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Struct({ permissions: Schema.optional(Schema.Struct({ allow: Schema.optional(Schema.Unknown) })) }),
-  ),
+  Schema.fromJsonString(Schema.Struct({ permissions: Schema.optional(Schema.Struct({ allow: Schema.optional(Schema.Unknown) })) })),
 );
 
 const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((rule) => typeof rule === 'string') : []);

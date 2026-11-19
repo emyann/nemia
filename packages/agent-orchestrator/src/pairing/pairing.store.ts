@@ -17,7 +17,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Option, Result, Schema } from 'effect';
+import { Option, Schema } from 'effect';
 import type { LinkMinted, Pairing, PairingAsked, PairingList, TicketState } from 'objects';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';

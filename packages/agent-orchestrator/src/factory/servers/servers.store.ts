@@ -17,7 +17,7 @@ import { factoryNameRefusal } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
-import type { FactoryServer, FactoryServers, FactoryServersFile, BuiltinServer } from './servers.ts';
+import type { FactoryServers, FactoryServersFile, BuiltinServer } from './servers.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /**

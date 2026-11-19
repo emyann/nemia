@@ -381,7 +381,9 @@ const forgettingDir = (home: string): string => path.join(home, 'forgetting');
 const forgettingFile = (home: string, id: string): string => path.join(forgettingDir(home), `${id}.json`);
 
 /** A marker as `nemia rm` writes it; any key beside these is left unread. */
-const forgettingIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) })));
+const forgettingIn = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ run: Schema.String, taskIds: Schema.Array(Schema.String) })),
+);
 
 /** The marker of the run `id` written whole, through a hidden file renamed over it, the folder made first. */
 function writeForgetting(home: string, id: string, taskIds: readonly string[]): void {

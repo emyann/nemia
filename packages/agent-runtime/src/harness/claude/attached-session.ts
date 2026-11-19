@@ -599,7 +599,7 @@ export const hear = (root: string, live: Live): void => {
   const end = said.lastIndexOf(10) + 1;
   if (end <= from) return;
   const say = filesOf(root, live.run.name).say;
-  for (let at = from; at < end; ) {
+  for (let at = from; at < end;) {
     const next = said.indexOf(10, at) + 1;
     const line = said.subarray(at, next - 1).toString('utf8');
     const words = line ? saidLine(line) : Option.none();

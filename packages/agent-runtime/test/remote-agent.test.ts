@@ -1339,8 +1339,14 @@ test('REFUSED: a registry entry that does not read as one is refused, naming its
   const root = scratch('ae-entry-');
   const file = path.join(root, 'entry.json');
   fs.writeFileSync(file, JSON.stringify({ name: 'ae/t/1', agent: 'reviewer', sentAt: '2026-11-19T00:00:00.000Z' }));
-  assert.throws(() => readEntry(file), (e: Error) => e.message.includes(file) && e.message.includes('messageId'));
+  assert.throws(
+    () => readEntry(file),
+    (e: Error) => e.message.includes(file) && e.message.includes('messageId'),
+  );
   fs.writeFileSync(file, '{ "name": ');
-  assert.throws(() => readEntry(file), (e: Error) => e.message.includes(file));
+  assert.throws(
+    () => readEntry(file),
+    (e: Error) => e.message.includes(file),
+  );
   assert.equal(readEntry(path.join(root, 'none.json')), undefined, 'no file is no entry');
 });

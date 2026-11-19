@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Server } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { Effect, Schema } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import { Event, watchEventOf } from 'objects';
 import type { ChannelMeta, ChannelNotice, ChannelNoticeOf } from '../../contracts/channel-notice.contract.ts';
 import { sessionHeaders, urlOf } from '../client.ts';
@@ -197,13 +197,7 @@ type Following = {
 type Answer = { kind: 'ok'; response: Response } | { kind: 'refused'; status: number; said: string } | { kind: 'none'; why: string };
 
 /** The JSON of `text`, or none where it is no JSON. */
-const jsonOf = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
+const jsonOf = (text: string): unknown => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text));
 
 /** The api's words in a refusal's body, `{ error }`, else its status and text. */
 function refusalOf(status: number, text: string): string {
@@ -256,7 +250,7 @@ function framesOf(text: string): { data: string[]; rest: string } {
   return { data, rest };
 }
 
-const decodeWatched = Schema.decodeUnknownSync(watchEventOf(Event));
+const decodeWatched = Schema.decodeUnknownSync(Schema.fromJsonString(watchEventOf(Event)));
 
 /** `word` as a shell reads it back unchanged: in single quotes, each quote of its own closed, escaped and opened again. */
 const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
@@ -313,7 +307,7 @@ type Opened = { held: Event[] | undefined; readonly from: string };
 function onFrame(f: Following, data: string, state: Opened): void {
   let watched: ReturnType<typeof decodeWatched>;
   try {
-    watched = decodeWatched(JSON.parse(data));
+    watched = decodeWatched(data);
   } catch (err) {
     console.error(`nemia channel: a frame of the watch is no event this nemia reads, skipped (${(err as Error).message.slice(0, 200)})`);
     return;

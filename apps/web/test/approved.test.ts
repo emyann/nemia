@@ -30,7 +30,9 @@ test('every story has its approved picture, each canary its light one, and no pi
   const folder = path.join(WEB, APPROVED);
   const owed = unapprovedOf(stories, namedIn(folder), namedIn(path.join(folder, LIGHT)), LIGHT_CANARIES);
   const said = [
-    owed.unpictured.length ? `no approved picture: ${owed.unpictured.join(', ')} (draw them: npm run stories -- --update, from apps/web)` : '',
+    owed.unpictured.length
+      ? `no approved picture: ${owed.unpictured.join(', ')} (draw them: npm run stories -- --update, from apps/web)`
+      : '',
     owed.stray.length ? `no story's: ${owed.stray.map((id) => `${APPROVED}/${id}.png`).join(', ')} (git rm them)` : '',
     owed.lightUnpictured.length
       ? `no light picture: ${owed.lightUnpictured.join(', ')} (draw them: npm run stories -- --update, from apps/web)`

@@ -114,6 +114,13 @@ describe("stepCardOf: a step's card in each of its states, its facts, its note a
     assert.equal(card.spend?.kind, 'words');
     assert.equal(card.spend?.kind === 'words' && card.spend.said, 'not measured yet');
   });
+  test("a step at work whose session said what it has spent so far: so far, on its budget's meter, the earlier tries in it", () => {
+    const live = { usd: 16.06, measured: 1, unmeasured: 0, live: { usd: 16.26, at: '2026-11-18T23:16:38.018Z' }, said: '$32.32 so far' };
+    const metered = cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(2)], spent: live })]);
+    assert.deepEqual(metered.spend, { kind: 'meter', label: 'Spent', value: 32.32, max: 10, said: '$32.32 so far of $10' });
+    const alone = cardOf('implement', STATUSES, [quiet('implement', 'running (working)', { tries: [aTry(2)], spent: live, budget: null })]);
+    assert.deepEqual(alone.spend, { kind: 'words', label: 'Spent', said: '$32.32 so far', note: '' });
+  });
   test('a step at its gate: yours, waiting since its session ended, its spend on a meter, and Read and approve', () => {
     const card = cardOf('design', { ...STATUSES, design: 'awaiting approval' }, [
       quiet('design', 'awaiting approval', {

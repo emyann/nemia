@@ -682,9 +682,11 @@ const unaccepted = (step: StepSpec, run: Run, steps: readonly StepSpec[], said: 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),
  * and how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still
- * running is in neither: a job writes its cost as it prints its result (agent-runtime's open issue 18).
+ * running is in neither: a job writes its cost as it prints its result (agent-runtime's open issue 18). What the attempts still running
+ * have spent so far, as their harness last said it, is `live` beside them — its dollars together and the latest time said — never in
+ * `usd`, which stays what was measured; absent where no attempt at work said one.
  */
-export type Spend = { usd: number; measured: number; unmeasured: number };
+export type Spend = { usd: number; measured: number; unmeasured: number; live?: { usd: number; at: string } };
 
 /**
  * What one task's sessions cost (`Spend`), whether its harness ended its last attempt at its budget — the runtime's `limit: 'budget'` — and
@@ -708,23 +710,36 @@ export function taskSpend(view: TaskClock | undefined): TaskSpend | undefined {
   if (!view) return undefined;
   const over = view.state.attempts.filter((a) => a.reason !== 'unstartable' && (a.endedAt != null || view.state.settled != null));
   const costs = over.map((a) => a.usage?.costUsd);
+  const last = view.state.attempts.at(-1);
+  const atWork = last !== undefined && last.endedAt == null && view.state.settled == null;
   return {
     usd: costs.reduce<number>((n, c) => n + (c ?? 0), 0),
     measured: costs.filter((c) => c !== undefined).length,
     unmeasured: costs.filter((c) => c === undefined).length,
-    budgetEnded: view.state.attempts.at(-1)?.limit === 'budget',
+    ...(atWork && view.spent ? { live: { usd: view.spent.usd, at: view.spent.at } } : {}),
+    budgetEnded: last?.limit === 'budget',
   };
 }
+
+/** Two live figures as one: their dollars together, and the later of their times. */
+const addLive = (a: Spend['live'], b: Spend['live']): Spend['live'] =>
+  a && b ? { usd: a.usd + b.usd, at: a.at > b.at ? a.at : b.at } : (a ?? b);
 
 /**
  * Several spends as one.
  * @param spends The spends, each undefined where nothing is known of it.
  */
 export const addSpend = (spends: ReadonlyArray<Spend | undefined>): Spend =>
-  spends.reduce<Spend>(
-    (sum, s) => (s ? { usd: sum.usd + s.usd, measured: sum.measured + s.measured, unmeasured: sum.unmeasured + s.unmeasured } : sum),
-    NOTHING_SPENT,
-  );
+  spends.reduce<Spend>((sum, s) => {
+    if (!s) return sum;
+    const live = addLive(sum.live, s.live);
+    return {
+      usd: sum.usd + s.usd,
+      measured: sum.measured + s.measured,
+      unmeasured: sum.unmeasured + s.unmeasured,
+      ...(live ? { live } : {}),
+    };
+  }, NOTHING_SPENT);
 
 /**
  * The tasks a step's sessions ran as, every try's, each once: the try after a recheck has its session's task again (`EarlierTry`).
@@ -785,10 +800,17 @@ export const loopOver = (
   });
 
 /**
- * What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole.
- * @param s What the sessions cost, and how many ended with no cost on them.
+ * What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole;
+ * with what the sessions at work have spent so far added in, `$32.32 so far`.
+ * @param s What the sessions cost, how many ended with no cost on them, and what those at work have spent so far.
  */
-export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd)}`;
+export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd + (s.live?.usd ?? 0))}${s.live ? ' so far' : ''}`;
+
+/**
+ * Whether anything of a spend is known: a session measured, or one at work that said what it has spent so far.
+ * @param s The spend.
+ */
+export const spendKnown = (s: Spend): boolean => s.measured > 0 || s.live !== undefined;
 
 /**
  * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, so the harness holds the tries

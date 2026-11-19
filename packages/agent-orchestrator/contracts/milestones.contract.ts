@@ -14,7 +14,8 @@ export type MilestoneState = 'done' | 'next' | 'later';
 
 /**
  * What the store holds now, one fact a milestone: a harness whose install and sign-in are both met (`harness`); a factory filed besides
- * the default (`factory`); a volume of a factory that is there and that no start would refuse (`volume`); a run with a step that landed
+ * the default (`factory`); a writable volume of a factory that is there, that no start would refuse and that every harness keeping a
+ * trust trusts now (`volume`: a read-only one, or one left untrusted at "Not now", is not the milestone); a run with a step that landed
  * (`landed`).
  */
 export type MilestoneFacts = {

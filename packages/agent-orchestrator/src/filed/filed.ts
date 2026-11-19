@@ -7,7 +7,7 @@ import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import { volumeMounts } from '../factory/volume/volume.ts';
+import { volumeMounts } from '../factory/volume/index.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, declarationOf, isRemoteHarness } from '../harness/harness.ts';
 import { addedFolderReadsOf, fenceReach, unruledIn } from 'agent-runtime/vocabulary';

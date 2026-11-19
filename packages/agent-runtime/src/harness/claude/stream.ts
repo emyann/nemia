@@ -32,7 +32,7 @@ const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
 /** A block whose `type` is none of `known`'s: only its `type` is checked. */
 const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
-  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
+  Schema.Struct({ type: noneOf(known, (t) => `the fields of a ${t} block`) });
 
 /** Every key of `T`, of each of its members when it is a union. */
 type KeyOfAny<T> = T extends unknown ? keyof T : never;
@@ -261,8 +261,8 @@ export const printedKindOf = (text: string): PrintedKind | 'other' | undefined =
 };
 
 /** Why `value`, a `kind` line at line `at`, is refused: the line, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.SchemaError): string => {
-  const { path, words } = firstRefusal(value, error, 'Claude Code prints');
+const refusal = (at: number, kind: PrintedKind, value: unknown): string => {
+  const { path, words } = firstRefusal(PRINTED[kind], value, 'Claude Code prints');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')
@@ -287,7 +287,7 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): {
     const kind = kindOf(value, kinds);
     if (kind === undefined) continue;
     const decoded = DECODERS[kind](value);
-    if (Result.isFailure(decoded)) return { wrong: refusal(at + 1, kind, value, decoded.failure) };
+    if (Result.isFailure(decoded)) return { wrong: refusal(at + 1, kind, value) };
     lines.push({ kind, line: decoded.success } as PrintedLine);
   }
   return { lines };

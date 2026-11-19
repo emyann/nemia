@@ -6,6 +6,7 @@ import { RunResult } from './RunResult';
 import { Ledger } from './Ledger';
 import { Receipts } from './Receipts';
 import { KindsBehind } from './KindsBehind';
+import { FirstHint } from '../welcome/FirstHint';
 import { readGone } from '@/lib/api/gone';
 import { useRunView, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
@@ -51,16 +52,22 @@ function RunRead({ runId }: { runId: string }) {
  * — its title, where it stands, its id, its labels, three tiles and its menu (`RunHeader`) — with its warning and the kinds it is behind
  * on under it; the graph, the whole width of the page, whose edges carry the packets that passed between steps, a step pressed on it
  * inspected in the frame's bar; the ask beside the result (`RunResult`); every step in one part (`Ledger`); and its receipts, folded
- * (`Receipts`). The machine's detail is one fold down, never gone.
+ * (`Receipts`). The machine's detail is one fold down, never gone. Where it is the welcome's first card's run, the hint of the beat it
+ * stands at is drawn where that beat is (`FirstHint`): the gate's over the asks, the card's under the header, the steps' over the graph
+ * and landed's over the result.
  */
 function Run({ run }: { run: RunDetail }) {
   return (
     <article className="space-y-6">
       <RunTrail runId={run.id} name={titleOf(run)} />
 
+      <FirstHint run={run} beat="gate" />
+
       <AsksOfYou run={run} />
 
       <RunHeader run={run} />
+
+      <FirstHint run={run} beat="card" />
 
       {run.warning && (
         <p data-run-warning className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">
@@ -70,9 +77,13 @@ function Run({ run }: { run: RunDetail }) {
 
       <KindsBehind run={run} />
 
+      <FirstHint run={run} beat="steps" />
+
       <section aria-label="The run's steps as a graph">
         <RunCanvas run={run} />
       </section>
+
+      <FirstHint run={run} beat="landed" />
 
       <RunResult run={run} />
 

@@ -26,6 +26,11 @@ export const TemplateParameter = Schema.Struct({
   default: Schema.optionalKey(
     Schema.Union([Schema.String, Schema.Number, Schema.Boolean]).annotate({ description: 'The value taken when the person gives none.' }),
   ),
+  whenOrigin: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The host whose clones set this boolean true when it is a factory's first writable volume, and any other volume false.",
+    }),
+  ),
 });
 export type TemplateParameter = typeof TemplateParameter.Type;
 

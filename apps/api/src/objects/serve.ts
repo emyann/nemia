@@ -20,12 +20,12 @@
  * and a path
  * no endpoint serves the api's own 404 (`noRoute`), whatever router missed it.
  */
-import { ByteSize, Context, Effect, Layer, SchemaIssue } from 'effect';
+import { ByteSize, Context, Effect, Layer } from 'effect';
 import { HttpIncomingMessage, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder, HttpApiError } from 'effect/http-api';
 import type { Context as RequestContext } from 'hono';
 import { runWatchVersion } from 'agent-orchestrator';
-import { Api } from 'objects';
+import { Api, refusedIn } from 'objects';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { cardsHandlers } from './cards.ts';
 import {
@@ -85,17 +85,15 @@ export function noRoute(c: RequestContext<ApiEnv>): Response {
   );
 }
 
-/** Each issue of a refused decode, as Standard Schema says it: its path within the request's part. */
-const issuesOf = SchemaIssue.makeFormatterStandardSchemaV1();
-
 /**
  * The key a refused decode names, from the request's part it is in (`payload.spec.steps`, `query.limit`, `params.name`), and what its
- * Schema says of it: the message it was declared with, where it says what to send instead, or the decoder's own.
+ * Schema says of it: the message it was declared with, where it says what to send instead, or what it expected there, read off the
+ * issue by its `_tag` (objects' `refusedIn`).
  */
 const refusedOf = (error: HttpApiError.HttpApiSchemaError): { field: string; said: string | undefined } => {
-  const first = issuesOf(error.cause.issue).issues[0];
-  const path = (first?.path ?? []).map((segment) => String(typeof segment === 'object' ? segment.key : segment));
-  return { field: [error.kind.toLowerCase(), ...path].join('.'), said: first?.message };
+  const [first] = refusedIn(error.cause.issue);
+  const path = (first?.path ?? []).map(String);
+  return { field: [error.kind.toLowerCase(), ...path].join('.'), said: first && (first.message ?? first.expected) };
 };
 
 /**

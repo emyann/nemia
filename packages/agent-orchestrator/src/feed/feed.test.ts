@@ -804,6 +804,7 @@ test(
     const said = bell();
     const open = fs.openSync;
     let opens = 0;
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the feed removed between two opens: a race no seam gives
     vi.spyOn(fs, 'openSync').mockImplementation(((file: fs.PathLike, flags: string) => {
       const fd = open(file, flags);
       if (String(file) === FEED && ++opens === 2) fs.rmSync(FEED, { force: true });
@@ -925,12 +926,10 @@ test(
 );
 
 test("`wf --help` says which feed is whose: nemia watch, whose words are the client's, and ae watch", async () => {
-  const out: string[] = [];
-  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    out.push(args.join(' '));
-  });
+  const outSpy = vi.spyOn(console, 'log');
+  const out = () => outSpy.mock.calls.flatMap((args) => [args.join(' ')]);
   await main(['--help'], engineOf(testEngine().layer), undefined, undefined, ENV);
-  const printed = out.join('\n');
+  const printed = out().join('\n');
   assert.equal(/^ {2}nemia feed\b/m.test(printed), false, 'nemia feed is retired: nemia watch --once reads once');
   assert.match(printed, /nemia watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);

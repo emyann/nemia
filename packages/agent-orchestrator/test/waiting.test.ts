@@ -180,12 +180,11 @@ const sectionOf = (brief: string, id: string) => {
 /** What `console.log` printed while `run` ran, a line each. */
 const printedBy = async (t: TestContext, run: () => Promise<unknown>) => {
   const out: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    out.push(args.map(String).join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await run();
   } finally {
+    out.push(...log.mock.calls.flatMap((args) => [args.map(String).join(' ')]));
     log.mockRestore();
   }
   return out.join('\n').split('\n');

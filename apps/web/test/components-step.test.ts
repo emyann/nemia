@@ -378,12 +378,16 @@ function withMotion<T>(reduce: boolean | undefined, render: () => T) {
     addEventListener() {},
     removeEventListener() {},
   });
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
   if (reduce === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
   else Object.defineProperty(globalThis, 'matchMedia', { value: matchMedia, configurable: true, writable: true });
   try {
     return render() satisfies T;
   } finally {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     if (before) Object.defineProperty(globalThis, 'matchMedia', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     else Reflect.deleteProperty(globalThis, 'matchMedia');
   }
 }

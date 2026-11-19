@@ -1157,6 +1157,7 @@ export async function bannerShown(context: BrowserContext) {
     const response = await route.fetch();
     if (!response.ok()) return route.fulfill({ response });
     const read = (await response.json()) as { ready: boolean; pieces: unknown[] };
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a banner on the api's own read: the seat has none
     return route.fulfill({ response, json: { ...read, ready: false, pieces: [...read.pieces, BANNER_PIECE] } });
   });
 }

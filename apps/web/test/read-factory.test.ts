@@ -97,7 +97,7 @@ describe("get, the Factory's and the inbox's reads: each decodes what the api gi
     assert.equal(Object.hasOwn(offered.steps[0], 'colour'), false);
     assert.deepEqual(offered, capabilities({ steps: [stepReach()] }));
   });
-  test('the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined', async (t) => {
+  test('the capabilities are asked for the factory and the repository a place names, and nothing a page left undefined', async () => {
     const asked: string[] = [];
     apiAnswers(async (input) => {
       asked.push(new URL(input, 'http://board').search);
@@ -144,7 +144,7 @@ function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: 
       method,
       url,
       body: init?.body
-        ? JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body as Uint8Array))
+        ? JSON.parse(init.body)
         : undefined,
     });
     return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });

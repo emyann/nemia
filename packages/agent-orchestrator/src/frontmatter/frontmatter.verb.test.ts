@@ -88,6 +88,7 @@ test("the store's workflows, inbox and a templated factory's tree and applied ba
 test('REFUSED: a mode that cannot be set leaves the read-only file in place, unreplaced, and no hidden file beside it', () => {
   const dir = scratch('wf-frontmatter-mode-');
   const file = put(path.join(dir, 'land.md'), FORMER, 0o444);
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- chmod refused on cue, no seam gives it
   const chmod = vi.spyOn(fs, 'chmodSync').mockImplementation(() => {
     throw new Error('chmod refused');
   });

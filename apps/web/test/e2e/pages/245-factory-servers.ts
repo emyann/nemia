@@ -249,6 +249,7 @@ async function pastesBack(page: Page) {
     let taken = false;
     const until = '2099-01-01T00:00:00.000Z';
     const answer = (route: Route, json: unknown) =>
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- servers answered: a state the seed cannot plant
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) });
     await other.route(
       (url) => url.pathname === `/api/namespaces/${FACTORY}/mcpservers`,

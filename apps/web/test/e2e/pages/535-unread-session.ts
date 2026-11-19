@@ -19,6 +19,7 @@ const unread = async (route: Route) => {
   const response = await route.fetch();
   const body = (await response.json()) as { status: { steps: Array<{ name: string }> } };
   const steps = body.status.steps.map((step) => (step.name === FAKE.unverified ? { ...step, sessionUnread: WHY } : step));
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- sessionUnread on the api's own read: the seed has none
   await route.fulfill({ response, json: { ...body, status: { ...body.status, steps } } });
 };
 

@@ -553,6 +553,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
   const pid = await spawnFrozenBeforePublish(t, ops, dir, 'ae/t4/4');
   const write = fs.writeFileSync;
   let held = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the child ends as the stop is written: a race
   (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = (f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
     if (typeof f === 'string' && f.endsWith('.stop') && !held) {
       held = true;

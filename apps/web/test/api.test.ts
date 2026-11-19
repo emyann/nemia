@@ -184,23 +184,23 @@ function asking(
   body: string,
   sent: Array<{ url: string; init: RequestInit }>,
 ) {
-  apiAnswers((async (url: string, init: RequestInit) => {
+  apiAnswers(async (url: string, init: RequestInit) => {
     sent.push({ url, init });
     return new Response(body, { status, headers: { 'content-type': 'application/json' } });
-  }) as typeof fetch);
+  });
 }
 
 const { askRound } = await import('../src/lib/api/asks.ts');
 
 describe("each ask of a run's page: posted as the api takes it, read back, and refused in the api's words", () => {
-  test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
+  test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async () => {
     const sent: Array<{ url: string; init: RequestInit }> = [];
     let answer = () =>
       new Response(JSON.stringify({ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.', after: null }), { status: 202 });
-    apiAnswers((async (url: string, init: RequestInit) => {
+    apiAnswers(async (url: string, init: RequestInit) => {
       sent.push({ url, init });
       return answer();
-    }) as typeof fetch);
+    });
     assert.deepEqual(await sayToStep('default', 'r 1', 'implement', 'Widen it.'), {
       at: '2026-09-14T16:06:19.851Z',
       attempt: 1,
@@ -327,13 +327,13 @@ describe("a run's reads: gone on a 404 alone, its last read kept, any other fail
   });
   test("the run object's read: a 404 is the run gone, said at once, its last read kept, asked of the run's own route", async (t) => {
     const asked: string[] = [];
-    apiAnswers((async (url: string) => {
+    apiAnswers(async (url: string) => {
       asked.push(url);
       return new Response(JSON.stringify({ error: "No run 'r-1' in this store." }), {
         status: 404,
         headers: { 'content-type': 'application/json' },
       });
-    }) as typeof fetch);
+    });
     const client = new QueryClient();
     t.onTestFinished(() => {
       client.clear();

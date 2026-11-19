@@ -64,12 +64,14 @@ const steered = async <A>(t: Waiter, program: Effect.Effect<A>) => {
 const printed = async (t: TestContext, fn: () => Promise<unknown>) => {
   const out: string[] = [];
   const err: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void out.push(args.join(' ')));
-  const error = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void err.push(args.join(' ')));
+  const log = vi.spyOn(console, 'log');
+  const error = vi.spyOn(console, 'error');
   try {
     await fn();
   } finally {
+    out.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
+    err.push(...error.mock.calls.flatMap((args) => [args.join(' ')]));
     error.mockRestore();
   }
   return { out, err };

@@ -282,6 +282,7 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
 
 test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async () => {
   const run = await isolated(aNodeRepo());
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- EXDEV, which one scratch disk cannot give
   vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   });

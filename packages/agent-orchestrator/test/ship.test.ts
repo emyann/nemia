@@ -223,12 +223,11 @@ async function endings(stage: Stage, root: string) {
     /** What `nemia <argv>` prints, line by line, over the board's engine. */
     printedBy: async (t: TestContext, argv: string[]) => {
       const printed: string[] = [];
-      const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-        printed.push(args.map(String).join(' '));
-      });
+      const log = vi.spyOn(console, 'log');
       try {
         await stage.main(argv);
       } finally {
+        printed.push(...log.mock.calls.flatMap((args) => [args.map(String).join(' ')]));
         log.mockRestore();
       }
       return printed;

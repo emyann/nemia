@@ -247,12 +247,11 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
     return inner();
   });
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await assert.rejects(main(['up', '1'], up.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
   const named = printed.filter((l) => l.includes('odd-include-a1b2'));
@@ -303,11 +302,8 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
   t.onTestFinished(() => process.chdir(cwd));
   aCard('no-git-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
-  const said: string[] = [];
-  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
-    said.push(String(chunk));
-    return true;
-  });
+  const stderr = vi.spyOn(process.stderr, 'write');
+  const said = () => stderr.mock.calls.flatMap(([chunk]) => [String(chunk)]);
   let pass: Effect.Success<ReturnType<typeof tickRun>>;
   try {
     pass = await runWith(b.e, tickRun());
@@ -315,7 +311,7 @@ test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no 
     stderr.mockRestore();
   }
   assert.deepEqual(
-    said,
+    said(),
     [],
     "git writes `fatal:` on its stderr, and that stderr is not the daemon's: a pass every four seconds would print it every four seconds",
   );
@@ -355,12 +351,11 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
     return inner();
   });
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await assert.rejects(main(['up', '1'], b.e, undefined, undefined, ENV), (err) => err === stop);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
 

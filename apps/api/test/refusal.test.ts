@@ -33,7 +33,7 @@ const answered = async (thrown: unknown) => {
 
 /** A run of `answered` with stderr held: what an error that is no refusal says there, and nothing of it on the test's output. */
 const quietly = async <T>(t: TestContext, run: () => Promise<T>) => {
-  const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const said = vi.spyOn(console, 'error');
   return { answer: await run(), said: said.mock.calls.length };
 };
 

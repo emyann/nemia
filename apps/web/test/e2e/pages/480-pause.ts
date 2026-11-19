@@ -67,6 +67,7 @@ async function heldRun(page: Page, theme: string) {
     if (route.request().method() !== 'GET') return route.fallback();
     const read = (await (await route.fetch()).json()) as RunObject.Run;
     const steps = read.status.steps.map((s) => (s.name === FAKE.refused ? { ...s, ...HELD_WORDS } : s));
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- held words on the api's own read: no seeded run holds them
     return route.fulfill({ json: { ...read, status: { ...read.status, steps } } });
   });
   try {

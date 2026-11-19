@@ -32,6 +32,7 @@ describe('Getting started: shown until a change is merged, or the person dismiss
   test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
     const kept = new Map<string, string>();
     const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: (k: string) => kept.get(k) ?? null,
@@ -42,7 +43,9 @@ describe('Getting started: shown until a change is merged, or the person dismiss
       writable: true,
     });
     t.onTestFinished(() => {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
       if (before) Object.defineProperty(globalThis, 'localStorage', before);
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
       else Reflect.deleteProperty(globalThis, 'localStorage');
     });
     assert.equal(readStarterDismissed(), false, 'nothing kept: not dismissed');

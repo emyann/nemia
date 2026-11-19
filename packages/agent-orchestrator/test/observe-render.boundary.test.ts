@@ -206,6 +206,7 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
   const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
   fs.writeFileSync(lockFile(), JSON.stringify(live));
   const link = fs.linkSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a third holder takes the lock: a race
   vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from).endsWith(`.stale-${process.pid}`) && String(to) === lockFile()) fs.writeFileSync(lockFile(), JSON.stringify(third));
     link(from, to);
@@ -233,12 +234,14 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));
   const rename = fs.renameSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the lock's rename refused on cue (EPERM)
   vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from) !== lockFile()) return rename(from, to);
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
   const write = fs.writeFileSync;
   let tries = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- stops a take that loops, else it never ends
   vi.spyOn(fs, 'writeFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, data: string) => {
     if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
     write(file, data);

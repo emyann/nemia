@@ -215,6 +215,7 @@ time('on a clock that moves at every reading, the phases and measuring are the p
   emptyStore();
   await started(3);
   let clock = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- steps the monotonic clock, which no seam gives
   vi.spyOn(performance, 'now').mockImplementation(() => ++clock);
   const { ms, tallies } = await metered(() => runWith(fake({ passMs: 5, observeMs: 2, ioMs: 1 }), tickRun()));
   assert.ok(tallies);

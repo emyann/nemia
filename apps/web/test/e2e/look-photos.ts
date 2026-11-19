@@ -198,6 +198,7 @@ async function closeUps(browser: Browser, theme: 'light' | 'dark') {
   });
   await onStory(browser, 'look-copyid--short', theme, async (page) => {
     await enlarged(page, ID_GROUND, 6, `parts-id-rest-${theme}.png`);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the story's page has no clipboard permission
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true }));
     await page.locator(`${ID_GROUND} button`).click();
     await page.locator(`${ID_GROUND} [data-copied]`).waitFor();

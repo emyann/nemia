@@ -217,6 +217,7 @@ const aRepo = () => {
 
 test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async () => {
   let draws = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- fixes the random draws, so a collision is met
   vi.spyOn(Math, 'random').mockImplementation(() => (draws++ === 0 ? 0.5 : draws / 97));
   const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   draws = 0;
@@ -871,7 +872,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   await onHandler(['retry', run.id, 'implement'], b.e, undefined, stand().place, ENV);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -936,6 +937,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the asks folder removed as made: a race
   vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);

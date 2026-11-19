@@ -100,6 +100,7 @@ test('REFUSED: two adds of one name, the second while the first is between its w
   const second = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const link = fs.linkSync;
   let raced: unknown;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a second add between write and link: a race no seam gives
   const mocked = vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     mocked.mockRestore();
     raced = addFactoryAt(ROOT, { name: 'pipao', volumes: [second].map((r) => `${r}:rw`) });

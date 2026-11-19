@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
-/** What the board sent, as a test reads it: the method, the headers, the body's text (none where it is empty) and the signal that aborts it. */
+/** What the board sent, as a test reads it: the method, the headers, the body's text (none where empty), the signal that aborts it. */
 export type Sent = { method: string; headers: Headers; body: string | undefined; signal: AbortSignal };
 
 const server = setupServer();

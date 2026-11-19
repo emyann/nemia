@@ -250,7 +250,7 @@ describe('a switch onto another template: previewed with no common base, held to
 });
 
 test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('later'));
@@ -282,7 +282,7 @@ test('a base whose status names no template is refused a switch until a pass nam
 });
 
 test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('moved'));
@@ -306,7 +306,7 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
 });
 
 test('a factory whose template changed under its version is named after that template, and switched from it with no base', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('kit'));

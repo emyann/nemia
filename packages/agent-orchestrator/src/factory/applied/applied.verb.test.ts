@@ -123,7 +123,7 @@ const templated = (name: string) =>
 
 describe('what apply and a start of a templated factory refuse, by kind and exit 2, writing nothing', () => {
   test('apply refuses a key not declared, a value of the wrong type and a required one not given, every one at once, and writes nothing', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     const before = filed();
     await assert.rejects(
@@ -191,7 +191,7 @@ test(
   'REFUSED at shipped defaults: a factory applied after a pass is not rendered before five seconds, and is at the next pass',
   WAITED,
   async (t) => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const clock = steeredClock();
     const loop = Effect.runFork(reconcile().pipe(Effect.provide(clock.layer), Effect.provideService(StoreRoot, ROOT)));
     t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(loop)));
@@ -209,7 +209,7 @@ test(
 
 describe('what the controller says of a template or parameters moved since the render, its base and tree kept', () => {
   test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drifted', dir, repo, '--set', 'budget=7');
     const first = reconciled(templated('drifted'));
@@ -233,7 +233,7 @@ describe('what the controller says of a template or parameters moved since the r
     assert.equal(reconciled(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
   });
   test("parameters changed in the factory's file alone are merged at its version; changed with the template's files under it, said by Applied, base and tree kept", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('moved', dir, repo, '--set', 'budget=7');
     const first = reconciled(templated('moved'));
@@ -292,7 +292,7 @@ describe("the controller stamps each condition with when its status last moved, 
   let file!: string;
   beforeAll(async () => {
     const t = teardowns();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     ({ repo, dir } = template());
     await apply('stamped', dir, repo, '--set', 'budget=7');
     file = path.join(FACTORIES, 'stamped.json');
@@ -353,13 +353,13 @@ function unnamed(name: string, change: (status: Record<string, unknown>) => void
 
 describe('the controller names the template a base holds, even where the base is no longer the render, so a switch from it can be told', () => {
   test('a base that is the render is named after its template', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('as-rendered', dir, repo, '--set', 'budget=7');
     assert.equal(reconciled(templated('as-rendered')).template, 'team');
   });
   test("the template's files changed under its version (ContentChanged): the base is named after the template the file names", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('content', dir, repo, '--set', 'budget=7');
     reconciled(templated('content'));
@@ -372,7 +372,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.equal(readStatus(ROOT, 'content')?.template, 'team', 'and written');
   });
   test('the template moved to another version (VersionDrift): named', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('drift', dir, repo, '--set', 'budget=7');
     reconciled(templated('drift'));
@@ -384,7 +384,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.deepEqual([status.conditions[0].reason, status.template], ['VersionDrift', 'team']);
   });
   test("the parameters in the factory's file changed with the template's files under its version (ParamsChanged): named", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('params', dir, repo, '--set', 'budget=7');
     reconciled(templated('params'));
@@ -400,7 +400,7 @@ describe('the controller names the template a base holds, even where the base is
     assert.deepEqual([status.conditions[0].reason, status.template], ['ParamsChanged', 'team']);
   });
   test("an upgrade under way: the factory's file names the template wanted, not the base's, so no name is written", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('under-way', dir, repo, '--set', 'budget=7');
     reconciled(templated('under-way'));
@@ -416,7 +416,7 @@ describe('the controller names the template a base holds, even where the base is
 
 describe("what a templated factory's verbs read and write: its tree's wiring, instruction and parts, and the places apply trusts", () => {
   test("a templated factory reads its tree's wiring, and attach, hire, fire, detach and revisions write the tree; none while it is not rendered", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('wired', dir, repo, '--set', 'budget=7');
     await assert.rejects(
@@ -471,7 +471,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     assert.deepEqual(readFactoryAt(ROOT, 'wired').volumes.at(-1), volume);
   });
   test("a templated factory's instruction is its tree's NEMIA.md, written by instruct; and rm removes it all, its read-only base included", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('told', dir, repo, '--set', 'budget=7');
     const words = path.join(scratch('wf-applied-words-'), 'words.md');
@@ -492,7 +492,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
     );
   });
   test("the writers' place factory writes a templated factory's tree through each writer's handler; refused without a factory, for an untemplated one, and before its render", async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     const { dir, repo } = template();
     await apply('written', dir, repo, '--set', 'budget=7');
     await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());

@@ -110,15 +110,17 @@ const JOURNAL_OUT = (id: string) => `${id} is not advanced while a task it reads
 const printedBy = async (t: unknown, argv: string[], engine: Parameters<typeof stage.main>[1]) => {
   const out: string[] = [];
   const err: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void out.push(...a.map(String).join(' ').split('\n')));
-  const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => void err.push(a.map(String).join(' ')));
+  const log = vi.spyOn(console, 'log');
+  const error = vi.spyOn(console, 'error');
   let threw: unknown;
   try {
     await stage.main(argv, engine);
   } catch (caught) {
     threw = caught;
   } finally {
+    out.push(...log.mock.calls.flatMap((a) => a.map(String).join(' ').split('\n')));
     log.mockRestore();
+    err.push(...error.mock.calls.flatMap((a) => [a.map(String).join(' ')]));
     error.mockRestore();
   }
   return { out, err, threw };
@@ -200,11 +202,8 @@ describe('one broken run does not stop the others: each left out and said once, 
       fs.writeFileSync(runFile(ROOT, 'torn'), '{ "id": "torn", "repo"');
       runs.good = (await started('the good one')).id;
 
-      const wrote: string[] = [];
-      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
-        wrote.push(String(line));
-        return true;
-      }) as never);
+      const stderr = vi.spyOn(process.stderr, 'write');
+      const wrote = () => stderr.mock.calls.flatMap(([line]) => [String(line)]);
       const now = await pass().finally(() => stderr.mockRestore());
 
       assert.deepEqual(now.runs.find((a) => a.run.id === runs.good)?.filed, ['work'], 'the good run filed its step');
@@ -228,7 +227,7 @@ describe('one broken run does not stop the others: each left out and said once, 
         now.unreadable?.some((w) => w.startsWith(LEFT_OUT(runs.gone)) && w.includes('no workflow folder at')),
         JSON.stringify(now.unreadable),
       );
-      assert.equal(wrote.filter((l) => l.startsWith('left out: run torn: its record, ')).length, 1, wrote.join(''));
+      assert.equal(wrote().filter((l) => l.startsWith('left out: run torn: its record, ')).length, 1, wrote().join(''));
       for (const id of [runs.journal, runs.gone, runs.unplaced])
         assert.equal(saidRemoved(id), false, `the feed does not say ${id} removed`);
     },

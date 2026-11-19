@@ -14,6 +14,7 @@ import type { TestContext } from 'vitest';
  */
 export const stepClock = (t: TestContext, ms: number) => {
   const Real = Date;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the stepped clock, the runtime's seam for a wall time
   globalThis.Date = class extends Real {
     constructor(...args: ConstructorParameters<DateConstructor> | []) {
       if (args.length === 0) super(Real.now() + ms);
@@ -24,6 +25,7 @@ export const stepClock = (t: TestContext, ms: number) => {
     }
   } as DateConstructor;
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- puts the real clock back
     globalThis.Date = Real;
   });
 };

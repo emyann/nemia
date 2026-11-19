@@ -193,15 +193,14 @@ const engineOf = (
 /** What a verb printed, line by line, and what it threw: one the client holds on its entry's handler, its lines said (`told`). */
 const typed = async (t: TestContext, argv: string[], e: Engine) => {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.map(String).join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   let threw: unknown;
   try {
     await told(argv, e, undefined, stand().place, ENV);
   } catch (err) {
     threw = err;
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.map(String).join(' ')]));
     log.mockRestore();
   }
   return { printed, threw };
@@ -942,26 +941,24 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
     if (e.passes > byPass.length) throw STOP;
     return pass({ tasks: 2, unreadable: byPass[e.passes - 1] });
   });
-  const errors: string[] = [];
-  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-    errors.push(args.map(String).join(' '));
-  });
+  const errorsSpy = vi.spyOn(console, 'error');
+  const errors = () => errorsSpy.mock.calls.flatMap((args) => [args.map(String).join(' ')]);
   const { threw } = await typed(t, ['up', '1'], e);
   assert.equal(threw, STOP);
-  const said = errors.filter((l) => l.includes('left out: '));
+  const said = errors().filter((l) => l.includes('left out: '));
   assert.deepEqual(
     said.map((l) => l.slice(10)),
     [`left out: ${bad}`, `left out: ${feed}`, `left out: ${bad}`],
-    errors.join('\n'),
+    errors().join('\n'),
   );
   assert.ok(
     said.every((l) => /^\d\d:\d\d:\d\d  left out: /.test(l)),
     'stamped as the daemon stamps every line',
   );
-  errors.length = 0;
+  errors().length = 0;
   e.setTick(async () => pass({ tasks: 2, unreadable: [bad, feed] }));
   assert.equal((await typed(t, ['tick'], e)).threw, undefined);
-  assert.deepEqual(errors, [`left out: ${bad}`, `left out: ${feed}`]);
+  assert.deepEqual(errors(), [`left out: ${bad}`, `left out: ${feed}`]);
 });
 
 /** A pass's cost as the meter writes one: every phase, and two harnesses observed. */
@@ -1016,8 +1013,8 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
     assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote');
   });
   test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async () => {
-    const errors: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => errors.push(line) > 0) as never);
+    const errorsSpy = vi.spyOn(process.stderr, 'write');
+    const errors = () => errorsSpy.mock.calls.flatMap(([line]) => [String(line)]);
     fs.rmSync(recentFile(ROOT), { force: true });
     try {
       assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');
@@ -1033,8 +1030,8 @@ describe('what a pass kept reads back: its cost, the recent passes, the ceilings
         recentPasses(ROOT).map((r) => r.ms),
         [3, 5],
       );
-      assert.equal(errors.length, 1, errors.join(''));
-      assert.ok(errors[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors[0]);
+      assert.equal(errors().length, 1, errors().join(''));
+      assert.ok(errors()[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors()[0]);
       recordRecentPass(ROOT, { ...COST, ms: 6 }, 3);
       assert.deepEqual(
         recentPasses(ROOT).map((r) => r.ms),

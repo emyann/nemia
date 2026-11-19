@@ -115,7 +115,7 @@ test("a step's conversation is read on at once from each cursor while the api sa
   assert.ok(asked.every((url) => url.searchParams.get('limit') === String(TRANSCRIPT_PAGE.most)));
 });
 
-test("a step's conversation read through its query is read once by the readers that come while it is out, and none that leaves aborts it", async (t) => {
+test("a step's conversation read through its query is read once by the readers that come while it is out, and none that leaves aborts it", async () => {
   const signals: (AbortSignal | null | undefined)[] = [];
   let answer: () => void = () => {};
   const held = new Promise<void>((done) => {

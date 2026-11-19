@@ -177,13 +177,14 @@ const aParent = async (repo: string, { work, signed = Boolean(work) }: { work?: 
 const typed = async (...argv: string[]) => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e(), effect), ROOT, argv);
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv, e());
     return { printed, forgot: [], error: undefined } satisfies Typed;
   } catch (err) {
     return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } } satisfies Typed;
   } finally {
+    printed.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
     log.mockRestore();
   }
 };

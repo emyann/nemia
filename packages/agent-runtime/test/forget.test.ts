@@ -8,7 +8,7 @@
  * detached harness's run files stay focused.
  */
 import { Effect } from 'effect';
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -100,14 +100,14 @@ const sighting = (name: string, state: Sighting['state'], held?: boolean) =>
 /** What `main(argv)` printed with `console.log`, on the board at `root`. */
 const printed = async (root: string, argv: string[]) => {
   const lines: string[] = [];
-  const log = console.log;
   const given = process.env.AE_ROOT;
   process.env.AE_ROOT = root;
-  console.log = (...args: unknown[]) => void lines.push(args.join(' '));
+  const log = vi.spyOn(console, 'log');
   try {
     await main(argv);
   } finally {
-    console.log = log;
+    lines.push(...log.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
     if (given === undefined) delete process.env.AE_ROOT;
     else process.env.AE_ROOT = given;
   }

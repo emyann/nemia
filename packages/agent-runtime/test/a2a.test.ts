@@ -623,6 +623,7 @@ describe('the conformance walk: each verb through the client reaches the driver 
       'ae/t-3/1': 'not expected',
     };
     const unread = expected.map((e) => e.name);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- an older driver's answer, no driver gives today
     vi.spyOn(HarnessHandler.prototype, 'observeSessions').mockImplementation((async () =>
       answer === undefined ? { tasks: [], unread, why: [] } : { tasks: [], unread, why: [], unreadWhy: answer }) as never);
     const runner = a2aOps('fake', ops, async () => []);

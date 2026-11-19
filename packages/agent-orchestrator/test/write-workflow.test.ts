@@ -447,21 +447,18 @@ const caseSensitive = (() => {
 test('the files of the steps the folder no longer has go before a byte of the new ones is written', () => {
   const dir = devIn('order');
   const [implement, review] = loadWorkflows(dir) as [StepSpec, StepSpec];
-  const order: string[] = [];
-  const { rmSync, writeFileSync } = fs;
-  const removals = vi.spyOn(fs, 'rmSync').mockImplementation((at: fs.PathLike, opts?: fs.RmOptions) => {
-    order.push(`removed ${path.basename(String(at))}`);
-    return rmSync(at, opts);
-  });
-  const writes = vi
-    .spyOn(fs, 'writeFileSync')
-    .mockImplementation((at: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, opts?: fs.WriteFileOptions) => {
-      order.push(`wrote ${path.basename(String(at))}`);
-      return writeFileSync(at, data, opts);
-    });
+  const removals = vi.spyOn(fs, 'rmSync');
+  const writes = vi.spyOn(fs, 'writeFileSync');
+  let order: string[] = [];
   try {
     writeWorkflow(ROOT, dir, [implement, { ...review, name: 'REVIEW', rounds: 2 }]);
   } finally {
+    order = [
+      ...removals.mock.calls.map(([at], i) => ({ at: removals.mock.invocationCallOrder[i], said: `removed ${path.basename(String(at))}` })),
+      ...writes.mock.calls.map(([at], i) => ({ at: writes.mock.invocationCallOrder[i], said: `wrote ${path.basename(String(at))}` })),
+    ]
+      .sort((a, b) => a.at - b.at)
+      .map((call) => call.said);
     removals.mockRestore();
     writes.mockRestore();
   }

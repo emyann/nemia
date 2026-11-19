@@ -10,6 +10,7 @@ export const steppingClock = (t: TestContext, ms: number) => {
   const Real = Date;
   let ahead = 0;
   const read = () => Real.now() + (ahead += ms);
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the stepped clock, the package's seam for a wall time
   globalThis.Date = class extends Real {
     constructor(...args: ConstructorParameters<DateConstructor> | []) {
       if (args.length === 0) super(read());
@@ -20,6 +21,7 @@ export const steppingClock = (t: TestContext, ms: number) => {
     }
   } as DateConstructor;
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- puts the real clock back
     globalThis.Date = Real;
   });
 };

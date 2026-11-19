@@ -509,6 +509,7 @@ test("where a hardlink cannot be made — another filesystem — main's packages
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   };
   const { main, wt } = aCheckout();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- EXDEV, which one scratch disk cannot give
   const linking = vi.spyOn(fs, 'linkSync').mockImplementation(exdev);
   const got = await provisionDeps(main, wt);
   assert.equal(got.tree, 'linked');
@@ -531,6 +532,7 @@ test("where a hardlink cannot be made — another filesystem — main's packages
   linking.mockRestore();
 
   const other = aCheckout();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- EACCES on link, which our scratch cannot give
   vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error('EACCES: permission denied, link'), { code: 'EACCES', syscall: 'link' });
   });
@@ -725,6 +727,7 @@ test("a worktree's own tree read against its lockfile: current as cut, as npm in
   const lock = JSON.parse(fs.readFileSync(lockfile, 'utf8'));
   lock.packages['node_modules/third'] = { version: '2.0.0' };
   fs.writeFileSync(lockfile, JSON.stringify(lock));
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- EXDEV, which one scratch disk cannot give
   vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV', syscall: 'link' });
   });

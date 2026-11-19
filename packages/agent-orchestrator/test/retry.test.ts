@@ -241,10 +241,11 @@ const asking = async ({ gate = false, open = [cut, where] as unknown[] } = {}) =
 /** What `nemia` printed, line by line, over the stage's engine. */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void printed.push(args.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv, e);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
   return printed.join('\n').split('\n');

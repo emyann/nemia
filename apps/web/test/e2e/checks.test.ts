@@ -102,7 +102,9 @@ async function pageWith(html: string, { theme = 'light', api = 200 }: { theme?: 
   const { problems } = watch(page);
   await page.route('http://e2e.test/**', (route) => {
     const { pathname } = new URL(route.request().url());
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the runner's check needs a page, not a board
     if (pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the api's status planted: the check needs no board
     if (pathname === '/api/runs') return route.fulfill({ status: api, contentType: 'application/json', body: '[]' });
     return route.abort('connectionrefused');
   });
@@ -434,6 +436,7 @@ test('idle counts its quiet on a clock that does not step: the wall clock steppe
   const wall = Date.now.bind(Date);
   const from = performance.now();
   const waited = idle(page, 3_000);
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the clock: a minute on, past the wait's wall deadline
   vi.spyOn(Date, 'now').mockImplementation(() => wall() + 60_000);
   await waited;
   assert.ok(

@@ -31,7 +31,7 @@ const ROOT = path.join(PACKAGE, '..', '..');
 const waiter = (of: TestContext) => {
   const control = new AbortController();
   const t: Waiter = { signal: control.signal };
-  const logged = vi.isMockFunction(console.error) ? console.error : vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const logged = vi.isMockFunction(console.error) ? console.error : vi.spyOn(console, 'error');
   const from = vi.mocked(logged).mock.calls.length;
   of.onTestFinished(() => control.abort());
   return {

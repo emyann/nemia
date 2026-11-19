@@ -158,6 +158,7 @@ function storage(refuses = false) {
   const refuse = () => {
     throw new Error('storage is refused');
   };
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
   Reflect.set(globalThis, 'localStorage', {
     getItem: (key: string) => (refuses ? refuse() : (held.get(key) ?? null)),
     setItem: (key: string, value: string) => (refuses ? refuse() : void held.set(key, value)),

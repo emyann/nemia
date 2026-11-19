@@ -184,12 +184,11 @@ const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')
 /** What `nemia argv` printed, line by line, over `e` (the stage's engine when none is named). */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv, e);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
   return printed.join('\n').split('\n');
@@ -630,14 +629,13 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
     ENV.WF_MAX_CONCURRENT = '4';
     ENV.WF_MEMORY_RESERVED = '2Gi';
     const printed: string[] = [];
-    const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-      printed.push(args.join(' '));
-    });
+    const log = vi.spyOn(console, 'log');
     try {
       await assert.rejects(stage.main(['up'], e), (err) => err === stop);
       ENV.WF_MAX_RUNS = '2';
       await assert.rejects(stage.main(['up', '1000'], e), (err) => err === stop);
     } finally {
+      printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
       log.mockRestore();
       ENV.WF_MAX_CONCURRENT = undefined;
       ENV.WF_MAX_RUNS = undefined;
@@ -689,7 +687,7 @@ describe("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read
       const { e, own } = stoppedBy(stop);
       if (engineAskedFirst) Object.assign(e, { tick: () => Effect.succeed(QUIET) });
       Object.assign(ENV, env);
-      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log');
       try {
         await assert.rejects(argv === 'pass' ? runWith(e, tickRun()) : stage.main(argv, e), (err: Error & { exitCode?: number }) => {
           assert.equal(err.exitCode, 2, err.message);
@@ -876,12 +874,11 @@ describe('a card becomes a run: filed with its factory and its gate, queued, it 
     const stop = new Error('the test stops the daemon');
     Object.assign(b.e, { tick: () => (++passes > 1 ? Effect.die(stop) : Effect.succeed(QUIET)) });
     const printed: string[] = [];
-    const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-      printed.push(args.join(' '));
-    });
+    const log = vi.spyOn(console, 'log');
     try {
       await assert.rejects(stage.main(['up', '1']), (err) => err === stop);
     } finally {
+      printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
       log.mockRestore();
       Object.assign(b.e, { tick: () => Effect.succeed(QUIET) });
     }
@@ -1276,11 +1273,8 @@ test('a record that does not read as a run stops no other run: the pass files th
   const run = await started('a run beside a broken one', at(1));
   const broken = path.join(RUNS, 'r-broken.json');
   fs.writeFileSync(broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
-  const errs: string[] = [];
-  const err = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
-    errs.push(String(chunk));
-    return true;
-  });
+  const err = vi.spyOn(process.stderr, 'write');
+  const errs = () => err.mock.calls.flatMap(([chunk]) => [String(chunk)]);
   try {
     const ticked = await printedBy(t, ['tick']);
     assert.deepEqual(b.filings, [`${run.id}-implement`]);
@@ -1295,8 +1289,8 @@ test('a record that does not read as a run stops no other run: the pass files th
     err.mockRestore();
     fs.rmSync(broken);
   }
-  const leftOut = errs.filter((l) => l.startsWith('left out: run r-broken: its record, '));
-  assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs.join('')}`);
+  const leftOut = errs().filter((l) => l.startsWith('left out: run r-broken: its record, '));
+  assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs().join('')}`);
   assert.ok(leftOut[0].includes('does not read as a run: its `workspace` is missing'), leftOut[0]);
 });
 

@@ -103,9 +103,11 @@ async function holdFix(
   const start = (route: Route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     sent.push(route.request().postDataJSON());
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a start answered: no harness runs in the e2e's store
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(made('pending', '')) });
   };
   const output = (route: Route) =>
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- its output answered: no harness runs in the e2e's store
     route.fulfill({
       status: 200,
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
@@ -198,6 +200,7 @@ async function raisesBanner(page: Page) {
   let planted: keyof typeof PLANTED_READS = 'waits';
   const answer = (route: Route) =>
     route.request().method() === 'GET'
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
       : route.fallback();
   await page.route(READINESS_ROUTE, answer);

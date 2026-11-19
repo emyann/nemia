@@ -62,7 +62,7 @@ const handedTo = async (...argv: string[]) => {
  * is proposed only where a template is a folder on the machine, so its handler refuses it from anywhere else.
  */
 const resolvedBy = async (t: TestContext, ...argv: string[]) => {
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(['factory', 'resolve', ...argv]);
   } finally {

@@ -376,6 +376,7 @@ test("an answer's turn that was LOST settles its task failed, and a `nemia retry
   h.sessions.delete(h.turn);
   const read = process.hrtime.bigint.bind(process.hrtime);
   vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 10 * 60_000 });
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- steps the monotonic clock, which no seam gives
   const later = vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => read() + 10n * 60_000_000_000n);
   try {
     await h.pass(h.run.id);

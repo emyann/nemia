@@ -54,6 +54,7 @@ const framed = (rows: number) => `<!doctype html><body style="margin:0;backgroun
 /** A 1280 × 800 page showing `framed(rows)`, scrolled down `scrollY` pixels. */
 async function framedPage(rows: number, scrollY = 0) {
   const page = await (await browser.newContext({ viewport: WINDOW })).newPage();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the runner's check needs a page, not a board
   await page.route('http://e2e.test/**', (route) => route.fulfill({ contentType: 'text/html', body: framed(rows) }));
   await page.goto('http://e2e.test/');
   await page.evaluate((y) => scrollTo(0, y), scrollY);

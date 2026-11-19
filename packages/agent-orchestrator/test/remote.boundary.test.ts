@@ -18,7 +18,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`. Each row leaves a step held at work on its agent, so the
  * file sets `WF_MAX_CONCURRENT` on it itself, since a check the run executes inherits the daemon's ceiling.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { beforeAll, describe, test, type TestContext, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -63,14 +63,16 @@ const declare = (agents: Record<string, { url: string }>) =>
 async function said(run: () => Promise<unknown>) {
   const out: string[] = [];
   const err: string[] = [];
-  const { log, error } = console;
-  console.log = (...args: unknown[]) => void out.push(args.join(' '));
-  console.error = (...args: unknown[]) => void err.push(args.join(' '));
+  const log = vi.spyOn(console, 'log');
+  const error = vi.spyOn(console, 'error');
   let answered: unknown;
   try {
     answered = await run();
   } finally {
-    Object.assign(console, { log, error });
+    out.push(...log.mock.calls.map((args) => args.join(' ')));
+    err.push(...error.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
+    error.mockRestore();
   }
   return { answered, out: out.join('\n').split('\n'), err: err.join('\n') } satisfies { answered: unknown; out: string[]; err: string };
 }

@@ -3,7 +3,7 @@
  * both declarers, and no run is written. The test's store is its own, at `ROOT`, handed to `main` as `ENV`, and a start
  * outside a factory is allowed, with no daemon started, whether or not the test setup's preload ran.
  */
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,9 +51,8 @@ const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSy
 test('REFUSED: nemia start of a step declaring a field its agent declares exits 2, naming the field and both declarers, and writes no run', async () => {
   const dir = twice();
   const runs = runsWritten();
-  const { error } = console;
+  const error = vi.spyOn(console, 'error');
   const cwd = process.cwd();
-  console.error = () => undefined;
   process.chdir(ROOT);
   try {
     await assert.rejects(
@@ -72,7 +71,7 @@ test('REFUSED: nemia start of a step declaring a field its agent declares exits 
     );
   } finally {
     process.chdir(cwd);
-    console.error = error;
+    error.mockRestore();
   }
   assert.equal(runsWritten(), runs, 'no run was written');
 });

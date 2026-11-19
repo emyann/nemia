@@ -25,12 +25,14 @@ const drawn = (text: string, title = `When it was filed: ${instantWhole(new Date
 async function atClock(iso: string, body: () => Promise<void>) {
   const real = globalThis.Date;
   const fixed = new real(iso).getTime();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the clock: a fixed now put on Date, then taken back
   globalThis.Date = new Proxy(real, {
     construct: (target, args) => (args.length === 0 ? new target(fixed) : Reflect.construct(target, args)),
   });
   try {
     await body();
   } finally {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the clock: a fixed now put on Date, then taken back
     globalThis.Date = real;
   }
 }

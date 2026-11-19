@@ -12,7 +12,7 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -130,17 +130,15 @@ function filed(name: string, ...repos: string[]) {
 async function typedFrom(cwd: string, argv: string[]) {
   if (argv[0] === 'start') throw new Error('a start answers its facts, not lines: call startTypedFrom');
   const lines: string[] = [];
-  const log = console.log;
+  const log = vi.spyOn(console, 'log');
   const was = process.cwd();
-  console.log = (...args: unknown[]) => {
-    lines.push(args.join(' '));
-  };
   process.chdir(cwd);
   try {
     await stage.main(argv);
   } finally {
     process.chdir(was);
-    console.log = log;
+    lines.push(...log.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
   }
   return lines.join('\n').split('\n');
 }

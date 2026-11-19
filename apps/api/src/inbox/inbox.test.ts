@@ -418,7 +418,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   execFileSync('git', ['init', '-q'], { cwd: odd });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
   fs.symlinkSync('.worktreeinclude', path.join(odd, '.worktreeinclude'));
-  const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const said = vi.spyOn(console, 'error');
   const factory = onFolder(odd);
   t.onTestFinished(() => {
     removeFactory(factory);

@@ -332,9 +332,12 @@ describe('edgeLine, edgeStroke and loopPath: how an edge is drawn', () => {
 
 function stubStorage(t: { onTestFinished: (fn: () => void) => void }, storage: object) {
   const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
   Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true, writable: true });
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     if (before) Object.defineProperty(globalThis, 'localStorage', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     else Reflect.deleteProperty(globalThis, 'localStorage');
   });
 }

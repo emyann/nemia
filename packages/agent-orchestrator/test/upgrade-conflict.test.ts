@@ -81,10 +81,11 @@ const rewrite = (folder: string, file: string, from: string, to: string) => {
 /** What `argv` printed, as `nemia` prints it, line by line. */
 async function printedBy(t: TestContext, ...argv: string[]) {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
+    printed.push(...log.mock.calls.flatMap((words) => [words.join(' ')]));
     log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));
@@ -508,7 +509,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
   s.test('from a session of another factory, refused Forbidden: no proposal, and the choice stays a draft', async (t) => {
     await scripted(t, 'theirs');
     const token = await liveToken('elsewhere', 'elsewhere-session');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     await assert.rejects(
       resolveIn(token, 'theirs', SCRIPT_LINE, '--theirs'),
       (err: Error & { _tag?: string; reason?: string; exitCode?: number }) =>
@@ -520,7 +521,7 @@ describe("a workflow's resolution made from a session: its agent's in its own fa
   });
   s.test("from a live session of the factory, the proposal is its agent's", async () => {
     const token = await liveToken('theirs', 'theirs-session');
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'log');
     await resolveIn(token, 'theirs', SCRIPT_LINE, '--theirs');
     const made = recordedFor('theirs', 'Workflow/dev') ?? '';
     assert.deepEqual(proposalIn('theirs', made).status.proposedBy, { agent: 'implementer' });

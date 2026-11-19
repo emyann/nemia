@@ -68,7 +68,7 @@ const holdsAny = (object: unknown, ...keys: string[]) => keys.some((key) => Obje
 
 /** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
 const listed = async () => {
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const error = vi.spyOn(console, 'error');
   try {
     return (await stage.main(['ls'])) as RunsListed;
   } finally {

@@ -119,7 +119,7 @@ describe("runViewOf: the one view of a run off its object — its factory from i
   });
 });
 
-test('every run is the plain RunList whole, a label selector going with it, each run it could not judge a row in name order', async (t) => {
+test('every run is the plain RunList whole, a label selector going with it, each run it could not judge a row in name order', async () => {
   const asked: string[] = [];
   apiAnswers(async (input) => {
     asked.push(String(input));
@@ -142,7 +142,7 @@ test('every run is the plain RunList whole, a label selector going with it, each
   );
 });
 
-test("the frame is the RunList of the runs not finished, split by each run's state, with the list's counts and asOf", async (t) => {
+test("the frame is the RunList of the runs not finished, split by each run's state, with the list's counts and asOf", async () => {
   const asked: string[] = [];
   const clock = { wallMs: 5, sessionsMs: 1, checksMs: 1, personMs: 1, slotMs: 1, restMs: 1 };
   const stepCosts = [

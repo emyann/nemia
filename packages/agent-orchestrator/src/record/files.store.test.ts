@@ -67,14 +67,11 @@ describe('`runs.find`: one run by id, among the ids the store lists, never by a 
     assert.match(said[0], /^left out: run r-bad: its record, .*is not JSON/);
     assert.match(said[0], /Only the tick writes a record/);
 
-    const wrote: string[] = [];
-    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => {
-      wrote.push(line);
-      return true;
-    }) as never);
+    const wroteSpy = vi.spyOn(process.stderr, 'write');
+    const wrote = () => wroteSpy.mock.calls.flatMap(([line]) => [String(line)]);
     assert.equal(files.runs.find('r-bad'), undefined);
     assert.equal(files.runs.find('r-bad'), undefined);
-    assert.equal(wrote.length, 1, `said once a process, not ${wrote.length} times`);
+    assert.equal(wrote().length, 1, `said once a process, not ${wrote().length} times`);
   });
 });
 

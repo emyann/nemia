@@ -55,8 +55,8 @@ const DRAFTS = scratch('wf-writers-cli-drafts-');
 /** What this CLI's `main` printed on stdout for `nemia <argv>`, or the words it was refused with, its kind (`_tag`) and its exit code. */
 async function said(t: TestContext, ...argv: string[]) {
   const out: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void out.push(args.join(' ')));
-  const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const log = vi.spyOn(console, 'log');
+  const err = vi.spyOn(console, 'error');
   try {
     await main(argv, engineOf(engine().layer), undefined, undefined, ENV);
     return { out: out.join('\n') } satisfies { out: string; refused?: string; tag?: string; exitCode?: number };
@@ -69,6 +69,7 @@ async function said(t: TestContext, ...argv: string[]) {
       exitCode?: number;
     };
   } finally {
+    out.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
     err.mockRestore();
   }
@@ -572,6 +573,7 @@ describe("a command the client holds is no name of this CLI's: typed here, it pr
       const held = entry(name) as unknown as { handler: (args: Args) => never } | undefined;
       const handler =
         held &&
+        // oxlint-disable-next-line landmines-testing/no-test-doubles -- a handler reached throws, writing nothing
         vi.spyOn(held, 'handler').mockImplementation((args: Args) => {
           handed.push(args);
           throw new Error('handed');

@@ -139,14 +139,14 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       assert.deepEqual(days(ROOT, 'minute'), ['2026-10-04', '2026-10-05']);
       fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
       appendLines(ROOT, 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
-      const said: string[] = [];
-      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
+      const saidSpy = vi.spyOn(process.stderr, 'write');
+      const said = () => saidSpy.mock.calls.flatMap(([text]) => [String(text)]);
       assert.deepEqual(
         readDay(ROOT, 'minute', '2026-10-05').map((x) => x.sum),
         [2, 3],
       );
-      assert.equal(said.length, 1, said.join(''));
-      assert.ok(said[0].startsWith(`${dayFile(ROOT, 'minute', '2026-10-05')}: 2 `), said[0]);
+      assert.equal(said().length, 1, said().join(''));
+      assert.ok(said()[0].startsWith(`${dayFile(ROOT, 'minute', '2026-10-05')}: 2 `), said()[0]);
     },
   },
   {
@@ -164,8 +164,8 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
           stored(5, { part: 'runs', kind: 'records' }),
         ].join(''),
       );
-      const said: string[] = [];
-      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
+      const saidSpy = vi.spyOn(process.stderr, 'write');
+      const said = () => saidSpy.mock.calls.flatMap(([text]) => [String(text)]);
       assert.deepEqual(
         readDay(ROOT, 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
         [
@@ -173,7 +173,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
           [5, { part: 'runs', kind: 'records' }],
         ],
       );
-      assert.equal(said.length, 1, 'the three lines of no set are said once, with their file');
+      assert.equal(said().length, 1, 'the three lines of no set are said once, with their file');
     },
   },
   { name: 'no file, no lines', check: () => assert.deepEqual(readDay(ROOT, 'minute', '2026-01-01'), []) },

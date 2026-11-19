@@ -161,13 +161,14 @@ const aFinished = async (
 const typed = async (e: Engine, ...argv: string[]) => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e, effect), ROOT, argv);
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv, e);
     return { printed, forgot: [], error: undefined } satisfies Typed;
   } catch (err) {
     return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } } satisfies Typed;
   } finally {
+    printed.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
     log.mockRestore();
   }
 };
@@ -441,6 +442,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
       aShot(run.id);
       const rm = fs.rmSync;
       let seen: unknown;
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- reads the mark as the files go: no seam shows it
       const mocked = vi.spyOn(fs, 'rmSync').mockImplementation((at: fs.PathLike, opts?: fs.RmOptions) => {
         if (String(at).endsWith(path.join(run.id, 'artifacts')))
           seen = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.pruned`), 'utf8'));

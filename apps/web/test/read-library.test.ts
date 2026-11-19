@@ -58,7 +58,7 @@ const without = <T extends object>(value: T, ...keys: string[]) =>
   Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
 
 describe("a step's page and a list of workflows are read in the place named, under a key of that place", () => {
-  test("a step's page is read in the place named, keyed by it, with what a run of it will be told, its hires and its recent runs", async (t) => {
+  test("a step's page is read in the place named, keyed by it, with what a run of it will be told, its hires and its recent runs", async () => {
     const asked: string[] = [];
     const page = stepPage({
       factory: 'f',

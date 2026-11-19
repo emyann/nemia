@@ -62,6 +62,7 @@ const urlOf = (input: string | URL | Request) => (input instanceof Request ? inp
  * `fetch`. The test context restores it.
  */
 const stubFetch = (t: TestContext, answer: (url: string, init: RequestInit | undefined) => Response | undefined) =>
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a remote agent's error on cue; the rest is real
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
     const r = answer(urlOf(input), init);
     return r ?? realFetch(input, init);

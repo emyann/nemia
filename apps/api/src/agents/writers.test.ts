@@ -20,7 +20,6 @@ import type { Workflow } from 'objects';
 import { app } from '../app.ts';
 
 type Command = (typeof COMMANDS)[number];
-type Args = Parameters<NonNullable<Command['handler']>>[0];
 
 const STORE = path.join(root, 'workflows');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
@@ -40,14 +39,10 @@ const handlerKeys = (command: Command) =>
 /** The answer to `request`, and the arguments each call of `name`'s handler was handed meanwhile, the handler run as it is. */
 async function watched(t: TestContext, name: string, request: () => Response | Promise<Response>) {
   const command = COMMANDS.find((c) => c.name === name)!;
-  const handler = command.handler.bind(command);
-  const handed: Args[] = [];
-  const watch = vi.spyOn(command, 'handler').mockImplementation((args: Args, kept?: Parameters<typeof handler>[1]) => {
-    handed.push(args);
-    return handler(args, kept);
-  });
+  const watch = vi.spyOn(command, 'handler');
   try {
-    return { res: await request(), handed };
+    const res = await request();
+    return { res, handed: watch.mock.calls.map(([args]) => args) };
   } finally {
     watch.mockRestore();
   }

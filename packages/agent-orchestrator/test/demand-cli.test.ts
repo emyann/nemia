@@ -68,8 +68,8 @@ function hostOf() {
 
 /** `nemia <argv>` over `host`, its lines kept off the test's output and any refusal it ends with swallowed. */
 async function typed(t: TestContext, argv: string[], host: () => DemandHost) {
-  vi.spyOn(console, 'log').mockImplementation(() => undefined);
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.spyOn(console, 'log');
+  vi.spyOn(console, 'error');
   try {
     await main(argv, noEngine(), host, undefined, ENV);
   } catch {

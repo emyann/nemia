@@ -178,15 +178,14 @@ const aStarted = (repo: string, brief: string, workflowDir = oneStep(), more: Pa
 /** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: Finishes, ...argv: string[]) => {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
     return { printed: printed.join('\n'), error: undefined };
   } catch (err) {
     return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
+    printed.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
     log.mockRestore();
   }
 };
@@ -309,6 +308,7 @@ describe('a run held until another lands: said by every screen with why and who,
       'held again with no --why after a lift: no why of the lifted hold survives',
     );
     const nameless = await aStarted(repo, 'held by a user the system cannot name');
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a user the system cannot name, no seam gives
     vi.spyOn(os, 'userInfo').mockImplementation(() => {
       throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
     });
@@ -964,6 +964,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const holdFile = holdFileOf(id);
   const file = b.e.file.bind(b.e);
   let held = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a hold put as the check is filed: a race
   vi.spyOn(b.e, 'file').mockImplementation((spec: Parameters<Engine['file']>[0]) => {
     if (!held && spec.id?.endsWith('-check')) {
       held = true;
@@ -973,6 +974,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   });
   const exists = fs.existsSync;
   let lifted = false;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold lifted as it is read: a race
   vi.spyOn(fs, 'existsSync').mockImplementation((p: fs.PathLike) => {
     const there = exists(p);
     if (p === holdFile && there && !lifted) {
@@ -1028,6 +1030,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const put = { at: '2099-01-01T00:00:00.000Z', until: [other.id] };
   const read = fs.readFileSync;
   let reads = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the hold changed between two reads: a race
   vi.spyOn(fs, 'readFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.readFileSync>) {
     if (args[0] === holdFileOf(run.id) && ++reads === 2) fs.writeFileSync(holdFileOf(run.id), JSON.stringify(put));
     return read.apply(this, args);
@@ -1046,6 +1049,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const race = await aRunning(b, repo);
   const first = { at: '2099-01-02T00:00:00.000Z', until: [other.id] };
   const write = fs.writeFileSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- another hold put first: a race no seam gives
   vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
     if (args[0] === holdFileOf(race.id) && !fs.existsSync(holdFileOf(race.id))) write.call(fs, holdFileOf(race.id), JSON.stringify(first));
     return write.apply(this, args);
@@ -1278,6 +1282,7 @@ test('a defect is no refusal: `hold` and `unhold` die of what the engine or the 
   await stage.runWith(b.e, hold(run.id, [target.id]));
   const denied = Object.assign(new Error(`EACCES: permission denied, unlink '${holdFileOf(run.id)}'`), { code: 'EACCES' });
   const rm = fs.rmSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the removal refused on cue (EACCES)
   vi.spyOn(fs, 'rmSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.rmSync>) {
     if (args[0] === holdFileOf(run.id)) throw denied;
     return rm.apply(this, args);

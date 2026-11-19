@@ -743,6 +743,7 @@ test('a card gone between its start and the taking off of its `queued:` line is 
   fs.mkdirSync(INBOX, { recursive: true });
   fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
   const write = fs.writeFileSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the card removed as the run is made: a race no seam gives
   vi.spyOn(fs, 'writeFileSync').mockImplementation(function (this: unknown, ...args: Parameters<typeof fs.writeFileSync>) {
     write.apply(this, args);
     const created = typeof args[0] === 'string' && path.dirname(args[0]) === path.join(ROOT, 'runs') && args[0].endsWith('.json');

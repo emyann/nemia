@@ -9,9 +9,12 @@ import { forgetStored, readStored, store } from '../src/lib/stored.ts';
 /** While the test runs, `storage` as the page's `localStorage`. */
 function stubStorage(t: { onTestFinished: (fn: () => void) => void }, storage: object) {
   const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
   Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true, writable: true });
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     if (before) Object.defineProperty(globalThis, 'localStorage', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     else Reflect.deleteProperty(globalThis, 'localStorage');
   });
 }
@@ -58,6 +61,7 @@ describe('stored: what this browser keeps, under one door', () => {
     );
     assert.doesNotThrow(() => store('k', '[]'));
     assert.doesNotThrow(() => forgetStored('k'));
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no localStorage: the browser's global, put and taken back
     Object.defineProperty(globalThis, 'localStorage', { get: refuse, configurable: true });
     assert.deepEqual(
       readStored('k', (raw) => [raw], []),

@@ -197,15 +197,18 @@ describe('follow: the transport and the protocol of a followed conversation, eac
     const window = globalThis as { requestAnimationFrame?: unknown; cancelAnimationFrame?: unknown };
     const [request, cancel] = [window.requestAnimationFrame, window.cancelAnimationFrame];
     const flushes: Array<() => void> = [];
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node draws no frame: each flush is run by the test
     window.requestAnimationFrame = function (this: unknown, flush: () => void) {
       if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
       flushes.push(flush);
       return flushes.length;
     };
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node draws no frame: each flush is run by the test
     window.cancelAnimationFrame = function (this: unknown) {
       if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
     };
     t.onTestFinished(() => {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node draws no frame: each flush is run by the test
       Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel });
     });
 

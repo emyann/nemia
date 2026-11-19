@@ -14,7 +14,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -119,12 +119,12 @@ const started = async (argv: string[]) => factsOf((await stage.main(['start', ..
 /** What `nemia <argv>` prints, a line each. */
 async function typed(argv: string[]) {
   const lines: string[] = [];
-  const log = console.log;
-  console.log = (...args: unknown[]) => lines.push(args.join(' '));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
-    console.log = log;
+    lines.push(...log.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
   }
   return lines;
 }

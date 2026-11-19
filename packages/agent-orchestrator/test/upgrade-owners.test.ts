@@ -60,10 +60,11 @@ const written = (folder: string, file: string, text: string) => {
 /** What `argv` printed, line by line. */
 async function printedBy(t: TestContext, ...argv: string[]) {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
+    printed.push(...log.mock.calls.flatMap((words) => [words.join(' ')]));
     log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));

@@ -22,15 +22,19 @@ function answer(hook: () => boolean) {
 function withMedia(t: { onTestFinished: (fn: () => void) => void }, matches: ((query: string) => boolean) | undefined) {
   const asked: string[] = [];
   const before = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
   if (matches === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');
   else
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     Object.defineProperty(globalThis, 'matchMedia', {
       value: (media: string) => (asked.push(media), { media, matches: matches(media), addEventListener() {}, removeEventListener() {} }),
       configurable: true,
       writable: true,
     });
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     if (before) Object.defineProperty(globalThis, 'matchMedia', before);
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no matchMedia: the browser's global, put and taken back
     else Reflect.deleteProperty(globalThis, 'matchMedia');
   });
   return asked;

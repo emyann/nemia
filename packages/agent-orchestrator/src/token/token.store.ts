@@ -98,12 +98,6 @@ export function readToken(home: string, token: string): TokenFiled | null {
   return Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(TokenFiledSchema))(text));
 }
 
-/**
- * What the store keeps of a standing token, found by its digest: the name the person gave it, when it was minted (an ISO date), and who
- * holds it (`holder`: absent, minted before holders were said, is the person).
- */
-export type PersonTokenFiled = { readonly name: string; readonly createdAt: string; readonly holder?: TokenHolder };
-
 /** The holder of an agent's token as its record keeps it. */
 const AgentHolderSchema = Schema.Struct({
   kind: Schema.Literal('agent'),
@@ -112,11 +106,16 @@ const AgentHolderSchema = Schema.Struct({
   narrowed: Schema.NullOr(Schema.Literals(['read', 'act'])),
 });
 
+/**
+ * What the store keeps of a standing token, found by its digest: the name the person gave it, when it was minted (an ISO date), and who
+ * holds it (`holder`: absent, minted before holders were said, is the person).
+ */
 const PersonTokenFiledSchema = Schema.Struct({
   name: Schema.String,
   createdAt: Schema.String,
   holder: Schema.optionalKey(Schema.Union([Schema.Struct({ kind: Schema.Literal('person') }), AgentHolderSchema])),
 });
+export type PersonTokenFiled = typeof PersonTokenFiledSchema.Type;
 
 /** The person, as a token's holder. */
 const PERSON_HOLDER: TokenHolder = { kind: 'person' };
@@ -145,9 +144,7 @@ const PERSON_TOKEN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
 /** The record a file of a person's token holds, or null where it does not read as one, which vouches for no one. */
 function personRecordOf(text: string): PersonTokenFiled | null {
   const read = Schema.decodeUnknownResult(Schema.fromJsonString(PersonTokenFiledSchema))(text);
-  if (!Result.isSuccess(read)) return null;
-  const { name, createdAt, holder } = read.success;
-  return holder === undefined ? { name, createdAt } : { name, createdAt, holder };
+  return Result.isSuccess(read) ? read.success : null;
 }
 
 /** Every record of a person's token under the store `home`, with the file it is kept in; none where the folder is not there. */

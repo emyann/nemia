@@ -36,7 +36,8 @@ export const JOB_HOLD_POLL_MS = 250;
 export const inside = (input: unknown): boolean => typeof (input as { agent_id?: unknown }).agent_id === 'string';
 
 /** A call in flight: the tool it calls, and since when (ISO). */
-export type Call = { tool: string; since: string };
+const CallSchema = Schema.Struct({ tool: Schema.String, since: Schema.String });
+export type Call = typeof CallSchema.Type;
 
 /** A session's calls in flight, by the call's id, as its hooks keep them. */
 export type CallsInFlight = Map<string, Call>;
@@ -57,8 +58,6 @@ export const callStarted = (calls: CallsInFlight, id: string | undefined, input:
   const tool = (input as { tool_name?: unknown }).tool_name;
   if (id) calls.set(id, { tool: typeof tool === 'string' ? tool : 'a tool', since: new Date().toISOString() });
 };
-
-const CallSchema = Schema.Struct({ tool: Schema.String, since: Schema.String });
 
 const JobHoldSchema = Schema.Struct({
   calling: Schema.optional(CallSchema),

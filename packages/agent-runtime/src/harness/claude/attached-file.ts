@@ -145,6 +145,10 @@ export const filesOf = (root: string, name: string) => {
  * reached it. Appended by the session's holder alone, and read by any process, which composes the two on read (`openAsks`). A
  * permission's line says `kind: 'permission'` and carries its facts; a line with no `kind` is a question, as every line was before
  * a permission was held.
+ *
+ * The writer's type (`appendAsk`), kept by hand on purpose: a writer hands a permission's facts typed (`PermissionFacts`), where the
+ * reader keeps them unknown and decodes them apart (`askOf`), so that a line whose facts do not decode is unread alone. What a reader
+ * holds is `AskLineRead`, the schema's own.
  */
 export type AskLine = {
   id: string;
@@ -172,21 +176,20 @@ const PermissionFactsSchema = Schema.Struct({
 const decodePermission = Schema.decodeUnknownOption(PermissionFactsSchema);
 
 /** The ask an opening line says: a question, or a permission whose facts decode; nothing where they do not, which is unread. */
-const askOf = (l: AskLine & { questions: AskQuestion[] }): SessionAsk[] => {
+const askOf = (l: AskLineRead & { questions: AskQuestion[] }): SessionAsk[] => {
   if (l.kind === undefined) return [{ id: l.id, at: l.at, kind: 'question', questions: l.questions }];
   if (l.kind !== 'permission') return [];
   const facts = decodePermission(l.permission);
   return facts._tag === 'Some' ? [{ id: l.id, at: l.at, kind: 'permission', questions: l.questions, permission: facts.value }] : [];
 };
 
-/** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
-type AnswerLine = { id: string; at: string; answers: Record<string, string> };
-
 /** A question as an asks file holds it (`AskQuestion`). */
 const AskQuestionSchema = Schema.Struct({
   question: Schema.String,
   header: Schema.String,
-  options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String, preview: Schema.optional(Schema.String) })),
+  options: Schema.mutable(
+    Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String, preview: Schema.optionalKey(Schema.String) })),
+  ),
   multiSelect: Schema.Boolean,
 });
 
@@ -194,15 +197,19 @@ const AskQuestionSchema = Schema.Struct({
 const AskLineSchema = Schema.Struct({
   id: Schema.String,
   at: Schema.String,
-  questions: Schema.optional(Schema.Array(AskQuestionSchema)),
-  kind: Schema.optional(Schema.Literal('permission')),
-  permission: Schema.optional(Schema.Unknown),
-  closed: Schema.optional(Schema.String),
-  how: Schema.optional(Schema.Literals(['taken', 'cut'])),
+  questions: Schema.optionalKey(Schema.mutable(Schema.Array(AskQuestionSchema))),
+  kind: Schema.optionalKey(Schema.Literal('permission')),
+  permission: Schema.optionalKey(Schema.Unknown),
+  closed: Schema.optionalKey(Schema.String),
+  how: Schema.optionalKey(Schema.Literals(['taken', 'cut'])),
 });
 
-/** A line of an answers file (`AnswerLine`). */
+/** A line of an asks file as a reader holds it: its permission's facts unknown until `askOf` decodes them. */
+type AskLineRead = typeof AskLineSchema.Type;
+
+/** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
 const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, answers: Schema.Record(Schema.String, Schema.String) });
+type AnswerLine = typeof AnswerLineSchema.Type;
 
 /** The lines of a JSONL file read through a schema, and how many it left unread: lines that do not parse, or do not decode. */
 type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
@@ -239,13 +246,7 @@ const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> 
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> => {
-  const read = jsonLines(filesOf(root, name).asks, AskLineSchema);
-  return {
-    lines: read.lines.map((l) => ({ ...l, ...(l.questions ? { questions: [...l.questions] } : {}) }) as AskLine),
-    unread: read.unread,
-  };
-};
+export const askLinesOf = (root: string, name: string): DecodedLines<AskLineRead> => jsonLines(filesOf(root, name).asks, AskLineSchema);
 
 /** Appends `line` to `file`, its folder made first. */
 const append = (file: string, line: unknown): void => {

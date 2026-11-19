@@ -11,20 +11,7 @@ import { Option, Result, Schema } from 'effect';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { StandingSchema } from '../place/place.store.ts';
-import type { Standing } from '../place/place.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
-
-/**
- * One repository, place and base branch as a pass read where its branches stand: the place's answer, or why there is none — the place
- * refused or was not heard — in words, and when it was read.
- */
-export type StoodRead = { readonly repo: string; readonly base: string; readonly at: string } & (
-  | { readonly answer: Standing }
-  | { readonly unread: string }
-);
-
-/** `standing.json` as the tick writes it: its version, when the pass read it, and each repository, place and base branch it read. */
-export type StandingFile = { readonly v: 1; readonly at: string; readonly places: readonly StoodRead[] };
 
 /**
  * `$WF_ROOT/standing.json`, where the tick keeps what its last pass read of where the branches stand.
@@ -36,16 +23,30 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 const Where = { repo: Schema.String, base: Schema.String, at: Schema.String };
 
-const StoodReadSchema = Schema.Union([
-  Schema.StructWithRest(Schema.Struct({ ...Where, answer: StandingSchema }), Rest),
-  Schema.StructWithRest(Schema.Struct({ ...Where, unread: Schema.String }), Rest),
-]);
+/** A repository, place and base branch the place answered for. */
+const StoodAnswer = Schema.Struct({ ...Where, answer: StandingSchema });
+
+/** A repository, place and base branch the place was not read on, and why. */
+const StoodUnread = Schema.Struct({ ...Where, unread: Schema.String });
+
+/**
+ * One repository, place and base branch as a pass read where its branches stand: the place's answer, or why there is none — the place
+ * refused or was not heard — in words, and when it was read.
+ * Taken from the two members' own Structs, not from `StoodReadSchema`, whose rest keys would give it an index signature that undoes the
+ * `'answer' in` narrowing its readers do.
+ */
+export type StoodRead = typeof StoodAnswer.Type | typeof StoodUnread.Type;
+
+const StoodReadSchema = Schema.Union([Schema.StructWithRest(StoodAnswer, Rest), Schema.StructWithRest(StoodUnread, Rest)]);
+
+/** `standing.json` as the tick writes it: its version, when the pass read it, and each repository, place and base branch it read. */
+const StandingFileFields = Schema.Struct({ v: Schema.Literal(1), at: Schema.String, places: Schema.Array(StoodReadSchema) });
+
+/** `standing.json` as the tick writes it, its keys alone: a newer tick's rest left out of the type, as `StoodRead`'s is. */
+export type StandingFile = Omit<typeof StandingFileFields.Type, 'places'> & { readonly places: readonly StoodRead[] };
 
 /** `standing.json`, decoded: a newer tick's keys kept where it wrote any. */
-export const StandingFileSchema = Schema.StructWithRest(
-  Schema.Struct({ v: Schema.Literal(1), at: Schema.String, places: Schema.Array(StoodReadSchema) }),
-  Rest,
-);
+export const StandingFileSchema = Schema.StructWithRest(StandingFileFields, Rest);
 
 /** What to do about a `standing.json` that does not read. */
 const REWRITTEN =

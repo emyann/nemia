@@ -875,12 +875,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/core/event-schema.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
         "complexity": ["error", { "max": 28 }],

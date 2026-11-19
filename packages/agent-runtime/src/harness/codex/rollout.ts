@@ -11,7 +11,7 @@
 import { Predicate, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 
-const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
+const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)), { expected: 'a date and time' }));
 
 /** A content block's text: a string, or a block whose `text` is read. */
 const Text = Schema.Union([Schema.String, Schema.Struct({ text: Schema.optional(Schema.String) })]);
@@ -59,7 +59,7 @@ export const Items = Schema.Union([
 
 /** An item whose `type` is none the runtime reads: only its `type` and `id` are checked. */
 const OtherItem = Schema.Struct({
-  type: Schema.optional(noneOf(Items, (t) => `Expected the fields of a ${t} item`)),
+  type: Schema.optional(noneOf(Items, (t) => `the fields of a ${t} item`)),
   id: Schema.optional(Schema.String),
 });
 

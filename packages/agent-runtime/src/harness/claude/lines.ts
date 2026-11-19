@@ -12,11 +12,11 @@ import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Count = Schema.Natural;
 
-const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
+const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)), { expected: 'a date and time' }));
 
 /** A block whose `type` is none of `known`'s: only its `type` is checked. */
 const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
-  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
+  Schema.Struct({ type: noneOf(known, (t) => `the fields of a ${t} block`) });
 
 const TextBlock = Schema.Struct({ type: Schema.Literal('text'), text: Schema.optional(Schema.String) });
 

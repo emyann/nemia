@@ -1,7 +1,7 @@
 /**
  * Where a schema refused a value, read off Effect's own issue tree by each issue's `_tag`, never off the English its formatter
  * writes: the formatter's leaf and check hooks never see a union with no member that matches, which is every optional field and every
- * union of literals. The walk is Effect's `toDefaultIssues` (`effect/src/SchemaIssue.ts`) again, its places listed rather than said.
+ * union of literals. The walk is the one Effect's formatter takes (effect/src/SchemaIssue.ts), its places listed rather than said.
  * The rejected value is the one Effect kept on the issue, decoded with `{ reportInput: true }`; the expected type and a check's message
  * are Effect's own words (`SchemaIssue.defaultLeafHook`, `SchemaIssue.defaultCheckHook`), a union's `undefined` member left out.
  *

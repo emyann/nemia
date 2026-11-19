@@ -12,7 +12,7 @@
  * a journal holds what a door let through when it was written, a former argument included (`FORMER_ARGS`), which `upgrade`
  * moves.
  */
-import { Result, Schema } from 'effect';
+import { Result, Schema, SchemaIssue } from 'effect';
 import { quote } from './quote.ts';
 import { refusedIn, type RefusedPlace } from './refused.ts';
 
@@ -299,10 +299,16 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
  * Spread `known`'s members beside the catch-all (`Schema.Union([...known.members, catchAll])`): a union nested in another refuses a
  * value as a whole, never by the field of it that is wrong.
  * @param known The tagged union (`Schema.toTaggedUnion`) whose tags the catch-all must not take.
- * @param refused The words that refuse a value whose tag `tag` is one of `known`'s.
+ * @param refused What a value whose tag `tag` is one of `known`'s was expected to hold, in its holder's words (`the fields of a text
+ * block`): the refusal's `expected`, said after the holder.
  */
 export const noneOf = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }, refused: (tag: string) => string) =>
-  Schema.String.check(Schema.makeFilter((tag: string) => !known.discriminants.includes(tag) || refused(tag)));
+  Schema.String.check(
+    Schema.makeFilter(
+      (tag: string, _ast, options) =>
+        !known.discriminants.includes(tag) || new SchemaIssue.InvalidValue({ expected: refused(tag) }, tag, options),
+    ),
+  );
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
 const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');

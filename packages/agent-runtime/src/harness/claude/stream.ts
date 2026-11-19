@@ -32,7 +32,7 @@ const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
 /** A block whose `type` is none of `known`'s: only its `type` is checked. */
 const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
-  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
+  Schema.Struct({ type: noneOf(known, (t) => `the fields of a ${t} block`) });
 
 /** Every key of `T`, of each of its members when it is a union. */
 type KeyOfAny<T> = T extends unknown ? keyof T : never;

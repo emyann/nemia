@@ -1,5 +1,3 @@
-
-
 /** A colour a meaning is drawn in: the meaning itself, or one of rest's two tints. */
 export type Hue = 'yours' | 'alive' | 'money' | 'failure' | 'grey' | 'sage';
 

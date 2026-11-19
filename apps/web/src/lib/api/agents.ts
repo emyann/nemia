@@ -4,7 +4,15 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import { AgentInstructions as AgentInstructionsAnswer, AgentInstructionsCleared as AgentInstructionsClearedAnswer, DEFAULT_NAMESPACE, type Agent, type AgentInstructions, type AgentSpec, type DefinitionOrigin } from 'objects';
+import {
+  AgentInstructions as AgentInstructionsAnswer,
+  AgentInstructionsCleared as AgentInstructionsClearedAnswer,
+  DEFAULT_NAMESPACE,
+  type Agent,
+  type AgentInstructions,
+  type AgentSpec,
+  type DefinitionOrigin,
+} from 'objects';
 import { agents as served, call, read, write, type Refuse } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';

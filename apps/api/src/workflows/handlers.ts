@@ -5,15 +5,16 @@
  *
  * Each folder is read where it is (`heldIn`, no folder loaded), the one served of each name chosen by `definitionServed` (served.ts), and
  * only those served are loaded, as a start on the repository loads them (`loadedOf`, with the factory's hires), into the object
- * (`workflowObject`): its spec the steps as their files write them, its status the steps resolved, the typed graph (`typedGraphOf`), and
+ * (`workflowObject`): its spec the folder as its files hold it (`workflowSpecAt`), its status what the store works out of it — the
+ * description, the README's needs and its instruction, the steps resolved in graph order, the typed graph (`typedGraphOf`), and
  * the ledger's number for what the folder holds now (`definitionRevision`), which a run started on it pins.
  *
  * The store's library, in no namespace (`/api/workflows`): the person's workflows beside the builtins, each with the factories that attach
  * it. Writes are the person's, at the library alone (`writeGoes`), a write sent to a namespace refused naming its way: made with its steps
  * (the builder's `write`, builder.ts), written whole at the `metadata.resourceVersion` it was read at, its `spec.files` — served as the
- * folder's other text files, left out where it has none — the whole set of them where given, so one it leaves out is removed; its
- * `spec.needs` — served apart from the README, read off its frontmatter — written back into that frontmatter where given, and kept as the
- * README has them where left out (`workflowSpecReadme`, which a proposal's apply writes by too); — a stale one is a 409 — and removed at
+ * folder's other text files — the whole set of them where given, so one it leaves out is removed; its `spec.readme` written as given
+ * where it opens with a frontmatter of its own, and under the README's own frontmatter where it is the instruction alone
+ * (`workflowSpecReadme`, which a proposal's apply writes by too); — a stale one is a 409 — and removed at
  * the `?resourceVersion=` it was read at (`workflows rm`), unless a factory attaches it. The builder's refusal of a step is an `Invalid`
  * naming the steps (`steps`).
  *
@@ -21,7 +22,7 @@
  * name (from `?origin=`, where one is asked); and the builder's form (`keys`), in no namespace, is read from the library's agents.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Result, Schema } from 'effect';
 import {
   definitionRevision,
   factoryDraftIn,
@@ -33,23 +34,24 @@ import {
   workflowDraftOfFiles,
   workflowStale,
   workflowNeeds,
+  workflowSpecAt,
+  workflowSpecOf,
   workflowSpecReadme,
   workflowVersion,
   type FolderLoaded,
-  type WorkflowFilesRead,
 } from 'agent-orchestrator';
+import { WorkflowError } from 'agent-orchestrator/workflow';
 import {
   Api,
   API_VERSION,
   Conflict,
   Invalid,
   Missing,
-  type Need,
   type DefinitionFiles,
   type Workflow,
   type WorkflowCreate,
   type WorkflowFile,
-  type WorkflowSpec,
+  WorkflowSpec,
   type WorkflowStep,
   type WorkflowWrite,
 } from 'objects';
@@ -58,11 +60,10 @@ import { repoLayer } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
-import { draftOf, isRoleKey, keyForm, schemasOf, write, yourAgentsRead, type StepBody } from './builder.ts';
+import { draftOf, keyForm, schemasOf, write, yourAgentsRead, type StepBody } from './builder.ts';
 import { workflowNameRefusal } from './words.ts';
 import {
   listed as listingOf,
-  listedStep,
   loadedAt,
   loadedOf,
   placesOf,
@@ -134,14 +135,6 @@ export const heldIn = (s: Served): Held<Folder>[] => {
   ];
 };
 
-/** A key set: not null, not left out, not an empty list. */
-/** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
-const LISTS_OF_NONE: readonly string[] = ['tools', 'routes', 'when', 'ends'];
-
-/** Whether a file writes `key`'s line: a value set, an empty list only where unset is null. */
-const isSet = (key: string, value: unknown): boolean =>
-  value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0 && !LISTS_OF_NONE.includes(key));
-
 /** The spec of a step in the object's words: `workspace: main`, the former spelling, said `base`. */
 const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
   const { shape: _shape, ...keys } = spec as ListedStep['spec'] & { shape?: unknown };
@@ -149,38 +142,29 @@ const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
 };
 
 /**
- * A step as its file writes it: for one with an agent, the keys it sets itself and `agent`, and its own note; for one with none, the keys
- * it sets and its body.
+ * The spec of a folder as its files hold it (`workflowSpecAt`, the orchestrator's one reader of it, which a proposal's stale check reads
+ * too), so a spec read and proposed back changes nothing. No steps where a step's frontmatter does not read (`WorkflowError`, or its YAML
+ * refused), nor where a key holds a value no step's key takes (`WorkflowSpec`), which the loader refuses too: `status.error` says why.
  */
-const writtenStep = (step: ListedStep): WorkflowStep => {
-  const spec = keysOf(step.spec) as Record<string, unknown>;
-  const own = step.own;
-  const keys = Object.fromEntries(
-    Object.entries(spec).filter(
-      ([key, value]) => isSet(key, value) && (own === null || !isRoleKey(key) || own.keys.includes(key as never)),
-    ),
-  );
-  return { name: step.name, keys, body: own ? own.body : step.body };
+const specAt = (dir: string): WorkflowSpec => {
+  let read: unknown;
+  try {
+    read = workflowSpecAt(dir);
+  } catch (err) {
+    if (err instanceof WorkflowError || (err instanceof Error && err.name.startsWith('YAML'))) return { steps: [] };
+    throw err;
+  }
+  const spec = Schema.decodeUnknownResult(WorkflowSpec)(read);
+  return Result.isSuccess(spec) ? spec.success : { ...(read as WorkflowSpec), steps: [] };
 };
 
 /**
- * The spec of a folder read off the files sent (`workflowDraftOfFiles`), in the words a GET of the same folder answers it: each step as
- * its file writes it (`writtenStep` over the listing's `listedStep`, in no factory), its description and README, and its other text
- * files, left out where it has none.
- */
-const specRead = ({ steps, readme, description, files }: WorkflowFilesRead): WorkflowSpec => ({
-  description,
-  readme,
-  steps: steps.map(listedStep(new Map())).map(writtenStep),
-  ...(files.length > 0 && { files: [...files] }),
-});
-
-/**
- * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the request's repository and yours, as a GET
- * of the same folder in yours reads it: its name and its spec, writing nothing. On a request that reads no repository (the default
- * factory with no `?repo=`), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Read for a
- * factory (`?factory=`), as a run of it there reads it (`factoryDraftIn`): each step the factory hires an agent into read as if its file
- * named that agent, and a templated factory's agents looked for in its tree. Refused `Invalid` without a name, and as the reader refuses.
+ * A folder sent as its files (`POST /api/workflows/read`), judged by the package's reader on the request's repository and yours, and
+ * answered as a GET of the same folder answers its spec, as its files hold it (`workflowSpecOf`): its name and its spec, writing nothing.
+ * On a request that reads no repository (the default factory with no `?repo=`), its steps' agents and skills are looked for in yours alone:
+ * a read names no repository it needs. Read for a factory (`?factory=`), as a run of it there reads it (`factoryDraftIn`): each step the
+ * factory hires an agent into read as if its file named that agent, and a templated factory's agents looked for in its tree. Refused
+ * `Invalid` without a name, and as the reader refuses.
  */
 async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
   if (name === undefined)
@@ -192,8 +176,8 @@ async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<
     s.factory === undefined
       ? { places: s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home), fills: undefined }
       : factoryDraftIn(s.home, s.factory, name, s.repo);
-  const read = await s.inRequest(workflowDraftOfFiles(name, files, places, fills));
-  return { metadata: { name }, spec: specRead(read) };
+  await s.inRequest(workflowDraftOfFiles(name, files, places, fills));
+  return { metadata: { name }, spec: workflowSpecOf(files.map((f) => ({ name: f.path, text: f.text }))) };
 }
 
 /** A step the object sends, as the builder takes it: `agent` among its keys makes every key its own, and its body its own note. */
@@ -203,12 +187,6 @@ const stepBodyOf = (step: WorkflowStep): StepBody => ({
   body: step.body,
   own: typeof step.keys.agent === 'string' ? { keys: Object.keys(step.keys), body: step.body } : null,
 });
-
-/** The machine needs the README of the folder `dir` declares in its frontmatter (`workflowNeeds`) as a spec's `needs`, none where none. */
-const needsOf = (dir: string): { needs?: readonly Need[] } => {
-  const needs = workflowNeeds(dir);
-  return needs.length > 0 ? { needs } : {};
-};
 
 /**
  * The object of one folder served: its listing, the loading its graph is drawn from, and its revision; with no namespace and no revision
@@ -230,18 +208,15 @@ const workflowObject = (
     creationTimestamp: writtenAt(listing.dir),
     resourceVersion: listing.version,
   },
-  spec: {
-    description: listing.description,
-    readme: listing.readme,
-    ...needsOf(listing.dir),
-    steps: listing.steps.map(writtenStep),
-    ...(listing.files.length > 0 && { files: listing.files }),
-  },
+  spec: specAt(listing.dir),
   status: {
     origin,
     ...(shadowedBy !== null && { shadowedBy }),
     ...(revision !== undefined && { revision }),
     dir: listing.dir,
+    description: listing.description,
+    needs: workflowNeeds(listing.dir),
+    readmeBody: listing.readme,
     graph: typedGraphOf('error' in loaded ? [] : loaded.steps),
     steps: listing.steps.map((step) => ({ ...step, spec: keysOf(step.spec) })),
     schemas: listing.schemas,

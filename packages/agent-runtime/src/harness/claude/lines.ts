@@ -37,7 +37,7 @@ const ToolUseBlock = Schema.Struct({
 const ToolResultBlock = Schema.Struct({
   type: Schema.Literal('tool_result'),
   tool_use_id: Schema.optional(Schema.String),
-  content: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.Union([ResultTexts, otherThan(ResultTexts)]))])),
+  content: Schema.optional(Schema.Union([Schema.String, Schema.Array(Schema.Union([...ResultTexts.members, otherThan(ResultTexts)]))])),
   is_error: Schema.optional(Schema.Boolean),
 });
 
@@ -50,7 +50,7 @@ export const Blocks = Schema.Union([
   ToolResultBlock,
 ]).pipe(Schema.toTaggedUnion('type'));
 
-const Block = Schema.Union([Blocks, otherThan(Blocks)]);
+const Block = Schema.Union([...Blocks.members, otherThan(Blocks)]);
 
 /** A content block of a conversation line, as `Block` decodes it. */
 export type ContentBlock = typeof Block.Type;
@@ -130,7 +130,7 @@ export const LINES = {
   attachment: Schema.Struct({
     type: Schema.Literal('attachment'),
     ...Said,
-    attachment: Schema.optional(Schema.Union([Attachments, otherThan(Attachments)])),
+    attachment: Schema.optional(Schema.Union([...Attachments.members, otherThan(Attachments)])),
   }),
   'cost-state': Schema.Struct({
     type: Schema.Literal('cost-state'),

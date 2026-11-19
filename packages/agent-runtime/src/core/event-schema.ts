@@ -297,6 +297,8 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
  * The tag of a catch-all member beside a tagged union: a string that is none of `known`'s discriminants, so a value that names one of
  * them is decoded by that member or refused, never taken by the catch-all. Effect has no "string except these" schema, and a union
  * keeps a member with no literal tag as a fallback, so the catch-all keeps this filter; its list is `known`'s own.
+ * Spread `known`'s members beside the catch-all (`Schema.Union([...known.members, catchAll])`): a union nested in another refuses a
+ * value as a whole, never by the field of it that is wrong.
  * @param known The tagged union (`Schema.toTaggedUnion`) whose tags the catch-all must not take.
  * @param refused The words that refuse a value whose tag `tag` is one of `known`'s.
  */

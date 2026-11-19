@@ -9,12 +9,10 @@ import path from 'node:path';
 import { Predicate } from 'effect';
 import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
 import {
-  initLineText,
   initRanIn,
   partialMarksOf,
   printedKindOf,
   printedLinesOf,
-  statusLineText,
   statusRanIn,
   type PrintedKind,
   type PrintedLine,
@@ -23,6 +21,13 @@ import {
 import type { InitKept, InitRead } from '../../../contracts/capture.contract.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
+
+/** A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read. */
+const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
+
+/** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
+const initLineText = ({ ranIn, ...read }: InitRead): string =>
+  JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
 
 /** The lines of `kinds` in `output`, decoded; throws an `Error` whose message is `printedLinesOf`'s `wrong` when one does not decode. */
 const decoded = (output: string, kinds: readonly PrintedKind[]): PrintedLine[] => {

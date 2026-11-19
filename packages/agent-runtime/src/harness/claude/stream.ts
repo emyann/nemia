@@ -25,7 +25,6 @@ import type {
 import { Option, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
-import type { InitRead } from '../../../contracts/capture.contract.ts';
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -101,7 +100,7 @@ const DeltaEvent = reading(
   Schema.Struct({
     type: Schema.Literal('content_block_delta'),
     index: Count,
-    delta: Schema.Union([Deltas, otherThan(Deltas)]),
+    delta: Schema.Union([...Deltas.members, otherThan(Deltas)]),
   }),
 ).of<SdkEventOf<'content_block_delta'>>();
 
@@ -203,7 +202,7 @@ const PRINTED = {
   stream_event: reading(
     Schema.Struct({
       type: Schema.Literal('stream_event'),
-      event: Schema.Union([Events, otherThan(Events)]),
+      event: Schema.Union([...Events.members, otherThan(Events)]),
     }),
   ).of<SDKPartialAssistantMessage>(),
   assistant: reading(
@@ -211,7 +210,7 @@ const PRINTED = {
       type: Schema.Literal('assistant'),
       message: reading(
         Schema.Struct({
-          content: Schema.Union([Schema.String, Schema.Array(Schema.Union([Blocks, otherThan(Blocks)]))]),
+          content: Schema.Union([Schema.String, Schema.Array(Schema.Union([...Blocks.members, otherThan(Blocks)]))]),
         }),
       ).of<SDKAssistantMessage['message']>(),
     }),
@@ -311,16 +310,6 @@ export const initRanIn = (line: Printed<'system init'>): string | undefined => l
  * @param line The decoded `status` line.
  */
 export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
-
-/**
- * A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read.
- * @param ranIn The mode the line named.
- */
-export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
-
-/** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
-export const initLineText = ({ ranIn, ...read }: InitRead): string =>
-  JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
 
 const decodeEvent = Schema.decodeUnknownOption(Events);
 

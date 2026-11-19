@@ -65,7 +65,7 @@ const SdkSchemes = Schema.Union([
 export const SCHEME_KINDS: readonly string[] = SdkSchemes.discriminants;
 
 /** A scheme in the SDK's objects: one of the five kinds with its fields, or a kind none of them is. */
-const SdkSchemeSchema = Schema.Union([SdkSchemes, held({ $case: noneOf(SdkSchemes, (k) => `Expected the fields of ${k}`) })]);
+const SdkSchemeSchema = Schema.Union([...SdkSchemes.members, held({ $case: noneOf(SdkSchemes, (k) => `Expected the fields of ${k}`) })]);
 
 /**
  * A security scheme: in A2A's JSON, one key per kind; in the SDK's objects, `scheme`. An object with neither is a kind this

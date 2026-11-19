@@ -63,7 +63,7 @@ const OtherItem = Schema.Struct({
   id: Schema.optional(Schema.String),
 });
 
-const Item = Schema.Union([Items, OtherItem]);
+const Item = Schema.Union([...Items.members, OtherItem]);
 
 /** A thread item of an `item_completed` record, as `Item` decodes it. */
 export type RolloutItem = typeof Item.Type;

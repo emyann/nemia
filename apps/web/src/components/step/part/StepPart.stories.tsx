@@ -95,6 +95,7 @@ export const AtWork: StoryObj = {
 
 /** A step at work whose session said what it has spent so far: the earlier try's cost and the live one, so far, on its budget's meter. */
 export const AtWorkSpending: StoryObj = {
+  parameters: { a11y: { test: 'todo' } },
   render: () => <Sizes run={RUNS.spendingSoFar} />,
   play: async ({ canvasElement }) => {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step', true);

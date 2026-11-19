@@ -74,7 +74,8 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   (`daemon.json`), read only under this machine's context. No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
-  other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it, spawning the old path's
+  other file imports `node:child_process` but `src/browser.ts`, which runs this machine's browser opener for `nemia open` (`openerOf`,
+  proved by `contracts/opener.contract.ts`). A daemon started on demand (`src/daemon.ts`) starts through it, spawning the old path's
   `daemon --json`, which that CLI keeps for it; `nemia daemon` typed is a read of the client's (`src/reads/daemon.ts`, `GET
   /api/daemon`). `agent-orchestrator` is in `dependencies` for that resolve alone.
 - **The printers are the client's alone**: each moved command prints from the api's decoded answer, its printer typed by the api's

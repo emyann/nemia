@@ -19,19 +19,29 @@
 import { Effect } from 'effect';
 import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
-import { deleteCookie } from 'hono/cookie';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
 import { Forbidden, TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
 import { CLAIM_SEGMENT, LINK_CLAIM_PATH, MCP_PATH, OPEN_METHOD, PAIRINGS_PATH } from './paths.ts';
+import type { Presented } from '../../contracts/cookie-renewal.contract.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
 import { type ApiEnv, type Served, traceOf } from '../layer.ts';
+import { cookieRenewed } from '../server/renewal.ts';
+import { httpsBy, KEPT_SECONDS } from '../server/keeping.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
 export { MCP_PATH } from './paths.ts';
 
-/** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
-export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message: string; readonly reason?: TokenRefusal }> {
+/**
+ * A request whose token the api refuses, with the reason where it presented one, and whether the store is marked exposed (`exposed`),
+ * so the board's token page says what to do on a store served on this machine alone: the api's 401 (`objects`' `Unauthorized`).
+ */
+export class Unauthorized extends TaggedError('Unauthorized')<{
+  readonly message: string;
+  readonly reason?: TokenRefusal;
+  readonly exposed?: boolean;
+}> {
   readonly exitCode = 2;
 }
 
@@ -82,7 +92,7 @@ export const needOf: NeedOf = (method, path) =>
 
 /** How a client sends a token, and where the person finds or mints one. */
 const SEND =
-  "send one as `Authorization: Bearer <token>`: the person's own `nemia` on the store's machine sends the one the daemon keeps for it, `nemia board link` opens the board with one, and `nemia token add <name>` mints another";
+  "send one as `Authorization: Bearer <token>`: the person's own `nemia` on the store's machine sends the one the daemon keeps for it, `nemia open` opens the board signed in, and `nemia token add <name>` mints another";
 
 /** Why a token is refused for `reason`, and what the person who sent it does next. */
 const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
@@ -118,6 +128,7 @@ export async function callerBy(
   if (caller.kind !== 'refused') return caller;
   throw new Unauthorized({
     reason: caller.reason,
+    exposed: placed.config.exposed,
     message: `${c.req.method} ${c.req.path} refuses its request (${caller.reason}): ${REFUSED_WORDS[caller.reason]}.`,
   });
 }
@@ -126,38 +137,54 @@ export async function callerBy(
  * The middleware that puts the request's caller on it (`c.var.caller`), or refuses it 401 before any router is reached: the need its
  * route has of a token (`needOf`) judged with the token it presents. A refusal on the MCP port says `WWW-Authenticate: Bearer`, as a
  * client of the port reads it; a refusal of a token presented by the board's cookie alone clears the cookie, so a browser holding one
- * gone stale (its token removed with `nemia token rm`) sends none after, and the board's token page asks for another.
+ * gone stale (its token removed with `nemia token rm`) sends none after, and the board's token page asks for another. A read the
+ * person's cookie alone signed in sets the cookie again for its whole keeping (`cookieRenewed`), so a board in use stays signed in.
  * @param c The request's context, given the caller.
  * @param next The rest of the request's handling, reached once the caller is put.
  */
 export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
-  let caller: ProposalCaller;
+  let judged: { readonly caller: ProposalCaller; readonly presented: Presented };
   try {
-    caller = await callerOfRequest(c);
+    judged = await callerOfRequest(c);
   } catch (err) {
     if (err instanceof Unauthorized && onPort(c.req.path)) c.header('WWW-Authenticate', 'Bearer');
     if (err instanceof Unauthorized && bearerOf(c.req.header('authorization')) === undefined && cookieTokenOf(c) !== undefined)
       deleteCookie(c, TOKEN_COOKIE, { path: '/', httpOnly: true, sameSite: 'Strict' });
     throw err;
   }
-  c.set('caller', caller);
+  c.set('caller', judged.caller);
   await next();
+  const token = cookieTokenOf(c);
+  if (token !== undefined && cookieRenewed(c.req.method, judged.presented, judged.caller.kind))
+    setCookie(c, TOKEN_COOKIE, token, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Strict',
+      secure: httpsBy(c.req.header('x-forwarded-proto'), c.req.url),
+      maxAge: KEPT_SECONDS,
+    });
 };
 
 /**
- * The caller a request is, by the token it presents and what its route needs of one; refused, `Unauthorized`. The token is the bearer
- * (`Authorization: Bearer <token>`), else the board's cookie (`TOKEN_COOKIE`, which `POST /api/session` sets) on a path the api answers
- * or the port's: a page of the board carries no data and reads no cookie, so one gone stale still loads the page that asks for a token.
+ * The caller a request is, by the token it presents and what its route needs of one, and where that token came from (`presented`);
+ * refused, `Unauthorized`. The token is the bearer (`Authorization: Bearer <token>`), else the board's cookie (`TOKEN_COOKIE`, which
+ * `POST /api/session` sets) on a path the api answers or the port's: a page of the board carries no data and reads no cookie, so one
+ * gone stale still loads the page that asks for a token.
  */
-async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Promise<ProposalCaller> {
+async function callerOfRequest(
+  c: Parameters<MiddlewareHandler<ApiEnv>>[0],
+): Promise<{ readonly caller: ProposalCaller; readonly presented: Presented }> {
   const path = c.req.path;
   const bearer = bearerOf(c.req.header('authorization'));
   if (bearer === null)
     throw new Unauthorized({
+      exposed: await c.var.runtime.runPromise(Effect.map(StoreConfig, (config) => config.exposed)),
       message: `${c.req.method} ${path} reads its Authorization header as \`Bearer <token>\`, and this one is not: send a token as \`Authorization: Bearer <token>\` — a session's is in $WF_SESSION_TOKEN, and \`nemia token add <name>\` mints one of yours.`,
     });
-  const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
-  return callerBy(c, token, needOf(c.req.method, path));
+  const cookie = bearer === undefined && (onPort(path) || answered(path)) ? cookieTokenOf(c) : undefined;
+  const token = bearer ?? cookie;
+  const presented: Presented = bearer !== undefined ? 'bearer' : cookie !== undefined ? 'cookie' : 'none';
+  return { caller: await callerBy(c, token, needOf(c.req.method, path)), presented };
 }
 
 /**

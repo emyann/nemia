@@ -102,23 +102,33 @@ const whoIs = async (headers: Record<string, string>): Promise<ProposalCaller> =
 /** The refusal word a 401 answers. */
 const reasonOf = async (res: Response): Promise<string | undefined> => ((await res.json()) as { reason?: string }).reason;
 
+/** The refusal word a 401 answers and whether it says the store is exposed, the board's token page reading both. */
+const refusalOf = async (res: Response): Promise<{ reason?: string; exposed?: boolean }> => {
+  const { reason, exposed } = (await res.json()) as { reason?: string; exposed?: boolean };
+  return { reason, exposed };
+};
+
 test('REFUSED 401 token-required: a store not marked exposed, on loopback, refuses a request with no token: no request is the person for presenting none', async () => {
   for (const url of ['/api/runs', '/api/health', '/openapi/v3/nemia/v1']) {
     const res = await get(app, url);
     assert.equal(res.status, 401, url);
-    assert.equal(await reasonOf(res), 'token-required', url);
+    assert.deepEqual(await refusalOf(res), { reason: 'token-required', exposed: false }, url);
   }
   const local = await app().request('http://127.0.0.1:8787/api/runs', { headers: { ...NO_TOKEN, host: '127.0.0.1:8787' } });
   assert.equal(local.status, 401, 'addressed to loopback by name');
-  assert.equal(await reasonOf(local), 'token-required');
+  assert.deepEqual(await refusalOf(local), { reason: 'token-required', exposed: false });
+  const unknown = await get(app, '/api/runs', 'never-minted');
+  assert.deepEqual(await refusalOf(unknown), { reason: 'unknown-token', exposed: false }, 'a token the store never minted');
 });
 
 test('REFUSED 401 token-required: a store marked exposed refuses a request with no token, on any route', async () => {
   for (const url of ['/api/runs', '/api/health']) {
     const res = await get(exposed, url);
     assert.equal(res.status, 401, url);
-    assert.equal(await reasonOf(res), 'token-required', url);
+    assert.deepEqual(await refusalOf(res), { reason: 'token-required', exposed: true }, url);
   }
+  const unknown = await get(exposed, '/api/runs', 'never-minted');
+  assert.deepEqual(await refusalOf(unknown), { reason: 'unknown-token', exposed: true }, 'a token the store never minted');
 });
 
 test("a store not marked exposed: a token of the person's is the person under the token's name, by the bearer or the board's cookie", async () => {
@@ -271,6 +281,45 @@ test('a bearer is judged before the cookie: a live bearer passes beside a forged
 /** The `Set-Cookie` of `res`'s answer, split into its attributes, each in lower case but the first. */
 const setCookieOf = (res: Response): string[] =>
   (res.headers.get('set-cookie') ?? '').split(';').map((part, i) => (i === 0 ? part.trim() : part.trim().toLowerCase()));
+
+test("the board's sign-in renews itself: a GET the person's cookie alone signed in sets the same cookie again, kept thirty days", async () => {
+  for (const on of [app, exposed]) {
+    const res = await byCookie(on, '/api/runs', personToken);
+    assert.equal(res.status, 200);
+    const cookie = setCookieOf(res);
+    assert.equal(cookie[0], `${TOKEN_COOKIE}=${personToken}`);
+    for (const part of ['httponly', 'samesite=strict', 'path=/', 'max-age=2592000']) assert.ok(cookie.includes(part), part);
+    assert.ok(!cookie.includes('secure'), 'no Secure on plain http');
+  }
+  const proxied = await exposed().request('/api/runs', {
+    headers: { cookie: `${TOKEN_COOKIE}=${personToken}`, 'x-forwarded-proto': 'https' },
+  });
+  assert.ok(setCookieOf(proxied).includes('secure'), 'Secure behind a proxy that says https');
+  const https = await exposed().request('https://nemia.example/api/runs', { headers: { cookie: `${TOKEN_COOKIE}=${personToken}` } });
+  assert.ok(setCookieOf(https).includes('secure'), 'Secure over https');
+});
+
+test("REFUSED a renewal: a bearer, an agent's token or a session's in the cookie, and a write by the person's cookie set no cookie", async () => {
+  sessionRunning();
+  const bearer = await get(exposed, '/api/runs', personToken);
+  assert.equal(bearer.status, 200);
+  assert.equal(bearer.headers.get('set-cookie'), null, "the person's token as a bearer");
+  for (const [token, who] of [
+    [agentToken, "an agent's standing token"],
+    [sessionToken, "a session's token"],
+  ] as const) {
+    const res = await byCookie(exposed, '/api/runs', token);
+    assert.equal(res.status, 200, who);
+    assert.equal(res.headers.get('set-cookie'), null, who);
+  }
+  const write = await exposed().request('http://127.0.0.1:8787/api/session', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', cookie: `${TOKEN_COOKIE}=${personToken}` },
+    body: '{}',
+  });
+  assert.equal(write.status, 400);
+  assert.equal(write.headers.get('set-cookie'), null, "a write by the person's cookie");
+});
 
 /** A session request of `method` on `on`, as the board sends one: JSON, from its own page, presenting `bearer` where given. */
 const session = (

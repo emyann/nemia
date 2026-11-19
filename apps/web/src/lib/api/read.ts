@@ -95,14 +95,14 @@ export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unkn
 }
 
 /**
- * Why the api asks this browser for a token: it sent none to a store marked exposed (`token-required`), or the one its cookie carries is
- * no token the store keeps (`unknown-token`, one removed since). The two of `objects`' `TOKEN_REFUSALS` a person answers by pasting a
- * token: the other two are a session's and the MCP port's, which a browser never is.
+ * Why the api asks this browser for a token: it sent none (`token-required`, on every store, loopback included), or the one its cookie
+ * carries is no token the store keeps (`unknown-token`, one removed since). The two of `objects`' `TOKEN_REFUSALS` a person answers by
+ * pasting a token: the other two are a session's and the MCP port's, which a browser never is.
  */
 export type TokenAsk = Extract<TokenRefusal, 'token-required' | 'unknown-token'>;
 
-/** The api's ask for a token: its reason, and its words, which say where a token is minted. */
-export type TokenAsked = { readonly reason: TokenAsk; readonly message: string };
+/** The api's ask for a token: its reason, its words, which say where a token is minted, and whether the store is marked exposed. */
+export type TokenAsked = { readonly reason: TokenAsk; readonly message: string; readonly exposed: boolean };
 
 /** The refusals the token page answers, by their words. */
 const TOKEN_ASKS: ReadonlySet<string> = new Set<TokenAsk>(['token-required', 'unknown-token']);
@@ -114,14 +114,17 @@ const stringAt = (answer: unknown, key: string): string | undefined => {
 };
 
 /**
- * The token the api asks for where it answered `status` with `answer`: a 401 whose reason is a `TokenAsk`, with its words; else none.
+ * The token the api asks for where it answered `status` with `answer`: a 401 whose reason is a `TokenAsk`, with its words, and whether
+ * the store is marked exposed — only an answer that says `exposed: false` is a store served on this machine alone, so an api that says
+ * nothing keeps today's words; else none.
  * @param status The status the api answered.
  * @param answer The answer's JSON, undefined for one that is not JSON.
  */
 export function tokenAskOf(status: number, answer: unknown): TokenAsked | null {
   const reason = stringAt(answer, 'reason');
   if (status !== 401 || reason === undefined || !TOKEN_ASKS.has(reason)) return null;
-  return { reason: reason as TokenAsk, message: stringAt(answer, 'error') ?? '' };
+  const exposed = typeof answer === 'object' && answer !== null ? Reflect.get(answer, 'exposed') !== false : true;
+  return { reason: reason as TokenAsk, message: stringAt(answer, 'error') ?? '', exposed };
 }
 
 /** The token the api last asked this page for, until the page loads again: none, until a read or a write is answered with one. */

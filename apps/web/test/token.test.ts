@@ -29,9 +29,32 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 }
 
 test('tokenAskOf: a 401 whose reason is token-required or unknown-token asks for a token; no other answer does', () => {
-  assert.deepEqual(tokenAskOf(401, { error: 'x', reason: 'token-required' }), { reason: 'token-required', message: 'x' });
-  assert.deepEqual(tokenAskOf(401, { error: 'y', reason: 'unknown-token' }), { reason: 'unknown-token', message: 'y' });
-  assert.deepEqual(tokenAskOf(401, { reason: 'unknown-token' }), { reason: 'unknown-token', message: '' }, 'no words: none said');
+  assert.deepEqual(tokenAskOf(401, { error: 'x', reason: 'token-required', exposed: true }), {
+    reason: 'token-required',
+    message: 'x',
+    exposed: true,
+  });
+  assert.deepEqual(tokenAskOf(401, { error: 'y', reason: 'unknown-token', exposed: true }), {
+    reason: 'unknown-token',
+    message: 'y',
+    exposed: true,
+  });
+  assert.deepEqual(
+    tokenAskOf(401, { reason: 'unknown-token', exposed: true }),
+    { reason: 'unknown-token', message: '', exposed: true },
+    'no words: none said',
+  );
+  assert.deepEqual(
+    tokenAskOf(401, { error: 'x', reason: 'token-required', exposed: false }),
+    { reason: 'token-required', message: 'x', exposed: false },
+    'a store served on this machine alone',
+  );
+  for (const said of [undefined, 'no', 0])
+    assert.equal(
+      tokenAskOf(401, { error: 'x', reason: 'token-required', exposed: said })?.exposed,
+      true,
+      `exposed ${String(said)}: not said false, so today's words`,
+    );
   for (const [status, answer] of [
     [401, { error: 'x', reason: 'session-ended' }],
     [401, { error: 'x', reason: 'person-token-required' }],
@@ -46,12 +69,12 @@ test('tokenAskOf: a 401 whose reason is token-required or unknown-token asks for
 test('askToken: every listener is told once a refusal asks, the ask is read back, and a listener let go hears nothing', () => {
   let told = 0;
   const stop = onTokenAsked(() => (told += 1));
-  askToken({ reason: 'token-required', message: 'first' });
-  askToken({ reason: 'token-required', message: 'second' });
-  assert.deepEqual(tokenAsked(), { reason: 'token-required', message: 'first' }, 'the first words of a reason are kept');
+  askToken({ reason: 'token-required', message: 'first', exposed: true });
+  askToken({ reason: 'token-required', message: 'second', exposed: true });
+  assert.deepEqual(tokenAsked(), { reason: 'token-required', message: 'first', exposed: true }, 'the first words of a reason are kept');
   assert.equal(told, 1, 'the same reason again tells no one');
   stop();
-  askToken({ reason: 'unknown-token', message: '' });
+  askToken({ reason: 'unknown-token', message: '', exposed: true });
   assert.equal(tokenAsked()?.reason, 'unknown-token');
   assert.equal(told, 1, 'a listener let go is not told');
 });
@@ -61,13 +84,17 @@ test('a read the api refuses 401 token-required asks for a token, and still reje
   let told = 0;
   const stop = onTokenAsked(() => (told += 1));
   t.after(stop);
-  askToken({ reason: 'unknown-token', message: '' });
+  askToken({ reason: 'unknown-token', message: '', exposed: true });
   told = 0;
   await assert.rejects(
     async () => versionQuery.queryFn!({} as never),
     (err: unknown) => err instanceof ReadRefusal && err.status === 401,
   );
-  assert.deepEqual(tokenAsked(), { reason: 'token-required', message: 'this store is marked exposed' }, "with the api's words");
+  assert.deepEqual(
+    tokenAsked(),
+    { reason: 'token-required', message: 'this store is marked exposed', exposed: true },
+    "with the api's words",
+  );
   assert.equal(told, 1);
 });
 
@@ -96,7 +123,7 @@ test('signIn of a token the api does not keep rejects with its 401, so the token
 });
 
 test("a refused signIn asks nothing more of the page: its 401 is the pasted token's, not the browser's", async (t) => {
-  askToken({ reason: 'token-required', message: 'asked' });
+  askToken({ reason: 'token-required', message: 'asked', exposed: true });
   answering(t, { error: 'no token the store keeps is this one', reason: 'unknown-token' }, 401);
   await assert.rejects(signIn('never-minted'));
   assert.equal(tokenAsked()?.reason, 'token-required');

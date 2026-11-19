@@ -40,10 +40,43 @@ export default {
    * and the token page is back. A second seat serves the worker's store marked exposed, in a browser context of its own with no cookie,
    * so its cookie reaches neither the worker's seat nor another page; the token is removed and the seat stopped at the end. Its 401s
    * are the point, so its page counts exactly those.
+   *
+   * Before it, the worker's own seat, which is not marked exposed, opened in a bare browser context: the page there names `nemia open`
+   * and shows no token field until the person opens its disclosure, which holds one for someone handed a token.
    */
   name: 'token',
   route: '/runs',
   expect: async (page) => {
+    const here = await page
+      .context()
+      .browser()!
+      .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
+    try {
+      const bare = await here.newPage();
+      const { problems } = watch(bare);
+      await bare.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+      const local = bare.locator('form[data-token-page="token-required"][data-token-here]');
+      await expectVisible(local, 'a store served on this machine alone shows a browser with no token the page that names nemia open');
+      await expectVisible(
+        bare.locator('[data-token-way] code').getByText('nemia open', { exact: true }),
+        'the page names the one command that opens the board here signed in, nemia open',
+      );
+      await expectCount(bare.locator('[data-token-field]'), 0, 'and asks for no token: the field is folded away');
+      await settled(bare);
+      await photograph(bare, path.join(OUT, `token-local-${await themeOf(bare)}.png`));
+      await bare.getByRole('button', { name: 'I was given a token' }).click();
+      await expectVisible(bare.locator('[data-token-field]'), 'its disclosure holds the field for someone handed a token');
+      const others = problems().filter(
+        (p) =>
+          !p.startsWith('request answered 401: ') &&
+          !/^console error: Failed to load resource: the server responded with a status of 401\b/.test(p),
+      );
+      if (others.length)
+        throw new Refused(`the page on this machine saw the store's 401s and nothing else — it saw:\n    ${others.join('\n    ')}`);
+    } finally {
+      await here.close();
+    }
+
     const dir = path.join(store!, 'person-tokens');
     const before = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
     const seat = await serveExposed();

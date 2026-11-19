@@ -1,7 +1,7 @@
 /**
- * The words of pairing and first-visit links: `nemia pairings ls`, `nemia pairings approve` and `nemia board link`. The api serves each
- * endpoint with a handler of its own, which judges the caller a person before it approves or mints; the writes are out of an agent's
- * reach (class `none`), since a pairing approved or a link minted ends in a person's token. Pure.
+ * The words of pairing and first-visit links: `nemia pairings ls`, `nemia pairings approve`, `nemia board link` and `nemia open`. The
+ * api serves each endpoint with a handler of its own, which judges the caller a person before it approves or mints; the writes are out
+ * of an agent's reach (class `none`), since a pairing approved or a link minted ends in a person's token. Pure.
  */
 import type { CommandWords } from './command.ts';
 
@@ -62,8 +62,9 @@ export const BOARD_LINK_WORDS = {
     'a first-visit link to the board, opened once within ten minutes: the',
     'browser that opens it is signed in with a token of yours minted then,',
     'named board-<day>. Printed under where the api serves (its bound',
-    'address, or 127.0.0.1); --base <url> prints it under another, the name',
-    'you reach the board by (a browser keeps one cookie per host name)',
+    'address, or localhost); --base <url> prints it under another, the name',
+    'you reach the board by (a browser keeps one cookie per host name).',
+    'nemia open opens it in your browser instead',
   ],
   spec: {
     positionals: [],
@@ -78,5 +79,40 @@ export const BOARD_LINK_WORDS = {
   served: [{ endpoint: 'links.mint' }],
 } as const satisfies CommandWords;
 
+/** How `nemia open` is typed, as its refusals end on it. */
+const OPEN_SHAPE = 'nemia open [--base <url>]';
+
+/**
+ * `nemia open [--base <url>]`: the board opened in this machine's browser, signed in by a first-visit link minted for it, and the link
+ * printed where no browser opens.
+ */
+export const OPEN_WORDS = {
+  name: 'open',
+  usage: '[--base <url>]',
+  help: [
+    "open the board in this machine's browser, signed in: a first-visit link",
+    'is minted (a token of yours, named board-<day>) and opened, under',
+    'localhost on this machine, or the server a remote context names. Where',
+    'no browser can be opened the link is printed, to open once within ten',
+    'minutes; --base <url> mints it under the name you reach the board by',
+  ],
+  spec: {
+    positionals: [],
+    flags: [
+      { flag: '--base', kind: 'text', key: 'base', takes: `--base takes the board's address, like --base http://box:8787: ${OPEN_SHAPE}.` },
+    ],
+    unknown: (arg) => `nemia open does not take ${arg}: ${OPEN_SHAPE}.`,
+  },
+  writes: true,
+  class: 'none',
+  only: CLI_ALONE,
+  served: [{ endpoint: 'links.mint' }],
+} as const satisfies CommandWords;
+
 /** The pairing commands' words, in the order the help lists them. */
-export const REST_PAIRING_WORDS = [PAIRINGS_LS_WORDS, PAIRINGS_APPROVE_WORDS, BOARD_LINK_WORDS] as const satisfies readonly CommandWords[];
+export const REST_PAIRING_WORDS = [
+  PAIRINGS_LS_WORDS,
+  PAIRINGS_APPROVE_WORDS,
+  BOARD_LINK_WORDS,
+  OPEN_WORDS,
+] as const satisfies readonly CommandWords[];

@@ -67,9 +67,6 @@ export function resultStepsOf(view: RunDetail) {
   })) satisfies ResultStep[];
 }
 
-/** How a run ended before its final steps gave: called off by a person, or ended on its own. */
-type RunEnd = 'calledOff' | 'ended';
-
 /**
  * How the run ended, where it has: called off (its status, or the moment it was), else ended once its status is one a run ends in
  * (succeeded or failed); null for a run still going. What none of its steps says once it stopped: a step a called-off run never ran

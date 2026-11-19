@@ -27,6 +27,4 @@ export type ComposedLayer = keyof typeof LAYER_HEADINGS;
  * @param layers Each layer by its key, with the words frozen for it or none.
  */
 export const headedLayers = (layers: ReadonlyArray<readonly [ComposedLayer, string | undefined]>) =>
-  layers
-    .flatMap(([layer, words]) => (words ? [`${LAYER_HEADINGS[layer]}\n\n${words.trimEnd()}`] : []))
-    .join('\n\n') satisfies string as string;
+  layers.flatMap(([layer, words]) => (words ? [`${LAYER_HEADINGS[layer]}\n\n${words.trimEnd()}`] : [])).join('\n\n');

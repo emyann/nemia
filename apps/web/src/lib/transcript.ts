@@ -189,9 +189,6 @@ const timeOf = (turn: Turn) => {
   }
 };
 
-/** What was said to a session (`Said`), with when the session's own transcript shows its words reaching it — null until it does. */
-type Heard = Said & { arrived: string | null };
-
 /**
  * Whether a transcript event is the session's own record of `said` reaching it: a system line whose text is the words, as a working session
  * writes them when it reads them between calls — or ends with them, after Claude Code's line saying another session sent them ("Another
@@ -361,20 +358,6 @@ export function summaryLine(text: string) {
   const space = room.lastIndexOf(' ');
   return `${(space > 0 ? room.slice(0, space) : room).trimEnd()}…`;
 }
-
-/**
- * A closeout in the shape every step's is asked for, either version, or null for a statement in any other: its summary one line
- * (`summaryLine`), its body the markdown beneath, led by the whole summary where the cut changed it; its files by path and its values by
- * name. One given before the envelope was versioned has no body of its own.
- */
-type Closeout = {
-  outcome: string;
-  summary: string;
-  body: string | null;
-  needs: string | null;
-  artifacts: string[];
-  values: Array<{ name: string; value: string }>;
-};
 
 /**
  * The closeout a call gives (`Closeout`), or null where its input is no closeout.

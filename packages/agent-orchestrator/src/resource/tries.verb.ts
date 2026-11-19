@@ -316,7 +316,7 @@ export function triesOf(
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
-  const turnAt = (t: EarlierTry, i: number) => turnOfTry(earlier.slice(0, i), t) satisfies number as number;
+  const turnAt = (t: EarlierTry, i: number) => turnOfTry(earlier.slice(0, i), t);
   const recordAt = (n: number) => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   const askAt = (n: number) => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers);
   const answerAt = (n: number) => (askAt(n)?.message ?? null) satisfies string | null as string | null;

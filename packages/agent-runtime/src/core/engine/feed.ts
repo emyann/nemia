@@ -47,12 +47,6 @@ export type ForgottenFeed = {
   linesByTask?: Readonly<Record<string, number>>;
 };
 
-/**
- * A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were
- * forgotten, when any.
- */
-type FeedRead = { entries: unknown[]; cursor: number; forgotten?: number };
-
 /** The three files of the feed under `root`. */
 const feedFiles = (root: string) => ({
   head: path.join(root, 'feed.jsonl'),

@@ -12,9 +12,6 @@ export type Box = { x: number; y: number; width: number; height: number };
 /** React Flow's transform: the pan across and down, in the frame's pixels, and the zoom. */
 export type Transform = readonly [x: number, y: number, zoom: number];
 
-/** A view to move to, as React Flow's `setViewport` takes it. */
-type View = { x: number; y: number; zoom: number };
-
 /**
  * How big `el` is laid out, in its own pixels: 0 × 0 while it is hidden or off the page.
  * @param el The element the frame is drawn in, by its client width and height.

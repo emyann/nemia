@@ -40,7 +40,6 @@ export type Card = {
 
 /** Every key a card may set. Anything else is refused by name: how a card's steps run is its workflow's to say. */
 export const CARD_KEYS = ['workflow', 'after'] as const;
-type CardKey = (typeof CARD_KEYS)[number];
 
 function refuse(why: string): never {
   throw new WorkflowError(why);

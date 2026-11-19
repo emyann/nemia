@@ -956,8 +956,7 @@ export const capOf = (looping: StepSpec) => looping.rounds ?? DEFAULT_ROUNDS;
  * one.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const roundIn = (record: StepRecord | undefined) =>
-  (1 + (record?.tries?.filter((t) => t.cause === 'round').length ?? 0)) satisfies number as number;
+export const roundIn = (record: StepRecord | undefined) => 1 + (record?.tries?.filter((t) => t.cause === 'round').length ?? 0);
 
 /**
  * The round a step of a run is on (`roundIn`). Every step of a loop moves on together, so the looping step's is the loop's.

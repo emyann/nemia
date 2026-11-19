@@ -5,7 +5,7 @@
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type StepSpec } from '../step/step.ts';
-import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS, type HarnessDeclaration } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none: the runtime's. */
 export { DEFAULT_HARNESS };
@@ -60,7 +60,7 @@ export const REMOTE_NAME = /^[a-z][a-z0-9-]*$/;
  * Whether a step's harness is a remote A2A agent (`REMOTE_PREFIX`). Pure.
  * @param harness The step's harness, or undefined where it names none.
  */
-export const isRemoteHarness = (harness: string | undefined) => (harness?.startsWith(REMOTE_PREFIX) ?? false) satisfies boolean as boolean;
+export const isRemoteHarness = (harness: string | undefined) => harness?.startsWith(REMOTE_PREFIX) ?? false;
 
 /**
  * The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure.

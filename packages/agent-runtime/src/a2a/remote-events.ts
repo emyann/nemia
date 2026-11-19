@@ -20,7 +20,7 @@ const artifactKey = (artifactId: string) => `artifact:${artifactId}`;
  * Whether a session in `state` has ended its turn: it no longer works, whether it ended or waits on its caller.
  * @param state The session's state.
  */
-export const turnOver = (state: SessionState) => !atWorkState(state) satisfies boolean as boolean;
+export const turnOver = (state: SessionState) => !atWorkState(state);
 
 /** A part's words: its text, or its data as JSON; a file part says none. */
 const wordsOfPart = (p: Part) => {

@@ -7,7 +7,7 @@ import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
-import type { SaidBy, SaidFrom } from '../../contracts/step-speaker.contract.ts';
+import type { SaidBy } from '../../contracts/step-speaker.contract.ts';
 import { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';
 
 export { AGENT_OPENS, AGENT_WRITES } from './agent-frame/agent-frame.ts';

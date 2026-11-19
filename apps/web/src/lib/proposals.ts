@@ -4,7 +4,7 @@
  * resources a delegation may grant (`DELEGABLE`). Pure.
  */
 import { PROPOSABLE_KINDS, RESOURCE_PLURALS, type Proposal, type ProposalPhase } from 'objects';
-import type { ProposalBefore, ProposalOffers, ProposalOffersOf, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
+import type { ProposalBefore, ProposalOffersOf, ProposalOrderFacts } from '../../contracts/proposal.contract.ts';
 
 export type { ProposalOffers } from '../../contracts/proposal.contract.ts';
 

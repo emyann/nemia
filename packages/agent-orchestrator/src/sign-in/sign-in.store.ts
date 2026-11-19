@@ -29,7 +29,7 @@ export const TOKEN_VARIABLE = DEFAULT_SIGN_IN.variable;
  * The token file of the store at `home`.
  * @param home The store's root.
  */
-export const claudeTokenFile = (home: string) => path.join(home, TOKEN_NAME) satisfies string as string;
+export const claudeTokenFile = (home: string) => path.join(home, TOKEN_NAME);
 
 /** Whether the store keeps a sign-in token (`set`) or not (`unset`). */
 export type ClaudeTokenState = 'set' | 'unset';

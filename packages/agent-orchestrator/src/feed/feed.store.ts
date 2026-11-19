@@ -410,7 +410,7 @@ export const feedCursorRefusal = (home: string, after: number) => ran(doorAt(hom
  * The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads.
  * @param home The store's root folder.
  */
-export const feedSize = (home: string) => (ran(doorAt(home).lines.end())?.cursor ?? 0) satisfies number as number;
+export const feedSize = (home: string) => ran(doorAt(home).lines.end())?.cursor ?? 0;
 
 /**
  * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from: what a live reader hands on. A
@@ -568,14 +568,6 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
     return `the feed was truncated under this watch at cursor ${cursor}, and is ${stat.size} bytes now (${file}): ${from}`;
   return undefined;
 }
-
-/**
- * What one beat of a watch found: the cut that happened under it, in words (`feedCut`), or the lines at its cursor, and the inode it read
- * them in.
- */
-type WatchBeat =
-  | { cut: string; ino: number | undefined }
-  | { cut?: undefined; ino: number | undefined; got: { lines: FeedLine[]; ends: number[]; cursor: number } };
 
 /**
  * One beat of a watch at `cursor`: the cut that happened under it (`feedCut`), or the lines from `cursor` to the size that same stat said.

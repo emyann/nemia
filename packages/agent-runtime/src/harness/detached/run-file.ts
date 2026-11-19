@@ -79,12 +79,7 @@ type Beaten = { state: string; heartbeatAt: string; beat?: Monotonic };
 export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)) => {
   const age = elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now);
   const fresh = run.state !== 'working' || age <= STALE_MS;
-  return leaseWord(
-    run.state,
-    age,
-    STALE_MS,
-    fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker,
-  ) satisfies string as string;
+  return leaseWord(run.state, age, STALE_MS, fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker);
 };
 
 /**

@@ -251,8 +251,7 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
  * `--recheck`.
  * @param how The try's mode, and the model a `--model` named.
  */
-export const modeWord = (how: { mode: RetryMode; model?: string }) =>
-  (how.model ? `--model ${how.model}` : `--${how.mode}`) satisfies string as string;
+export const modeWord = (how: { mode: RetryMode; model?: string }) => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
 /**
  * The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with.
@@ -339,13 +338,13 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]) => asks.filter((a
  * @param r The try due.
  */
 export const dueNote = (step: StepSpec, run: Run, r: Retry) => {
-  if (r.by === 'ask') return askedNote(r) satisfies string as string;
+  if (r.by === 'ask') return askedNote(r);
   if (r.by === 'signoff')
-    return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}` satisfies string as string;
-  if (r.by === 'pause') return pausedNote(r) satisfies string as string;
+    return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
+  if (r.by === 'pause') return pausedNote(r);
   if (r.mode === 'recheck')
-    return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent: the machine ran out of memory and killed a process of its check, and the next tick runs it again` satisfies string as string;
-  return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent` satisfies string as string;
+    return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent: the machine ran out of memory and killed a process of its check, and the next tick runs it again`;
+  return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
 };
 
 /** A try a person asked for, as `dueNote` says it: its mode, budget and answer, and whether its session is stopped first. */

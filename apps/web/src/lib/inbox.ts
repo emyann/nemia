@@ -89,11 +89,6 @@ export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: reado
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue' | 'from'; message: string };
 
 /**
- * A line of the inbox page: a card, with the refusal it was last given, or one the inbox no longer lists (`gone`), kept for its refusal.
- */
-type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: boolean };
-
-/**
  * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read
  * again after the refusal, no longer lists — dropped or started behind the page's back — in the place it was listed, so the refusal's
  * sentence stays where the person asked. A refusal of a card still listed is on that card, and on no line of its own.
@@ -152,9 +147,6 @@ export const factoryPreset = (shown: string | undefined, offered: readonly Pick<
  * workflow picked among those it offers, null for none.
  */
 type FilingChoice = { idea: string; factory: Pick<Factory, 'name'> | null; workflow: string | null };
-
-/** A card as `fileCard` sends it: never a repository nor an origin, which the factory decides. */
-type CardFiling = { body: string; factory?: string; workflow?: string };
 
 /**
  * What the box sends for `choice`, by what is offered now and never by what a list held before. With no factory, the idea alone: its

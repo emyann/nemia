@@ -208,9 +208,6 @@ const AskLineSchema = Schema.Struct({
 /** A line of an answers file (`AnswerLine`). */
 const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, answers: Schema.Record(Schema.String, Schema.String) });
 
-/** The lines of a JSONL file read through a schema, and how many it left unread: lines that do not parse, or do not decode. */
-type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
-
 /** The lines of the JSONL file `file`, each decoded by `schema` (`DecodedLines`); none, and none unread, where there is no file. */
 const jsonLines = <A>(file: string, schema: Schema.Decoder<A>) => {
   let text: string;

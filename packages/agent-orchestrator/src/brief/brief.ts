@@ -225,13 +225,12 @@ export function composeBrief(
   const contracts = contractsOf(step, run, steps, { artifactsDir, round, words: place.words, inFolder });
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
   const tree = depsLines(deps);
-  if (retry?.resumed || round?.resumed) return (again.slice(1) + resumedLook(tree) + contracts) satisfies string as string;
+  if (retry?.resumed || round?.resumed) return again.slice(1) + resumedLook(tree) + contracts;
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
   const saidBefore = saidBeforeOf(step, run, retry, round);
 
-  if (step.resume && !retry && !round)
-    return (resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts) satisfies string as string;
+  if (step.resume && !retry && !round) return resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -253,7 +252,7 @@ export function composeBrief(
       ...(tree.length ? ['', ...tree] : []),
       ...(given ? [given] : []),
       contracts,
-    ].join('\n') satisfies string as string;
+    ].join('\n');
   }
 
   if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', headingOf('Where to look'), '');
@@ -294,7 +293,7 @@ export function composeBrief(
   if (tree.length) parts.push(...(earlier.length ? [''] : []), ...tree);
 
   parts.push(...(given ? [given] : []), contracts);
-  return parts.join('\n') satisfies string as string;
+  return parts.join('\n');
 }
 
 /**
@@ -463,7 +462,7 @@ export function remoteBrief(
     ...handed,
     ...given,
     ...(retry ? [remoteTrySection(step, retry)] : []),
-  ].join('\n') satisfies string as string;
+  ].join('\n');
 }
 
 /**

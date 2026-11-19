@@ -486,7 +486,7 @@ export function inventoryUnread(
   outcome: { readonly refused: string } | { readonly unread: { readonly said: string } },
 ) {
   const why = 'refused' in outcome ? `refused to read it — ${outcome.refused}` : `was not heard — ${outcome.unread.said}`;
-  return `its place's inventory of what it left in ${repo} ${why}; nothing was touched, as nothing says what is there: nemia ${verb} ${id} again once the place reads it` satisfies string as string;
+  return `its place's inventory of what it left in ${repo} ${why}; nothing was touched, as nothing says what is there: nemia ${verb} ${id} again once the place reads it`;
 }
 
 /**

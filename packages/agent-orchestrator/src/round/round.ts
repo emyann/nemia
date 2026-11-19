@@ -604,7 +604,7 @@ export function acceptAsk(
  * @param a The person's acceptance: when they said enough.
  */
 export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance) =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open` satisfies string as string;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
 
 /**
  * A round due now, as `nemia ls` and `nemia decide` say it.
@@ -613,10 +613,10 @@ export const acceptedNote = (step: StepSpec, run: Run, a: Acceptance) =>
  */
 export function roundDueNote(steps: readonly StepSpec[], r: Round) {
   const looping = steps.find((s) => s.name === r.step);
-  if (r.by === 'merge') return mergeDueNote(r) satisfies string as string;
-  return (r.by === 'ask'
+  if (r.by === 'merge') return mergeDueNote(r);
+  return r.by === 'ask'
     ? `round ${r.round} asked (nemia retry --round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
-    : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`) satisfies string as string;
+    : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;
 }
 
 /**
@@ -628,7 +628,7 @@ export function roundDueNote(steps: readonly StepSpec[], r: Round) {
  * @param raise Whether a step of the loop is over its budget, so the command offered carries `--budget`.
  */
 export const exhaustedNote = (step: StepSpec, run: Run, raise = false) =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}` satisfies string as string;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round${raise ? ' --budget <amount>' : ''}`}`;
 
 /**
  * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
@@ -637,7 +637,7 @@ export const exhaustedNote = (step: StepSpec, run: Run, raise = false) =>
  * @param run The run the loop is in: its round, and whether it is pruned or held.
  */
 export const heldNote = (step: StepSpec, run: Run) =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}` satisfies string as string;
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia retry ${run.id} ${step.name} --round --budget <amount>`}`;
 
 const noMoreRounds = (pruned: Pruned) => `no round more, since the run was ${prunedWords(pruned)}`;
 

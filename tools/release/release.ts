@@ -109,9 +109,6 @@ class Refusal extends Error {}
 type Out = (line: string) => void;
 type Env = Record<string, string | undefined>;
 
-/** What a call answered. */
-type Ran = { status: number | null; stdout: string; stderr: string };
-
 const spawn = (command: string, args: string[], env: Env, input?: string) => {
   const ran = spawnSync(command, args, { encoding: 'utf8', timeout: CALL_MS, env, input, maxBuffer: 256 << 20 });
   if (ran.error) throw new Refusal(`${command} ${args[0]} did not finish (${ran.error.message}): re-run the job once ${command} answers`);

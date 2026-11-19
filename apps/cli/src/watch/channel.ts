@@ -208,9 +208,8 @@ const jsonOf = (text: string) => {
 /** The api's words in a refusal's body, `{ error }`, else its status and text. */
 function refusalOf(status: number, text: string) {
   const body = jsonOf(text);
-  if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string')
-    return body.error satisfies string as string;
-  return `the api answered ${status}: ${text.slice(0, 200)}` satisfies string as string;
+  if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string') return body.error;
+  return `the api answered ${status}: ${text.slice(0, 200)}`;
 }
 
 /** `url` asked with the session's headers, aborted with `signal`. */
@@ -374,9 +373,6 @@ function startedOver(f: Following, cursor: string, why: string) {
   sent(f, noticeOf('missed', content, { after: cursor }));
   f.cursor = undefined;
 }
-
-/** What one stretch came to: on to the next after a pause, at once, or the exit code of a refusal and its words. */
-type Stretched = 'later' | 'again' | { readonly code: number; readonly said: string };
 
 /** What a refused or unanswered request makes of the stretch: a 4xx of the api ends the channel; anything else is the api down. */
 function failedWith(f: Following, got: Exclude<Answer, { kind: 'ok' }>) {

@@ -131,9 +131,6 @@ function octalField(block: Uint8Array, at: number, length: number) {
   return /^[0-7]+$/.test(text) ? Number.parseInt(text, 8) : Number.NaN;
 }
 
-/** An entry's header as read: its path, its type, its mode and the size of its body. */
-type Header = { path: string; type: string; mode: number; size: number };
-
 /** The header at `block`, or why it is no header: a magic that is not ustar's, a checksum that does not add up, a size not in octal. */
 function readHeader(block: Uint8Array) {
   const magic = Buffer.from(block.subarray(257, 265)).toString('latin1');

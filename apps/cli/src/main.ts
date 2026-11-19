@@ -105,7 +105,7 @@ async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean,
   const code = await spawned(argv, entry);
   if (argv[0] === 'upgrade' && !help && !argv.includes('-h') && chosen.kind === 'remote')
     process.stderr.write(serverHint(chosen.name, chosen.server));
-  return code satisfies number as number;
+  return code;
 }
 
 /**

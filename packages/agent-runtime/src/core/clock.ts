@@ -20,7 +20,7 @@ export type Instant = { at: number; mono?: Monotonic };
  * @param to The later moment.
  */
 export const elapsedMs = (from: Instant, to: Instant) =>
-  (from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at) satisfies number as number;
+  from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
 
 /**
  * How much of a budget of `ms`, taken at `from`, is left at `now`: never below zero, so a budget already spent cuts at once rather

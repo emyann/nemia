@@ -34,7 +34,7 @@ type Named = { readonly metadata: { readonly name: string; readonly labels?: Rea
  * @param parts The sub-resources read beside them, or undefined where the object has none.
  */
 export const versionOf = (spec: unknown, status: unknown, parts?: unknown) =>
-  valueVersion(parts === undefined ? { spec, status } : { spec, status, parts }) satisfies string as string;
+  valueVersion(parts === undefined ? { spec, status } : { spec, status, parts });
 
 /**
  * When a file was made, or the epoch where it cannot be read: a part's `creationTimestamp`.

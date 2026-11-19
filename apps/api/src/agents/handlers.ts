@@ -244,7 +244,7 @@ const named = (route: string, name: string | undefined) => {
   if (name === undefined) throw new Invalid({ error: `${route} takes the agent's name, as \`metadata.name\`.` });
   const wrong = agentNameRefusal(name);
   if (wrong !== undefined) throw new Invalid({ error: `${route}: ${wrong}` });
-  return name satisfies string as string;
+  return name;
 };
 
 /** The `resourceVersion` a write carries, or `Invalid` saying why it must. */

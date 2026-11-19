@@ -306,9 +306,6 @@ const recordTimeline = (fact: TimelineFact) =>
     return rootSpan(TIMELINE_SPAN, now, now, own, fact.attributes);
   });
 
-/** One value a fact puts into one series: the series, to be born before it (`seriesBorn`), and the value put into it (`said`). */
-type Write = { series: Metric.Metric<never, unknown>; said: Effect.Effect<void> };
-
 /** `value` into the counter `metric`, by the fact's attributes, refused if one is not a step's (`boundedAttributes`). */
 const counted = (metric: Metric.Counter<number>, attributes: Record<string, string>, value: number) => {
   const series = Metric.withAttributes(metric, boundedAttributes(attributes));

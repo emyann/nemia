@@ -25,7 +25,7 @@ const folderAt = (home: string, name: string) => path.join(home, 'factories', na
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const treeDir = (home: string, name: string) => path.join(folderAt(home, name), 'tree') satisfies string as string;
+export const treeDir = (home: string, name: string) => path.join(folderAt(home, name), 'tree');
 
 /**
  * The template as the controller last rendered it into the factory: read-only, the base of an upgrade's merge.

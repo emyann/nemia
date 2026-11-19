@@ -42,8 +42,7 @@ export type Problem = { file: string; line?: number; col?: number; message: stri
  * directory. A folder whose name is a template's is named as a path, `./<name>`.
  * @param given The `--template` word as typed.
  */
-export const sourceGiven = (given: string) =>
-  (templateNameRefusal(given) === null ? given : path.resolve(given)) satisfies string as string;
+export const sourceGiven = (given: string) => (templateNameRefusal(given) === null ? given : path.resolve(given));
 
 /**
  * The name a recorded source fixes with no read of it: a builtin template's is the name it is recorded by; a folder's or an archive's is

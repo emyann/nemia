@@ -351,7 +351,7 @@ export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | fal
  * @param steps The workflow's steps as the run froze them.
  * @param name The step's name.
  */
-export const isLoopTarget = (steps: readonly StepSpec[], name: string) => steps.some((s) => s.loop === name) satisfies boolean as boolean;
+export const isLoopTarget = (steps: readonly StepSpec[], name: string) => steps.some((s) => s.loop === name);
 
 /**
  * What the run adds to a loop's target's closeout (`LOOP_REPLIES`): an answer to each finding it was handed. Strict, as every schema handed

@@ -162,13 +162,7 @@ export function writeWorkflowAt(
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   for (const file of dropped) fs.rmSync(path.join(at, file));
-  return {
-    dir: at,
-    steps: parsed,
-    written: written.sort(),
-    kept: kept.sort(),
-    removed: [...removed, ...dropped].sort(),
-  } satisfies WorkflowWritten;
+  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: [...removed, ...dropped].sort() };
 }
 
 /**

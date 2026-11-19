@@ -43,9 +43,6 @@ export const templateGiven = (given: string) =>
     return { archive: packArchive(tree.name, tree.files).archive.toString('base64') };
   }) satisfies Effect.Effect<TemplateGiven, Refusal> as Effect.Effect<TemplateGiven, Refusal>;
 
-/** A template taken: the source a verb reads it at, and whether this request wrote it there. */
-type Taken = { readonly source: string; readonly wrote: string | null };
-
 /**
  * The template `given` as a source under the store `home`: a name as it is, refused where it names no template (`Invalid`); a path as it
  * is, refused where it is not whole (`Invalid`); an archive

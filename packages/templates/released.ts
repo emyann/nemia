@@ -206,9 +206,6 @@ function merged(ours: string, forked: string, theirs: string) {
 /** Where `cut` reads: the repository's root, the workspace's path from it, the commit the branch forked at, and git's modes there. */
 type Seat = { root: string; ws: string; fork: string; modes: ReadonlyMap<string, number> };
 
-/** What `cut` writes of one template: its manifest's text, where it writes one, and its record, where there is one. */
-type Cut = { template: string; manifest: string | undefined; record: Recorded | undefined };
-
 /** The template `template` cut against the base: its manifest merged, and its version and record decided by `landedVersion`. */
 function cutOne(seat: Seat, template: string, records: { base: Records; head: Records }) {
   const { root, ws, fork, modes } = seat;

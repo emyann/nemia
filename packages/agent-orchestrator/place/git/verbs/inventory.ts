@@ -51,7 +51,7 @@ function resolved(p: string): string {
 /** Whether `p` lies inside `dir`, and is not `dir` itself. */
 function inside(dir: string, p: string) {
   const rel = path.relative(dir, resolved(p));
-  return (rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)) satisfies boolean as boolean;
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
 /** The paths `git status --porcelain` lists in `worktree`, untrimmed so a first line's leading space stays; undefined when git fails. */

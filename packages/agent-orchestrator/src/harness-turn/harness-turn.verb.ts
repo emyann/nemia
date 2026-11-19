@@ -81,7 +81,7 @@ const FAILURE_WORDS = {
 } as const;
 
 /** `n` dollars, as a sentence says a turn's cost. */
-const costWords = (n: number) => `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}` satisfies string as string;
+const costWords = (n: number) => `$${n < 0.01 ? n.toFixed(4) : n.toFixed(2)}`;
 
 /**
  * The turn `record` as it stands: its check over its task's view, the cost its last attempt counted, and, where it failed, why in the

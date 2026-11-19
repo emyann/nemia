@@ -5,15 +5,7 @@
  * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and one reading of the machine,
  * and journals what it returns.
  */
-import type {
-  AdmissionPass,
-  AdmissionWait,
-  Admitted,
-  AdmitOne,
-  Holder,
-  MachineMemory,
-  Waiter,
-} from '../../contracts/admission.contract.ts';
+import type { AdmissionPass, AdmissionWait, AdmitOne, Holder, MachineMemory } from '../../contracts/admission.contract.ts';
 import type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
 import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';

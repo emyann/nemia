@@ -4,7 +4,7 @@
  * on its harness — each refused in the verb's own words — and a failure that may pass worded as the verb's unsent.
  */
 import { Cause, Effect } from 'effect';
-import { fold, nameFor, unknownTask, type Attempt, type Event, type Sighting, type State } from '../core/index.ts';
+import { fold, nameFor, unknownTask, type Attempt, type Event, type State } from '../core/index.ts';
 import type { Journal, JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 import { verbHarnessOf, type Capability } from '../harness/declaration.ts';
@@ -77,16 +77,6 @@ export type WrittenVerb<Refused, Unsent, Reach> = {
   readonly undone: string;
   /** What the verb says where no session of the task is there to take it. */
   readonly open: OpenWords;
-};
-
-/** The session a verb written to it found: its task's state, harness, the verb's reach there, the attempt, its name and sighting. */
-type Reached<Reach> = {
-  readonly state: State;
-  readonly harnessed: Harnessed;
-  readonly reach: Reach;
-  readonly last: Attempt;
-  readonly name: string;
-  readonly sighting: Sighting;
 };
 
 /**

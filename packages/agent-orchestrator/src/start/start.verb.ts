@@ -394,8 +394,8 @@ type Told = Pick<
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (home: string, repo: string) =>
-  (`--repo ${repo}: this workflow's steps say \`place: folder\`, so the run works in folders it makes under ${workRoot(runsDir(home), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
-    `Start it without --repo, or start a workflow whose steps work on a repository.`) satisfies string as string;
+  `--repo ${repo}: this workflow's steps say \`place: folder\`, so the run works in folders it makes under ${workRoot(runsDir(home), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
+  `Start it without --repo, or start a workflow whose steps work on a repository.`;
 
 /**
  * The files `nemia start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing.
@@ -671,7 +671,7 @@ const factoryNamed = (home: string, name: string | undefined) => (name === undef
  * @param fallback The repository taken where neither names one.
  */
 export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string) =>
-  factoryRepo(factoryNamed(home, name), named, fallback) satisfies string as string;
+  factoryRepo(factoryNamed(home, name), named, fallback);
 
 /**
  * The repository a run of the workflow named `workflow` works on in the factory `name` (`wiredRepo`): the one its wiring names by folder

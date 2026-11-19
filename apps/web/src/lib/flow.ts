@@ -155,7 +155,7 @@ function radiusOf(state: StepState | null) {
   return mark === 'alive' || mark === 'yours' ? 6.6 : mark === 'failure' ? 5.6 : mark === 'off' ? 4 : 5;
 }
 
-const r1 = (n: number) => (Math.round(n * 10) / 10) satisfies number as number;
+const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * A run's steps as its workflow's graph drawn small, `width` wide: the columns around where the run is (`windowOf`, `GRAPH_SLOTS`),

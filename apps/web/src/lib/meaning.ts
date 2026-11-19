@@ -1,12 +1,4 @@
-/**
- * The look's five meanings, and how each is drawn. A colour says one thing on every page: `yours` is what waits on a person, `alive` a
- * session at work, `money` an amount, `failure` what failed and nothing else, and `rest` what is at rest or done, in one of two tints —
- * the label's `grey`, and the `sage` of a finished step.
- *
- * `src/styles.css` reads each meaning from a role of the theme once (`--meaning-yours`), and names it for Tailwind (`bg-yours`). Every
- * class here is written whole: Tailwind finds a class by its text in a source file, never one built from a meaning's name.
- */
-type Meaning = 'yours' | 'alive' | 'money' | 'rest' | 'failure';
+
 
 /** A colour a meaning is drawn in: the meaning itself, or one of rest's two tints. */
 export type Hue = 'yours' | 'alive' | 'money' | 'failure' | 'grey' | 'sage';

@@ -600,16 +600,14 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
 export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: readonly StepSpec[] = [], answered = false) {
   const tries = record?.tries ?? [];
   const last = tries.at(-1);
-  if (!last) return '' satisfies string as string;
+  if (!last) return '';
   const looping = loopOf(steps, step.name);
   const round = roundIn(record);
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
-  if (last.cause === 'round') return [inRound, raised].filter(Boolean).join(', ') satisfies string as string;
+  if (last.cause === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how = howOf(step, last);
-  return [inRound, `try ${tries.length + 1}, ${how}`, raised, answered ? 'answered' : '']
-    .filter(Boolean)
-    .join(', ') satisfies string as string;
+  return [inRound, `try ${tries.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
 /**

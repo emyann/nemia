@@ -294,7 +294,7 @@ function writtenPair(key: string, value: FrontmatterValue) {
  * @param pairs The keys and their values, in the order they are written.
  */
 export function renderFrontmatter(pairs: readonly FrontmatterPair[]) {
-  return pairs.map(([key, value]) => writtenPair(key, value)).join('') satisfies string as string;
+  return pairs.map(([key, value]) => writtenPair(key, value)).join('');
 }
 
 /**

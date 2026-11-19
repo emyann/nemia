@@ -325,7 +325,7 @@ const memoryNoted = ({ steps, read, memoryOf }: ListingInput, listed: Listing) =
 const notedSaid = (run: Run, name: string, saidTo: (step: string) => number) =>
   [saidWord(saidTo(name)), saidBeforeWord(run.steps[name]?.tries?.length ? 0 : (run.saidBefore?.[name]?.length ?? 0))]
     .filter(Boolean)
-    .join(' · ') satisfies string as string;
+    .join(' · ');
 
 /**
  * What `nemia ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
@@ -398,7 +398,7 @@ function listedSteps(
   const rounds = assessed.due.round;
   const refiled = roundSpans(steps, rounds);
   const waitingAgain = new Set(assessed.unheld);
-  const takenByHand = (name: string) => (resultOnBase(standings) && unrunEnding(steps, run, name)) satisfies boolean as boolean;
+  const takenByHand = (name: string) => resultOnBase(standings) && unrunEnding(steps, run, name);
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
@@ -406,7 +406,7 @@ function listedSteps(
   const atGates = new Set<string>();
   const priced = new Set<string>();
   const rows = steps.map((step) => {
-    const row = lineOf(step);
+    const row: Listing['steps'][number] = lineOf(step);
     const spent = stepSpend(run, step.name, spendOf);
     const cost = spendKnown(spent) && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
@@ -448,26 +448,10 @@ function listedSteps(
     const stands: StepStatus = !taskId && routed.get(name) === 'awaiting approval' ? 'awaiting approval' : stoodAs;
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return {
-          name,
-          message: checkoutWord(checkout),
-          ...coded({ reason: 'Waiting', on: 'base' }),
-          baseHeldBy: checkout,
-          branch,
-        } satisfies Listing['steps'][number] as Listing['steps'][number];
-      return {
-        name,
-        ...unfiled(step, waiting, held, assessed.waitingOnNeeds),
-        branch,
-      } satisfies Listing['steps'][number] as Listing['steps'][number];
+        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), baseHeldBy: checkout, branch };
+      return { name, ...unfiled(step, waiting, held, assessed.waitingOnNeeds), branch };
     }
-    if (waitingAgain.has(name))
-      return {
-        name,
-        message: 'pending',
-        ...coded({ reason: 'Pending' }),
-        branch,
-      } satisfies Listing['steps'][number] as Listing['steps'][number];
+    if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
     if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
@@ -475,39 +459,20 @@ function listedSteps(
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
-      return {
-        name,
-        message: budgetStatus(step, status),
-        ...coded(REASON_OF[status]),
-        branch,
-      } satisfies Listing['steps'][number] as Listing['steps'][number];
+      return { name, message: budgetStatus(step, status), ...coded(REASON_OF[status]), branch };
     }
     if (status === 'awaiting approval') {
       atGates.add(name);
-      return {
-        name,
-        message: 'awaiting approval',
-        ...coded({ reason: 'AwaitingApproval' }),
-        branch,
-      } satisfies Listing['steps'][number] as Listing['steps'][number];
+      return { name, message: 'awaiting approval', ...coded({ reason: 'AwaitingApproval' }), branch };
     }
     if (status === 'exhausted') {
       exhausted.add(name);
-      return {
-        name,
-        message: 'rounds exhausted',
-        ...coded({ reason: 'AwaitingRound' }),
-        branch,
-      } satisfies Listing['steps'][number] as Listing['steps'][number];
+      return { name, message: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
-    if (judged) return { name, ...judged, branch } satisfies Listing['steps'][number] as Listing['steps'][number];
+    if (judged) return { name, ...judged, branch };
 
-    return {
-      name,
-      ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }),
-      branch,
-    } satisfies Listing['steps'][number] as Listing['steps'][number];
+    return { name, ...taskWord(status, taskId, closeoutOf(name), { phaseOf, parkedOf, waitingOf, sessionBlocked }), branch };
   }
 
   function budgetStatus(step: StepSpec, status: StepStatus) {
@@ -717,7 +682,7 @@ export const harnessWaitLine = (waitingFor: string, session: string | null, remo
 /** What a step's landing adds to its note, cut to one line (`LANDED_CAP`): nothing for one that left the base untouched, or none yet. */
 function landingWord(run: Run, name: string) {
   const landed = run.steps[name]?.landed;
-  return (landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '') satisfies string as string;
+  return landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
 }
 
 /** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
@@ -795,7 +760,7 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold' | 'cancelledAt'>, step
  * (`onBaseNote`), else the approval and the send-back (`gateNote`). Pure.
  */
 const atGateNote = (step: StepSpec, run: Run, byHand: boolean, standings: Parameters<typeof onBaseNote>[2]) =>
-  (byHand ? onBaseNote(run, step.name, standings) : gateNote(run, step.name, sendBackTo(step, run))) satisfies string as string;
+  byHand ? onBaseNote(run, step.name, standings) : gateNote(run, step.name, sendBackTo(step, run));
 
 /**
  * The send-back an ending approved and not filed still offers (`unfiledBack`), beside what it waits for: the work it would act on, sent
@@ -803,9 +768,7 @@ const atGateNote = (step: StepSpec, run: Run, byHand: boolean, standings: Parame
  */
 const backNote = (step: StepSpec, run: Run) => {
   const back = unfiledBack(step, run);
-  return (back.length
-    ? `or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}`
-    : '') satisfies string as string;
+  return back.length ? `or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : '';
 };
 
 /**

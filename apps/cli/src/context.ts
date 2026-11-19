@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import type { Chosen, ClientConfig, Context, ContextOf } from '../contracts/context.contract.ts';
+import type { Chosen, ClientConfig, ContextOf } from '../contracts/context.contract.ts';
 import { LOCAL_CONTEXT } from './local-context.ts';
 import { Refused } from './refused.ts';
 

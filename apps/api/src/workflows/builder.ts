@@ -492,9 +492,9 @@ export async function write(
  */
 export const writtenAt = (at: string) => {
   try {
-    return fs.statSync(at).mtime.toISOString() satisfies string as string;
+    return fs.statSync(at).mtime.toISOString();
   } catch {
-    return new Date(0).toISOString() satisfies string as string;
+    return new Date(0).toISOString();
   }
 };
 

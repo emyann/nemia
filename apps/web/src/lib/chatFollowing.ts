@@ -38,9 +38,6 @@ export type ChatAsk = Extract<ChatEvent, { kind: 'question' | 'proposal' | 'perm
 /** Whether an event of her chat is an ask of hers. */
 const isAsk = (event: ChatEvent): event is ChatAsk => event.kind === 'question' || event.kind === 'proposal' || event.kind === 'permission';
 
-/** How an ask is drawn: as the action buttons of a proposal, as the radio form of one question, or as the flow of several. */
-type AskDrawn = 'actions' | 'form' | 'many';
-
 /**
  * How the ask `questions` is drawn, the canvas's three boards: `many` for several questions (board 7b, a tab for each and a recap);
  * `actions` for one question whose every choice carries no explanation, which the proposal's buttons say whole (boards 5 and 6); and

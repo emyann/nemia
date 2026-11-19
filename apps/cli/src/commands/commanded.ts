@@ -53,12 +53,12 @@ export async function commanded(name: MovedCommand, rest: readonly string[]) {
   if (words === undefined) throw new Error(`${name} is in MOVED_COMMANDS and has no words in objects' COMMAND_WORDS: add them there`);
   if (words.manual !== undefined && rest.includes('--help')) {
     process.stdout.write(`${words.manual}\n`);
-    return 0 satisfies number as number;
+    return 0;
   }
   const args = parsed(words.spec, rest);
   if (args === undefined) {
     process.stdout.write(`${helpOf([words])}\n`);
-    return 0 satisfies number as number;
+    return 0;
   }
   const wrong = words.check?.(args);
   if (wrong) throw new Refused(wrong);

@@ -82,9 +82,6 @@ export function claudeTrustText(text: string, key: string) {
   return { text: `${JSON.stringify(next, null, 2)}${text.endsWith('\n') ? '\n' : ''}` } satisfies TrustText as TrustText;
 }
 
-/** What `claudeTrust` answers: whether it wrote the key, and why it could not where it neither wrote it nor found it set. */
-type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
-
 /** The bytes of `file`, or null where there is none. */
 const bytesOf = (file: string) => {
   try {

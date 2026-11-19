@@ -108,7 +108,7 @@ function placeOf(query: PlaceQuery, home: string) {
  * @param place The repository and factory the request is answered in.
  */
 export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>) {
-  if (place.repo !== undefined) return place.repo satisfies string as string;
+  if (place.repo !== undefined) return place.repo;
   if (place.factory !== undefined) {
     const repos = [...workedOn(place.factory)].sort();
     if (!repos.length)

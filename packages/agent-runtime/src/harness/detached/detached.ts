@@ -383,7 +383,7 @@ const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(r
 export const besideRun = (spec: Pick<HarnessSpec, 'name'>, root: string, name: string, end: string) => {
   if (end === 'json' || end.endsWith('.json') || !/^[a-z][a-z.-]*$/.test(end))
     throw new Error(`\`${end}\` is no end for a file beside a run: give a lowercase word other than \`json\`, as \`bridge\` is`);
-  return path.join(root, 'runs', spec.name, `${safe(name)}.${end}`) satisfies string as string;
+  return path.join(root, 'runs', spec.name, `${safe(name)}.${end}`);
 };
 const inboxFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.inbox.jsonl`);
 
@@ -432,7 +432,7 @@ const LAUNCHED_END = 'launched';
  * (`workerSeen`) only where its beat is stale. Every reader of a run's state on a look takes it from here.
  */
 const wordOf = (spec: HarnessSpec, root: string, name: string, run: RunFile, now: Instant) =>
-  leased(run, now, () => workerSeen(besideRun(spec, root, name, LAUNCHED_END))) satisfies string as string;
+  leased(run, now, () => workerSeen(besideRun(spec, root, name, LAUNCHED_END)));
 
 /**
  * Whether the run of `spec` under `name` lost its worker: its run file says `working`, its heartbeat is stale and its worker is not
@@ -886,6 +886,9 @@ const LEFT_RUNNING = (name: string, { group, scope }: Left) => {
   );
 };
 
+/** What a look at a run finds: its sighting, a warning, or both. */
+type Looked = { sighting?: Sighting; warning?: string };
+
 /** `detachedOps`, its workers' bounds read. */
 const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>, at: ScopeAt) => {
   const dir = path.join(root, 'runs', spec.name);
@@ -945,13 +948,9 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
   const lookAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]) => {
     const word = wordOf(spec, root, name, run, now);
     const { as, output, warning } = lookOf(spec, name, run, word, () => outputOf(name, run, word), logFile(name));
-    if (as === 'unread')
-      return { warning } satisfies { sighting?: Sighting; warning?: string } as { sighting?: Sighting; warning?: string };
+    if (as === 'unread') return { warning } satisfies Looked as Looked;
     const usage = usageOf(run, output?.read, all);
-    return withSpent(spec, run, sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning) satisfies {
-      sighting?: Sighting;
-      warning?: string;
-    } as { sighting?: Sighting; warning?: string };
+    return withSpent(spec, run, sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning);
   };
 
   return {

@@ -99,19 +99,19 @@ export function barOf(value: unknown) {
 export function barValue(bar: Bar) {
   switch (bar.kind) {
     case 'start':
-      return (bar.factory === null ? ASKING : `start:${bar.factory}`) satisfies string as string;
+      return bar.factory === null ? ASKING : `start:${bar.factory}`;
     case 'factory':
-      return `factory:${bar.factory}` satisfies string as string;
+      return `factory:${bar.factory}`;
     case 'run':
-      return `run:${bar.run}` satisfies string as string;
+      return `run:${bar.run}`;
     case 'step':
-      return `step:${bar.run}/${bar.step}` satisfies string as string;
+      return `step:${bar.run}/${bar.step}`;
     case 'spec':
-      return `spec:${bar.from}/${bar.workflow}/${bar.step}` satisfies string as string;
+      return `spec:${bar.from}/${bar.workflow}/${bar.step}`;
     case 'gauges':
-      return GAUGES satisfies string as string;
+      return GAUGES;
     case 'waiting':
-      return WAITING satisfies string as string;
+      return WAITING;
   }
 }
 

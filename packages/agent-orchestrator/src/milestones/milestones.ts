@@ -5,7 +5,7 @@
  * (`milestonesNow`, `milestones.verb.ts`).
  */
 import type { Milestone, MilestoneState } from 'objects';
-import type { MilestoneFacts, MilestonesOf, MilestoneStates } from '../../contracts/milestones.contract.ts';
+import type { MilestoneFacts, MilestonesOf } from '../../contracts/milestones.contract.ts';
 
 export type { MilestoneFacts, MilestoneStates } from '../../contracts/milestones.contract.ts';
 

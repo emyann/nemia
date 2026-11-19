@@ -27,9 +27,6 @@ export type SkillRow = {
 /** One place, in the order an agent of yours finds a name, the builtin last; its folder, null where it holds no skill to say it. */
 export type SkillPlace = { from: SkillSource; dir: string | null; skills: SkillRow[] };
 
-/** A builtin skill copied: the copy as it now reads in your library. */
-type SkillAdded = { skill: SkillRow };
-
 /** The folder a skill's folder is in: its place's. */
 const parentOf = (dir: string) => dir.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
 

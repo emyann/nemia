@@ -4,7 +4,7 @@
  * chat). Pure and level-triggered: the pane covered by the docked sheet under 1600 is read from what holds now, never written as the
  * person's fold, so it comes back as it was the moment the sheet closes.
  */
-import type { FrameAt, FrameFold, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
+import type { FrameAt, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
 
 export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
 

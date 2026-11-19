@@ -38,7 +38,7 @@ export const stepStamp = <S extends Pick<RunStepStatus, 'taskId' | 'attempts' | 
   const now = c
     ? [c.try, c.round, c.phase, c.reason, c.outcome ?? '-', c.verdict ? `${c.verdict.result}:${c.verdict.exit ?? '-'}` : '-'].join('.')
     : '-';
-  return `${step.taskId ?? '-'}|${step.attempts.count}|${now}` satisfies string as string;
+  return `${step.taskId ?? '-'}|${step.attempts.count}|${now}`;
 };
 
 /**

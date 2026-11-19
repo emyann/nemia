@@ -546,12 +546,12 @@ function readSaidBefore(home: string, id: string) {
 export const markCancelled = (home: string, id: string, actor?: Actor) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const at = new Date().toISOString();
-  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return (readCancelled(home, id)?.at || at) satisfies string as string;
+  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return readCancelled(home, id)?.at || at;
   try {
     fs.writeFileSync(cancelFile(home, id), actor ? JSON.stringify({ at, actor }) : at, { flag: 'wx' });
-    return at satisfies string as string;
+    return at;
   } catch {
-    return (readCancelled(home, id)?.at || at) satisfies string as string;
+    return readCancelled(home, id)?.at || at;
   }
 };
 
@@ -733,8 +733,7 @@ export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, v
 }
 
 /** Why a message is refused: one that is not text, or one with nothing in it. */
-const messageWords = (held: unknown) =>
-  (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text') satisfies string as string;
+const messageWords = (held: unknown) => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
 
 /** Why an approval file is refused, by the field refused: one written by hand where `nemia approve` would have refused it. */
 const APPROVAL_WORDS: Record<string, string> = {
@@ -874,11 +873,11 @@ export function roundAskIn(file: string, step: string, round: number) {
 
 /** Why an ask file cannot be read, by the field its schema refused (`refused`) of what it holds (`held`). */
 function askRefusal(refused: string, held: unknown) {
-  if (refused === 'model') return 'its model is not a name' satisfies string as string;
-  if (refused === 'message') return messageWords(held) satisfies string as string;
-  if (refused === 'budget') return BUDGET_WORDS satisfies string as string;
-  if (refused === 'interrupted') return 'the task it names as interrupted is not an id' satisfies string as string;
-  return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})` satisfies string as string;
+  if (refused === 'model') return 'its model is not a name';
+  if (refused === 'message') return messageWords(held);
+  if (refused === 'budget') return BUDGET_WORDS;
+  if (refused === 'interrupted') return 'the task it names as interrupted is not an id';
+  return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
 }
 
 /**
@@ -1196,8 +1195,7 @@ const rewriteNow = (
  * @param run The run, by its id.
  * @param step The step's name.
  */
-export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string) =>
-  path.join(runsDir(home), run.id, 'artifacts', step) satisfies string as string;
+export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string) => path.join(runsDir(home), run.id, 'artifacts', step);
 
 /**
  * The directory `nemia start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file
@@ -1209,7 +1207,7 @@ export const artifactsDir = (home: string, run: Pick<Run, 'id'>, step: string) =
  * @param home The store's root folder.
  * @param run The run, by its id.
  */
-export const inputsDir = (home: string, run: Pick<Run, 'id'>) => inputsRoot(runsDir(home), run.id) satisfies string as string;
+export const inputsDir = (home: string, run: Pick<Run, 'id'>) => inputsRoot(runsDir(home), run.id);
 
 /**
  * The directory `nemia start --card` copies each card a run is handed into, as `<name>.md`: `cards/` under its inputs (`inputsDir`).

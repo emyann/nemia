@@ -9,7 +9,7 @@
  *
  * Whether a process holds the pause is a fact beside the mode, not a mode: it decides when a `lapse` is seen, and nothing else.
  */
-import type { PauseEvent, PauseMode, PauseMove, PauseMoved } from '../../contracts/pause-machine.contract.ts';
+import type { PauseEvent, PauseMode, PauseMoved } from '../../contracts/pause-machine.contract.ts';
 
 export type { PauseEvent, PauseMode, PauseMove, PauseRefusal } from '../../contracts/pause-machine.contract.ts';
 

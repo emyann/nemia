@@ -18,7 +18,7 @@
  * rest. A git older than 2.41 lists no distance at all: each branch is then asked one by one. Refuses a repository git cannot list and,
  * where a branch is asked of, a `base` git cannot read.
  */
-import { Failed, git, gitSays, isDirectory, refused, type Asking } from '../git.ts';
+import { Failed, git, gitSays, isDirectory, refused } from '../git.ts';
 import type { BranchStood, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A branch asked of: its name, the tip its run recorded, the commit its run was cut at, and what was last read of it. */

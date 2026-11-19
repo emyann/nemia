@@ -19,9 +19,7 @@ const listeners = new Set<() => void>();
 
 /** The status a refusal carries, where it carries one. */
 const statusOf = (error: unknown) =>
-  (typeof error === 'object' && error !== null && typeof Reflect.get(error, 'status') === 'number'
-    ? Reflect.get(error, 'status')
-    : 0) satisfies number as number;
+  typeof error === 'object' && error !== null && typeof Reflect.get(error, 'status') === 'number' ? Reflect.get(error, 'status') : 0;
 
 /**
  * Claims the first-visit link the page's address carries, if it carries one: the address loses it first (`history.replaceState`), then

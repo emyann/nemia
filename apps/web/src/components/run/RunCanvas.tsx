@@ -188,11 +188,9 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
 
   const nodes = useMemo(() => {
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
-    return placed.flatMap((node) => {
+    return placed.flatMap<StepFlowNode>((node) => {
       const index = indexOf.get(node.id);
-      return (
-        index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }]
-      ) satisfies StepFlowNode[];
+      return index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }];
     });
   }, [placed, run, selected]);
 

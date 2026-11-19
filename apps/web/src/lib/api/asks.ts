@@ -24,12 +24,6 @@ export type QuestionAnswer = NonNullable<RunApprove['answers']>[number];
  */
 export type { RetryMode } from 'objects';
 
-/** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
-type AskedTry = { try: number; file: string; stopFirst: boolean };
-
-/** What an ask for a round answers: the looping step, the round asked for, and its ask file. */
-type AskedRound = { step: string; round: number; file: string };
-
 /**
  * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones; and
  * of a round's.
@@ -43,9 +37,6 @@ const retryRoute = (namespace: string, runId: string, step: string) =>
 
 const TRY_MAY = "The ask may be written: look at the step's note on the run's page before asking again.";
 const ROUND_MAY = "The ask may be written: look at the looping step's note on the run's page before asking again.";
-
-/** What an approval answers: the try approved, when, its words — null for none — and the approval's file. */
-type Approved = { try: number; at: string; message: string | null; file: string };
 
 /**
  * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,

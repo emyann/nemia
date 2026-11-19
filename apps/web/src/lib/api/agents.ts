@@ -4,16 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
-import {
-  AgentInstructions as AgentInstructionsAnswer,
-  AgentInstructionsCleared as AgentInstructionsClearedAnswer,
-  DEFAULT_NAMESPACE,
-  type Agent,
-  type AgentInstructions,
-  type AgentInstructionsCleared,
-  type AgentSpec,
-  type DefinitionOrigin,
-} from 'objects';
+import { AgentInstructions as AgentInstructionsAnswer, AgentInstructionsCleared as AgentInstructionsClearedAnswer, DEFAULT_NAMESPACE, type Agent, type AgentInstructions, type AgentSpec, type DefinitionOrigin } from 'objects';
 import { agents as served, call, read, write, type Refuse } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 import { cardEntryOf, originWord, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
@@ -205,9 +196,6 @@ const specOfDraft = (draft: AgentDraft) => ({
   instructions: draft.body,
 });
 
-/** An agent written: the agent as it now reads. */
-type AgentSaved = { agent: AgentListing };
-
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
  * 404 for an agent gone, 409 for one changed since it was read, a name taken, or an agent still named. Null for no answer.
@@ -260,9 +248,6 @@ export const saveAgent = async (name: string, version: string, draft: AgentDraft
  */
 export const removeAgent = async (name: string, version: string) => agentViewOf(await served.delete(name, version, refused));
 
-/** The run a try started, which its page follows. */
-type AgentTried = { id: string };
-
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
@@ -275,9 +260,6 @@ export const tryAgent = async (name: string, brief: string) => ({
 
 /** A person's custom instructions for an agent: the file they are kept in, their words (null for none), and why they do not read. */
 export type CustomInstructions = AgentInstructions;
-
-/** The file a clear looked at, and whether it removed words. */
-type CustomInstructionsCleared = AgentInstructionsCleared;
 
 /** Nemia's own name: her custom instructions are hers (`/api/nemia/instructions`), every other agent's its name's. */
 const NEMIA = 'nemia';

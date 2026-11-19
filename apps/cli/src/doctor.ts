@@ -383,14 +383,14 @@ async function fix(args: readonly string[], env: NodeJS.ProcessEnv) {
     (await asked('doctor fix', (client) => client.readiness.fixOf({ params: { id: started.id } }), env));
   if (ended.phase === 'succeeded') {
     process.stderr.write(`fix ${ended.id} of ${typed.need} succeeded: see the read again with \`nemia doctor\`\n`);
-    return 0 satisfies number as number;
+    return 0;
   }
   process.stderr.write(
     ended.phase === 'failed'
       ? `fix ${ended.id} of ${typed.need} failed${ended.exitCode === undefined ? '' : ` (exit ${ended.exitCode})`}: read its output above, then \`nemia doctor\`\n`
       : `fix ${ended.id} of ${typed.need} is still ${ended.phase}, its output no longer followed: see where it stands with \`nemia doctor\`\n`,
   );
-  return 1 satisfies number as number;
+  return 1;
 }
 
 /**

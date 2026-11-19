@@ -297,13 +297,13 @@ export type HandedFiles = { there: string[]; gone: number };
  * @param bytes The size, in bytes.
  */
 export const sizeOf = (bytes: number) =>
-  (bytes < 1024
+  bytes < 1024
     ? `${bytes} B`
     : bytes < 1024 ** 2
       ? `${(bytes / 1024).toFixed(1)} KB`
       : bytes < 1024 ** 3
         ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
-        : `${(bytes / 1024 ** 3).toFixed(2)} GB`) satisfies string as string;
+        : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
 /**
  * The folders of the run's artifacts (`runArtifacts`, one folder per step under it) a step is filed with, each read-only: the folder of

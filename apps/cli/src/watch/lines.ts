@@ -123,6 +123,4 @@ export const livenessOf = (state: Liveness['state'], base: string, cursor: numbe
  * @param json Whether the watch prints as JSON (`--json`): false where it is left out.
  */
 export const livenessWords = (l: Liveness, json = false) =>
-  (json
-    ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text })
-    : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`) satisfies string as string;
+  json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

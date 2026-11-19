@@ -47,9 +47,6 @@ const BOUND = 120_000;
 /** The sign-in a refusal names: gh signed in to github.com in a browser, with the `workflow` scope a push of a CI file takes. */
 const SIGN_IN = 'gh auth login --hostname github.com --web --git-protocol https --scopes workflow';
 
-/** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
-type Ran = { status: number | null; out: string; err: string; missing: boolean };
-
 /** Run `cmd` with `args`, bounded, reading nothing from stdin. */
 function run(cmd: string, args: string[]) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });

@@ -60,7 +60,7 @@ const readOf = (written: StepRead, filled: StepRead, hired: string | undefined, 
 
 /** The refusal of a step its own file and the factory's hire both fill: it names the fix. */
 const bothFill = (f: HiringFactory, workflow: string, step: string, written: string, hired: string) =>
-  `the step ${step} of ${workflow} names its own agent, ${written}, and the factory ${f.name} hires ${hired} into it too, which a start refuses: fire the hire with nemia factory fire ${f.name} --step ${workflow}/${step}, or take the agent: line out of the step` satisfies string as string;
+  `the step ${step} of ${workflow} names its own agent, ${written}, and the factory ${f.name} hires ${hired} into it too, which a start refuses: fire the hire with nemia factory fire ${f.name} --step ${workflow}/${step}, or take the agent: line out of the step`;
 
 /** The steps of the folder `dir` by their files, for a folder that does not read: each markdown file but its README. */
 const stepFiles = (dir: string) => {

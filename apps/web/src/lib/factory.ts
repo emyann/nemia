@@ -60,8 +60,7 @@ export const toDecideOf = (run: { toDecide?: Frozen<RunToDecide> | null }) => ru
  * @param run The run: the steps that wait on you, when it was called off, and what it waits on and who holds it.
  */
 export const waitsOnYou = (run: Frozen<Pick<RunView, 'waitingOnYou' | 'cancelledAt'> & Held>) =>
-  (!run.cancelledAt &&
-    (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou))) satisfies boolean as boolean;
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
  * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
@@ -336,9 +335,6 @@ function reachesAround(edges: readonly RunEdge[], edge: RunEdge) {
   return false;
 }
 
-/** A faint line on the Factory from a run another reads as context (`--from`) to the card that reads it. */
-type ContextEdge = { id: string; source: string; target: string };
-
 /**
  * The lines of what the focused card reads: one from each run in its `context` that is on the floor, to it. None without a focus — the
  * card hovered, else the one selected — so the floor draws only its waits until a person looks at a card.
@@ -383,10 +379,10 @@ export const readsLines = (run: Frozen<Pick<RunView, 'context'>>, runs: Readonly
  * @param repo The repository's path.
  */
 export const repoName = (repo: string) =>
-  (repo
+  repo
     .split(/[\\/]+/)
     .filter(Boolean)
-    .at(-1) ?? repo) satisfies string as string;
+    .at(-1) ?? repo;
 
 /**
  * Oldest first, so a run that starts takes the next free cell and moves no card already down.

@@ -370,7 +370,7 @@ const writePruned = (home: string, id: string, marker: Pruned | undefined) => {
  * repository, since a card's `repo:` says which one the idea is about.
  * @param home The store's root folder.
  */
-export const inboxDir = (home: string) => path.join(home, 'inbox') satisfies string as string;
+export const inboxDir = (home: string) => path.join(home, 'inbox');
 
 /** Where `nemia rm` writes down the engine's tasks of the runs it forgets: beside `runs/`, since each `runs/<id>.*` goes with a record. */
 const forgettingDir = (home: string) => path.join(home, 'forgetting');

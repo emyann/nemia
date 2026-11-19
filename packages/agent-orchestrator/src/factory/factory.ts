@@ -16,7 +16,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { dollars } from '../money/money.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
-import type { NamedRepo, WorkflowRepo, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
+import type { WorkflowRepo, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
 import type { ScheduleRepoRefusal, ScheduleRepoRefusalOf } from '../../contracts/schedule-repo.contract.ts';
 import type {
   ConditionStatus,
@@ -673,7 +673,7 @@ export function noFactoryRefusal(at: string, names: readonly string[], fix: stri
   const skipped = unread.length
     ? ` These factories' files do not read, and were not looked at: ${[...unread].sort().join(', ')} (nemia factory ls).`
     : '';
-  return `${path.resolve(at)}: no factory works on this folder, and every run is started in a factory. Name the factory — ${fix}, ${choices(names)} — or file one on this repository and attach the workflow to it: nemia factory add <name> --volume <root>:rw, then nemia factory attach <name> <workflow>.${skipped} Nothing was started.` satisfies string as string;
+  return `${path.resolve(at)}: no factory works on this folder, and every run is started in a factory. Name the factory — ${fix}, ${choices(names)} — or file one on this repository and attach the workflow to it: nemia factory add <name> --volume <root>:rw, then nemia factory attach <name> <workflow>.${skipped} Nothing was started.`;
 }
 
 /**
@@ -697,7 +697,7 @@ export function ambiguousFactoryRefusal(at: string, holding: readonly Holding[],
  * @param names The store's factories, by name.
  */
 export const defaultStartRefusal = (fix: string, names: readonly string[]) =>
-  `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.` satisfies string as string;
+  `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.`;
 
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory, mounted for
@@ -948,7 +948,7 @@ export function factoryLines(
  * @param names The store's factories, by name.
  */
 export const noFactoryLine = (name: string, names: readonly string[]) =>
-  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --volume <path|url>:rw.'}` satisfies string as string;
+  `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --volume <path|url>:rw.'}`;
 
 /**
  * Why `factory` cannot be relieved of `workflow`: it has not attached it, naming those it offers.
@@ -994,7 +994,7 @@ export const costLinedDetachRefusal = (factory: string, workflow: string) =>
  */
 export const unhiredFireRefusal = (factory: string, step: string, hires: Hires) => {
   const there = Object.keys(hires).sort();
-  return `${factory} hires no agent into ${step}. ${there.length ? `It hires into: ${there.join(', ')}.` : 'It hires none.'} Nothing was fired.` satisfies string as string;
+  return `${factory} hires no agent into ${step}. ${there.length ? `It hires into: ${there.join(', ')}.` : 'It hires none.'} Nothing was fired.`;
 };
 
 /**
@@ -1012,7 +1012,7 @@ export const unofferedScheduleRefusal = (factory: string, workflow: string) =>
  * @param scheduled The workflows it schedules, by folder name.
  */
 export const unscheduledRefusal = (factory: string, workflow: string, scheduled: readonly string[]) =>
-  `${factory} does not schedule ${workflow}. ${scheduled.length ? `It schedules: ${[...scheduled].sort().join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.` satisfies string as string;
+  `${factory} does not schedule ${workflow}. ${scheduled.length ? `It schedules: ${[...scheduled].sort().join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.`;
 
 /**
  * Why a factory `name` is not filed: there is one already, at `file`, left as it was.

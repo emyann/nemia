@@ -47,8 +47,7 @@ export const rulesAt = (home: string, factory: Pick<Factory, 'name' | 'tree'>) =
  * @param home The store's root.
  * @param factory The factory: its name, and its tree where it was made from a template.
  */
-export const rulesAtHome = (home: string, factory: Pick<Factory, 'name' | 'tree'>) =>
-  rulesFile(factory, rulesFolderAt(home, factory.name)) satisfies string as string;
+export const rulesAtHome = (home: string, factory: Pick<Factory, 'name' | 'tree'>) => rulesFile(factory, rulesFolderAt(home, factory.name));
 
 /**
  * The rules kept at `file`, read afresh (`RulesRead`). A link is not read: the store keeps its own file, and words read through a link
@@ -132,7 +131,7 @@ export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree
   fs.mkdirSync(folder, { recursive: true });
   fs.rmSync(file, { recursive: true, force: true });
   fs.writeFileSync(file, words.trim() + '\n');
-  return file satisfies string as string;
+  return file;
 }
 
 /**

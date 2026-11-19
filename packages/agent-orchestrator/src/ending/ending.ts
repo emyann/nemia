@@ -283,8 +283,7 @@ export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAs
  * still working, so a step with no session of its own would be drawn as one whose session is running.
  * @param hold The run and step that hold the checkout.
  */
-export const checkoutWord = (hold: CheckoutHold) =>
-  `waiting on the checkout (${hold.run}'s ${hold.step} has it)` satisfies string as string;
+export const checkoutWord = (hold: CheckoutHold) => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 
 /**
  * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees

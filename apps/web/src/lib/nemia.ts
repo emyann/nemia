@@ -141,9 +141,6 @@ export function composerWords(presence: Presence, asking = false, refused = fals
   return 'Tell Nemia what to do, or ask';
 }
 
-/** What the composer's one button does: send what is written, or end the turn she is answering. */
-type ComposerButton = 'send' | 'stop';
-
 /**
  * What the composer's button is, by where she is: the stop while she answers, since a turn of hers can be ended without ending her
  * session; the send otherwise, and while this browser keeps a message the api would not take, where nothing of hers can be reached at

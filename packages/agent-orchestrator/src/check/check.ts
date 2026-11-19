@@ -227,7 +227,7 @@ export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: str
  */
 export function lastLines(text: string, n = CHECK_TAIL_LINES) {
   const lines = text.replace(/\s+$/, '').split('\n');
-  return lines.slice(-n).join('\n') satisfies string as string;
+  return lines.slice(-n).join('\n');
 }
 
 /**

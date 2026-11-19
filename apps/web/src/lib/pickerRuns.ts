@@ -5,10 +5,7 @@
  */
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { judged } from './api/judged.ts';
-import { finishedPagesQuery, openRunsQuery, type FinishedPage, type FinishedRun, type ListedRun, type OpenRuns } from './api/runs.ts';
-
-/** The runs a picker lists: the open, newest created first, then the finished, newest finished first. */
-type PickedRuns = { open: ListedRun[]; finished: FinishedRun[] };
+import { finishedPagesQuery, openRunsQuery, type FinishedPage, type OpenRuns } from './api/runs.ts';
 
 /**
  * The runs a picker lists, off the open runs and the finished pages read so far: the runs that wait and those in flight together, each

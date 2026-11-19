@@ -31,16 +31,8 @@ export type PermissionFacts = typeof PermissionFactsAnswer.Type;
 export type ChatEvent = typeof ChatEventAnswer.Type;
 /** Where she is: up, answering, how many asks wait on the person, and how many messages they have not read. */
 export type ChatPresence = typeof ChatPresenceAnswer.Type;
-/** A page of her chat, with the cursor a stream resumes from and where she is. */
-type ChatHistory = typeof ChatHistoryAnswer.Type;
 /** The person's words, put in her outbox. */
 export type ChatSent = typeof ChatSentAnswer.Type;
-/** An ask of hers answered. */
-type ChatAnswer = typeof ChatAnswerAnswer.Type;
-/** Her turn ended. */
-type ChatStop = typeof ChatStopAnswer.Type;
-/** The person's read mark, moved. */
-type ChatReadMark = typeof ChatReadMarkAnswer.Type;
 
 /** What each named event of her chat's stream carries. */
 type ChatStreamData = {

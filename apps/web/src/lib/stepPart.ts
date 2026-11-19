@@ -518,7 +518,7 @@ function fieldsOf(step: StepView, spec: StepSpecView | null) {
  * else, for a file outside every folder of its step, the path its closeout gave, which is shown and never matched.
  * @param file The file, as the api serves it.
  */
-export const fileKey = (file: StepArtifact) => (file.relativePath ?? ('name' in file ? file.name : file.path)) satisfies string as string;
+export const fileKey = (file: StepArtifact) => file.relativePath ?? ('name' in file ? file.name : file.path);
 
 /** Whether a file a step's folders list is one its closeout named: the same path from the step's folder. */
 const namedAs = (named: StepArtifact, listed: StepArtifact) =>

@@ -3,7 +3,7 @@
  * of it (`broughtFacts`) and which of the run's page's own parts answers it (`broughtPart`, proved by `contracts/brought.contract.ts`).
  * Pure: the drawing is `components/nemia/chat/ChatBrought.tsx`.
  */
-import type { BroughtFacts, BroughtPart, BroughtPartOf } from '../../contracts/brought.contract.ts';
+import type { BroughtFacts, BroughtPartOf } from '../../contracts/brought.contract.ts';
 import { askedOf, offersOf } from './asks.ts';
 import { gateOfStep } from './gate.ts';
 import type { RunDetail } from './runView';

@@ -44,7 +44,7 @@ export const pageSizeOf = (limit: number | null, bounds: PageBounds) => {
  * The `continue` token that asks for the objects after `name`: its UTF-8 in base64url, with no padding.
  * @param name The name of the last object a page answered.
  */
-export const continueToken = (name: string) => Buffer.from(name, 'utf8').toString('base64url') satisfies string as string;
+export const continueToken = (name: string) => Buffer.from(name, 'utf8').toString('base64url');
 
 /** The token's refusal: it names the fix. */
 const badToken = (token: string) =>

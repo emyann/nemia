@@ -7,7 +7,7 @@
  * Kubernetes' words. The parser is pure.
  */
 import { Schema } from 'effect';
-import type { ApiRoute, KindPlural, Resource, ResourcesOf, RouteMethod } from '../contracts/discovery.contract.ts';
+import type { ApiRoute, KindPlural, ResourcesOf, RouteMethod } from '../contracts/discovery.contract.ts';
 import { API_VERSION } from './meta.ts';
 import { KINDS, RESOURCE_VERBS, type ResourceVerb } from './words.ts';
 

@@ -250,7 +250,7 @@ export const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', '
  * @param run The run.
  * @param step The step's name.
  */
-export const tryOf = (run: Run, step: string) => ((run.steps[step]?.tries?.length ?? 0) + 1) satisfies number as number;
+export const tryOf = (run: Run, step: string) => (run.steps[step]?.tries?.length ?? 0) + 1;
 
 /**
  * The try the task a step is on was first filed for, from 1: the try it is on, unless a later try kept the same task — a recheck, which
@@ -301,7 +301,7 @@ export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)) =>
  * @param n The try, from 1; the first where absent.
  */
 export const stepTaskId = (run: { readonly id: string }, step: string, n = 1) =>
-  (n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`) satisfies string as string;
+  n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
 /**
  * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that

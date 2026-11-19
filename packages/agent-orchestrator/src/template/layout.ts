@@ -451,8 +451,7 @@ export const writeExpressions = (text: string, write: (name: string) => string) 
  * @param at The key path, each part a key or a list's index.
  */
 export const spelled = (at: ReadonlyArray<string | number>) =>
-  (at.map((part, i) => (typeof part === 'number' ? `[${part}]` : i === 0 ? part : `.${part}`)).join('') ||
-    'the document') satisfies string as string;
+  at.map((part, i) => (typeof part === 'number' ? `[${part}]` : i === 0 ? part : `.${part}`)).join('') || 'the document';
 
 /** Why a source at `at` is not read: v1 carries every file in the folder. */
 const notYet = (at: ReadonlyArray<string | number>) =>

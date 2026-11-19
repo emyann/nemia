@@ -15,13 +15,7 @@
  * `/api/workflows`), and never removes what a factory uses; a factory's own definitions change the factory's way. Its laws are
  * `contracts/definition-write.contract.ts`'s.
  */
-import type {
-  DefinitionOrigin,
-  DefinitionServedOf,
-  DefinitionFound,
-  DefinitionListed,
-  HeldOriginsOf,
-} from '../../contracts/definition-served.contract.ts';
+import type { DefinitionOrigin, DefinitionServedOf, DefinitionFound, HeldOriginsOf } from '../../contracts/definition-served.contract.ts';
 import type { DefinitionWriteRefusal } from '../../contracts/definition-write.contract.ts';
 
 export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';

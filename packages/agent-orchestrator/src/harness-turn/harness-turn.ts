@@ -4,7 +4,7 @@
  * task as the engine answers it comes to (`turnCheckOf`, whose laws are contracts/harness-turn.contract.ts'). Pure: the task's view is
  * read and handed in.
  */
-import type { TurnCheckOf, TurnSeen, TurnVerdict } from '../../contracts/harness-turn.contract.ts';
+import type { TurnCheckOf, TurnSeen } from '../../contracts/harness-turn.contract.ts';
 
 export type { TurnSeen, TurnVerdict } from '../../contracts/harness-turn.contract.ts';
 

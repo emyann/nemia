@@ -5,12 +5,9 @@
  * what is left to refuse — a question answered twice or not at all, several labels where one is taken, a step that asks none — is the
  * api's, in its words.
  */
-import type { RunRetry, StepTries } from 'objects';
+import type { StepTries } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
-
-/** An answer as the api takes it. */
-type Answer = NonNullable<RunRetry['answers']>[number];
 
 /** A question a closeout asks. */
 type Question = NonNullable<StepTries['tries'][number]['closeout']>['questions'][number]['questions'][number];

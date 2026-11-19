@@ -14,13 +14,13 @@ import { when } from '../step/Facts';
  * @param bytes the size, in bytes
  */
 export const bytesWord = (bytes: number) =>
-  (bytes < 1024
+  bytes < 1024
     ? `${bytes} B`
     : bytes < 1024 ** 2
       ? `${(bytes / 1024).toFixed(1)} KB`
       : bytes < 1024 ** 3
         ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
-        : `${(bytes / 1024 ** 3).toFixed(2)} GB`) satisfies string as string;
+        : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
 /** A file the api serves: its name, its link and its kind. */
 type Served = Extract<StepArtifact, { url: string }>;

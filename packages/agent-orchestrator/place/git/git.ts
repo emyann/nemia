@@ -180,9 +180,6 @@ export type Asked = {
 /** The environment `command` runs in: the place's own, its own variables laid over it. */
 const envOf = (command: Command, asked: Asked) => (command.env ? { ...asked.env, ...command.env } : asked.env);
 
-/** A body moved one step: what it yields or returns next, or what it threw. */
-type Moved<V extends PlaceVerb> = { readonly step: IteratorResult<Command, Reply<V>> } | { readonly threw: unknown };
-
 /** `body` resumed with how its last command ended, or started with none. */
 function moved<V extends PlaceVerb>(body: Asking<Reply<V>>, ran?: Ran) {
   try {

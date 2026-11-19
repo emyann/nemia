@@ -261,9 +261,7 @@ function pushing(branch: string) {
         '  Merge what is on the remote into your branch and push again: `git fetch origin && git merge FETCH_HEAD`, or ' +
         '`git merge main-worktree/HEAD` where the base moved under you.',
     );
-  return (pushed.err || pushed.out
-    ? (pushed.err || pushed.out).trim().split('\n')[0]
-    : `${branch} is on origin`) satisfies string as string;
+  return pushed.err || pushed.out ? (pushed.err || pushed.out).trim().split('\n')[0] : `${branch} is on origin`;
 }
 
 /** A rule of `push --labels`: a run whose label `key` is `value` gets the pull request label `label`. */
@@ -376,7 +374,7 @@ function relabelled(pr: Pr, plan: { want: Set<string>; givable: Set<string> }) {
   for (const label of removing) gh('api', '-X', 'DELETE', `repos/{owner}/{repo}/issues/${pr.number}/labels/${encodeURIComponent(label)}`);
   const set = plan.want.size ? [...plan.want].join(', ') : 'none';
   const moved = [...adding.map((label) => `+${label}`), ...removing.map((label) => `-${label}`)];
-  return `#${pr.number} carries the labels its run's give: ${set}${moved.length ? ` (${moved.join(' ')})` : ''}` satisfies string as string;
+  return `#${pr.number} carries the labels its run's give: ${set}${moved.length ? ` (${moved.join(' ')})` : ''}`;
 }
 
 /** The `statusCheckRollup` of `number`, as it is now. */

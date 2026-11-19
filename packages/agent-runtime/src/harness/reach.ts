@@ -3,7 +3,7 @@
  * declaration (`declaration.ts`): pure, so a caller that only judges words asks without loading a runner.
  */
 import { own } from '../core/own.ts';
-import { HARNESS_DECLARATIONS, type FenceReach } from './declaration.ts';
+import { HARNESS_DECLARATIONS } from './declaration.ts';
 
 export type { FenceReach } from './declaration.ts';
 

@@ -30,9 +30,6 @@ const SETTINGS_TABS = [
   { to: '/tokens', label: 'Tokens' },
 ] as const;
 
-/** A tab of Settings (`SETTINGS_TABS`): its page and its name. */
-type SettingsTab = (typeof SETTINGS_TABS)[number];
-
 /**
  * The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page.
  *

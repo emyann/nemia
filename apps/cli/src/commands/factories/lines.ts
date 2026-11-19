@@ -13,7 +13,7 @@ import { pathSent, textArg } from '../requests.ts';
  * @param args The words parsed against the command's words.
  * @param key The name of the positional or flag to read.
  */
-export const textOf = (args: Args, key: string) => (textArg(args, key) ?? '') satisfies string as string;
+export const textOf = (args: Args, key: string) => textArg(args, key) ?? '';
 
 /** A git URL, `scheme://…` or `user@host:…`, which the daemon clones: sent as typed, never resolved as a path. */
 const GIT_URL = /^(?:[a-z][a-z0-9+.-]*:\/\/|[^/\s@]+@[^/\s:]+:)/i;

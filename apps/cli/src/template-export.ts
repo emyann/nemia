@@ -31,10 +31,7 @@ export const factoryNamed = (words: readonly string[]) => {
  * @param words The words typed after the bin's name.
  */
 export const exportsAFactory = (words: readonly string[]) =>
-  (words[0] === 'template' &&
-    words[1] === 'export' &&
-    !words.includes('--help') &&
-    factoryNamed(words) !== undefined) satisfies boolean as boolean;
+  words[0] === 'template' && words[1] === 'export' && !words.includes('--help') && factoryNamed(words) !== undefined;
 
 /**
  * Where the factory `name` is kept, as an export says where its hires came from: its file in this machine's store under this machine's
@@ -42,9 +39,9 @@ export const exportsAFactory = (words: readonly string[]) =>
  */
 const keptAt = (name: string, env: NodeJS.ProcessEnv) => {
   const chosen = chosenOf(env);
-  return (chosen.kind === 'remote'
+  return chosen.kind === 'remote'
     ? `${chosen.server.replace(/\/+$/, '')}/api/factories/${name}`
-    : path.join(storeRoot(env), 'factories', `${name}.json`)) satisfies string as string;
+    : path.join(storeRoot(env), 'factories', `${name}.json`);
 };
 
 /**

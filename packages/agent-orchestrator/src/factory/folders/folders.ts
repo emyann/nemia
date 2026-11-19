@@ -5,8 +5,8 @@
  * by `folders.verb.ts`.
  */
 import path from 'node:path';
-import type { FolderEntry, FolderNamesShown, FolderNamesShownOf } from '../../../contracts/folder-names.contract.ts';
-import type { FolderReach, FolderReachOf } from '../../../contracts/folder-reach.contract.ts';
+import type { FolderEntry, FolderNamesShownOf } from '../../../contracts/folder-names.contract.ts';
+import type { FolderReachOf } from '../../../contracts/folder-reach.contract.ts';
 
 export type { FolderEntry, FolderNamesShown } from '../../../contracts/folder-names.contract.ts';
 export type { FolderReach } from '../../../contracts/folder-reach.contract.ts';

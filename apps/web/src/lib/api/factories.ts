@@ -6,21 +6,7 @@
  * `McpServer` objects, their headers served masked, beside Nemia's builtin ones.
  */
 import { queryOptions } from '@tanstack/react-query';
-import {
-  DEFAULT_NAMESPACE,
-  type Factory as FactoryObject,
-  type FactoryCommands,
-  type FactoryCondition,
-  type FactoryInstruction,
-  type FactoryInstructionWrite,
-  type FactoryRules,
-  type McpServer,
-  type McpServerWrite,
-  type McpTransport,
-  type Schedule,
-  type SignInStarted,
-  type SignInState,
-} from 'objects';
+import { DEFAULT_NAMESPACE, type Factory as FactoryObject, type FactoryCommands, type FactoryCondition, type FactoryInstructionWrite, type McpServer, type McpServerWrite, type McpTransport, type Schedule } from 'objects';
 import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
 
 export type { FactoryCondition, FactoryInstruction, FactoryRules, McpServerWrite, SignInStarted, SignInState } from 'objects';

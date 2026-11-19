@@ -201,4 +201,4 @@ export async function servedWith(verb: string, env: NodeJS.ProcessEnv = process.
  * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.
  */
 export const served = async (verb: string, env: NodeJS.ProcessEnv = process.env, client: string | null = clientRelease()) =>
-  (await servedWith(verb, env, client)).base satisfies string as string;
+  (await servedWith(verb, env, client)).base;

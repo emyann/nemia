@@ -594,7 +594,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
   if ((content.template ?? factory.template) !== undefined) changed = treeRewired(home, factory, notDone) ?? changed;
   const after = fileContentOf(content, written);
   if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, `${JSON.stringify(after, null, 2)}\n`);
-  return changed satisfies string as string;
+  return changed;
 }
 
 /**

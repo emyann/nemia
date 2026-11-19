@@ -20,7 +20,7 @@ import { withoutTelemetry } from '../telemetry.ts';
 import { quote, WORDS_QUOTE } from '../../core/quote.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { CLAUDE_SIGN_IN } from './vocabulary.ts';
-import type { ClaudeSignInAsk, ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
+import type { ClaudeSignInAsk } from '../../../contracts/claude-sign-in.contract.ts';
 
 export type { ClaudeSignInAsk, ClaudeSignIn } from '../../../contracts/claude-sign-in.contract.ts';
 

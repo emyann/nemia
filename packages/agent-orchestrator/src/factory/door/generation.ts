@@ -65,5 +65,4 @@ export const generationWritten = (was: Factory | { error: string }, now: Factory
  * @param was The level file the factory held before, or undefined where none was written.
  * @param now The level file written now.
  */
-export const levelDiffers = (was: FactoryLevelFile | undefined, now: FactoryLevelFile) =>
-  ((was?.level ?? null) !== (now.level ?? null)) satisfies boolean as boolean;
+export const levelDiffers = (was: FactoryLevelFile | undefined, now: FactoryLevelFile) => (was?.level ?? null) !== (now.level ?? null);

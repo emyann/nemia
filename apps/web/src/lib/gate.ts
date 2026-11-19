@@ -69,7 +69,7 @@ export function gateOfStep(
  * Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from.
  * @param back The steps a send-back goes to.
  */
-export const backName = (back: readonly string[]) => (back.length === 1 ? back[0] : 'the work') satisfies string as string;
+export const backName = (back: readonly string[]) => (back.length === 1 ? back[0] : 'the work');
 
 /**
  * What approving an ending does, said before a person approves it, on the card and at the run page's gate alike: it runs in the

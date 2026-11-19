@@ -36,7 +36,7 @@ import { elapsedMs, purseOf, type Purse } from '../../core/clock.ts';
 import { capLeft, capSpent } from '../../core/cap.ts';
 import type { Sighting, Usage } from '../../core/index.ts';
 import { RunnerError } from '../error.ts';
-import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
+import type { RunnerOps, SpawnRequest } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
 import { claudeStreamOutput } from '../detached/output.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
@@ -565,6 +565,14 @@ const releaseOn = (root: string) =>
     })) satisfies NonNullable<RunnerOps['release']>;
 
 /**
+ * The refusal of an interrupt of session `name`, which is not answering: there is no turn to end.
+ * @param name The session's name.
+ * @param run Its run file as read, or undefined where it is no attached session.
+ */
+const noTurnToEnd = (name: string, run: AttachedRun | undefined) =>
+  new Error(`\`${name}\` is ${run ? run.state : 'not an attached session'}, so it has no turn to end. Interrupt it while it answers.`);
+
+/**
  * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is
  * the engine's (`ae/<task>/<n>`), and every verb reads the session's run file, so another process reads and stops what the holder runs.
  * `follow` is answered from `pushes`, the fan-out the holder's own message loop feeds: a session this process does not hold is
@@ -596,8 +604,7 @@ const opsOf = (
         catch: failed('spawn'),
       }),
     observe: Effect.sync(() => runs()),
-    observeFor: (expected) =>
-      Effect.sync(() => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() }) satisfies Observation),
+    observeFor: (expected) => Effect.sync(() => ({ seen: runs(expected.map((e) => e.name)), unread: new Set<string>() })),
     stop: (name) =>
       Effect.try({
         try: () => {
@@ -627,10 +634,7 @@ const opsOf = (
         try: async () => {
           const { run: file, interrupt } = filesOf(root, session.name);
           const run = readRun(file);
-          if (run?.state !== 'working')
-            throw new Error(
-              `\`${session.name}\` is ${run ? run.state : 'not an attached session'}, so it has no turn to end. Interrupt it while it answers.`,
-            );
+          if (run?.state !== 'working') throw noTurnToEnd(session.name, run);
           fs.writeFileSync(interrupt, String(process.pid));
           if (await interruptTurn(live.get(session.name))) fs.rmSync(interrupt, { force: true });
         },

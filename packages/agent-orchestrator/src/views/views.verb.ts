@@ -510,7 +510,7 @@ export const landingSaidRead = Effect.fn('landingSaid')(function* (step: string,
 /** Why what a check's task printed cannot be given: the engine's words for the read that failed. */
 const unreadWords = (taskId: string, cause: Cause.Cause<unknown>) => {
   const failed = Cause.squash(cause);
-  return `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}` satisfies string as string;
+  return `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}`;
 };
 
 /**

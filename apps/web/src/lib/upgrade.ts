@@ -4,7 +4,7 @@
  * (`atWork`); and the words of a release the server runs (`releaseWord`). Pure: the drawing is `components/settings/ServerRelease.tsx`.
  */
 import type { Release, Upgrade, UpgradesRead, VersionAnswer } from 'objects';
-import type { UpgradeOffers, UpgradeOffersOf, UpgradeOffersRead } from '../../contracts/upgrade-offers.contract.ts';
+import type { UpgradeOffersOf, UpgradeOffersRead } from '../../contracts/upgrade-offers.contract.ts';
 
 export type { UpgradeOffers } from '../../contracts/upgrade-offers.contract.ts';
 

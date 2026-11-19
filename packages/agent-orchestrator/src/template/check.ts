@@ -92,8 +92,12 @@ function originRefusals(held: Held): Refusal[] {
     const at = ['spec', 'parameters', name, 'whenOrigin'];
     const host = String(parameter.whenOrigin);
     const messages = [
-      ...(parameter.type === 'boolean' ? [] : [`whenOrigin sets a boolean, and ${name} is a ${String(parameter.type)}: make it type: boolean, or remove whenOrigin.`]),
-      ...(BARE_HOST.test(host) ? [] : [`whenOrigin is a bare lower-case host, such as example.org, and ${host} is none: write the host alone.`]),
+      ...(parameter.type === 'boolean'
+        ? []
+        : [`whenOrigin sets a boolean, and ${name} is a ${String(parameter.type)}: make it type: boolean, or remove whenOrigin.`]),
+      ...(BARE_HOST.test(host)
+        ? []
+        : [`whenOrigin is a bare lower-case host, such as example.org, and ${host} is none: write the host alone.`]),
     ];
     return messages.map((message) => ({ file: 'nemia.yaml', at, message }));
   });
@@ -490,11 +494,11 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
 
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
- * parameter or file named that the folder lacks, a `whenOrigin` that is no bare host on a boolean, a step's words, each harness's block against the runtime's knobs for it, and an
- * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
- * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
- * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin places declare, which a workflow's
- * need may fill. None for a template that passes.
+ * parameter or file named that the folder lacks, a `whenOrigin` that is no bare host on a boolean, a step's words, each harness's block
+ * against the runtime's knobs for it, and an undeclared parameter's expression in a text the render writes, at its line. `packageSkills`:
+ * Nemia's place and builtin skills, each a skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`,
+ * the lines of a file of shared lines, or undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin
+ * places declare, which a workflow's need may fill. None for a template that passes.
  * @param folder The template's folder as read: its files and documents.
  * @param packageSkills Nemia's place and builtin skills, each a skill the folder need not carry.
  * @param text The words of one of the folder's files, by its path.

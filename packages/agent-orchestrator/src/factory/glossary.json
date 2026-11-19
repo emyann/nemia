@@ -297,6 +297,11 @@
       "term": "Made repository",
       "meaning": "an empty git repository Nemia makes in its store for a factory to work on, at `<WF_ROOT>/repositories/<name>`, with one empty first commit so a run can cut a worktree (`repositoryNew`, in `packages/agent-orchestrator/src/factory/folders/folders.verb.ts`, by the place's `init`).",
       "type": "RepositoryMadeRead"
+    },
+    {
+      "term": "Followed parameter",
+      "meaning": "a template's boolean parameter declared with `whenOrigin: <host>`: a templated factory's first writable volume sets it, true where that volume was cloned from the host and false otherwise, and no later volume touches it, it is the person's by then (`originParams`, proved by `packages/agent-orchestrator/contracts/origin-params.contract.ts`, in `packages/agent-orchestrator/src/factory/volume/origin-params.ts`). The Factory's `commands.follow` says the line that sets it true.",
+      "type": "OriginParams"
     }
   ]
 }

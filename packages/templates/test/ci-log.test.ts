@@ -1,11 +1,26 @@
 /**
  * `failures`, the lines of a failing job's log `pull-request.ts` hands the next try, on a log of the board's e2e shard: a runner that
  * says the page that failed as `<tool>: FAILED — <subject>: <why>`, from each worker and again from the runner, gives that page once, with
- * the line saying what it looked like, rather than npm's tail.
+ * the line saying what it looked like, rather than npm's tail. And `declaresCi`, whether a tree declares any CI the round's check and
+ * the landing can wait on.
  */
-import { test } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { failures } from '../sdlc/carried/ci-log.ts';
+import { declaresCi, failures } from '../sdlc/carried/ci-log.ts';
+
+describe('a tree declares CI where a workflow file sits directly under .github/workflows/', () => {
+  const rows: Array<[string[], boolean]> = [
+    [['.github/workflows/ci.yml'], true],
+    [['README.md', '.github/workflows/release.yaml'], true],
+    [[], false],
+    [['README.md', '.github/dependabot.yml'], false],
+    [['.github/workflows/README.md'], false],
+    [['.github/workflows/nested/ci.yml'], false],
+    [['docs/.github/workflows/ci.yml'], false],
+  ];
+  for (const [paths, declares] of rows)
+    test(`${JSON.stringify(paths)} → ${String(declares)}`, () => assert.equal(declaresCi(paths), declares));
+});
 
 /** The page that failed, as the e2e runner names it, and the reason it gives. */
 const PAGE = 'the run page (/runs/give-the-board-a-look-e2e0) in the dark theme';

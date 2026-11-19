@@ -82,7 +82,7 @@ const BRANCH = 'wf/r-1/run';
 function based(base: Record<string, string> = {}): { repo: string; base: string } {
   const repo = scratch('wf-quick-repo-');
   git(repo, 'init', '-q', '-b', 'main');
-  commit(repo, { 'README.md': 'base\n', ...base }, 'base');
+  commit(repo, { 'README.md': 'base\n', '.github/workflows/ci.yml': 'name: ci\n', ...base }, 'base');
   const at = git(repo, 'rev-parse', 'HEAD').trim();
   git(repo, 'checkout', '-q', '-b', BRANCH);
   bareOrigin(repo);
@@ -564,11 +564,18 @@ test("REFUSED: a note or a README that says a bound on the size, or other clause
   const { before, github, local } = waysOf(CHECK);
   const check = before + github;
   const clauses = [
-    ...check.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size|tests|pages|push|wait)?/g),
+    ...check.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size|tests|pages|push|declares-ci|wait)?/g),
   ].map(([, script, verb]) => (verb ? `${script} ${verb}` : script));
-  assert.deepEqual(clauses, ['change.ts size', 'probe.ts', 'parts.ts', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, [
+    'change.ts size',
+    'probe.ts',
+    'parts.ts',
+    'pull-request.ts push',
+    'pull-request.ts declares-ci',
+    'pull-request.ts wait',
+  ]);
   assert.doesNotMatch(check, /\bnpm\b|\bnpx\b/);
-  assert.equal(local, '; else { npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test; }; fi');
+  assert.equal(local, '; else { node "$WF_CARRIED_FILES/local-check.ts"; }; fi');
   const ahead = [...before.matchAll(/node\s+"\$\{WF_(?:WORKFLOW|CARRIED)_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(size)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );

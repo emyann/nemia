@@ -85,9 +85,10 @@ type World = { repo: string; bare: string; base: string; tip: string; merged: st
  * Built once for each `extra` (`builtWorld`), then copied for each call, checkout and origin both, the copy's `origin` set to the
  * copied bare repository: every test has a world of its own to change, with the same commits.
  */
-function world({ extra }: { extra?: string } = {}): World {
-  const built = builtWorlds.get(extra) ?? builtWorld(extra);
-  builtWorlds.set(extra, built);
+function world({ extra, ci = true }: { extra?: string; ci?: boolean } = {}): World {
+  const key = `${extra ?? ''}|${String(ci)}`;
+  const built = builtWorlds.get(key) ?? builtWorld(extra, ci);
+  builtWorlds.set(key, built);
   const repo = scratch('wf-land-repo-');
   const bare = scratch('wf-origin-bare-');
   fs.cpSync(built.repo, repo, { recursive: true });
@@ -97,13 +98,20 @@ function world({ extra }: { extra?: string } = {}): World {
 }
 
 /** The worlds built so far, by their `extra`: never handed to a test, only copied. */
-const builtWorlds = new Map<string | undefined, Omit<World, 'gh'>>();
+const builtWorlds = new Map<string, Omit<World, 'gh'>>();
 
-/** The world `world` copies, built in git: `extra`, where given, a branch off the base of one commit of its own. */
-function builtWorld(extra: string | undefined): Omit<World, 'gh'> {
+/**
+ * The world `world` copies, built in git: `extra`, where given, a branch off the base of one commit of its own; its base declares a CI
+ * workflow (`.github/workflows/ci.yml`) where `ci`, and none otherwise.
+ */
+function builtWorld(extra: string | undefined, ci: boolean): Omit<World, 'gh'> {
   const repo = scratch('wf-land-repo-');
   gitIn(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n');
+  if (ci) {
+    fs.mkdirSync(path.join(repo, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(repo, '.github', 'workflows', 'ci.yml'), 'name: ci\n');
+  }
   gitIn(repo, 'add', '-A');
   gitIn(repo, 'commit', '-qm', 'base');
   const base = gitIn(repo, 'rev-parse', 'HEAD').trim();
@@ -432,6 +440,23 @@ test('REFUSED: a ci that is red, one still running, and a head no ci judged at a
   assert.match(a.err, /no `ci` context was reported for #7 at [0-9a-f]{12}/);
   assert.match(a.err, /nothing has judged the commit that would land/);
   assert.equal(asked(a.calls, 'pr', 'merge').length, 0);
+});
+
+test('a head that declares no CI workflow merges with no context reported, saying it waited on none; its receipt waits on none', () => {
+  const w = world({ ci: false });
+  w.gh.answers([
+    ...mergeable(w).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [] }) },
+  ]);
+  const r = land(w, 'merge', args());
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /declares no CI workflow/);
+  assert.equal(asked(r.calls, 'pr', 'view').length, 0, 'no rollup is read for a context that will not come');
+  assert.equal(asked(r.calls, 'pr', 'merge').length, 1);
+  w.gh.answers(landed(w));
+  const receipt = land(w, 'receipt', receiptArgs());
+  assert.equal(receipt.code, 0, receipt.err);
+  assert.equal(waited(receipt.calls).length, 0, 'nor is the merge commit waited on');
 });
 
 test('merge reads the latest run of its check, as the wait does: a red run a later green one replaced is no verdict, and a green one a later red replaced is none either', () => {

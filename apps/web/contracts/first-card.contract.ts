@@ -43,13 +43,12 @@ export type RunCost = { readonly ms: number; readonly dollars: number };
 export type CostLine = { readonly kind: 'measured' | 'estimate' } & RunCost;
 
 /** Whether the stats measured a landed run's cost and time. */
-const measured = (m: LandedMeasure): boolean =>
-  m.landed !== null && m.landed > 0 && m.costPerLanded !== null && m.timePerLanded !== null;
+const measured = (m: LandedMeasure): boolean => m.landed !== null && m.landed > 0 && m.costPerLanded !== null && m.timePerLanded !== null;
 
 const costLineOfSpec = spec<(stats: LandedMeasure | undefined, estimate: RunCost) => CostLine>({
   ensures: {
     measuredWhereTheStoreHasLanded: {
-      description: "Where this store has landed runs of the workflow, the line says what one cost and took here, never a guess",
+      description: 'Where this store has landed runs of the workflow, the line says what one cost and took here, never a guess',
       condition: ({ input: [stats], output }) =>
         stats === undefined ||
         !measured(stats) ||
@@ -102,13 +101,11 @@ const firstBeatOfSpec = spec<(run: FirstRunRead) => FirstBeat | null>({
     },
     theStepsOnceFiled: {
       description: 'Once a step is filed and nothing waits on the person, the hint is the steps at work',
-      condition: ({ input: [run], output }) =>
-        !run.first || run.landed || run.ended || run.waitsOnYou || !run.filed || output === 'steps',
+      condition: ({ input: [run], output }) => !run.first || run.landed || run.ended || run.waitsOnYou || !run.filed || output === 'steps',
     },
     theCardBeforeAnything: {
       description: 'Started and nothing filed yet, the hint is the card: what was asked, and that the daemon files it',
-      condition: ({ input: [run], output }) =>
-        !run.first || run.landed || run.ended || run.waitsOnYou || run.filed || output === 'card',
+      condition: ({ input: [run], output }) => !run.first || run.landed || run.ended || run.waitsOnYou || run.filed || output === 'card',
     },
   },
 });

@@ -653,15 +653,16 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
   });
 });
 
+/** The tests' team as a template whose `follow` defaults true and follows example.org, so a volume given by its path sets it false. */
+function following(): { dir: string; repo: string } {
+  const made = template();
+  edit(made.dir, 'nemia.yaml', (spec) => {
+    spec.parameters.follow = { type: 'boolean', description: 'whether it lands on the host', default: true, whenOrigin: 'example.org' };
+  });
+  return made;
+}
+
 describe("a boolean that follows a host (whenOrigin) is set by the factory's first writable volume, and by no later one", () => {
-  /** The tests' team as a template whose `follow` defaults true and follows example.org, so a volume given by its path sets it false. */
-  function following(): { dir: string; repo: string } {
-    const made = template();
-    edit(made.dir, 'nemia.yaml', (spec) => {
-      spec.parameters.follow = { type: 'boolean', description: 'whether it lands on the host', default: true, whenOrigin: 'example.org' };
-    });
-    return made;
-  }
   test('apply with a repository by its path files follow=false, a --set of the person wins, and a later writable volume sets nothing', async () => {
     const { dir, repo } = following();
     await apply('follows', dir, repo, '--set', 'budget=3');

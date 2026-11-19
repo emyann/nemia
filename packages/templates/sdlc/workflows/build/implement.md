@@ -20,7 +20,8 @@ the open one up to date, never a draft. Name the address it prints (`nemia pr: <
 request", "value": "<the url>"}`.
 
 Your check runs `probe.ts`, `parts.ts` and the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), then pushes again through the same script, so CI's verdict is for the commit it judges, runs the repository's round check
-(`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context: CI runs the repository's suite on that commit,
+(`${{ parameters.roundCheck }}`), and waits on the `${{ parameters.ciCheck }}` context — or, where the head declares no CI workflow under
+`.github/workflows/` (`pull-request.ts declares-ci`), runs the local check (`${{ parameters.localCheck }}`) in its place: CI runs the repository's suite on that commit,
 and a red, cancelled or missing `${{ parameters.ciCheck }}` comes back as the check's refusal, with the Actions URL, the failing jobs
 and the tail of their log — the script reads it for you, since you may type no `gh` yourself (*When your check refuses*, below).
 A red context has been re-run once by then, its failed jobs, so a red refusal names the jobs re-run and how each ended the second

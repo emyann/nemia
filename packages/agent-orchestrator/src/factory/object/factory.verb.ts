@@ -325,11 +325,7 @@ export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home:
  * @param version The template's version the factory is applied at.
  * @param declared The parameters its template declares, by name.
  */
-export const followOf = (
-  name: string,
-  version: string,
-  declared: Readonly<Record<string, Parameter>>,
-): FactoryCommands['follow'] => {
+export const followOf = (name: string, version: string, declared: Readonly<Record<string, Parameter>>): FactoryCommands['follow'] => {
   const found = Object.entries(declared)
     .sort(([a], [b]) => byText(a, b))
     .find(([, p]) => p.type === 'boolean' && p.whenOrigin !== undefined);

@@ -375,7 +375,10 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       rules: 'text',
       parameters: {
         fields: {},
-        rest: { fields: { type: 'string', description: 'string', default: 'any', whenOrigin: 'string' }, required: ['type', 'description'] },
+        rest: {
+          fields: { type: 'string', description: 'string', default: 'any', whenOrigin: 'string' },
+          required: ['type', 'description'],
+        },
       },
       hires: { fields: {}, rest: 'string' },
       revisions: 'revisions',

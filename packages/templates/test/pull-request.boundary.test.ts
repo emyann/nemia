@@ -1238,10 +1238,16 @@ test("build's implement check, rendered on GitHub, pushes through the script bef
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;
   assert.equal(typeof check, 'string', "sdlc's build has an implement step with a check");
   const frozen = check as string;
-  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|wait)?/g)].map(
+  const clauses = [...frozen.matchAll(/node\s+"\$\{WF_CARRIED_FILES:\?[^}]*\}\/([\w-]+\.ts)"\s+(check|push|declares-ci|wait)?/g)].map(
     ([, script, verb]) => (verb ? `${script} ${verb}` : script),
   );
-  assert.deepEqual(clauses, ['probe.ts check', 'parts.ts check', 'pull-request.ts push', 'pull-request.ts wait']);
+  assert.deepEqual(clauses, [
+    'probe.ts check',
+    'parts.ts check',
+    'pull-request.ts push',
+    'pull-request.ts declares-ci',
+    'pull-request.ts wait',
+  ]);
   const round = frozen.indexOf('{ round-check --all; }');
   assert.ok(round > 0, `the round check the factory set is a clause of its own:\n${frozen}`);
   assert.ok(

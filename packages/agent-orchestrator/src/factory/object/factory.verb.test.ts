@@ -148,7 +148,7 @@ test("a factory's commands are the lines a person types for it, with each schedu
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
 });
 
-test("a factory whose template declares a boolean that follows a host is told how to follow it, and one whose template declares none is not", () => {
+test('a factory whose template declares a boolean that follows a host is told how to follow it, and one whose template declares none is not', () => {
   const follow = followOf('acme', '4.9.0', {
     model: { type: 'string', description: 'a model', whenOrigin: 'example.org' },
     lands: { type: 'boolean', description: 'whether it lands there', default: false, whenOrigin: 'example.org' },

@@ -22,12 +22,14 @@ workflow's steps, so both ways are in each file: the implement and land steps' c
 notes of implement, review and land each open with the answer and hold a part for each.
 
 - **`github: false`, the default: in this checkout.** No remote is read or written. The implement step's check runs `probe.ts`, `parts.ts` and
-  the factory's own check, its `implementCheck` parameter, then the factory's `localCheck` parameter (the repository's lint, typecheck and test, where it has them, by default) on the round's tree; no
+  the factory's own check, its `implementCheck` parameter, then the factory's `localCheck` parameter (by default `local-check.ts`, carried: the repository's npm `lint`, `typecheck` and `test`, each where its `package.json` declares it, npm init's
+  placeholder test left out, and nothing where it has no `package.json`) on the round's tree; no
   pull request is opened. Land checks the checkout and stages every result branch in one `git merge --no-ff --no-commit`, as the git
   place's skill says (*Stage a landing*), and signs off with the merge's message; the land step's check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
 - **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes and opens a pull request, its check runs
   `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's check is a receipt.
+  Where the head's tree declares no CI workflow under `.github/workflows/`, `declares-ci` says so and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
   The rest of this README, but where it says otherwise, is this way's.
 
 The CI context the scripts wait on and land on is the factory's `ciCheck` parameter (`ci` by default), handed to each script as

@@ -419,19 +419,21 @@ function jobLog(id: string): Ran {
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
  * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
- * names none, bounded by `LOG_LINES` in all. The `check` context itself, which may only gather the others, comes last. No agent of this
+ * names none, bounded by `LOG_LINES` in all; where gh gives no log (it refuses, or GitHub expired it), one line saying so, with the job's
+ * URL a person reads it at. The `check` context itself, which may only gather the others, comes last. No agent of this
  * team may call `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[], check: string): string[] {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED).flatMap(jobsFailing);
-  const jobs = new Map<string, string>();
+  const jobs = new Map<string, Entry>();
   const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
   for (const entry of ordered.slice(0, JOBS)) {
     const id = jobIdOf(entry);
-    if (id && !jobs.has(id)) jobs.set(id, nameOf(entry));
+    if (id && !jobs.has(id)) jobs.set(id, entry);
   }
   const logs: string[] = [];
-  for (const [id, name] of jobs) {
+  for (const [id, entry] of jobs) {
+    const name = nameOf(entry);
     const left = LOG_LINES - logs.length;
     if (left <= 1) {
       logs.push(`… the logs of the other jobs are cut: \`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs\` reads each`);
@@ -440,7 +442,8 @@ function why(entries: readonly Entry[], check: string): string[] {
     const api = `gh api repos/{owner}/{repo}/actions/jobs/${id}/logs`;
     const log = jobLog(id);
     if (log.status !== 0 || !log.out.trim()) {
-      logs.push(`${name} (job ${id}): \`${api}\` gave no log${log.err ? `: ${log.err.split('\n')[0]}` : ''}`);
+      const refused = log.err ? `: ${log.err.split('\n')[0]}` : '';
+      logs.push(`${name} (job ${id}): \`${api}\` gave no log${refused}; read it at ${linkOf(entry)}`);
       continue;
     }
     const said = failures(log.out);

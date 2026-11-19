@@ -9,7 +9,7 @@
  */
 
 /** The most lines the refusal prints of one failing job's log: enough to read, never a log in a closeout. */
-const JOB_LINES = 60;
+const JOB_LINES = 40;
 
 /** The most lines from the end of a job's log the refusal prints where the log names no failing test: a typecheck, a lint, a build. */
 const TAIL_LINES = 30;
@@ -58,36 +58,67 @@ const subjectOf = (line: string): string | undefined => {
 };
 
 /**
+ * A test Vitest's reporters say failed: ` FAIL  <file> > <suite> > <test>` in its summary of the failed tests (` FAIL  <file>` alone where
+ * the file failed before a test of it ran), its project's name in bars or in a badge before the file where it has several (`|<project>| `,
+ * `<project> (<browser>) `), and ` × <suite> > <test> <ms>ms` where the test ran. Its name, without the mark, the project, the file it was
+ * in or the time it took, is what says it once (`keyOf`).
+ */
+const VITEST_FAILED = /^\s*(?:FAIL|×)\s+(?:\|[^|]+\|\s+|[^\s>]+ \([^)]+\)\s+)?(.+?)$/;
+
+/** The name of a test Vitest says failed (`VITEST_FAILED`): its suites and its own name, without its file or its time. */
+const vitestTest = (line: string): string | undefined => {
+  const said = VITEST_FAILED.exec(bare(line))?.[1];
+  return said
+    ?.replace(/^[^\s>]+\.\w+ > /, '')
+    .replace(/ \d+(?:\.\d+)?m?s$/, '')
+    .trim();
+};
+
+/**
  * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
  * `✖ failing tests:` the spec reporter lists them again under, the rule of Nemia's own check, copied, since this script imports
- * nothing — a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's
- * ` x <rule>: …` (`×` where it draws).
+ * nothing — a test Vitest says failed (`VITEST_FAILED`), a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error
+ * (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
   const said = bare(line);
   const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
   if (test !== null) return !test[1].startsWith('✖ failing tests:');
   return (
-    subjectOf(line) !== undefined || /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said)
+    vitestTest(line) !== undefined ||
+    subjectOf(line) !== undefined ||
+    /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) ||
+    /^\s*[x×] \S+: /.test(said)
   );
 };
 
-/** What says a failing line once: a runner's failure by its subject, any other by the line itself. */
+/** What says a failing line once: a test Vitest failed by its name, a runner's failure by its subject, any other by the line itself. */
 const keyOf = (line: string): string => {
+  const test = vitestTest(line);
+  if (test !== undefined) return `vitest — ${test}`;
   const subject = subjectOf(line);
   return subject === undefined ? bare(line).trim() : `FAILED — ${subject}`;
 };
 
-/** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
-const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
+/**
+ * Whether `line` ends the lines that tell one failing test: the next test, a pass (`✔`, Vitest's `✓`), a summary, the spec reporter's
+ * location line, the rule Vitest draws between two failures (`⎯`).
+ */
+const ends = (line: string): boolean => /^\s*(?:✔|✓|ℹ|ok |# Subtest|test at |⎯)/.test(bare(line)) || failing(line);
 
 /**
- * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), or
- * the location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`).
+ * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), the
+ * location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`), and Vitest's error under a test where it ran (`→ <message>`) and the
+ * frame it draws under an error (`❯ <file>:<line>`).
  */
 const detail = (line: string): boolean => {
   const said = bare(line).trim();
-  return /^[+-](?:\s|$)/.test(said) || /^(?:,-|╭─)\[/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
+  return (
+    /^[+-](?:\s|$)/.test(said) ||
+    /^(?:,-|╭─)\[/.test(said) ||
+    /^(?:❯ \S+:\d+|→ \S)/.test(said) ||
+    (/error/i.test(said) && !said.startsWith('at '))
+  );
 };
 
 /**

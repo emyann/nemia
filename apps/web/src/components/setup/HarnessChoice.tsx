@@ -48,6 +48,14 @@ function Option({ choice, starts }: { choice: Choice; starts: Starts }) {
   );
 }
 
+/** What the activation says of where it stands: installing, installed and to sign in, or installed and signed in. */
+const activationSaid = (activation: Activation): string => {
+  if (!activation.installed) return 'The server installs it: its output shows here as it runs.';
+  return activation.choice.signIn?.state === 'met'
+    ? 'It is installed and signed in: a session can start on it.'
+    : 'It is installed. Sign it in, and a session can start on it.';
+};
+
 /**
  * The first visit's question, over the readiness list: which harness to activate, one option for each the read declares
  * (`harnessChoices`) — the sentence its install piece says, and Activate, which starts the install's fix (`onStart`) — and Skip, where
@@ -81,11 +89,7 @@ export function HarnessChoice({
             {activation === undefined
               ? (lead ??
                 'A session runs on a harness this server installs for you. Activate one now, or skip and activate one from the list below when you need it.')
-              : activation.installed
-                ? signIn?.state === 'met'
-                  ? 'It is installed and signed in: a session can start on it.'
-                  : 'It is installed. Sign it in, and a session can start on it.'
-                : 'The server installs it: its output shows here as it runs.'}
+              : activationSaid(activation)}
           </p>
         </header>
         {activation === undefined ? (

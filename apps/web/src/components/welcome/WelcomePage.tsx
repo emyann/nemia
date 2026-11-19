@@ -18,9 +18,10 @@ export const WELCOME_LINE = "The harness you pick runs Nemia's own agent and eve
 
 /**
  * The welcome, at `/welcome`, where a fresh store opens: one card per harness the read declares, with the one line; Activate installs the
- * pinned copy (the same fix as Setup's), followed on the page, then its version tick, its sign-in, and one real turn through it, the quota shown once it passed, as information. Its
- * skip keeps the skip in this browser and leaves for the board; once both ticks passed, Next names the next milestone. A harness
- * already installed when the page is drawn is shown as activated, with its sign-in and its checks.
+ * pinned copy (the same fix as Setup's), followed on the page, then its version tick, its sign-in, and one real turn through it, the
+ * quota shown once it passed, as information. Its skip keeps the skip in this browser and leaves for the board; once both ticks passed,
+ * Next names the next milestone. A harness already installed when the page is drawn is shown as activated, with its sign-in and its
+ * checks.
  */
 export function WelcomePage() {
   const navigate = useNavigate();

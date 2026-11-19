@@ -65,6 +65,7 @@ const PLACE_OF_SEGMENT: Readonly<Record<string, PanePlace>> = {
   skills: 'skills',
   proposals: 'proposals',
   settings: 'settings',
+  volume: 'settings',
 };
 
 /**

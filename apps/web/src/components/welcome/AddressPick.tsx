@@ -5,7 +5,7 @@ import { Pending } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
 import { FollowedFix } from '../setup/FollowedFix';
-import { PieceFixes } from '../setup/ReadinessList';
+import { PieceFixes, type Starts } from '../setup/ReadinessList';
 
 /**
  * Whether `piece` is a need of the factory `factory` still missing: a need of one of its workflows, or one its place declares, as the
@@ -48,24 +48,12 @@ export function AddressPick({
   return (
     <div data-address-pick className="flex flex-col gap-5">
       {missing.length > 0 && (
-        <section data-address-needs aria-label="What this factory needs first" className="flex flex-col gap-3">
-          <p className="m-0 text-body-medium text-on-surface-variant">This factory needs these in place before it clones and runs:</p>
-          <ul className="m-0 flex list-none flex-col gap-4 p-0">
-            {missing.map((piece) => (
-              <li
-                key={`${piece.factory ?? ''}/${piece.workflow ?? ''}/${piece.name}`}
-                data-address-need={piece.name}
-                className="flex flex-col gap-2"
-              >
-                <p className="m-0 text-body-medium text-on-surface">{piece.message}</p>
-                <PieceFixes piece={piece} starts={starts} />
-              </li>
-            ))}
-          </ul>
-          {fixes.map((fix) => (
-            <FollowedFix key={fix.id} fix={fix} onEnded={() => void queryClient.invalidateQueries({ queryKey: readinessQuery.queryKey })} />
-          ))}
-        </section>
+        <NeedsFirst
+          missing={missing}
+          starts={starts}
+          fixes={fixes}
+          onEnded={() => void queryClient.invalidateQueries({ queryKey: readinessQuery.queryKey })}
+        />
       )}
       <form
         data-address-form
@@ -100,5 +88,39 @@ export function AddressPick({
         </div>
       </form>
     </div>
+  );
+}
+
+/** What this factory still needs before it clones and runs, each need with its fixes, and the fixes started here, followed. */
+function NeedsFirst({
+  missing,
+  starts,
+  fixes,
+  onEnded,
+}: {
+  missing: readonly ReadinessPiece[];
+  starts: Starts;
+  fixes: readonly Fix[];
+  onEnded: () => void;
+}) {
+  return (
+    <section data-address-needs aria-label="What this factory needs first" className="flex flex-col gap-3">
+      <p className="m-0 text-body-medium text-on-surface-variant">This factory needs these in place before it clones and runs:</p>
+      <ul className="m-0 flex list-none flex-col gap-4 p-0">
+        {missing.map((piece) => (
+          <li
+            key={`${piece.factory ?? ''}/${piece.workflow ?? ''}/${piece.name}`}
+            data-address-need={piece.name}
+            className="flex flex-col gap-2"
+          >
+            <p className="m-0 text-body-medium text-on-surface">{piece.message}</p>
+            <PieceFixes piece={piece} starts={starts} />
+          </li>
+        ))}
+      </ul>
+      {fixes.map((fix) => (
+        <FollowedFix key={fix.id} fix={fix} onEnded={onEnded} />
+      ))}
+    </section>
   );
 }

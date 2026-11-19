@@ -42,7 +42,8 @@ export type VolumeStepFacts = {
 const volumeStepOfSpec = spec<(facts: VolumeStepFacts) => VolumeScreen>({
   ensures: {
     trustAskedBeforeUse: {
-      description: 'A volume added here that a harness does not trust is asked its trust before anything else, until the person says not now',
+      description:
+        'A volume added here that a harness does not trust is asked its trust before anything else, until the person says not now',
       condition: ({ input: [f], output }) => !(f.added !== undefined && !f.added.trusted && !f.later) || output === 'trust',
     },
     notNowLeavesItWaiting: {
@@ -52,8 +53,7 @@ const volumeStepOfSpec = spec<(facts: VolumeStepFacts) => VolumeScreen>({
     doneOnlyWhenTrusted: {
       description:
         'The step says the work is in place only where the volume added here is trusted, or, at the welcome, the factory already has a trusted writable one',
-      condition: ({ input: [f], output }) =>
-        output !== 'done' || (f.added !== undefined ? f.added.trusted : f.held && !f.again),
+      condition: ({ input: [f], output }) => output !== 'done' || (f.added !== undefined ? f.added.trusted : f.held && !f.again),
     },
     doneOnceTrusted: {
       description: 'A volume added here and trusted is the work in place',

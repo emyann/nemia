@@ -28,7 +28,7 @@ export function NewRepository({
     >
       <TextField
         label="Name"
-        supportingText="Lowercase letters, digits and dashes, such as my-app: it is made in Nemia's store, under repositories/"
+        supportingText="Lowercase letters, digits, dots, dashes and underscores, such as my-app: it is made in Nemia's store, under repositories/"
         value={name}
         onChange={setName}
         isDisabled={pending}

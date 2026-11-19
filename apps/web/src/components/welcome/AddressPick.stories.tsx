@@ -44,6 +44,6 @@ export const Cloning: Story = {
 export const Refused: Story = {
   args: { refused: 'git@github.com:you/acme.git could not be cloned: give the machine an SSH key that github.com accepts, then ask again' },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('alert')).toBeVisible();
+    await expect(canvasElement.querySelector('[data-volume-refused]')).toBeVisible();
   },
 };

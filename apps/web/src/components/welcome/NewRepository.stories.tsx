@@ -37,6 +37,6 @@ export const Refused: Story = {
       "`My App` is not a repository's name: a name is lowercase letters, digits, dots, dashes and underscores — acme or my-app, say.",
   },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole('alert')).toBeVisible();
+    await expect(canvasElement.querySelector('[data-volume-refused]')).toBeVisible();
   },
 };

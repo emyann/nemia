@@ -34,6 +34,7 @@ export const Used: Story = {
     const canvas = within(canvasElement);
     await userEvent.type(canvas.getByRole('combobox', { name: /Folder/ }), '/home/you/code/acme');
     await new Promise((resolve) => setTimeout(resolve, 600));
+    await userEvent.keyboard('{Escape}');
     await userEvent.click(canvas.getByRole('button', { name: 'Use this folder' }));
     await waitFor(() => expect(args.onUse).toHaveBeenCalledWith('/home/you/code/acme', true));
   },

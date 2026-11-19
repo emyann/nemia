@@ -34,7 +34,11 @@ const loaded = async (canvas: HTMLElement, screen?: string): Promise<HTMLElement
 };
 
 /** What a play presses and types with. */
-type User = { click: (e: Element) => Promise<void>; type: (e: Element, text: string) => Promise<void> };
+type User = {
+  click: (e: Element) => Promise<void>;
+  type: (e: Element, text: string) => Promise<void>;
+  keyboard: (text: string) => Promise<void>;
+};
 
 /** The way `way` pressed in `page`. */
 const choose = async (page: HTMLElement, way: string, user: User) =>
@@ -44,6 +48,7 @@ const choose = async (page: HTMLElement, way: string, user: User) =>
 const useFolder = async (page: HTMLElement, path: string, user: User) => {
   await choose(page, 'folder', user);
   await user.type(within(page).getByRole('combobox', { name: /Folder/ }), path);
+  await user.keyboard('{Escape}');
   await user.click(within(page).getByRole('button', { name: 'Use this folder' }));
 };
 
@@ -69,19 +74,25 @@ export const Skipped: Story = {
   },
 };
 
-/** A folder on this machine: typing the folder's path, the api's folders under it are offered. */
+/** A folder on this machine: typing the folder's path, the api's folders under it are offered; Escape closes the list. */
 export const FolderNamed: Story = {
   parameters: { msw: volumeStore() },
   play: async ({ canvasElement, userEvent }) => {
     const page = await loaded(canvasElement, 'choose');
     await choose(page, 'folder', userEvent);
     await userEvent.type(within(page).getByRole('combobox', { name: /Folder/ }), '/home/you/code/');
-    const listbox = await within(document.body).findByRole('listbox', {}, { timeout: 5000 });
-    await expect(
-      within(listbox)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['acme', 'nemia', 'notes']);
+    await waitFor(
+      async () => {
+        const listbox = within(document.body).getByRole('listbox');
+        await expect(
+          within(listbox)
+            .getAllByRole('option')
+            .map((o) => o.textContent),
+        ).toEqual(['acme', 'nemia', 'notes']);
+      },
+      { timeout: 5000 },
+    );
+    await userEvent.keyboard('{Escape}');
   },
 };
 

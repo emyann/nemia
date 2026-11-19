@@ -363,7 +363,8 @@ const isRuntime = (m: string): boolean => m !== VOCABULARY && (m === 'agent-runt
 
 /**
  * Effect, by any subpath. A pure file takes what a store file decoded, and the api loads `agent-orchestrator/run` and
- * `agent-orchestrator/workflow`, which are pure and load no Effect but the modules `PURE_EFFECT` names: a schema lives beside the read it decodes.
+ * `agent-orchestrator/workflow`, which are pure and load no Effect but the modules `PURE_EFFECT` names: a schema lives beside the
+ * read it decodes.
  */
 const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
 
@@ -391,8 +392,8 @@ function unsorted(sources: Sources): string[] {
 }
 
 /**
- * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but the modules `PURE_EFFECT` names, and no store,
- * controller, client or model file, and reads neither the environment nor `fetch`.
+ * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but the modules `PURE_EFFECT`
+ * names, and no store, controller, client or model file, and reads neither the environment nor `fetch`.
  */
 function impurities(sources: Sources): string[] {
   const of = kinds(sources);

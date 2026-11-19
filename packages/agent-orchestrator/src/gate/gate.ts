@@ -255,6 +255,9 @@ export function approveFormOf(steps: readonly StepSpec[], run: Pick<Run, 'gates'
 export const takeBackStop: TakeBackStopOf = ({ known, approved, filed }) =>
   !known ? 'unknown' : !approved ? 'unapproved' : filed ? 'handed-on' : null;
 
+/** What taking an approval back answers: the approval taken, or why it is refused. */
+type TakenBack = { approval: Approval } | { refused: string };
+
 /**
  * Whether `nemia approve <run> <name> --off` may take back the approval of step `name`: the approval it takes back, where the step stands
  * approved (`approvalOf`) — whether the approval names the work it approved or an older nemia wrote it with none — and nothing of it has
@@ -274,18 +277,21 @@ export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: strin
     approved: given !== undefined,
     filed: Boolean(record?.taskId || record?.check),
   });
-  if (stop === 'unknown')
-    return { refused: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` } satisfies
-      | { approval: Approval }
-      | { refused: string } as { approval: Approval } | { refused: string };
-  if (stop === 'unapproved' || !given)
-    return {
+  if (stop === 'unknown') {
+    const unknown: TakenBack = { refused: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` };
+    return unknown;
+  }
+  if (stop === 'unapproved' || !given) {
+    const unapproved: TakenBack = {
       refused: `try ${tryOf(run, name)} of ${name} is not approved, so there is nothing to take back. To approve it once it waits at its gate: nemia approve ${run.id} ${name}. See where it stands: nemia ls ${run.id}.`,
-    } satisfies { approval: Approval } | { refused: string } as { approval: Approval } | { refused: string };
-  if (stop === null)
-    return { approval: given } satisfies { approval: Approval } | { refused: string } as { approval: Approval } | { refused: string };
+    };
+    return unapproved;
+  }
+  if (stop === null) {
+    const taken: TakenBack = { approval: given };
+    return taken;
+  }
   const approved = `try ${given.try} of ${name} was approved at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
-  return { refused: handedOnWords(steps, name, run, approved, 'and its approval cannot be taken back') } satisfies
-    | { approval: Approval }
-    | { refused: string } as { approval: Approval } | { refused: string };
+  const handedOn: TakenBack = { refused: handedOnWords(steps, name, run, approved, 'and its approval cannot be taken back') };
+  return handedOn;
 }

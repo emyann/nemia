@@ -52,7 +52,10 @@ export const nodeFate: NodeFate = (when, answered, parents) => {
   if (parents.length > 0 && parents.every((p) => p === 'skipped')) return 'skipped';
   if (parents.some((p) => stopsFollowers(p))) return 'unreachable';
   if (when !== undefined && answered === undefined) return 'waits';
-  const satisfied = (p: string) => p === 'verified' || p === 'unverified' || p === 'sent';
+  const satisfied = (p: string) => {
+    if (p === 'verified' || p === 'unverified' || p === 'sent') return true;
+    return false;
+  };
   if (!parents.every((p) => satisfied(p) || p === 'skipped')) return 'waits';
   return parents.length === 0 || parents.some(satisfied) ? 'ready' : 'waits';
 };

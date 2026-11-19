@@ -207,19 +207,25 @@ export const satisfiesAfter = (s: StepStatus) => {
 
 /**
  * A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met.
+ * Two returns, so the checker infers a plain boolean and no type predicate, which the contracts' verifier would read as a cast.
  * @param s The status of the step waited on.
  */
-export const stopsFollowers = (s: StepStatus) =>
-  s === 'blocked' ||
-  s === 'unsigned' ||
-  s === 'awaiting approval' ||
-  s === 'exhausted' ||
-  s === 'over budget' ||
-  s === 'budget exhausted' ||
-  s === 'denied' ||
-  s === 'failed (check)' ||
-  s === 'failed' ||
-  s === 'stopped';
+export const stopsFollowers = (s: StepStatus) => {
+  if (
+    s === 'blocked' ||
+    s === 'unsigned' ||
+    s === 'awaiting approval' ||
+    s === 'exhausted' ||
+    s === 'over budget' ||
+    s === 'budget exhausted' ||
+    s === 'denied' ||
+    s === 'failed (check)' ||
+    s === 'failed' ||
+    s === 'stopped'
+  )
+    return true;
+  return false;
+};
 
 /**
  * Whether the run will never file anything again: it was called off (`nemia cancel`) or pruned (`nemia prune`). A hold ends nothing, since

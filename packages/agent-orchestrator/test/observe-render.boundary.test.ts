@@ -71,7 +71,6 @@ const RENDER_TMP = scratch('wf-observe-render-tmp-');
  */
 function ran(file: string, args: string[]): { status: number | null; out: string } {
   const env: NodeJS.ProcessEnv = { ...process.env, TMPDIR: RENDER_TMP };
-  delete env.NODE_TEST_CONTEXT;
   delete env.WF_ARTIFACTS;
   const r = spawnSync(process.execPath, [path.join(RENDER, file), ...args], { env, encoding: 'utf8', timeout: 100_000 });
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
@@ -291,7 +290,6 @@ test('a hold says its container, how to stop it, where Grafana listens, its coll
 /** Start the reaper of the held stack `name` for `seconds`, the lock naming it; the child. */
 function reaping(name: string, seconds: number): ReturnType<typeof spawn> {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  delete env.NODE_TEST_CONTEXT;
   const child = spawn(process.execPath, [path.join(RENDER, 'reap.ts'), name, String(seconds)], { env, stdio: 'ignore' });
   fs.writeFileSync(lockFile(), JSON.stringify({ pid: child.pid ?? 0, name, held: true, until: 'soon' } satisfies Lock));
   return child;

@@ -20,7 +20,7 @@
  * the engine's built-in harnesses, `claude` first, a job on the Agent SDK, with no `mcp` on the task, so the only servers it can have
  * are the ones the checkout's `.mcp.json` names.
  *
- *   AE_LIVE=1 node --test test/mcp-config.test.ts
+ *   AE_LIVE=1 npx vitest run test/mcp-config.test.ts
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

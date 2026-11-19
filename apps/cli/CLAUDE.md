@@ -109,4 +109,4 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   `process.exit` drops what a pipe has not taken yet, past its 64 KiB (`apps/cli/test/pipe.test.ts`). `nemia watch` stopped by a
   signal answers its code to the bin rather than exiting itself.
 - **The source is under `noUncheckedIndexedAccess`, and lint refuses a `!`** there, as in the orchestrator and the api. Tests run from
-  this folder: `node --test test/<file>`.
+  this folder: `npx vitest run test/<file>`.

@@ -232,7 +232,7 @@ test("the baseline's folder: each entry in its source file's file, no file empty
   assert.equal(
     fs.existsSync(path.join(REPO, 'apps/web/test/stories.baseline.ts')),
     false,
-    'the baseline moved to test/baseline/: git rm apps/web/test/stories.baseline.ts, run node --test test/stories.test.ts from apps/web, and cut from test/baseline/ what it names',
+    'the baseline moved to test/baseline/: git rm apps/web/test/stories.baseline.ts, run npx vitest run --project=node test/stories.test.ts from apps/web, and cut from test/baseline/ what it names',
   );
 });
 

@@ -1,8 +1,8 @@
 /**
  * The look's browser tests (`test/e2e/*.test.ts`) run through the e2e's runner, behind `--look` (`LOOK_TESTS`, `e2e/look.ts`), never
- * from the `e2e` script: npm appends a script's arguments to its last command, so a script that ran `node --test` before the runner ran
- * them all whatever `--pages` named. When they run, they run bounded as every package's suite is: at most the files at once the `test`
- * script runs (`--test-concurrency`), each test at `WAITED`'s timeout. Each of the seven launches Chromium and builds the look's stories
+ * from the `e2e` script: npm appends a script's arguments to its last command, so a script that ran a test runner before the e2e's ran
+ * them all whatever `--pages` named. When they run, they run bounded as every package's suite is: at most the files at once its config
+ * runs (`maxWorkers`), each test at `WAITED`'s timeout. Each of the seven launches Chromium and builds the look's stories
  * page, about 1.8 GB a file, and unbounded they ran as many at once as the machine has cores but one.
  */
 import assert from 'node:assert/strict';
@@ -41,9 +41,11 @@ const boundBreaks = (config: string): string[] => {
   return breaks;
 };
 
-/** What makes `--pages` not scope the e2e: a script that runs `node --test` before the runner npm appends the arguments to. */
+/** What makes `--pages` not scope the e2e: a script that runs a test runner before the runner npm appends the arguments to. */
 const scriptBreaks = (e2e: string): string[] =>
-  /\bnode\s+--test\b/.test(e2e) ? ['the e2e script runs node --test, past which npm appends --pages: run the look through --look'] : [];
+  /\b(node\s+--test|vitest)\b/.test(e2e)
+    ? ['the e2e script runs a test runner, past which npm appends --pages: run the look through --look']
+    : [];
 
 test("the look's tests run at most as many files at once as npm test, each at `WAITED`'s timeout", () => {
   assert.deepEqual(LOOK_TESTS, ['vitest', 'run', '--project=look'], 'every look test, through its project');
@@ -74,6 +76,7 @@ test("the e2e script is the runner alone, so npm appends --pages to it, and the 
 
 test('REFUSED: the old script, which ran every look test past any --pages', () => {
   assert.equal(scriptBreaks('node --test --test-timeout=120000 test/e2e/*.test.ts && node test/e2e/run.ts').length, 1);
+  assert.equal(scriptBreaks('vitest run --project=look && node test/e2e/run.ts').length, 1);
 });
 
 test("--look runs the stories' Vitest after the look's node tests, the stories script being the storybook project's run", () => {

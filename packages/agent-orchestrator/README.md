@@ -1048,9 +1048,9 @@ no tool list, so its fence is `sandbox:`, is the runtime's to refuse at `wf star
 `Bash(npm run build)` is that command, as the settings' allow of the same words is.
 
 **A deny closes a command, not an allow.** This repository's settings also allow `Bash(npx turbo run test:*)`
-and `Bash(node --test:*)` for the suite, and those run the build and the e2e by other names:
-`npx turbo run test build` and `node --test apps/web/test/e2e/run.ts`. No deny list closes an allow that runs
-any task or any file (`node --test` takes a glob, so a rule on the file's path is walked around). What keeps a
+and `Bash(npx vitest run:*)` for the suite, and those run the build and the e2e by other names:
+`npx turbo run test build` and `npx vitest run --project=look` from `apps/web`. No deny list closes an allow that runs
+any task or any file (`npx vitest run` takes any filter, project or config, so a rule on the file's path is walked around). What keeps a
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
 then, only a sentence in the reviewer's brief.
 

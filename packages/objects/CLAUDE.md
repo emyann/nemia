@@ -60,5 +60,5 @@ orchestrator, the api, the board and the client import it through its one entry,
   the board each make, and what it sets up around the contract (a bodiless write's `{}`, the
   bearer, the headers, the bound, an undeclared status decoded into `Answered`) is decided there alone. Any other `HttpApiClient`
   constructor in the repository is refused, with no baseline (`tools/guards/test/one-api-client.test.ts`).
-- **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole package: `npx turbo run test --force --continue
+- **Run one test** from this folder: `npx vitest run test/<file>.test.ts`; the whole package: `npx turbo run test --force --continue
   --filter=objects`.

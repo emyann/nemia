@@ -135,7 +135,7 @@ function scopeOf(config: Collector, command: string): string | undefined {
 
 /**
  * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a
- * `cd` into it, some files by `node --test`, and e2e on every page or some; read at any command of the line, past its wrappers, the
+ * `cd` into it, some files by `node --test` or `vitest run`, and e2e on every page or some; read at any command of the line, past its wrappers, the
  * last match winning, and never inside a quote, a script's longer name or another flag.
  */
 const SCOPE_ROWS: [string, string | undefined][] = [
@@ -159,6 +159,10 @@ const SCOPE_ROWS: [string, string | undefined][] = [
   ['cd apps/web && cd ../.. && npx turbo run test --force --continue', 'suite'],
   ['node --test test/a.test.ts', 'files'],
   ['timeout --foreground 60 node --test test/a.test.ts', 'files'],
+  ['npx vitest run test/a.test.ts', 'files'],
+  ['cd packages/agent-orchestrator && npx vitest run test/observe-time.test.ts', 'files'],
+  ['cd apps/web && npx vitest run --project=node test/a.test.ts', 'files'],
+  ['npx vitest run', undefined],
   ['cd packages/agent-orchestrator && node --import ./test/ambient.ts --test test/observe-time.test.ts', 'files'],
   ['npm run e2e', 'e2e: all'],
   ['npm run build && npm run e2e -- --photos', 'e2e: all'],
@@ -445,7 +449,7 @@ test('REFUSED: the scope after the batch, on every span, copied from the command
   const copied = 'set(attributes["test_scope"], attributes["full_command"])';
   assert.deepEqual(
     changed((statements) => statements.push(copied)),
-    [`statement 8 sets no literal, not one of ${SCOPES.join(', ')}`],
+    [`statement 9 sets no literal, not one of ${SCOPES.join(', ')}`],
   );
   assert.deepEqual(
     changed((statements) => {

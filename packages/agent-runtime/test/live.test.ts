@@ -38,7 +38,7 @@
  *
  * Every session a test starts is stopped at its end, whatever happened.
  *
- *   AE_LIVE=1 node --test test/live.test.ts
+ *   AE_LIVE=1 npx vitest run test/live.test.ts
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

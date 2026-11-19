@@ -3,7 +3,7 @@
 # Why: on 2026-11-13 main's ci went red twice in two hours on packages/agent-runtime/test/detached.test.ts, on one node only, and a
 # re-run of the failed job passed both times (da83c96a9, e46b993eb). A test that fails one run in many is not seen by one run, and ci
 # hides it besides: implement's round check re-runs a red ci job once, so a first try that failed reads green. So each leg here is the
-# package's whole suite, as ci runs it (--test-concurrency=2, detached.test.ts beside the rest), and each leg's verdict is its first.
+# package's whole suite, as ci runs it (two files at a time, its config's maxWorkers, detached.test.ts beside the rest), and each leg's verdict is its first.
 #
 # It informs and never gates: it is a workflow of its own, not a job of ci.yml, whose gate must need every job there
 # (tools/guards/test/ci-workflow.test.ts); a review reads its legs by `gh pr checks`. A leg re-run by hand hides its first try: read

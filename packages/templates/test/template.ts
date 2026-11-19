@@ -62,7 +62,6 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_MAX_CONCURRENT: '2',
     WF_MAX_RUNS: '2',
   };
-  delete env.NODE_TEST_CONTEXT;
   for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
   return env;

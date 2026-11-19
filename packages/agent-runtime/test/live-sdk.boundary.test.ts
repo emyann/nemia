@@ -3,7 +3,7 @@
  * `AE_LIVE=1`, because it spends money.
  *
  * A boundary test: the real Claude Code the SDK bundles is its whole subject, and it is a file of its own rather than a case of
- * `live.test.ts`, so that one measurement can be run alone: `AE_LIVE=1 node --test test/live-sdk.boundary.test.ts` from
+ * `live.test.ts`, so that one measurement can be run alone: `AE_LIVE=1 npx vitest run test/live-sdk.boundary.test.ts` from
  * `packages/agent-runtime`.
  *
  * Only a real session can answer this. The model a session runs on is chosen inside Claude Code, and `opus` is an alias it resolves

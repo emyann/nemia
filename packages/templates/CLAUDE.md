@@ -43,5 +43,5 @@ layout gives a place sits inside a template's folder: the workspace's own files 
   does, by `checkArgv`. The orchestrator never imports this workspace either: it finds a builtin template by path.
 - **A test's roots come from `test-kit/scratch`**, the test kit's (`tools/test-kit`), as every workspace's do. `test/origin.ts` is this
   workspace's own, for its script boundaries.
-- **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole workspace: `npx turbo run test --force --continue
+- **Run one test** from this folder: `npx vitest run test/<file>.test.ts`; the whole workspace: `npx turbo run test --force --continue
   --filter=templates`.

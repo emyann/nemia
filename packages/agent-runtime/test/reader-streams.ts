@@ -20,7 +20,7 @@ export const resultLine = (o: object) =>
 /** Lines of `claude -p --output-format stream-json --verbose`, shaped as Claude Code prints them (keys trimmed). */
 export const stream = {
   init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: MODEL }),
-  calls: (...uses: Array<[string, string, object]>) =>
+  calls: (...uses: Array<[string, string, unknown]>) =>
     JSON.stringify({
       type: 'assistant',
       session_id: SESSION,

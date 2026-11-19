@@ -26,7 +26,7 @@ test("a folder's files as a spec: its steps by name, its README, and its other t
     ],
   );
   assert.deepEqual(
-    spec.files.map((f) => f.path),
+    (spec.files ?? []).map((f) => f.path),
     ['check.ts', 'route.schema.json'],
   );
   assert.equal('readme' in workflowSpecOf([{ name: 'a.md', text: '' }]), false, 'a folder with no README says none');
@@ -44,7 +44,7 @@ test('markdown in capitals is markdown: a README.MD is the README, and no .MD is
     { name: 'a.md', text: 'Do a.\n' },
   ]);
   assert.equal(spec.readme, '# Flow\n');
-  assert.deepEqual(spec.files, []);
+  assert.equal(spec.files, undefined, 'no file but markdown, so no files are said');
 });
 
 describe("a key the loader reads as text though it holds a map is carried as readKeys' JSON text, flow or block, and written back loads as it was", () => {

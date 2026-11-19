@@ -269,6 +269,15 @@ describe('claudeStreamKept keeps no line twice, and each line it keeps as its re
       ].join('\n'),
       (kept) => assert.equal(kept.includes('"tool_progress"'), false, 'keeps no `tool_progress` line'),
     ],
+    [
+      'a call whose input is no record, which the SDK types `unknown`, keeps its id and tool and no input',
+      [initOf('2.1.323'), stream.calls(['toolu_n', 'Bash', null], ['toolu_s', 'Read', 'a.ts'])].join('\n'),
+      (kept) =>
+        assert.deepEqual(JSON.parse(kept.split('\n')[1]).message.content, [
+          { type: 'tool_use', id: 'toolu_n', name: 'Bash' },
+          { type: 'tool_use', id: 'toolu_s', name: 'Read' },
+        ]),
+    ],
   ];
   for (const [name, whole, says] of rows)
     test(name, () => {

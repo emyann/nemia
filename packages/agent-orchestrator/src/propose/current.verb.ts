@@ -22,7 +22,7 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { stepDraftOf, workflowSpecOf } from './workflow-spec.ts';
+import { stepDraftOf, workflowSpecOf, type WorkflowSpecRead } from './workflow-spec.ts';
 import { agentSpecOf } from './agent-spec.ts';
 import { skillSpecOf } from './skill-spec.ts';
 import { textIn } from '../folder/folder.ts';
@@ -80,11 +80,13 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
   );
 
 /**
- * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, frontmatter and all — so its needs
- * are said there and not apart, and an undo that writes this spec back writes the README byte for byte — and its other text files. A file
- * that is not text, or not directly in it, a Workflow's spec does not carry.
+ * A workflow folder's spec as its files write it, the one reader of it: each step's keys and body, by file name, its README, frontmatter
+ * and all — so its needs are said there and not apart, and an undo that writes this spec back writes the README byte for byte — and its
+ * other text files. A file that is not text, or not directly in it, a Workflow's spec does not carry. What the api serves as a Workflow's
+ * `spec`, and what a proposal's stale check and access read, so a spec read and proposed back changes nothing.
+ * @param dir The workflow's folder.
  */
-function workflowSpecAt(dir: string): unknown {
+export function workflowSpecAt(dir: string): WorkflowSpecRead {
   const texts = fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isFile())

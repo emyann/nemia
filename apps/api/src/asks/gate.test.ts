@@ -333,7 +333,14 @@ describe('a person approves a gate on the board: the need on the list and the de
     "a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `nemia ls`'s words",
     async () => {
       const run = await object();
-      assert.deepEqual(run.status.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
+      assert.deepEqual(
+        run.status.gates,
+        [
+          { step: 'plan', at: 'after' },
+          { step: 'sketch', at: 'after' },
+        ],
+        "the start's gate and the step's own, in the order they run, each approved after its step",
+      );
       assert.deepEqual(
         run.status.steps.map(({ name, message, approve, gate }) => ({ name, message, approve, gate })),
         [

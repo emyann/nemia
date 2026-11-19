@@ -355,7 +355,7 @@ export const detail = (extra: Partial<RunDetail> = {}) =>
     waitingOnYou: ['implement'],
     waitingOnYouWords: ['approve implement'],
     toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
-    gates: ['implement'],
+    gates: [{ step: 'implement', at: 'after' }],
     warning: null,
     kinds: [],
     refresh: 'nemia refresh r-1',

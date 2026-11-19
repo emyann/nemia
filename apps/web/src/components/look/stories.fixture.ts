@@ -37,6 +37,14 @@ export const GATE: RailStep[] = [
   { name: 'land', ...APPROVAL },
 ];
 
+/** A build run at its design gate: design ran and its closeout waits on a person's word, the rest to come. */
+export const DESIGN_GATE: RailStep[] = [
+  { name: 'design', ...APPROVAL },
+  { name: 'implement', ...TO_COME },
+  { name: 'review', ...TO_COME },
+  { name: 'land', ...TO_COME },
+];
+
 /** A run whose steps are done, on a check or on their own word. */
 export const DONE: RailStep[] = [
   { name: 'design', ...UNVERIFIED },
@@ -76,7 +84,7 @@ const SKIPPED = { phase: 'succeeded', reason: 'Skipped', on: null, via: null, ve
 type GraphRunFixture = {
   steps: RailStep[];
   graph: RunView['graph'];
-  gates: string[];
+  gates: RunView['gates'];
   cancelledAt: string | null;
   holding: RunView['holding'];
 };
@@ -98,6 +106,12 @@ const HOLD: NonNullable<RunView['holding']> = {
   waitingOnYou: false,
 };
 
+/** Build's gates: design approved after it, its closeout waiting; land, an ending, approved before it runs. */
+const BUILD_GATES: RunView['gates'] = [
+  { step: 'design', at: 'after' },
+  { step: 'land', at: 'before' },
+];
+
 /**
  * A run of `steps` as its graph draws it: build's graph among them, design and land gated.
  * @param steps The run's steps.
@@ -106,7 +120,7 @@ const HOLD: NonNullable<RunView['holding']> = {
 export const graphRun = (steps: RailStep[], held = false): GraphRunFixture => ({
   steps,
   graph: chainOf(steps),
-  gates: ['design', 'land'].filter((gate) => steps.some((one) => one.name === gate)),
+  gates: BUILD_GATES.filter((gate) => steps.some((one) => one.name === gate.step)),
   cancelledAt: null,
   holding: held ? HOLD : null,
 });
@@ -157,7 +171,7 @@ export const ROUTED: GraphRunFixture = {
       { name: 'to-quick', kind: 'workflow', workflow: 'quick' },
     ],
   },
-  gates: ['next'],
+  gates: [{ step: 'next', at: 'after' }],
   cancelledAt: null,
   holding: null,
 };

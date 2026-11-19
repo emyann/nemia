@@ -62,7 +62,6 @@ const OWNED_ELSEWHERE: Readonly<Record<string, string>> = {
   model: "a step's model: line",
   outputStyle: "a step's agent, which renders it",
   autoMemoryEnabled: 'the runtime, which turns it off for every session',
-  claudeMdExcludes: 'the runtime, which writes it for every session',
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);

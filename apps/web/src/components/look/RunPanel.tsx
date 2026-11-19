@@ -66,9 +66,10 @@ function Fact({ name, value, under }: { name: string; value: ReactNode; under?: 
 /** What a run's gates say: how many, and of the first that waits on you, or else the last passed, its word. */
 function gatesUnder(run: PanelRun): { value: string; under: string | null } {
   if (run.gates.length === 0) return { value: 'none', under: null };
-  const yours = run.gates.find((gate) => run.waitingOnYou.includes(gate));
+  const gated = run.gates.map((gate) => gate.step);
+  const yours = gated.find((gate) => run.waitingOnYou.includes(gate));
   if (yours) return { value: String(run.gates.length), under: `${yours} waits on you` };
-  const passed = run.gates.filter((gate) => run.steps.find((step) => step.name === gate)?.phase === 'succeeded');
+  const passed = gated.filter((gate) => run.steps.find((step) => step.name === gate)?.phase === 'succeeded');
   return { value: String(run.gates.length), under: passed.length > 0 ? `${passed.join(', ')} approved` : null };
 }
 

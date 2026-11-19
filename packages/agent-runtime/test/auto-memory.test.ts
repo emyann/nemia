@@ -1,8 +1,7 @@
 /**
  * Every Claude Code session the runtime starts runs with its auto-memory off: a job and a held session alike are each given
  * `autoMemoryEnabled: false` in the settings they already carry, on the SDK's own `Options.settings`, so none of them is handed the
- * checkout's `MEMORY.md` or told it may write there; and every one excludes a dependency's `CLAUDE.md` in the same settings
- * (`claudeMdExcludes`), which `test/live.test.ts` measures Claude Code honouring.
+ * checkout's `MEMORY.md` or told it may write there; a task's own `claudeMdExcludes` is passed on whole.
  */
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
@@ -28,7 +27,6 @@ describe('auto-memory: every Claude Code session is given it off in the one sett
       outputStyle: 'nemia-x:no-coding',
       env: { CI: '1' },
       autoMemoryEnabled: false,
-      claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'],
     });
   });
   const dir = scratch('auto-memory');
@@ -36,29 +34,29 @@ describe('auto-memory: every Claude Code session is given it off in the one sett
     {
       name: "a session given nothing is given auto-memory off on the SDK's own settings",
       task: taskOf(dir),
-      settings: { autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'] },
+      settings: { autoMemoryEnabled: false },
     },
     {
       name: "a session keeps the task's own settings, auto-memory off beside them",
       task: taskOf(dir, { settings: JSON.stringify({ outputStyle: 'x' }) }),
-      settings: { outputStyle: 'x', autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'] },
+      settings: { outputStyle: 'x', autoMemoryEnabled: false },
     },
     {
-      name: "a task's own excludes are kept, and every dependency's CLAUDE.md is added after them, once",
-      task: taskOf(dir, { settings: JSON.stringify({ claudeMdExcludes: ['/x/CLAUDE.md', '**/node_modules/**/CLAUDE.md'] }) }),
-      settings: { autoMemoryEnabled: false, claudeMdExcludes: ['/x/CLAUDE.md', '**/node_modules/**/CLAUDE.md'] },
+      name: "a task's own excludes are kept whole, and the runtime adds none of its own",
+      task: taskOf(dir, { settings: JSON.stringify({ claudeMdExcludes: ['/x/CLAUDE.md', '**/vendor/**/CLAUDE.md'] }) }),
+      settings: { claudeMdExcludes: ['/x/CLAUDE.md', '**/vendor/**/CLAUDE.md'], autoMemoryEnabled: false },
     },
     {
       name: 'the context window is a key of those same settings, and auto-memory stays off beside it',
       task: { ...taskOf(dir), config: { contextTokens: 150_000 } },
-      settings: { autoMemoryEnabled: false, claudeMdExcludes: ['**/node_modules/**/CLAUDE.md'], autoCompactWindow: 150_000 },
+      settings: { autoMemoryEnabled: false, autoCompactWindow: 150_000 },
     },
   ];
   for (const row of ATTACHED)
     test(row.name, () => {
       assert.deepEqual(attachedOptions(row.task).settings, row.settings);
     });
-  test('REFUSED: excludes that are no list of globs, which the runtime would add its own to', () => {
+  test('REFUSED: excludes that are no list of globs, which Claude Code takes nothing else for', () => {
     assert.throws(
       () => attachedOptions(taskOf('/r', { settings: JSON.stringify({ claudeMdExcludes: '/x/CLAUDE.md' }) })),
       (err: Error) => err.message.includes('claudeMdExcludes'),

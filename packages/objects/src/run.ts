@@ -33,6 +33,7 @@ import { ObjectGraph } from './graph.ts';
 import {
   ANSWER_VIA,
   FIELD_SHAPES,
+  GATE_AT,
   OUTCOMES,
   PLACE_KINDS,
   RAISE_BY,
@@ -448,6 +449,15 @@ const RunToDecide = Schema.Union([
   }),
 ]);
 
+/** A step of the run that is a gate, and where its approval is beside it (`GATE_AT`). */
+export const RunGate = Schema.Struct({
+  step: Schema.String.annotate({ description: 'The step that is a gate, by name.' }),
+  at: Schema.Literals(GATE_AT).annotate({
+    description:
+      "Where the gate's approval is beside its step: after, its closeout waits for an approval before anything after it is filed; before, it is approved before it runs (an ending on the base branch).",
+  }),
+});
+
 /** One kind and name the run or a step of it is behind the files on (`Drift`, revisions.ts). */
 export const RunDrift = Schema.Struct({
   kind: Schema.Literals(REVISION_KINDS).annotate({ description: 'What kind it is: an agent, a skill or a workflow.' }),
@@ -605,8 +615,9 @@ export const RunStatus = Schema.Struct({
   }),
   waitingOnYou: Strings.annotate({ description: 'The steps a person has to act on, by name; empty where none waits on one.' }),
   waitingOnYouWords: Strings.annotate({ description: 'What each of those steps waits on a person for, in words, one line a step.' }),
-  gates: Strings.annotate({
-    description: "The steps of the run that are gates: each one's closeout waits for an approval before anything after it is filed.",
+  gates: List(RunGate).annotate({
+    description:
+      'The steps of the run that are gates, in the order they run, each with where its approval is: after the step, its closeout waiting on it, or before it, for an ending approved first.',
   }),
   warning: NullString.annotate({ description: "A warning about the run's workflow folder, in words; null where there is none." }),
   kinds: List(RunDrift).annotate({

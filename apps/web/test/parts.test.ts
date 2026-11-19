@@ -50,7 +50,10 @@ const graphRun = (steps: ReadonlyArray<(typeof STEPS)[number]>, held = false) =>
     roots: [steps[0].name],
     edges: steps.slice(1).map((step, i) => ({ from: steps[i].name, to: step.name, kind: 'after' as const })),
   },
-  gates: ['design', 'land'],
+  gates: [
+    { step: 'design', at: 'after' as const },
+    { step: 'land', at: 'before' as const },
+  ],
   cancelledAt: null,
   holding: held ? { at: '2026-11-15T17:30:00.000Z', runs: [], word: 'held by you', advice: '', waitingOnYou: false } : null,
 });
@@ -224,12 +227,12 @@ describe("StepGraph, Pager and TextLink: a run's steps as its graph, and the way
     assert.equal(html.match(/data-step-pulse/g)?.length, 1, 'the step at work alone pulses');
     assert.match(html, /data-step="implement"[\s\S]*?data-step-pulse/, "the pulse is the step at work's");
     assert.deepEqual(
-      [...html.matchAll(/data-gate="([^"]+)"[^>]*stroke="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+      [...html.matchAll(/data-gate="([^"]+)" data-gate-at="([^"]+)"[^>]*stroke="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
       [
-        ['design', 'var(--md-sys-color-outline)'],
-        ['land', 'var(--meaning-yours)'],
+        ['design', 'after', 'var(--md-sys-color-outline)'],
+        ['land', 'before', 'var(--meaning-yours)'],
       ],
-      "a gate's tick before each gated step, yellow where that step waits on you",
+      "a gate's tick on the side of its step its approval is, yellow where that step waits on you",
     );
   });
   test('the step graph with a wrap: each node inside what the wrap gives, its step and state handed, and no tooltip of its own', async () => {

@@ -259,8 +259,9 @@ the orchestrator's code holds a fact today, it is named beside it.
   `api-request-shape`, by `test/live.test.ts` and its control on the code before it.
 - **`claudeMdExcludes` in `Options.settings` keeps a folder's `CLAUDE.md` out of a session** (2.1.308, 2026-11-02):
   `**/node_modules/**/CLAUDE.md` left out the `nested_memory` attachment a read under `node_modules/<dep>/` brought, while one beside
-  it outside `node_modules` was still attached; without the key, both were, and the dependency's text reached the model
-  (`DEPENDENCY_CLAUDE_MD`, `harness/claude/memory.ts`; `test/live.test.ts`).
+  it outside `node_modules` was still attached; without the key, both were, and the dependency's text reached the model. The runtime
+  writes no such glob since 2026-11-19 and follows Claude Code's default, a dependency's `CLAUDE.md` included (Effect's is its
+  guidance to agents that use it); a task's own `claudeMdExcludes` is passed on whole (`harness/claude/memory.ts`).
 
 ## A permission prompt, as `canUseTool` is handed it
 

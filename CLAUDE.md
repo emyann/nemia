@@ -54,9 +54,11 @@ holds what every change needs.
   `@interfere/landmines`' recommended config, pinned exactly, which holds how a test is written (no double but a watching spy, MSW for
   the network, no fixed sleep, no retry or raised timeout); its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
   with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
+  `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. A commit
+  formats and lints its staged files (husky and lint-staged, `.husky/pre-commit`), and `npm run lint:fast` checks the whole tree.
 - `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
   boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of the files
-  a change touched never run them: a run's check runs them, and a person runs them before a push.
+  a change touched never run them: CI runs them, and a person runs them before a push.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages

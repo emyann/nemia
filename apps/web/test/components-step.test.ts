@@ -562,7 +562,7 @@ const panelMarkup = async (run: RunView, selected: string | null = null) => {
   const { Run } = await import('../src/components/look/Run.tsx');
   return routedWith(
     createElement(Run, {
-      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/flows/build', gates: ['theme'] }, run),
+      run: Object.assign({ labels: {}, factory: null, workflowDir: '/code/app/flows/build', gates: [{ step: 'theme', at: 'after' }] }, run),
       size: 'xl',
       asOf: new Date('2026-10-12T11:00:00.000Z'),
       read: null,

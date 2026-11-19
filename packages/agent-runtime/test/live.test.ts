@@ -19,8 +19,7 @@
  *   `skill_listing`, what the model reads, not `init`'s `skills`, which lists every skill either way); its control, on `'default'`, is
  *   listed the built-in ones beside it.
  * - An attached session made light: on a closed tool list, in `dontAsk`, with one server, its first request (the transcript's
- *   `api-request-shape`) carries `ToolSearch` and no MCP tool with its definition, and the tool, loaded on demand, still answers; it
- *   reads into a folder outside `node_modules` and one under it, and only the first's `CLAUDE.md` is attached (`nested_memory`).
+ *   `api-request-shape`) carries `ToolSearch` and no MCP tool with its definition, and the tool, loaded on demand, still answers.
  * - An attached session's cost across its processes: a resumed query's first result carries on the total its parent saved as it
  *   exited, and a session cut by its holder's let-go prints the turn it was cut in, saves its total, and its resume carries it on
  *   (`docs/harness.md`). What it read is said as diagnostics; what the let-go rests on is asserted.
@@ -1162,57 +1161,41 @@ test.skipIf(skip)(
 );
 
 const LIGHT_BRIEF = [
-  'With your Read tool, read lib/note.txt and then node_modules/dep/note.txt.',
-  'Then call the MCP tool mcp__aeprobe__ping: if it is not among your tools, load it first with ToolSearch, and if the server is',
+  'Call the MCP tool mcp__aeprobe__ping: if it is not among your tools, load it first with ToolSearch, and if the server is',
   'still connecting, search again, at most six times. Give in pong the text the tool answered, or an empty string if you could not',
-  'call it; in words, every word of the day your instructions have told you, an empty list for none. Then give your closing statement.',
+  'call it. Then give your closing statement.',
 ].join(' ');
 const LIGHT_CLOSEOUT = {
   type: 'object',
-  properties: { pong: { type: 'string' }, words: { type: 'array', items: { type: 'string' } } },
-  required: ['pong', 'words'],
+  properties: { pong: { type: 'string' } },
+  required: ['pong'],
   additionalProperties: false,
 };
 
 /**
  * What a session's transcript says it was sent: the tools of its first request (`api-request-shape`), each by name with whether it was
- * deferred (`defer_loading`), and the path of every `CLAUDE.md` attached as it read into a folder (`nested_memory`).
+ * deferred (`defer_loading`).
  */
 const firstRequest = (id: string | undefined) => {
   const file = id ? claudeTranscriptFile(id) : undefined;
-  if (file === undefined || !fs.existsSync(file))
-    return undefined satisfies { tools: { name: string; deferred: boolean }[]; nested: string[] } | undefined;
+  if (file === undefined || !fs.existsSync(file)) return undefined satisfies { tools: { name: string; deferred: boolean }[] } | undefined;
   let tools: { name: string; deferred: boolean }[] | undefined;
-  const nested: string[] = [];
   for (const l of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
-    const row = JSON.parse(l) as {
-      type?: string;
-      shape?: { tools?: { name?: string; defer_loading?: boolean }[] };
-      attachment?: { type?: string; path?: string };
-    };
+    const row = JSON.parse(l) as { type?: string; shape?: { tools?: { name?: string; defer_loading?: boolean }[] } };
     if (row.type === 'api-request-shape' && tools === undefined)
       tools = (row.shape?.tools ?? []).map((t) => ({ name: t.name ?? '', deferred: t.defer_loading === true }));
-    if (row.attachment?.type === 'nested_memory' && row.attachment.path) nested.push(row.attachment.path);
   }
-  return { tools: tools ?? [], nested } satisfies { tools: { name: string; deferred: boolean }[]; nested: string[] } | undefined;
+  return { tools: tools ?? [] } satisfies { tools: { name: string; deferred: boolean }[] } | undefined;
 };
 
 test.skipIf(skip)(
-  'an attached session on a closed tool list, in dontAsk, is sent its server’s tool deferred and still calls it, and no dependency’s CLAUDE.md',
+  'an attached session on a closed tool list, in dontAsk, is sent its server’s tool deferred and still calls it',
   { timeout: 12 * 60_000 },
   async (t) => {
     const root = tmp('light-root');
     const cwd = tmp('light-cwd');
     const server = path.join(tmp('light-server'), 'server.mjs');
     fs.writeFileSync(server, PROBE_SERVER);
-    for (const [dir, word] of [
-      ['lib', 'quuxle'],
-      [path.join('node_modules', 'dep'), 'frobnitz'],
-    ] as const) {
-      fs.mkdirSync(path.join(cwd, dir), { recursive: true });
-      fs.writeFileSync(path.join(cwd, dir, 'note.txt'), 'nothing to see here\n');
-      fs.writeFileSync(path.join(cwd, dir, 'CLAUDE.md'), `The word of the day is ${word}.\n`);
-    }
     const name = 'ae/live-light/1';
     const attached = attachedSessions(root);
     const scope = Scope.makeUnsafe();
@@ -1248,12 +1231,10 @@ test.skipIf(skip)(
       const out = filesOf(root, name).out;
       const closeout = (fs.existsSync(out) ? claudeStreamOutput(fs.readFileSync(out, 'utf8')).closeout?.payload : {}) as {
         pong?: string;
-        words?: string[];
       };
       const sent = firstRequest(id);
       console.log(`${state}, session ${id}: ${JSON.stringify(closeout)}`);
       console.log(`first request: ${JSON.stringify(sent?.tools)}`);
-      console.log(`nested CLAUDE.md: ${JSON.stringify(sent?.nested)}`);
       assert.equal(state, 'completed', `the session ran to its end; it was ${state}`);
       assert.ok(
         sent?.tools.some((tool) => tool.name === 'ToolSearch'),
@@ -1265,16 +1246,6 @@ test.skipIf(skip)(
         'no MCP tool reaches the first request with its definition',
       );
       assert.equal(closeout.pong, 'pong', 'and the deferred tool, loaded on demand, is still called and answers, in dontAsk');
-      assert.ok(
-        sent?.nested.some((p) => p.endsWith(path.join('lib', 'CLAUDE.md'))),
-        'control: the CLAUDE.md of a folder it read outside node_modules is attached',
-      );
-      assert.deepEqual(
-        sent?.nested.filter((p) => p.includes('node_modules')),
-        [],
-        'and the one under node_modules is not',
-      );
-      assert.ok(!closeout.words?.includes('frobnitz'), 'nor is its word told to the session');
     } finally {
       await Effect.runPromise(Scope.close(scope, Exit.void));
       id ??= readRun(filesOf(root, name).run)?.sessionId;

@@ -24,6 +24,7 @@ import {
   type Run,
   type TaskPhase,
 } from '../run.ts';
+import { gatesAt } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { gatesAfterSection } from '../brief/brief-sections.ts';
 import type { RetryAsk } from '../retry/retry-ask.ts';
@@ -67,6 +68,23 @@ describe('gatesOf, hasGate', () => {
   });
   test('a step neither gates is not gated', () => {
     assert.equal(hasGate(steps[1], { gates: ['plan'] }), false);
+  });
+});
+
+describe('gatesAt', () => {
+  const steps: StepSpec[] = [
+    { ...step('design'), gate: true },
+    step('implement', ['design']),
+    { ...step('land', ['implement']), workspace: 'base' },
+  ];
+  test('a step whose closeout waits is approved after it; an ending on the base branch, before it', () => {
+    assert.deepEqual(gatesAt(steps, { gates: ['land'] }), [
+      { step: 'design', at: 'after' },
+      { step: 'land', at: 'before' },
+    ]);
+  });
+  test('an ending no gate reaches is no gate at all', () => {
+    assert.deepEqual(gatesAt(steps, {}), [{ step: 'design', at: 'after' }]);
   });
 });
 

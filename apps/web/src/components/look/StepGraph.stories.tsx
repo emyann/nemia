@@ -8,6 +8,7 @@ import { StepGraph } from './StepGraph';
 import {
   AT_WORK,
   CHECKED,
+  DESIGN_GATE,
   DONE,
   FORKED,
   GATE,
@@ -23,8 +24,8 @@ import {
 } from './stories.fixture';
 
 /**
- * A run's steps as its workflow's graph drawn small, one story a state: done, at work, checked, at its gate, refused, waiting, held,
- * looped, routed, folded, ungraphed, named in a fork, pressable.
+ * A run's steps as its workflow's graph drawn small, one story a state: done, at work, checked, at its gate, at its design gate,
+ * refused, waiting, held, looped, routed, folded, ungraphed, named in a fork, pressable.
  */
 const meta: Meta<typeof StepGraph> = {
   title: 'Look/StepGraph',
@@ -37,6 +38,12 @@ const meta: Meta<typeof StepGraph> = {
 export default meta;
 
 type Story = StoryObj<typeof StepGraph>;
+
+/** The centre of a step's node across the graph, in the graph's own pixels. */
+const centreOf = (canvas: HTMLElement, step: string): number => {
+  const node = canvas.querySelector<HTMLElement>(`[data-step="${step}"]`)!;
+  return node.offsetLeft + node.offsetWidth / 2;
+};
 
 /** A run whose steps are done, on a check or on their own word, its last at its gate. */
 export const Done: Story = { args: { run: graphRun(DONE) } };
@@ -57,8 +64,30 @@ export const AtWork: Story = {
 /** A run whose check is at work on implement: alive, as its session would be. */
 export const Checking: Story = { args: { run: graphRun(CHECKED) } };
 
-/** A run at its gate: land yellow and a size larger, its gate's tick yellow. */
-export const AtItsGate: Story = { args: { run: graphRun(GATE) } };
+/** A run at its gate: land yellow and a size larger, its gate's tick yellow, before land, which is approved before it runs. */
+export const AtItsGate: Story = {
+  args: { run: graphRun(GATE) },
+  play: async ({ canvasElement }) => {
+    const tick = canvasElement.querySelector('[data-gate="land"]')!;
+    await expect(tick).toHaveAttribute('data-gate-at', 'before');
+    await expect(Number(tick.getAttribute('x1'))).toBeLessThan(centreOf(canvasElement, 'land'));
+  },
+};
+
+/**
+ * A build run at its design gate: design yellow and a size larger, its gate's tick yellow after it, between design and implement, since
+ * its closeout is what waits; land's tick still before land.
+ */
+export const AtItsDesignGate: Story = {
+  args: { run: graphRun(DESIGN_GATE) },
+  play: async ({ canvasElement }) => {
+    const tick = canvasElement.querySelector('[data-gate="design"]')!;
+    await expect(tick).toHaveAttribute('data-gate-at', 'after');
+    const x = Number(tick.getAttribute('x1'));
+    await expect(x).toBeGreaterThan(centreOf(canvasElement, 'design'));
+    await expect(x).toBeLessThan(centreOf(canvasElement, 'implement'));
+  },
+};
 
 /** A run whose implement failed its check: red, the steps after it hollow. */
 export const Refused: Story = { args: { run: graphRun(REFUSED) } };

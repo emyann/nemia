@@ -287,7 +287,9 @@ nemia factory home shop ~/code/shop --claude-md on
 - **Only the home's settings are read** (`--setting-sources project`), as a step's session reads them: your own settings, hooks and
   user `CLAUDE.md` do not apply. For your own, open a plain session instead.
 - **Claude Code asks what a step is never asked**: to trust the copy's folder, and to approve the home's `.mcp.json` servers, once for
-  each new copy.
+  each new copy. A run's own copy is trusted for its sessions by Nemia as the run starts, so the allow rules of the home's settings
+  apply to its steps, and that trust is taken back when you remove the run (`nemia rm`). Where Claude Code's `.claude.json` cannot
+  take the trust (it does not read as JSON, or the store's user cannot write it), `nemia start` is refused, naming the file.
 
 It needs `claude` on your PATH, and a factory with a home: one made by hand has none, and is refused naming how to take it over by a
 template.
@@ -299,5 +301,5 @@ _A factory's instruction_, and _Five layers_), and from `packages/agent-orchestr
 `packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts`,
 `packages/agent-orchestrator/src/revisions/pin.verb.ts`, `packages/agent-orchestrator/src/factory/rules/rules.store.ts`,
 `packages/agent-orchestrator/src/factory/upgrade/upgrade.verb.ts`, `packages/agent-orchestrator/src/factory/applied/applied.verb.ts`,
-`packages/objects/src/commands-factories-move.ts`, `packages/objects/src/factory-move.ts` and
-`packages/agent-orchestrator/src/factory/servers/sign-in.verb.ts`.
+`packages/objects/src/commands-factories-move.ts`, `packages/objects/src/factory-move.ts`,
+`packages/agent-orchestrator/src/factory/servers/sign-in.verb.ts` and `packages/agent-orchestrator/src/trust/home.verb.ts`.

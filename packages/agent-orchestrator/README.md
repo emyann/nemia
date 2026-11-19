@@ -3605,6 +3605,16 @@ servers are read from the home's `.mcp.json` where it has one and else from the 
 the workspace as before. A factory with no home, a run started before homes were, a step on Codex or a remote agent, and a folder run
 start in their workspace, filed as they were.
 
+A harness drops the allow rules of a folder's own `.claude/settings.json` until it trusts that folder, and a trusted parent does not
+count (measured in `packages/agent-runtime/docs/harness.md`, *A session in one folder, working on another*). So the run's copy is
+trusted by its harness's own record before its first session (`trustRunHome`, `src/trust/home.verb.ts`, through the runtime's
+`trustFolder`): `nemia start` trusts it for each harness of a step that starts there, and each filing of such a step — its first, a try
+that is no answer to a held session, a round — reads the trust again and gives it where it has gone. A trust that cannot be written
+refuses the start `Invalid`, nothing left of the run, and leaves a step unfiled with a note, `<step>: not filed — <why and the fix>`,
+until a pass finds the file mended. `nemia rm` takes back every record at or under the run's `home/` before its files go
+(`untrustRunHome`, the runtime's `untrustFolder`), the harness's own records of each folder a session started in included, so its file
+does not grow with every run; one it cannot take back is said, and the removal goes on.
+
 A person sees the home as a step does with `nemia factory home <factory> [<repo>]`, a verb of the client's own: the api serves the home
 whole, its files and the digest a run's copy is named by (`GET /api/factories/:name/home`, `factoryHomeOf`,
 `src/factory/object/factory.verb.ts`, read through the Factory door with `homeFilesOf`), and the client renders it read-only into its own

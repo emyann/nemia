@@ -882,12 +882,12 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
  * The run's home trusted by the harness of each step that starts there (`trustRunHome`), before the run is written: where it cannot be,
  * the run's files are forgotten and the start refused `Invalid`, in words that name the harness's file and the fix.
  */
-const homeTrusted = (home: string, run: Run, steps: readonly StepSpec[]): Effect.Effect<void, Invalid> => {
+const homeTrusted = Effect.fnUntraced(function* (home: string, run: Run, steps: readonly StepSpec[]) {
   const untrusted = trustRunHome(home, run, steps);
-  if (untrusted === undefined) return Effect.void;
-  runsAtOnce(home).runs.forget(run.id);
-  return Effect.fail(new Invalid({ message: `${untrusted}; then start the run again. Nothing was started.` }));
-};
+  if (untrusted === undefined) return;
+  yield* (yield* RunDoor).runs.forget(RunId.read(run.id));
+  return yield* Effect.fail(new Invalid({ message: `${untrusted}; then start the run again. Nothing was started.` }));
+});
 
 /** Whether a start hands its run anything to copy into its inputs: a file (`--input`) or a card (`--card`). */
 const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards'>): boolean => Boolean(opts.inputs?.length || opts.cards?.length);

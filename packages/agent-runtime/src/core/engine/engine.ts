@@ -629,7 +629,7 @@ const expectedOf = (
       expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness, ...since });
     }
   }
-  return expected satisfies ExpectedSession[] as ExpectedSession[];
+  return expected satisfies ExpectedSession[];
 };
 
 /**

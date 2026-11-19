@@ -242,7 +242,7 @@ const startedOver = (file: string, saved: number, refusal: string) =>
 const noneAnswers = (base: string, why: string) =>
   new Refused(
     `no daemon answers at ${base} (${why}). Start the daemon, \`nemia service restart\` (or \`nemia up\` where no service is installed), then type \`nemia watch\` again`,
-  ) satisfies Refused as Refused;
+  ) satisfies Refused;
 
 /**
  * Opens the stream for the first time, from the saved cursor, the typed one or 0: a saved cursor the api refuses (400) starts over at 0,

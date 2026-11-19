@@ -36,7 +36,7 @@ export const placedIn = <A, E, R>(env: Env, place: Place, program: Effect.Effect
     A,
     E,
     Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>
-  > as Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>>;
+  >;
 
 /**
  * What `command`'s handler answers for `input`, the one seam `commanded` calls an entry through: its handler run over the engine `e`,

@@ -578,7 +578,7 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
       message: `kind is ${JSON.stringify(doc.kind)}, and ${file} holds a ${expected.kind}: write kind: ${expected.kind}.`,
     });
   const name = isMap(doc.metadata) ? doc.metadata.name : undefined;
-  if (expected.name === undefined || typeof name !== 'string') return refusals satisfies Refusal[] as Refusal[];
+  if (expected.name === undefined || typeof name !== 'string') return refusals satisfies Refusal[];
   if (!SKILL_NAME.test(name))
     refusals.push({ file, at: ['metadata', 'name'], message: `metadata.name ${name} is not a name: lowercase words joined by dashes.` });
   else if (name !== expected.name)
@@ -587,7 +587,7 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
       at: ['metadata', 'name'],
       message: `metadata.name is ${name}, and a document's name is its folder's: write ${expected.name}, or rename the folder.`,
     });
-  return refusals satisfies Refusal[] as Refusal[];
+  return refusals satisfies Refusal[];
 }
 
 /**

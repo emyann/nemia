@@ -379,7 +379,7 @@ export function skillFiles(dir: string) {
   if ('refused' in folder) return [{ path: '', refused: folder.refused }] satisfies SkillFile[] as SkillFile[];
   return filesUnder(walk, folder.real, '', [folder.real]).sort((a, b) =>
     a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
-  ) satisfies SkillFile[] as SkillFile[];
+  ) satisfies SkillFile[];
 }
 
 /**

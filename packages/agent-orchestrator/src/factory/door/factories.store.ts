@@ -250,7 +250,7 @@ export function instructionRead(
  */
 const levelHeld = (read: () => FactoryLevelFile | undefined) => {
   try {
-    return read() satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
+    return read() satisfies FactoryLevelFile | undefined;
   } catch {
     return undefined;
   }
@@ -268,7 +268,7 @@ export function factoryFiles(home: string) {
   const instructionOf = (name: string, notDone: string) =>
     instructionRead(readFactoryAt(home, name, notDone), instructionFileAt(home, name), readInstructionAt, (file) =>
       storeKeeps(home, name, file),
-    ) satisfies FactoryInstruction as FactoryInstruction;
+    ) satisfies FactoryInstruction;
   const storeKept = (name: string, notDone: string) => {
     const before = instructionOf(name, notDone);
     if (!before.store) throw folderKeptRefusal(name, before.file);
@@ -384,7 +384,7 @@ export const doorAt = <A>(home: string, use: (door: FactoryDoorShape) => Effect.
  * @param use What to do with the door.
  */
 export const doorAtOnce = <A>(home: string, use: (door: FactoryDoorShape) => Effect.Effect<A, Refusal>) =>
-  Effect.runSync(use(factoryDoorOver(factoryFiles(home)))) satisfies A as A;
+  Effect.runSync(use(factoryDoorOver(factoryFiles(home)))) satisfies A;
 
 /** A tree's check, said beside the door that reads the factory it is of. */
 export { treeChecked };
@@ -434,8 +434,7 @@ export const startFactoryAtOnce = (home: string, named: string | undefined, at: 
  * @param name The factory's name.
  * @param notDone What the caller did not do, said at the end of a refusal.
  */
-export const readFactoryAtOnce = (home: string, name: string, notDone: string) =>
-  readFactoryAt(home, name, notDone) satisfies Factory as Factory;
+export const readFactoryAtOnce = (home: string, name: string, notDone: string) => readFactoryAt(home, name, notDone) satisfies Factory;
 
 /**
  * The factory `name` filed in the store `home`, read through the door at once; none for the default, which has no spec of its own.
@@ -472,7 +471,7 @@ export const templatedTreeOf = (home: string, name: string, who: string) => temp
  * @param root The store's root.
  */
 export const factoryDoorFiles = (root: string) =>
-  Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root))) satisfies Layer.Layer<never> as Layer.Layer<never>;
+  Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root))) satisfies Layer.Layer<never>;
 
 /**
  * The factory `name` filed in the store `home`, read through the door at once, for `verb`: refused as `filedFactory` refuses it, the

@@ -14,7 +14,7 @@ import { listArg, namespaceOfRun, said, switchArg } from '../requests.ts';
 import { forgottenLine, sizeOf } from './forgotten.ts';
 
 /** The runs named, in the order typed. */
-const idsOf = (args: Args) => listArg(args, 'runId') satisfies readonly string[] as readonly string[];
+const idsOf = (args: Args) => listArg(args, 'runId') satisfies readonly string[];
 
 /** The runs a verb named and left, and whether one failed otherwise than by a refusal, which makes its exit 1 and not 2. */
 type Tally = { left: string[]; failed: boolean };

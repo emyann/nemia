@@ -317,7 +317,7 @@ export const leftEndedLine = (run: string, note: string, at: string) =>
 export type FeedFold = { said: Map<string, FeedSaid>; shots: Map<string, number> };
 
 /** A fold of nothing. */
-export const freshFold = () => ({ said: new Map(), shots: new Map() }) satisfies FeedFold as FeedFold;
+export const freshFold = () => ({ said: new Map(), shots: new Map() }) satisfies FeedFold;
 
 /**
  * A process's fold of the feed, as far as it has read it: the byte it read to (`cursor`), and the generation of the feed it read

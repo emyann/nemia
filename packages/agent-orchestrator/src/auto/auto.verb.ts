@@ -171,10 +171,7 @@ export function proposalOf(words: string) {
           when: rule.when,
           ...(rule.under === undefined ? {} : { under: rule.under }),
         };
-  return { rules: rules.map(kept), guidance } satisfies { rules: PolicyRule[]; guidance: string[] } as {
-    rules: PolicyRule[];
-    guidance: string[];
-  };
+  return { rules: rules.map(kept), guidance } satisfies { rules: PolicyRule[]; guidance: string[] };
 }
 
 /**

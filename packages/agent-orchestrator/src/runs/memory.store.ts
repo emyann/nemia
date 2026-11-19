@@ -74,7 +74,7 @@ const stateOf = () =>
     asks: new Map(),
     forgetting: new Map(),
     versions: new Map(),
-  }) satisfies State as State;
+  }) satisfies State;
 
 /** The marks the stand-in holds of `id` (`runMarkOf`), which each writer of one asks the machine with, as the files' writers do. */
 const marksIn = (st: State, id: string) =>
@@ -380,4 +380,4 @@ function memoryRuns() {
 }
 
 /** A fresh Run door in memory: no run, and nothing kept between two calls (a test makes one per test). */
-export const runDoorMemory = () => Layer.succeed(RunDoor)(runDoorOver(memoryRuns())) satisfies Layer.Layer<never> as Layer.Layer<never>;
+export const runDoorMemory = () => Layer.succeed(RunDoor)(runDoorOver(memoryRuns())) satisfies Layer.Layer<never>;

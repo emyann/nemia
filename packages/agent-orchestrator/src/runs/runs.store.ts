@@ -72,7 +72,7 @@ export const runTaken = (id: string) =>
 export const cardStartedTwice = (card: string, run: string) =>
   new Conflict({
     message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
-  }) satisfies Conflict as Conflict;
+  }) satisfies Conflict;
 
 /**
  * The run store's files at the store's root `home`, a new run's record refused as `runTaken` when one is there: what the files layer is
@@ -123,4 +123,4 @@ export const runDoorFiles = (home: string) => Layer.succeed(RunDoor)(runDoorOver
  * itself: a run written here is checked as the door checks it.
  * @param home The store's root folder.
  */
-export const runsAtOnce = (home: string) => atOnce<RunsLayer, RunId>(runDoorOver(filesRuns(home))) satisfies RunsLayer as RunsLayer;
+export const runsAtOnce = (home: string) => atOnce<RunsLayer, RunId>(runDoorOver(filesRuns(home))) satisfies RunsLayer;

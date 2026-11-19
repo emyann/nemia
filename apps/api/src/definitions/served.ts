@@ -43,7 +43,7 @@ export function originAsked(asked: string | undefined) {
 export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string | undefined) {
   const origin = originAsked(asked);
   if (origin === 'repo') repoNeeded(place);
-  return origin satisfies Origin | undefined as Origin | undefined;
+  return origin satisfies Origin | undefined;
 }
 
 /**
@@ -148,6 +148,6 @@ export const listed = <const K extends string, T extends Named>(kind: K, items: 
  */
 export function addsGated<T>(home: string, namespace: string, kind: 'agents' | 'skills', held: readonly Held<T>[]) {
   const added = addedOf(home, namespace);
-  if (added === undefined) return [...held] satisfies Held<T>[] as Held<T>[];
-  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name)) satisfies Held<T>[] as Held<T>[];
+  if (added === undefined) return [...held] satisfies Held<T>[];
+  return held.filter((h) => (h.origin !== 'user' && h.origin !== 'builtin') || added[kind].has(h.name)) satisfies Held<T>[];
 }

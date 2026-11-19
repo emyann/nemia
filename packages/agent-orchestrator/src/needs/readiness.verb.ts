@@ -496,7 +496,7 @@ const needFixes = (need: Need, state: NeedState, at?: FixAt, fixes = need.fixes 
         ...(fix.kind === 'removes' ? { kind: 'removes' as const } : {}),
       },
     ] satisfies ReadinessFix[];
-  }) satisfies ReadinessFix[] as ReadinessFix[];
+  }) satisfies ReadinessFix[];
 
 /** A need's piece, its state off `memo` under `key`: `unknown` where no reading is kept. */
 const needPiece = (

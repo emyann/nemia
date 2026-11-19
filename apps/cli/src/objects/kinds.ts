@@ -129,9 +129,9 @@ function writable<S>(
  * file written by hand with no `queued` keeps the card's.
  */
 const queuedAsServed = (spec: CardSpec, served: Served | null) => {
-  if (spec.queued !== undefined) return spec satisfies CardSpec as CardSpec;
+  if (spec.queued !== undefined) return spec satisfies CardSpec;
   const was = typeof served?.spec === 'object' && served.spec !== null && 'queued' in served.spec ? served.spec.queued : undefined;
-  return (typeof was === 'string' ? { ...spec, queued: was } : spec) satisfies CardSpec as CardSpec;
+  return (typeof was === 'string' ? { ...spec, queued: was } : spec) satisfies CardSpec;
 };
 
 /** A namespace's object by its name, and the list of a namespace's. */

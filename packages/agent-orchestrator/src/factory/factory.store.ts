@@ -474,7 +474,7 @@ function readable(home: string) {
  * The names of the store's factories that read, as a refusal offers them.
  * @param home The store's root.
  */
-export const factoryNamesAt = (home: string) => readable(home).factories.map((f) => f.name) satisfies string[] as string[];
+export const factoryNamesAt = (home: string) => readable(home).factories.map((f) => f.name) satisfies string[];
 
 /**
  * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory `named`,

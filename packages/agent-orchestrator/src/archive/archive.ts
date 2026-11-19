@@ -249,9 +249,5 @@ export function unpackArchive(bytes: Uint8Array, limit = ARCHIVE_LIMIT, source =
   const files = entries.files
     .map(({ path, mode, bytes: body }) => ({ path: path.slice(name.length + 1), mode, bytes: body }))
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  return { name, files, digest: contentDigest(name, files) } satisfies { name: string; files: TreeFile[]; digest: string } as {
-    name: string;
-    files: TreeFile[];
-    digest: string;
-  };
+  return { name, files, digest: contentDigest(name, files) } satisfies { name: string; files: TreeFile[]; digest: string };
 }

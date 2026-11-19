@@ -341,7 +341,8 @@ const refreshedSteps = (run: Run, read: PassRevisions) =>
 export const driftNow = Effect.fn('driftNow')(function* (run: Run, given?: PassRevisions) {
   const now = yield* pinsNow(run, yield* readOr(given));
   const ran = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);
-  return [...kindsDrift(run.pinned, now), ...stepsDrift(ran, run.pinned, now)] satisfies Drift[] as Drift[];
+  const drift: Drift[] = [...kindsDrift(run.pinned, now), ...stepsDrift(ran, run.pinned, now)];
+  return drift;
 });
 
 /** The pins the run's next filing would take, numbered without a write (`driftNow`'s): none where nothing would be filed or read. */

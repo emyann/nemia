@@ -34,7 +34,7 @@ function parseWorktrees(porcelain: string) {
     else if (word === 'locked') at.locked = rest;
     else if (word === 'prunable') at.prunable = true;
   }
-  return listed satisfies Listed[] as Listed[];
+  return listed satisfies Listed[];
 }
 
 /** A path with every link on the way followed, as far as it exists, as git names a worktree. */

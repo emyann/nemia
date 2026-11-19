@@ -41,7 +41,7 @@ function upRefusal(args: Args) {
       | string
       | null as string | null;
   const asked = everyOf(every);
-  return ('refusal' in asked ? asked.refusal : null) satisfies string | null as string | null;
+  return ('refusal' in asked ? asked.refusal : null) satisfies string | null;
 }
 
 /** `nemia up`: a pass every interval, holding the store, until it is stopped; or, with `--stats`, what the last pass cost. */

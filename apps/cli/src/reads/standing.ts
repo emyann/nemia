@@ -54,7 +54,7 @@ export const pausedLines = (paused: Paused, now: Date = new Date()) => {
       ({ run, step, repo }) => `   ${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`,
     ),
     ...paused.held.map(({ run, step }) => `   ${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`),
-  ] satisfies string[] as string[];
+  ] satisfies string[];
 };
 
 /** When a schedule fires or fired, and how far that is from `now`. */
@@ -81,4 +81,4 @@ export const scheduleLines = (factories: readonly FactorySchedules[], now: numbe
           `scheduled  ${factory}/${metadata.name}  ${spec.cron}${spec.tz ? ` (${spec.tz})` : ''}  next ${status.next ? fireWord(status.next, now) : 'never'}  last ${status.last ? `${status.last.run} (${fireWord(status.last.at, now)})` : 'none'}`,
           ...(status.refused ? [`  refused: ${status.refused}`] : []),
         ]),
-    ) satisfies string[] as string[];
+    ) satisfies string[];

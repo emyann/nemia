@@ -6,8 +6,6 @@
  */
 import type { FrameAt, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
 
-export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
-
 /** The factory pane wider than a narrow screen: none off a factory, folded as the person keeps it, covered by the sheet under 1600. */
 const paneWide = (at: FrameAt, wanted: boolean) => {
   if (!at.hasPane) return 'none';

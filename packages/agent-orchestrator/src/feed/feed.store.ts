@@ -347,7 +347,7 @@ const doorAt = (home: string) => feedDoorOver(feedFiles(home)) satisfies FeedDoo
 /** `effect` run where it is called: what it succeeds with, or the refusal it failed with thrown, or the defect it died of. */
 function ran<A>(effect: Effect.Effect<A, Refusal>) {
   const exit = Effect.runSyncExit(effect);
-  if (Exit.isSuccess(exit)) return exit.value satisfies A as A;
+  if (Exit.isSuccess(exit)) return exit.value satisfies A;
   throw Cause.squash(exit.cause);
 }
 
@@ -417,7 +417,7 @@ export const feedSize = (home: string) => ran(doorAt(home).lines.end())?.cursor 
  * @param home The store's root folder.
  * @param after The cursor to read from, in bytes.
  */
-export const readFeedEnds = (home: string, after: number) => ran(doorAt(home).lines.read(after)) satisfies FeedRead as FeedRead;
+export const readFeedEnds = (home: string, after: number) => ran(doorAt(home).lines.read(after)) satisfies FeedRead;
 
 /**
  * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched

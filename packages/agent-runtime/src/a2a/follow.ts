@@ -89,15 +89,8 @@ const responseOf = (taskId: string, m: Followed) => {
       { $case: 'data', value: { events: m.events, cursor: m.cursor } },
       true,
       false,
-    ) satisfies StreamResponse as StreamResponse;
-  return artifactUpdate(
-    taskId,
-    m.key,
-    PARTIAL,
-    { $case: 'text', value: m.text },
-    m.append,
-    m.last,
-  ) satisfies StreamResponse as StreamResponse;
+    ) satisfies StreamResponse;
+  return artifactUpdate(taskId, m.key, PARTIAL, { $case: 'text', value: m.text }, m.append, m.last) satisfies StreamResponse;
 };
 
 /**
@@ -177,7 +170,4 @@ export const followThrough =
           message: cause instanceof Error ? cause.message : String(cause),
           ...(cause instanceof UnsupportedOperationError ? { refused: true } : {}),
         }),
-    ).pipe(Stream.map(followedOf), Stream.flattenIterable) satisfies Stream.Stream<Followed, RunnerError> as Stream.Stream<
-      Followed,
-      RunnerError
-    >;
+    ).pipe(Stream.map(followedOf), Stream.flattenIterable) satisfies Stream.Stream<Followed, RunnerError>;

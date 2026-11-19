@@ -122,7 +122,7 @@ export const declaredAs = <K extends Exclude<ApiErrorClass, typeof Gone>>(
   const kind = kinds.find((k) => statusOfClass(k) === status);
   if (kind === undefined)
     throw new Error(`A refusal of status ${status} reached an endpoint that declares none (${error}): declare its class on the endpoint.`);
-  return new kind({ error }) satisfies ApiError as ApiError;
+  return new kind({ error }) satisfies ApiError;
 };
 
 /**
@@ -134,7 +134,7 @@ const READER_ERRORS = [BadRequest, Missing, Conflict, Invalid] as const;
  * One of the api's own `Refusal`s as the `Api`'s error of its status: 400 `BadRequest`, 404 `Missing`, 409 `Conflict`, 422 `Invalid`.
  * @param refusal The api's own refusal, its status and its words.
  */
-export const readerRefused = (refusal: Refusal) => declaredAs(READER_ERRORS, refusal) satisfies ApiError as ApiError;
+export const readerRefused = (refusal: Refusal) => declaredAs(READER_ERRORS, refusal) satisfies ApiError;
 
 /**
  * `work` over the request's services, failing with the error the api answers a refusal with (`refusedAs`), dying with anything else, a

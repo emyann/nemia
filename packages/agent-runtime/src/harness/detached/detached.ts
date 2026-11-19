@@ -532,7 +532,7 @@ const streamIn = (file: string, lastBytes?: number) => {
 /** The run `name` names under `spec`'s folder at `root`, or `undefined` when it has none or its file cannot be read. */
 const runNamed = (spec: HarnessSpec, root: string, name: string) => {
   const at = runAt(spec, root, name);
-  return (at && 'run' in at ? { name, run: at.run } : undefined) satisfies Run | undefined as Run | undefined;
+  return (at && 'run' in at ? { name, run: at.run } : undefined) satisfies Run | undefined;
 };
 
 /** The file a run's `stream` is kept whole in, beside its run file in `dir`. */
@@ -806,11 +806,11 @@ const endedWorker = (run: RunFile) => (run.state !== 'working' && run.pid > 0 ? 
 const leftBy = (run: RunFile) => {
   const group = groupLeft(run.harness);
   const scope = scopeLeft(run.cgroup, endedWorker(run));
-  return (group === undefined && scope === undefined
-    ? undefined
-    : { ...(group === undefined ? {} : { group }), ...(scope === undefined ? {} : { scope }) }) satisfies Left | undefined as
-    | Left
-    | undefined;
+  return (
+    group === undefined && scope === undefined
+      ? undefined
+      : { ...(group === undefined ? {} : { group }), ...(scope === undefined ? {} : { scope }) }
+  ) satisfies Left | undefined;
 };
 
 /** `signal` sent to what the ended `run` `left`: its harness's group, and its scope, the latter by `cgroup.kill` for SIGKILL. */

@@ -237,7 +237,7 @@ export function escapeDoes(key: EscapeKey) {
 }
 
 /** Where the focus stands as the bar closes: `in` it, `out` of it on another element, or on `nothing` — null or the page's body. */
-export type FocusPlace = 'in' | 'out' | 'nothing';
+type FocusPlace = 'in' | 'out' | 'nothing';
 
 /**
  * Whether the bar gives the focus back to what opened it as it closes (`BarPanel`): only while it still holds the focus — `now` is

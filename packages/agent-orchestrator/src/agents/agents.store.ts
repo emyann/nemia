@@ -123,7 +123,7 @@ export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: 
       const version = skillVersion(path.join(skills, bareSkillOf(name)));
       return version === null ? [] : [[name, version] as const];
     }),
-  ) satisfies Map<string, string> as Map<string, string>;
+  ) satisfies Map<string, string>;
 }
 
 /**
@@ -169,7 +169,7 @@ export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: S
       const globs = fs.existsSync(file) ? appliesOf(fs.readFileSync(file, 'utf8')) : [];
       return globs.length ? [[name, globs] as const] : [];
     }),
-  ) satisfies Map<string, string[]> as Map<string, string[]>;
+  ) satisfies Map<string, string[]>;
 }
 
 /**

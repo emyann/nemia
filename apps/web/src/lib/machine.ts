@@ -219,7 +219,7 @@ export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'fi
     path: pathOf(legsOf(points, at.get(route.from)!, at.get(route.to)!, half)),
   }));
   const { width = 0, height = 0 } = g.graph();
-  return { states, routes, width, height } satisfies Drawing as Drawing;
+  return { states, routes, width, height } satisfies Drawing;
 }
 
 /**

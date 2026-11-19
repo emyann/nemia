@@ -612,7 +612,7 @@ function answerOf(
     advanced: Advanced;
     blockers: string[];
     rest?: { tipped: string[] };
-  } as { advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } };
+  };
 }
 
 /**

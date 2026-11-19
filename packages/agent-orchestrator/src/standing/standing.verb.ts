@@ -184,8 +184,7 @@ const stoodRead = (place: Place, ask: Ask, memo: StandingMemo | undefined) =>
   }).pipe(Effect.map((outcome) => stoodOutcome(ask, outcome)));
 
 /** The readings as one `PassStanding`, by repository and base branch. */
-const byKey = (read: readonly StoodRead[]) =>
-  new Map(read.map((r) => [keyOf(r.repo, r.base), r])) satisfies Map<string, StoodRead> as Map<string, StoodRead>;
+const byKey = (read: readonly StoodRead[]) => new Map(read.map((r) => [keyOf(r.repo, r.base), r])) satisfies Map<string, StoodRead>;
 
 /**
  * Where the repositories of `runs` stand now, each repository and base branch asked at once (`asksOf`, of the result branches of

@@ -395,7 +395,7 @@ export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run) =>
  * @param taskId The task the next try continues.
  */
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string) =>
-  continuesFrom(views.get(taskId)?.state.attempts) satisfies string | undefined as string | undefined;
+  continuesFrom(views.get(taskId)?.state.attempts) satisfies string | undefined;
 
 /** The word of a step on a run left unjudged, a task of which does not read (`unjudgedWord`). */
 export const UNREADABLE = 'unreadable';
@@ -696,7 +696,7 @@ export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
  * The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`.
  * @param git What reads the runs' branches.
  */
-export const passParents = (git: BranchReader) => ({ git, read: new Map() }) satisfies Parents as Parents;
+export const passParents = (git: BranchReader) => ({ git, read: new Map() }) satisfies Parents;
 
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply

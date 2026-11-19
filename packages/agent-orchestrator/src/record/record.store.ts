@@ -366,7 +366,7 @@ function readUnheld(home: string, id: string) {
   if (!marker) return undefined satisfies Unheld | undefined as Unheld | undefined;
   const since = fieldOf(marker.json, 'since');
   const { actor } = actorIn(fieldOf(marker.json, 'actor'));
-  return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined as Unheld | undefined;
+  return (isText(since) && actor ? { since, actor } : undefined) satisfies Unheld | undefined;
 }
 
 /**
@@ -407,7 +407,7 @@ export const removeHold = (home: string, id: string, at: string, actor?: Actor) 
  * @param home The store's root folder.
  * @param id The run's id.
  */
-export const runRecord = (home: string, id: string) => within('records', () => readRecord(home, id)) satisfies Run as Run;
+export const runRecord = (home: string, id: string) => within('records', () => readRecord(home, id)) satisfies Run;
 
 /** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
 const heldOf = (home: string, id: string) => {
@@ -1086,7 +1086,7 @@ export const listRuns = (home: string, said: (line: string) => void = sayOnce, k
           })
           .sort((a, b) => a.id.localeCompare(b.id))
       : [],
-  ) satisfies Run[] as Run[];
+  ) satisfies Run[];
 
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they

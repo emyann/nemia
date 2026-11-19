@@ -110,7 +110,7 @@ export type AdoptPlan = {
 };
 
 /** `names` sorted, each once. */
-const sorted = (names: Iterable<string>) => [...new Set(names)].sort() satisfies string[] as string[];
+const sorted = (names: Iterable<string>) => [...new Set(names)].sort() satisfies string[];
 
 /** The hires `was` becomes as `now`, by step in order: each added, dropped, or given another agent. */
 function hireChanges(was: Hires, now: Hires) {

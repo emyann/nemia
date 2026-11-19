@@ -223,7 +223,7 @@ export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>) => pru
  */
 export function pruneLines(p: Pruning) {
   const engine = p.engine && p.kind !== 'refused' ? engineWords(p.engine, { id: p.id, dry: true }) : '';
-  return (engine ? [...storeLines(p), `   ${engine}`] : storeLines(p)) satisfies string[] as string[];
+  return (engine ? [...storeLines(p), `   ${engine}`] : storeLines(p)) satisfies string[];
 }
 
 /** What `nemia prune` says of one run's worktrees and files. */

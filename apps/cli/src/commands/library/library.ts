@@ -17,7 +17,7 @@ type Held = {
 const KINDS = ['skills', 'agents', 'mcpservers', 'workflows'] as const;
 
 /** The items of a list, as a line reads them. */
-const items = (list: { readonly items: readonly Held[] }) => list.items satisfies readonly Held[] as readonly Held[];
+const items = (list: { readonly items: readonly Held[] }) => list.items satisfies readonly Held[];
 
 /** Every item of the library's `kind`, page after page. */
 const heldOf = (c: ObjectsClient, kind: (typeof KINDS)[number]) => {

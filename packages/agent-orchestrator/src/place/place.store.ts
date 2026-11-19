@@ -162,8 +162,7 @@ export type Place = {
  */
 export class PlaceService extends Context.Service<PlaceService, Place>()('orchestrator/PlaceService') {
   /** `place` as the layer that gives it to a program. */
-  static readonly layer = (place: Place) =>
-    Layer.succeed(PlaceService)(PlaceService.of(place)) satisfies Layer.Layer<PlaceService> as Layer.Layer<PlaceService>;
+  static readonly layer = (place: Place) => Layer.succeed(PlaceService)(PlaceService.of(place)) satisfies Layer.Layer<PlaceService>;
 }
 
 /** A started repository run's place as `nemia rm` and `nemia prune` read it: the place, its `say`, and what its inventory read. */

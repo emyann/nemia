@@ -183,7 +183,7 @@ export type StepAttempts = {
 const attemptsOn = (state: TaskView['state'] | undefined, turn?: number) =>
   (state
     ? state.attempts.filter((a) => (a.turn ?? 0) === (turn ?? state.inputs?.length ?? 0))
-    : []) satisfies TaskView['state']['attempts'] as TaskView['state']['attempts'];
+    : []) satisfies TaskView['state']['attempts'];
 
 /**
  * How one try of a step signed off, off the engine's record of its turn's last attempt — as `closeoutOf` reads the current try's —
@@ -319,7 +319,7 @@ export function triesOf(
   const turnAt = (t: EarlierTry, i: number) => turnOfTry(earlier.slice(0, i), t);
   const recordAt = (n: number) => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   const askAt = (n: number) => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers);
-  const answerAt = (n: number) => (askAt(n)?.message ?? null) satisfies string | null as string | null;
+  const answerAt = (n: number) => (askAt(n)?.message ?? null) satisfies string | null;
   const answeredBy = (n: number) => {
     const ask = askAt(n);
     return (ask?.message !== undefined && ask.actor ? { answeredBy: ask.actor } : {}) satisfies Pick<StepTry, 'answeredBy'> as Pick<

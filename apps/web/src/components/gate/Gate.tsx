@@ -420,7 +420,7 @@ export const sendBackWaits = ({
   draft: Draft;
 }) => {
   const left = unanswered(questions, draft);
-  return (to === step && left.length < questions.length ? left : []) satisfies string[] as string[];
+  return (to === step && left.length < questions.length ? left : []) satisfies string[];
 };
 
 /**

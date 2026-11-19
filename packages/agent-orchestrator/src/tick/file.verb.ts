@@ -136,7 +136,7 @@ export type Filing = {
 export type Heads = () => Readonly<Record<string, string>> | undefined;
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
-const asRead = (f: Filing) => reportedEngine(f.e, [...f.reads.views.values()]) satisfies Engine as Engine;
+const asRead = (f: Filing) => reportedEngine(f.e, [...f.reads.views.values()]) satisfies Engine;
 
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
 const closeFirst = (f: Filing, name: string, taskId: string | null | undefined) =>

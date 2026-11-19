@@ -188,7 +188,7 @@ const LIBRARY_PATH = 'GET /api/skills';
 
 /** The skills the library holds: the person's and the builtins, at each origin. */
 const libraryHeld = async (s: Served) =>
-  (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin') satisfies Held<Row>[] as Held<Row>[];
+  (await heldIn(s)).filter((h) => h.origin === 'user' || h.origin === 'builtin') satisfies Held<Row>[];
 
 /**
  * The library's objects of the skills `served`, in no namespace, each with the factories that use it and, on the person's copy of a

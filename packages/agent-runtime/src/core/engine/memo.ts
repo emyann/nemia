@@ -79,7 +79,7 @@ export const keptIn = (memo: TickMemoState | undefined, id: string) => {
  * @param memo The engine's memo, or undefined for a pass without one.
  */
 export const keptLooked = (memo: TickMemoState | undefined) =>
-  (memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : []) satisfies Releasable[] as Releasable[];
+  (memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : []) satisfies Releasable[];
 
 /**
  * Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip.

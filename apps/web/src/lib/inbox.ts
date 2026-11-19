@@ -299,7 +299,7 @@ export function cardRepo(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factor
  */
 export function factoryRepoOf(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factories: readonly Factory[] | undefined) {
   const on = cardRepo(entry, factories);
-  return (on !== null && 'repo' in on ? on.repo : null) satisfies string | null as string | null;
+  return (on !== null && 'repo' in on ? on.repo : null) satisfies string | null;
 }
 
 /**

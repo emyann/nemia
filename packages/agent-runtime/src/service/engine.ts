@@ -1038,6 +1038,5 @@ const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typ
  * asks no harness.
  */
 export class Engine extends Context.Service<Engine, EngineShape>()('agent-runtime/Engine') {
-  static readonly layer = (options: EngineOptions) =>
-    Layer.effect(Engine, make(options)) satisfies Layer.Layer<Engine, EngineRefused> as Layer.Layer<Engine, EngineRefused>;
+  static readonly layer = (options: EngineOptions) => Layer.effect(Engine, make(options)) satisfies Layer.Layer<Engine, EngineRefused>;
 }

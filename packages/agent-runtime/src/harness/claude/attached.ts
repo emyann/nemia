@@ -161,9 +161,7 @@ const carriedFrom = (root: string, resumeFrom: string) => {
  * carried on taken off (`lessCarried`). What a sighting counts, and what a take-up takes off the cap.
  */
 const ownUsage = (told: ReturnType<typeof saidBy>, run: AttachedRun) =>
-  (told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage) satisfies Usage | undefined as
-    | Usage
-    | undefined;
+  (told.usage && run.carried ? lessCarried(told.usage, run.carried, told.ownTokens) : told.usage) satisfies Usage | undefined;
 
 /** The spend cap a run file's request asked for, where it asked one. */
 const capOf = (run: AttachedRun) => {

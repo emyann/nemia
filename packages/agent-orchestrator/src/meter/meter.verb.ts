@@ -31,7 +31,7 @@ export const ioOf = (e: Engine) => (typeof e.io === 'function' ? e.io() : Effect
  * @param program The program whose work alone the totals are to count.
  */
 export const talliedIn = <A, E, R>(e: Engine, program: Effect.Effect<A, E, R>) =>
-  (typeof e.tallied === 'function' ? e.tallied(program) : program) satisfies Effect.Effect<A, E, R> as Effect.Effect<A, E, R>;
+  (typeof e.tallied === 'function' ? e.tallied(program) : program) satisfies Effect.Effect<A, E, R>;
 
 /**
  * Each harness's observes between two of the runtime's totals, for a harness observed in between; `unread` only where some observe could

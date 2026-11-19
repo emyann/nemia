@@ -73,7 +73,7 @@ export const filedFields: FiledFields = (filed, now, gave) => {
 export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRead, record: StepRecord | undefined) =>
   (record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined) satisfies
     | string
-    | undefined as string | undefined;
+    | undefined;
 
 /**
  * A run as its record is read, each step's record written before `declared` was kept given the fields its try was filed with, where they

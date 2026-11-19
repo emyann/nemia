@@ -59,8 +59,4 @@ export const proposalsActed: ProposalsActed = (runs, judged) =>
  * @param program A tick's pass, given the proposals pass.
  */
 export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>) =>
-  Effect.provideService(program, ProposalsAct, proposalsActed) satisfies Effect.Effect<A, E, Exclude<R, ProposalsAct>> as Effect.Effect<
-    A,
-    E,
-    Exclude<R, ProposalsAct>
-  >;
+  Effect.provideService(program, ProposalsAct, proposalsActed) satisfies Effect.Effect<A, E, Exclude<R, ProposalsAct>>;

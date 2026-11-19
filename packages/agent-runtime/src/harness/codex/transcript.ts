@@ -143,5 +143,5 @@ export const codexRolloutEvents = (entry: unknown, offset: number, file?: string
     ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   const { item } = read.record.payload;
-  return (item ? itemEvents(item, item.id || `@${offset}`, at) : []) satisfies TranscriptEvent[] as TranscriptEvent[];
+  return (item ? itemEvents(item, item.id || `@${offset}`, at) : []) satisfies TranscriptEvent[];
 };

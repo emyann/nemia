@@ -72,11 +72,10 @@ const wiringFile = (home: string, name: string) => path.join(treeDir(home, name)
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const readTreeWiring = (home: string, name: string) =>
-  wiringIn(wiringFile(home, name)) satisfies { wiring: TreeWiring } | { absent: true } | { error: string } as
-    | { wiring: TreeWiring }
-    | { absent: true }
-    | { error: string };
+export const readTreeWiring = (home: string, name: string) => {
+  const read: { wiring: TreeWiring } | { absent: true } | { error: string } = wiringIn(wiringFile(home, name));
+  return read;
+};
 
 /** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
 function wiringIn(file: string) {
@@ -101,10 +100,9 @@ function wiringIn(file: string) {
  */
 export function treeWiringOf(entries: readonly Entry[]) {
   const entry = entries.find((e) => e.path === 'factory.json');
-  return (entry === undefined ? { absent: true } : wiringOfText("the render's factory.json", entry.bytes.toString('utf8'))) satisfies
-    | { wiring: TreeWiring }
-    | { absent: true }
-    | { error: string } as { wiring: TreeWiring } | { absent: true } | { error: string };
+  const read: { wiring: TreeWiring } | { absent: true } | { error: string } =
+    entry === undefined ? { absent: true } : wiringOfText("the render's factory.json", entry.bytes.toString('utf8'));
+  return read;
 }
 
 /** The wiring `text`, read at `file`, holds, or why it does not read. */
@@ -201,8 +199,7 @@ export type Condition = typeof ConditionSchema.Type;
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const readStatus = (home: string, name: string) =>
-  statusIn(statusFile(home, name)) satisfies Status | undefined as Status | undefined;
+export const readStatus = (home: string, name: string) => statusIn(statusFile(home, name)) satisfies Status | undefined;
 
 /** The status a factory's `file` holds, or none where it is not there or does not read. */
 function statusIn(file: string) {
@@ -405,9 +402,7 @@ export function readResolutions(home: string, name: string) {
  * @param merge The merge the choices are asked for: its version, template and base.
  */
 export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt) =>
-  (resolutions !== undefined && choicesApply(resolutions, merge)
-    ? resolutions.choices
-    : {}) satisfies Resolutions['choices'] as Resolutions['choices'];
+  (resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {}) satisfies Resolutions['choices'];
 
 /**
  * The proposals of `resolutions`, by the key of the owner each resolves (`ownerKey`), that resolve the merge `merge`: those recorded

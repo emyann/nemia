@@ -247,9 +247,7 @@ export function nowOf(row: NowRow) {
  * @param asOf The instant the wait is measured to.
  */
 export const presentWait = (run: { waitingSince: string | null }, asOf: Date) =>
-  (run.waitingSince === null ? null : durationWords(asOf.getTime() - Date.parse(run.waitingSince), 'minute')) satisfies string | null as
-    | string
-    | null;
+  (run.waitingSince === null ? null : durationWords(asOf.getTime() - Date.parse(run.waitingSince), 'minute')) satisfies string | null;
 
 /** What a distance under a minute says, a column having no room for seconds. */
 export const JUST_NOW = 'just now';

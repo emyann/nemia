@@ -81,7 +81,7 @@ export const startWorker = (
     child.on('error', () => {});
     child.unref();
     countSpawn();
-    return child.pid satisfies number | undefined as number | undefined;
+    return child.pid satisfies number | undefined;
   } finally {
     if (typeof err === 'number') fs.closeSync(err);
   }

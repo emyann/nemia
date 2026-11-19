@@ -520,18 +520,16 @@ export function renderStep(step: StepDraft) {
   const pairs = STEP_KEYS.flatMap((key) => {
     if (key === 'route') {
       const route = routeDrafted(step.name, step.route);
-      return (route === undefined ? [] : [['route', routeWritten(route)]]) satisfies FrontmatterPair[] as FrontmatterPair[];
+      return (route === undefined ? [] : [['route', routeWritten(route)]]) satisfies FrontmatterPair[];
     }
     if (key === 'checkFailurePolicy') {
       const policy = policyDrafted(step.name, step.checkFailurePolicy);
-      return (policy === undefined
-        ? []
-        : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]]) satisfies FrontmatterPair[] as FrontmatterPair[];
+      return (policy === undefined ? [] : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]]) satisfies FrontmatterPair[];
     }
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key])
-      return [] satisfies FrontmatterPair[] as FrontmatterPair[];
-    return (value === undefined ? [] : [[key, value]]) satisfies FrontmatterPair[] as FrontmatterPair[];
+      return [] satisfies FrontmatterPair[];
+    return (value === undefined ? [] : [[key, value]]) satisfies FrontmatterPair[];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
   if (pairs.length)

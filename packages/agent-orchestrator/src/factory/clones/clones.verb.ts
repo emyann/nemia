@@ -33,7 +33,7 @@ export const cloned = Effect.fn('cloned')(function* (urls: Readonly<Record<strin
 export type CloneMemory = { said: Map<string, string> };
 
 /** A daemon's memory before its first sweep. */
-export const freshCloneMemory = () => ({ said: new Map() }) satisfies CloneMemory as CloneMemory;
+export const freshCloneMemory = () => ({ said: new Map() }) satisfies CloneMemory;
 
 /** The clone `into` of `factory`'s volume, gone, cloned again from `url`: whether it was, a refusal warned of once while it stands. */
 const clonedAgain = Effect.fn('clonedAgain')(function* (memory: CloneMemory, factory: string, into: string, url: string) {

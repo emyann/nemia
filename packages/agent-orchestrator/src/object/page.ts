@@ -37,7 +37,7 @@ export const listPage: ListPage = (total, start, limit, bounds) => {
  */
 export const pageSizeOf = (limit: number | null, bounds: PageBounds) => {
   const cut = listPage(Number.MAX_SAFE_INTEGER, 0, limit, bounds);
-  return ('refused' in cut ? undefined : cut.to) satisfies number | undefined as number | undefined;
+  return ('refused' in cut ? undefined : cut.to) satisfies number | undefined;
 };
 
 /**

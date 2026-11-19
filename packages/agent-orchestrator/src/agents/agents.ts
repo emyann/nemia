@@ -673,7 +673,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * @param skills Each skill its `skills:` line names, read again: its SKILL.md's body, or why it cannot be read; none where absent.
  */
 export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []) => {
-  if (!step.agent) return step satisfies StepSpec as StepSpec;
+  if (!step.agent) return step satisfies StepSpec;
   const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent } satisfies StepSpec as StepSpec;
   return {

@@ -94,10 +94,10 @@ export const pushesOf = (source: PushSource) => {
 
   const fannedOf = (name: string) => {
     const there = sessions.get(name);
-    if (there) return there satisfies Fanned as Fanned;
+    if (there) return there satisfies Fanned;
     const made: Fanned = { at: {}, followers: new Set() };
     sessions.set(name, made);
-    return made satisfies Fanned as Fanned;
+    return made satisfies Fanned;
   };
 
   const woke = (fanned: Fanned, said: readonly Followed[]) => {

@@ -239,7 +239,8 @@ export function graphOf(
   });
   const rows = lanes <= 2 ? GRAPH.height : GRAPH.height + (lanes - 2) * GRAPH.lane;
   const under = loops > 0 ? lowest + GRAPH.under + GRAPH.nest * (loops - 1) + 1 : 0;
-  return { points, lines, gates: ticks, width, height: Math.max(rows, under), error } satisfies StepGraphLayout as StepGraphLayout;
+  const layout: StepGraphLayout = { points, lines, gates: ticks, width, height: Math.max(rows, under), error };
+  return layout;
 }
 
 const stateReader = (steps: readonly EdgeStep[]) => {
@@ -320,5 +321,7 @@ function joinedOf(slots: readonly Box[][], graph: Frozen<RunGraph>, steps: reado
 }
 
 /** Running if any edge an arrow stands for is, done if every one is, and to come otherwise. */
-const stateOf = (states: readonly EdgeState[]) =>
-  (states.includes('running') ? 'running' : states.every((s) => s === 'done') ? 'done' : 'to-come') satisfies EdgeState as EdgeState;
+const stateOf = (states: readonly EdgeState[]) => {
+  const state: EdgeState = states.includes('running') ? 'running' : states.every((s) => s === 'done') ? 'done' : 'to-come';
+  return state;
+};

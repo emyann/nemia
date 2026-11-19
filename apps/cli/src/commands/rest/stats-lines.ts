@@ -68,7 +68,7 @@ function table(rows: readonly string[][]) {
       .map((cell, i) => cell.padEnd(widths[i] ?? 0))
       .join('  ')
       .trimEnd(),
-  ) satisfies string[] as string[];
+  ) satisfies string[];
 }
 
 /** The tiles: each headline number over the last 14 days, beside the same over the 14 before. */

@@ -41,7 +41,7 @@ export function factoryLevelFile(home: string, name: string) {
  * @param name The factory's name.
  */
 export const readFactoryLevel = (home: string, name: string) =>
-  levelIn(factoryLevelFile(home, name), name) satisfies FactoryLevelFile | undefined as FactoryLevelFile | undefined;
+  levelIn(factoryLevelFile(home, name), name) satisfies FactoryLevelFile | undefined;
 
 /** The level `file` of the factory `name` holds, or undefined where it is not there; refused where it does not read. */
 function levelIn(file: string, name: string) {

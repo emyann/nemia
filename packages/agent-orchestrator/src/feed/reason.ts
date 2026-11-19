@@ -172,14 +172,14 @@ export const typeOf = (reason: Reason) => entryOf(reason).type;
  * The kinds a reason is written of, by the table: what a line's `involved.kind` may be where it names that reason.
  * @param reason The reason to look up.
  */
-export const kindsOf = (reason: Reason) => entryOf(reason).kinds satisfies readonly InvolvedKind[] as readonly InvolvedKind[];
+export const kindsOf = (reason: Reason) => entryOf(reason).kinds satisfies readonly InvolvedKind[];
 
 /**
  * Who a line of `reason` is the deed of, by the table: the tick's where the table names none, so a reason added without a source is the
  * tick's judgement, which is what every word it judges is.
  * @param reason The reason to look up.
  */
-export const sourceOf = (reason: Reason) => (entryOf(reason).source ?? 'tick') satisfies LineSource as LineSource;
+export const sourceOf = (reason: Reason) => (entryOf(reason).source ?? 'tick') satisfies LineSource;
 
 /**
  * Whether `reason` is a one-shot: a fact written exactly once per occurrence — a call denied, a person's act, a spawn refused, a session

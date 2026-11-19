@@ -71,9 +71,10 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
         fieldSelector: query.fieldSelector,
       };
-      return (table ? s.inRequest(cardTable(s.e, howOf(s), asked)) : s.inRequest(cardList(s.e, howOf(s), asked))) satisfies Promise<
-        CardList | Table
-      > as Promise<CardList | Table>;
+      const listed: Promise<CardList | Table> = table
+        ? s.inRequest(cardTable(s.e, howOf(s), asked))
+        : s.inRequest(cardList(s.e, howOf(s), asked));
+      return listed;
     }),
   );
 

@@ -36,5 +36,5 @@ export const monoNow = () => {
 /** Now, on both clocks: the wall clock's `Date.now()`, and the monotonic reading where there is one. */
 export const instantNow = () => {
   const mono = monoNow();
-  return { at: Date.now(), ...(mono ? { mono } : {}) } satisfies Instant as Instant;
+  return { at: Date.now(), ...(mono ? { mono } : {}) } satisfies Instant;
 };

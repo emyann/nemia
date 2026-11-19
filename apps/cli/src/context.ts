@@ -122,7 +122,7 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
  * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
 export const chosenOf = (env: NodeJS.ProcessEnv = process.env) =>
-  contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim()) satisfies Chosen as Chosen;
+  contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim()) satisfies Chosen;
 
 /**
  * The context in use, by its name: `NEMIA_CONTEXT`, else the config's, else this machine's.

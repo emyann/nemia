@@ -345,10 +345,7 @@ const subscribedIn = (body: unknown) => {
 
 /** A JSON-RPC error answering the request `id`, in band (HTTP 200), as the SDK's listen router answers its own refusals. */
 const rpcRefused = (id: unknown, message: string) =>
-  Response.json(
-    { jsonrpc: '2.0', id: id ?? null, error: { code: INVALID_PARAMS, message } },
-    { status: 200 },
-  ) satisfies Response as Response;
+  Response.json({ jsonrpc: '2.0', id: id ?? null, error: { code: INVALID_PARAMS, message } }, { status: 200 }) satisfies Response;
 
 /** `body` read off `request` within the SDK's bound, as JSON, or none where it is past it or no JSON. */
 const bodyOf = async (request: Request) => {

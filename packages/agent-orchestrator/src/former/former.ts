@@ -338,7 +338,7 @@ export function fencedPairs(pairs: ReadonlyArray<readonly [string, FrontmatterVa
     }
     fence[key] = value;
   }
-  return out satisfies Array<readonly [string, FrontmatterValue]> as Array<readonly [string, FrontmatterValue]>;
+  return out satisfies Array<readonly [string, FrontmatterValue]>;
 }
 
 /** The harness whose fence takes key `key` (`fenceKeysOf`): each fence key is one harness's. */
@@ -598,9 +598,9 @@ function renamedFields(fields: object) {
  * @param step The step as the record holds it.
  */
 export function asNamed(step: FrozenStep) {
-  if (isNamed(step)) return step satisfies StepSpec as StepSpec;
+  if (isNamed(step)) return step satisfies StepSpec;
   const fields = renamedFields(step) as StepSpec;
-  if (!step.agent) return fields satisfies StepSpec as StepSpec;
+  if (!step.agent) return fields satisfies StepSpec;
   const { keys, given } = step.agent;
   const agent = {
     ...harnessPromptAsNamed(step.agent),

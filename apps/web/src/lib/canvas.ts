@@ -84,7 +84,7 @@ type CanvasEdge = {
 export type Packet = { from: string; to: string; label: string; fields: number; files: number };
 
 /** A step as its packets read it: its name, the steps whose declared output it is handed, and what its shown try gave. */
-export type PacketStep = { name: string; input: readonly string[]; fields: number; files: number };
+type PacketStep = { name: string; input: readonly string[]; fields: number; files: number };
 
 /**
  * A packet's label: the name of the step that gave it.

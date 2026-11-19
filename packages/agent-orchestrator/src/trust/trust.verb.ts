@@ -45,11 +45,11 @@ export const trustPlaces = Effect.fn('trustPlaces')(function* (repos: readonly s
     repos,
     (dir) =>
       Effect.map(rootOf(place, dir), (rooted) => {
-        if ('unasked' in rooted) return [{ place: dir, unasked: rooted.unasked }] satisfies PlaceTrust[] as PlaceTrust[];
+        if ('unasked' in rooted) return [{ place: dir, unasked: rooted.unasked }] satisfies PlaceTrust[];
         try {
-          return given(dir, rooted.root) satisfies PlaceTrust[] as PlaceTrust[];
+          return given(dir, rooted.root) satisfies PlaceTrust[];
         } catch (err) {
-          return [{ place: dir, unasked: threwWords(err) }] satisfies PlaceTrust[] as PlaceTrust[];
+          return [{ place: dir, unasked: threwWords(err) }] satisfies PlaceTrust[];
         }
       }),
     { concurrency: 1 },

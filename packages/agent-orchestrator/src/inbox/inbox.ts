@@ -520,7 +520,7 @@ export function cardsListed(
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
   });
-  return listed satisfies CardListing[] as CardListing[];
+  return listed satisfies CardListing[];
 }
 
 /**
@@ -571,7 +571,7 @@ export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, fac
   const workflow = cardWorkflowName(l.workflow);
   if (factory === undefined || workflow === undefined) return null;
   const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
-  return ('repo' in of ? of.repo : null) satisfies string | null as string | null;
+  return ('repo' in of ? of.repo : null) satisfies string | null;
 }
 
 /**
@@ -600,10 +600,7 @@ export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'star
   listing: readonly L[],
   repo: string,
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
-) =>
-  queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo)) satisfies L | undefined as
-    | L
-    | undefined;
+) => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo)) satisfies L | undefined;
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and, when its `queued:`
@@ -808,10 +805,10 @@ export const retiredRepoRefusal = (notDone: string) =>
  * rule of its own, under no key, is given a frontmatter of one YAML comment line, so the rule is not read as the card's frontmatter.
  */
 function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }, body: string) {
-  const pairs = INBOX_KEYS.flatMap((key) => {
+  const pairs = INBOX_KEYS.flatMap<FrontmatterPair>((key) => {
     if (key !== 'labels') {
       const value = keys[key];
-      return (value !== undefined ? [[key, value]] : []) satisfies FrontmatterPair[] as FrontmatterPair[];
+      return value !== undefined ? [[key, value]] : [];
     }
     const labels = keys.labels ?? {};
     const sorted = Object.fromEntries(
@@ -819,7 +816,7 @@ function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labe
         .sort()
         .map((k) => [k, labels[k] ?? '']),
     );
-    return (Object.keys(sorted).length ? [[key, sorted]] : []) satisfies FrontmatterPair[] as FrontmatterPair[];
+    return Object.keys(sorted).length ? [[key, sorted]] : [];
   });
   const block = pairs.length ? renderFrontmatter(pairs) : body.startsWith('---') ? '# the idea below opens with a rule of its own\n' : '';
   return `${block ? `---\n${block}---\n` : ''}${body}\n`;

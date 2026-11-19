@@ -90,7 +90,7 @@ export type CommandSpec = CommandWords;
  */
 export function parseArgv(spec: Spec, argv: readonly string[]) {
   try {
-    return parseArgvOf(spec, argv) satisfies Args | undefined as Args | undefined;
+    return parseArgvOf(spec, argv) satisfies Args | undefined;
   } catch (err) {
     throw asInvalid(err);
   }

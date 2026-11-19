@@ -14,5 +14,5 @@ export function usePagePlace() {
   return {
     ...(factory !== undefined && { factory }),
     ...(typeof repo === 'string' && repo !== '' ? { repo } : {}),
-  } satisfies PagePlace as PagePlace;
+  } satisfies PagePlace;
 }

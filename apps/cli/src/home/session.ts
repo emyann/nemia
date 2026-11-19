@@ -42,5 +42,5 @@ export function ownSessionRun(start: Extract<OwnSession, { kind: 'start' }>, env
       off();
       resolve(code ?? 128 + (signal === null ? 0 : os.constants.signals[signal]));
     });
-  }) satisfies Promise<number> as Promise<number>;
+  }) satisfies Promise<number>;
 }

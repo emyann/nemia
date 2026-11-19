@@ -115,7 +115,7 @@ export const livenessOf = (state: Liveness['state'], base: string, cursor: numbe
       state === 'down'
         ? `daemon: none answers at ${base}${why ? ` (${why})` : ''} — the watch reads on from ${cursor} once one does; start it with nemia service restart, or npm start in apps/api`
         : `daemon: answering at ${base} — reading on from ${cursor}`,
-  }) satisfies Liveness as Liveness;
+  }) satisfies Liveness;
 
 /**
  * A liveness line as the watch prints it: `12:00:00  daemon down  · <text>`, or one JSON object, which no cursor has.

@@ -132,7 +132,7 @@ export async function asked<A, E>(
   return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs, {
     daemon: release,
     client: clientRelease(),
-  }) satisfies A as A;
+  }) satisfies A;
 }
 
 /**
@@ -172,7 +172,7 @@ export async function askedBare<A, E>(
   return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs, {
     daemon: undefined,
     client: clientRelease(),
-  }) satisfies A as A;
+  }) satisfies A;
 }
 
 /**
@@ -185,7 +185,7 @@ export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(list
     'items' in list
       ? Effect.succeed(list)
       : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
-  ) satisfies Effect.Effect<L, E | Error> as Effect.Effect<L, E | Error>;
+  ) satisfies Effect.Effect<L, E | Error>;
 
 /** The page of a list asked: `limit`, and past the first page the `continue` the page before answered, sent back as it is. */
 export type PageAsked = { readonly limit: string; readonly continue?: string };

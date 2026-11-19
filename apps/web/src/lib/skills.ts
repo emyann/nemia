@@ -163,7 +163,5 @@ export function reachWords(users: readonly SkillUser[]) {
  * @param changed Whether the form holds unsaved words.
  */
 export function drawnSkill(drawn: SkillDetail, now: SkillDetail, changed: boolean) {
-  return (drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir
-    ? now
-    : drawn) satisfies SkillDetail as SkillDetail;
+  return (drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir ? now : drawn) satisfies SkillDetail;
 }

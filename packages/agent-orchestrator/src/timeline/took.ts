@@ -34,13 +34,13 @@ export function ranIn(view: TaskClock) {
     if (a.reason !== 'unstartable') turns.set(a.turn ?? 0, [...(turns.get(a.turn ?? 0) ?? []), a]);
   }
   const over = view.state.settled !== null || signedAndHeld(view);
-  return [...turns.values()].flatMap((turn, i, all) => {
+  return [...turns.values()].flatMap<Ran>((turn, i, all) => {
     const from = turn.find((a) => a.spawnedAt)?.spawnedAt;
-    if (!from) return [] satisfies Ran[] as Ran[];
+    if (!from) return [];
     const to = turn.at(-1)?.endedAt;
-    if (to) return [{ from: Date.parse(from), to: Date.parse(to) }] satisfies Ran[] as Ran[];
-    return (over || i < all.length - 1 ? [] : [{ from: Date.parse(from), to: null }]) satisfies Ran[] as Ran[];
-  }) satisfies Ran[];
+    if (to) return [{ from: Date.parse(from), to: Date.parse(to) }];
+    return over || i < all.length - 1 ? [] : [{ from: Date.parse(from), to: null }];
+  });
 }
 
 /**

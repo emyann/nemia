@@ -209,20 +209,19 @@ function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads
  */
 export function settledFacts(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads) {
   if (!settled.size) return [] satisfies StepFact[] as StepFact[];
-  return steps.flatMap((step) => {
+  return steps.flatMap<StepFact>((step) => {
     const record = run.steps[step.name];
     if (!record) return [];
-    const facts = tasksOf(record).flatMap(({ taskId, metric }) => {
+    const facts = tasksOf(record).flatMap<StepFact>(({ taskId, metric }) => {
       const view = settled.has(taskId) ? reads.views.get(taskId) : undefined;
-      if (!view) return [] satisfies StepFact[] as StepFact[];
-      if (metric === 'check')
-        return [{ metric, attributes: stepAttributes(run, step, checkOutcome(view)) }] satisfies StepFact[] as StepFact[];
-      return [tryFact(run, step, taskId, view, reads)] satisfies StepFact[] as StepFact[];
+      if (!view) return [];
+      if (metric === 'check') return [{ metric, attributes: stepAttributes(run, step, checkOutcome(view)) }];
+      return [tryFact(run, step, taskId, view, reads)];
     });
     if (facts.length && reads.statusOf(step) === 'exhausted')
       facts.push({ metric: 'round', attributes: stepAttributes(run, step, 'exhausted') });
     return facts;
-  }) satisfies StepFact[] as StepFact[];
+  });
 }
 
 /**
@@ -236,14 +235,12 @@ export function settledFacts(run: Run, steps: readonly StepSpec[], settled: Read
  */
 export function settlesDue(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>) {
   const counted = run.settlesCounted;
-  if (!counted) return new Set() satisfies Set<string> as Set<string>;
+  if (!counted) return new Set() satisfies Set<string>;
   const tasks = steps.flatMap((step) => {
     const record = run.steps[step.name];
     return record ? tasksOf(record).map((t) => t.taskId) : [];
   });
-  return new Set(
-    tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId)),
-  ) satisfies Set<string> as Set<string>;
+  return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId))) satisfies Set<string>;
 }
 
 /**

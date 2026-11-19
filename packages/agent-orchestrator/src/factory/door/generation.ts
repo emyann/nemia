@@ -57,7 +57,7 @@ export const specDiffers = (was: Factory, now: Factory) => specKey(was) !== spec
 export const generationWritten = (was: Factory | { error: string }, now: Factory, counted = false) =>
   ('error' in was
     ? now
-    : { ...now, generation: generationAfter(was.generation ?? null, counted || specDiffers(was, now)) }) satisfies Factory as Factory;
+    : { ...now, generation: generationAfter(was.generation ?? null, counted || specDiffers(was, now)) }) satisfies Factory;
 
 /**
  * Whether a factory's level file `now` changes the spec `was` held: its own default level, absent where none was written. A raise and

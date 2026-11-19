@@ -215,10 +215,13 @@ export type Verdict = number | 'unfinished';
  * otherwise `unfinished` — killed, stopped, never started, or not ended yet — which is no verdict on the work, never a guessed number.
  * @param attempt The check's last attempt, its exit code and why it ended, or undefined where it has none.
  */
-export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: string | null } | undefined) =>
-  (typeof attempt?.exitCode === 'number' && attempt.reason !== 'deadline' && attempt.reason !== 'operator'
-    ? attempt.exitCode
-    : 'unfinished') satisfies Verdict as Verdict;
+export const attemptVerdict = (attempt: { exitCode?: number | null; reason?: string | null } | undefined) => {
+  const verdict: Verdict =
+    typeof attempt?.exitCode === 'number' && attempt.reason !== 'deadline' && attempt.reason !== 'operator'
+      ? attempt.exitCode
+      : 'unfinished';
+  return verdict;
+};
 
 /**
  * The last `n` non-trailing lines of some output.

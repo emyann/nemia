@@ -57,9 +57,9 @@ export type { TryCause };
  * @param read An ask file's JSON, as parsed.
  */
 export const upgradeAsk = (read: unknown) =>
-  (isObjectOrArray(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode')
+  isObjectOrArray(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode')
     ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }
-    : read) as unknown;
+    : read;
 
 /**
  * Every `RetryMode`, as the record's schema reads an ask file's: `objects`' list word for word, held equal by `wordsHeld`
@@ -375,5 +375,5 @@ export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]) {
   const n = tryOf(run, step);
   return answers.find(
     (a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model,
-  ) satisfies RetryAsk | undefined as RetryAsk | undefined;
+  ) satisfies RetryAsk | undefined;
 }

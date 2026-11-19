@@ -199,31 +199,26 @@ type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { h
  */
 export function offersOf(run: Offerable) {
   if (run.cancelledAt !== null || run.holding != null) return [] satisfies Offer[];
-  return run.steps.flatMap((step) => {
-    if (step.asked) return [] satisfies Offer[] as Offer[];
-    if (atHarness(step)) return [{ step: step.name, case: 'continue', kind: 'retry' }] satisfies Offer[] as Offer[];
-    if (!run.waitingOnYou.includes(step.name)) return [] satisfies Offer[] as Offer[];
+  return run.steps.flatMap<Offer>((step) => {
+    if (step.asked) return [];
+    if (atHarness(step)) return [{ step: step.name, case: 'continue', kind: 'retry' }];
+    if (!run.waitingOnYou.includes(step.name)) return [];
     const unfinished = step.check?.verdict?.result === 'unfinished';
     if (step.raise) {
       const questions = askedIn(step.closeout);
       return [
         { step: step.name, case: 'raise', kind: 'retry', message: step.message, needs: step.needs, unfinished, questions, ...step.raise },
-      ] satisfies Offer[] as Offer[];
+      ];
     }
     const state = stepState(step, false, false);
     if (state === 'blocked') {
-      return [
-        { step: step.name, case: 'answer', kind: 'retry', needs: step.needs, questions: askedIn(step.closeout) },
-      ] satisfies Offer[] as Offer[];
+      return [{ step: step.name, case: 'answer', kind: 'retry', needs: step.needs, questions: askedIn(step.closeout) }];
     }
-    if (state === 'failed-check')
-      return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: true, unfinished }] satisfies Offer[] as Offer[];
-    if (state === 'unsigned')
-      return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: false, unfinished: false }] satisfies Offer[] as Offer[];
-    if (state === 'denied')
-      return [{ step: step.name, case: 'denied', kind: 'retry', calls: step.denied?.words ?? null }] satisfies Offer[] as Offer[];
-    if (state === 'exhausted') return [{ step: step.name, case: 'enough', kind: 'approve' }] satisfies Offer[] as Offer[];
-    return [] satisfies Offer[] as Offer[];
+    if (state === 'failed-check') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: true, unfinished }];
+    if (state === 'unsigned') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: false, unfinished: false }];
+    if (state === 'denied') return [{ step: step.name, case: 'denied', kind: 'retry', calls: step.denied?.words ?? null }];
+    if (state === 'exhausted') return [{ step: step.name, case: 'enough', kind: 'approve' }];
+    return [];
   }) satisfies Offer[];
 }
 

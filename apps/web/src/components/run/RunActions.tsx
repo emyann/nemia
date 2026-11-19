@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { QuestionPopover } from './RunMenu';
 
 /** A run found under what a menu was asked for on, and the element its question opens beside: its row, its card. */
-export type FoundRun = { run: RunView; at: Element };
+type FoundRun = { run: RunView; at: Element };
 
 /** How long a finger rests on a run before its menu opens, where the browser opens none itself. */
 export const LONG_PRESS_MS = 500;

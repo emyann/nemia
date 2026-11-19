@@ -63,10 +63,10 @@ const attemptOf = (e: Engine, taskId: string, history: { after?: string } | unde
               if (seen)
                 return Effect.succeed([seen, m.kind === 'events' ? unseen(m, seen) : [m]] as const) satisfies Effect.Effect<
                   readonly [Set<string>, Moment[]]
-                > as Effect.Effect<readonly [Set<string>, Moment[]]>;
+                >;
               return asked('transcript', e.transcript(taskId, history.after)).pipe(
                 Effect.map((h) => [new Set(h.events.map(markOf)), h.events.length ? [m, { kind: 'events' as const, ...h }] : [m]] as const),
-              ) satisfies Effect.Effect<readonly [Set<string>, Moment[]]> as Effect.Effect<readonly [Set<string>, Moment[]]>;
+              ) satisfies Effect.Effect<readonly [Set<string>, Moment[]]>;
             },
           ),
         );

@@ -83,9 +83,7 @@ const stranded = (argv: readonly string[], name: string, context: string) =>
  * `--local` refused (`localRefused`).
  */
 const carryUnlocal = (argv: readonly string[]) =>
-  (argv[0] === 'doctor' && argv[1] === 'carry'
-    ? argv.filter((word) => word !== '--local')
-    : argv) satisfies readonly string[] as readonly string[];
+  (argv[0] === 'doctor' && argv[1] === 'carry' ? argv.filter((word) => word !== '--local') : argv) satisfies readonly string[];
 
 /**
  * The verbs answered before any context or route is read: `nemia config` and `nemia pair`, about the client's own config, and the

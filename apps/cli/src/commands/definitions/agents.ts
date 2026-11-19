@@ -48,7 +48,7 @@ function agentLines({ metadata: { name }, spec, status }: Agent) {
 export const agentsLines = (agents: readonly Agent[]) =>
   (agents.length
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
-    : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"]) satisfies string[] as string[];
+    : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"]) satisfies string[];
 
 /**
  * `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in.

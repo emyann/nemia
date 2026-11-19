@@ -160,7 +160,7 @@ function ownOrigins(home: string, name: string, ref: LibraryRef) {
   const out: DefinitionOrigin[] = [];
   if (factory.tree !== undefined && at(path.join(factory.tree, 'workflows'))) out.push('factory');
   if (workedOn(factory).some((repo) => at(path.join(path.resolve(repo), REPOSITORY_HOLDER)))) out.push('repo');
-  return out satisfies DefinitionOrigin[] as DefinitionOrigin[];
+  return out satisfies DefinitionOrigin[];
 }
 
 /** What to do about an add the library no longer holds. */

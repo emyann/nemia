@@ -18,11 +18,8 @@ import { workflowLink } from '../lib/factoryAddress';
 export const Route = createFileRoute('/agents_/new')({
   validateSearch: (search: Record<string, unknown>) => {
     const { factory: into, workflow, step } = hirePlaceOf(search);
-    return (into === undefined ? {} : { into, workflow, step }) satisfies { into?: string; workflow?: string; step?: string } as {
-      into?: string;
-      workflow?: string;
-      step?: string;
-    };
+    const place: { into?: string; workflow?: string; step?: string } = into === undefined ? {} : { into, workflow, step };
+    return place;
   },
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(storeQuery), context.queryClient.prefetchQuery(keyFormQuery)]),
   component: NewAgentPage,

@@ -13,7 +13,7 @@ import { Focusable, Tooltip, TooltipTrigger } from '@/components/ui/ds';
 import { cn, focusRing } from '@/components/ui/ds/utils';
 
 /** What the graph says under a step's node, with `named`: its agent, and a line of its own, its time and cost. */
-export type StepNamed = { agent: string | null; said: string };
+type StepNamed = { agent: string | null; said: string };
 
 /** How much taller a graph is that names its steps: three lines under the row. */
 const NAMED_HEIGHT = 44;

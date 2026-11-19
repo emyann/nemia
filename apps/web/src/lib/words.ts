@@ -19,7 +19,7 @@ import type { StepState } from './status.ts';
 export type Wait = { step: string | null; done: number };
 
 /** The words of a wait: the card's tag, its one sentence, and its button, given the step whose work there is to read, if one. */
-export interface WaitWords {
+interface WaitWords {
   readonly tag: (wait: Wait) => string;
   readonly sentence: (wait: Wait) => string;
   readonly open: (wait: Wait, read: string | null) => string;

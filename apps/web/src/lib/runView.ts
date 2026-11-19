@@ -126,7 +126,7 @@ const lastRead = <T>(client: QueryClient, key: QueryKey) =>
     .getQueryCache()
     .findAll({ queryKey: key })
     .filter((q) => q.state.data !== undefined)
-    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0]?.state.data as T | undefined satisfies T | undefined as T | undefined;
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0]?.state.data as T | undefined satisfies T | undefined;
 
 /** The data of each of a list of reads, in order: a `combine` declared once, so the list keeps its identity while no read changes. */
 const dataOf = <T>(results: UseQueryResult<T>[]) => results.map((r) => r.data);

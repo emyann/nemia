@@ -333,7 +333,7 @@ const foundOnDisk = (home: string, dir: string, places: Places) => {
  */
 export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills) {
   const home = places.home ?? '';
-  return workflowFiles(home).workflows.read(dir, foundOnDisk(home, dir, places), fills) satisfies Step[] as Step[];
+  return workflowFiles(home).workflows.read(dir, foundOnDisk(home, dir, places), fills) satisfies Step[];
 }
 
 /**

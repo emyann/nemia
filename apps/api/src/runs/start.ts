@@ -191,7 +191,7 @@ function foundFactory(s: Served, repo: string, first: Asked | Refusal) {
     return startFactoryAtOnce(s.home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts) satisfies {
       factory?: Factory;
       repo?: string;
-    } as { factory?: Factory; repo?: string };
+    };
   } catch (err) {
     if ('status' in first) throw declaredAs(START_REFUSALS, first);
     throw err;

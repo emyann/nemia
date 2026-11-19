@@ -78,7 +78,7 @@ const processes = () => {
       found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0] ?? '', args, cwd, env });
     } catch {}
   }
-  return found satisfies Proc[] as Proc[];
+  return found satisfies Proc[];
 };
 
 const realOf = (p: string) => {

@@ -49,8 +49,7 @@ export const sourceGiven = (given: string) => (templateNameRefusal(given) === nu
  * read off it (an archive's is the top folder inside it), so none is said where it cannot be read.
  * @param source The template's source as recorded.
  */
-export const nameOfSource = (source: string) =>
-  (templateNameRefusal(source) === null ? source : undefined) satisfies string | undefined as string | undefined;
+export const nameOfSource = (source: string) => (templateNameRefusal(source) === null ? source : undefined) satisfies string | undefined;
 
 /**
  * The folder a recorded source is read from, for a line that cannot fail: a name's folder in `builtins`, a path as it is.

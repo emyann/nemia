@@ -229,7 +229,10 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     }),
   );
   yield* recordStepMetrics(value.runs.flatMap((advanced) => advanced.facts ?? []));
-  if (!tallies) return value satisfies Pass as Pass;
+  if (!tallies) {
+    const untallied: Pass = value;
+    return untallied;
+  }
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, io1);
   const cost: PassCost = {
@@ -242,7 +245,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     return recordPassCost(home, cost) + recent.ms + seriesKept(home, recent.kept, config);
   });
   yield* recordPassMetrics(cost);
-  return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } } satisfies Pass as Pass;
+  const tallied: Pass = { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
+  return tallied;
 });
 
 /**

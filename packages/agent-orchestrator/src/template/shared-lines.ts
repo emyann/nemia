@@ -31,4 +31,4 @@ const linesFor = (linesOf: Readonly<Record<string, readonly string[]>>, file: st
 export const listItemsOf = (value: readonly unknown[]) =>
   value.flatMap<ListItem>((item) =>
     typeof item === 'string' ? [{ line: item }] : isPathItem(item) ? [{ path: item.path }] : [],
-  ) satisfies ListItem[] as ListItem[];
+  ) satisfies ListItem[];

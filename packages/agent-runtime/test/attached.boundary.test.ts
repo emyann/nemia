@@ -259,7 +259,7 @@ describe('a long-lived attached session takes turns, is interrupted, parks betwe
     await say(first, 'one last turn');
     await until(st, () => saidIn(dir).includes('one last turn'), 'the next turn heard', { everyMs: 50 });
     const other = claudeCodeOps({ root }, attachedSessions(root, STAND_IN));
-    await Effect.runPromise(other.interrupt!({ name: NAME, sessionId: NAME }));
+    await Effect.runPromise(other.interrupt({ name: NAME, sessionId: NAME }));
     assert.ok(fs.existsSync(filesOf(root, NAME).interrupt), 'a process that holds nothing leaves the ask on a file of its own');
     await until(
       st,
@@ -272,7 +272,7 @@ describe('a long-lived attached session takes turns, is interrupted, parks betwe
     );
     assert.equal(fs.existsSync(filesOf(root, NAME).interrupt), false, 'the ask goes once the request was sent');
     assert.equal(interrupts(dir), 2, 'the ask was sent as one interrupt control request');
-    const refused = await Effect.runPromise(Effect.flip(other.interrupt!({ name: NAME, sessionId: NAME })));
+    const refused = await Effect.runPromise(Effect.flip(other.interrupt({ name: NAME, sessionId: NAME })));
     assert.match(refused.message, /is idle, so it has no turn to end/, 'and an idle session has no turn to end');
   });
   s.test("REFUSED: an ask that reached the file after its turn ended is dropped on the holder's look, never kept", async () => {

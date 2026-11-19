@@ -16,8 +16,7 @@ import { type Env, settingsOf, StoreConfig, wfRoot } from './config.store.ts';
  */
 export class StoreRoot extends Context.Service<StoreRoot, string>()('orchestrator/StoreRoot') {
   /** `root`, an absolute directory, as the layer that gives it to a program. */
-  static readonly layer = (root: string) =>
-    Layer.succeed(StoreRoot)(StoreRoot.of(root)) satisfies Layer.Layer<StoreRoot> as Layer.Layer<StoreRoot>;
+  static readonly layer = (root: string) => Layer.succeed(StoreRoot)(StoreRoot.of(root)) satisfies Layer.Layer<StoreRoot>;
 }
 
 /**

@@ -566,7 +566,7 @@ export function triedFrom(
   spendOf: SpendOf,
 ) {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  return (satisfiesAfter(own) && hasGate(step, run) ? 'awaiting approval' : own) satisfies StepStatus as StepStatus;
+  return (satisfiesAfter(own) && hasGate(step, run) ? 'awaiting approval' : own) satisfies StepStatus;
 }
 
 /**
@@ -797,7 +797,7 @@ export const loopOver = (steps: readonly StepSpec[], looping: StepSpec, run: Run
     const step = steps.find((s) => s.name === name);
     const over = step && overBudget(step, run, spendOf);
     return over ? [{ name, ...over }] : [];
-  }) satisfies Array<{ name: string; spent: Spend; cap: number }> as Array<{ name: string; spent: Spend; cap: number }>;
+  });
 
 /**
  * What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole;

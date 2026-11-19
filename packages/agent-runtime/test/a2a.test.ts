@@ -76,7 +76,7 @@ describe('the A2A map: every mapping of a session, a spawn, words and an attempt
     const t = taskOfSighting('ae/t-1/3', full);
     assert.equal(t.id, 'ae/t-1/3');
     assert.equal(t.contextId, 'native-7', "its context is the harness's id for the conversation");
-    assert.equal(t.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
+    assert.equal(t.status.state, TaskState.TASK_STATE_INPUT_REQUIRED);
     assert.deepEqual(sightingOf(t), full);
     assert.deepEqual(t.artifacts, [closeoutArtifact(full.closeout!.payload, full.closeout!.at)], 'what it closed with is its Artifact');
     assert.deepEqual(closeoutOf(overTheWire(t)), full.closeout!.payload);
@@ -134,7 +134,7 @@ describe('the A2A map: every mapping of a session, a spawn, words and an attempt
   });
   test("a Task whose state is not its sighting's carries no sighting", () => {
     const t = taskOfSighting('ae/t-1/3', full);
-    assert.equal(sightingOf({ ...t, status: { ...t.status!, state: TaskState.TASK_STATE_WORKING } }), undefined);
+    assert.equal(sightingOf({ ...t, status: { ...t.status, state: TaskState.TASK_STATE_WORKING } }), undefined);
     assert.equal(sightingOf(startedTask('ae/t-1/3', messageOf({ name: 'ae/t-1/3', brief: 'b', cwd: '/r' }, 'm'))), undefined);
   });
   test('a spawn is a user Message: the name its task, the brief its one text part, the session it continues its context, the rest its metadata', () => {
@@ -206,14 +206,14 @@ describe('the A2A map: every mapping of a session, a spawn, words and an attempt
   test("a failed spawn's words ride in its Task's status: REJECTED when nothing started, SUBMITTED when something may have", () => {
     const asked = messageOf(request, 'm-1');
     const refused = failedSpawnTask('ae/t-1/2', asked, 'fake: no binary called `fake` on PATH', true, 'm-2');
-    assert.equal(refused.status!.state, TaskState.TASK_STATE_REJECTED);
+    assert.equal(refused.status.state, TaskState.TASK_STATE_REJECTED);
     assert.equal(wordsOf(refused), 'fake: no binary called `fake` on PATH');
-    assert.equal(refused.status!.message!.role, Role.ROLE_AGENT);
+    assert.equal(refused.status.message!.role, Role.ROLE_AGENT);
     const ambiguous = failedSpawnTask('ae/t-1/2', asked, 'fake: the launcher lost its acknowledgement', false, 'm-3');
-    assert.equal(ambiguous.status!.state, TaskState.TASK_STATE_SUBMITTED);
+    assert.equal(ambiguous.status.state, TaskState.TASK_STATE_SUBMITTED);
     assert.equal(wordsOf(ambiguous), 'fake: the launcher lost its acknowledgement');
     const started = startedTask('ae/t-1/2', asked);
-    assert.equal(started.status!.state, TaskState.TASK_STATE_WORKING);
+    assert.equal(started.status.state, TaskState.TASK_STATE_WORKING);
     assert.deepEqual(started.history, [asked]);
     assert.equal(wordsOf(started), undefined);
   });
@@ -241,7 +241,7 @@ describe('the A2A map: every mapping of a session, a spawn, words and an attempt
     ];
     for (const [change, state] of cases) {
       const t = taskOfAttempt('ae/t-1/1', { ...attempt, ...change }, 'm');
-      assert.equal(t.status!.state, state, JSON.stringify(change));
+      assert.equal(t.status.state, state, JSON.stringify(change));
       assert.equal((t.metadata!.attempt as Attempt).reason, change.reason ?? null);
       assert.deepEqual(overTheWire(t.metadata), t.metadata);
     }
@@ -252,10 +252,10 @@ describe('the A2A map: every mapping of a session, a spawn, words and an attempt
   test('an attempt that signed while its task waits on a person is INPUT_REQUIRED, its closeout still its Artifact; only a done one is', () => {
     const signed = { ...ended, closeout: { outcome: 'done' } };
     const waiting = taskOfAttempt('ae/t-1/1', signed, 'm', true);
-    assert.equal(waiting.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
+    assert.equal(waiting.status.state, TaskState.TASK_STATE_INPUT_REQUIRED);
     assert.deepEqual(closeoutOf(waiting), { outcome: 'done' });
-    assert.equal(taskOfAttempt('ae/t-1/1', signed, 'm').status!.state, TaskState.TASK_STATE_COMPLETED);
-    assert.equal(taskOfAttempt('ae/t-1/1', { ...signed, ended: 'failed' }, 'm', true).status!.state, TaskState.TASK_STATE_FAILED);
+    assert.equal(taskOfAttempt('ae/t-1/1', signed, 'm').status.state, TaskState.TASK_STATE_COMPLETED);
+    assert.equal(taskOfAttempt('ae/t-1/1', { ...signed, ended: 'failed' }, 'm', true).status.state, TaskState.TASK_STATE_FAILED);
   });
   test("REFUSED: words sent in a context that is not their session's", () => {
     const s: Sighting = { sessionId: 's-1', state: 'working', nativeId: 'conv-a' };

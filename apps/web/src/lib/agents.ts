@@ -335,7 +335,7 @@ export function latestTryOf<T extends { try: { agent: string } | null; createdAt
     .filter((run) => run.try?.agent === agent)
     .reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined) satisfies
     | T
-    | undefined as T | undefined;
+    | undefined;
 }
 
 /**

@@ -187,5 +187,5 @@ export const passRead = (
       }),
     );
   });
-  return { runs, slots, parents, standing, revisions } satisfies PassRead as PassRead;
+  return { runs, slots, parents, standing, revisions } satisfies PassRead;
 };

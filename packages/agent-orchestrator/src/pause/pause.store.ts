@@ -179,7 +179,7 @@ export function putPause(
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     throw new Conflict({ message: standing() });
   }
-  return pause satisfies Pause as Pause;
+  return pause satisfies Pause;
 }
 
 /**

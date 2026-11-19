@@ -40,7 +40,7 @@ export function finishedSearch(search: Record<string, unknown>) {
  * (`olderOf`): a route's search carries its parent's keys as the address wrote them, unread by `finishedSearch`.
  * @param search The search, by its `older`; absent on the first page.
  */
-export const trailOf = (search: { older?: unknown }) => (olderOf(search.older)?.split(JOIN) ?? []) satisfies string[] as string[];
+export const trailOf = (search: { older?: unknown }) => (olderOf(search.older)?.split(JOIN) ?? []) satisfies string[];
 
 /**
  * `prev`, the address's search, at `trail`: every other key kept, `older` set for a trail and dropped for none.

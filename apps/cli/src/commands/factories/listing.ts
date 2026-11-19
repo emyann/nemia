@@ -132,7 +132,7 @@ export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<
         : factoryLines(o, beside.get(o.metadata.name) ?? none, width, now),
     ),
     "\nfile one: nemia factory add <name> [--volume <path|url>:rw] — remove one: nemia factory rm <name> — in the daemon's store",
-  ] satisfies string[] as string[];
+  ] satisfies string[];
 }
 
 /** What `read` answers, or undefined where the api refuses it: a part of a factory's listing that does not read is left out. */

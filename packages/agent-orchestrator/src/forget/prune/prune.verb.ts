@@ -231,7 +231,7 @@ function nothingLeft(run: RepositoryRun, artifacts: boolean) {
 const forgetGone = ({ run, place, within }: Left) =>
   place.place
     .ask('remove', { repo: run.repo, workspaces: [], branches: [] })
-    .pipe(Effect.andThen(Effect.sync(() => dropEmpty(within)))) satisfies Effect.Effect<void> as Effect.Effect<void>;
+    .pipe(Effect.andThen(Effect.sync(() => dropEmpty(within)))) satisfies Effect.Effect<void>;
 
 /**
  * What a removal left behind and why (`leftWhy`), said on stderr; nothing for none.

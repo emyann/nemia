@@ -59,5 +59,5 @@ export function stepCardOf(input: StepCardInput) {
     spend: orNull(head.spend),
     note: orNull(head.note),
     action: head.action,
-  } satisfies StepCardFacts as StepCardFacts;
+  } satisfies StepCardFacts;
 }

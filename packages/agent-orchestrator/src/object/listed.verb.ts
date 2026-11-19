@@ -103,12 +103,7 @@ export const listOf = <const K extends string, T>(kind: K, page: Omit<Paged<unkn
     kind: `${kind}List`,
     metadata: { remainingItemCount: page.remainingItemCount, ...(page.continue !== undefined ? { continue: page.continue } : {}) },
     items,
-  }) satisfies { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] } as {
-    apiVersion: typeof API_VERSION;
-    kind: `${K}List`;
-    metadata: ListedMeta;
-    items: T[];
-  };
+  }) satisfies { apiVersion: typeof API_VERSION; kind: `${K}List`; metadata: ListedMeta; items: T[] };
 
 /** An object's name and labels, as a list of objects reads them. */
 const byMetadata: ListedBy<Named> = { key: (o) => o.metadata.name, labels: (o) => o.metadata.labels ?? {} };

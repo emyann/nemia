@@ -197,9 +197,13 @@ export type StepStatus = StepStatusWord;
 
 /**
  * What a follower may be filed on: work a step did, or a card a workflow node filed (`sent`). `skipped` neither satisfies nor stops.
+ * Two returns, so the checker infers a plain boolean and no type predicate, which the contracts' verifier would read as a cast.
  * @param s The status of the step waited on.
  */
-export const satisfiesAfter = (s: StepStatus) => s === 'verified' || s === 'unverified' || s === 'sent';
+export const satisfiesAfter = (s: StepStatus) => {
+  if (s === 'verified' || s === 'unverified' || s === 'sent') return true;
+  return false;
+};
 
 /**
  * A step in one of these stops what waits on it: for good where it broke, or until a person answers — a gate approved, a question met.

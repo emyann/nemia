@@ -36,7 +36,7 @@ const RUNNERS: Readonly<Record<MovedCommand, Runner>> = {
 /** `rest` read against `spec` (`parseArgv`), its usage refusal said as this client's own, exit 2. */
 const parsed = (spec: Parameters<typeof parseArgv>[0], rest: readonly string[]) => {
   try {
-    return parseArgv(spec, rest) satisfies Args | undefined as Args | undefined;
+    return parseArgv(spec, rest) satisfies Args | undefined;
   } catch (err) {
     if (err instanceof CommandRefused) throw new Refused(err.message);
     throw err;

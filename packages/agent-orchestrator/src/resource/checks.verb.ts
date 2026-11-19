@@ -11,8 +11,7 @@ import { asked, type Engine } from '../runtime-client.ts';
  * One verb of the engine, `read`, run to a Promise: what it succeeds with; its refusal as an `Error` whose `exitCode` is 2 and whose
  * message is led by `verb` (`output: …`), as `asked` words it; and any other failure as it failed.
  */
-const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) =>
-  Effect.runPromise(asked(verb, read)) satisfies Promise<A> as Promise<A>;
+const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) => Effect.runPromise(asked(verb, read)) satisfies Promise<A>;
 
 /**
  * The command a step is judged by, and what it said once it refused.
@@ -59,7 +58,7 @@ export type StepLog = {
 export function tailOf(output: string, max: number) {
   const lines = output.split(/\r?\n/);
   if (lines.at(-1) === '') lines.pop();
-  return (lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false }) satisfies StepLog as StepLog;
+  return (lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false }) satisfies StepLog;
 }
 
 /** How many lines of each stream a refused check shows: as many as `nemia decide` does (`CHECK_TAIL_LINES`). */
@@ -96,12 +95,14 @@ export async function refusedStderr(e: Engine, run: Run, views: Views) {
   const read = await Promise.all(
     [...new Set(ids)].map(async (id) => {
       try {
-        return [id, tailOf((await engineRead('output', e.output(id, 'stderr', TAIL_BYTES))) ?? '', CHECK_LINES)] satisfies [
-          string,
-          StepLog | string,
-        ] as [string, StepLog | string];
+        const tail: [string, StepLog | string] = [
+          id,
+          tailOf((await engineRead('output', e.output(id, 'stderr', TAIL_BYTES))) ?? '', CHECK_LINES),
+        ];
+        return tail;
       } catch (err) {
-        return [id, unreadableOutput(run, id, err)] satisfies [string, StepLog | string] as [string, StepLog | string];
+        const unread: [string, StepLog | string] = [id, unreadableOutput(run, id, err)];
+        return unread;
       }
     }),
   );

@@ -265,7 +265,7 @@ const wake = (at: Following, published: FeedPublished | undefined) => {
       onFailure: () => readOn(at),
       onSuccess: (end) => ((end?.cursor ?? 0) === at.cursor ? Effect.succeed([at, []] as const) : readOn(at)),
     }),
-  ) satisfies Woken as Woken;
+  ) satisfies Woken;
 };
 
 /**
@@ -308,13 +308,11 @@ export const followFeed = (from: number, { beat = '1 second' }: { beat?: Duratio
         Stream.drop(1),
         Stream.map(() => undefined),
       );
-      const live = Stream.merge(published, beats).pipe(
-        Stream.mapAccumArrayEffect(() => following satisfies Following as Following, wakeAll),
-      );
+      const live = Stream.merge(published, beats).pipe(Stream.mapAccumArrayEffect(() => following satisfies Following, wakeAll));
       return Stream.concat(Stream.fromIterable(caught), live).pipe(
         Stream.mapArrayEffect((chunk) =>
           Metric.update(FEED_FOLLOW_LINES, chunk.filter((f) => f.kind === 'line').length).pipe(Effect.as(chunk)),
         ),
       );
     }),
-  ) satisfies Stream.Stream<Followed, Refusal> as Stream.Stream<Followed, Refusal>;
+  ) satisfies Stream.Stream<Followed, Refusal>;

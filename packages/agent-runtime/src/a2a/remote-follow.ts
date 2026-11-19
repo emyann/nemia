@@ -280,9 +280,7 @@ const transcriptOfEntry = async (d: FollowDeps, e: Entry | undefined, taskId: st
     return (after === reply.cursor ? { events: [], cursor: reply.cursor } : reply) satisfies Transcript as Transcript;
   }
   const task = taskId === undefined ? undefined : await taskRead(d, taskId);
-  return (task
-    ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after)
-    : none) satisfies Transcript as Transcript;
+  return (task ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after) : none) satisfies Transcript;
 };
 
 /**

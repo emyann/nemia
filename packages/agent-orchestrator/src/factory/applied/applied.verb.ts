@@ -84,7 +84,7 @@ export type RenderedAt = { name: string; version: string; params: Params; entrie
  * @param params The factory's parameters, by name.
  */
 export const setsOf = (params: FactoryTemplate['params']) =>
-  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`) satisfies string[] as string[];
+  Object.entries(params).map(([key, value]) => `${key}=${String(value)}`) satisfies string[];
 
 /** What a render answers where it does not render: every problem a line, with the template's name and version where they were read. */
 export type Unrendered = { problems: string[]; version?: string; name?: string };
@@ -688,13 +688,13 @@ export const reconcile = () => {
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string) => {
   const value = args[key];
-  return (typeof value === 'string' ? value : undefined) satisfies string | undefined as string | undefined;
+  return (typeof value === 'string' ? value : undefined) satisfies string | undefined;
 };
 
 /** The words given under the flag `key` that takes many, in order. */
 const manyOf = (args: Args, key: string) => {
   const value = args[key];
-  return (Array.isArray(value) ? value.map(String) : []) satisfies string[] as string[];
+  return (Array.isArray(value) ? value.map(String) : []) satisfies string[];
 };
 
 /**

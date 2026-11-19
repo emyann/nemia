@@ -254,7 +254,7 @@ function sole(open: readonly Pr[], branch: string, onto: string) {
         `the base: a person moves its base (\`gh pr edit ${pr.number} --base ${onto}\`, or \`${API_LINE(pr.number, `base=${onto}`)}\` ` +
         `where \`gh pr edit\` fails on GitHub's deprecated Projects query), then the step is retried with \`--recheck\``,
     );
-  return pr satisfies Pr as Pr;
+  return pr satisfies Pr;
 }
 
 /** `branch` pushed to `origin`, never forced; refuses a push git rejected, naming the merge that answers it. */
@@ -553,23 +553,17 @@ function open(args: string[]) {
   const already = pulls(branch);
   const standing = already.length ? sole(already, branch, onto) : undefined;
   const said = [pushing(branch)];
-  const labelling = (pr: () => Pr) =>
-    (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]) satisfies string[] as string[];
+  const labelling = (pr: () => Pr) => (plan === undefined ? [] : ['note' in plan ? plan.note : relabelled(pr(), plan)]) satisfies string[];
   if (standing) {
     edited(standing.number, title, bodyFile);
     const updated = `#${standing.number} brought up to date with the title and body you wrote`;
-    return [...said, updated, ...labelling(() => standing), standing.url] satisfies string[] as string[];
+    return [...said, updated, ...labelling(() => standing), standing.url] satisfies string[];
   }
   const printed = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile);
   const url = printed.split('\n').at(-1)?.trim() ?? '';
   const number = Number(/\/pull\/(\d+)$/.exec(url)?.[1]);
   const made: Pr = { number, url, isDraft: false, baseRefName: onto, headRefOid: '', labels: [] };
-  return [
-    ...said,
-    'opened',
-    ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))),
-    url,
-  ] satisfies string[] as string[];
+  return [...said, 'opened', ...labelling(() => (number > 0 ? made : sole(pulls(branch), branch, onto))), url] satisfies string[];
 }
 
 /**
@@ -582,7 +576,7 @@ function headed(branch: string, onto: string, at: string) {
   const began = Date.now();
   for (;;) {
     const pr = sole(pulls(branch), branch, onto);
-    if (pr.headRefOid === at) return pr satisfies Pr as Pr;
+    if (pr.headRefOid === at) return pr satisfies Pr;
     const secs = Math.round((Date.now() - began) / 1000);
     if (Date.now() - began >= whole * 1000)
       throw new Refusal(
@@ -606,8 +600,8 @@ function push(args: string[]) {
   const at = head();
   const pr = headed(branch, onto, at);
   const proven = `#${pr.number} is at ${at.slice(0, 12)}, the commit this check judges: ${pr.url}`;
-  if (plan === undefined) return [said, proven] satisfies string[] as string[];
-  return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)] satisfies string[] as string[];
+  if (plan === undefined) return [said, proven] satisfies string[];
+  return [said, proven, 'note' in plan ? plan.note : relabelled(pr, plan)] satisfies string[];
 }
 
 /** A check run or a status context as REST gives one (`commits/<sha>/check-runs`, `commits/<sha>/status`); apart: it is spread whole. */

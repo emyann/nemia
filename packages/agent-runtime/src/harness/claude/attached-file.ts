@@ -213,7 +213,10 @@ type AskLineRead = typeof AskLineSchema.Type;
 const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, answers: Schema.Record(Schema.String, Schema.String) });
 type AnswerLine = typeof AnswerLineSchema.Type;
 
-/** The lines of the JSONL file `file`, each decoded by `schema` (`DecodedLines`); none, and none unread, where there is no file. */
+/**
+ * The lines of the JSONL file `file`, each decoded by `schema`, and how many did not decode; none, and none unread, where there is no
+ * file.
+ */
 const jsonLines = <A>(file: string, schema: Schema.Decoder<A>) => {
   let text: string;
   try {
@@ -351,7 +354,7 @@ export const everyRun = (root: string) => {
   return new Map(names.flatMap((f) => [readRun(path.join(dir, f)) ?? []].flat().map((run) => [run.name, run] as const))) satisfies Map<
     string,
     AttachedRun
-  > as Map<string, AttachedRun>;
+  >;
 };
 
 /** The spawn as a run file keeps it: everything but the brief, which a resume does not say again. */

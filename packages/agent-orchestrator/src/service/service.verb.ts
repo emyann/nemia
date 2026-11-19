@@ -141,10 +141,7 @@ export const timeoutGiven = (args: Args, home: string, by: string) =>
  * @param verb The verb after `nemia`, which a refusal names.
  */
 export const timedHost = (args: Args, home: string, verb: string) =>
-  Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms)) satisfies Effect.Effect<
-    ServiceHost,
-    Refusal
-  > as Effect.Effect<ServiceHost, Refusal>;
+  Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms)) satisfies Effect.Effect<ServiceHost, Refusal>;
 
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
@@ -197,7 +194,7 @@ function placed(args: Args, host: ServiceHost) {
     system: system.system,
     file: unitPathOf(system.system, named, host.dirs()),
     unit: unitName(system.system, named),
-  } satisfies Placed as Placed;
+  } satisfies Placed;
 }
 
 /** The system's programs for one service: reload its files, enable it at login, start, restart, stop and read it. */
@@ -425,11 +422,7 @@ function specOf(at: Placed, args: Args, host: ServiceHost) {
   };
   const bad = specRefusal(spec);
   if (bad !== null) throw new Invalid({ message: bad });
-  return { spec, lines: sized.lines, slice: sized.slice } satisfies { spec: ServiceSpec; lines: string[]; slice: SliceFile | null } as {
-    spec: ServiceSpec;
-    lines: string[];
-    slice: SliceFile | null;
-  };
+  return { spec, lines: sized.lines, slice: sized.slice } satisfies { spec: ServiceSpec; lines: string[]; slice: SliceFile | null };
 }
 
 /** What `nemia service install` did: the service and its file, the checkout it runs, how it stands now, and its lines. */
@@ -478,11 +471,13 @@ function startedBeside(at: Placed, host: ServiceHost) {
 const lingerLines = (at: Placed, host: ServiceHost) => {
   if (at.system !== 'systemd') return [] satisfies string[] as string[];
   const user = host.user().name;
-  return (host.linger(user) === false
-    ? [
-        `lingering is off: the service stops at the last logout and starts at the next login; loginctl enable-linger ${user} keeps it running`,
-      ]
-    : []) satisfies string[] as string[];
+  return (
+    host.linger(user) === false
+      ? [
+          `lingering is off: the service stops at the last logout and starts at the next login; loginctl enable-linger ${user} keeps it running`,
+        ]
+      : []
+  ) satisfies string[];
 };
 
 /**

@@ -62,7 +62,7 @@ function unreadOf(servers: readonly McpServer[]) {
  */
 export function serverLines(factory: string, servers: readonly McpServer[]) {
   if (servers.length === 0)
-    return [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`] satisfies string[] as string[];
+    return [`${factory}  no server recorded — nemia factory server add ${factory} <server> --url <address>`] satisfies string[];
   const unread = unreadOf(servers);
   return [
     ...servers.map(({ metadata, spec, status }) => {
@@ -70,7 +70,7 @@ export function serverLines(factory: string, servers: readonly McpServer[]) {
       return `${metadata.name.padEnd(20)} ${spec.type}  ${spec.url}  ${status?.state ?? 'unread'}${status?.tools === undefined ? '' : ` (${status.tools} tools)`}${error}`;
     }),
     ...(unread === null ? [] : [`the states were not read: ${unread}`]),
-  ] satisfies string[] as string[];
+  ] satisfies string[];
 }
 
 /**

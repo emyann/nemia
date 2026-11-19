@@ -10,9 +10,7 @@
  * @param value Any value, read as JSON is.
  */
 export const fieldsOf = (value: unknown) =>
-  (typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined) satisfies
-    | Record<string, unknown>
-    | undefined as Record<string, unknown> | undefined;
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : undefined;
 
 /**
  * `value`'s items, as a fresh list, where it is a list; else undefined.

@@ -27,7 +27,7 @@ import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string) => {
   const value = args[key];
-  return (typeof value === 'string' ? value : undefined) satisfies string | undefined as string | undefined;
+  return (typeof value === 'string' ? value : undefined) satisfies string | undefined;
 };
 
 /** The words given under the flag `key` that takes many, in order. */

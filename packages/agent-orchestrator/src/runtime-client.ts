@@ -313,7 +313,7 @@ export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>) => {
  * the one engine it is given.
  */
 export class EngineService extends Context.Service<EngineService, Engine>()('agent-orchestrator/Engine') {
-  static readonly layer = (e: Engine) => Layer.succeed(EngineService)(e) satisfies Layer.Layer<EngineService> as Layer.Layer<EngineService>;
+  static readonly layer = (e: Engine) => Layer.succeed(EngineService)(e) satisfies Layer.Layer<EngineService>;
 }
 
 /** What a read threw or rejected with, in a controller's program: a refusal (`isRefusal`) as its failure, anything else as a defect. */
@@ -332,7 +332,7 @@ export const tried: <A>(read: () => A) => Effect.Effect<A, Refusal> = fromThrow;
  * @param effect What the verb returns, run in the program.
  */
 export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>) =>
-  effect.pipe(Effect.mapError(refusalWords(verb)), Effect.orDie) satisfies Effect.Effect<A> as Effect.Effect<A>;
+  effect.pipe(Effect.mapError(refusalWords(verb)), Effect.orDie) satisfies Effect.Effect<A>;
 
 /**
  * `program` over the engine `e`, run to a Promise: what the CLI, the api and the tests run a controller with. Rejects with the refusal
@@ -345,7 +345,7 @@ export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>) =>
 export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>) =>
   Effect.runPromise(
     program.pipe(Effect.provide(EngineService.layer(e)), Effect.provideService(References.MinimumLogLevel, 'Warn')),
-  ) satisfies Promise<A> as Promise<A>;
+  ) satisfies Promise<A>;
 
 /**
  * `program` over the engine `e` in place of the one in its context: what a pass hands a read the engine it reads through
@@ -476,7 +476,7 @@ export const refusalsOf = (read: RemoteRead) => (read.unread ? [read.unread] : [
 export function remoteAgents(root: string) {
   const read = readRemote(root);
   if (read.unread) throw new Invalid({ message: read.unread });
-  return read.agents satisfies ReadonlyMap<string, RemoteAgent> as ReadonlyMap<string, RemoteAgent>;
+  return read.agents satisfies ReadonlyMap<string, RemoteAgent>;
 }
 
 /**

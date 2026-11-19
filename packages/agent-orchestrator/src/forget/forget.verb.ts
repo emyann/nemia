@@ -112,33 +112,41 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const git = asksStanding(f.run, f.steps) ? yield* standingLive([f.run]) : standingReader(NOTHING_READ);
   const asked = yield* PlaceService;
   const refusal = yield* tried(() => refusalOf(home, id, f, git, asked));
-  if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot as Forgot;
+  if (refusal) {
+    const refused: Forgot = { ...said, kind: 'refused', refusal, ...nothing() };
+    return refused;
+  }
   const read = isRepositoryRun(run) ? yield* tried(() => readRunPlace(run, asked, dir)) : undefined;
-  if (isRepositoryRun(run) && read && !('inventory' in read))
-    return { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() } satisfies Forgot as Forgot;
+  if (isRepositoryRun(run) && read && !('inventory' in read)) {
+    const unread: Forgot = { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() };
+    return unread;
+  }
   const place = read && 'inventory' in read ? read : undefined;
   const taskIds = forgottenIds(run);
   yield* (yield* RunDoor).forgetting.write(RunId.read(id), taskIds);
   yield* closeWaitingTasks(e, run, f.views);
   if (!isRepositoryRun(run) || !place) {
     const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
-    return {
+    const folder: Forgot = {
       ...said,
       folder: true,
       kind: 'forgotten',
       ...nothing(),
       files,
       engine: yield* forgetTasks(id, taskIds),
-    } satisfies Forgot as Forgot;
+    };
+    return folder;
   }
   const worktrees = yield* tried(() => removeWorktrees(run, steps, dir, place));
   if (worktrees.left.length) {
     yield* (yield* RunDoor).forgetting.lift(RunId.read(id));
-    return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot as Forgot;
+    const held: Forgot = { ...said, kind: 'held', ...worktrees, branches: [], files: [] };
+    return held;
   }
   const branches = yield* tried(() => deleteBranches(run, how, place, worktrees.handedOff));
   const files = yield* tried(() => removeKeyed(home, id, Object.keys(run.steps)));
-  return { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot as Forgot;
+  const forgotten: Forgot = { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) };
+  return forgotten;
 });
 
 /**

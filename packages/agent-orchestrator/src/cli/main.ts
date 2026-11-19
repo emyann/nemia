@@ -93,7 +93,7 @@ function tickLines(pass: Pass) {
   if (queue) console.log(queueLine(queue));
   if (!results.length && !queue && !unreadable?.length) console.log('no runs');
   for (const r of results) tickRunLines(r);
-  return pass satisfies Pass as Pass;
+  return pass satisfies Pass;
 }
 
 /**

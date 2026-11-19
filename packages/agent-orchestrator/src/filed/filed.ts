@@ -204,9 +204,7 @@ export const startOf = (step: StepSpec, workspace: string, found: StartFound | u
 
 /** A list of rules each read by `rule`, with `more` after them; undefined where there was no list and nothing more, as before. */
 const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]) =>
-  (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined as
-    | string[]
-    | undefined;
+  (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
 
 /** A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's. */
 const mountOf = (m: Mount) =>
@@ -285,11 +283,11 @@ export const WORKSPACE = 'WF_WORKSPACE';
 function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own) {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const given = frozen?.[SETTINGS_HARNESS];
-  if (harness !== SETTINGS_HARNESS || given === undefined) return own satisfies Own as Own;
+  if (harness !== SETTINGS_HARNESS || given === undefined) return own satisfies Own;
   const rendered: unknown = Reflect.get(own, harness);
   const flags = typeof rendered === 'object' && rendered !== null ? rendered : {};
   const settings = filedSettings(given, 'settings' in flags && typeof flags.settings === 'string' ? flags.settings : undefined);
-  return (settings === undefined ? own : { ...own, [harness]: { ...flags, settings } }) satisfies Own as Own;
+  return (settings === undefined ? own : { ...own, [harness]: { ...flags, settings } }) satisfies Own;
 }
 
 /**

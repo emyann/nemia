@@ -29,7 +29,7 @@ export const workflowSearch = (search: Record<string, unknown>) =>
   ({
     ...(search.build === true || search.build === 'true' ? { build: true as const } : {}),
     ...pagePlaceOf(search),
-  }) satisfies { build?: true; repo?: string } as { build?: true; repo?: string };
+  }) satisfies { build?: true; repo?: string };
 
 /**
  * What a workflow's page loads before it draws, in `place`: the list it is read from (`loadWorkflowsIn`), the store, and for one of yours

@@ -375,7 +375,7 @@ export const merges = (steps: readonly StepSpec[]) => steps.some(endsOnBase);
  * @param run The run's gates.
  */
 export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) =>
-  terminalSteps(steps).filter((s) => hasGate(s, run)) satisfies StepSpec[] as StepSpec[];
+  terminalSteps(steps).filter((s) => hasGate(s, run)) satisfies StepSpec[];
 
 /**
  * The words a step's own file says, below its frontmatter: its note alone where it names an agent, since `body` then opens with the

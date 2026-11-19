@@ -64,7 +64,7 @@ export function clockBreakdown(clock: RunClock, head: string, from: string) {
     head,
     rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]), none: ms <= 0 })),
     foot: `Wall time ${durationWords(clock.wallMs, 'minute')}, from ${from}.`,
-  } satisfies Breakdown as Breakdown;
+  } satisfies Breakdown;
 }
 
 /** The cost's last line: what the run cost beyond its steps' own costs. */
@@ -93,7 +93,7 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]) {
       none: !part.run,
     })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',
-  } satisfies Breakdown as Breakdown;
+  } satisfies Breakdown;
 }
 
 /** The cost's rest as a part, none under half a cent either way. */
@@ -158,7 +158,7 @@ export function tokensBreakdown(tokens: TokenCounts, cost?: string) {
       'Each kind is billed at its own rate, reads from the cache at the lowest.',
       ...(least ? ['A session measured no tokens: these are the least they were.'] : []),
     ].join(' '),
-  } satisfies Breakdown as Breakdown;
+  } satisfies Breakdown;
 }
 
 /** A round of a loop on the clock, or the run's whole time, as the run's timeline totals them. */

@@ -216,7 +216,7 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: st
     return [
       { id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' },
     ] satisfies TranscriptEvent[] as TranscriptEvent[];
-  if (line.type === 'attachment') return queuedEvents(line, id, at) satisfies TranscriptEvent[] as TranscriptEvent[];
+  if (line.type === 'attachment') return queuedEvents(line, id, at) satisfies TranscriptEvent[];
   const role = line.isMeta === true ? 'system' : line.type;
   const from =
     line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: originOf(line.origin.kind) } : undefined;
@@ -225,9 +225,7 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: st
     return [
       { id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) },
     ] satisfies TranscriptEvent[] as TranscriptEvent[];
-  return (content ?? []).flatMap<TranscriptEvent>((block, i) =>
-    blockEvents(block, i, id, at, role, from),
-  ) satisfies TranscriptEvent[] as TranscriptEvent[];
+  return (content ?? []).flatMap<TranscriptEvent>((block, i) => blockEvents(block, i, id, at, role, from)) satisfies TranscriptEvent[];
 };
 
 /**

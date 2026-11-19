@@ -201,11 +201,12 @@ export function readingOf(
     for (const [kind, bytes] of kinds) add(at(kind), bytes, 0, read);
   }
   const said = [...entries.values()].map(({ read, bytes, ...entry }) => (read ? { ...entry, bytes } : entry));
-  return {
+  const reading: DiskReading = {
     at,
     ...space,
     entries: DISK_PARTS.flatMap((part) => said.filter((entry) => entry.part === part)),
-  } satisfies DiskReading as DiskReading;
+  };
+  return reading;
 }
 
 /** The kinds of the folder handed to the runtime that the runtime names by task: all of `engine` but what no task names. */

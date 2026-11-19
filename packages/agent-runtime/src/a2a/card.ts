@@ -110,8 +110,8 @@ const hasKey = (value: unknown, key: string): boolean => typeof value === 'objec
  * The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write.
  * Each key of the path is quoted, since a served card is another party's, which may name a key of any length.
  */
-const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
-  const { path, words } = firstRefusal(json, error, HOLDER);
+const wrongOf = (json: unknown): string => {
+  const { path, words } = firstRefusal(CardSchema, json, HOLDER);
   const keys = path.map(String);
   const shown = keys.map((k) => quote(k));
   const last = keys.at(-1);
@@ -136,7 +136,7 @@ const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
  */
 export const cardOfJson = (json: unknown): { card: AgentCard } | { wrong: string } => {
   const decoded = decodeCard(json);
-  if (Result.isFailure(decoded)) return { wrong: wrongOf(json, decoded.failure) };
+  if (Result.isFailure(decoded)) return { wrong: wrongOf(json) };
   const parsed = AgentCard.fromJSON(decoded.success);
   const sdk = Object.entries(decoded.success.securitySchemes ?? {}).filter(([, s]) => s.scheme !== undefined);
   if (!sdk.length) return { card: parsed };

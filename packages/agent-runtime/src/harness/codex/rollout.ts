@@ -112,8 +112,8 @@ const kindOf = (entry: unknown): RolloutKind | undefined => {
 };
 
 /** Why `entry`, a `kind` record at `where`, is refused: the record, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema.SchemaError): string => {
-  const { path, words } = firstRefusal(entry, error, 'Codex writes');
+const refusal = (where: string, kind: RolloutKind, entry: unknown): string => {
+  const { path, words } = firstRefusal(ROLLOUT[kind] as Schema.Codec<unknown>, entry, 'Codex writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')
@@ -133,7 +133,5 @@ export const rolloutRecordOf = (entry: unknown, where: string): RolloutRecord | 
   const kind = kindOf(entry);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
-  return Result.isSuccess(decoded)
-    ? ({ kind, record: decoded.success } as RolloutRecord)
-    : { wrong: refusal(where, kind, entry, decoded.failure) };
+  return Result.isSuccess(decoded) ? ({ kind, record: decoded.success } as RolloutRecord) : { wrong: refusal(where, kind, entry) };
 };

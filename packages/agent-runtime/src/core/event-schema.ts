@@ -12,8 +12,9 @@
  * a journal holds what a door let through when it was written, a former argument included (`FORMER_ARGS`), which `upgrade`
  * moves.
  */
-import { Schema, SchemaIssue } from 'effect';
+import { Result, Schema } from 'effect';
 import { quote } from './quote.ts';
+import { refusedIn, type RefusedPlace } from './refused.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -291,8 +292,6 @@ export const StoredFeedEntrySchema = Schema.StructWithRest(Schema.Struct({ taskI
 const fieldOf = (value: unknown, key: PropertyKey): unknown =>
   typeof value === 'object' && value !== null && key in value ? (value as Record<PropertyKey, unknown>)[key] : undefined;
 
-const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
-
 /**
  * The tag of a catch-all member beside a tagged union: a string that is none of `known`'s discriminants, so a value that names one of
  * them is decoded by that member or refused, never taken by the catch-all. Effect has no "string except these" schema, and a union
@@ -308,28 +307,30 @@ export const noneOf = (known: { readonly discriminants: ReadonlyArray<PropertyKe
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
 const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');
 
+const refusedPlace = (schema: Schema.Decoder<unknown>, value: unknown): RefusedPlace | undefined => {
+  const decoded = Schema.decodeUnknownResult(schema)(value, { reportInput: true });
+  return Result.isFailure(decoded) ? refusedIn(decoded.failure.issue)[0] : undefined;
+};
+
+const wordsOf = (place: RefusedPlace, holder: string): string =>
+  place._tag === 'MissingKey' ? 'is missing' : `is ${shown(place.input)}, where ${place.message ?? `${holder} ${place.expected}`}`;
+
 /**
- * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds
- * there (`the runtime writes`, the default, for a journal). The value found there is quoted as JSON to at most 60 characters, a cut
- * marked `…`.
- * @param value The value the schema refused.
- * @param error The schema's refusal of it.
+ * The first thing `schema` refuses in `value`: where, and what is there instead of what it expected, said as what `holder` holds
+ * there (`the runtime writes`, the default, for a journal). It decodes `value` itself, keeping the value it refused (`reportInput`),
+ * and reads the refusal by its `_tag` (`refusedIn`): a missing key `is missing`; anything else is the value found there, quoted as
+ * JSON to at most 60 characters, a cut marked `…`, then the message the schema declared or the type it expected.
+ * @param schema The schema `value` is read by.
+ * @param value The value the schema refuses.
  * @param holder What the value's writer is said as, in the words of what it holds there.
  */
 export const firstRefusal = (
+  schema: Schema.Decoder<unknown>,
   value: unknown,
-  error: Schema.SchemaError,
   holder = 'the runtime writes',
 ): { path: readonly PropertyKey[]; words: string } => {
-  const [first] = formatter(error.issue).issues;
-  const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
-  const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
-  const message = first?.message ?? `is not what ${holder}`;
-  const words =
-    message === 'Missing key'
-      ? 'is missing'
-      : `is ${shown(found)}, where ${message.replace(/^Expected /, `${holder} `).replace(/ \| undefined$/, '')}`;
-  return { path, words };
+  const place = refusedPlace(schema, value);
+  return place === undefined ? { path: [], words: `is not what ${holder}` } : { path: place.path, words: wordsOf(place, holder) };
 };
 
 /**
@@ -338,11 +339,14 @@ export const firstRefusal = (
  * given as its text.
  * @param where Where the entry is, the first words of the sentence.
  * @param entry The entry as the store gave it back, or the text of a line it could not parse.
- * @param error The schema's refusal of the entry.
+ * @param schema The schema the entry is read by: an event's, or a feed entry's when `feed` is set.
  * @param feed Whether the entry is a feed entry rather than a task's event.
  */
-export const entryWords = (where: string, entry: unknown, error: Schema.SchemaError, feed: boolean): string => {
-  const { path, words } = firstRefusal(entry, error);
+export const entryWords = (where: string, entry: unknown, schema: Schema.Decoder<unknown>, feed: boolean): string => {
+  const place = refusedPlace(schema, entry);
+  if (place === undefined) return `${where} is not what the runtime writes.`;
+  const { path } = place;
+  const words = wordsOf(place, 'the runtime writes');
   const rest = path.slice(feed ? 1 : 0);
   const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');
   const what =

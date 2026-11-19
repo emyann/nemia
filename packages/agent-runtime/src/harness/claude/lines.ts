@@ -160,7 +160,9 @@ const DECODERS = Object.fromEntries(KINDS.map((k) => [k, Schema.decodeUnknownRes
   (entry: unknown) => Result.Result<unknown, Schema.SchemaError>
 >;
 
-const TIMED = Schema.decodeUnknownResult(Schema.Struct({ timestamp: Schema.optional(Time) }));
+const Timed = Schema.Struct({ timestamp: Schema.optional(Time) });
+
+const TIMED = Schema.decodeUnknownResult(Timed);
 
 const FIX =
   'A transcript that holds it is not read until it decodes, never read as saying nothing: run a Claude Code whose transcript' +
@@ -174,8 +176,8 @@ const kindOf = <K extends LineKind>(entry: unknown, kinds: readonly K[]): K | un
 };
 
 /** Why `entry`, a `kind` line at `where`, is refused: the line, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.SchemaError): string => {
-  const { path, words } = firstRefusal(entry, error, 'Claude Code writes');
+const refusal = (where: string, kind: LineKind, entry: unknown, schema: Schema.Decoder<unknown>): string => {
+  const { path, words } = firstRefusal(schema, entry, 'Claude Code writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   return `${where} is ${kind.startsWith('a') ? 'an' : 'a'} \`${kind}\` line whose ${field} ${words}. ${FIX}`;
 };
@@ -196,7 +198,9 @@ export const decodeLine = <K extends LineKind>(
   const kind = kindOf(entry, kinds);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
-  return Result.isSuccess(decoded) ? { line: decoded.success as Line<K> } : { wrong: refusal(where, kind, entry, decoded.failure) };
+  return Result.isSuccess(decoded)
+    ? { line: decoded.success as Line<K> }
+    : { wrong: refusal(where, kind, entry, LINES[kind] as Schema.Codec<unknown>) };
 };
 
 /**
@@ -236,7 +240,7 @@ export const writtenAt = (text: string, where: string): number | undefined => {
   const kind = kindOf(entry, KINDS);
   if (kind !== undefined) {
     const timed = TIMED(entry);
-    if (Result.isFailure(timed)) throw new Error(refusal(where, kind, entry, timed.failure));
+    if (Result.isFailure(timed)) throw new Error(refusal(where, kind, entry, Timed));
   }
   const { timestamp } = entry as { timestamp?: unknown };
   const at = typeof timestamp === 'string' ? Date.parse(timestamp) : NaN;

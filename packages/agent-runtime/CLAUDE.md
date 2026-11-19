@@ -30,6 +30,7 @@ above it. Most of its rules are said in a comment at the code they hold: read th
 - **What the runtime reads from a store or a harness is decoded by its schema first** (`event-schema.ts`,
   `PRINTED`, `LINES`, `CodexEventSchema`, `ROLLOUT`, `CardSchema`): a field the runtime starts reading is added to the schema, and what
   does not decode is unread, never absent. A former journal shape is accepted by the schema, rewritten by `upgrade`, and read by a test.
+  `PRINTED` is bound to the Agent SDK's types of the messages it reads (`boundTo`): a key or a type the SDK moves fails the typecheck.
 - **A feed is read through `readFeed`, never as plain lines, and written under `withFeedLock`.**
 
 ## Processes and streams

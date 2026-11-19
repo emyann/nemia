@@ -16,12 +16,12 @@
  * which reads no `.claude/settings.json`, and nothing of whose sessions was measured: its fence is its sandbox — has nothing else
  * claimed for it.
  */
-import { DEFAULT_NAMESPACE } from 'objects';
+import { type CapabilitiesWithSteps, type CapabilityRule, type CapabilityServer, DEFAULT_NAMESPACE, type StepReach } from 'objects';
 import { FACTORY_SERVERS } from 'agent-orchestrator';
 import { CLAUDE_RULES, DEFAULT_HARNESS, rulesOf, type ClaudeRules } from 'agent-orchestrator/workflow';
-import { type AskServer, capabilitiesOf, SETTINGS, type Capabilities, type DeniedRule, type McpServer } from './capabilities.ts';
+import { type AskServer, capabilitiesOf, SETTINGS, type Capabilities } from './capabilities.ts';
 import { runPlaced, type Engine, type RunsOn } from '../store.ts';
-import { listWorkflows, type InRequest, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
+import { listWorkflows, type InRequest, type WorkflowListing, type WorkflowStepSpec } from '../workflows/workflows.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /**
@@ -39,109 +39,17 @@ export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permi
 /** Where a step's own deny rules are read from. */
 export const DISALLOW = 'disallowedTools:';
 
-/**
- * A tool taken from a step by a deny rule: the tool, the rule and where it was read — and the family the set names it in, for one taken
- * from `Cron*`.
- */
-export type RemovedTool = { name: string; rule: string; source: string; of: string | null };
+/** What the settings' allow rules give a step (objects' `StepReach`, its `allowed`). */
+type StepReachAllowed = StepReach['allowed'];
 
-/**
- * A server's tool as it reaches a step: the rule that denies it; the ask rule that makes it ask, when no deny does; and whether a rule
- * allows it with neither over it — which, in `dontAsk`, is whether it runs at all.
- */
-export type ReachedMcpTool = { name: string; denied: DeniedRule | null; asks: DeniedRule | null; allowed: boolean };
+/** A tool taken from a step by a deny rule (objects' `StepReach`, its `tools.removed`). */
+type RemovedTool = NonNullable<StepReach['tools']>['removed'][number];
 
-/**
- * What the settings' allow rules give a step. `rules` are those that stand: none a deny takes back (`takenBack`, with the deny), none an
- * ask rule takes back (`asked`, with the ask rule: it asks, and where `askDenier` names why, is denied), and none of a tool the step does
- * not have (`unused`) — known only for a step whose `tools:` names its set. `bash` are the Bash rules that stand, each with its command as
- * the rule writes it, the narrower deny rules that still refuse some of what it allows (`except`) and the narrower ask rules that still
- * make some of it ask (`asks`); none for a step with no Bash, which `why` says. `dontAsk` is whether the step runs in it, where anything
- * that asks and no rule allows is denied without a prompt. `askDenier` is why what an ask rule makes ask is denied without a prompt instead
- * — `dontAsk`, or `a job`, which asks nobody — and null where the page claims neither: a job in a mode not measured.
- */
-export type AllowedFor = {
-  rules: string[];
-  takenBack: Array<{ rule: string; by: DeniedRule }>;
-  asked: Array<{ rule: string; by: DeniedRule }>;
-  unused: string[];
-  bash: Array<{ rule: string; command: string; except: string[]; asks: string[] }>;
-  /**
-   * Every rule of `rules` that a narrower deny still refuses part of, or a narrower ask rule still makes part of ask — a Bash command, one
-   * tool of a server — with those denies and those ask rules.
-   */
-  exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
-  dontAsk: boolean;
-  askDenier: 'dontAsk' | 'a job' | null;
-  why: string | null;
-};
+/** A server's tool as it reaches a step (objects' `StepReach`, its `mcp`'s `tools`). */
+type ReachedMcpTool = NonNullable<NonNullable<StepReach['mcp']>[number]['tools']>[number];
 
-/**
- * One of Claude Code's read-only commands as it reaches a step with Bash: whether it was measured running without a rule, or only
- * documented so (`readOnlyCommands`); the ask rule that makes all of it ask, when no deny refuses it — `Bash`, or a Bash rule covering
- * `<command> *` — which beats the harness's own leave as it beats an allow; and the rule that refuses all of it: a deny so covering it, or
- * that ask rule on a step that denies what asks (`askDenierOf`).
- */
-export type ReadOnlyCommand = { command: string; measured: boolean; denied: DeniedRule | null; asks: DeniedRule | null };
-
-export type StepReach = {
-  workflow: string;
-  from: WorkflowSource;
-  step: string;
-  /** The harness it runs on: the step's, or the default harness when it names none. */
-  harness: string;
-  /** Whether its harness declares rules — Claude Code's, whose set was measured. Every field below that says null says it is not. */
-  claudeCode: boolean;
-  /**
-   * The fence as its file declares it, null where it declares none. `mcp` is the servers its sessions load, its agent's `mcp:` line
-   * then its own: empty where neither names any and for a step with no agent, whose sessions load no server.
-   * `permissionMode` is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
-   */
-  fence: {
-    tools: string[] | null;
-    disallowedTools: string[];
-    allowedTools: string[];
-    permissionMode: string | null;
-    sandbox: string | null;
-    effort: string | null;
-    mcp: string[];
-  };
-  /**
-   * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes.
-   * `inferred` are those of the measured set no measurement named (`measuredTools.inferred`); none for a step that declares its tools.
-   */
-  tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: RemovedTool[] } | null;
-  /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
-  skills: { names: string[]; why: string | null } | null;
-  /**
-   * Each server the step or its agent names (`fence.mcp`): one the checkout enables with the tools it listed, or why there are none to
-   * show; and one no `.mcp.json` of the checkout declares with no tools and why, since a session of the step is refused at its start.
-   */
-  mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
-  /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */
-  denied: DeniedRule[];
-  /**
-   * Every ask rule that holds for it: the settings' — a step has no key of its own for one. None for a step whose harness reads no
-   * settings.
-   */
-  asked: DeniedRule[];
-  allowed: AllowedFor;
-  /**
-   * Claude Code's read-only commands, the measured ones first: none for a step with no Bash, and null for a harness whose were not
-   * measured.
-   */
-  readOnly: ReadOnlyCommand[] | null;
-};
-
-/**
- * What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, the read-only commands
- * Claude Code runs without a rule, and what each step gets.
- */
-export type CapabilitiesWithSteps = Capabilities & {
-  measured: ClaudeRules['measuredTools'];
-  readOnly: ClaudeRules['readOnlyCommands'];
-  steps: StepReach[];
-};
+/** One of Claude Code's read-only commands as it reaches a step with Bash (objects' `StepReach`, its `readOnly`). */
+type ReadOnlyCommand = NonNullable<StepReach['readOnly']>[number];
 
 /**
  * What each step of each workflow that reads gets. A folder the loader refuses has no step to give anything to.
@@ -180,7 +88,13 @@ function serversReached(
   servers: Capabilities['mcp'],
   named: readonly string[],
   { denyingRule }: ClaudeRules,
-  rules: { deny: string[]; ask: string[]; denied: DeniedRule[]; asked: DeniedRule[]; allow: string[] },
+  rules: {
+    deny: readonly string[];
+    ask: readonly string[];
+    denied: readonly CapabilityRule[];
+    asked: readonly CapabilityRule[];
+    allow: readonly string[];
+  },
 ): NonNullable<StepReach['mcp']> {
   const loaded = servers
     .filter((server) => named.includes(server.name))
@@ -302,34 +216,14 @@ function stepReach(
           : `Its tools have no \`Skill\`, so it cannot load a skill — its session still lists the repository's skills (measured, ${measuredTools.harness} ${measuredTools.version}).`,
       };
 
-  const allowed: AllowedFor = { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk, askDenier, why: null };
-  for (const { rule } of capabilities.allowed) {
-    const by = takenBackBy(rule, denied);
-    const asks = by ? undefined : takenBackBy(rule, asked);
-    const tool = ruleOf(rule)?.tool;
-    if (by) allowed.takenBack.push({ rule, by });
-    else if (asks) allowed.asked.push({ rule, by: asks });
-    else if (tool !== undefined && !has(tool)) allowed.unused.push(rule);
-    else allowed.rules.push(rule);
-  }
   const narrowerAsks = (rule: string) => narrowerRules(rule, asked).filter((ask) => !takenBackBy(ask, denied));
-  allowed.exceptions = allowed.rules
-    .map((rule) => ({ rule, except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }))
-    .filter((e) => e.except.length > 0 || e.asks.length > 0);
-  const bashTaken = removed.find((r) => r.name === 'Bash');
-  if (names.includes('Bash')) {
-    allowed.bash = allowed.rules.flatMap((rule) => {
-      const r = ruleOf(rule);
-      if (r?.tool !== 'Bash') return [];
-      return [{ rule, command: r.scope ?? '*', except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }];
-    });
-  } else {
-    allowed.why = bashTaken
-      ? `\`Bash\` is denied by ${bashTaken.rule} (${bashTaken.source}), so it runs no command, whatever the settings allow.`
-      : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
-  }
+  const allowed = allowedOf(rules, capabilities.allowed, { denied, asked, has, narrowerAsks }, names.includes('Bash'), {
+    dontAsk,
+    askDenier,
+    bashTaken: removed.find((r) => r.name === 'Bash'),
+  });
 
-  const covering = (rules: readonly DeniedRule[], command: string) =>
+  const covering = (rules: readonly CapabilityRule[], command: string) =>
     rules.find((d) => {
       const r = ruleOf(d.rule);
       return r?.tool === 'Bash' && (r.scope === null || bashCovers(r.scope, `${command}:*`));
@@ -366,6 +260,67 @@ function stepReach(
 }
 
 /**
+ * What the settings' allow rules give a Claude Code step (objects' `StepReachAllowed`): deny, then ask, then allow, each allow rule taken
+ * back by the first deny or ask rule that matches the whole of it, or unused where its tool is not the step's.
+ * @param rules The harness's rules, which match a rule against another.
+ * @param allow The settings' allow rules, in their order.
+ * @param over The deny and ask rules that hold for the step, whether it has a tool, and the narrower ask rules under a rule.
+ * @param hasBash Whether the step has Bash, without which no Bash rule stands as a command.
+ * @param mode Whether the step runs in `dontAsk`, why what asks is denied, and the deny that took Bash, if one did.
+ */
+function allowedOf(
+  { ruleOf, takenBackBy, narrowerRules }: ClaudeRules,
+  allow: readonly CapabilityRule[],
+  over: {
+    denied: readonly CapabilityRule[];
+    asked: readonly CapabilityRule[];
+    has: (tool: string) => boolean;
+    narrowerAsks: (rule: string) => string[];
+  },
+  hasBash: boolean,
+  mode: { dontAsk: boolean; askDenier: StepReachAllowed['askDenier']; bashTaken?: RemovedTool },
+): StepReachAllowed {
+  const { denied, asked, has, narrowerAsks } = over;
+  const standing: string[] = [];
+  const takenBack: Array<StepReachAllowed['takenBack'][number]> = [];
+  const askedBack: Array<StepReachAllowed['asked'][number]> = [];
+  const unused: string[] = [];
+  for (const { rule } of allow) {
+    const by = takenBackBy(rule, denied);
+    const asks = by ? undefined : takenBackBy(rule, asked);
+    const tool = ruleOf(rule)?.tool;
+    if (by) takenBack.push({ rule, by });
+    else if (asks) askedBack.push({ rule, by: asks });
+    else if (tool !== undefined && !has(tool)) unused.push(rule);
+    else standing.push(rule);
+  }
+  const { bashTaken } = mode;
+  return {
+    rules: standing,
+    takenBack,
+    asked: askedBack,
+    unused,
+    bash: hasBash
+      ? standing.flatMap((rule) => {
+          const r = ruleOf(rule);
+          if (r?.tool !== 'Bash') return [];
+          return [{ rule, command: r.scope ?? '*', except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }];
+        })
+      : [],
+    exceptions: standing
+      .map((rule) => ({ rule, except: narrowerRules(rule, denied), asks: narrowerAsks(rule) }))
+      .filter((e) => e.except.length > 0 || e.asks.length > 0),
+    dontAsk: mode.dontAsk,
+    askDenier: mode.askDenier,
+    why: hasBash
+      ? null
+      : bashTaken
+        ? `\`Bash\` is denied by ${bashTaken.rule} (${bashTaken.source}), so it runs no command, whatever the settings allow.`
+        : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.',
+  };
+}
+
+/**
  * `servers` with the state the harness reports of each server the **default factory** records under the same name: the default factory
  * is the one every run and card that names none runs in, so a server it records is one the checkout's own steps are handed, and the
  * page shows the same chip the factory's settings page does.
@@ -374,7 +329,12 @@ function stepReach(
  * so does one whose state could not be read, which is not an absence. The read is one short-lived harness session for the whole
  * record, and none at all for a default factory that records no server, which is the common case.
  */
-const statedByFactory = async (servers: readonly McpServer[], e: Engine['Service'], on: RunsOn, home: string): Promise<McpServer[]> => {
+const statedByFactory = async (
+  servers: readonly CapabilityServer[],
+  e: Engine['Service'],
+  on: RunsOn,
+  home: string,
+): Promise<CapabilityServer[]> => {
   if (!servers.length) return [...servers];
   const listing = await runPlaced({ ...on, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_NAMESPACE })).catch(() => undefined);
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
@@ -409,14 +369,16 @@ export async function capabilitiesWithSteps(
     inRequest: InRequest;
   },
 ): Promise<CapabilitiesWithSteps> {
-  const capabilities = await capabilitiesOf(repo, { env, asker });
-  capabilities.mcp = await statedByFactory(capabilities.mcp, e, { placeService, config, trace }, home);
+  const read = await capabilitiesOf(repo, { env, asker });
+  const mcp = await statedByFactory(read.mcp, e, { placeService, config, trace }, home);
   let workflows: WorkflowListing[] = [];
+  let unlisted: string[] = [];
   try {
     workflows = await listWorkflows(e, { placeService, config, trace }, repo, home, inRequest);
   } catch (err) {
-    capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
+    unlisted = [`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`];
   }
+  const capabilities = { ...read, mcp, warnings: [...read.warnings, ...unlisted] };
   return {
     ...capabilities,
     measured: CLAUDE_RULES.measuredTools,

@@ -404,7 +404,7 @@ export {
   type TranscriptRole,
 } from './words.ts';
 export { BaseHold, RunHolding, RunWaiting } from './run.ts';
-export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState } from './words.ts';
+export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,
   Decidable,
@@ -422,6 +422,7 @@ export {
   Standing,
   StandingMerge,
 } from './decide.ts';
+export { CapabilityDescribed, CapabilityRule, CapabilityServer, StepReach } from './capabilities.ts';
 export {
   Ceilings,
   CAPABILITIES_UNREAD,
@@ -565,7 +566,6 @@ export {
   AgentSources,
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
-export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,

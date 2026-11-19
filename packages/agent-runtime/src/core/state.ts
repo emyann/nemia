@@ -238,19 +238,19 @@ export type Bridge = { url: string } | { url: null; why: string };
 export type Denial = { tool: string; what?: string };
 
 /**
- * What a session consumed, as its runner measured it.
- *
- * Every field is a measurement. A count the runner could not see is absent, never 0, and a runner
- * that measured nothing reports no usage at all, so its attempt records `null`. A zero that means
- * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
- */
-/**
  * What a session at work has spent so far, as its harness said it while it ran: `usd`, the attempt's own dollars, `capUsd`, the cap
  * its harness holds the attempt to, and `at`, when it said so, an ISO time. Read afresh from the harness's own record on every look,
  * never added up across looks; the attempt's measured cost (`Usage.costUsd`), once it has one, replaces it.
  */
 export type SpentSoFar = { usd: number; capUsd: number; at: string };
 
+/**
+ * What a session consumed, as its runner measured it.
+ *
+ * Every field is a measurement. A count the runner could not see is absent, never 0, and a runner
+ * that measured nothing reports no usage at all, so its attempt records `null`. A zero that means
+ * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
+ */
 export type Usage = {
   /**
    * Model responses, each counted once however many lines it was written as. Absent from a runner

@@ -157,7 +157,7 @@ export const TimelineTry = Schema.Struct({
 
 /**
  * The time of several tasks together (`TimelineTotal`, timeline.ts): a round of a loop, or the whole run's, and what the sessions it counts
- * cost (null until a cost was measured).
+ * cost (null until a cost was measured or a session at work said what it has spent).
  */
 export const TimelineTotal = Schema.Struct({
   loop: NullString.annotate({ description: "The looping step whose loop this is a round of; null for the run's total." }),
@@ -174,7 +174,9 @@ export const TimelineTotal = Schema.Struct({
   queued: Schema.String.annotate({ description: 'The queue time in words, saying what it leaves out.' }),
   ran: Schema.String.annotate({ description: 'The run time in words, saying what it leaves out.' }),
   wall: Schema.String.annotate({ description: 'The wall time in words, saying what it leaves out.' }),
-  cost: Schema.NullOr(Spent).annotate({ description: 'What the sessions it counts cost; null until a cost was measured.' }),
+  cost: Schema.NullOr(Spent).annotate({
+    description: 'What the sessions it counts cost; null until a cost was measured or a session at work said what it has spent.',
+  }),
 });
 
 /**

@@ -270,10 +270,12 @@ const sightingOf = (
 /**
  * What a run at work has spent so far, by its harness's own record (`transcript.spent`), read afresh on every look: `{ wrong }` where a
  * line of it does not decode, and undefined for a spec that reads none, a run with no session id yet, or a record that says none.
+ * A run spawned with no spend cap (`capUsd`) has its record left unread: its harness writes no such line, and a look at work would
+ * read the most of the record's end for nothing.
  */
 const spentOf = (spec: HarnessSpec, run: RunFile): { spent: SpentSoFar } | { wrong: string } | undefined => {
   const read = spec.transcript?.spent;
-  const file = read && run.nativeId ? spec.transcript?.file(run.nativeId) : undefined;
+  const file = read && run.nativeId && run.capUsd !== undefined ? spec.transcript?.file(run.nativeId) : undefined;
   if (!read || file === undefined) return undefined;
   try {
     const spent = read(file, startOf(run));
@@ -982,6 +984,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }
               : {}),
             ...(input ? { input } : {}),
+            ...(r.config?.budgetUsd !== undefined ? { capUsd: r.config.budgetUsd } : {}),
           };
           fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
 

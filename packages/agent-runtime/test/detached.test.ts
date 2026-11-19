@@ -2901,14 +2901,14 @@ describe('observe: a Claude Code run at work says what it has spent so far, by t
   const BEGAN = '2026-11-18T23:00:00.000Z';
   const budgetLine = (at: string, used: number, total: number) =>
     JSON.stringify({ type: 'attachment', timestamp: at, attachment: { type: 'budget_usd', used, total, remaining: total - used } });
-  const observing = (state: 'working' | 'done', lines: string[], log = '') => {
+  const observing = (state: 'working' | 'done', lines: string[], log = '', capped = true, spent = claudeTranscriptSpent) => {
     const dir = root();
     const transcript = path.join(dir, `${SESSION}.jsonl`);
     fs.writeFileSync(transcript, lines.map((l) => `${l}\n`).join(''));
     const spec: HarnessSpec = {
       ...sh('true'),
       readOutput: claudeResultOutput,
-      transcript: { file: () => transcript, events: () => [], spent: claudeTranscriptSpent },
+      transcript: { file: () => transcript, events: () => [], spent },
     };
     const runs = path.join(dir, 'runs', 'sh');
     fs.mkdirSync(runs, { recursive: true });
@@ -2924,6 +2924,7 @@ describe('observe: a Claude Code run at work says what it has spent so far, by t
         nativeId: SESSION,
         startedAt: BEGAN,
         heartbeatAt: now,
+        ...(capped ? { capUsd: 23.94 } : {}),
       }),
     );
     fs.writeFileSync(path.join(runs, 'ae_live_1.log'), log);
@@ -2944,6 +2945,27 @@ describe('observe: a Claude Code run at work says what it has spent so far, by t
     const long = JSON.stringify({ type: 'user', timestamp: '2026-11-18T23:17:00.000Z', message: { content: 'x'.repeat(600_000) } });
     const working = await seen('working', [budgetLine('2026-11-18T23:16:38.018Z', 3.5, 20), long]);
     assert.equal(working?.spent?.usd, 3.5);
+  });
+
+  test("the spawn writes the request's spend cap on the run file, and none where it asked none", async () => {
+    const dir = root();
+    const ops = detachedOps(sh('true'), dir);
+    await Effect.runPromise(ops.spawn({ ...req('ae/cap/1', dir), config: { budgetUsd: 2.5 } }));
+    await Effect.runPromise(ops.spawn(req('ae/cap/2', dir)));
+    const capOf = (name: string) => (JSON.parse(fs.readFileSync(runFileOf(dir, 'sh', name), 'utf8')) as { capUsd?: number }).capUsd;
+    assert.deepEqual([capOf('ae/cap/1'), capOf('ae/cap/2')], [2.5, undefined]);
+  });
+
+  test('a run spawned with no spend cap has its record left unread: its harness writes no budget line, so a look reads nothing', async () => {
+    let read = 0;
+    const counted: typeof claudeTranscriptSpent = (file, since) => {
+      read += 1;
+      return claudeTranscriptSpent(file, since);
+    };
+    const working = await Effect.runPromise(observing('working', [budgetLine('2026-11-18T23:16:38.018Z', 1, 20)], '', false, counted));
+    assert.deepEqual([working?.state, working?.spent, read], ['working', undefined, 0]);
+    await Effect.runPromise(observing('working', [budgetLine('2026-11-18T23:16:38.018Z', 1, 20)], '', true, counted));
+    assert.equal(read, 1, 'the same run with a cap reads its record');
   });
 
   test('a run whose transcript has no budget line, a session with no cap, has no spend so far', async () => {

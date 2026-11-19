@@ -254,8 +254,9 @@ const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
 /**
  * A step's `cost` line on `nemia decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read,
  * by price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran
- * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody
- * measured, never $0, and nothing of what it read where nobody counted that.
+ * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. A try at work with no cost yet
+ * says what its session has spent so far (`$16.26 so far`, the spend's `live`); `not measured` where nobody measured and nothing was said,
+ * never $0, and nothing of what it read where nobody counted that.
  * @param step The step's spec, or undefined where the workflow no longer has it.
  * @param run The run's record.
  * @param name The step's name.
@@ -263,11 +264,11 @@ const budgetStopped = (run: Run, name: string, spendOf: SpendOf): boolean => {
  * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
 export function costLine(step: StepSpec | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
-  const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
+  const all = stepSpend(run, name, spendOf);
+  const current = used?.costUsd !== undefined ? dollars(used.costUsd) : all.live ? `${dollars(all.live.usd)} so far` : 'not measured';
   const read = readWords(used, step?.context);
   const record = run.steps[name];
   const sessions = sessionTasks(record).length;
-  const all = stepSpend(run, name, spendOf);
   const spent =
     sessions > 1
       ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`}${read ? ` · ${read}` : ''} · ${spendKnown(all) ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
@@ -289,15 +290,16 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 
 /**
  * What the run has cost, in `runCostLines`' words without their label: `run $12.40`, with how many ended attempts had no cost on them, or
- * `run not measured`; null before any attempt has ended.
+ * `run not measured`; with what the sessions at work have spent so far added in, `run $32.32 so far`; null before any attempt has ended
+ * and while none at work has said what it spent.
  * @param run The run's record.
  * @param spendOf What each task spent, by its id, or undefined where nothing is recorded of it.
  */
 export function runCostWords(run: Run, spendOf: SpendOf): string | null {
   const spent = runSpend(run, spendOf);
-  if (!spent.measured && !spent.unmeasured) return null;
-  if (!spent.measured) return 'run not measured';
-  return `run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} session${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`;
+  if (!spent.measured && !spent.unmeasured && !spent.live) return null;
+  if (!spent.measured && !spent.live) return 'run not measured';
+  return `run ${dollars(spent.usd + (spent.live?.usd ?? 0))}${spent.live ? ' so far' : ''}${spent.unmeasured ? ` measured · ${spent.unmeasured} session${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`;
 }
 
 /**

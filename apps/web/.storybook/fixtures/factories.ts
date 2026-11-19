@@ -71,8 +71,24 @@ export const rendered: FactoryTemplate = {
 
 /** A folder the factory's runs read, and one they write. */
 export const volumes: FactoryVolume[] = [
-  { path: '/srv/notes', readOnly: true, origin: null, commands: { rm: `nemia volume rm notes -n ${FACTORY}` } },
-  { path: '/srv/scratch', readOnly: false, origin: null, commands: { rm: `nemia volume rm scratch -n ${FACTORY}` } },
+  {
+    path: '/srv/notes',
+    name: 'notes',
+    readOnly: true,
+    origin: null,
+    claudeMd: false,
+    skills: true,
+    commands: { rm: `nemia volume rm notes -n ${FACTORY}` },
+  },
+  {
+    path: '/srv/scratch',
+    name: 'scratch',
+    readOnly: false,
+    origin: null,
+    claudeMd: false,
+    skills: true,
+    commands: { rm: `nemia volume rm scratch -n ${FACTORY}` },
+  },
 ];
 
 /**

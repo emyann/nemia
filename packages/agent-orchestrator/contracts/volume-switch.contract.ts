@@ -45,7 +45,7 @@ const volumeSwitchedSpec = spec<(volumes: readonly NamedSwitchable[], name: stri
         (output.kind === 'missing') === (asked(switches) && namedIn(volumes, name) === undefined),
     },
     sameVolume: {
-      description: "The volume written is the one named, its name, folder, mark and origin as they were: only what it gives sessions moves",
+      description: 'The volume written is the one named, its name, folder, mark and origin as they were: only what it gives sessions moves',
       condition: ({ input: [volumes, name], output }) => {
         if (output.kind !== 'switched') return true;
         const was = namedIn(volumes, name);

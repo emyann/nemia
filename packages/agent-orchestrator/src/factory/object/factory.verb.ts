@@ -323,7 +323,8 @@ const homeLine = (name: string): string => {
 
 /**
  * The lines of the factory `name` (`factoryCommands`), read now at `home`, each schedule its file holds taken back by its workflow, by
- * name, and the line that opens its home where its tree holds one (`homeAt`): none for the default factory or a file that does not read. `Missing` where no factory has the name.
+ * name, and the line that opens its home where its tree holds one (`homeAt`): none for the default factory or a file that does not
+ * read. `Missing` where no factory has the name.
  */
 export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, name: string) {
   const { factory, listing } = yield* factoryFiled(home, name);

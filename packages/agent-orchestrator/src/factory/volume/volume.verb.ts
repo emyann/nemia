@@ -1,9 +1,9 @@
 /**
- * `nemia factory volume add`, `volume set` and `volume rm`: a folder of the person's machine, or a git URL cloned under the store, given to a factory as
- * a volume, marked `:ro` or `:rw`, and taken back. A writable one is a git repository the factory works on, trusted as it is added unless
- * `noTrust`; a read-only one is mounted for every local step of its runs. Written into the factory's own file through the Factory door,
- * whether or not it is made from a template: a volume is the person's, never the template's. `volume set` sets one volume's switches, by
- * its stored name, without giving it again.
+ * `nemia factory volume add`, `volume set` and `volume rm`: a folder of the person's machine, or a git URL cloned under the store, given to
+ * a factory as a volume, marked `:ro` or `:rw`, and taken back. A writable one is a git repository the factory works on, trusted as it is
+ * added unless `noTrust`; a read-only one is mounted for every local step of its runs. Written into the factory's own file through the
+ * Factory door, whether or not it is made from a template: a volume is the person's, never the template's. `volume set` sets one volume's
+ * switches, by its stored name, without giving it again.
  */
 import path from 'node:path';
 import { Effect } from 'effect';

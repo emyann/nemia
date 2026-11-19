@@ -1,7 +1,8 @@
 /**
  * The volumes group's handlers (`objects`' `Api`): a factory's volumes as objects, in its namespace — a page of them (`volumeList`), one
- * (`volumeObject`) — each with the runs in play that mount it, judged off the app's informer — and its switches set by a PATCH (`nemia factory volume set`), answered as it reads after with the file
- * written (`written`). `nemia factory volume add` and `rm`, which take a folder by its whole path, are the factories group's.
+ * (`volumeObject`) — each with the runs in play that mount it, judged off the app's informer; and one's switches set by a PATCH
+ * (`nemia factory volume set`), answered as it reads after with the file written (`written`). `nemia factory volume add` and `rm`, which
+ * take a folder by its whole path, are the factories group's.
  */
 import { FACTORY_VOLUME_SET, informerMemo, type SummaryHow, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
 import { Api } from 'objects';

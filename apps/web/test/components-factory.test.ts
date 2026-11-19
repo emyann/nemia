@@ -359,8 +359,11 @@ test("FactoryVolumes says a writable volume is worked on, each path with its mar
   const { FactoryVolumes } = await import('../src/components/factory/FactoryVolumes.tsx');
   const volume = (path: string, readOnly: boolean) => ({
     path,
+    name: readOnly ? 'notes' : null,
     readOnly,
     origin: null,
+    claudeMd: false,
+    skills: true,
     commands: { rm: `nemia factory volume rm nemia ${path}` },
   });
   const factory = filed('nemia', { volumes: [volume('/home/me/notes', true), volume('/home/me/scratch', false)] });
@@ -379,6 +382,9 @@ test("FactoryVolumes says a writable volume is worked on, each path with its mar
   assert.match(notes, /data-volume-role="read"/, 'a read-only volume is read');
   assert.match(scratch, /data-volume-role="worked-on"/, 'the writable one is worked on');
   assert.match(notes, /data-volume-remove="\/home\/me\/notes"/, 'each row has its Remove');
+  assert.match(notes, /data-volume-switch="claudeMd"/, 'each row has its CLAUDE.md switch');
+  assert.match(notes, /data-volume-switch="skills"/, 'and its skills switch');
+  assert.match(html, /data-volume-switches-reach/, 'said once: a switch reaches the runs started after it');
   assert.match(html, /data-volume-form/, 'the form that gives one');
   assert.ok(notes.includes('nemia factory volume rm nemia /home/me/notes'), "the api's line that takes it back");
   assert.ok(scratch.includes('nemia factory volume rm nemia /home/me/scratch'));

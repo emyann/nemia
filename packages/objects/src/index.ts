@@ -746,7 +746,6 @@ export {
   FACTORY_UNSCHEDULE_WORDS,
 } from './commands-factories-parts.ts';
 export {
-  COST_LINE_FORMS,
   FACTORY_COST_LINE_RM_WORDS,
   FACTORY_COST_LINE_SET_WORDS,
   FACTORY_SETTABLE,
@@ -756,8 +755,6 @@ export {
   FACTORY_VOLUME_ADD_WORDS,
   FACTORY_VOLUME_RM_WORDS,
   FACTORY_VOLUME_SET_WORDS,
-  SETTING_FORMS,
-  VOLUME_FORMS,
 } from './commands-factories-settings.ts';
 export {
   APPLY_USAGE,

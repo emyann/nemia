@@ -1,6 +1,7 @@
 /**
- * How `npm run e2e` looks at its pages, and how it ends: every page in the themes its plan asks — the dark alone, unless `--photos`
- * asks for light, then dark — pictured where the plan says, then an exit code that says whether each passed. Apart from run.ts, which
+ * How `npm run e2e` looks at its pages, and how it ends: every page in the themes its plan asks — the dark alone, unless `--light`
+ * or `--contrast` asks for light, then dark (`themesOf`, pages.ts) — pictured where the plan says, then an exit code that says whether
+ * each passed. Apart from run.ts, which
  * builds and serves the app, so that a page breaking the rules can be put through the very same code (broken-page.ts) and seen to fail
  * it — not only the app's pages seen to pass.
  */
@@ -94,13 +95,17 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
   }
 }
 
+/** The zone this process last said each theme's browser is in: a worker says it once, and again only where it moved. */
+const zoneSaid = new Map<Theme, string>();
+
 /**
  * The pages given, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
  * alone take their own pictures too (`setPhotographing`), each with its text pairs beside it when `measured` (`setMeasuring`). Says each
  * page passed with its time and its phases. Resolves with the
  * screenshots, and what each page took in each theme, stamped with `worker`, the worker that visited it. Rejects on the first page that
  * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
- * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
+ * of the assertion (`storeGone`), and visiting no page after it. The zone each theme's browser is placed in is said once a process, and
+ * again only when it moves. Every page a theme's browser opens, a page's second page too, has its
  * requests counted from its first, for `idle`. Each theme's browser holds the seat's token as the board's cookie (`seated`) where a store
  * was seeded in this process, so every page is read as the person's.
  *
@@ -131,9 +136,11 @@ export async function visitAll(
     const now = Date.now();
     const timezoneId = middayZone(now);
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 }, timezoneId });
-    console.log(
-      `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
-    );
+    if (zoneSaid.get(theme) !== timezoneId)
+      console.log(
+        `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
+      );
+    zoneSaid.set(theme, timezoneId);
     if (seatToken !== undefined) await seated(context, base);
     context.on('page', track);
     await bannerShown(context);

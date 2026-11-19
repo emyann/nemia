@@ -1010,17 +1010,15 @@ describe("a Workflow's spec carries its folder's other text files: served sorted
   });
 });
 
-describe("a Workflow's spec carries the needs its README's frontmatter declares: served apart from the README, and kept by a read then a write", () => {
+describe("a Workflow's spec carries its README whole, its needs and instruction read under status, and a read then a write changes nothing", () => {
+  const README = '---\nneeds:\n  - name: tool\n    message: the tool is installed\n    check: command -v tool\n---\n# Needful\n';
   let dir!: string;
   let read!: Awaited<ReturnType<typeof got>>;
   beforeAll(async () => {
     const t = teardowns();
     dir = path.join(root, 'workflows', 'needful');
     write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
-    write(
-      path.join(dir, 'README.md'),
-      '---\nneeds:\n  - name: tool\n    message: the tool is installed\n    check: command -v tool\n---\n# Needful\n',
-    );
+    write(path.join(dir, 'README.md'), README);
     t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
     read = await got();
     return t.end;
@@ -1034,17 +1032,19 @@ describe("a Workflow's spec carries the needs its README's frontmatter declares:
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-  test('GET serves the needs in spec.needs, and the README without its frontmatter', () => {
-    assert.deepEqual(read.spec.needs, [tool]);
-    assert.equal(read.spec.readme, '# Needful\n');
+  test('GET serves the README whole in spec.readme, its needs in status.needs and its instruction in status.readmeBody', () => {
+    assert.equal(read.spec.readme, README);
+    assert.equal('needs' in read.spec, false, 'no needs apart in the spec');
+    assert.deepEqual(read.status.needs, [tool]);
+    assert.equal(read.status.readmeBody, '# Needful\n');
   });
-  test('PUT of the Workflow as it was read keeps the needs in the README', async () => {
+  test('PUT of the Workflow as it was read writes the README byte for byte', async () => {
     const res = await put({ metadata: { resourceVersion: read.metadata.resourceVersion }, spec: read.spec });
     assert.equal(res.status, 200, await res.clone().text());
-    assert.deepEqual(((await res.json()) as import('objects').Workflow).spec.needs, [tool]);
-    assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /^---\nneeds:/, 'the frontmatter written back');
+    assert.deepEqual(((await res.json()) as import('objects').Workflow).status.needs, [tool]);
+    assert.equal(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), README, 'the README as it was');
   });
-  test('PUT of a new README with no needs given keeps the needs; needs given replace them', async () => {
+  test("PUT of an instruction alone keeps the README's frontmatter; a README with a frontmatter of its own writes its needs", async () => {
     const now = await got();
     const res = await put({
       metadata: { resourceVersion: now.metadata.resourceVersion },
@@ -1052,11 +1052,12 @@ describe("a Workflow's spec carries the needs its README's frontmatter declares:
     });
     assert.equal(res.status, 200, await res.clone().text());
     const kept = (await res.json()) as import('objects').Workflow;
-    assert.deepEqual(kept.spec.needs, [tool], 'needs left out: the README keeps its own');
-    assert.equal(kept.spec.readme, '# Needful, again\n');
+    assert.deepEqual(kept.status.needs, [tool], 'an instruction alone: the README keeps its own needs');
+    assert.equal(kept.status.readmeBody, '# Needful, again\n');
     const other = { name: 'other', message: 'another tool', check: 'command -v other' };
-    const replaced = await put({ metadata: { resourceVersion: kept.metadata.resourceVersion }, spec: { ...kept.spec, needs: [other] } });
+    const readme = `---\nneeds:\n  - name: ${other.name}\n    message: ${other.message}\n    check: ${other.check}\n---\n# Needful\n`;
+    const replaced = await put({ metadata: { resourceVersion: kept.metadata.resourceVersion }, spec: { ...kept.spec, readme } });
     assert.equal(replaced.status, 200, await replaced.clone().text());
-    assert.deepEqual(((await replaced.json()) as import('objects').Workflow).spec.needs, [other]);
+    assert.deepEqual(((await replaced.json()) as import('objects').Workflow).status.needs, [other]);
   });
 });

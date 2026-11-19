@@ -22,7 +22,6 @@ import {
   type ChangeVerb,
   type Proposal,
   type ProposalChange,
-  type Need,
   type ProposedObject,
   type WorkflowStep,
   DEFAULT_NAMESPACE,
@@ -108,12 +107,28 @@ function verbRefusal(object: ProposedObject, label: string, verb: ChangeVerb, fa
 }
 
 /**
+ * Why a Workflow's spec is not its files' form, or undefined where it is: one that still carries `needs` or `description` apart, which its
+ * README's frontmatter and first paragraph say and the read serves under `status`, so that a proposal sending them loses none unsaid.
+ */
+function workflowSpecRefusal(object: ProposedObject, label: string): string | undefined {
+  const spec = recordOf(object.spec);
+  const apart = ['needs', 'description'].filter((key) => spec !== undefined && key in spec);
+  if (apart.length === 0) return undefined;
+  return (
+    `${label}: its spec carries ${apart.join(' and ')}, which a Workflow's files say in its README (spec.readme, frontmatter and all) and ` +
+    `its read serves under status: read it as its files hold it (nemia get workflows ${object.metadata.name}) and propose that spec, ` +
+    "with the needs in the README's frontmatter."
+  );
+}
+
+/**
  * Why `object`'s spec is not its kind's, or undefined where it is: the kind's schema, a Skill's file at a path out of its folder or given
- * twice (`skillFilesRefusal`), and a Hire named after its step.
+ * twice (`skillFilesRefusal`), a Workflow's needs or description apart (`workflowSpecRefusal`), and a Hire named after its step.
  */
 function specRefusal(object: ProposedObject, label: string): string | undefined {
   const broken = brokenBy(SPECS[object.kind], object.spec);
   if (broken !== null) return `${label}: its spec ${broken}: write it as nemia explain ${RESOURCE_PLURALS[object.kind]}.spec says.`;
+  if (object.kind === 'Workflow') return workflowSpecRefusal(object, label);
   if (object.kind === 'Skill') {
     const files = skillFilesRefusal((object.spec as SkillSpec).files);
     return files === undefined ? undefined : `${label}: ${files}`;
@@ -193,7 +208,7 @@ const changeOf = (place: ProposalPlace, factory: string, object: ProposedObject)
     if (verb !== 'create' && now.version !== object.metadata.resourceVersion)
       return yield* Effect.fail(
         new Conflict({
-          message: `${label} was read at ${object.metadata.resourceVersion ?? 'none'} and is now at ${now.version}: read it again (nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}) and propose from what it holds.`,
+          message: `${label} was read at ${object.metadata.resourceVersion ?? 'none'} and is now at ${now.version}: read it again as its files hold it (nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}) and propose its spec as it reads.`,
         }),
       );
     const before = accessOf(object.kind, object.metadata.name, now.spec);
@@ -228,21 +243,19 @@ const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined
 
 /**
  * A Workflow's `spec` as its apply writes it over `now`, the spec its folder holds (`currentOf`), in `now`'s shape: its `readme` the
- * README the write composes (`readmeComposed`), its `readme` under a frontmatter of its `needs`, each `now`'s where left out, and no
- * `needs` apart, since that README declares them. A proposal that leaves its needs out so shows `now`'s frontmatter as it is, and one that
- * gives others shows them in it.
+ * README the write writes (`readmeComposed`), as given where it opens with a frontmatter of its own, under `now`'s frontmatter where it
+ * does not, `now`'s own where none is given.
  */
 const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonly<Record<string, unknown>> | undefined): unknown => {
   const was = typeof now?.readme === 'string' ? now.readme : undefined;
   const body = typeof spec.readme === 'string' ? spec.readme : undefined;
-  const needs = Array.isArray(spec.needs) ? (spec.needs as readonly Need[]) : undefined;
-  const readme = readmeComposed(was ?? '', body, needs) ?? was;
-  const { needs: _given, readme: _readme, ...rest } = spec;
+  const readme = readmeComposed(was ?? '', body) ?? was;
+  const { readme: _readme, ...rest } = spec;
   return readme === undefined ? rest : { ...rest, readme };
 };
 
 /**
- * The spec an object will hold once written: a Factory's parts it names over what it holds; a Workflow's README and needs as its apply
+ * The spec an object will hold once written: a Factory's parts it names over what it holds; a Workflow's README as its apply
  * writes them (`workflowAsWritten`); any other kind's spec whole.
  * @param object The object proposed.
  * @param now The spec the object holds now; undefined where nothing is there.

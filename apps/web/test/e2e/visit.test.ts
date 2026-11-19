@@ -2,7 +2,8 @@
  * `npm run e2e` made to refuse, whole: a page with a console error, one with a failed request, and one whose button
  * something lies over, each put through the code run.ts puts the app's pages through (visit.ts) in a process of its
  * own — which must exit non-zero, naming the page, and end both its streams saying so, with a picture of the failure alone. And the
- * page that breaks nothing passes, pictured by no one unless `--photos` asks. checks.test.ts proves the
+ * page that breaks nothing passes, pictured by no one unless `--photos` asks, in the dark alone unless `--light` asks too. checks.test.ts
+ * proves the
  * watch hears each problem; this proves hearing one fails the run. Needs Chromium, like checks.test.ts.
  */
 import { test } from 'vitest';
@@ -163,7 +164,7 @@ test(
 );
 
 test('a store gone between two visits is said before the next page, which is not visited', { timeout: 60_000 }, async () => {
-  const ended = await e2eOn('store-swept', '--photos');
+  const ended = await e2eOn('store-swept', '--photos', '--light');
   assert.equal(ended.code, 1, said(ended));
   assert.match(ended.stdout, /the store-swept page \(\/store-swept\) in the light theme ✓/, said(ended));
   for (const stream of [ended.stdout, ended.stderr]) {
@@ -197,10 +198,27 @@ test(
 );
 
 test(
-  'with --photos the same page passes in light, then dark, and is pictured in both, by the runner and by itself',
+  'with --photos the same page passes in the dark theme alone, and is pictured there, by the runner and by itself',
   { timeout: 60_000 },
   async () => {
     const ended = await e2eOn('none', '--photos');
+    assert.equal(ended.code, 0, said(ended));
+    assert.match(ended.stdout, /the none page \(\/none\) in the dark theme ✓ /, said(ended));
+    assert.doesNotMatch(ended.stdout, /in the light theme/, said(ended));
+    assert.deepEqual(ended.shots, ['none-dark.png', 'none-own-dark.png'], said(ended));
+    assert.deepEqual(
+      timingsOf(ended).map((t) => t.theme),
+      ['dark'],
+      'a timing for the one theme visited',
+    );
+  },
+);
+
+test(
+  'with --photos --light the same page passes in light, then dark, and is pictured in both, by the runner and by itself',
+  { timeout: 60_000 },
+  async () => {
+    const ended = await e2eOn('none', '--photos', '--light');
     assert.equal(ended.code, 0, said(ended));
     assert.match(
       ended.stdout,
@@ -218,6 +236,13 @@ test(
   },
 );
 
+test('a process that visits two pages says where its browser is once', { timeout: 60_000 }, async () => {
+  const ended = await e2eOn('none', '--again');
+  assert.equal(ended.code, 0, said(ended));
+  assert.equal(ended.stdout.match(/the none page \(\/none\) in the dark theme ✓/g)?.length, 2, said(ended));
+  assert.equal(ended.stdout.match(/the dark theme's browser is in /g)?.length, 1, said(ended));
+});
+
 test("a run that pictures no page leaves the runner's pictures an earlier run took of it", { timeout: 60_000 }, async () => {
   const out = planted('none-dark.png', 'none-light.png');
   const ended = await e2eIn(out, 'none');
@@ -226,13 +251,17 @@ test("a run that pictures no page leaves the runner's pictures an earlier run to
   assert.deepEqual(stillPlanted(out), ['none-dark.png', 'none-light.png'], said(ended));
 });
 
-test("a run that pictures a page takes the runner's pictures of it again, in the themes it visits", { timeout: 60_000 }, async () => {
-  const out = planted('none-dark.png', 'none-light.png');
-  const ended = await e2eIn(out, 'none', '--photos');
-  assert.equal(ended.code, 0, said(ended));
-  assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png', 'none-own-light.png'], said(ended));
-  assert.deepEqual(stillPlanted(out), [], said(ended));
-});
+test(
+  "a run that pictures a page takes the runner's pictures of it again, in the themes it visits and no other",
+  { timeout: 60_000 },
+  async () => {
+    const out = planted('none-dark.png', 'none-light.png');
+    const ended = await e2eIn(out, 'none', '--photos');
+    assert.equal(ended.code, 0, said(ended));
+    assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png'], said(ended));
+    assert.deepEqual(stillPlanted(out), ['none-light.png'], said(ended));
+  },
+);
 
 test(
   'a failing page that is not pictured leaves its failure pictured, and the picture an earlier run took of it',
@@ -260,7 +289,7 @@ test(
 
 test('a run that pictures a page touches no picture of a page it does not visit', { timeout: 60_000 }, async () => {
   const out = planted('other-dark.png', 'other-light.png', 'other-dark-failed.png');
-  const ended = await e2eIn(out, 'none', '--photos');
+  const ended = await e2eIn(out, 'none', '--photos', '--light');
   assert.equal(ended.code, 0, said(ended));
   assert.deepEqual(
     ended.shots,

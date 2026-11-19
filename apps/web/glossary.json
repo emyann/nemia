@@ -250,6 +250,15 @@
     {
       "term": "Getting started",
       "meaning": "the floor's list of a store's four milestones, each as the api reads it from the store, the next one linked to its page, shown until a run has landed or the person dismisses it in this browser (`starterShown`, `apps/web/src/lib/gettingStarted.ts`; `GettingStarted`, `apps/web/src/components/frame/GettingStarted.tsx`)."
+    },
+    {
+      "term": "Approved picture",
+      "meaning": "a story's picture in the dark theme, Nemia's default, committed under `apps/web/test/approved/<story id>.png` and drawn in the pinned place (Ubuntu 24.04, the lockfile's Chromium: `apps/web/test/e2e/stories/pinned.ts`); the stories project compares every run of a story against it and fails on a difference (`apps/web/.storybook/compare.ts`), `npm run stories -- --update` writes those that differ, to commit with the change, and `apps/web/test/e2e/stories/changed.ts` hands those a change added, changed and removed. The folder owes one to every story and holds none astray (`unapprovedOf`, `apps/web/.storybook/approved.ts`, proved by `apps/web/contracts/approved-pictures.contract.ts`).",
+      "type": "Unapproved"
+    },
+    {
+      "term": "Light canary",
+      "meaning": "a story approved in the light theme too, `apps/web/test/approved/light/<story id>.png`, one of the few that draw what the board writes for one scheme outside the theme's roles (`LIGHT_CANARIES`, `apps/web/.storybook/approved.ts`): light is held by the theme otherwise, its contrast pairs in both schemes (`apps/web/test/theme-contrast.test.ts`) and the palette guard, not by a picture of every story."
     }
   ]
 }

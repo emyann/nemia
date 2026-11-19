@@ -1,9 +1,10 @@
 /**
  * A LibraryAdd proposal applied (`objectWritten`, `write.verb.ts`): the factory's record of its adds written as the proposal says, and the
  * proposal's read of what is there now (`currentOf`) agreeing with it, an add made and then taken off. A Workflow proposal applied writes
- * its README as the api's write does: its needs kept where it leaves them out, written where it gives them, a readme with a frontmatter of
- * its own written as given; the spec it will hold once written (`mergedSpec`) shows them so in its README, beside what is there now;
- * and an undo, which proposes the spec read before, writes the README back byte for byte.
+ * its README as the api's write does: the spec read (`currentOf`, the api's GET) proposed back writes it byte for byte, a readme with a
+ * frontmatter of its own is written as given, its needs with it, and an instruction alone under the README's own frontmatter; the spec it
+ * will hold once written (`mergedSpec`) shows each so, beside what is there now; and an undo, which proposes the spec read before, writes
+ * the README back byte for byte.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -103,19 +104,17 @@ function plantedNeeds(prefix: string) {
 const nowIn = (home: string, kind: 'Workflow' = 'Workflow', name = 'dev') =>
   ran(Effect.provideService(currentOf({ home }, FACTORY, kind, name), StoreRoot, home));
 
-/** `dev` as the api serves it, read now: its README without its frontmatter, its needs apart, at the version it was read. */
+/** `dev` as the api serves it, read now: its spec as its files hold it, at the version it was read. */
 async function servedDev(home: string) {
   const now = await nowIn(home);
-  const dir = path.join(home, 'factories', FACTORY, 'tree', 'workflows', 'dev');
-  const { readme: _whole, ...rest } = now.spec as Record<string, unknown>;
-  return { version: now.version ?? '', spec: { ...rest, readme: workflowReadme(dir), needs: workflowNeeds(dir) } } satisfies {
+  return { version: now.version ?? '', spec: now.spec as Record<string, unknown> } satisfies {
     version: string;
     spec: Record<string, unknown>;
   };
 }
 
 /** The spec `object` will hold once written over `now` (`mergedSpec`), its README read: its needs are declared there, never apart. */
-const previewOf = (object: ProposedObject, now: unknown) => mergedSpec(object, now) as { readme?: string; needs?: unknown };
+const previewOf = (object: ProposedObject, now: unknown) => mergedSpec(object, now) as { readme?: string };
 
 /** `dev` proposed back as an update at `version` with `spec`. */
 const devProposed = (version: string, spec: ProposedObject['spec']) =>
@@ -126,46 +125,48 @@ const devProposed = (version: string, spec: ProposedObject['spec']) =>
     spec,
   }) satisfies ProposedObject;
 
-test('a Workflow read as the api serves it, proposed back with its needs left out, keeps them and its frontmatter', async () => {
-  const { home, readme } = plantedNeeds('wf-apply-needs-kept-');
-  const { version, spec } = await servedDev(home);
-  const { needs: _needs, ...left } = spec;
-  const object = devProposed(version, left);
-  const now = await nowIn(home);
-  assert.equal(previewOf(object, now.spec).readme, (now.spec as { readme?: string }).readme, 'the preview shows the README unchanged');
-  await ran(objectWritten({ home }, FACTORY, object));
-  assert.deepEqual(workflowNeeds(path.dirname(readme)), NEEDS, 'the needs are still declared');
-  assert.match(fs.readFileSync(readme, 'utf8'), /^---\nowner: team\n/, "the frontmatter's other key is kept");
-});
-
-describe('a Workflow proposed with other needs writes those, and with needs [] writes none, each shown so by the preview', () => {
-  for (const [label, needs] of [
-    ['other needs', [{ name: 'git-identity', message: 'a git identity', check: 'git config user.name' }]],
-    ['none', []],
+describe('a Workflow read as the api serves it and proposed back writes its README byte for byte, the preview showing it unchanged', () => {
+  for (const [label, line] of [
+    ['line ends of LF', (text: string) => text],
+    ['line ends of CRLF', (text: string) => text.replace(/\n/g, '\r\n')],
   ] as const) {
     test(label, async () => {
-      const { home, readme } = plantedNeeds('wf-apply-needs-given-');
+      const { home, readme } = plantedNeeds('wf-apply-read-back-');
+      fs.writeFileSync(readme, line(README));
       const { version, spec } = await servedDev(home);
-      const object = devProposed(version, { ...spec, needs });
-      const now = await nowIn(home);
-      assert.deepEqual(needsDeclaredIn(previewOf(object, now.spec).readme ?? '').needs, needs, 'the preview shows the needs given');
+      assert.equal(spec.readme, line(README), 'the read serves the README whole');
+      const object = devProposed(version, spec);
+      assert.equal(previewOf(object, spec).readme, line(README), 'the preview shows the README unchanged');
       await ran(objectWritten({ home }, FACTORY, object));
-      assert.deepEqual(workflowNeeds(path.dirname(readme)), needs);
-      assert.equal(workflowReadme(path.dirname(readme)), '# dev\n\nBuild it.\n', 'the instruction is kept');
+      assert.equal(fs.readFileSync(readme, 'utf8'), line(README));
+      assert.deepEqual(workflowNeeds(path.dirname(readme)), NEEDS, 'the needs are still declared');
     });
   }
 });
 
-test('a Workflow whose readme carries its own frontmatter is written as given, as an upgrade composes it', async () => {
+test("a Workflow given its instruction alone writes it under the README's own frontmatter, its needs kept", async () => {
+  const { home, readme } = plantedNeeds('wf-apply-instruction-');
+  const { version, spec } = await servedDev(home);
+  const object = devProposed(version, { ...spec, readme: '# dev\n\nBuild it again.\n' });
+  assert.equal(needsDeclaredIn(previewOf(object, spec).readme ?? '').needs.length, NEEDS.length, 'the preview keeps the needs');
+  await ran(objectWritten({ home }, FACTORY, object));
+  assert.deepEqual(workflowNeeds(path.dirname(readme)), NEEDS);
+  assert.match(fs.readFileSync(readme, 'utf8'), /^---\nowner: team\n/, "the frontmatter's other key is kept");
+  assert.equal(workflowReadme(path.dirname(readme)), '# dev\n\nBuild it again.\n');
+});
+
+test('a Workflow whose readme carries its own frontmatter is written as given, its needs those it declares', async () => {
   const { home, readme } = plantedNeeds('wf-apply-needs-composed-');
   const { version, spec } = await servedDev(home);
-  const { needs: _needs, ...left } = spec;
-  const given = '---\nneeds:\n  - name: gh\n    message: GitHub CLI\n    check: gh --version\n---\n# dev\n\nComposed.\n';
-  const object = devProposed(version, { ...left, readme: given });
-  const now = await nowIn(home);
-  assert.equal(previewOf(object, now.spec).readme, given, 'the preview shows the readme as given');
+  const given =
+    '---\nneeds:\n  - name: git-identity\n    message: a git identity\n    check: git config user.name\n---\n# dev\n\nComposed.\n';
+  const object = devProposed(version, { ...spec, readme: given });
+  assert.equal(previewOf(object, spec).readme, given, 'the preview shows the readme as given');
   await ran(objectWritten({ home }, FACTORY, object));
   assert.equal(fs.readFileSync(readme, 'utf8'), given);
+  assert.deepEqual(workflowNeeds(path.dirname(readme)), [
+    { name: 'git-identity', message: 'a git identity', check: 'git config user.name' },
+  ]);
 });
 
 test("an undo of a Workflow proposal writes the README back byte for byte, its frontmatter's comment and order kept", async () => {
@@ -175,7 +176,7 @@ test("an undo of a Workflow proposal writes the README back byte for byte, its f
   const before = await nowIn(home);
   assert.equal((before.spec as { needs?: unknown }).needs, undefined, 'the current read says the needs in the README alone');
   const { version, spec } = await servedDev(home);
-  await ran(objectWritten({ home }, FACTORY, devProposed(version, { ...spec, needs: [] })));
+  await ran(objectWritten({ home }, FACTORY, devProposed(version, { ...spec, readme: '---\nowner: team\n---\n# dev\n\nBuild it.\n' })));
   assert.notEqual(fs.readFileSync(readme, 'utf8'), was, 'the proposal changed the README');
   const after = await nowIn(home);
   await ran(objectWritten({ home }, FACTORY, devProposed(after.version ?? '', before.spec)));

@@ -1,7 +1,8 @@
 /**
  * Which of the board's stories a change touches, and which changed part no story reaches (`storiesTouched`, proved by
- * `contracts/touched-stories.contract.ts`), and which file of the board owes a story (`owesAStory`): what `shoot.ts` pictures and
- * refuses, and what `test/stories.test.ts` holds the tree to. Pure: the paths, the reach and what owes are read by the caller.
+ * `contracts/touched-stories.contract.ts`), and which file of the board owes a story (`owesAStory`): what `changed.ts` refuses (a
+ * changed part no story reaches), and what `test/stories.test.ts` holds the tree to. Pure: the paths, the reach and what owes are read by
+ * the caller.
  */
 import type { StoriesTouched } from '../../../contracts/touched-stories.contract.ts';
 

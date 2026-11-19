@@ -636,6 +636,8 @@ const PINNED: Record<string, string[]> = {
     'workflowNeeds',
     'workflowReadme',
     'workflowReadmeWith',
+    'workflowSpecAt',
+    'workflowSpecOf',
     'workflowSpecReadme',
     'workflowStale',
     'workflowTaken',

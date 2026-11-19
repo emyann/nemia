@@ -2304,6 +2304,11 @@ describe('REFUSED: a line a reader reads that does not decode refuses the output
       refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 'toolu_n', input: {} })].join('\n'))),
       printedRefusal(2, 'an `assistant`', 'message.content.1.name', 'is missing'),
     );
+    assert.doesNotThrow(
+      () =>
+        claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 'toolu_s', name: 'Bash', input: 'ls' }), resultLine({})].join('\n')),
+      'a call whose input is no record decodes, as the SDK types it `unknown`',
+    );
     const badInit = JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 });
     assert.equal(
       refusedWith(() => claudeStreamOutput([badInit, resultLine({})].join('\n'))),

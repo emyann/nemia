@@ -1,7 +1,9 @@
 /**
- * Pictures the look's parts for a person who reviews them: `node test/e2e/look-photos.ts` from `apps/web` builds Nemia's Storybook
+ * Pictures the look's parts for a person who reviews them: `node test/e2e/look-photos.ts [--light]` from `apps/web` builds Nemia's
+ * Storybook
  * into a scratch folder, says what the build took and its largest process held, and opens each story alone in it
- * (`iframe.html?id=<id>`, `stories/built.ts`), in light, then in dark, writing into the e2e's folder of pictures (`OUT`, the run's
+ * (`iframe.html?id=<id>`, `stories/built.ts`), in dark, Nemia's default, and first in light where `--light` asks, writing into the e2e's
+ * folder of pictures (`OUT`, the run's
  * files where `WF_ARTIFACTS` names them) a picture of every story but a page body's (`parts-<id>-<theme>.png`); then, enlarged for a
  * person's eye, the cut button at rest and with the keyboard's focus, as a link and as a press, and disabled, six times, the corner of
  * a frame that waits on a person, four times, the rail of a run whose steps are done, a page's name over its rule, short and long, a
@@ -22,6 +24,9 @@ import { photograph } from './board.ts';
 import { builtIds, openStory, serveBuilt, type Look } from './stories/built.ts';
 import { launch } from './visit.ts';
 import { fromNodeModules, OUT, WEB } from './world.ts';
+
+/** The themes the parts are pictured in: dark, and light first where `--light` asks for it. */
+const THEMES: readonly ('light' | 'dark')[] = process.argv.includes('--light') ? ['light', 'dark'] : ['dark'];
 
 /** The ground a story draws its part on: the cut button's, as a link, as a press and disabled, and a text link's and a short id's. */
 const CARD_GROUND = '[data-story-ground] > div';
@@ -133,13 +138,13 @@ async function onStory(browser: Browser, id: string, theme: 'light' | 'dark', us
   }
 }
 
-/** The pictures of the scroll bars, in a browser of each kind of bar, light then dark. */
+/** The pictures of the scroll bars, in a browser of each kind of bar, in each theme pictured. */
 async function barsPictured() {
   const look = { scale: 4, still: true };
   for (const kind of ['classic', 'overlay'] as const) {
     const drawing = await launch(kind);
     try {
-      for (const theme of ['light', 'dark'] as const) {
+      for (const theme of THEMES) {
         const tail = `${kind}-${theme}.png`;
         if (kind === 'classic') await onStory(drawing, 'look-cutframe--table-of-one-row', theme, (page) => framedCorners(page, tail), look);
         await onStory(drawing, 'look-scrollbars--marked', theme, (page) => barStates(page, tail), look);
@@ -232,7 +237,7 @@ async function buildStorybook(out: string) {
 
 /** Pictures Storybook's index, served at `at`, with a story of the cut button open. */
 async function storybookPictured(browser: Browser) {
-  for (const theme of ['light', 'dark'] as const) {
+  for (const theme of THEMES) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
     await page.goto(`${at}/?path=/story/look-cutbutton--press`);
@@ -251,7 +256,7 @@ at = served.at;
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await launch();
 try {
-  for (const theme of ['light', 'dark'] as const) {
+  for (const theme of THEMES) {
     await sheets(browser, builtIds(storybook), theme);
     await closeUps(browser, theme);
   }

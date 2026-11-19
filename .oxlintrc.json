@@ -122,7 +122,7 @@
           "apps/cli/test/watch.test.ts": 1,
           "apps/cli/vitest.config.ts": 2,
           "apps/docs/vitest.config.ts": 2,
-          "apps/web/test/e2e/visit.test.ts": 12,
+          "apps/web/test/e2e/visit.test.ts": 14,
           "apps/web/vitest.config.ts": 4,
           "packages/agent-orchestrator/test/mcp-config.test.ts": 2,
           "packages/agent-orchestrator/test/step-labels.boundary.test.ts": 1,

@@ -359,28 +359,24 @@ export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[
 export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead(dir).needs;
 
 /**
- * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`), so that what a read gave
- * — the instruction (`workflowReadme`) and the needs (`workflowNeeds`), apart — is written back whole: `body` under a frontmatter of
- * `needs`, each the README's own where it is left out (`readmeComposed`). Undefined where neither is given: the README is left as it is.
- * @param dir The workflow's folder, whose README on disk fills what is not given.
- * @param body The instruction to write, or undefined to keep the README's own.
- * @param needs The needs to declare, or undefined to keep the README's own.
+ * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`): `body` as given where it
+ * opens with a frontmatter of its own, so the README a read served is written back byte for byte, otherwise `body` as the instruction
+ * under the README's own frontmatter (`readmeComposed`). Undefined where none is given: the README is left as it is.
+ * @param dir The workflow's folder, whose README on disk gives the frontmatter a bare instruction is written under.
+ * @param body The README to write, whole or its instruction alone, or undefined to keep the README's own.
  */
-export function workflowReadmeWith(dir: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
-  return readmeComposed(readmeText(dir) ?? '', body, needs);
+export function workflowReadmeWith(dir: string, body: string | undefined): string | undefined {
+  return readmeComposed(readmeText(dir) ?? '', body);
 }
 
 /**
  * The README a Workflow's `spec` writes into the folder `dir`, whichever writer writes it — the api's `PUT` and a proposal's apply alike:
- * its `readme` (null or left out, the README's own) under a frontmatter of its `needs` (left out, the README's own), as
- * `workflowReadmeWith` composes it; undefined where it gives neither, the README left as it is.
+ * its `readme` as `workflowReadmeWith` writes it; undefined where it gives none (null or left out), the README left as it is.
  * @param dir The workflow's folder.
- * @param spec The Workflow's spec, of which its `readme` and `needs` are read.
+ * @param spec The Workflow's spec, of which its `readme` is read.
  */
-export const workflowSpecReadme = (
-  dir: string,
-  spec: { readonly readme?: string | null; readonly needs?: readonly Need[] },
-): string | undefined => workflowReadmeWith(dir, spec.readme ?? undefined, spec.needs);
+export const workflowSpecReadme = (dir: string, spec: { readonly readme?: string | null }): string | undefined =>
+  workflowReadmeWith(dir, spec.readme ?? undefined);
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 

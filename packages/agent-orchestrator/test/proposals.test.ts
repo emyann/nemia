@@ -645,6 +645,12 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   assert.ok(costLines.message?.includes('nemia factory cost-line'), costLines.message);
   const shapeless: ProposedObject = { ...object, spec: { steps: 'none' } };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [shapeless] }, PLACE)))._tag, 'Invalid');
+  for (const apart of [{ needs: [] }, { description: 'Build it.' }]) {
+    const resolved: ProposedObject = { ...object, spec: { ...(object.spec as object), ...apart } };
+    const refused = await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [resolved] }, PLACE));
+    assert.equal(refused._tag, 'Invalid', `a Workflow's spec with ${Object.keys(apart).join()} apart, which its README says`);
+    assert.ok(refused.message?.includes('nemia get workflows'), refused.message);
+  }
   const moved: ProposedObject = { ...object, metadata: { ...object.metadata, resourceVersion: 'not-it' } };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [moved] }, PLACE)))._tag, 'Conflict');
   assert.equal((await refusalOf(proposeProgram(PERSON, 'default', { objects: [object] }, PLACE)))._tag, 'Invalid');

@@ -166,8 +166,8 @@ test("a builder's save round-trips its spec, the step files keep only their own 
   assert.deepEqual(
     steps.map((s) => [s.name, s.keys]),
     [
-      ['plan', { place: 'git', harness: 'claude' }],
       ['make', { after: ['plan'], place: 'git', agent: 'implementer' }],
+      ['plan', { place: 'git', harness: 'claude' }],
     ],
   );
   const saved = await send('PUT', `${L}/mine`, { metadata: { resourceVersion: read.metadata.resourceVersion }, spec: { steps } });

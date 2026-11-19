@@ -3,13 +3,12 @@
  * step and the folders beside it may take, and `parseFolder`, which reads every step and checks them together.
  */
 import path from 'node:path';
-import type { Need } from 'objects';
-import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type StepSpec } from '../step/step.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
 import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';
+import type { ReadmeWrittenOf } from '../../contracts/readme-written.contract.ts';
 
 export type { WorkflowThere, VersionRefused } from '../../contracts/workflow-version.contract.ts';
 
@@ -325,37 +324,27 @@ export function textIn(bytes: Uint8Array): string | null {
   }
 }
 
-/** The keys of a frontmatter `block` other than its needs, none where it does not read as a map. */
-function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
-  let read: unknown;
-  try {
-    read = block === undefined ? undefined : frontmatterValues(block);
-  } catch {
-    read = undefined;
-  }
-  if (typeof read !== 'object' || read === null || Array.isArray(read)) return {};
-  const { needs: _needs, ...rest } = read as Record<string, unknown>;
-  return rest;
-}
+/**
+ * The README a write of a workflow writes (`readme-written`): none where none is given; a README given with a frontmatter of its own,
+ * exactly as given; one given without, its instruction under `diskBlock`, the frontmatter the README on disk opens with.
+ * @param diskBlock The frontmatter block the README on disk opens with, its fences included; empty where it opens with none.
+ * @param given The README given to the write, and whether it opens with a frontmatter of its own; undefined for none.
+ */
+export const readmeWritten: ReadmeWrittenOf = (diskBlock, given) => {
+  if (given === undefined) return undefined;
+  return given.ownFrontmatter ? given.text : diskBlock + given.text;
+};
 
 /**
- * The README a write of a workflow writes over `onDisk`, the README it has: `body`, the instruction (`onDisk`'s own where none is given),
- * under a frontmatter whose `needs:` is `needs` (`onDisk`'s own where none are given) beside the frontmatter's other keys. A `body` that
- * carries a frontmatter of its own is read as the whole README, its frontmatter in place of `onDisk`'s. No frontmatter where it would hold
- * nothing, and undefined where neither is given: the README is then left as it is. Pure: one rule for a write (`workflowSpecReadme`) and
- * for the spec a proposal will hold once written (`mergedSpec`).
+ * The README a write of a workflow writes over `onDisk`, the README it has (`readmeWritten`): `body` as given where it opens with a
+ * frontmatter of its own, so a README read and proposed back is written byte for byte; otherwise `body` as the instruction, under the
+ * frontmatter `onDisk` opens with. Undefined where no `body` is given: the README is then left as it is. Pure: one rule for a write
+ * (`workflowSpecReadme`) and for the spec a proposal will hold once written (`mergedSpec`).
  * @param onDisk The README the folder has now, frontmatter and all; empty where it has none.
- * @param body The instruction to write, or undefined to keep `onDisk`'s.
- * @param needs The needs to declare, or undefined to keep `onDisk`'s.
+ * @param body The README to write, whole or its instruction alone, or undefined to keep `onDisk`.
  */
-export function readmeComposed(onDisk: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
-  if (body === undefined && needs === undefined) return undefined;
-  const given = body?.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const own = given === undefined ? undefined : FRONTMATTER.exec(given);
-  const was = onDisk.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const block = own ?? FRONTMATTER.exec(was);
-  const instruction = given === undefined ? was.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
-  if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
-  const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
-  return Object.keys(keys).length === 0 ? instruction : `---\n${frontmatterOfValues(keys)}---\n${instruction}`;
+export function readmeComposed(onDisk: string, body: string | undefined): string | undefined {
+  const ownFrontmatter = body !== undefined && FRONTMATTER.test(body.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'));
+  const diskBlock = FRONTMATTER.exec(onDisk.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'))?.[0] ?? '';
+  return readmeWritten(diskBlock, body === undefined ? undefined : { text: body, ownFrontmatter });
 }

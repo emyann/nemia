@@ -240,6 +240,11 @@ const listedHere = (): string[] => factoryLines(readFactoriesAt(ROOT));
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
 describe('a factory from nothing to a run: filed, given workflows, hires and a schedule, listed, started in, and removed', () => {
+  let a!: string;
+  let b!: string;
+  beforeAll(() => {
+    [a, b] = [aRepo(), aRepo()];
+  });
   let build!: string;
   let file!: string;
   beforeAll(() => {
@@ -249,7 +254,6 @@ describe('a factory from nothing to a run: filed, given workflows, hires and a s
     return t.end;
   });
   const s = story(test);
-  const [a, b] = [aRepo(), aRepo()];
   let run = '';
   s.test("no factory is filed before the first `nemia factory add` (its listing and help are the client's: apps/cli/test)", async () => {
     assert.deepEqual(readFactoriesAt(ROOT), []);

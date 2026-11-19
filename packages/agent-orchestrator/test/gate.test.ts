@@ -700,7 +700,10 @@ describe("an inbox card's `gate:` is frozen on the run it starts", () => {
 });
 
 describe('`--gate` and a card’s `gate:`, REFUSED before a run is written', () => {
-  const repo = aRepo();
+  let repo!: string;
+  beforeAll(() => {
+    repo = aRepo();
+  });
   const starting = (...gates: string[]) =>
     runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
   const typed = (...flags: string[]) =>

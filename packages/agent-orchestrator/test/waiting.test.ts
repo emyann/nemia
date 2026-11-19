@@ -1710,7 +1710,10 @@ describe('words said to a step of a run waiting on another are kept, and its fir
 });
 
 describe('REFUSED by name at shipped defaults: `startPlan` starts nothing on a folder it cannot start whole', () => {
-  const repo = aRepo();
+  let repo!: string;
+  beforeAll(() => {
+    repo = aRepo();
+  });
   const first = oneStep();
   const broken = folderOf({ implement: ['afer: plan'] });
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${first}`, 'the first card') }));
@@ -1723,33 +1726,40 @@ describe('REFUSED by name at shipped defaults: `startPlan` starts nothing on a f
       else fs.writeFileSync(path.join(plan, file), text);
     }
   };
-  const rows: Array<[string, Record<string, string>, string[], string, string[]]> = [
+  const rows: Array<[string, () => [Record<string, string>, string[], string, string[]]]> = [
     [
       "a second card's workflow that does not load: the workflow's own refusal, behind the card",
-      { 'b.md': cardText(`workflow: ${broken}\nafter: a`, 'the second card') },
-      [plan, '--repo', repo],
-      'Invalid',
-      ['b.md:', `workflow: ${broken}`, 'implement:', '`afer`'],
+      () => [
+        { 'b.md': cardText(`workflow: ${broken}\nafter: a`, 'the second card') },
+        [plan, '--repo', repo],
+        'Invalid',
+        ['b.md:', `workflow: ${broken}`, 'implement:', '`afer`'],
+      ],
     ],
     [
       'a workflow that is not there, naming both places',
-      { 'b.md': cardText('workflow: nope\nafter: a', 'the second card') },
-      [plan, '--repo', repo],
-      'Invalid',
-      ['b.md:', 'workflow: nope', path.join(plan, 'nope'), path.join(repo, 'workflows')],
+      () => [
+        { 'b.md': cardText('workflow: nope\nafter: a', 'the second card') },
+        [plan, '--repo', repo],
+        'Invalid',
+        ['b.md:', 'workflow: nope', path.join(plan, 'nope'), path.join(repo, 'workflows')],
+      ],
     ],
     [
       'a cycle',
-      { 'b.md': cardText(`workflow: ${first}\nafter: c`, 'b'), 'c.md': cardText(`workflow: ${first}\nafter: b`, 'c') },
-      [plan, '--repo', repo],
-      'Invalid',
-      ['b.md, c.md wait on each other', 'b after c, c after b', '`after:`'],
+      () => [
+        { 'b.md': cardText(`workflow: ${first}\nafter: c`, 'b'), 'c.md': cardText(`workflow: ${first}\nafter: b`, 'c') },
+        [plan, '--repo', repo],
+        'Invalid',
+        ['b.md, c.md wait on each other', 'b after c, c after b', '`after:`'],
+      ],
     ],
-    ['a folder inside the plan', { 'drafts/': '' }, [plan, '--repo', repo], 'Invalid', ['drafts/', plan, 'not a card']],
-    ['a folder with no card', {}, [empty, '--repo', repo], 'Invalid', [empty, 'no cards', 'README.md']],
+    ['a folder inside the plan', () => [{ 'drafts/': '' }, [plan, '--repo', repo], 'Invalid', ['drafts/', plan, 'not a card']]],
+    ['a folder with no card', () => [{}, [empty, '--repo', repo], 'Invalid', [empty, 'no cards', 'README.md']]],
   ];
-  for (const [what, files, argv, tag, facts] of rows) {
+  for (const [what, later] of rows) {
     test(what, async () => {
+      const [files, argv, tag, facts] = later();
       cards(files);
       const before = runsWritten();
       await assert.rejects(planned(argv[0] ?? '', argv[2] ?? ''), refusedNaming(tag, ...facts));

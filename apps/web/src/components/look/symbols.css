@@ -1,0 +1,125 @@
+/*
+ * The symbols the board draws that none of its four faces has, drawn from two faces served with the board under each of the board's
+ * families, so every reader's browser draws the same glyph rather than whatever system font it falls back to: ← → ↗ ≥ ✓ ⧉ (U+2190,
+ * U+2192, U+2197, U+2265, U+2713, U+29C9) from Noto Sans Math (@fontsource/noto-sans-math), and ✗ (U+2717), which it lacks, from the
+ * symbols subset of Noto Sans Symbols 2 (@fontsource/noto-sans-symbols-2). Each rule's unicode-range is its face's characters alone,
+ * so it never takes a glyph a face of the board draws. Each rule repeats the weight, style and width of one face `styles.css` loads,
+ * exactly: a face whose descriptors differ is matched apart from the family's own, and Chromium then takes the text from the fallback
+ * rather than from the board's face. A face added to styles.css gets its two rules here; a character added to the board that its faces
+ * lack is added to every rule of the symbol face that has it (the list is read off apps/web/src, its stories' fixtures and the messages
+ * the api serves, by their string and JSX text).
+ */
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Share Tech Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Archivo Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url('@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+2197, U+2265, U+2713, U+29C9;
+}
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Share Tech Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}
+@font-face {
+  font-family: 'Archivo Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url('@fontsource/noto-sans-symbols-2/files/noto-sans-symbols-2-symbols-400-normal.woff2') format('woff2');
+  unicode-range: U+2717;
+}

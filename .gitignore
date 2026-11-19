@@ -7,3 +7,6 @@ dist
 .e2e
 .observe
 .claude/settings.local.json
+
+# What the stories project leaves on a failing comparison: the reference, the actual and the diff (vitest.config.ts).
+.vitest

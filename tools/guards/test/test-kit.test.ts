@@ -95,7 +95,7 @@ const tmpdirCalls = (text: string): string[] =>
 /**
  * The files of a workspace's tests that make a root by hand: the fixture that shows the reaper a leak, run alone under a temp directory of
  * its own; and the e2e's runner, with the module it runs the look's tests through (`look.ts`, whose static Storybook it builds into a
- * folder of its own), the served board's command, and the stories' pictures (`stories/shoot.ts`), each a script and no test file, outside
+ * folder of its own), the served board's command, each a script and no test file, outside
  * which Vitest's hooks throw, and each removes its store or its folder and stops its servers on its own exit and signals.
  */
 const ROOTS_BY_HAND = [
@@ -103,7 +103,6 @@ const ROOTS_BY_HAND = [
   'apps/web/test/e2e/run.ts',
   'apps/web/test/e2e/look.ts',
   'apps/web/test/e2e/serve.ts',
-  'apps/web/test/e2e/stories/shoot.ts',
 ];
 
 /** The workspaces whose code and tests the sweeps read: every one the root names but the kit itself. */

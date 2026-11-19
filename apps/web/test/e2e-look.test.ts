@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'vitest';
 import { LOOK_RUNS, LOOK_TESTS } from './e2e/look.ts';
+import { placeVerdict, SYSTEM } from './e2e/stories/pinned.ts';
 import { WAITED } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -79,7 +80,7 @@ test('REFUSED: the old script, which ran every look test past any --pages', () =
   assert.equal(scriptBreaks('vitest run --project=look && node test/e2e/run.ts').length, 1);
 });
 
-test("--look runs the stories' Vitest after the look's node tests, the stories script being the storybook project's run", () => {
+test("--look runs the stories' Vitest after the look's node tests, the stories script being the storybook project's run in the pinned place", () => {
   assert.deepEqual(
     LOOK_RUNS.map((run) => run.what),
     ['tests', 'stories'],
@@ -89,6 +90,37 @@ test("--look runs the stories' Vitest after the look's node tests, the stories s
   assert.deepEqual(stories && [stories.command, ...stories.args], ['npm', 'run', 'stories']);
   assert.match(
     (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: Record<string, string> }).scripts.stories ?? '',
-    /^vitest run --project=storybook$/,
+    /^node test\/e2e\/stories\/pinned\.ts$/,
+  );
+  assert.ok(
+    fs.readFileSync(path.join(PACKAGE, 'test', 'e2e', 'stories', 'pinned.ts'), 'utf8').includes("'--project=storybook'"),
+    'the pinned place runs the storybook project',
+  );
+});
+
+/**
+ * The runner a job of a GitHub workflow's text runs on, by the job's key, or null where it names none: read from the key to the next
+ * job.
+ */
+const runnerOf = (workflow: string, job: string): string | null => {
+  const at = workflow.indexOf(`\n  ${job}:\n`);
+  if (at < 0) return null;
+  const rest = workflow.slice(at + job.length + 4);
+  const next = /\n  [\w-]+:\n/.exec(rest);
+  return /\n    runs-on: (\S+)/.exec(next ? rest.slice(0, next.index) : rest)?.[1] ?? null;
+};
+
+test("CI's e2e-look job runs on the pinned place's runner, and a CI not in the pinned place refuses rather than compare nothing", () => {
+  const ci = fs.readFileSync(path.join(PACKAGE, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.equal(runnerOf(ci, 'e2e-look'), `${SYSTEM.id}-${SYSTEM.version}`);
+  assert.equal(runnerOf(ci.replace(`runs-on: ${SYSTEM.id}-${SYSTEM.version}`, 'runs-on: ubuntu-latest'), 'e2e-look'), 'ubuntu-latest');
+  assert.deepEqual(
+    [
+      placeVerdict(undefined, true),
+      placeVerdict(undefined, false),
+      placeVerdict('this is Ubuntu 26.04', true),
+      placeVerdict('this is Ubuntu 26.04', false),
+    ],
+    ['compare', 'compare', 'refused', 'uncompared'],
   );
 });

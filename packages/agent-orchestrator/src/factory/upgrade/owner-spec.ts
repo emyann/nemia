@@ -152,4 +152,5 @@ export function ownerSpec(
     case 'Factory':
       return factoryOf(factory, owner, texts, ours);
   }
+  return undefined;
 }

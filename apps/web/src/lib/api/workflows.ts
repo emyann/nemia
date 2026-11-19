@@ -113,8 +113,8 @@ const workflowViewOf = (workflow: Workflow): WorkflowListing => ({
   name: workflow.metadata.name,
   from: workflow.status.origin,
   dir: workflow.status.dir,
-  description: workflow.spec.description ?? null,
-  readme: workflow.spec.readme ?? null,
+  description: workflow.status.description,
+  readme: workflow.status.readmeBody,
   steps: workflow.status.steps.map(stepOf),
   graph: {
     roots: copied(workflow.status.graph.roots),

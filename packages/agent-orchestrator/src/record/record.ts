@@ -25,7 +25,7 @@ export type Mount = {
   readOnly: boolean;
   /** Whether the step's own rules alone decide its writes there (the runtime's `Mount.ruled`): the workspace beside a session's home. */
   ruled?: true;
-  /** Whether the folder's CLAUDE.md files load, frozen from its volume's switch (`switchesOf`): absent is off. */
+  /** Whether the folder's memory files load, frozen from its volume's switch (`switchesOf`): absent is off. */
   claudeMd?: true;
   /** Whether the folder's skills are offered, frozen from its volume's switch (`switchesOf`): absent is on. */
   skills?: false;

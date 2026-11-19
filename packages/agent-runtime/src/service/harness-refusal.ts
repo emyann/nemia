@@ -144,8 +144,7 @@ const ASKED: readonly Asked[] = [
   },
   {
     words: ['projectMcp'],
-    asks: (spec) =>
-      askedIf(spec.config?.projectMcp !== undefined || spec.config?.projectMcpFrom !== undefined, 'projectMcp'),
+    asks: (spec) => askedIf(spec.config?.projectMcp !== undefined || spec.config?.projectMcpFrom !== undefined, 'projectMcp'),
     only: 'local',
     says: (spec) =>
       `\`projectMcp\` says which servers of the checkout's \`.mcp.json\` the session loads, and the \`${spec.harness}\` harness loads no MCP server it could leave out: it would run as if nothing were asked.`,

@@ -102,7 +102,7 @@ test('a volume added again keeps the switches it is not given, and takes those i
   assert.deepEqual(withVolume({ volumes: [] }, { path: '/a', readOnly: true }).volumes, [{ path: '/a', readOnly: true, name: 'a' }]);
 });
 
-test('a run freezes a volume\'s switches only where they are not the defaults', () => {
+test("a run freezes a volume's switches only where they are not the defaults", () => {
   assert.deepEqual(
     factoryVolumes({
       volumes: [

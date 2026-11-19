@@ -263,9 +263,10 @@ const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] 
   });
 
 /**
- * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records, read from the store
- * `home` the caller was given, its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a parameter and has no default: a caller that passes none does not compile, so no filing
- * reads a store nobody named (`test/root-given.test.ts`).
+ * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records, read from the store `home`
+ * the caller was given, its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a
+ * parameter and has no default: a caller that passes none does not compile, so no filing reads a store nobody named
+ * (`test/root-given.test.ts`).
  * @param run The run, read down to what names its folders and its factory.
  * @param home The store's root folder.
  * @param workspace The step's workspace, absolute.
@@ -305,7 +306,6 @@ export const sessionCwd = (
   home: string,
   workspace: string,
 ): string => startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
-
 
 /**
  * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —

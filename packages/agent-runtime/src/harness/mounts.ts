@@ -28,7 +28,8 @@ const mountRefusalOf = (mount: unknown): string | undefined => {
     return `\`mounts\` holds ${JSON.stringify(mount)}, which is not a mount. Give an object, like { "path": "/srv/repo", "readOnly": true }.`;
   }
   const stray = Object.keys(mount).find((key) => !MOUNT_KEYS.includes(key));
-  if (stray) return `\`mounts\` holds a mount with \`${stray}\`, which a mount does not have. A mount has \`path\`, \`readOnly\` and \`ruled\` alone.`;
+  if (stray)
+    return `\`mounts\` holds a mount with \`${stray}\`, which a mount does not have. A mount has \`path\`, \`readOnly\` and \`ruled\` alone.`;
   const { path: at, readOnly, ruled } = mount as Partial<Mount>;
   if (typeof at !== 'string' || at.includes(String.fromCharCode(0)) || !path.isAbsolute(at) || path.resolve(at) !== at) {
     return `\`mounts\` holds the path ${JSON.stringify(at)}, which is not an absolute folder. Name the folder by its absolute path, as \`path.resolve\` gives it, like "/srv/repo".`;

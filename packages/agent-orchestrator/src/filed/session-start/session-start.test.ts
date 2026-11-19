@@ -22,10 +22,7 @@ const READER = stepOf('permissionMode: dontAsk\nallowedTools: ["Bash(cd ${{ work
 
 const found = (over: Partial<StartFound> = {}): StartFound => ({ home: HOME, mcp: false, skills: {}, ...over });
 
-const filed = (
-  step: StepSpec,
-  t: { start?: StartFound; workspace?: string; run?: Partial<Run>; own?: Record<string, unknown> } = {},
-) =>
+const filed = (step: StepSpec, t: { start?: StartFound; workspace?: string; run?: Partial<Run>; own?: Record<string, unknown> } = {}) =>
   filedConfig(
     step,
     [step],
@@ -107,6 +104,10 @@ describe('filedConfig in a home: where the session starts, the workspace beside 
   });
   test('the switches of a mount never reach the runtime, which takes a path, a mode and `ruled` alone', () => {
     const config = filed(DESIGN, { workspace: WS, start: found(), run: { volumes: [{ path: '/vol', readOnly: true, claudeMd: true }] } });
-    for (const m of config.mounts ?? []) assert.deepEqual(Object.keys(m).filter((k) => !['path', 'readOnly', 'ruled'].includes(k)), []);
+    for (const m of config.mounts ?? [])
+      assert.deepEqual(
+        Object.keys(m).filter((k) => !['path', 'readOnly', 'ruled'].includes(k)),
+        [],
+      );
   });
 });

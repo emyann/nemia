@@ -100,7 +100,8 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
   if (!names?.length) return undefined;
   const picked = pickedProjectMcp(mcpFolderOf(r.cwd, r.config), names);
   const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
-  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(mcpFolderOf(r.cwd, r.config), '.mcp.json')}, picked by \`projectMcp\`.`);
+  if (refused)
+    throw new Error(`${refused} It is an entry of ${path.resolve(mcpFolderOf(r.cwd, r.config), '.mcp.json')}, picked by \`projectMcp\`.`);
   return picked as Record<string, McpServer>;
 };
 

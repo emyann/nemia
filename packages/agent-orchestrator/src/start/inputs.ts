@@ -207,7 +207,7 @@ const homeLines = (step: Pick<StepSpec, 'harness'>, run: Partial<Pick<Run, 'home
   !isRemoteHarness(step.harness) &&
   declarationOf(step.harness ?? DEFAULT_HARNESS)?.can.includes('writableMount') === true
     ? [
-        `Your session starts in your factory's home, its CLAUDE.md and its skills yours, which you may read and must not write. The folder you work on is your workspace, added beside it${workspace === undefined ? '' : `, ${workspace}`}, whose path is in \`$WF_WORKSPACE\`: before your first command, move there by its path as it stands${workspace === undefined ? '' : ` (\`cd ${workspace}\`)`}, never through the variable, which no rule can name. Your checks run there and your work is committed there.`,
+        `Your session starts in your factory's home, its instructions and its skills yours, which you may read and must not write. The folder you work on is your workspace, added beside it${workspace === undefined ? '' : `, ${workspace}`}, whose path is in \`$WF_WORKSPACE\`: before your first command, move there by its path as it stands${workspace === undefined ? '' : ` (\`cd ${workspace}\`)`}, never through the variable, which no rule can name. Your checks run there and your work is committed there.`,
       ]
     : [];
 

@@ -45,7 +45,7 @@ export const inWorkspace: InWorkspace = (rule, workspace) => {
 };
 
 /**
- * Which added folders' memory files Claude Code loads: none unless a person switched one on, and then every folder left off skipped.
+ * Which added folders' memory files the harness loads: none unless a person switched one on, and then every folder left off skipped.
  * @param folders Each folder added to the session, and whether its memory files are switched on.
  */
 export const memoryFilesOf: MemoryFilesOf = (folders) => {

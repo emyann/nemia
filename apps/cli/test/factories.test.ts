@@ -106,7 +106,10 @@ describe('a person files a factory, wires its parts, sees each in the listing, a
     const switched = new RegExp(`^mill  volume ${notes} :ro --claude-md on --skills off$`, 'm');
     assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro', '--claude-md', 'on', '--skills', 'off']), switched);
     assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro']), switched);
-    assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro', '--skills', 'on']), new RegExp(`^mill  volume ${notes} :ro --claude-md on$`, 'm'));
+    assert.match(
+      await out(['factory', 'volume', 'add', 'mill', 'notes:ro', '--skills', 'on']),
+      new RegExp(`^mill  volume ${notes} :ro --claude-md on$`, 'm'),
+    );
     await out(['factory', 'volume', 'rm', 'mill', 'notes']);
   });
   s.test('`factory setting` and `cost-line` set and take off what the runs are given, each seen in the listing', async () => {

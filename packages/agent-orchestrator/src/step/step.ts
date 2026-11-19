@@ -665,8 +665,8 @@ export const SKILLS_FOLDER = 'skills';
 export const CARRIED_FOLDER = 'carried';
 
 /**
- * The folder of a factory's tree, and of the template it is applied from, that is the factory's home: where a run's Claude Code sessions
- * start, its `CLAUDE.md`, `.claude/` and `.mcp.json` theirs. Copied byte for byte from the template's into the tree's, and frozen per run
+ * The folder of a factory's tree, and of the template it is applied from, that is the factory's home: where a run's local sessions
+ * start, its project files theirs. Copied byte for byte from the template's into the tree's, and frozen per run
  * at `nemia start` under `runs/<id>/home/<hex>/` (`freezeHomeFiles`), read-only to every session.
  */
 export const HOME_FOLDER = 'home';

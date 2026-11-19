@@ -303,12 +303,12 @@ const runFields = {
   carriedFiles: Schema.optional(Schema.String),
   /**
    * The digest's hex of the run's own copy of its factory's home (`homeFilesDir` in frozen.store.ts), the tree's `home/` taken at
-   * `nemia start`: the folder each local Claude Code session of the run starts in, its workspace added beside it (`sessionStart`).
+   * `nemia start`: the folder each local session of the run starts in, its workspace added beside it (`sessionStart`).
    * Absent: the factory has no home, or the run started before homes were, and its sessions start in their workspace.
    */
   homeFiles: Schema.optional(Schema.String),
   /**
-   * The switches of the volume the run works on, frozen at start from the factory's file (`switchesOf`): whether its CLAUDE.md files
+   * The switches of the volume the run works on, frozen at start from the factory's file (`switchesOf`): whether its memory files
    * load (`claudeMd`) and whether its skills are offered (`skills`) to a session that starts in the home. Absent: the defaults.
    */
   worked: Schema.optional(

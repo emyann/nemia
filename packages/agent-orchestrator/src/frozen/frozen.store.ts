@@ -9,6 +9,7 @@
  * removes the copy with the run.
  */
 import { createHash } from 'node:crypto';
+import { ADDED_FOLDER_READS } from 'agent-runtime/vocabulary';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
@@ -37,8 +38,9 @@ export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: strin
 export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => carriedFilesRoot(runsDir(home), run.id, hex);
 
 /**
- * The run's own copies of its factory's home, `runs/<id>/home`, and with `hex` the one copy under that digest (`Run.homeFiles`): the
- * folder each local Claude Code session of the run starts in (`sessionStart`). Beside the run's record, and removed with it (`nemia rm`).
+ * The run's own copies of its factory's home, `runs/<id>/home`, and with `hex` the one copy under that digest (`Run.homeFiles`): the folder
+ * each local session of the run starts in, where its harness adds its workspace beside it (`sessionStart`). Beside the run's record, and
+ * removed with it (`nemia rm`).
  * @param home The store's home folder.
  * @param run The run, by its id.
  * @param hex The digest of one copy, or undefined for the folder of every copy.
@@ -49,8 +51,7 @@ export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): 
  * The home folder of a factory's tree (`tree`), `home/` in it, where its template gave one.
  * @param tree The factory's tree, or undefined for a factory made by hand, which has none.
  */
-export const homeDirOf = (tree: string | undefined): string | undefined =>
-  tree === undefined ? undefined : path.join(tree, HOME_FOLDER);
+export const homeDirOf = (tree: string | undefined): string | undefined => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
 
 /**
  * Every file of the factory's home in its tree (`homeDirOf`), read and refused as `workflowFilesOf` reads and refuses them; undefined
@@ -159,8 +160,8 @@ export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined 
 };
 
 /**
- * Copies `files`, a folder as read, into the run's copies of its workflow folder, of its carried files or of its home (`which`), under its digest, as
- * `freezeWorkflowFiles` says; answers the hex.
+ * Copies `files`, a folder as read, into the run's copies of its workflow folder, of its carried files or of its home (`which`), under its
+ * digest, as `freezeWorkflowFiles` says; answers the hex.
  */
 function freezeInto(home: string, files: readonly WorkflowFile[], run: Pick<Run, 'id'>, which: 'workflow' | 'carried' | 'home'): string {
   const hex = workflowFilesDigest(files);
@@ -213,18 +214,20 @@ export const startFoundAt = (
 };
 
 /**
- * The names of the skills of a folder's Claude Code project, each folder of its `.claude/skills` that holds a `SKILL.md`, sorted; none
- * where it has none or cannot be read.
+ * The names of the skills a harness lists of a folder, each folder of its skills folder (`ADDED_FOLDER_READS`' `skills`) that holds a
+ * `SKILL.md`, sorted, once each; none where it has none or cannot be read.
  * @param folder The folder.
  */
 const projectSkillsIn = (folder: string): string[] => {
-  const dir = path.join(folder, '.claude', 'skills');
-  try {
-    return fs
-      .readdirSync(dir)
-      .filter((name) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true)
-      .sort();
-  } catch {
-    return [];
+  const names = new Set<string>();
+  for (const reads of Object.values(ADDED_FOLDER_READS)) {
+    const dir = path.join(folder, ...reads.skills);
+    try {
+      for (const name of fs.readdirSync(dir))
+        if (fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true) names.add(name);
+    } catch {
+      continue;
+    }
   }
+  return [...names].sort();
 };

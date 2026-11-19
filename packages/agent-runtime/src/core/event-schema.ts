@@ -67,7 +67,11 @@ const harnessArgs = {
   env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   niceness: Schema.optional(Schema.Finite),
   terminationMessagePath: Schema.optional(Schema.String),
-  mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, ruled: Schema.optional(Schema.Literal(true)) })))),
+  mounts: Schema.optional(
+    Schema.mutable(
+      Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, ruled: Schema.optional(Schema.Literal(true)) })),
+    ),
+  ),
   callAdmission: Schema.optional(Schema.Struct({ command: Strings, tools: Strings })),
   mayAsk: Schema.optional(Schema.Boolean),
   enabledSkills: Schema.optional(Schema.Union([Strings, Schema.Literal('default')])),

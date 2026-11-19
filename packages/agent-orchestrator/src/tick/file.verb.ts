@@ -73,7 +73,17 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
-import { filedAt, sessionCwd, foldersTold, placeTold, toldOf, type RunRead, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
+import {
+  filedAt,
+  sessionCwd,
+  foldersTold,
+  placeTold,
+  toldOf,
+  type RunRead,
+  type PlaceTold,
+  type StepTold,
+  type Told,
+} from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 

@@ -207,8 +207,14 @@ const ROWS: { name: string; check: () => void }[] = [
         config: { ...RICH.config, mounts: [...(RICH.config?.mounts ?? []), { path: '/ws', readOnly: false, ruled: true }] },
       });
       assert.deepEqual(given.additionalDirectories, ['/ro', '/rw', '/ws']);
-      assert.equal(given.allowedTools?.some((rule) => rule.includes('//ws')), false);
-      assert.equal(given.disallowedTools?.some((rule) => rule.includes('//ws')), false);
+      assert.equal(
+        given.allowedTools?.some((rule) => rule.includes('//ws')),
+        false,
+      );
+      assert.equal(
+        given.disallowedTools?.some((rule) => rule.includes('//ws')),
+        false,
+      );
     },
   },
   {

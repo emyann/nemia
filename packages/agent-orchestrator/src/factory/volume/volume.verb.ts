@@ -30,6 +30,13 @@ import type { PlaceTrust } from '../../trust/trust.ts';
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
+ * How the command line spells a volume's switch, as `objects`' words of `nemia factory volume add` name it.
+ * @param key The switch's key.
+ */
+const flagOf = (key: 'claudeMd' | 'skills'): string =>
+  FACTORY_VOLUME_ADD_WORDS.spec.flags.find((f) => 'key' in f && f.key === key)?.flag ?? key;
+
+/**
  * A volume's switch under `key` as given: true for `on` (or true, over the api), false for `off` (or false), undefined where it is not
  * given, or why it is neither, a string.
  * @param args The command's arguments.
@@ -122,9 +129,9 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
       const home = yield* StoreRoot;
       const spelled = volumeOf(textOf(args, 'volume'), process.cwd(), home);
       if (typeof spelled === 'string') return yield* Effect.fail(new Invalid({ message: spelled }));
-      const claudeMd = switchOf(args, 'claudeMd', '--claude-md');
+      const claudeMd = switchOf(args, 'claudeMd', flagOf('claudeMd'));
       if (typeof claudeMd === 'string') return yield* Effect.fail(new Invalid({ message: claudeMd }));
-      const skills = switchOf(args, 'skills', '--skills');
+      const skills = switchOf(args, 'skills', flagOf('skills'));
       if (typeof skills === 'string') return yield* Effect.fail(new Invalid({ message: skills }));
       const volume: Volume = {
         ...spelled,

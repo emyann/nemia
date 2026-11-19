@@ -121,8 +121,8 @@ export type Factory = {
 export type Volume = { path: string; readOnly: boolean; name?: string; origin?: string } & VolumeSwitches;
 
 /**
- * What a volume gives the factory's sessions, which start in its home where it has one: `claudeMd`, whether its CLAUDE.md files load
- * (absent is off), and `skills`, whether the skills of its `.claude/skills` are offered (absent is on). A person's settings, kept on the
+ * What a volume gives the factory's sessions, which start in its home where it has one: `claudeMd`, whether its memory files load
+ * (absent is off), and `skills`, whether the skills its harness lists of it are offered (absent is on). A person's settings, kept on the
  * volume in the factory's own file, which no proposal changes; stored only where given.
  */
 export type VolumeSwitches = { claudeMd?: boolean; skills?: boolean };

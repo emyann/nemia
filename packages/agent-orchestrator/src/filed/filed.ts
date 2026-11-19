@@ -9,7 +9,7 @@ import { stepMounts } from '../factory/factory.ts';
 import { volumeMounts } from '../factory/volume/volume.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, declarationOf, isRemoteHarness } from '../harness/harness.ts';
-import { fenceReach, unruledIn } from 'agent-runtime/vocabulary';
+import { addedFolderReadsOf, fenceReach, unruledIn } from 'agent-runtime/vocabulary';
 import { filedSettings, SETTINGS_HARNESS } from '../harness-settings/harness-settings.ts';
 import { splitServers, type FactoryServer, type FactoryServers } from '../factory/servers/index.ts';
 import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
@@ -86,44 +86,81 @@ export const filedConfig = <Own extends object>(
     sessionToken?: string;
   },
 ) => {
-  const ws = t.workspace;
-  const start = ws === undefined ? undefined : startOf(step, ws, t.start);
-  const worked = start?.worked ?? null;
-  const rule = (r: string): string =>
-    ws === undefined ? r : worked !== null ? inWorkspace(r, ws) : r.split(WORKSPACE_EXPRESSION).join(ws);
   const others = [...(stepMounts(step, run.mounts) ?? []), ...volumeMounts(step, run.volumes), ...folders(filedFolders(step, steps, t))];
-  const mounts =
-    worked === null || start === undefined
-      ? others
-      : [worked, ...others.filter((m) => m.path !== worked.path && m.path !== start.cwd)];
-  const memory = worked === null ? undefined : memoryFilesOf(memoryFolders(mounts, worked.path, run));
-  const own = ownWith(step, run.harnessSettings, t.own);
+  const placed = placedOf(step, run, t, others);
   return {
     model: t.model,
     effort: step.effort,
     contextTokens: sessionContext(step, steps),
     permissionMode: modeOf(step),
     tools: step.tools,
-    disallowedTools: withRules(filedDenies(step, run, t.landingDenied), rule, start?.denies ?? []),
-    allowedTools: withRules(filedAllows(step, t.runArtifacts), rule, []),
+    disallowedTools: withRules(filedDenies(step, run, t.landingDenied), placed.rule, placed.denies),
+    allowedTools: withRules(filedAllows(step, t.runArtifacts), placed.rule, []),
     budgetUsd: t.budgetUsd,
-    ...mountsOf(mounts.map(mountOf)),
+    ...mountsOf(placed.mounts.map(mountOf)),
     ...serversOf(step, t.servers),
-    ...(worked === null || start === undefined ? {} : { projectMcpFrom: t.start?.mcp === true ? start.cwd : worked.path }),
-    ...stepFilesEnv(step, t.runArtifacts, { workflowFiles: t.workflowFiles, carriedFiles: t.carriedFiles }, run.labels, t.sessionToken, {
-      ...(worked === null ? {} : { [WORKSPACE]: worked.path }),
-      ...(memory?.load === true ? { [ADDED_MEMORY]: '1' } : {}),
-    }),
-    ...(worked === null || start === undefined
-      ? own
-      : inHomeOwn(own, step, homeSkills(t.start, mounts, worked.path, run), memory?.excludes ?? [])),
+    ...placed.servedFrom,
+    ...stepFilesEnv(
+      step,
+      t.runArtifacts,
+      { workflowFiles: t.workflowFiles, carriedFiles: t.carriedFiles },
+      run.labels,
+      t.sessionToken,
+      placed.env,
+    ),
+    ...placed.own(ownWith(step, run.harnessSettings, t.own)),
+  };
+};
+
+/**
+ * What a step's filing takes of where its session starts (`startOf`): how each of its rules is read (`rule`), what it is denied for its
+ * start, its mounts with the workspace first where it starts in the home, the folder its project servers are read from, its environment's
+ * part, and its own arguments' (`inHomeOwn`). As before homes were for a session in its workspace, but a `${{ workspace }}` put in.
+ */
+const placedOf = (
+  step: StepSpec,
+  run: Pick<Run, 'harnessSettings'> & Partial<Pick<Run, 'worked'>>,
+  t: { workspace?: string; start?: StartFound },
+  others: Mount[],
+): {
+  rule: (r: string) => string;
+  denies: readonly string[];
+  mounts: Mount[];
+  servedFrom: { projectMcpFrom?: string };
+  env: Record<string, string>;
+  own: <Own extends object>(own: Own) => Own;
+} => {
+  const ws = t.workspace;
+  const start = ws === undefined ? undefined : startOf(step, ws, t.start);
+  const worked = start?.worked ?? null;
+  if (ws === undefined || start === undefined || worked === null)
+    return {
+      rule: (r) => (ws === undefined ? r : r.split(WORKSPACE_EXPRESSION).join(ws)),
+      denies: [],
+      mounts: others,
+      servedFrom: {},
+      env: {},
+      own: (own) => own,
+    };
+  const mounts = [worked, ...others.filter((m) => m.path !== worked.path && m.path !== start.cwd)];
+  const reads = addedFolderReadsOf(step.harness ?? DEFAULT_HARNESS);
+  const memory = reads === undefined ? undefined : memoryFilesOf(memoryFolders(mounts, worked.path, run));
+  const load = memory?.load === true && reads !== undefined ? { [reads.memoryEnv]: '1' } : {};
+  const skills = homeSkills(t.start, mounts, worked.path, run);
+  return {
+    rule: (r) => inWorkspace(r, ws),
+    denies: start.denies,
+    mounts,
+    servedFrom: { projectMcpFrom: t.start?.mcp === true ? start.cwd : worked.path },
+    env: { [WORKSPACE]: worked.path, ...load },
+    own: (own) => inHomeOwn(own, step, skills, { key: reads?.memoryExcludes, excludes: memory?.excludes ?? [] }),
   };
 };
 
 /**
  * What the filing found on disk of where a step's session starts, for a run that froze a home: the run's copy of its factory's home
  * (`home`, absolute), whether it holds a `.mcp.json` (`mcp`), and the skills of each folder that may be added to the session, by its
- * path: the home's, the workspace's and each mounted volume's, each the names of its `.claude/skills/<name>/SKILL.md`.
+ * path: the home's, the workspace's and each mounted volume's, each the names of the skills its harness lists there (`addedFolderReadsOf`).
  */
 export type StartFound = { home: string; mcp: boolean; skills: Readonly<Record<string, readonly string[]>> };
 
@@ -144,17 +181,14 @@ export const startOf = (step: StepSpec, workspace: string, found: StartFound | u
   });
 
 /** A list of rules each read by `rule`, with `more` after them; undefined where there was no list and nothing more, as before. */
-const withRules = (
-  rules: readonly string[] | undefined,
-  rule: (r: string) => string,
-  more: readonly string[],
-): string[] | undefined => (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]);
+const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]): string[] | undefined =>
+  rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more];
 
 /** A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's. */
 const mountOf = (m: Mount): Mount => ({ path: m.path, readOnly: m.readOnly, ...(m.ruled === true ? { ruled: true as const } : {}) });
 
 /**
- * Each folder added to a session in the home, and whether its CLAUDE.md files are switched on: the workspace by the volume the run works
+ * Each folder added to a session in the home, and whether its memory files are switched on: the workspace by the volume the run works
  * on (`run.worked`), each other by its own frozen switch.
  */
 const memoryFolders = (mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>): { path: string; claudeMd: boolean }[] =>
@@ -164,12 +198,7 @@ const memoryFolders = (mounts: readonly Mount[], workspace: string, run: Pick<Ru
  * The skills a session in the home is offered beside its step's own: the home's, then each added folder's (`found.skills`) whose volume
  * does not switch its skills off, the workspace's by the volume the run works on.
  */
-const homeSkills = (
-  found: StartFound | undefined,
-  mounts: readonly Mount[],
-  workspace: string,
-  run: Pick<Run, 'worked'>,
-): string[] => {
+const homeSkills = (found: StartFound | undefined, mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>): string[] => {
   if (found === undefined) return [];
   const offered = mounts.filter((m) => (m.path === workspace ? run.worked?.skills !== false : m.skills !== false));
   return [...(found.skills[found.home] ?? []), ...offered.flatMap((m) => found.skills[m.path] ?? [])];
@@ -177,13 +206,20 @@ const homeSkills = (
 
 /**
  * A step's own harness arguments for a session in the home: its closed list of skills (`enabledSkills`) with `skills` added, and its
- * Claude Code settings given `claudeMdExcludes` where an added folder's memory files load and others are skipped. A list left open
- * (`'default'`) stays open; settings given as a file, which nothing rewrites, are left as they are.
+ * harness's settings given the folders whose memory files are skipped (`skipped.excludes`, under the setting its harness reads them by,
+ * `skipped.key`) where an added folder's load. A list left open (`'default'`) stays open; settings given as a file, which nothing
+ * rewrites, are left as they are.
  */
-function inHomeOwn<Own extends object>(own: Own, step: Pick<StepSpec, 'harness'>, skills: readonly string[], excludes: readonly string[]): Own {
+function inHomeOwn<Own extends object>(
+  own: Own,
+  step: Pick<StepSpec, 'harness'>,
+  skills: readonly string[],
+  skipped: { key: string | undefined; excludes: readonly string[] },
+): Own {
+  const { key, excludes } = skipped;
   const listed: unknown = Reflect.get(own, 'enabledSkills');
   const withSkills = Array.isArray(listed) && skills.length ? { ...own, enabledSkills: [...new Set([...listed, ...skills])] } : own;
-  if (!excludes.length) return withSkills;
+  if (!excludes.length || key === undefined) return withSkills;
   const harness = step.harness ?? DEFAULT_HARNESS;
   const rendered: unknown = Reflect.get(withSkills, harness);
   const flags = typeof rendered === 'object' && rendered !== null ? rendered : {};
@@ -195,7 +231,7 @@ function inHomeOwn<Own extends object>(own: Own, step: Pick<StepSpec, 'harness'>
     return withSkills;
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return withSkills;
-  const settings = JSON.stringify({ ...parsed, claudeMdExcludes: excludes });
+  const settings = JSON.stringify({ ...parsed, [key]: excludes });
   return { ...withSkills, [harness]: { ...flags, settings } };
 }
 
@@ -204,12 +240,6 @@ function inHomeOwn<Own extends object>(own: Own, step: Pick<StepSpec, 'harness'>
  * checks run and its work is committed.
  */
 export const WORKSPACE = 'WF_WORKSPACE';
-
-/**
- * Claude Code's variable that loads the memory files (CLAUDE.md) of every folder added to a session (`--add-dir`): set only where a
- * person switched a volume's on, the others skipped by `claudeMdExcludes` (`memoryFilesOf`).
- */
-const ADDED_MEMORY = 'CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD';
 
 /**
  * A step's own harness arguments with its factory's harness settings (`frozen`, the run's) given on a step on the harness they are for

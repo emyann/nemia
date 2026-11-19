@@ -365,7 +365,7 @@ test('the refused-call paragraph is in RULES.md, which every step holds, and in 
   assert.deepEqual(refusedCallCopies(prompts), ['agents/argus/instructions.md']);
 });
 
-test("the read-only agents may move into their workspace, once its path is put in at filing, and nowhere else", () => {
+test('the read-only agents may move into their workspace, once its path is put in at filing, and nowhere else', () => {
   const workspace = '/wt/run';
   for (const way of ['shipped', 'github'])
     for (const agent of READ_ONLY) {

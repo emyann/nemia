@@ -41,7 +41,14 @@ import { runsAtOnce } from '../runs/runs.store.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { artifactsDir, cardsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
-import { carriedFilesOf, freezeCarriedFiles, freezeHomeFiles, freezeWorkflowFiles, homeFilesOf, workflowFilesOf } from '../frozen/frozen.store.ts';
+import {
+  carriedFilesOf,
+  freezeCarriedFiles,
+  freezeHomeFiles,
+  freezeWorkflowFiles,
+  homeFilesOf,
+  workflowFilesOf,
+} from '../frozen/frozen.store.ts';
 import { PlaceService, openPlace } from '../place/place.store.ts';
 import { parentRecord } from '../steps/steps.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
@@ -640,8 +647,9 @@ function renderAgents(
   run: Run,
   steps: readonly StepSpec[],
   found: SkillsFound,
-  tree: string | undefined,
+  factory: Factory | undefined,
 ): Pick<Run, 'workflowFiles' | 'carriedFiles' | 'homeFiles'> {
+  const tree = factory?.tree;
   let what = `the steps' agents could not be rendered into ${path.join(runsDir(home), run.id, 'agents')}`;
   try {
     writeAgentFiles(home, run, steps, found);
@@ -666,15 +674,27 @@ function renderAgents(
 }
 
 /**
- * The switches of the volume a run in `factory` works on (`repo`), as the run freezes them (`switchesOf`); undefined where they are the
- * defaults, the run works on no volume of the factory, or it is in none.
+ * The switches of the volume `run` in `factory` works on, its repository, as the run freezes them (`switchesOf`), as the record's
+ * `worked`; none where they are the defaults, the run works on no volume of the factory or on no repository, or it is in no factory.
  */
-const workedSwitches = (factory: Factory | undefined, repo: string | undefined): Run['worked'] => {
-  if (factory === undefined || repo === undefined) return undefined;
-  const at = path.resolve(repo);
+const workedSwitches = (factory: Factory | undefined, run: Run): Pick<Run, 'worked'> => {
+  if (factory === undefined || !isRepositoryRun(run)) return {};
+  const at = path.resolve(run.repo);
   const volume = factory.volumes.find((v) => !v.readOnly && path.resolve(v.path) === at);
   const switches = volume === undefined ? {} : switchesOf(volume);
-  return Object.keys(switches).length ? switches : undefined;
+  return Object.keys(switches).length ? { worked: switches } : {};
+};
+
+/**
+ * Reads, and refuses as `workflowFilesOf` refuses, every folder a start freezes: the workflow's, the carried folder beside it, and the
+ * factory's home where its tree holds one; before the run has an id, so a link refuses the start with nothing written.
+ * @param workflowDir The workflow's folder.
+ * @param factory The run's factory, whose tree holds its home; none for the default factory.
+ */
+const frozenRead = (workflowDir: string, factory: Factory | undefined): void => {
+  workflowFilesOf(workflowDir);
+  carriedFilesOf(workflowDir);
+  homeFilesOf(factory?.tree);
 };
 
 /**
@@ -831,9 +851,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const cards = yield* cardsOf(opts.cards ?? [], inputs);
-  yield* tried(() => workflowFilesOf(opts.workflowDir));
-  yield* tried(() => carriedFilesOf(opts.workflowDir));
-  yield* tried(() => homeFilesOf(factory?.tree));
+  yield* tried(() => frozenRead(opts.workflowDir, factory));
   let id = runId(opts.brief);
   while (runsAtOnce(home).runs.taken(id)) id = runId(opts.brief);
   const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], (runId) => runsAtOnce(home).runs.exists(runId), id);
@@ -850,9 +868,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : repositoryRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(home, run, inputs, cards));
-  Object.assign(run, yield* tried(() => renderAgents(home, run, steps, found, factory?.tree)));
-  const worked = workedSwitches(factory, folder ? undefined : opts.repo);
-  if (worked !== undefined) run.worked = worked;
+  Object.assign(run, yield* tried(() => renderAgents(home, run, steps, found, factory)));
+  Object.assign(run, workedSwitches(factory, run));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
   yield* (yield* RunDoor).runs.create(run);

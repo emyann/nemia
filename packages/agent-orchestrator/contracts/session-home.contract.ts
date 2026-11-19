@@ -76,8 +76,7 @@ const sessionStartSpec = spec<(i: SessionPlaceOf) => SessionStart>({
     },
     homeReadOnly: {
       description: 'A session in the home may write nothing there: the home changes only by a proposal',
-      condition: ({ input: [i], output }) =>
-        !startsInHome(i) || (i.home !== undefined && output.denies.includes(editDenied(i.home))),
+      condition: ({ input: [i], output }) => !startsInHome(i) || (i.home !== undefined && output.denies.includes(editDenied(i.home))),
     },
     deniesOnlyTheHome: {
       description: 'The start denies nothing but the home',
@@ -116,9 +115,8 @@ const inWorkspaceSpec = spec<(rule: string, workspace: string) => string>({
   requires: ({ input: [, workspace] }) => workspace.startsWith('/') && !workspace.includes(WORKSPACE_EXPRESSION),
   ensures: {
     expressionExpanded: {
-      description: 'A rule that names `${{ workspace }}` names the step\'s workspace in its place, wherever it stands in the rule',
-      condition: ({ input: [rule, workspace], output }) =>
-        !rule.includes(WORKSPACE_EXPRESSION) || output === expanded(rule, workspace),
+      description: "A rule that names `${{ workspace }}` names the step's workspace in its place, wherever it stands in the rule",
+      condition: ({ input: [rule, workspace], output }) => !rule.includes(WORKSPACE_EXPRESSION) || output === expanded(rule, workspace),
     },
     relativeFileRuleInTheWorkspace: {
       description:

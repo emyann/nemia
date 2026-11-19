@@ -166,7 +166,7 @@ const ROOT_FILES = ['nemia.yaml', 'NEMIA.md', 'RULES.md', 'nemia.lock.yaml'];
 const LAYOUT =
   "A template holds nemia.yaml, NEMIA.md, RULES.md and nemia.lock.yaml at its root; workflows/<workflow>/workflow.yaml, its steps' <step>.md, " +
   'README.md and any file that is not .md or .yaml; agents/<agent>/agent.yaml, instructions.md and output.schema.json; ' +
-  'skills/<skill>/SKILL.md and anything beside it; carried/ and any file in it, the files its workflows share; and a file a {path:} names';
+  'skills/<skill>/SKILL.md and anything beside it; carried/ and any file in it, the files its workflows share; home/ and any file in it, the home its sessions start in; and a file a {path:} names';
 
 /**
  * Whether `rest`, a file's path in a workflow's folder after the folder's name, is one the layout gives it: the workflow's document and a
@@ -198,6 +198,7 @@ export const inLayout: InLayout = (file, named) => {
   if (named.has(file) || ROOT_FILES.includes(file)) return true;
   if (!file.includes('/')) return false;
   if (file.startsWith('carried/')) return file.length > 'carried/'.length && !file.endsWith('/');
+  if (file.startsWith('home/')) return file.length > 'home/'.length && !file.endsWith('/');
   if (file.startsWith('workflows/')) {
     const rest = pastFolder(file.slice('workflows/'.length));
     return rest !== undefined && inWorkflow(rest);

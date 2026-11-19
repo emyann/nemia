@@ -46,6 +46,16 @@ export const FactoryVolume = Schema.Struct({
   origin: Schema.optionalKey(
     Schema.String.annotate({ description: 'The git URL the folder was cloned from; absent where it was given by its path.' }),
   ),
+  claudeMd: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the volume's CLAUDE.md files reach the factory's sessions; absent is off.",
+    }),
+  ),
+  skills: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the skills of the volume's .claude/skills are offered to the factory's sessions; absent is on.",
+    }),
+  ),
 });
 export type FactoryVolume = typeof FactoryVolume.Type;
 
@@ -443,6 +453,16 @@ export const VolumeWrite = Schema.Struct({
       'The folder of the machine the api runs on, by its whole path, or a git URL it clones, marked :ro or :rw, as `nemia factory volume add` spells it.',
   }),
   noTrust: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Whether to leave a writable volume untrusted.' })),
+  claudeMd: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the volume's CLAUDE.md files reach the factory's sessions; absent keeps what it had, off for a new one.",
+    }),
+  ),
+  skills: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description: "Whether the volume's skills are offered to the factory's sessions; absent keeps what it had, on for a new one.",
+    }),
+  ),
 });
 export type VolumeWrite = typeof VolumeWrite.Type;
 

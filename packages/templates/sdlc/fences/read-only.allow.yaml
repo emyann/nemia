@@ -2,6 +2,9 @@
 # the text tools. Every line is a read that writes none of the repository's history, its refs or its configuration; what a line
 # would still let git write or run by is denied beside it, in read-only.deny.yaml. An allow is matched by its prefix, so each verb is
 # named alone: `git` whole, `git worktree` whole or `git branch` whole would reach a write.
+# Into the step's workspace, by its path, and nowhere else: a session that starts in its factory's home moves there before its first
+# read, and a session already there stays. `${{ workspace }}` is the workspace's path, put in at filing.
+- Bash(cd ${{ workspace }})
 - Bash(git diff:*)
 - Bash(git diff-tree:*)
 - Bash(git log:*)

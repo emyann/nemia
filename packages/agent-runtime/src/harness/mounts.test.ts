@@ -88,7 +88,31 @@ const ROWS: Row[] = [
     name: 'a key a mount has not',
     at: 'core',
     config: { mounts: [{ path: '/srv/a', readOnly: true, mode: 'ro' }] },
-    says: [/^`mounts` holds a mount with `mode`/, /`path` and `readOnly` alone/],
+    says: [/^`mounts` holds a mount with `mode`/, /`path`, `readOnly` and `ruled` alone/],
+  },
+  {
+    name: 'a mount ruled by the task and read-only, which the harness holds by its own deny',
+    at: 'core',
+    config: { mounts: [{ path: '/srv/a', readOnly: true, ruled: true }] },
+    says: [/^`mounts` holds \/srv\/a read-only and ruled/, /`readOnly: false` with `ruled: true`/],
+  },
+  {
+    name: 'a `ruled` that is not true',
+    at: 'core',
+    config: { mounts: [{ path: '/srv/a', readOnly: false, ruled: false }] },
+    says: [/^`mounts` holds \/srv\/a with `ruled: false`/],
+  },
+  {
+    name: 'a writable mount ruled by the task is filed on Claude Code',
+    at: 'core',
+    config: { mounts: [{ path: '/srv/a', readOnly: false, ruled: true }] },
+  },
+  {
+    name: 'a ruled mount on Codex, which writes only its workspace',
+    at: 'engine',
+    harness: 'codex',
+    config: { mounts: [{ path: '/srv/a', readOnly: false, ruled: true }] },
+    says: [/^`mounts` gives the session \/srv\/a writable, and the `codex` harness/],
   },
   {
     name: 'a path given twice',

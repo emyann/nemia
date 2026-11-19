@@ -492,7 +492,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory server rm <factory> <server>
                                take a server off a factory's record
                                on the port: factory_server_rm
-  nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust]
+  nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust] [--claude-md on|off] [--skills on|off]
                                give a factory a volume: a folder or a git URL, read-only (:ro) or writable
                                (:rw), a writable one a repository it works on, trusted unless --no-trust
                                on the port: factory_volume_add

@@ -24,7 +24,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { filedFolders, type FiledFolders, type HandedRunFolders } from '../filed/filed.ts';
+import { filedFolders, startOf, type FiledFolders, type HandedRunFolders, type StartFound } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
@@ -59,7 +59,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir, isDirectory } from '../record/record.store.ts';
-import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, startFoundAt, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
@@ -263,15 +263,18 @@ const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] 
   });
 
 /**
- * What a step of `run` is filed with (`filedConfig`): its folders, and the MCP servers the run's factory records, read from the store
- * `home` the caller was given. The root is a parameter and has no default: a caller that passes none does not compile, so no filing
- * reads a store nobody named (`test/root-given.test.ts`).
+ * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records, read from the store `home`
+ * the caller was given, its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a
+ * parameter and has no default: a caller that passes none does not compile, so no filing reads a store nobody named
+ * (`test/root-given.test.ts`).
  * @param run The run, read down to what names its folders and its factory.
  * @param home The store's root folder.
+ * @param workspace The step's workspace, absolute.
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
+  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles' | 'homeFiles' | 'mounts' | 'volumes'>,
   home: string,
+  workspace: string,
 ): {
   runArtifacts: string;
   inbox: string;
@@ -280,10 +283,29 @@ export const filedAt = (
   carriedFiles?: string;
   runs?: HandedRunFolders[];
   servers: FactoryServers;
+  workspace: string;
+  start?: StartFound;
 } => ({
   ...filedFoldersAt(home, run),
   servers: recordedServers(run.factory, home),
+  workspace,
+  ...startFoundAt(home, run, workspace),
 });
+
+/**
+ * The folder a step's session starts in (`startOf`): the run's copy of its factory's home where it froze one and the step's harness adds
+ * its workspace beside it, else its workspace, as before homes were.
+ * @param step The step filed.
+ * @param run The run: its frozen home, its mounts and its volumes.
+ * @param home The store's root.
+ * @param workspace The step's workspace, absolute.
+ */
+export const sessionCwd = (
+  step: StepSpec,
+  run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>,
+  home: string,
+  workspace: string,
+): string => startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
 
 /**
  * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —

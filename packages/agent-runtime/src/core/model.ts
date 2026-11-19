@@ -72,7 +72,11 @@ export type ExecutionPlace = typeof ExecutionPlace.Type;
  * session may only read it. The harness's `Mount` (`harness/mounts.ts`) in the model; `model.test.ts` holds the two to one shape.
  * Exported only for the tests that import it.
  */
-export const Mount = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({ identifier: 'Mount' });
+export const Mount = Schema.Struct({
+  path: Schema.String,
+  readOnly: Schema.Boolean,
+  ruled: Schema.optional(Schema.Literal(true)),
+}).annotate({ identifier: 'Mount' });
 export type Mount = typeof Mount.Type;
 
 /** A task's harness arguments, as `HarnessArgsSchema` reads them, with its mounts named as the model's. Carried, never read by `decide`. */

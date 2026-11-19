@@ -30,6 +30,8 @@ export const Volume = Schema.Struct({
   readOnly: Schema.Boolean,
   name: Schema.optional(Schema.String),
   origin: Schema.optional(Schema.String),
+  claudeMd: Schema.optional(Schema.Boolean),
+  skills: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: 'Volume' });
 export type Volume = typeof Volume.Type;
 

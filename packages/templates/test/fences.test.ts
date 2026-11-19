@@ -364,3 +364,17 @@ test('the refused-call paragraph is in RULES.md, which every step holds, and in 
   prompts.set('RULES.md', '');
   assert.deepEqual(refusedCallCopies(prompts), ['agents/argus/instructions.md']);
 });
+
+test('the read-only agents may move into their workspace, once its path is put in at filing, and nowhere else', () => {
+  const workspace = '/wt/run';
+  for (const way of ['shipped', 'github'])
+    for (const agent of READ_ONLY) {
+      const { allowed, denied } = fencesOf(way)[agent];
+      const fence = {
+        allow: allowed.map((rule) => rule.split('${{ workspace }}').join(workspace)),
+        deny: denied.map((rule) => rule.split('${{ workspace }}').join(workspace)),
+      };
+      const moves = [`cd ${workspace}`, 'cd /elsewhere', `cd ${workspace}/..`, 'cd ..'].map(bash);
+      assert.deepEqual(runsUnder(fence, moves, { inside: false }), [`Bash(cd ${workspace})`], `${way}: ${agent}`);
+    }
+});

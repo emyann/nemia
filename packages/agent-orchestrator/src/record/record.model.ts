@@ -217,7 +217,13 @@ const Pruned = Schema.Struct({
 });
 
 /** A folder a step may reach beyond its workspace (`Mount`, record.ts). */
-const Mount = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean });
+const Mount = Schema.Struct({
+  path: Schema.String,
+  readOnly: Schema.Boolean,
+  ruled: Schema.optional(Schema.Literal(true)),
+  claudeMd: Schema.optional(Schema.Literal(true)),
+  skills: Schema.optional(Schema.Literal(false)),
+});
 
 /** The store's pause, composed onto every run read (`Pause`, pause/pause.ts). */
 const Pause = Schema.Struct({
@@ -295,6 +301,19 @@ const runFields = {
    * (`renderAgain`); absent where no `carried/` stands beside the workflow's folder.
    */
   carriedFiles: Schema.optional(Schema.String),
+  /**
+   * The digest's hex of the run's own copy of its factory's home (`homeFilesDir` in frozen.store.ts), the tree's `home/` taken at
+   * `nemia start`: the folder each local session of the run starts in, its workspace added beside it (`sessionStart`).
+   * Absent: the factory has no home, or the run started before homes were, and its sessions start in their workspace.
+   */
+  homeFiles: Schema.optional(Schema.String),
+  /**
+   * The switches of the volume the run works on, frozen at start from the factory's file (`switchesOf`): whether its memory files
+   * load (`claudeMd`) and whether its skills are offered (`skills`) to a session that starts in the home. Absent: the defaults.
+   */
+  worked: Schema.optional(
+    Schema.Struct({ claudeMd: Schema.optional(Schema.Literal(true)), skills: Schema.optional(Schema.Literal(false)) }),
+  ),
   /**
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
    * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while

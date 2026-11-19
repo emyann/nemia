@@ -14,7 +14,7 @@ import { clonesOf, FactoryDoor, filedFactory, refuseName } from '../door/factori
 import { tried } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
-import { factoryVolumes, folderName, workedOn, type Factory, type FactoryTemplate, type Volume } from '../factory.ts';
+import { factoryVolumes, folderName, volumeEntry, workedOn, type Factory, type FactoryTemplate, type Volume } from '../factory.ts';
 import { originSetsAt } from '../applied/declared.store.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 import { cloned } from '../clones/clones.verb.ts';
@@ -29,6 +29,28 @@ import type { PlaceTrust } from '../../trust/trust.ts';
 
 /** The text under `key`, as the spec read it. */
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+
+/**
+ * How the command line spells a volume's switch, as `objects`' words of `nemia factory volume add` name it.
+ * @param key The switch's key.
+ */
+const flagOf = (key: 'claudeMd' | 'skills'): string =>
+  FACTORY_VOLUME_ADD_WORDS.spec.flags.find((f) => 'key' in f && f.key === key)?.flag ?? key;
+
+/**
+ * A volume's switch under `key` as given: true for `on` (or true, over the api), false for `off` (or false), undefined where it is not
+ * given, or why it is neither, a string.
+ * @param args The command's arguments.
+ * @param key The switch's key, `claudeMd` or `skills`.
+ * @param flag The switch's flag, said in the refusal.
+ */
+const switchOf = (args: Args, key: 'claudeMd' | 'skills', flag: string): boolean | undefined | string => {
+  const given: unknown = args[key];
+  if (given === undefined || typeof given === 'boolean') return given;
+  if (given === 'on') return true;
+  if (given === 'off') return false;
+  return `${flag} takes on or off, not ${JSON.stringify(given)}: ${flag} on, or ${flag} off. Nothing was changed.`;
+};
 
 /**
  * A volume added: the factory's file written, the volume, what one of its path was marked before (`null` for none), and what was asked
@@ -125,8 +147,17 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
     const name = textOf(args, 'factory');
     return Effect.gen(function* () {
       const home = yield* StoreRoot;
-      const volume = volumeOf(textOf(args, 'volume'), process.cwd(), home);
-      if (typeof volume === 'string') return yield* Effect.fail(new Invalid({ message: volume }));
+      const spelled = volumeOf(textOf(args, 'volume'), process.cwd(), home);
+      if (typeof spelled === 'string') return yield* Effect.fail(new Invalid({ message: spelled }));
+      const claudeMd = switchOf(args, 'claudeMd', flagOf('claudeMd'));
+      if (typeof claudeMd === 'string') return yield* Effect.fail(new Invalid({ message: claudeMd }));
+      const skills = switchOf(args, 'skills', flagOf('skills'));
+      if (typeof skills === 'string') return yield* Effect.fail(new Invalid({ message: skills }));
+      const volume: Volume = {
+        ...spelled,
+        ...(claudeMd === undefined ? {} : { claudeMd }),
+        ...(skills === undefined ? {} : { skills }),
+      };
       yield* tried(() => refuseName(name, 'volume'));
       const door = yield* FactoryDoor;
       const factory = yield* filedFactory(name, 'volume');
@@ -141,7 +172,8 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
       const template = factory.template === undefined || !sets.length ? {} : { template: withSets(factory.template, sets) };
       const file = yield* door.factories.rewrite({ ...factory, volumes, ...template });
       const trusts = yield* volumesTrusted([volume], args.noTrust === true);
-      return { file, volume, was, trusts, ...(sets.length ? { params: sets } : {}) };
+      const stored = volumes.find((v) => path.resolve(v.path) === volume.path) ?? volume;
+      return { file, volume: volumeEntry(stored), was, trusts, ...(sets.length ? { params: sets } : {}) };
     });
   },
 };

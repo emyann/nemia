@@ -63,6 +63,12 @@ function stepIn(tree: string, workflow: string, step: string) {
 /** The check of the step `workflow/step` of `tree`. */
 const checkOf = (tree: string, workflow: string, step: string) => String(stepIn(tree, workflow, step).front.check ?? '');
 
+/**
+ * The one expression an applied tree keeps: a step's workspace, which a rule names and the filing writes (`${{ workspace }}`), where a
+ * parameter's is written at apply.
+ */
+const FILED = '${{ workspace }}';
+
 /** The steps whose check and note differ by way. */
 const WAYS = [
   ['build', 'implement'],
@@ -107,8 +113,12 @@ test('applied with every parameter set, each is written where the template says,
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('a, b'));
   assert.deepEqual(
-    filesUnder(tree).filter((file) => fs.readFileSync(path.join(tree, file), 'utf8').includes('${{')),
+    filesUnder(tree).filter((file) => fs.readFileSync(path.join(tree, file), 'utf8').replaceAll(FILED, '').includes('${{')),
     [],
+  );
+  assert.ok(
+    filesUnder(tree).some((file) => fs.readFileSync(path.join(tree, file), 'utf8').includes(`Bash(cd ${FILED})`)),
+    'the read-only agents keep the workspace for the filing to write',
   );
 });
 

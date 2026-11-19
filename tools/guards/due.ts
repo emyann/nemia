@@ -6,8 +6,8 @@
  * Where a job runs a turbo task, its claims are turbo's own (`claimsOf`): the task's `inputs` in `turbo.json` (`<workspace>#<task>`,
  * else `<task>`, else `$TURBO_DEFAULT$`) and the folders of the workspaces its workspace depends on, followed through `dependencies`
  * and `devDependencies` as `^transit` and `^build` follow them. So turbo's cache and CI's filter are one list. Where a job runs no turbo
- * task (`lint`, `e2e`, `e2e-look`, `contracts <leg>`), its claims are written below (`LINT_SKIPS`, `LINT_CONFIGS`, `WRITTEN`), each held
- * by `test/due.test.ts` to what it is read off.
+ * task (`lint`, `e2e`, `e2e-look`, `contracts <leg>`), its claims are written below (`LINT_SKIPS`, `LINT_CONFIGS`, `LINT_READS`,
+ * `WRITTEN`), each held by `test/due.test.ts` to what it is read off. A typecheck reads its workspace's tests too (`TURBO_JOBS`).
  *
  * `jobDueOf` is the decision, pure, and `dueOf` the decision of one claim. It fails closed: a path in `EVERYWHERE`, or a path no
  * job's claim names, makes every job due. Run as a program from the repository's root, `node tools/guards/due.ts <job>` reads
@@ -65,6 +65,12 @@ export const LINT_SKIPS: readonly string[] = ['md', 'json', 'jsonc', 'yaml', 'ym
 
 /** The files that configure `npm run lint`, read whatever their extension. */
 export const LINT_CONFIGS: readonly string[] = ['.oxlintrc.json', '.oxlintrc.fast.json', '.oxfmtrc.json'];
+
+/**
+ * The JSON `npm run lint` reads wherever it lies, as inputs: its type-aware rules (`typeAware` in `.oxlintrc.json`) resolve types
+ * through each workspace's tsconfig, and resolve an import of a workspace through its manifest.
+ */
+export const LINT_READS: readonly string[] = ['$TURBO_ROOT$/**/tsconfig*.json', '$TURBO_ROOT$/**/package.json'];
 
 /** What every contracts leg reads besides its workspaces: the prover and its legs. */
 export const CONTRACTS_TOOL = '$TURBO_ROOT$/tools/contracts/**';
@@ -260,34 +266,46 @@ export const claimsOf = (root: string): Claims => {
   return claims;
 };
 
+/**
+ * Which turbo task's inputs make which job due, each needing the scripts it names. A workspace's typecheck reads its `test/` too, whose
+ * files import what the tests read outside the workspace (`tools/release`, `tools/observe`, …), so the typecheck claims the `test`
+ * task's inputs as well as its own.
+ */
+const TURBO_JOBS: readonly { job: 'test' | 'typecheck' | 'build'; task: string; scripts: readonly string[] }[] = [
+  { job: 'test', task: 'test', scripts: ['test'] },
+  { job: 'typecheck', task: 'typecheck', scripts: ['typecheck'] },
+  { job: 'typecheck', task: 'test', scripts: ['typecheck', 'test'] },
+  { job: 'build', task: 'build', scripts: ['build'] },
+];
+
 /** The claims of the jobs that run a turbo task, each beside its key, read off `turbo.json` and each workspace's scripts. */
 const turboClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => {
   const tasks = readJson<{ tasks?: Record<string, { inputs?: string[] }> }>(path.join(root, 'turbo.json')).tasks ?? {};
-  const keyOf = (task: string, name: string, folder: string): string => {
-    if (task !== 'test') return task;
+  const keyOf = (job: string, name: string, folder: string): string => {
+    if (job !== 'test') return job;
     return folder === GUARDS ? 'guards' : `test ${name}`;
   };
   return [...workspaces]
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([name, folder]) => {
       const scripts = readJson<Manifest>(path.join(root, folder, 'package.json')).scripts ?? {};
-      return ['test', 'typecheck', 'build']
-        .filter((task) => scripts[task] !== undefined)
-        .map((task): [string, Claim] => [
-          keyOf(task, name, folder),
+      return TURBO_JOBS.filter((each) => each.scripts.every((script) => scripts[script] !== undefined)).map(
+        ({ job, task }): [string, Claim] => [
+          keyOf(job, name, folder),
           {
             inputs: tasks[`${name}#${task}`]?.inputs ?? tasks[task]?.inputs ?? ['$TURBO_DEFAULT$'],
             folder,
             folders: dependencyFolders(root, folder),
           },
-        ]);
+        ],
+      );
     });
 };
 
 /** The claims of the jobs that run no turbo task, each beside its key, from this file's table. */
 const writtenClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => [
   ['lint', { inputs: ['$TURBO_ROOT$/**', ...LINT_SKIPS.map((ext) => `!$TURBO_ROOT$/**/*.${ext}`)], folder: '.', folders: [] }],
-  ['lint', { inputs: LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), folder: '.', folders: [] }],
+  ['lint', { inputs: [...LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), ...LINT_READS], folder: '.', folders: [] }],
   ...Object.entries(WRITTEN).flatMap(([key, names]) => [
     ...names.map((name): [string, Claim] => {
       const folder = workspaces.get(name);

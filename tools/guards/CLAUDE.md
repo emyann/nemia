@@ -9,8 +9,9 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   gate and gitleaks runs `node tools/guards/due.ts <job>` (a matrix leg's `LEG` beside it) before `npm ci`, and conditions every later
   step on its answer. `due.ts` reads the range a push or a pull request changed and says `due=true` when a path is named by one of the
   job's claims: for a job that runs a turbo task, that task's `inputs` in `turbo.json` and the folders of the workspaces its workspace
-  depends on (the guards': `guards#test`, `agent-orchestrator` and through it `agent-runtime`); for `lint`, `e2e`, `e2e-look` and each
-  `contracts <leg>`, the table in `due.ts` (`WRITTEN`, `LINT_SKIPS`, `LINT_CONFIGS`), which `test/due.test.ts` holds to
+  depends on (the guards': `guards#test`, `agent-orchestrator` and through it `agent-runtime`), and for `typecheck` each workspace's
+  `test` inputs besides, since it checks the tests and what they import; for `lint`, `e2e`, `e2e-look` and each
+  `contracts <leg>`, the table in `due.ts` (`WRITTEN`, `LINT_SKIPS`, `LINT_CONFIGS`, `LINT_READS`: every tsconfig and manifest, which the type-aware rules resolve through), which `test/due.test.ts` holds to
   `tools/contracts/legs.ts` and `.oxfmtrc.json`. It fails closed: a path in its `EVERYWHERE` (the lockfile, `turbo.json`, `ci.yml`,
   `due.ts` itself), a path no job claims, an event with no range, a branch's first push and a range git cannot resolve are due for
   every job. An input of a shape it does not read (`{a,b}`, `?`, `[`, a `**` inside a name) is refused, so a new path a test reads goes

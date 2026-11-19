@@ -16,6 +16,7 @@ import {
   EVERYWHERE,
   jobDueOf,
   LINT_CONFIGS,
+  LINT_READS,
   LINT_SKIPS,
   patternOf,
   TASK,
@@ -168,6 +169,10 @@ test("on the repository's own claims, a change reaches the jobs that read it and
       due: ['e2e', 'e2e-look', 'build', 'test web', 'contracts rest'],
       not: ['contracts observe', 'contracts approval-refusal', 'test api'],
     },
+    { file: 'tools/release/release.ts', due: ['typecheck', 'guards', 'lint'], not: ['build', 'e2e', 'contracts rest'] },
+    { file: 'tools/observe/render/seed.ts', due: ['typecheck', 'test agent-orchestrator'], not: ['build', 'e2e'] },
+    { file: 'apps/web/tsconfig.json', due: ['lint', 'typecheck', 'test web'], not: ['contracts observe'] },
+    { file: 'packages/objects/test/tsconfig.json', due: ['lint', 'typecheck'], not: ['contracts observe'] },
   ];
   for (const row of rows) {
     const due = reached(row.file);
@@ -212,6 +217,13 @@ test("each extension lint's claim takes out is one .oxfmtrc.json skips, and the 
     assert.ok(fs.existsSync(path.join(ROOT, file)), `${file} is there`);
     assert.ok(reached(file).includes('lint'), `${file} makes lint due`);
   }
+  const lint = ROOT_CLAIMS.lint ?? [];
+  for (const input of LINT_READS)
+    assert.ok(
+      lint.some((each) => each.inputs.includes(input)),
+      `lint reads ${input}`,
+    );
+  assert.ok(reached('tools/x/tsconfig.test.json').includes('lint'), 'a tsconfig the type-aware rules resolve through makes lint due');
 });
 
 test("due.ts imports Node's built-ins alone, so a job runs it before npm ci", () => {

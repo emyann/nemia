@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { API_VERSION, type DefinitionOrigin, type LibraryAdd, type LibraryAddList } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { DEFAULT_NAMESPACE, type Factory } from '../factory/factory.ts';
+import { DEFAULT_NAMESPACE, type Factory, workedOn } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { stepSkillsNamed, stepsFilled } from '../roster/fills.store.ts';
 import { frontmatterKey } from '../former/former.ts';
@@ -70,7 +70,7 @@ const givenSkills = (file: string): string[] => {
 function filledPlaces(home: string, name: string): { factory: Factory | undefined; repos: Array<string | undefined> } | undefined {
   const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
   if (name !== DEFAULT_NAMESPACE && factory === undefined) return undefined;
-  const repos = factory === undefined || factory.repos.length === 0 ? [undefined] : factory.repos.map((r) => path.resolve(r));
+  const repos = factory === undefined || workedOn(factory).length === 0 ? [undefined] : workedOn(factory);
   return { factory, repos };
 }
 
@@ -157,7 +157,7 @@ function ownOrigins(home: string, name: string, ref: LibraryRef): DefinitionOrig
       : fs.existsSync(path.join(root, SKILLS_FOLDER, ref.name, 'SKILL.md'));
   const out: DefinitionOrigin[] = [];
   if (factory.tree !== undefined && at(path.join(factory.tree, 'workflows'))) out.push('factory');
-  if (factory.repos.some((repo) => at(path.join(path.resolve(repo), REPOSITORY_HOLDER)))) out.push('repo');
+  if (workedOn(factory).some((repo) => at(path.join(path.resolve(repo), REPOSITORY_HOLDER)))) out.push('repo');
   return out;
 }
 

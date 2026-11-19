@@ -3,7 +3,8 @@
  * its workspace links, a global prefix's — and passes over one of another tree; `readNemia` refuses a hand
  * list of her rules, which her fence derives, as
  * `test/agent-fences.test.ts` refuses her a mode but `auto`. Focused on the real disk: npm's links are real symbolic links, and the
- * checkout's own is read.
+ * checkout's own is read. And the keeper's record of her session: denied her, read as none where it does not decode, her tasks adopted
+ * from an older store's level file, and her chat waking her but while her folder's trust is refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { names } from '../../test/assessed.ts';
-import { nemiaDefinition, ownBin, readNemia } from './level.store.ts';
+import {
+  herTasks,
+  nemiaChatPlace,
+  nemiaDefinition,
+  ownBin,
+  readNemia,
+  readSession,
+  sessionFile,
+  storeDenies,
+  writeLevel,
+  writeSession,
+  writeUntrusted,
+} from './level.store.ts';
 
 /** A package at `dir` whose `package.json` says its `nemia` is `bin/nemia.ts`, as the client in `apps/cli` does. */
 const pkg = (dir: string): string => {
@@ -100,5 +113,39 @@ test('`readNemia`: her shipped definition reads in auto, and a hand list of her 
     const file = path.join(dir, 'read.md');
     fs.writeFileSync(file, head('allowedTools: Read'));
     assert.deepEqual(readNemia(file).allowedTools, ['Read']);
+  });
+});
+
+test("the keeper's record of her session: hers to read, never to write, and an older store's task adopted", async (t) => {
+  const root = scratch('wf-nemia-session-');
+  await t.test('no record and no level: she has no task, and a message wakes her', () => {
+    assert.deepEqual(herTasks(root), []);
+    assert.deepEqual(nemiaChatPlace(root).tasks, []);
+    assert.equal(nemiaChatPlace(root).wakes, true);
+  });
+  await t.test("an older store's level file names her task: adopted as her first", () => {
+    writeLevel(root, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: 'nemia-1' });
+    assert.deepEqual(herTasks(root), ['nemia-1']);
+  });
+  await t.test('the record, once written, names her tasks', () => {
+    writeSession(root, { tasks: ['nemia-1', 'nemia-2'], idleSince: '2026-10-06T09:00:00.000Z' });
+    assert.deepEqual(herTasks(root), ['nemia-1', 'nemia-2']);
+    assert.deepEqual(readSession(root), { tasks: ['nemia-1', 'nemia-2'], idleSince: '2026-10-06T09:00:00.000Z' });
+  });
+  await t.test('REFUSED: a record that does not decode is read as none, its next write replacing it', () => {
+    fs.writeFileSync(sessionFile(root), '{ "tasks": 3 }');
+    assert.equal(readSession(root), undefined);
+    fs.writeFileSync(sessionFile(root), 'not json');
+    assert.equal(readSession(root), undefined);
+    assert.deepEqual(herTasks(root), ['nemia-1'], "read as none: the level file's task again");
+  });
+  await t.test('REFUSED: her session denies her an edit of the record', () => {
+    assert.ok(storeDenies(root).includes(`Edit(/${sessionFile(root)})`));
+  });
+  await t.test("REFUSED: while the keeper's record says her folder's trust was refused, a message does not wake her", () => {
+    writeUntrusted(root, 'her folder could not be trusted');
+    assert.equal(nemiaChatPlace(root).wakes, false);
+    writeUntrusted(root, undefined);
+    assert.equal(nemiaChatPlace(root).wakes, true);
   });
 });

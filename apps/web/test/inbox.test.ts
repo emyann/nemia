@@ -609,13 +609,13 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
 });
 
 /** The line that files a factory, as `GET /api/store` answers it. */
-const FILE_FACTORY = 'nemia factory add <name> --repo <path>';
+const FILE_FACTORY = 'nemia factory add <name> --volume <path|url>:rw';
 
 /** A factory as the api lists it, on `repos`. */
 const factoryOn = (name: string, repos: string[], error: string | null = null): Factory => ({
   name,
   default: name === 'default',
-  repos,
+  worksOn: repos,
   workflows: name === 'default' ? null : ['good'],
   hires: {},
   error,
@@ -623,10 +623,10 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
   commands: {
     attach: `nemia factory attach ${name} <workflow>`,
     rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --repo <path>`,
+    add: `nemia factory add ${name} --volume <path|url>:rw`,
     schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
     trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
   },
   untrusted: [],
   volumes: [],
@@ -674,7 +674,7 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     'REFUSED: no place for a card naming a factory the store does not list, or one whose file does not read — each says why',
     () => {
       assert.deepEqual(cardPlace(entry('a', null, { factory: 'gone' }), FACTORIES, FILE_FACTORY), {
-        why: "The card names the factory gone, which the store does not have: file it by that name with nemia factory add <name> --repo <path>, or change the card's factory: line.",
+        why: "The card names the factory gone, which the store does not have: file it by that name with nemia factory add <name> --volume <path|url>:rw, or change the card's factory: line.",
       });
       assert.deepEqual(
         cardPlace(

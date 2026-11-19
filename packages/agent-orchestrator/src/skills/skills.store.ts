@@ -303,7 +303,7 @@ function judgeSkillPlace(home: string, at: string, name: string, anywhere: boole
     );
   if (!anywhere && !isWorkflowsHolderAt(home, path.dirname(at))) {
     refuseSkill(
-      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`,
+      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${at} all the same.`,
     );
   }
   refuseSkill(skillNameRefusal(name));

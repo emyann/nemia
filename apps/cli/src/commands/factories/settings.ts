@@ -1,55 +1,48 @@
 /**
  * The runners of what a factory gives the runs started in it: a volume mounted and taken off (`nemia factory volume add|rm`, its folder
- * sent through `pathSent`, the daemon keeping it by its whole path), a harness setting set and taken off (`setting set|rm`) and a
+ * or git URL sent through `repoSent`, the daemon keeping it by its whole path), a harness setting set and taken off (`setting set|rm`) and
+ * a
  * workflow's cost line (`cost-line set|rm`). Each prints, word for word as the old path did, what the answer says it wrote.
  */
-import { type Args, NOT_THE_WORKSPACE } from 'objects';
+import type { Args } from 'objects';
 import { asked } from '../../objects.ts';
-import { pathSent, said } from '../requests.ts';
-import { dollars, textOf, writtenOf } from './lines.ts';
+import { said, switchArg } from '../requests.ts';
+import { dollars, repoSent, textOf, trustedLines, volumeSent, writtenOf } from './lines.ts';
 
 /** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
 const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
 
 /**
- * A volume as it is sent: its folder through `pathSent` and its mark as typed; one with no mark the api reads (`:ro`, `:rw`) sent whole
- * through `pathSent`, for the api to refuse in its words.
- * @param spelled The volume as typed: a folder, then `:ro` or `:rw`.
- * @param env The environment whose chosen context says how the folder is sent; this process's by default.
- */
-export function volumeSent(spelled: string, env: NodeJS.ProcessEnv = process.env): string {
-  const at = spelled.lastIndexOf(':');
-  const mark = at < 0 ? '' : spelled.slice(at + 1);
-  const folder = at < 0 ? '' : spelled.slice(0, at);
-  return (mark === 'ro' || mark === 'rw') && folder.trim() !== '' ? `${pathSent(folder, env)}:${mark}` : pathSent(spelled, env);
-}
-
-/**
- * `nemia factory volume add`: a folder mounted for every local step of a factory's runs, and how it was marked before.
+ * `nemia factory volume add`: a writable volume, a repository the factory works on, its place trusted unless `--no-trust`; or a
+ * read-only one, mounted for every local step of its runs; and how it was marked before.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryVolumeAdd(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const added = await asked('factory volume add', (c) =>
-    c.factories.addVolume({ params: { factory }, payload: { volume: volumeSent(textOf(args, 'volume')) } }),
+    c.factories.addVolume({
+      params: { factory },
+      payload: { volume: volumeSent(textOf(args, 'volume')), ...(switchArg(args, 'noTrust') ? { noTrust: true } : {}) },
+    }),
   );
-  const { file, volume, was } = added;
+  const { file, volume, was, trusts } = added;
   said([
     `${factory}  volume ${volume.path} ${markOf(volume.readOnly)}${was === null || was === volume.readOnly ? '' : ` (was ${markOf(was)})`}`,
-    ...(volume.readOnly ? [] : [`writable for each step whose fence writes; ${NOT_THE_WORKSPACE}`]),
+    ...(volume.readOnly ? [] : ['a repository the factory works on: a run on it works in a worktree of its own']),
     `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
+    ...trustedLines(factory, trusts),
   ]);
   return 0;
 }
 
 /**
- * `nemia factory volume rm`: a volume taken off a factory, by its path.
+ * `nemia factory volume rm`: a volume taken off a factory, by its path or the git URL it was cloned from.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function factoryVolumeRm(args: Args): Promise<number> {
   const factory = textOf(args, 'factory');
   const { file, removed } = await asked('factory volume rm', (c) =>
-    c.factories.removeVolume({ params: { factory }, query: { path: pathSent(textOf(args, 'path')) } }),
+    c.factories.removeVolume({ params: { factory }, query: { path: repoSent(textOf(args, 'path')) } }),
   );
   said([`${factory}  volume ${removed} removed`, `changed: ${file}`]);
   return 0;

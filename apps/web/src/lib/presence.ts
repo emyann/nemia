@@ -5,14 +5,16 @@
 
 /**
  * What holds of her now: how many runs wait on the person (`runsWaiting`, the run list's own count, never added to), how many asks of
- * her own they have not answered (`asksWaiting`), whether a message of theirs was not sent, whether her session is down, whether she is
- * answering, and how many of her answers are unread. None holding is up, at rest.
+ * her own they have not answered (`asksWaiting`), whether a message of theirs was not sent, whether her session is down, whether it
+ * rests — no session of hers open, and a message starts one — whether she is answering, and how many of her answers are unread. None
+ * holding is up, at rest.
  */
 export type Presence = {
   runsWaiting: number;
   asksWaiting: number;
   notSent: boolean;
   down: boolean;
+  resting: boolean;
   answering: boolean;
   unread: number;
 };
@@ -21,7 +23,15 @@ export type Presence = {
 export type FaceExpression = 'surprised' | 'unsure' | 'sleepy' | 'thinking' | 'happy' | 'idle';
 
 /** Up, at rest: nothing waits, nothing failed to go, she is neither down, answering, nor holding an unread answer. */
-export const UP: Presence = { runsWaiting: 0, asksWaiting: 0, notSent: false, down: false, answering: false, unread: 0 };
+export const UP: Presence = {
+  runsWaiting: 0,
+  asksWaiting: 0,
+  notSent: false,
+  down: false,
+  resting: false,
+  answering: false,
+  unread: 0,
+};
 
 /** A hue a cue is drawn in: what waits on a person, a session at work, what failed, or none, at rest. */
 type CueHue = 'yours' | 'alive' | 'failure' | 'none';
@@ -39,8 +49,8 @@ type Fact = {
 
 /**
  * The presences in the owner's order, the first that holds wins the face: runs that wait on you, then her own asks unanswered — both
- * what waits on the person, each said apart so no number mixes the two — then a message not sent, then down, then answering, then
- * unread.
+ * what waits on the person, each said apart so no number mixes the two — then a message not sent, then down, then resting, then
+ * answering, then unread.
  */
 const FACE_ORDER: readonly Fact[] = [
   {
@@ -62,6 +72,12 @@ const FACE_ORDER: readonly Fact[] = [
     says: () => 'A message was not sent.',
   },
   { holds: (p) => p.down, face: 'sleepy', cue: () => ({ hue: 'none', words: 'Down' }), says: () => 'Her session is down.' },
+  {
+    holds: (p) => p.resting,
+    face: 'sleepy',
+    cue: () => ({ hue: 'none', words: 'Resting' }),
+    says: () => 'She rests; a message wakes her.',
+  },
   {
     holds: (p) => p.answering,
     face: 'thinking',

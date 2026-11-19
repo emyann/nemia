@@ -678,7 +678,8 @@ test(
     await s.test(
       'REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both',
       async () => {
-        for (const name of ['pipao', 'hkb']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
+        for (const name of ['pipao', 'hkb'])
+          addFactoryAt(ROOT, { name, volumes: [fs.mkdtempSync(path.join(ROOT, `${name}-`))].map((r) => `${r}:rw`) });
         writeFactoryLevel(ROOT, 'hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
         await plantRun(door, 'r-pipao', 'pipao');
         await plantRun(door, 'r-hkb', 'hkb');

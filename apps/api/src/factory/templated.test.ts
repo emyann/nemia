@@ -63,12 +63,16 @@ const builtins = scratch('nemia-api-templated-builtins-');
 template(builtins, 'mill');
 const press = template(scratch('nemia-api-templated-own-'), 'press');
 
-/** A factory's places: plain folders, by their whole paths. */
+/** A factory's places, by their whole paths: a repository of each test's place, and a plain folder. */
 const repo = scratch('nemia-api-templated-repo-');
 const data = scratch('nemia-api-templated-data-');
-for (const name of ['plain', 'refused']) addFactory({ name, repos: [repo] });
+for (const name of ['plain', 'refused']) addFactory({ name, volumes: [repo].map((r) => `${r}:rw`) });
 
-const stand = eachTest(testPlace);
+const stand = eachTest(() => {
+  const place = testPlace();
+  place.world.repository(repo, {});
+  return place;
+});
 const standIn = eachTest(testEngine);
 const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(BuiltinTemplates)(builtins)));
 
@@ -114,30 +118,39 @@ test('a person files a factory over the api, then mounts a volume and takes it o
   const s = story(t);
 
   await s.test('a POST of the name and its repositories files it, its places left untrusted with noTrust', async () => {
-    const body = await answered<FactoryCreated>(send('POST', '/api/factories', { name: 'tiles', repos: [repo], noTrust: true }));
-    assert.deepEqual(body.repos, [repo]);
+    const body = await answered<FactoryCreated>(send('POST', '/api/factories', { name: 'tiles', volumes: [`${repo}:rw`], noTrust: true }));
+    assert.deepEqual(
+      body.volumes.map((v) => v.path),
+      [repo],
+    );
     assert.deepEqual(body.trusts, []);
-    assert.deepEqual(JSON.parse(fileOf('tiles') ?? '{}').repos, [repo]);
+    assert.deepEqual(
+      JSON.parse(fileOf('tiles') ?? '{}').volumes.map((v: { path: string }) => v.path),
+      [repo],
+    );
   });
 
   await s.test(
     'REFUSED: a repository named from where the api runs is a 422, the default factory a 409, a second filing a 409',
     async () => {
-      await refused('stones', () => send('POST', '/api/factories', { name: 'stones', repos: ['repo'], noTrust: true }), 422);
-      await refused('default', () => send('POST', '/api/factories', { name: 'default', repos: [repo], noTrust: true }), 409);
-      await refused('tiles', () => send('POST', '/api/factories', { name: 'tiles', repos: [repo], noTrust: true }), 409);
+      await refused('stones', () => send('POST', '/api/factories', { name: 'stones', volumes: ['repo:rw'], noTrust: true }), 422);
+      await refused('default', () => send('POST', '/api/factories', { name: 'default', volumes: [`${repo}:rw`], noTrust: true }), 409);
+      await refused('tiles', () => send('POST', '/api/factories', { name: 'tiles', volumes: [`${repo}:rw`], noTrust: true }), 409);
     },
   );
 
   await s.test("a volume mounted read-only is written in the factory's file; its DELETE by path takes it off", async () => {
     const added = await answered<VolumeAdded>(send('POST', '/api/factories/tiles/volumes', { volume: `${data}:ro` }));
     assert.deepEqual([added.volume.path, added.volume.readOnly, added.was], [data, true, null]);
-    assert.equal(JSON.parse(fileOf('tiles') ?? '{}').volumes.length, 1);
+    assert.equal(JSON.parse(fileOf('tiles') ?? '{}').volumes.length, 2, 'beside the repository it works on');
     const removed = await answered<VolumeRemoved>(
       app().request(`/api/factories/tiles/volumes?path=${encodeURIComponent(data)}`, { method: 'DELETE', headers: json, body: '{}' }),
     );
     assert.equal(removed.removed, data);
-    assert.equal(JSON.parse(fileOf('tiles') ?? '{}').volumes, undefined);
+    assert.deepEqual(
+      JSON.parse(fileOf('tiles') ?? '{}').volumes.map((v: { path: string }) => v.path),
+      [repo],
+    );
   });
 
   await s.test('REFUSED: a volume with no mark or named from where the api runs is a 422, a path it does not mount a 404', async () => {
@@ -165,20 +178,26 @@ test('a person on another machine files a factory by its git URL over the api; t
   const { url, head, into } = origin();
 
   await s.test('a POST naming the repository by its URL clones it under the store and files the factory with its origin', async () => {
-    const body = await answered<FactoryCreated>(send('POST', '/api/factories', { name: 'quarry', repos: [url], noTrust: true }));
-    assert.deepEqual(body.repos, [into]);
+    const body = await answered<FactoryCreated>(send('POST', '/api/factories', { name: 'quarry', volumes: [`${url}:rw`], noTrust: true }));
+    assert.deepEqual(
+      body.volumes.map((v) => v.path),
+      [into],
+    );
     const file = JSON.parse(fileOf('quarry') ?? '{}');
-    assert.deepEqual([file.repos, file.origins], [[into], { [into]: url }]);
+    assert.deepEqual(file.volumes, [{ path: into, readOnly: false, origin: url, name: 'r' }]);
     assert.equal(stand().world.head(into), head);
   });
 
   await s.test('an apply naming the repository by its URL files the factory on the same clone, with its origin', async () => {
     const body = await answered<FactoryApplied>(
-      send('POST', '/api/factories/kiln/apply', { template: { name: 'mill' }, repos: [url], noTrust: true }),
+      send('POST', '/api/factories/kiln/apply', { template: { name: 'mill' }, volumes: [`${url}:rw`], noTrust: true }),
     );
-    assert.deepEqual(body.repos, [into]);
+    assert.deepEqual(
+      body.volumes.map((v) => v.path),
+      [into],
+    );
     const file = JSON.parse(fileOf('kiln') ?? '{}');
-    assert.deepEqual([file.repos, file.origins], [[into], { [into]: url }]);
+    assert.deepEqual(file.volumes, [{ path: into, readOnly: false, origin: url, name: 'r' }]);
   });
 
   await s.test(
@@ -186,16 +205,20 @@ test('a person on another machine files a factory by its git URL over the api; t
     async () => {
       await refused(
         'secret',
-        () => send('POST', '/api/factories', { name: 'secret', repos: ['https://u:p@host/o/r'], noTrust: true }),
+        () => send('POST', '/api/factories', { name: 'secret', volumes: ['https://u:p@host/o/r:rw'], noTrust: true }),
         422,
       );
       const none = path.join(scratch('nemia-api-templated-none-'), 'none');
-      await refused('none', () => send('POST', '/api/factories', { name: 'none', repos: [pathToFileURL(none).href], noTrust: true }), 422);
+      await refused(
+        'none',
+        () => send('POST', '/api/factories', { name: 'none', volumes: [`${pathToFileURL(none).href}:rw`], noTrust: true }),
+        422,
+      );
       assert.equal(fs.existsSync(path.join(root, 'clones', 'localhost', ...none.split(path.sep).filter(Boolean))), false);
-      await refused('relative', () => send('POST', '/api/factories', { name: 'relative', repos: ['repo'], noTrust: true }), 422);
+      await refused('relative', () => send('POST', '/api/factories', { name: 'relative', volumes: ['repo:rw'], noTrust: true }), 422);
       await refused(
         'relative',
-        () => send('POST', '/api/factories/relative/apply', { template: { name: 'mill' }, repos: ['repo'], noTrust: true }),
+        () => send('POST', '/api/factories/relative/apply', { template: { name: 'mill' }, volumes: ['repo:rw'], noTrust: true }),
         422,
       );
     },
@@ -208,7 +231,7 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
   await s.test("an archive packed by template pack's code makes the factory, read from the store's copy of it", async () => {
     const before = sent();
     const body = await answered<FactoryApplied>(
-      send('POST', '/api/factories/pressed/apply', { template: await given(press), repos: [repo], noTrust: true }),
+      send('POST', '/api/factories/pressed/apply', { template: await given(press), volumes: [`${repo}:rw`], noTrust: true }),
     );
     const kept = sent().filter((f) => !before.includes(f));
     assert.equal(kept.length, 1, 'the archive sent is kept under the store');
@@ -219,7 +242,7 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
   await s.test("a builtin's name makes the factory from the builtin template of that name, and keeps nothing", async () => {
     const before = sent();
     const body = await answered<FactoryApplied>(
-      send('POST', '/api/factories/milled/apply', { template: { name: 'mill' }, repos: [repo], noTrust: true }),
+      send('POST', '/api/factories/milled/apply', { template: { name: 'mill' }, volumes: [`${repo}:rw`], noTrust: true }),
     );
     assert.deepEqual([body.template.source, body.place], ['mill', path.join(builtins, 'mill')]);
     assert.deepEqual(sent(), before);
@@ -230,12 +253,16 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
     async () => {
       const before = sent();
       const body = await answered<FactoryApplied>(
-        send('POST', '/api/factories/foldered/apply', { template: { path: press }, repos: [repo], noTrust: true }),
+        send('POST', '/api/factories/foldered/apply', { template: { path: press }, volumes: [`${repo}:rw`], noTrust: true }),
       );
       assert.equal(body.template.source, press);
       assert.equal(JSON.parse(fileOf('foldered') ?? '{}').template.source, press);
       assert.deepEqual(sent(), before);
-      await refused('broken', () => send('POST', '/api/factories/broken/apply', { template: { path: 'press' }, repos: [repo] }), 422);
+      await refused(
+        'broken',
+        () => send('POST', '/api/factories/broken/apply', { template: { path: 'press' }, volumes: [`${repo}:rw`] }),
+        422,
+      );
     },
   );
 
@@ -244,10 +271,22 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
     async () => {
       const before = sent();
       const bytes = Buffer.from('no archive').toString('base64');
-      await refused('broken', () => send('POST', '/api/factories/broken/apply', { template: { archive: bytes }, repos: [repo] }), 422);
-      await refused('broken', () => send('POST', '/api/factories/broken/apply', { template: { name: '../mill' }, repos: [repo] }), 422);
+      await refused(
+        'broken',
+        () => send('POST', '/api/factories/broken/apply', { template: { archive: bytes }, volumes: [`${repo}:rw`] }),
+        422,
+      );
+      await refused(
+        'broken',
+        () => send('POST', '/api/factories/broken/apply', { template: { name: '../mill' }, volumes: [`${repo}:rw`] }),
+        422,
+      );
       const large = 'A'.repeat(Number(OBJECT_BODY_LIMIT) + 1);
-      await refused('broken', () => send('POST', '/api/factories/broken/apply', { template: { archive: large }, repos: [repo] }), 413);
+      await refused(
+        'broken',
+        () => send('POST', '/api/factories/broken/apply', { template: { archive: large }, volumes: [`${repo}:rw`] }),
+        413,
+      );
       assert.deepEqual(sent(), before, 'a refused apply keeps no archive');
     },
   );
@@ -256,7 +295,11 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
     const before = sent();
     const bare = template(scratch('nemia-api-templated-unchecked-'), 'bare');
     fs.rmSync(path.join(bare, 'nemia.yaml'));
-    await refused('bare', async () => send('POST', '/api/factories/bare/apply', { template: await given(bare), repos: [repo] }), 422);
+    await refused(
+      'bare',
+      async () => send('POST', '/api/factories/bare/apply', { template: await given(bare), volumes: [`${repo}:rw`] }),
+      422,
+    );
     assert.deepEqual(sent(), before);
   });
 });
@@ -296,7 +339,7 @@ test("a person previews a templated factory's upgrade, files it by its digest, a
   const s = story(t);
   const folder = template(scratch('nemia-api-templated-next-'), 'press');
   await answered<FactoryApplied>(
-    send('POST', '/api/factories/next/apply', { template: await given(folder), repos: [repo], noTrust: true }),
+    send('POST', '/api/factories/next/apply', { template: await given(folder), volumes: [`${repo}:rw`], noTrust: true }),
   );
   await reconciled();
   const tree = path.join(root, 'factories', 'next', 'tree');

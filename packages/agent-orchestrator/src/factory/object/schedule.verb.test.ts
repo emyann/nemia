@@ -9,7 +9,7 @@ import { scheduleOf } from './schedule.verb.ts';
 const mill: Exclude<FactoryListing, { error: string }> = {
   name: 'mill',
   file: '/store/factories/mill.json',
-  repos: ['/repo'],
+  volumes: [{ path: '/repo', readOnly: false }],
   workflows: ['nightly'],
   hires: {},
   schedules: { nightly: { cron: '0 3 * * *', brief: 'tidy', since: '2026-10-01T00:00:00.000Z' } },

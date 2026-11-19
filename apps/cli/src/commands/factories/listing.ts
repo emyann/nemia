@@ -9,7 +9,7 @@ import { DEFAULT_NAMESPACE, type Factory, type FactoryInstruction, type Schedule
 import { asked, everyPage, factoriesListed } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { said } from '../requests.ts';
-import { dollars, fireWord } from './lines.ts';
+import { dollars, fireWord, worksOnLine } from './lines.ts';
 
 /** What a factory's listing reads beside its object: its schedules, and where its instruction is kept, each absent where unread. */
 export type Beside = { readonly schedules: readonly Schedule[]; readonly instruction: FactoryInstruction | undefined };
@@ -42,18 +42,12 @@ function templateLines(o: Factory, width: number): string[] {
   ];
 }
 
-/** A factory's volumes, by path, once each: `volume /home/me/notes :ro`, a writable one with its caveat. */
+/** A factory's read-only volumes, by path, once each: `volume /home/me/notes :ro`; its writable ones are what its first line says it works
+ * on. */
 function volumeLines(o: Factory, width: number): string[] {
   const seen = new Map<string, boolean>();
-  for (const v of o.spec.volumes) if (!seen.has(v.path)) seen.set(v.path, v.readOnly);
-  return [...seen.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([at, readOnly]) =>
-      under(
-        width,
-        `volume ${at} ${readOnly ? ':ro' : ':rw'}${readOnly ? '' : " — writable, and not a run's workspace: nothing commits or lands what a step writes there"}`,
-      ),
-    );
+  for (const v of o.spec.volumes) if (v.readOnly && !seen.has(v.path)) seen.set(v.path, v.readOnly);
+  return [...seen.keys()].sort((a, b) => a.localeCompare(b)).map((at) => under(width, `volume ${at} :ro`));
 }
 
 /** A factory's harness settings: `setting claude.attribution {"commit":"","pr":""}`. */
@@ -101,7 +95,7 @@ function instructionLine(instruction: FactoryInstruction | undefined, width: num
 
 /** The lines of one factory that reads: its places, template, workflows, volumes, settings, lines, hires, schedules and the rest. */
 const factoryLines = (o: Factory, beside: Beside, width: number, now: number): string[] => [
-  `${o.metadata.name.padEnd(width)}  ${o.spec.repos.join(', ')}`,
+  `${o.metadata.name.padEnd(width)}  ${worksOnLine(o.spec.volumes)}`,
   ...untrustedLines(o, width),
   ...templateLines(o, width),
   ...((o.spec.workflows ?? []).length ? [under(width, `workflows: ${[...(o.spec.workflows ?? [])].sort().join(', ')}`)] : []),
@@ -115,7 +109,7 @@ const factoryLines = (o: Factory, beside: Beside, width: number, now: number): s
 ];
 
 /** Whether `o` is a factory whose file does not read: an error, and no repository. */
-const unread = (o: Factory): o is Factory & { status: { error: string } } => o.status.error !== undefined && o.spec.repos.length === 0;
+const unread = (o: Factory): o is Factory & { status: { error: string } } => o.status.error !== undefined && o.spec.volumes.length === 0;
 
 /**
  * What `nemia factory ls` prints of `factories` (the default's object left out) with what was read beside each (`beside`, by name) at
@@ -137,7 +131,7 @@ export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<
         ? [`${o.metadata.name.padEnd(width)}  ${o.status.error}`]
         : factoryLines(o, beside.get(o.metadata.name) ?? none, width, now),
     ),
-    "\nfile one: nemia factory add <name> --repo <path> — remove one: nemia factory rm <name> — in the daemon's store",
+    "\nfile one: nemia factory add <name> [--volume <path|url>:rw] — remove one: nemia factory rm <name> — in the daemon's store",
   ];
 }
 

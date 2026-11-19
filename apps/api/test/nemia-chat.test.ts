@@ -99,7 +99,7 @@ test('A person talks with Nemia in her chat: a page of history, a send to her ou
       body.events.map((e) => (e as { text: string }).text),
       ['Two.', 'Three.'],
     );
-    assert.deepEqual(body.presence, { up: true, answering: true, waitsOnYou: 0, unread: 3 });
+    assert.deepEqual(body.presence, { up: true, answering: true, waitsOnYou: 0, unread: 3, wakes: true });
     assert.equal(body.before, 'm:1:e1:0');
     assert.equal((await asked('GET', '/api/nemia/chat?limit=0')).status, 422, 'a page of no size');
   });
@@ -210,7 +210,7 @@ test('A person talks with Nemia in her chat: a page of history, a send to her ou
       const { sessionId } = withHer(['One.', 'Two.']);
       const first = await streamed(await app.request('/api/nemia/chat/stream'), (said) => textsOf(said).length >= 2);
       assert.equal(first[0]?.event, 'presence');
-      assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
+      assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2, wakes: true });
       assert.deepEqual(textsOf(first), ['One.', 'Two.']);
       const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
       assert.equal(cursor, '1.2.0.0.0.0.0.0.0');
@@ -275,7 +275,8 @@ test("a stop of the turn she is answering is a 200 with the stop as the package 
   const { task } = withHer(['One.']);
   const stopped = await asked('POST', '/api/nemia/chat/stop', {});
   assert.equal(stopped.status, 200, JSON.stringify(stopped.body));
-  assert.deepEqual(Object.keys(stopped.body).sort(), ['at', 'attempt'], 'the stop as the package gave it, and nothing else');
+  assert.deepEqual(Object.keys(stopped.body).sort(), ['at', 'attempt', 'task'], 'the stop as the package gave it, and nothing else');
+  assert.equal(stopped.body.task, task, 'the task whose turn it stopped');
   assert.equal(stopped.body.attempt, 1, 'the attempt she is in');
   assert.ok(
     fs.existsSync(path.join(root, 'engine', 'runs', 'attached', `ae_${task}_1.interrupt`)),

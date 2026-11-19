@@ -3388,13 +3388,13 @@ run 'wf tick' (or 'wf up') to start it
 
 ## Factories: a named grouping in the store — `wf factory`
 
-A factory names the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps, as a
-file of its own in the store. A run started in a factory names it on its record, and every run is started in one
+A factory names its volumes, the writable ones the repositories a body of work is on, the workflows it offers, and the agents it
+hires into their steps, as a file of its own in the store. A run started in a factory names it on its record, and every run is started in one
 ([*Every run in a factory*](#every-run-in-a-factory)); a record or a card written before, that names none, is in the one default
 factory, which holds that history.
 
 ```
-$ wf factory add pipao --repo ~/code/pipao
+$ wf factory add pipao --volume ~/code/pipao:rw
 pipao  /home/me/code/pipao
 filed: /home/me/.agent-workflows/factories/pipao.json
 $ wf factory attach pipao build
@@ -3414,9 +3414,11 @@ $ wf factory detach pipao build
 $ wf factory rm pipao
 ```
 
-- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "repos": ["/abs/path", ...] }`; its name is the file's. `wf factory
+- **A factory is `$WF_ROOT/factories/<name>.json`**, `{ "volumes": [{ "path": "/abs/path", "readOnly": false }, ...] }`, none at
+  all included; its name is the file's. `wf factory
   add` writes it whole to a hidden file and links it onto its name, so a reader never sees half of one and two adds of one
-  name file one. A key beside `repos` is kept when the file is read.
+  name file one. A key beside `volumes` is kept when the file is read; a file
+  an earlier release wrote, with `repos` and `origins`, is moved into volumes once, when the daemon starts.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
   `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
 - **A repository is a directory**, resolved from where `wf` is typed, as `wf start --repo` records one, and named once.
@@ -3725,8 +3727,10 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   retry that waits on no one — is hers. Each command's class in the table decides (`class` on its entry, `src/admission/class.ts`), and
   a "don't ask again" never widens what waits. Her folder is Nemia's own, so the keeper gives the harness's trust to it before it
   files her, in the same beat, and no person runs a command for it; only a write the harness's file refuses is said, as `untrusted` on
-  `nemia level`, the board and `nemia doctor`, in words that name what to mend. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
-  session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
+  `nemia level`, the board and `nemia doctor`, in words that name what to mend. **`nemia level manual`** ends her operating: the keeper drops her
+  subscription, and she stays for the conversation, resting after 15 quiet minutes. A message in her chat starts her at any level, a
+  new task resuming her last session. A session stopped from outside is not filed again until the person speaks: a message or a level
+  set starts a fresh one.
 - **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
   person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
   answer (`approve`, `retry`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its

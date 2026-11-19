@@ -161,16 +161,19 @@ export const factoryObjectOf = (listing: FactoryListing, listed: FactoryListed, 
  */
 export const filedOf = (listing: FactoryListing, home: string): FiledFactory => {
   const meta = { name: listing.name, creationTimestamp: bornAt(listing.file) };
-  if ('error' in listing) return { metadata: meta, spec: { repos: [], workflows: [], hires: {}, volumes: [] } };
+  if ('error' in listing) return { metadata: meta, spec: { workflows: [], hires: {}, volumes: [] } };
   const level = ownLevel(home, listing.name);
   const spec: FactoryObject['spec'] = {
-    repos: [...listing.repos],
     workflows: [...listing.workflows],
     hires: { ...listing.hires },
-    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly }) => ({ name, path, readOnly })),
+    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly, origin }) => ({
+      name,
+      path,
+      readOnly,
+      ...(origin === undefined ? {} : { origin }),
+    })),
     ...harnessSettingsOf(listing.harnessSettings),
     ...(listing.costLines === undefined || Object.keys(listing.costLines).length === 0 ? {} : { costLines: { ...listing.costLines } }),
-    ...(listing.origins === undefined || Object.keys(listing.origins).length === 0 ? {} : { origins: { ...listing.origins } }),
     ...(listing.workflowRepos === undefined || Object.keys(listing.workflowRepos).length === 0
       ? {}
       : { workflowRepos: { ...listing.workflowRepos } }),
@@ -184,16 +187,12 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
 };
 
 /**
- * The default factory's object: on no repository (a repository is a factory's own, filed with `nemia factory add`), offering every
+ * The default factory's object: with no volume (a volume is a factory's own, given with `nemia factory volume add`), offering every
  * workflow (no `workflows`), hiring no one, keeping no file.
  * @param home The store's root, whose time of birth is the default factory's.
  */
 export const defaultFactoryObject = (home: string): FactoryObject =>
-  objectOf(
-    { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
-    { repos: [], hires: {}, volumes: [] },
-    { conditions: [], untrusted: [] },
-  );
+  objectOf({ name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) }, { hires: {}, volumes: [] }, { conditions: [], untrusted: [] });
 
 /**
  * Every factory's object: the default, then each of `listed`, read at `home`.
@@ -211,7 +210,7 @@ export const factoryObjectsOf = (listed: FactoryListed, home: string): FactoryOb
  */
 export const noFactory = (name: string): Missing =>
   new Missing({
-    message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --repo <path>`,
+    message: `no factory ${name}: list them with nemia factory (GET /api/factories), or file one with nemia factory add ${name} --volume <path|url>:rw`,
   });
 
 /**
@@ -289,10 +288,10 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
   return {
     attach: commandLine(named('factory attach'), { factory: name }),
     rm: commandLine(named('factory rm'), { factory: name }),
-    add: commandLine(named('factory add'), { name }, { repos: '<path>' }),
+    add: commandLine(named('factory add'), { name }, { volumes: '<path|url>:rw' }),
     schedule: commandLine(named('factory schedule'), { factory: name }, { cron: '<expr>', brief: '<text>' }),
     trust: commandLine(named('factory trust'), { factory: name }),
-    volume: commandLine(named('factory volume add'), { factory: name, volume: '<path>:ro|:rw' }),
+    volume: commandLine(named('factory volume add'), { factory: name, volume: '<path|url>:ro|:rw' }),
     unschedule: Object.fromEntries(
       schedules.map((workflow) => [workflow, commandLine(named('factory unschedule'), { factory: name, workflow })]),
     ),

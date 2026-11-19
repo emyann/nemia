@@ -8,7 +8,7 @@
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -47,6 +47,7 @@ function template(folder: string, name: string): string {
 const here = scratch('nemia-factories-templated-here-');
 const repo = path.join(here, 'mill');
 fs.mkdirSync(repo);
+execFileSync('git', ['init', '-q'], { cwd: repo });
 const press = template(here, 'press');
 
 /** `nemia <argv>` typed in `here` on `env`, waited on for its end. */
@@ -77,14 +78,14 @@ test("under this machine's context a person makes a factory from a template's fo
   const s = story(t);
 
   await s.test('`factory apply` with a folder typed relative makes the factory read from that folder, by its whole path', async () => {
-    const said = await out(['factory', 'apply', 'pressed', '--template', './press', '--repo', 'mill', '--no-trust']);
+    const said = await out(['factory', 'apply', 'pressed', '--template', './press', '--volume', 'mill:rw', '--no-trust']);
     assert.match(said, new RegExp(`made from ${press} at 0\\.1\\.0`));
     assert.equal(fileOf(store.root, 'pressed').template?.source, press);
     assert.match(await out(['factory', 'ls']), new RegExp(`^ +template: ${press} 0\\.1\\.0, not rendered yet`, 'm'));
   });
 
   await s.test('`factory diff` previews a hand-made factory taken over; `adopt` by the digest it printed takes it over', async () => {
-    await out(['factory', 'add', 'plain', '--repo', 'mill', '--no-trust']);
+    await out(['factory', 'add', 'plain', '--volume', 'mill:rw', '--no-trust']);
     const plan = await out(['factory', 'diff', 'plain', '--template', './press']);
     assert.match(plan, /^plain: taken over by the template, in place/m);
     const digest = /^plan: (sha256:\S+)$/m.exec(plan)?.[1] ?? assert.fail(plan);
@@ -124,14 +125,14 @@ test("under a remote context, a template folder is packed here and kept by the d
   configWritten({ contexts: [{ name: 'vps', server: exposed.url, token }], current: 'vps' }, laptop);
 
   await s.test('`factory apply` packs the folder and sends it: the daemon keeps the archive, and the factory names it', async () => {
-    await out(['factory', 'apply', 'away', '--template', './press', '--repo', repo, '--no-trust'], laptop);
+    await out(['factory', 'apply', 'away', '--template', './press', '--volume', `${repo}:rw`, '--no-trust'], laptop);
     const source = fileOf(exposed.root, 'away').template?.source ?? '';
     assert.ok(source.startsWith(path.join(exposed.root, 'templates-sent')), source);
     assert.match(await out(['factory', 'ls'], laptop), /^away +/m);
   });
 
   await s.test("`factory add` by a repository's whole path files it there; `rules --file` sends the file's words", async () => {
-    assert.match(await out(['factory', 'add', 'far', '--repo', repo, '--no-trust'], laptop), new RegExp(`^far  ${repo}$`, 'm'));
+    assert.match(await out(['factory', 'add', 'far', '--volume', `${repo}:rw`, '--no-trust'], laptop), new RegExp(`^far  ${repo}$`, 'm'));
     write(path.join(here, 'RULES.md'), 'Short.\n');
     await out(['factory', 'rules', 'far', '--file', 'RULES.md'], laptop);
     assert.match(await out(['factory', 'rules', 'far'], laptop), /^Short\.$/m);
@@ -141,7 +142,7 @@ test("under a remote context, a template folder is packed here and kept by the d
   await s.test(
     "REFUSED: a repository typed relative names the daemon's machine, and its api refuses it; nothing is read here",
     async () => {
-      assert.notEqual((await nemia(['factory', 'add', 'near', '--repo', 'mill', '--no-trust'], laptop)).code, 0);
+      assert.notEqual((await nemia(['factory', 'add', 'near', '--volume', 'mill:rw', '--no-trust'], laptop)).code, 0);
       assert.equal(fs.existsSync(path.join(exposed.root, 'factories', 'near.json')), false);
       assert.equal(fs.existsSync(laptop.WF_ROOT ?? ''), false, "nothing read or made on this machine's store");
     },

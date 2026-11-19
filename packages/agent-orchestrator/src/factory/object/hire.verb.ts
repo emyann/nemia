@@ -162,7 +162,7 @@ const hiringOf = Effect.fn('hiringOf')(function* (home: string, namespace: strin
     hires: { ...object.spec.hires },
     ...(tree === undefined ? {} : { tree }),
     workflows: object.spec.workflows,
-    repo: object.spec.repos[0],
+    repo: object.spec.volumes.find((v) => !v.readOnly)?.path,
     harnessSettings: object.spec.harnessSettings,
   };
   return { factory, filedAt: object.metadata.creationTimestamp };

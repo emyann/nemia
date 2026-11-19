@@ -842,6 +842,8 @@ export type HerChat = {
   told?: readonly { text: string; delivers?: string }[];
   /** The questions of hers waiting on the person, each drawn in her talk by what its choices carry (`drawnAsk`). */
   asks?: readonly HerAsk[];
+  /** Why the keeper could not trust her folder, written as its record (`untrusted.json`): a message no longer wakes her. */
+  untrusted?: string;
 };
 
 /**
@@ -886,7 +888,8 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
 };
 
 /**
- * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned, her
+ * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned as her
+ * transcript's first line is written (a line timed before her attempt began is her parent session's, never drawn), her
  * session's run file as its holder writes one (`herRun`), her session's transcript, the person's outbox and their read mark. Each file
  * is written as the keeper, the api and the runtime write theirs — a key they leave out absent, never null.
  *
@@ -920,8 +923,8 @@ export function herChat(what: HerChat): () => void {
         /** Her session is long-lived, as the keeper files it: a session between turns reads idle only under this policy (`idleOf`). */
         restartPolicy: 'Always',
       },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
+      { kind: 'starting', at: at(0), attempt: 1 },
+      { kind: 'spawned', at: at(0), attempt: 1 },
       ...(what.told ?? []).map((told, i) => ({ kind: 'said', at: at(2 + i), attempt: 1, text: told.text })),
     ]),
   );
@@ -962,6 +965,8 @@ export function herChat(what: HerChat): () => void {
     );
     if (answered.length > 0) fs.writeFileSync(path.join(chat, 'answers.jsonl'), lines(answered));
   }
+  if (what.untrusted !== undefined)
+    fs.writeFileSync(path.join(nemiaDir, 'untrusted.json'), `${JSON.stringify({ refused: what.untrusted })}\n`);
   if (what.read !== undefined) {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
     fs.writeFileSync(path.join(nemiaDir, 'chat', 'read.json'), `${JSON.stringify({ through: what.read, at: at(600) })}\n`);

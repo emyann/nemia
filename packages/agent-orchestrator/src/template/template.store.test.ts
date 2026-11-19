@@ -126,7 +126,7 @@ function factoryOnTeam(name: string): string {
   const repo = repoWithTeam();
   fs.mkdirSync(path.join(repo, 'workflows', 'solo'));
   fs.writeFileSync(path.join(repo, 'workflows', 'solo', 'work.md'), '---\nplace: git\n---\nDo the work.\n');
-  addFactoryAt(ROOT, { name, repos: [repo] });
+  addFactoryAt(ROOT, { name, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'solo' });
   hireAgentAt(ROOT, { factory: name, agent: 'implementer', step: 'solo/work' });
   return repo;

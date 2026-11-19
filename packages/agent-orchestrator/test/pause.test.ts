@@ -116,7 +116,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   const b = ticking(parked);
   const pass = () => stage.runWith(b.e, tickRun());
   const repo = aRepo();
-  addFactoryAt(ROOT, { name: 'solo', repos: [repo] });
+  addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
   setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
   const ONE = folder(['work']);

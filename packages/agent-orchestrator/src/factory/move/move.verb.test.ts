@@ -102,11 +102,10 @@ function planted(src: Side, template = templateFolder()): { factory: Factory; or
   const clone = path.join(src.root, 'clones', 'localhost', 'acme', 'shop');
   const factory: Factory = {
     name: 'shop',
-    repos: [clone],
+    volumes: [{ path: clone, readOnly: false, origin }],
     workflows: [],
     hires: {},
     schedules: {},
-    origins: { [clone]: origin },
     template: { source: template, version: '1.0.0', params: { team: 'ann' } },
     tree: path.join(src.root, 'factories', 'shop', 'tree'),
   };
@@ -206,9 +205,12 @@ test('the import files the factory on the target, clones its repositories, and t
   const record = done(dst.factories.factories.read(NAME));
   if (isDefaultFactory(record)) return assert.fail('read as the default');
   await t.test('its repository is the target’s clone of its origin, cloned there', () => {
-    assert.deepEqual(record.repos, [path.join(dst.root, 'clones', 'localhost', ...new URL(origin).pathname.split('/').filter(Boolean))]);
+    assert.deepEqual(
+      record.volumes.map((v) => v.path),
+      [path.join(dst.root, 'clones', 'localhost', ...new URL(origin).pathname.split('/').filter(Boolean))],
+    );
     assert.deepEqual(answered.cloned, [origin]);
-    assert.equal(fs.existsSync(record.repos[0] ?? ''), true, 'the place cloned it there');
+    assert.equal(fs.existsSync(record.volumes[0]?.path ?? ''), true, 'the place cloned it there');
   });
   await t.test('its template, version and parameters, the template kept under the target’s store', () => {
     assert.equal(record.template?.source.startsWith(path.join(dst.root, 'templates-sent')), true);
@@ -223,7 +225,10 @@ test('the import files the factory on the target, clones its repositories, and t
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
   });
   await t.test('its places are all untrusted, for the person to trust', () => {
-    assert.deepEqual(answered.untrusted, record.repos);
+    assert.deepEqual(
+      answered.untrusted,
+      record.volumes.map((v) => v.path),
+    );
   });
   await t.test('its card is filed under its old name, not queued, and says where it came from', () => {
     assert.deepEqual(answered.cards, [{ name: 'add-a-flag-c3d4', was: 'add-a-flag-c3d4' }]);
@@ -250,9 +255,10 @@ test('REFUSED: the import refuses before anything is written, and writes nothing
     ...exp,
     file: JSON.stringify({
       ...(JSON.parse(exp.file) as object),
-      repos: ['/work/notes'],
-      origins: undefined,
-      volumes: [{ path: '/work/data', readOnly: true, name: 'data' }],
+      volumes: [
+        { path: '/work/notes', readOnly: false },
+        { path: '/work/data', readOnly: true, name: 'data' },
+      ],
     }),
   };
   await t.test('a name the target holds is a Conflict', async () => {

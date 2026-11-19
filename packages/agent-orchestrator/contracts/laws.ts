@@ -25,7 +25,7 @@ export const approved = (run: Run, name: string): boolean =>
  * alone has.
  */
 export const accepted = (
-  factory: Pick<Factory, 'repos' | 'workflows' | 'hires' | 'schedules' | 'costLines'>,
+  factory: Pick<Factory, 'volumes' | 'workflows' | 'hires' | 'schedules' | 'costLines'>,
   change: WiringChange,
 ): boolean => {
   if (change.verb === 'hire') return factory.workflows.includes(change.step.slice(0, change.step.indexOf('/')));

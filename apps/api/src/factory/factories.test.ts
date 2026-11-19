@@ -78,7 +78,7 @@ for (const [name, repos] of [
   ['hired', [repoR]],
   ['pair', [repoR, repoS]],
 ] as const) {
-  addFactory({ name, repos });
+  addFactory({ name, volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflow({ factory: name, workflow: 'alpha' });
 }
 hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
@@ -105,7 +105,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
     async () => {
       const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(stranger)}`);
       assert.equal(status, 422);
-      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --repo ${stranger}.`]);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --volume ${stranger}:rw.`]);
       assert.ok(!said(body).includes(own), "the api's own, which no factory works on, is not offered");
       assert.ok(!JSON.stringify(body).includes('"x"'), 'the workflow x in it is never listed');
     },
@@ -114,7 +114,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
   await t.test("a ?repo= of the api's own that no factory works on is a 422 as any other, its workflow beta never listed", async () => {
     const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(own)}`);
     assert.equal(status, 422);
-    saysAll(said(body), [`${own}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${own}.`]);
+    saysAll(said(body), [`${own}: `, [repoR, repoS].join(', '), `nemia factory add <name> --volume ${own}:rw.`]);
     assert.ok(!said(body).includes(`, ${own}`) && !said(body).includes(`${own},`), "the api's own is not among those it may be");
     assert.ok(!JSON.stringify(body).includes('"beta"'), 'the workflow beta in it is never listed');
   });
@@ -126,7 +126,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       assert.equal(refused.status, 422);
       assert.equal(fs.existsSync(starts), false, 'no server of the stranger started');
 
-      addFactory({ name: 'strange', repos: [stranger] });
+      addFactory({ name: 'strange', volumes: [stranger].map((r) => `${r}:rw`) });
       try {
         const served = await app.request(`/api/capabilities?repo=${encodeURIComponent(stranger)}`);
         assert.equal(served.status, 200, 'the same request, once a factory names the directory, is served');
@@ -165,7 +165,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       assert.deepEqual(await workflowsListed<WorkflowListing>(app, 'factory=default'), await workflowsListed<WorkflowListing>(app, ''));
       const { status, body } = await workflowsListed<never>(app, `factory=default&repo=${encodeURIComponent(stranger)}`);
       assert.equal(status, 422);
-      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${stranger}.`]);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), `nemia factory add <name> --volume ${stranger}:rw.`]);
     },
   );
 
@@ -183,7 +183,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       saysAll(said(named.body), [
         `${own}: the factory pair works on ${sorted.join(', ')}`,
         `?factory=pair&repo=${sorted[0]}`,
-        `nemia factory add <name> --repo ${own}.`,
+        `nemia factory volume add pair ${own}:rw.`,
       ]);
       assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
       const fallen = await workflowsListed<never>(app, 'factory=pair');
@@ -215,7 +215,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
   await t.test(
     "a factory that works on the api's own and another, asked with no ?repo=, is a 422 naming the ?repo= — the api's own is not filled in; named, it is read",
     async (t) => {
-      addFactory({ name: 'owned', repos: [own, repoR] });
+      addFactory({ name: 'owned', volumes: [own, repoR].map((r) => `${r}:rw`) });
       t.after(() => removeFactory('owned'));
       const sorted = [own, repoR].sort();
       const fallen = await workflowsListed<never>(app, 'factory=owned');
@@ -343,7 +343,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
   await s.test(
     'POST /api/namespaces/<factory>/runs on a factory of two repositories: unwired, a 422 naming the attach; wired, the run works on the wired one, whatever `?repo=` says',
     async (t) => {
-      addFactory({ name: 'twin', repos: [repoR, repoS] });
+      addFactory({ name: 'twin', volumes: [repoR, repoS].map((r) => `${r}:rw`) });
       const implementer = path.join(repoR, 'workflows', 'agents', 'implementer.md');
       write(implementer, '---\nharness: claude\n---\nYou implement what you are asked.\n');
       t.after(() => {
@@ -428,7 +428,7 @@ function asShipped(t: { after: (fn: () => void) => void }): string {
   const repoT = gitRepo('nemia-api-factory-t-');
   write(path.join(repoT, 'workflows', 'delta', 'implement.md'), '---\nplace: git\nharness: claude\nagent: ada\n---\nImplement it.\n');
   write(path.join(repoT, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
-  addFactory({ name: 'trio', repos: [repoT] });
+  addFactory({ name: 'trio', volumes: [repoT].map((r) => `${r}:rw`) });
   attachWorkflow({ factory: 'trio', workflow: 'delta' });
   t.after(() => {
     removeFactory('trio');
@@ -530,18 +530,14 @@ test('a person reads the factories: the default first, each by name, a broken fi
         const commandsOf = (name: string) => ({
           attach: `nemia factory attach ${name} <workflow>`,
           rm: `nemia factory rm ${name}`,
-          add: `nemia factory add ${name} --repo <path>`,
+          add: `nemia factory add ${name} --volume <path|url>:rw`,
           schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
           trust: `nemia factory trust ${name}`,
-          volume: `nemia factory volume add ${name} <path>:ro|:rw`,
+          volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
           unschedule: {},
-          volumeRm: {},
+          volumeRm: name === 'hired' ? { [path.basename(repoR).toLowerCase()]: `nemia factory volume rm hired ${repoR}` } : {},
         });
-        assert.deepEqual(
-          byName('default')?.spec,
-          { repos: [], hires: {}, volumes: [] },
-          'no workflows: it offers every one, on no repository',
-        );
+        assert.deepEqual(byName('default')?.spec, { hires: {}, volumes: [] }, 'no workflows: it offers every one, on no repository');
         assert.deepEqual(byName('default')?.status, { conditions: [], untrusted: [] });
         assert.deepEqual(byName('hired')?.status.untrusted, [
           {
@@ -563,7 +559,11 @@ test('a person reads the factories: the default first, each by name, a broken fi
           [repoS],
         );
         fs.rmSync(path.join(config, '.claude.json'));
-        assert.deepEqual(byName('hired')?.spec, { repos: [repoR], workflows: ['alpha'], hires: { 'alpha/implement': 'ada' }, volumes: [] });
+        assert.deepEqual(byName('hired')?.spec, {
+          workflows: ['alpha'],
+          hires: { 'alpha/implement': 'ada' },
+          volumes: [{ name: path.basename(repoR).toLowerCase(), path: repoR, readOnly: false }],
+        });
         assert.equal(byName('hired')?.metadata.generation, 3, 'filed at 1, its attach and its hire each counted');
         for (const name of ['default', 'hired', 'broken'])
           assert.deepEqual(
@@ -571,9 +571,12 @@ test('a person reads the factories: the default first, each by name, a broken fi
             commandsOf(name),
             `${name}'s lines; a file that does not read is filed again by the same lines`,
           );
-        assert.deepEqual(byName('pair')?.spec.repos, [repoR, repoS]);
+        assert.deepEqual(
+          byName('pair')?.spec.volumes.map((v) => v.path),
+          [repoR, repoS],
+        );
         assert.match(byName('broken')?.status.error ?? '', /is not JSON/);
-        assert.deepEqual(byName('broken')?.spec, { repos: [], workflows: [], hires: {}, volumes: [] });
+        assert.deepEqual(byName('broken')?.spec, { workflows: [], hires: {}, volumes: [] });
         assert.deepEqual((await get<Factory>('/api/factories/hired')).body, byName('hired'), 'got as it is listed');
         assert.equal((await get<Factory>('/api/factories/default')).body.metadata.name, 'default');
         assert.equal((await get('/api/factories/nowhere')).status, 404);
@@ -591,7 +594,6 @@ test('a person reads the factories: the default first, each by name, a broken fi
         file,
         JSON.stringify({
           name: 'vols',
-          repos: [repoR],
           workflows: [],
           hires: {},
           schedules: {},
@@ -630,7 +632,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
           notes: 'nemia factory volume rm vols /tmp/x/notes',
           zeta: 'nemia factory volume rm vols /tmp/x/zeta',
         });
-        assert.equal(commands.volume, 'nemia factory volume add vols <path>:ro|:rw');
+        assert.equal(commands.volume, 'nemia factory volume add vols <path|url>:ro|:rw');
       } finally {
         fs.rmSync(file);
       }
@@ -640,7 +642,11 @@ test('a person reads the factories: the default first, each by name, a broken fi
   await s.test(
     "a templated factory's template: not applied before the daemon renders it, then the version and conditions it wrote",
     async () => {
-      addFactory({ name: 'shaped', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } } });
+      addFactory({
+        name: 'shaped',
+        volumes: [repoR].map((r) => `${r}:rw`),
+        template: { source: '/t/team', version: '0.1.0', params: { budget: 7 } },
+      });
       const shaped = async () => (await get<Factory>('/api/factories/shaped')).body;
       try {
         assert.deepEqual((await shaped()).spec.template, { source: '/t/team', version: '0.1.0', params: { budget: 7 } });
@@ -670,7 +676,7 @@ test('a person reads the factories: the default first, each by name, a broken fi
   await s.test(
     "a templated factory's workflows are its tree's, before its repository's: listed, paged and started from the tree",
     async () => {
-      addFactory({ name: 'treed', repos: [repoR], template: { source: '/t/team', version: '0.1.0', params: {} } });
+      addFactory({ name: 'treed', volumes: [repoR].map((r) => `${r}:rw`), template: { source: '/t/team', version: '0.1.0', params: {} } });
       const tree = path.join(root, 'factories', 'treed', 'tree');
       write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['alpha', 'gamma'], hires: {} }));
       write(path.join(tree, 'workflows', 'alpha', 'implement.md'), '---\nplace: git\nagent: ada\n---\nImplement it, as the tree says.\n');
@@ -854,8 +860,16 @@ test('the factories asked as a Table answer the columns of a factory, the defaul
   );
   const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
   assert.equal(lines.length, list.items.length + 1, 'a header, then a line per factory');
-  const withRepos = list.items.find((f) => f.metadata.name !== 'default' && f.spec.repos.length > 0);
+  const withRepos = list.items.find((f) => f.metadata.name !== 'default' && f.spec.volumes.some((v) => !v.readOnly));
   assert.ok(withRepos, 'a factory filed on a repository');
   const line = lines.find((l) => l.startsWith(`${withRepos.metadata.name} `));
-  assert.ok(line?.includes(withRepos.spec.repos.join(', ')), 'its repositories');
+  assert.ok(
+    line?.includes(
+      withRepos.spec.volumes
+        .filter((v) => !v.readOnly)
+        .map((v) => v.path)
+        .join(', '),
+    ),
+    'its repositories',
+  );
 });

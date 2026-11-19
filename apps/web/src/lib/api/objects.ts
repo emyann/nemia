@@ -48,6 +48,9 @@ import {
   type FactoryInstructionWrite,
   FactoryList,
   FactoryRules,
+  VolumeAdded,
+  VolumeRemoved,
+  type VolumeWrite,
   Hire,
   HireList,
   LibraryAdd,
@@ -558,6 +561,12 @@ export const factories = {
   /** The cost line of `workflow` in the factory `name` taken off: the factory as it then reads. */
   deleteCostLine: (name: string, workflow: string): Promise<Factory> =>
     call((c) => c.factories.deleteCostLine({ params: { name, workflow } }), write(Factory, SETTINGS_WRITTEN)),
+  /** `volume` given to the factory `name`: a path or a git URL, marked `:ro` or `:rw`, a writable one a repository it works on. */
+  addVolume: (name: string, volume: VolumeWrite): Promise<VolumeAdded> =>
+    call((c) => c.factories.addVolume({ params: { factory: name }, payload: volume }), write(VolumeAdded, SETTINGS_WRITTEN)),
+  /** The volume of the factory `name` at `path` taken off, as it was given. */
+  removeVolume: (name: string, path: string): Promise<VolumeRemoved> =>
+    call((c) => c.factories.removeVolume({ params: { factory: name }, query: { path } }), write(VolumeRemoved, SETTINGS_WRITTEN)),
 };
 
 /** What a write of a server may have done, and what to look at before writing again. */

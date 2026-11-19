@@ -47,7 +47,7 @@ const ended = (id: string, outcome: RunOutcome, end: number, usd: number, extra:
 const factory = (name: string, hires: Record<string, string>): Factory => ({
   name,
   default: name === 'default',
-  repos: [],
+  worksOn: [],
   workflows: null,
   hires,
   error: null,

@@ -4,8 +4,11 @@ import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_M
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
-/** The composer's words while she is down, and the words it says when she is up and at rest. */
+/** The composer's words while she is down. */
 const WAITING = 'Write now; she reads it when she is up';
+
+/** The composer's words while she rests. */
+const WAKES = 'Write to her; your message wakes her';
 
 /** Her session down: why she stopped, where it is started, and that what the person writes waits for her in the outbox. */
 async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string): Promise<void> {
@@ -26,11 +29,10 @@ async function expectDown(page: Parameters<PageSpec['expect']>[0], words: string
 
 export default {
   /**
-   * Nemia down, twice over: her task filed with no session of hers on the daemon, and her level at Manual with her session ended.
-   * At Manual with her session still up, before the keeper ends it, she reads up: her face reads her session alone, since a factory
-   * raised above Manual keeps it up at the store's Manual. Down, a Down cue stands beside her face, her panel says why she stopped
-   * and where it is started, and what the person writes is taken by the api and waits in her outbox. Her level and her task are the
-   * page's, taken back after.
+   * Nemia resting, then down. Her task filed with no session of hers on the daemon: she rests, a Resting cue beside her face, no band
+   * in her panel, and what the person writes is taken by the api, waits in her outbox and wakes her. At Manual with her session still
+   * up she reads up: her face reads her session alone. Her folder untrusted, a message wakes her no more: a Down cue, her panel says
+   * why she stopped and where it is started. Her level and her task are the page's, taken back after.
    */
   name: 'chat-down',
   route: '/',
@@ -39,10 +41,17 @@ export default {
     try {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
-      await expectCues(page, (words) => words.includes('Down'), 'a Down cue is said at her face');
-      await expectDown(page, 'Filed: her session is starting.');
+      await expectCues(
+        page,
+        (words) => words.includes('Resting') && !words.includes('Down'),
+        'a Resting cue is said at her face, not Down',
+      );
+      const panel = await openChat(page);
+      await expectCount(panel.locator('[data-band="stopped"]'), 0, 'no band says she stopped: she is there to talk to');
+      const placeholder = await chatFieldOf(page).getAttribute('placeholder');
+      if (placeholder !== WAKES) throw new Refused(`the composer says a message wakes her — it says ${placeholder}`);
       await settled(page);
-      await photograph(page, path.join(OUT, `chat-down-filed-${await themeOf(page)}.png`), { fullPage: true });
+      await photograph(page, path.join(OUT, `chat-down-resting-${await themeOf(page)}.png`), { fullPage: true });
 
       const field = chatFieldOf(page);
       await field.fill('Start the kit cards when you are back.');
@@ -53,7 +62,7 @@ export default {
         field.press('Enter'),
       ]);
       if (sent.status() !== 201)
-        throw new Refused(`the api takes what was written while she is down — it answered ${sent.status()}: ${await sent.text()}`);
+        throw new Refused(`the api takes what was written while she rests — it answered ${sent.status()}: ${await sent.text()}`);
       await expectVisible(
         chatPanelOf(page).locator('[data-chat-bubble="person"]', { hasText: 'Start the kit cards when you are back.' }),
         'and it waits in her outbox, drawn as the person’s own words',
@@ -76,15 +85,16 @@ export default {
         stopping();
       }
 
-      const manual = herChat({ level: 'manual', session: 'none' });
+      const down = herChat({ session: 'none', untrusted: 'Claude Code did not take the trust of her folder: mend its file.' });
       try {
         await page.reload({ waitUntil: 'load' });
         await idle(page);
-        await expectDown(page, 'Off: no session of hers runs.');
+        await expectCues(page, (words) => words.includes('Down'), 'her folder untrusted, a Down cue is said at her face');
+        await expectDown(page, 'Not filed: the keeper could not trust her folder');
         await settled(page);
-        await photograph(page, path.join(OUT, `chat-down-manual-${await themeOf(page)}.png`), { fullPage: true });
+        await photograph(page, path.join(OUT, `chat-down-untrusted-${await themeOf(page)}.png`), { fullPage: true });
       } finally {
-        manual();
+        down();
       }
     } finally {
       back();

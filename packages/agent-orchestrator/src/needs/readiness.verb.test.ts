@@ -234,7 +234,7 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'README.md'), '---\nneeds:\n  - name: stray-tool\n    message: the tool\n    check: touch ran\n---\n');
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  createFactoryAt(ROOT, { name: 'stray', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'stray', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   const toolchain: Need = { name: 'toolchain', message: 'the toolchain', check: 'touch ran-here', scope: 'repository' };
   const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'), toolchain);
   const need = got.pieces.find((p) => p.name === 'stray-tool');
@@ -303,7 +303,7 @@ test(
     const dir = path.join(repo, 'workflows', 'dev');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: folder\nharness: ${other}\n---\nimplement it\n`);
-    createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    createFactoryAt(ROOT, { name: 'named', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
     const named = await read(facts({ PATH }), identity('exit 0'));
     assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
     assert.equal(named.ready, false);
@@ -352,10 +352,16 @@ test(
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: folder\n---\nimplement it\n');
 
-    createFactoryAt(home, { name: 'unhired', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    createFactoryAt(home, { name: 'unhired', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
     assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'the store agent alone, hired nowhere, runs no step');
 
-    createFactoryAt(home, { name: 'hired', repos: [repo], workflows: ['dev'], hires: { 'dev/implement': 'coder' }, schedules: {} });
+    createFactoryAt(home, {
+      name: 'hired',
+      volumes: [{ path: repo, readOnly: false }],
+      workflows: ['dev'],
+      hires: { 'dev/implement': 'coder' },
+      schedules: {},
+    });
     const hired = await readAt(home);
     assert.deepEqual(hired.states, ['missing', 'missing'], "hired into the factory's step, the store agent's harness counts");
     assert.equal(hired.ready, false);
@@ -595,7 +601,7 @@ test("a workflow's need of scope repository is read in its factory's repository,
   );
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
   fs.writeFileSync(path.join(repo, 'only-here'), '');
-  createFactoryAt(ROOT, { name: 'scoped', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(ROOT, { name: 'scoped', volumes: [{ path: repo, readOnly: false }], workflows: ['dev'], hires: {}, schedules: {} });
   await Effect.runPromise(trustPlaces([repo]).pipe(Effect.provide(PlaceService.layer(testPlace().place))));
   const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'));
   const of = (name: string) => got.pieces.find((p) => p.name === name);

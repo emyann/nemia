@@ -44,19 +44,22 @@ const sessionLines = (data: Level): string[] => {
 /**
  * What `nemia level` prints of where she is.
  * @param data Where she is, as the api answers it: the level, the factories, her session, why her folder could not be trusted, spend,
- * reach and allows.
+ * whether she was stopped or rests, reach and allows.
  */
 export function levelLines(data: Level): string[] {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
   const factories = ['factories (a raise ends by itself, read as it passes):', ...data.factories.map((row) => `  ${factoryWords(row)}`)];
   const spent = data.spend === null ? [] : [spendLine(data.spend)];
-  const stopped = data.stopped ? ['it was stopped from outside and is not filed again: a level set above manual starts a fresh one'] : [];
+  const stopped = data.stopped
+    ? ['it was stopped from outside and is not filed again: your next message in her chat, or a level set, starts a fresh one']
+    : [];
+  const rests = data.rests && !data.stopped ? ['she rests: a message in her chat wakes her'] : [];
   const trust = data.untrusted === null ? [] : [untrustedLine(data.untrusted)];
   const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
   const allows = data.allows.length
     ? ['allowed at a prompt, beyond what is built in (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
     : [];
-  return [head, ...factories, ...sessionLines(data), ...trust, ...spent, ...stopped, ...reach, ...allows];
+  return [head, ...factories, ...sessionLines(data), ...trust, ...spent, ...stopped, ...rests, ...reach, ...allows];
 }
 
 /** A level by its word. */

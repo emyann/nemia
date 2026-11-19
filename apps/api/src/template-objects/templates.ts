@@ -31,7 +31,7 @@ async function renderedIn(s: Served, name: string): Promise<Served> {
   const tree = await s.inRequest(templateTree(name));
   const factory: Factory = {
     name: tree.name,
-    repos: s.repo === undefined ? [] : [s.repo],
+    volumes: s.repo === undefined ? [] : [{ path: s.repo, readOnly: false }],
     workflows: tree.workflows,
     hires: tree.hires,
     schedules: {},

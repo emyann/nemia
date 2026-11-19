@@ -9,15 +9,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { frontmatterKey } from '../../former/former.ts';
 import { Conflict } from '../../refusal/refusal.ts';
-import { hireRefusalOf, type Factory } from '../factory.ts';
+import { hireRefusalOf, type Factory, workedOn } from '../factory.ts';
 
 /**
  * The folders whose `workflows/<workflow>/` a start in `factory` reads a step's own file from, in the store `home`: its repositories and
  * `home`; made from a template, the first of its tree, its repositories and `home` that holds the workflow, as a start reads it by name.
  */
 function rootsOf(home: string, factory: Factory, workflow: string): readonly string[] {
-  if (factory.tree === undefined) return [...factory.repos, home];
-  const holder = [factory.tree, ...factory.repos, home].find((root) => fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)));
+  if (factory.tree === undefined) return [...workedOn(factory), home];
+  const holder = [factory.tree, ...workedOn(factory), home].find((root) =>
+    fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)),
+  );
   return holder === undefined ? [] : [holder];
 }
 

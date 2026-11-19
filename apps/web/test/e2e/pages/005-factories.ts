@@ -62,10 +62,10 @@ export default {
     await expectVisible(block(FACTORIES.bare).locator('[data-runs]', { hasText: /^No runs yet$/ }), `${FACTORIES.bare} holds none`);
     await expectVisible(
       block(FACTORIES.broken).locator('[data-error]', { hasText: `Its file does not read: ` }),
-      `${FACTORIES.broken}'s file names no repository: its block says it does not read`,
+      `${FACTORIES.broken}'s file's volumes are no list: its block says it does not read`,
     );
     const why = (await block(FACTORIES.broken).locator('[data-error]').getAttribute('title')) ?? '';
-    if (!why.includes(`${FACTORIES.broken}.json`) || !why.includes('repos'))
+    if (!why.includes(`${FACTORIES.broken}.json`) || !why.includes('volumes'))
       throw new Refused(`the broken block says which file and why, whole on hover — its title is ${JSON.stringify(why)}`);
 
     await settled(page);

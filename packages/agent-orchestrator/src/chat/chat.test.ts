@@ -32,10 +32,13 @@ import {
   readChatCursor,
   sameWords,
   sourcesAt,
+  spanned,
+  offsetAfter,
   type AskQuestion,
   type ChatEvent,
   type ChatSources,
   type SourceEvent,
+  type TaskSpan,
   withEvents,
 } from './chat.ts';
 
@@ -360,8 +363,9 @@ test("the chat's cursor: it round-trips, says what changed since it, reads an ol
 test('`presenceOf`: down, up and idle, answering, waits on you, and unread after the mark, alone and at once', async (t) => {
   await t.test('presence in each state: down, up and idle, answering, waits on you, unread after the mark', () => {
     const events = projectChat(twoSessions());
-    const none = { up: false, answering: false, waitsOnYou: 0, unread: 2 };
+    const none = { up: false, answering: false, waitsOnYou: 0, unread: 2, wakes: false };
     assert.deepEqual(presenceOf(undefined, 0, events, undefined), none, 'no task: down');
+    assert.deepEqual(presenceOf(undefined, 0, events, undefined, true), { ...none, wakes: true }, 'no task, and a message starts one');
     assert.deepEqual(presenceOf('succeeded', 0, events, undefined), none, 'settled: down');
     assert.deepEqual(presenceOf('pending', 0, events, undefined), none, 'not started: down');
     assert.deepEqual(presenceOf('idle', 0, events, { through: 'm:2:a2', at: at(40) }), { ...none, up: true, unread: 0 });
@@ -414,6 +418,7 @@ test('`presenceOf`: down, up and idle, answering, waits on you, and unread after
       answering: true,
       waitsOnYou: 2,
       unread: 1,
+      wakes: false,
     });
   });
 });
@@ -552,4 +557,99 @@ test('`speakerNameRefusal`: the names an agent speaks under, by their characters
   for (const name of taken) await t.test(`taken: ${JSON.stringify(name)}`, () => assert.equal(speakerNameRefusal(name), undefined));
   for (const name of refused)
     await t.test(`REFUSED: ${JSON.stringify(name.slice(0, 20))}`, () => assert.equal(typeof speakerNameRefusal(name), 'string'));
+});
+
+/**
+ * Her chat across two tasks, the second continuing the first's session: the first's one attempt says hello and is told words at 3,
+ * delivered; the second's one attempt, which began at 20, holds the first's line again with its own time, then answers, and is told
+ * words at 22; and a stop of each. `tasks` names how many of the three tasks are spanned.
+ */
+const acrossTasks = (tasks = 2): ChatSources => {
+  const first: TaskSpan = { task: 'nemia-1', offset: 0, attempts: [1], said: [{ at: at(3), attempt: 1, text: 'Hi', after: null }] };
+  const second: TaskSpan = {
+    task: 'nemia-2',
+    offset: offsetAfter(first),
+    attempts: [1],
+    said: [{ at: at(22), attempt: 1, text: 'More', after: { kind: 'text', id: 'b1' } }],
+  };
+  const third: TaskSpan = { task: 'nemia-3', offset: offsetAfter(second), attempts: [1], said: [] };
+  const spans = [first, second, third].slice(0, tasks);
+  const outbox = [
+    { id: 'o1', at: at(2), text: 'Hi' },
+    { id: 'o2', at: at(21), text: 'More' },
+  ];
+  const delivered = [
+    { id: 'o1', said: at(3), attempt: 1 },
+    { id: 'o2', said: at(22), attempt: 1 },
+  ];
+  const stops = [
+    { at: at(5), attempt: 1, task: 'nemia-1' },
+    { at: at(25), attempt: 1, task: 'nemia-2' },
+  ];
+  const sessions = [
+    { attempt: 1, startedAt: at(0), events: [text('a1', 4, 'Hello.')] },
+    { attempt: 2, startedAt: at(20), events: [text('a1', 4, 'Hello.'), text('b1', 21, 'Back.')] },
+    { attempt: 3, startedAt: at(30), events: [text('a1', 4, 'Hello.'), text('b1', 21, 'Back.'), text('c1', 31, 'Again.')] },
+  ].slice(0, tasks);
+  return {
+    sessions,
+    outbox,
+    asks: [],
+    answers: [],
+    closed: [],
+    phase: 'idle',
+    ...spanned(spans, delivered, stops),
+  };
+};
+
+test('a chat across tasks: one history, a continued session drawn once, each task’s words and stops in their place', async (t) => {
+  const drawn = (sources: ChatSources) =>
+    projectChat(sources).map((e) => (e.kind === 'message' ? `${e.from}:${e.text}` : e.kind === 'session' ? '—' : e.kind));
+  await t.test('two tasks are drawn as one history, in order, the second after a session line', () => {
+    assert.deepEqual(drawn(acrossTasks()), [
+      'person:Hi',
+      'agent:Hello.',
+      'keeper:Stopped',
+      '—',
+      'agent:Back.',
+      'person:More',
+      'keeper:Stopped',
+    ]);
+  });
+  await t.test('a continued session’s copy of its parent’s lines, timed before it began, is drawn once', () => {
+    assert.equal(drawn(acrossTasks()).filter((w) => w === 'agent:Hello.').length, 1);
+  });
+  await t.test('an earlier task’s delivered words are drawn where their said is, not at the end', () => {
+    const events = projectChat(acrossTasks());
+    assert.equal(
+      events.findIndex((e) => e.id === 'p:o1'),
+      0,
+      'claimed by the first task’s said',
+    );
+    assert.equal(
+      events.findIndex((e) => e.id === 'p:o2'),
+      5,
+      'claimed by the second task’s said, after her answer',
+    );
+  });
+  await t.test('the ids drawn are the same when a third task is appended', () => {
+    const two = projectChat(acrossTasks(2)).map((e) => e.id);
+    const three = projectChat(acrossTasks(3)).map((e) => e.id);
+    assert.deepEqual(three.slice(0, two.length), two);
+  });
+  await t.test('a stop is numbered by the task it names; one that names none by the last task holding its attempt', () => {
+    const first: TaskSpan = { task: 'nemia-1', offset: 0, attempts: [1, 2], said: [] };
+    const second: TaskSpan = { task: 'nemia-2', offset: 2, attempts: [1], said: [] };
+    const stops = spanned(
+      [first, second],
+      [],
+      [
+        { at: at(1), attempt: 2, task: 'nemia-1' },
+        { at: at(2), attempt: 1, task: 'nemia-2' },
+        { at: at(3), attempt: 2 },
+        { at: at(4), attempt: 1 },
+      ],
+    ).stops.map((st) => st.attempt);
+    assert.deepEqual(stops, [2, 3, 2, 3]);
+  });
 });

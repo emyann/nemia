@@ -5,6 +5,7 @@
  * agents and skills reads: it imports neither the engine nor a controller. A run that froze its folder at `nemia start` is changed by none
  * of it.
  */
+import { workedOn } from '../factory/factory.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -305,7 +306,7 @@ function workflowPlaceRefusal(home: string, at: string, repo?: string): string |
   const holder = path.dirname(at);
   const store = path.resolve(home, 'workflows');
   if (isWorkflowsHolderAt(home, holder, repo)) return undefined;
-  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
+  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory volume add <factory> <repo>:rw), or pass { anywhere: true } to write ${at} all the same.`;
 }
 
 /** The factories of the store `home`, as the Factory door lists each with its file. */
@@ -317,7 +318,7 @@ const listedAt = (home: string) => doorAtOnce(home, (door) => door.factories.lis
  * @param repo A repository the caller names besides, or undefined for none.
  */
 export function knownReposAt(home: string, repo?: string): Set<string> {
-  const known = new Set(listedAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
+  const known = new Set(listedAt(home).flatMap((f) => ('volumes' in f ? workedOn(f).map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;
 }

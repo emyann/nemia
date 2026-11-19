@@ -113,7 +113,7 @@ test('the box with no factory to offer has the one choice, and the line that fil
   assert.deepEqual(selectsOf(html), [[['(none)', 'No factory: chosen at start', false]]]);
   assert.match(
     html,
-    /data-no-factory="true"[^>]*>The store has no factory yet: file one with <code[^>]*>nemia factory add &lt;name&gt; --repo &lt;path&gt;<\/code>/,
+    /data-no-factory="true"[^>]*>The store has no factory yet: file one with <code[^>]*>nemia factory add &lt;name&gt; --volume &lt;path\|url&gt;:rw<\/code>/,
   );
 });
 

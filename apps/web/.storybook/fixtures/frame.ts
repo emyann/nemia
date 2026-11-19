@@ -13,7 +13,7 @@ const QUIET_CHAT: ChatHistory = {
   events: [],
   before: null,
   cursor: '0',
-  presence: { up: true, answering: false, waitsOnYou: 0, unread: 0 },
+  presence: { up: true, answering: false, waitsOnYou: 0, unread: 0, wakes: true },
 };
 
 /** Her chat's read answered empty, and its stream held open with no event, as a live stream at rest. */

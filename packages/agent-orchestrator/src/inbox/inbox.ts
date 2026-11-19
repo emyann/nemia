@@ -230,7 +230,7 @@ function refuseFactoryKey(file: string, factory: string): void {
  * @param fix The start's own words for naming a factory, `--factory <name>` say; absent where the start has none.
  */
 export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string): string {
-  const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --repo <root>';
+  const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --volume <root>:rw';
   const atStart = fix === undefined ? '' : `, or name it at start: ${fix}`;
   return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
 }
@@ -554,7 +554,7 @@ export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'star
     .map(({ l }) => l);
 
 /** A factory as a card's placement reads it: its repositories and the repository its wiring names each workflow. */
-export type WiredFactory = Pick<Factory, 'repos' | 'workflowRepos'>;
+export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
 
 /**
  * The repository a card's factory works on for the card's workflow (`workflowRepo`): the one its wiring names, else its only one. Null

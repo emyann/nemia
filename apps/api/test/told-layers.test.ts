@@ -83,7 +83,7 @@ test('what a step was told reads, layer by layer, as the run froze it: no later 
     'a run started in a factory with rules answers them as a layer of their own, as it froze them: an edit or a removal since reaches none',
     async () => {
       fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\n---\nWrite the note.\n');
-      addFactory({ name: 'ruled', repos: [scratch('nemia-api-layers-ruled-')] });
+      addFactory({ name: 'ruled', volumes: [scratch('nemia-api-layers-ruled-')].map((r) => `${r}:rw`) });
       attachWorkflow({ factory: 'ruled', workflow: 'layers' });
       const rules = (method: string, words?: string) =>
         app().request('/api/factories/ruled/rules', {

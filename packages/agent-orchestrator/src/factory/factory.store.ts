@@ -1,8 +1,10 @@
 /**
- * The factories on disk: `<home>/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "workflows": [...], "hires":
- * {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back (`rewriteFactoryAt`),
+ * The factories on disk: `<home>/factories/<name>.json`, one file per factory, holding `{ "volumes": [...], "workflows": [...],
+ * "hires": {...} }` — read (`readFactoriesAt`, `readFactoryAt`), filed (`addFactoryAt`, `createFactoryAt`), written back
+ * (`rewriteFactoryAt`),
  * given workflows (`attachWorkflowAt`), hired into and fired from (`hireAgentAt`, `fireAgentAt`), told where its instruction is kept
- * (`setInstructionAt`), and removed (`removeFactoryAt`). Each takes the store's root, `home`, first: the Factory door's files layer
+ * (`setInstructionAt`), and removed (`removeFactoryAt`); and, once, a file an earlier release wrote moved into one list of volumes
+ * (`volumesMovedAt`). Each takes the store's root, `home`, first: the Factory door's files layer
  * (`factories.store.ts`) is over them. A person's verbs are their one writer; the judgement is `factory.ts`'s words and `wiring.ts`'s
  * decision.
  *
@@ -38,9 +40,11 @@ import {
   type FactoryWrite,
   type InstructionAt,
   type Schedule,
+  type Volume,
   volumeEntry,
 } from './factory.ts';
-import { cloneFolder, cloneTarget } from './clones/clones.ts';
+import { volumeOf, volumeRefusal, withVolume } from './volume/volume.ts';
+import { volumesFromRepos, type FileVolume } from './from-repos/from-repos.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
@@ -71,37 +75,44 @@ const ScheduleSchema = Schema.StructWithRest(
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
-/** A volume as a factory's file holds it (`Volume`): its path, its mark, its name where it stores one, and a key a later `nemia` writes. */
+/**
+ * A volume as a factory's file holds it (`Volume`): its path, its mark, its name where it stores one, the git URL it was cloned from where
+ * it is a clone, and a key a later `nemia` writes.
+ */
 const VolumeEntrySchema = Schema.StructWithRest(
-  Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean, name: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({
+    path: Schema.String,
+    readOnly: Schema.Boolean,
+    name: Schema.optionalKey(Schema.String),
+    origin: Schema.optionalKey(Schema.String),
+  }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
 /**
- * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a step's
+ * A factory's file: its volumes, none or several, the folders and repositories it reaches (`volumes`), each `{ path, readOnly }`, a name
+ * and the git URL it was cloned from where it has them, kept in this file whether or not it is made from a template, since they are the
+ * person's and never the template's; the workflows attached to it, each by its folder's name, its hires, a step's
  * `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path or the
  * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
- * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
- * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness its
+ * tree's wiring, and this key is not read); the settings of a harness its
  * runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; the cost
- * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the git URL of each repository it was given
- * by one, by its folder (`origins`); the repository each workflow works on, by folder name (`workflowRepos`), where it is made from no
+ * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the repository each workflow works on, by folder
+ * name (`workflowRepos`), where it is made from no
  * template (one made from a template keeps it in its tree's wiring, as an attach writes it); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
-    repos: Schema.NonEmptyArray(Schema.String),
+    volumes: Schema.Array(VolumeEntrySchema),
     workflows: Schema.optionalKey(Schema.Array(Schema.String)),
     hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     schedules: Schema.optionalKey(Schema.Record(Schema.String, ScheduleSchema)),
     instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
-    volumes: Schema.optionalKey(Schema.Array(VolumeEntrySchema)),
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
     costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
-    origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
@@ -124,9 +135,16 @@ type FactoryFile = typeof FactoryFileSchema.Type;
 /** A factory's file where it is: what it holds, or why it does not read as a factory (`error`). */
 type FileRead = { file: string } & ({ content: FactoryFile } | { error: string });
 
+/** The keys of a factory's file an earlier release wrote, before one list of volumes: `volumesMovedAt` moves them at the daemon's start. */
+const FORMER_KEYS = ['repos', 'origins'] as const;
+
+/** Whether `raw`, a factory's file as JSON, is in the shape an earlier release wrote: a key `volumesMovedAt` moves. */
+const isFormer = (raw: unknown): raw is Record<string, unknown> =>
+  typeof raw === 'object' && raw !== null && !Array.isArray(raw) && FORMER_KEYS.some((k) => k in raw);
+
 /**
  * The file of the factory `name`, read — or why it does not read as one: a name that is no slug, and `default.json`, since the default
- * factory is no file, are each to be removed by hand.
+ * factory is no file, are each to be removed by hand; and a file an earlier release wrote, which the daemon moves at its start.
  */
 function factoryFile(home: string, name: string): FileRead {
   const file = fileAt(home, name);
@@ -143,6 +161,11 @@ function factoryFile(home: string, name: string): FileRead {
   } catch (err) {
     return { file, error: `is not JSON (${(err as Error).message}): nemia factory rm ${name}, then add it again.` };
   }
+  if (isFormer(raw))
+    return {
+      file,
+      error: `is in the shape an earlier release wrote, its repositories under repos: start the daemon, nemia up, which moves it into one list of volumes once.`,
+    };
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
   if (Result.isSuccess(decoded)) return { file, content: decoded.success };
   const { path: where, words } = firstRefusal(raw, decoded.failure);
@@ -186,15 +209,13 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
   if ('error' in wiring) return wiring;
   return {
     name,
-    repos: content.repos,
+    volumes: content.volumes.map(volumeEntry),
     ...wiring,
     schedules: content.schedules ?? {},
     ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
     ...(template === undefined ? {} : { template, tree: treeDir(home, name) }),
-    ...(content.volumes?.length ? { volumes: content.volumes.map(volumeEntry) } : {}),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
     ...(content.costLines === undefined ? {} : { costLines: content.costLines }),
-    ...(content.origins === undefined ? {} : { origins: content.origins }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
   };
 }
@@ -232,45 +253,36 @@ export function readFactoriesAt(home: string): FactoryListing[] {
 }
 
 /**
- * A factory's `origins` key, where it has any: a factory given no URL files none.
- * @param origins The git URL of each folder kept as a clone, by the folder.
+ * The clones of `volumes`: each folder kept as a clone, to the URL it is cloned from (`origin`), as `cloned` makes them.
+ * @param volumes The volumes, each with its origin where it is a clone.
  */
-export const originsOf = (origins: Readonly<Record<string, string>>): { origins?: Readonly<Record<string, string>> } =>
-  Object.keys(origins).length ? { origins } : {};
-
-/** A factory's repositories as `--repo` gave them: each a folder, and the git URL of each folder kept as a clone (`origins`). */
-export type GivenRepos = { readonly repos: string[]; readonly origins: Readonly<Record<string, string>> };
+export const clonesOf = (volumes: readonly Volume[]): Record<string, string> =>
+  Object.fromEntries(volumes.flatMap((v) => (v.origin === undefined ? [] : [[v.path, v.origin]])));
 
 /**
- * The repositories a factory is given in the store `home`, each named once. A path is resolved from where `nemia` is typed, as `nemia
- * start --repo` records one, and must be a directory; a git URL is the folder its clone is kept in, `<home>/clones/<host>/<path>`
- * (`cloneTarget`, `cloneFolder`), which need not be there yet, and is recorded with its URL in `origins`. Refused, `Invalid`: none given,
- * a URL `cloneTarget` refuses, and a path that is not a directory, every one named. Git is never asked: the clone is the caller's.
+ * The volumes a factory is given in the store `home`, as `nemia factory add --volume` and `apply --volume` spell them, each
+ * `<path|url>:ro|:rw` (`volumeOf`): a path resolved from `cwd`, a git URL the folder its clone is kept in, `<home>/clones/<host>/<path>`,
+ * which need not be there yet, with its URL as its origin; in the order given, a path given twice once, the later mark kept, each named
+ * as `nemia factory volume add` names one (`withVolume`). None is a factory with no volume. Refused, `Invalid`, every volume named: a
+ * spelling `volumeOf` refuses, and a volume `volumeRefusal` refuses among those before it. Git is never asked: the clone, and whether a
+ * writable one is a repository, are the caller's.
  * @param home The store's root, under whose `clones/` a URL's clone is kept.
  * @param name The factory's name, said in a refusal.
- * @param given Each `--repo` as typed: a path or a git URL.
+ * @param given Each `--volume` as typed: `<path|url>:ro` or `<path|url>:rw`.
+ * @param cwd The folder a relative path is resolved from.
  */
-export function factoryRepos(home: string, name: string, given: readonly string[]): GivenRepos {
-  if (!given.length)
-    throw new Invalid({
-      message: `A factory names one repository at least, and none was given: nemia factory add ${name} --repo <path|url> [--repo <path|url> ...]. Nothing was filed.`,
-    });
-  const origins: Record<string, string> = {};
-  const read = given.map((r) => {
-    const target = cloneTarget(r);
-    if (target.kind === 'refused') throw new Invalid({ message: target.message });
-    if (target.kind === 'path') return path.resolve(r);
-    const folder = cloneFolder(home, target.folder);
-    origins[folder] ??= r;
-    return folder;
-  });
-  const repos = [...new Set(read)];
-  const missing = repos.filter((r) => origins[r] === undefined && !isDirectory(r));
-  if (missing.length)
-    throw new Invalid({
-      message: `--repo names a directory or a git URL, and ${missing.join(', ')} ${missing.length > 1 ? 'are not directories' : 'is not a directory'}. Give the path to each repository's directory, or its URL. Nothing was filed.`,
-    });
-  return { repos, origins };
+export function volumesGiven(home: string, name: string, given: readonly string[], cwd: string): Volume[] {
+  let volumes: Volume[] = [];
+  const refusals: string[] = [];
+  for (const spelled of given) {
+    const volume = volumeOf(spelled, cwd, home);
+    const refused = typeof volume === 'string' ? volume : volumeRefusal({ name, volumes }, volume, home, (at) => isDirectory(at));
+    if (refused !== undefined) refusals.push(refused);
+    else if (typeof volume !== 'string') volumes = withVolume({ volumes }, volume).volumes;
+  }
+  if (refusals.length)
+    throw new Invalid({ message: refusals.map((r) => r.replace(' Nothing was changed.', '')).join(' ') + ' Nothing was filed.' });
+  return volumes;
 }
 
 /**
@@ -284,22 +296,28 @@ export function refuseName(name: string, verb: FactoryWrite): void {
   if (name === DEFAULT_NAMESPACE) throw new Conflict({ message: defaultFactoryRefusal(verb) });
 }
 
+/** Whether `volumes` hold no writable one: a factory that works on no repository. */
+const workedOnNone = (volumes: readonly Volume[]): boolean => volumes.every((v) => v.readOnly);
+
 /**
  * `nemia factory add`, and `nemia factory apply` with the `template` it is made from: a factory filed in the store `home` as
- * `<name>.json` (`createFactoryAt`). Refused before anything is written: the name (`refuseName`) and the repositories (`factoryRepos`);
- * and, the file already there, `Conflict`, the file left as it was.
+ * `<name>.json` (`createFactoryAt`). Refused before anything is written: the name (`refuseName`) and the volumes (`volumesGiven`); and,
+ * the file already there, `Conflict`, the file left as it was. A hand-made factory that works on no repository keeps its instruction in
+ * the store, so a volume given it later does not move where it is read.
  * @param home The store's root.
- * @param opts The factory's name, each `--repo` as typed, and the template it is made from, where it is one.
+ * @param opts The factory's name, each `--volume` as typed, none or several, the folder a relative one is resolved from (where `nemia`
+ * runs where none is given), and the template it is made from, where it is one.
  */
 export function addFactoryAt(
   home: string,
-  opts: { name: string; repos: readonly string[]; template?: FactoryTemplate },
+  opts: { name: string; volumes: readonly string[]; cwd?: string; template?: FactoryTemplate },
 ): { factory: Factory; file: string } {
   refuseName(opts.name, 'add');
-  const { repos, origins } = factoryRepos(home, opts.name, opts.repos);
+  const volumes = volumesGiven(home, opts.name, opts.volumes, opts.cwd ?? process.cwd());
   const template = opts.template;
   const made = template === undefined ? {} : { template, tree: treeDir(home, opts.name) };
-  const factory: Factory = { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made, ...originsOf(origins) };
+  const stored = template === undefined && workedOnNone(volumes) ? { instruction: { store: true as const } } : {};
+  const factory: Factory = { name: opts.name, volumes, workflows: [], hires: {}, schedules: {}, ...made, ...stored };
   return { factory, file: createFactoryAt(home, factory) };
 }
 
@@ -332,14 +350,18 @@ export function createFactoryAt(home: string, factory: Factory): string {
 
 /**
  * What the file of `factory` holds, written over `content`, what it held, every key the model does not name kept where it was: its
- * repositories; its workflows, hires and schedules where the file named the key or the factory names one (made from a template, its
+ * volumes, a key a later `nemia` wrote beside one kept, the list written even where it is empty; its workflows, hires and schedules where
+ * the file named the key or the factory names one (made from a template, its
  * workflows, hires, revisions policy and workflows' repositories are its tree's, and the file's are left as they were); where its
- * instruction is kept and its revisions policy where it says, the key gone where it does not; its volumes where it has any, in this file
- * even where it is made from a template; its harness settings where it names any; and its template, the keys a later `nemia` wrote
+ * instruction is kept and its revisions policy where it says, the key gone where it does not; its harness settings where it names any; and
+ * its template, the keys a later `nemia` wrote
  * beside it kept.
  */
 function fileContentOf(content: FactoryFile | undefined, factory: Factory): FactoryFile {
-  const next: Record<string, unknown> = { ...content, repos: factory.repos };
+  const next: Record<string, unknown> = {
+    ...content,
+    volumes: factory.volumes.map((v) => ({ ...content?.volumes.find((was) => was.path === v.path), ...volumeEntry(v) })),
+  };
   const named = (key: string, value: unknown, some: boolean) => {
     if (some || (content !== undefined && key in content)) next[key] = value;
   };
@@ -358,15 +380,8 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
   }
   named('schedules', factory.schedules, Object.keys(factory.schedules).length > 0);
   kept('instruction', factory.instruction);
-  kept(
-    'volumes',
-    factory.volumes?.length
-      ? factory.volumes.map((v) => ({ ...content?.volumes?.find((was) => was.path === v.path), ...volumeEntry(v) }))
-      : undefined,
-  );
   kept('harnessSettings', factory.harnessSettings);
   kept('costLines', factory.costLines);
-  kept('origins', factory.origins);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
   if (factory.generation !== undefined) next.generation = factory.generation;
   return next as FactoryFile;
@@ -801,4 +816,72 @@ export function clearScheduleAt(home: string, opts: { factory: string; workflow:
   const cleared = was.schedules[opts.workflow];
   if (cleared === undefined) throw new Missing({ message: unscheduledRefusal(opts.factory, opts.workflow, Object.keys(was.schedules)) });
   return { file, cleared };
+}
+
+/** What the move of a store's factory files did: each file it moved, and each it left as it was, with why. */
+export type VolumesMoved = { readonly moved: readonly string[]; readonly left: readonly { file: string; why: string }[] };
+
+/** The keys of a factory's file the move reads, as an earlier release wrote them, each of the shape `volumesFromRepos` reads. */
+const FormerKeysSchema = Schema.Struct({
+  repos: Schema.optionalKey(Schema.Array(Schema.String)),
+  origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  volumes: Schema.optionalKey(Schema.Array(VolumeEntrySchema)),
+});
+
+/** Whether `xs` names each of its strings once: what `volumesFromRepos` asks of a file's repositories and of its volumes' paths. */
+const once = (xs: readonly string[]): boolean => new Set(xs).size === xs.length;
+
+/**
+ * The factory files of the store `home` an earlier release wrote, each moved once into one list of volumes (`volumesFromRepos`): its
+ * repositories become writable volumes, first and in their order, each with the URL it was cloned from, its extra folders read-only after
+ * them, `repos` and `origins` taken out and every other key kept, its generation as it was, since what the factory reaches is unchanged.
+ * Each file written whole (`writeWhole`), so a move stopped half way leaves each file in one shape or the other, and a file already in
+ * one list is not written: run at every start of the daemon, it finishes what a start before it began. A file whose keys do not read, or
+ * that names a repository twice or a volume at a repository's path (`volumesFromRepos`' `requires`), is left as it is, with why; it then
+ * reads as a file in the earlier shape, naming `nemia up`. A hidden file, one being written, is left out.
+ * @param home The store's root.
+ */
+export function volumesMovedAt(home: string): VolumesMoved {
+  let names: string[];
+  try {
+    names = fs.readdirSync(factoriesDirAt(home));
+  } catch {
+    return { moved: [], left: [] };
+  }
+  const moved: string[] = [];
+  const left: { file: string; why: string }[] = [];
+  for (const name of names.filter((n) => n.endsWith('.json') && !n.startsWith('.')).sort()) {
+    const file = path.join(factoriesDirAt(home), name);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (!isFormer(raw)) continue;
+    const keys = Schema.decodeUnknownResult(FormerKeysSchema)(raw);
+    if (Result.isFailure(keys)) {
+      left.push({ file, why: "its repos, origins or volumes do not read as a factory's: fix them by hand, then start the daemon again" });
+      continue;
+    }
+    const repos = keys.success.repos ?? [];
+    const paths = (keys.success.volumes ?? []).map((v) => v.path);
+    if (!once(repos) || !once(paths) || paths.some((p) => repos.includes(p))) {
+      left.push({
+        file,
+        why: 'it names a repository twice, a volume twice, or a volume at one of its repositories: take the one out by hand, then start the daemon again',
+      });
+      continue;
+    }
+    const kept: Record<string, unknown> = { ...raw };
+    for (const key of FORMER_KEYS) delete kept[key];
+    const former = keys.success.volumes ?? [];
+    const volumes = volumesFromRepos(keys.success).map((v: FileVolume) => ({
+      ...former.find((was) => was.path === v.path),
+      ...v,
+    }));
+    writeWhole(file, `${JSON.stringify({ ...kept, volumes }, null, 2)}\n`);
+    moved.push(file);
+  }
+  return { moved, left };
 }

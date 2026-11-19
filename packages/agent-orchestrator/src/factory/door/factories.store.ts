@@ -46,6 +46,8 @@ import {
   rewriteFactoryAt,
   startFactoryAt,
   treeChecked,
+  volumesMovedAt,
+  type VolumesMoved,
 } from '../factory.store.ts';
 import { levelDiffers } from './generation.ts';
 import type { TreeFile } from '../../archive/archive.ts';
@@ -67,7 +69,8 @@ import {
 /**
  * A layer of the Factory door, as plain synchronous methods: the factories filed (listed by name, listed as each reads with its file —
  * or why its file does not read, so one bad file hides no other — read, filed, written back, removed, each write answering the file it
- * wrote), a factory's level (none where it follows the store's), its rules (a read's file, its words or
+ * wrote, and the files an earlier release wrote moved once into one list of volumes, answering each moved and each left with why), a
+ * factory's level (none where it follows the store's), its rules (a read's file, its words or
  * why they do not read; a write's file; whether a clear found any), its instruction (where it is kept and its words; the text the store
  * keeps written, answering its file, or cleared, answering whether there was any), its servers (none where it has none), and its own
  * folder as a whole (its files, by path from it, sorted, but those that stay with the store, which it names; placed where none is,
@@ -82,6 +85,7 @@ export type FactoryLayer = {
     readonly create: (factory: Factory) => string;
     readonly rewrite: (factory: Factory) => string;
     readonly remove: (name: string) => string;
+    readonly moveVolumes: () => VolumesMoved;
   };
   readonly level: {
     readonly read: (name: string) => FactoryLevelFile | undefined;
@@ -176,6 +180,7 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
           }),
         ),
       remove: (name) => notDefaultBy(name, 'rm', door.factories.remove(name)),
+      moveVolumes: door.factories.moveVolumes,
     },
     level: {
       read: (name) => (isDefault(name) ? Effect.succeed(undefined) : door.level.read(name)),
@@ -278,6 +283,7 @@ export function factoryFiles(home: string): FactoryLayer {
       create: (factory) => createFactoryAt(home, factory),
       rewrite: (factory) => rewriteFactoryAt(home, factory),
       remove: (name) => removeFactoryAt(home, name).file,
+      moveVolumes: () => volumesMovedAt(home),
     },
     level: {
       read: (name) => readFactoryLevel(home, name),
@@ -390,12 +396,12 @@ export { treeChecked };
  * schedule's judgement.
  */
 export {
+  clonesOf,
   factoriesDirAt,
-  factoryRepos,
-  originsOf,
   refuseName,
   scheduleOf,
   scheduleRefused,
+  volumesGiven,
   wiringChecked,
   wiringNamesRefused,
 } from '../factory.store.ts';

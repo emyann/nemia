@@ -69,7 +69,7 @@ const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filte
 
 /** What the trigger's title says of the factory picked: its repositories whole, one a line, and why its file does not read. */
 const aboutOf = (factory: Factory | undefined): string | undefined =>
-  factory && [...factory.repos, ...(factory.error ? [`Its file does not read: ${factory.error}`] : [])].join('\n');
+  factory && [...factory.worksOn, ...(factory.error ? [`Its file does not read: ${factory.error}`] : [])].join('\n');
 
 /**
  * What a factory's item says under its name: its runs in flight, that the api lists no factory by that name, or that its file does not
@@ -95,8 +95,8 @@ const NEW_FACTORY = 'new-factory';
  * @param tick whether the store's daemon ticks or its factories are paused, none while unread
  */
 export function switcherLine(factory: Factory | undefined, tick: 'ticking' | 'paused' | 'not ticking' | undefined): string {
-  const repos = factory?.repos ?? [];
-  const repo = repos[0] === undefined ? 'no repository' : `${repoName(repos[0])}${repos.length > 1 ? ` +${repos.length - 1}` : ''}`;
+  const repos = factory?.worksOn ?? [];
+  const repo = repos[0] === undefined ? 'no volume to work on' : `${repoName(repos[0])}${repos.length > 1 ? ` +${repos.length - 1}` : ''}`;
   const template = factory?.template ? `${repoName(factory.template.source)}@${factory.template.version}` : undefined;
   return [repo, template, tick].filter((part) => part !== undefined).join(' · ');
 }

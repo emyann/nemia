@@ -24,7 +24,7 @@ import { story } from 'test-kit/checkpoints';
  */
 const repo = scratch('nemia-api-custom-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-addFactory({ name: 'elsewhere', repos: [repo] });
+addFactory({ name: 'elsewhere', volumes: [repo].map((r) => `${r}:rw`) });
 
 type CustomInstructionsAnswer = import('objects').AgentInstructions;
 type CustomInstructionsCleared = import('objects').AgentInstructionsCleared;

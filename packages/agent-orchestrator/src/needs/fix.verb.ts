@@ -72,7 +72,7 @@ type FixFound = {
   readonly fix: NeedFix;
   readonly index: number;
   readonly origin: Origin;
-  readonly listing?: Extract<FactoryListing, { repos: readonly string[] }>;
+  readonly listing?: Exclude<FactoryListing, { error: string }>;
   readonly folders?: { readonly workflowFiles: string; readonly carriedFiles: string };
   readonly repository?: string;
 };
@@ -81,7 +81,7 @@ type FixFound = {
 type Declared = { readonly fix: NeedFix; readonly origin: Origin };
 
 /** The factory `name` of the store `home`, read; refused (`Missing`) where there is none, or its file does not read. */
-function factoryNamed(home: string, name: string): Extract<FactoryListing, { repos: readonly string[] }> {
+function factoryNamed(home: string, name: string): Exclude<FactoryListing, { error: string }> {
   const all = listedAtOnce(home);
   const found = all.find((f) => f.name === name);
   if (found === undefined)

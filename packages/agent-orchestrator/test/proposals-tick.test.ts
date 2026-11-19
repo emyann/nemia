@@ -48,7 +48,10 @@ function factory(name: string): string {
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
     path.join(factories, `${name}.json`),
-    JSON.stringify({ repos: [scratch('wf-proposals-tick-repo-')], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+    JSON.stringify({
+      volumes: [{ path: scratch('wf-proposals-tick-repo-'), readOnly: false }],
+      template: { source: '/t/team', version: '0.1.0', params: {} },
+    }),
   );
   const tree = path.join(factories, name, 'tree');
   fs.mkdirSync(path.join(tree, 'workflows', 'dev'), { recursive: true });

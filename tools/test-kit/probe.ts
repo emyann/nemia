@@ -33,13 +33,17 @@ export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessE
 }
 
 /**
- * `env` less the variables of the Vitest a test runs in, which a Vitest it starts would read as its own.
+ * `env` less the variables of the Vitest a test runs in, which a Vitest it starts would read as its own, and with no colour: a test
+ * reads the child's words, which a runner colours where it finds a CI it knows (GitHub Actions) or `FORCE_COLOR`, as it would not by
+ * hand.
  *
  * @param env the environment a child Vitest is to run under
  */
 export function runnerless(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const given = { ...env };
   for (const name of RUNNERS) delete given[name];
+  delete given.FORCE_COLOR;
+  given.NO_COLOR = '1';
   return given;
 }
 

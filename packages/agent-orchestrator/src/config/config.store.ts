@@ -4,7 +4,8 @@
  * (`WF_KEEP_WORKTREES`), how long the series are kept (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`), and the memory limit each
  * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), the memory each asks of the
  * machine by default and the floor the daemon keeps (`WF_MEMORY_REQUEST`, `WF_MEMORY_RESERVED`), and whether the daemon of an
- * archive install checks for a newer release (`NEMIA_RELEASE_CHECK`). Each is an Effect `Config`
+ * archive install checks for a newer release (`NEMIA_RELEASE_CHECK`), and the folders the person's folder listing may read
+ * (`WF_FOLDER_ROOTS`). Each is an Effect `Config`
  * with its default, and each has a plain reader that takes the environment it is given — never `process.env` by default — and answers the
  * value or throws `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never
  * read as its default. Reads no disk.
@@ -307,6 +308,34 @@ export const releaseCheck = (env: Env): boolean =>
   );
 
 /**
+ * `WF_FOLDER_ROOTS`, the folders under which the person's folder listing names folders, and under which it makes a folder a repository
+ * (`foldersNamed`, `src/factory/folders/folders.verb.ts`): absolute paths separated by the system's path delimiter (`:` on Linux and
+ * macOS), or the home of the user the daemon runs as when unset or blank, read when it is read. Refused when an entry is relative: each
+ * process would read its own folders under its working directory.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
+export const folderRoots = (env: Env): readonly string[] => {
+  const value = env.WF_FOLDER_ROOTS ?? '';
+  const roots = value
+    .split(path.delimiter)
+    .map((root) => root.trim())
+    .filter((root) => root !== '');
+  if (roots.length === 0) return [os.homedir()];
+  if (roots.every((root) => path.isAbsolute(root))) return roots.map((root) => path.resolve(root));
+  throw new Invalid({
+    message: `WF_FOLDER_ROOTS=${value} holds a path that is not absolute. It is the folders the board's folder field lists folder names under, separated by ${path.delimiter}: WF_FOLDER_ROOTS=/srv/code${path.delimiter}/home/me — or unset, for the home of the user the daemon runs as.`,
+  });
+};
+
+/**
+ * `AE_ROOT`, the runtime's own store when it is run apart (`ae`): its path resolved, or `~/.agent-engine` when unset or blank. Read so
+ * that the person's folder listing names nothing inside it; Nemia's daemon keeps its engine under `WF_ROOT`.
+ * @param env The environment the variable is read from, as `process.env` holds it.
+ */
+export const engineStore = (env: Env): string =>
+  env.AE_ROOT?.trim() ? path.resolve(env.AE_ROOT.trim()) : path.join(os.homedir(), '.agent-engine');
+
+/**
  * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
  * it starts a card that names none: only with `1`, which the package's and the api's tests set for the starts they make in scratch
  * folders. Unset, by default, every such start is refused.
@@ -402,6 +431,8 @@ export type Settings = {
   readonly exposed: boolean;
   readonly servedNames: readonly string[];
   readonly releaseCheck: boolean;
+  readonly folderRoots: readonly string[];
+  readonly engineStore: string;
 };
 
 /**
@@ -454,6 +485,12 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get releaseCheck() {
     return releaseCheck(env);
+  },
+  get folderRoots() {
+    return folderRoots(env);
+  },
+  get engineStore() {
+    return engineStore(env);
   },
 });
 

@@ -258,6 +258,13 @@ export const withoutProgram = (pathValue: string, program: string) =>
     .join(path.delimiter);
 
 /**
+ * The folder the worker's api lists folder names under (`WF_FOLDER_ROOTS`), beside the store `root` and outside it, so the welcome's
+ * volume step lists what a page plants there.
+ * @param root The worker's store.
+ */
+export const folderRootOf = (root: string) => `${root}-folders`;
+
+/**
  * The api's environment over `root`: Claude Code's transcripts are in the store (CLAUDE_CONFIG_DIR), where the engine reads a session's
  * conversation, never from this machine's.
  */
@@ -266,6 +273,8 @@ export const apiEnvOf = (root: string, bin: string) =>
     ...process.env,
     PORT: '0',
     WF_ROOT: root,
+    /** The folders the person's folder listing reads: a scratch folder beside the store, never inside it, which the listing refuses. */
+    WF_FOLDER_ROOTS: folderRootOf(root),
     /** The e2e's starts are made in its scratch checkout, which no factory of its store holds: they go to the default factory. */
     WF_DEFAULT_FACTORY_STARTS: '1',
     /** The folder the api's tick works in; a request is placed by its factory alone, the checkout read through FACTORIES' `hiring`. */
@@ -407,6 +416,7 @@ export const serveExposed = () => serveSeat('exposed', { WF_EXPOSED: '1' }) sati
  */
 export async function serveStore(root: string, seat: Served, dist?: string) {
   seedStore(root);
+  fs.mkdirSync(folderRootOf(root), { recursive: true });
   const bin = fakeClaude(root);
   const draftTranscript = path.join(root, DRAFT_TRANSCRIPT);
   heardOn(attachedFiles(root, `ae/${SAYING.run}-${SAYING.step}/1`).say, (line) => {

@@ -1394,6 +1394,61 @@ const CLONE: readonly Walk[] = [
   },
 ];
 
+const INIT: readonly Walk[] = [
+  {
+    name: 'a folder not there yet is made a repository with one empty first commit, and asked again is found, not made',
+    walk: (side, area) => {
+      const dir = path.join(area, 'new', 'work');
+      const first = side.place.askNow('init', { dir });
+      const head = side.world.head(dir);
+      const rooted = side.place.askNow('root', { dir });
+      const again = side.place.askNow('init', { dir });
+      return { first, head, read: side.world.read(dir, head), rooted, again, headAgain: side.world.head(dir) };
+    },
+    says: {
+      again: { answer: { made: false, repo: '<area>/new/work' } },
+      first: { answer: { made: true, repo: '<area>/new/work' } },
+      head: 'commit-1',
+      headAgain: 'commit-1',
+      read: { message: 'Begin', parents: [] },
+      rooted: { answer: { root: '<area>/new/work' } },
+    },
+  },
+  {
+    name: 'a folder holding files is made a repository whose first commit holds none of them, each left as it was and not committed',
+    walk: (side, area) => {
+      const dir = path.join(area, 'held');
+      fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, 'note.txt'), 'kept\n');
+      const first = side.place.askNow('init', { dir });
+      return { first, files: filesIn(dir), changes: side.world.changes(dir), changed: side.world.changed(dir, side.world.head(dir)) };
+    },
+    says: {
+      changed: [],
+      changes: ['note.txt'],
+      files: { 'note.txt': 'kept\n' },
+      first: { answer: { made: true, repo: '<area>/held' } },
+    },
+  },
+  {
+    name: 'a repository with a commit already is found, not made, and given no commit',
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area);
+      return { base, answer: side.place.askNow('init', { dir: root }), head: side.world.head(root) };
+    },
+    says: { answer: { answer: { made: false, repo: '<area>/repo' } }, base: 'commit-1', head: 'commit-1' },
+  },
+  {
+    name: 'REFUSED: a relative folder and a file, each left as it was',
+    walk: (side, area) => {
+      fs.writeFileSync(path.join(area, 'file'), 'plain\n');
+      const outcomes = [side.place.askNow('init', { dir: 'relative/work' }), side.place.askNow('init', { dir: path.join(area, 'file') })];
+      return { outcomes, left: fs.readdirSync(area).sort(), file: fs.readFileSync(path.join(area, 'file'), 'utf8') };
+    },
+    says: { file: 'plain\n', left: ['file'], outcomes: [{ refused: true }, { refused: true }] },
+  },
+];
+
 /** The contract: every verb's walks. A verb of `PLACE_VERBS` with no entry does not compile, and one with none fails `unwalked`. */
 export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
   root: ROOT,
@@ -1411,6 +1466,7 @@ export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
   export: EXPORT,
   seal: SEAL,
   clone: CLONE,
+  init: INIT,
 };
 
 /** The verbs of `verbs` that `walks` holds no walk for. */

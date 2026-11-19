@@ -1,16 +1,29 @@
 /**
  * The caution on a factory one of whose places a harness does not trust: each place, what the api said is withheld from the place's own
  * settings meanwhile, and the line that trusts them, as the api answered it. A person weighs it, so it is drawn as theirs, light. Draws
- * nothing for a factory whose places are all trusted.
+ * nothing for a factory whose places are all trusted. Where the page asks the trust itself (the volume step), `onTrust` and `onLater`
+ * draw its two presses under the caution, Trust and Not now, `trusting` while the trust is being given.
  */
 import { ShieldAlert } from 'lucide-react';
+import { Pending } from '@/components/look';
+import { Button } from '@/components/ui/ds';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { Factory } from '@/lib/api/factories';
 import { edged, ink } from '@/lib/meaning';
 import { CopyButton } from '../command/CopyButton';
 
-/** The caution for `factory`, marked `data-untrusted` with the factory's name. */
-export function FactoryTrust({ factory }: { factory: Pick<Factory, 'name' | 'untrusted' | 'commands'> }) {
+/** The caution for `factory`, marked `data-untrusted` with the factory's name, with the presses that answer it where given. */
+export function FactoryTrust({
+  factory,
+  onTrust,
+  onLater,
+  trusting = false,
+}: {
+  factory: Pick<Factory, 'name' | 'untrusted' | 'commands'>;
+  onTrust?: () => void;
+  onLater?: () => void;
+  trusting?: boolean;
+}) {
   const { untrusted } = factory;
   if (untrusted.length === 0) return null;
   const repairable = untrusted.some((u) => u.never === null);
@@ -38,6 +51,20 @@ export function FactoryTrust({ factory }: { factory: Pick<Factory, 'name' | 'unt
             </span>
             <CopyButton text={factory.commands.trust} />
           </p>
+        )}
+        {(onTrust !== undefined || onLater !== undefined) && (
+          <div data-trust-presses className="flex flex-wrap items-center gap-2 pt-1">
+            {onTrust !== undefined && (
+              <Button variant="filled" data-trust-give onPress={onTrust} isDisabled={trusting} icon={trusting ? Pending : undefined}>
+                Trust
+              </Button>
+            )}
+            {onLater !== undefined && (
+              <Button variant="text" data-trust-later onPress={onLater} isDisabled={trusting}>
+                Not now
+              </Button>
+            )}
+          </div>
         )}
       </AlertDescription>
     </Alert>

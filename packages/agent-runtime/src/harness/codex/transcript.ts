@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
-import { type RolloutItem, rolloutRecordOf } from './rollout.ts';
+import { Items, type RolloutItem, rolloutRecordOf } from './rollout.ts';
 
 const rollouts = new Map<string, string>();
 
@@ -51,23 +51,15 @@ export const codexRolloutFile = (threadId: string): string | undefined => {
 const textsOf = (blocks: readonly (string | { readonly text?: string })[] | undefined): string[] =>
   (blocks ?? []).map((b) => (typeof b === 'string' ? b : b.text)).filter((t): t is string => t !== undefined);
 
-/** An item of `type`, as `ROLLOUT` decodes it. */
-type ItemOf<T extends string> = Extract<RolloutItem, { type: T }>;
-
-const isItem =
-  <T extends string>(type: T) =>
-  (item: RolloutItem): item is ItemOf<T> =>
-    item.type === type;
-
 /** A completed thread item as events, under `id` and at `at`. */
 const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[] => {
-  if (isItem('UserMessage')(item)) return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }];
-  if (isItem('AgentMessage')(item)) return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }];
-  if (isItem('Reasoning')(item)) {
+  if (Items.guards.UserMessage(item)) return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }];
+  if (Items.guards.AgentMessage(item)) return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }];
+  if (Items.guards.Reasoning(item)) {
     const text = [...textsOf(item.summary_text), ...textsOf(item.raw_content)].join('\n');
     return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }];
   }
-  if (isItem('CommandExecution')(item)) {
+  if (Items.guards.CommandExecution(item)) {
     return [
       { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'CommandExecution', input: { command: item.command, cwd: item.cwd } } },
       {
@@ -79,7 +71,7 @@ const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[
       },
     ];
   }
-  if (isItem('FileChange')(item)) {
+  if (Items.guards.FileChange(item)) {
     return [
       { id, at, role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: item.changes } } },
       {

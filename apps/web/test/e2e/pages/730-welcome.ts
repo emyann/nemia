@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from 'playwright';
 import { photograph, READINESS_ROUTE, themeOf } from '../board.ts';
@@ -5,7 +7,7 @@ import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts
 import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT } from '../world.ts';
+import { apiEnv, OUT } from '../world.ts';
 
 /** A check of a harness, as the api answers it: the keys the page reads. */
 type Check = { name: 'version' | 'turn'; state: 'passed' | 'failed' | 'running' | 'unrun'; message: string; fixes: [] };
@@ -118,9 +120,91 @@ async function makesFromTemplate(page: Page) {
     throw new Refused(`${MADE} is filed from sdlc with no volume — the api answered ${read.status} ${JSON.stringify(spec)}`);
   await settled(page);
   await photograph(page, path.join(OUT, `welcome-factory-made-${await themeOf(page)}.png`));
-  await page.locator('article[data-factory-step] [data-welcome-skip]').click();
+  await page.locator('article[data-factory-step] [data-welcome-next]').click();
+  await page.waitForURL((url) => url.pathname === '/welcome/volume');
+  await idle(page);
+}
+
+/** The folder the worker's api lists under (`WF_FOLDER_ROOTS`, `folderRootOf` in served.ts). */
+const folderRoot = () => {
+  const root = apiEnv.WF_FOLDER_ROOTS;
+  if (!root) throw new Refused("the worker's api lists folders under WF_FOLDER_ROOTS, which its environment does not set");
+  return fs.realpathSync(root);
+};
+
+/** The folders the page plants under the listing's root: `plain`, no repository, and `work`, a repository with one commit. */
+function plantFolders() {
+  const root = folderRoot();
+  const plain = path.join(root, 'plain');
+  const work = path.join(root, 'work');
+  fs.mkdirSync(plain, { recursive: true });
+  fs.mkdirSync(work, { recursive: true });
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', ...args], {
+      cwd: work,
+      stdio: 'ignore',
+    });
+  git('init', '--quiet', '-b', 'main');
+  git('commit', '--quiet', '--allow-empty', '-m', 'Begin');
+  return { plain, work };
+}
+
+/** `path` typed into the folder way's field and used. */
+async function useFolder(page: Page, at: string) {
+  const step = page.locator('article[data-volume-step]');
+  await step.getByRole('combobox', { name: /Folder/ }).fill(at);
+  await step.locator('[data-folder-use]').click();
+}
+
+/**
+ * The volume step, from the factory step's Next: the factory made chosen, A folder on this machine, the listing naming the planted
+ * folders under its root; a folder that is no repository offered git init, and on No held, adding nothing; then a repository's folder
+ * used, added writable to the factory, its trust asked (or, where no harness of the worker keeps one, the work in place at once), and
+ * Not now leaving it waiting. The volume is read from the api. Trust is never pressed: it would write a harness's own trust file.
+ */
+async function givesAFolder(page: Page) {
+  const { plain, work } = plantFolders();
+  const step = page.locator('article[data-volume-step]');
+  await expectVisible(step, 'Next leads to the volume step, at /welcome/volume');
+  const choice = step.locator(`[data-volume-factory="${MADE}"]`);
+  if ((await choice.count()) > 0) await choice.click();
+  await expectVisible(page.locator('article[data-volume-step="choose"]'), `${MADE} holds no volume: the step offers its three ways`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `welcome-volume-choose-${await themeOf(page)}.png`));
+  await step.locator('[data-volume-way="folder"]').click();
+  await step.getByRole('combobox', { name: /Folder/ }).fill(`${folderRoot()}/`);
+  const listbox = page.getByRole('listbox');
+  await expectVisible(listbox.getByRole('option', { name: 'plain' }), 'the listing names the planted folder plain');
+  await expectVisible(listbox.getByRole('option', { name: 'work' }), 'the listing names the planted folder work');
+  await settled(page);
+  await photograph(page, path.join(OUT, `welcome-volume-folder-${await themeOf(page)}.png`));
+  await page.keyboard.press('Escape');
+  await useFolder(page, plain);
+  await expectVisible(page.locator('article[data-volume-step="init"]'), 'a folder that is no repository is offered git init');
+  await step.locator('[data-init-no]').click();
+  await expectVisible(page.locator('article[data-volume-step="declined"]'), 'No holds the step on the folder, saying why');
+  await step.locator('[data-init-another]').click();
+  await useFolder(page, work);
+  const added = page.locator('article[data-volume-step="trust"], article[data-volume-step="done"]');
+  await expectVisible(added, 'the repository is added: its trust is asked, or, where no harness keeps one, the work is in place');
+  await settled(page);
+  await photograph(page, path.join(OUT, `welcome-volume-added-${await themeOf(page)}.png`));
+  if ((await page.locator('article[data-volume-step="trust"]').count()) > 0) {
+    await step.locator('[data-trust-later]').click();
+    await expectVisible(page.locator('article[data-volume-step="waiting"]'), 'Not now leaves the factory waiting on the trust');
+  }
+  const read = await asked(page, 'GET', `/api/factories/${MADE}`);
+  const volumes = (read.body as { spec?: { volumes?: { path: string; readOnly: boolean }[] } } | undefined)?.spec?.volumes ?? [];
+  if (volumes.length !== 1 || volumes[0]?.path !== work || volumes[0]?.readOnly !== false)
+    throw new Refused(`${MADE} has one writable volume, ${work} — the api answered ${read.status} ${JSON.stringify(volumes)}`);
+  await step.locator('[data-welcome-skip]').click();
   await page.waitForURL((url) => url.pathname === '/');
   await idle(page);
+}
+
+/** The planted folders taken away. */
+function takeBackFolders() {
+  for (const name of ['plain', 'work']) fs.rmSync(path.join(folderRoot(), name), { recursive: true, force: true });
 }
 
 /** Activate starts the install's first fix, held here as `660-setup` holds it: the start answered, its output streamed and ended. */
@@ -168,9 +252,9 @@ export default {
   /**
    * The welcome, over readiness reads it answers in place of the api's: `/` on a fresh store lands on `/welcome`; Activate starts the
    * install piece's first fix; a turn failed and both passed are drawn as their ticks, Next shown once both passed, leading to the
-   * factory step, where sdlc is applied through the real api (`makesFromTemplate`, the milestones answered too: factory next); and the
-   * skip leaves for `/`, under the Setup banner, which no longer sends that browser to the welcome. The factory and the skip are taken
-   * back.
+   * factory step, where sdlc is applied through the real api (`makesFromTemplate`, the milestones answered too: factory next), and on to
+   * the volume step, where a folder planted under the listing's root is given it (`givesAFolder`); and the skip leaves for `/`, under
+   * the Setup banner, which no longer sends that browser to the welcome. The factory, its folders and the skip are taken back.
    */
   name: 'welcome',
   route: '/setup',
@@ -220,6 +304,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `welcome-ready-${await themeOf(page)}.png`));
       await makesFromTemplate(page);
+      await givesAFolder(page);
 
       planted = 'fresh';
       await page.goto(new URL('/welcome/', page.url()).href);
@@ -237,6 +322,7 @@ export default {
       if (new URL(page.url()).pathname !== '/') throw new Refused(`skipped in this browser, / stays / — it went to ${page.url()}`);
     } finally {
       await asked(page, 'DELETE', `/api/factories/${MADE}`);
+      takeBackFolders();
       await page.unroute(MILESTONES_ROUTE, milestones);
       await page.evaluate((key) => localStorage.removeItem(key), HARNESS_SKIP_KEY);
       await unhold();

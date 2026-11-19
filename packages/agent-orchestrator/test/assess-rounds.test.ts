@@ -1235,14 +1235,13 @@ describe("`nemia ls`' costs: each step's tries' beside its word once measured, a
   });
   test('a try at work that said what it has spent so far: added in, so far, beside the step and the run, and alone where nothing ended', () => {
     const live = { usd: 1.25, at: '2026-11-18T23:16:38.018Z' };
-    const atWork =
-      (earlier: boolean): SpendOf =>
-      (id) =>
+    const atWork = (earlier: boolean) =>
+      ((id) =>
         id === 't0' && earlier
           ? { usd: 1, measured: 1, unmeasured: 0, budgetEnded: false }
           : id === 't1'
             ? { usd: 0, measured: 0, unmeasured: 0, live, budgetEnded: false }
-            : undefined;
+            : undefined) satisfies SpendOf;
     const both = ls(atWork(true));
     assert.deepEqual([both.steps[0].cost, both.cost], ['$2.25 so far', '$2.25 so far']);
     const alone = ls(atWork(false));

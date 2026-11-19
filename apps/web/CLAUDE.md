@@ -39,7 +39,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 ## Build and e2e
 
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
-- `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due;
+- `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due,
+  which pictures them in dark alone, and `--light` beside it when a light picture is asked for on purpose (`themesOf`, `e2e/pages.ts`);
   never the whole suite in a session but to measure it. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
   --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/stories/` or a runner file beside the
   pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
@@ -51,7 +52,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   shard's together against `PAGES_BOUND_MS` — the bound being the whole run's and additive — refusing a shard that is missing, doubled or
   of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`); a shard runs no look test,
   and CI's `e2e-look` job runs them once (`--look`, refused beside `--shard`).
-- `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
+- `npm run e2e -- --photos --contrast` visits light, then dark, and writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
   `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`), and either way free memory caps it: `--workers` can lower the
@@ -72,14 +73,23 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - The stories are the one place the parts are shown, and where a step builds and judges a visual change: write or extend the story
   first, then the part. They draw under one decorator (`.storybook/preview.tsx`: the look's ground, a router of the story's own in
   memory, `data-at` where it stands, a query client of its own that retries nothing, MSW's loader, axe as `error`, and a story the
-  holder caught throwing failed after it draws). Storybook's addons are the docs, the accessibility panel, the Vitest addon and MSW;
+  holder caught throwing failed after it draws). Storybook's addons are the docs, the accessibility panel, the Vitest addon, the theme switch and MSW;
   the ds kit's own published Storybook is composed beside ours (`refs`), loaded from its site in a person's browser, and no check runs
-  its stories. `npm run storybook`, from `apps/web` or the root, is a person's, on port 6007; dark follows the system alone, so its
-  toolbar switches nothing.
+  its stories. `npm run storybook`, from `apps/web` or the root, is a person's, on port 6007; its toolbar switches the theme, dark by
+  default (`@storybook/addon-themes`, the class on `<html>` of `.storybook/scheme.ts`), the board's dark rules copied under that class
+  by a PostCSS transform in Storybook's toolchain alone (`.storybook/schemeBuild.ts`), so the board's own build draws what it draws.
 - `npm run stories`, from `apps/web`, runs every story through Vitest in Playwright's Chromium (`vitest.config.ts`, the project
-  `storybook`): each a smoke test that it renders, its play function, and axe. `npm run e2e -- --look` runs it after the look's
+  `storybook`): each a smoke test that it renders, its play function, axe, and its approved picture. Every story has one in the dark
+  theme, `test/approved/<story id>.png`, and each light canary one in light too, `test/approved/light/<story id>.png`
+  (`LIGHT_CANARIES`, `.storybook/approved.ts`); `.storybook/compare.ts` compares the story's ground against it, strictly (pixelmatch's
+  0.1, anti-aliasing ignored, no other pixel), on a clock that stands still, in reduced motion, the pointer moved off and a read
+  still out drawn at once. It compares only in the pinned place, Ubuntu 24.04 on x64 with the lockfile's Chromium
+  (`test/e2e/stories/pinned.ts`, which `npm run stories` runs), as CI's `e2e-look` job and the steps' server both are; anywhere else
+  it says so and compares nothing. A story that differs fails, its reference, actual and diff left under `.vitest/attachments/approved/`
+  (uploaded by `e2e-look` on a failure); `npm run stories -- --update <file>.stories.tsx` writes the pictures of a change meant, to
+  commit with it. `test/approved.test.ts` refuses a story with no picture and a picture of no story. `npm run e2e -- --look` runs it after the look's
   tests (`LOOK_RUNS`, `e2e/look.ts`), so CI's `e2e-look` job does; `npm test` never does. One file:
-  `npx vitest run --project=storybook <file>.stories.tsx`. A story axe fails today says `a11y: { test: 'todo' }` itself, and the
+  `npm run stories -- <file>.stories.tsx`. A story axe fails today says `a11y: { test: 'todo' }` itself, and the
   count only shrinks.
 - A page body's stories (`Pages/`, the runs page's `components/run/RunsPage.stories.tsx` the pattern) answer its reads through MSW
   (`parameters.msw`), with handlers over fixtures typed by `objects`' own types (`.storybook/fixtures/`), so a key the api renames
@@ -101,28 +111,22 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - One component system: the ds kit. shadcn's `components/ui/*` is retired, a page at a time, and React Aria is imported only inside
   the kit or a part of the look. A generic part the kit lacks is asked for upstream (french-tech-homies/design-system); one that is
   Nemia's alone is a part of the look, with its stories.
-- `node test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <dir>`, from `apps/web`, pictures each story a change touches
-  (found by its imports, `storiesTouched`, `e2e/stories/touched.ts`, proved by `contracts/touched-stories.contract.ts`), light and
-  dark, at the head (`story-<id>-<theme>.png`), and again at the merge base drawn from a `git archive` on this machine, writing
-  `before-`, `after-` and `diff-` for each story whose pixels differ, and `stories.json`. Before it builds, it removes from `--out`
-  what an earlier pass wrote there (each `before-`, `after-`, `diff-`, `story-` and `match-*.png`, and `stories.json`, no other file
-  and no folder), so a step shooting again removes no picture by hand; a changed part no story reaches is refused,
-  exit 1, named. `--list` prints the touched ids and bare parts as JSON and launches no browser; `--changed <path>…` names the paths
-  instead of git. A picture is kept under a key of what its story is drawn from (`keysOf`, `e2e/stories/cache.ts`: the files its
-  imports reach, `.storybook/`, `theme/`, `public/`, the board's `package.json`, `vite.config.ts` and `tsconfig.json`, and from the
-  workspace the root's `package-lock.json`, `objects`' source and `package.json`, the tool's own files and the render settings), in the folder `STORIES_CACHE` names, else `node_modules/.cache/stories/`, and copied
-  rather than drawn on either side while its key holds; a side with nothing left to draw builds no Storybook, `stories.json`'s
-  `pictures` counts each side's copied and drawn, and `--no-cache` draws them all. Drawing builds Storybook once a side: a few
-  minutes, about 2.6 GB. Nothing prunes the cache. `--targets <dir>` sets each `target-<story id>[-light|-dark].png`
-  there beside its story at the head, one height, captioned, as `match-<id>-<theme>.png` (`e2e/stories/targets.ts`), listed in
-  `stories.json`'s `matched` and `matches`.
+- `node test/e2e/stories/changed.ts --base main-worktree/HEAD --out <dir>`, from `apps/web`, hands what a change did to the look:
+  the approved pictures its own commits added, changed and removed, read from git, and for each changed `before-`, `after-` and
+  `diff-<name>.png` (`<name>` the story's id, `-light` after it for a canary's light picture), and `approved.json`; it draws nothing.
+  Before it writes, it removes from `--out` what an earlier pass wrote there (each `before-`, `after-`, `diff-` and `match-*.png`, and
+  `approved.json`). A changed part no story reaches (found by its imports, `storiesTouched`, `e2e/stories/touched.ts`, proved by
+  `contracts/touched-stories.contract.ts`) is refused, exit 1, named. `--list` prints the stories the change reaches, the bare parts
+  and the pictures as JSON; `--changed <path>…` names the paths instead of git. `--targets <dir>` sets each
+  `target-<story id>[-light|-dark].png` there beside its story's approved picture, one height, captioned, as `match-<id>-<theme>.png`
+  (`e2e/stories/targets.ts`): a light target only of a canary, the others refused.
 - What a person does to a part — a press, the keyboard, the focus, where a link leads, what a press opens — is its story's play
   function (`play`, its helpers `.storybook/play.ts`), run by `npm run stories`. What needs the browser's own input or reads pixels
   stays a browser test under `test/e2e/` (`cuts.test.ts`, `bars.test.ts`, `motion.test.ts`, `secondary.test.ts`, `menu-key.test.ts`), each story opened
   alone in Storybook's static build at `iframe.html?id=<id>` (`openStory`, `e2e/stories/built.ts`), which `--look` builds once and names
   in `LOOK_STORYBOOK`, and a test run alone builds itself: the pixels (`e2e/pixels.ts`), Enter on a link, which the browser turns into a
   click and a play function's keys never do (`e2e/keys.ts`), CSS's `:hover`, reduced motion and the dark theme. `node
-  test/e2e/look-photos.ts` pictures every story and the look's close-ups, light then dark, for a person.
+  test/e2e/look-photos.ts` pictures every story and the look's close-ups in dark, for a person, and in light first with `--light`.
 - **A step looks at its visual work through `storybook dev`**, from `apps/web`: `npx storybook dev -p <a port of its own> --no-open
   --ci` (never 6007, the person's, nor a port another run holds), kept by its pid in the step's own files, and each story read at
   `http://localhost:<port>/iframe.html?id=<story id>`; an edit shows in under a second. It holds about 2.5 GB while it runs, which
@@ -141,7 +145,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A page is a file of its own, `test/e2e/pages/NNN-<name>.ts`, default-exporting a `PageSpec` named `<name>`, plus the line `<name>` at the
   end of `pages/NAMES`; touch nothing else. Pages are numbered in tens and handed out in file-name order. Shared helpers go in
   `board.ts` or `canvas.ts`, runner state in `world.ts`, the seed in `seed.ts`.
-- Every page is visited in dark; `--photos` visits it in light, then dark, in one store: a fixture a second page's close would show is
+- Every page is visited in dark; `--photos --light` visits it in light, then dark, in one store: a fixture a second page's close would show is
   taken back before the close.
 - A page run against the old code proves only its first failing assertion: to prove each new one, skip the earlier ones in a throwaway
   edit, run, and put the page back.

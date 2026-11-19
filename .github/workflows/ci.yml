@@ -321,8 +321,21 @@ jobs:
         timeout-minutes: 15
         working-directory: apps/web
       - name: Run the look's browser tests
-        # --look alone: the look's tests and no page, which the shards visit.
+        # --look alone: the look's tests and no page, which the shards visit; then every story, each compared against its approved
+        # picture (apps/web/test/approved), the runner being the pinned place, Ubuntu 24.04 and the lockfile's Chromium
+        # (apps/web/test/e2e/stories/pinned.ts), as on the server a step draws them on.
         run: npm run e2e -- --look
+      - name: Upload the stories' differing pictures
+        # A failure's alone: each story whose picture differs from its approved one leaves its reference, actual and diff here.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        timeout-minutes: 5
+        with:
+          name: approved-pictures-differ
+          path: apps/web/.vitest/attachments/approved
+          # .vitest is hidden, and upload-artifact skips a dotted path unless it is told not to.
+          include-hidden-files: true
+          if-no-files-found: ignore
 
   e2e-bound:
     # The whole e2e's page time, summed across the shards and held to PAGES_BOUND_MS — the bound that is additive and that a shard, like

@@ -216,7 +216,7 @@ const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>(
     switchedOnRead: {
       description: 'No exclude is a folder switched on, or a folder inside one',
       condition: ({ input: [folders], output }) =>
-        folders.every((f) => !f.claudeMd || output.excludes.every((e) => !e.endsWith('/**') || !within(e.slice(0, -3), f.path))),
+        folders.every((f) => !f.claudeMd || output.excludes.every((x) => x !== f.path && !x.startsWith(f.path + '/'))),
     },
     excludesOnlyFolders: {
       description: 'Each exclude is an added folder left off',

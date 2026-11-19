@@ -12,8 +12,8 @@
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { beforeAll, describe, test } from 'vitest';
+import { outlived, teardowns, type Finishes } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,7 +60,7 @@ const storeLines = (reason: string): FeedLine[] => readFeed(ROOT, 0).lines.filte
  * A take-over's process: a child of this test, on its `WF_ROOT`, that puts the store's pause through the live host's `pause` and then
  * waits to be killed. Answers once the pause is on disk; the test kills it, and `t.after` kills it where a checkpoint failed first.
  */
-const takeOverProcess = async (t: TestContext) => {
+const takeOverProcess = async (t: Finishes) => {
   const child = nodeChild(
     `const m = await import(${JSON.stringify(SERVICE_VERB)}); m.liveHost(${JSON.stringify(ROOT)}).pause({ by: ${JSON.stringify(BY)}, why: 'restarting the daemon at pid ${OLD}' }); process.stdout.write('paused\\n'); setInterval(() => {}, 60_000);`,
     ENV,
@@ -71,6 +71,7 @@ const takeOverProcess = async (t: TestContext) => {
 };
 
 describe("a restart killed while it waits leaves the store paused no longer than the daemon's next pass", () => {
+  const outer = outlived();
   let b!: Board;
   let child!: Awaited<ReturnType<typeof takeOverProcess>> | undefined;
   beforeAll(() => {
@@ -80,8 +81,8 @@ describe("a restart killed while it waits leaves the store paused no longer than
   });
   const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async (t) => {
-    child = await takeOverProcess(t);
+  s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async () => {
+    child = await takeOverProcess(outer);
     assert.equal(readPauseFile(ROOT)?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
     await pass();
     assert.equal(readPause(ROOT)?.by, BY, 'a pause whose process runs stands');

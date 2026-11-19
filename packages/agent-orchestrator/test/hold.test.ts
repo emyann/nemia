@@ -13,7 +13,7 @@
  */
 import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
-import { teardowns } from 'test-kit/checkpoints';
+import { teardowns, outlived } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -261,6 +261,7 @@ const atItsGate = async (b: Board, repo: string, brief: string) => {
 };
 
 describe('a run held until another lands: said by every screen with why and who, nothing filed nor asked while it stands, and lifted by the tick when it lands', () => {
+  const outer = outlived();
   let b!: Board;
   let repo!: string;
   let target!: import('../src/start/start.verb.ts').StartedRun;
@@ -316,14 +317,14 @@ describe('a run held until another lands: said by every screen with why and who,
   });
   s.test(
     'a held run files nothing, and the feed says the hold — its words where it has them — and not that the run waits on you',
-    async (t) => {
+    async () => {
       asOlder(run.id);
       await tick(b, run.id);
       const quiet = await tick(b, run.id);
       assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
       assert.equal(quiet.feed.run.note, `held until ${target.id} lands`, 'a hold older code wrote: the plain line');
       const worded = await aStarted(repo, 'held before it files');
-      assert.equal((await typed(t, 'hold', worded.id, '--until', target.id, ...why)).error, undefined);
+      assert.equal((await typed(outer, 'hold', worded.id, '--until', target.id, ...why)).error, undefined);
       assert.equal((await tick(b, worded.id)).feed.run.note, words, "the feed's note says the words");
     },
   );
@@ -703,6 +704,7 @@ describe('a run held until a person lifts it: no run named, nothing asked nor fi
 });
 
 describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arguments, the runs it names, the run it holds, its words — exit 2, and no hold written', () => {
+  const outer = outlived();
   let heldBefore!: string[];
   let b!: Board;
   let repo!: string;
@@ -902,12 +904,12 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
     assert.deepEqual(holdFiles(), held, 'no hold file under runs/ but those held on purpose');
     assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before);
   });
-  test('allowed: what is left holds — the one run that may still land, and words at their caps', async (t) => {
-    assert.equal((await typed(t, 'hold', id, '--until', other.id)).error, undefined);
+  test('allowed: what is left holds — the one run that may still land, and words at their caps', async () => {
+    assert.equal((await typed(outer, 'hold', id, '--until', other.id)).error, undefined);
     assert.deepEqual(runRecord(ROOT, id).hold?.until, [other.id]);
     const capped = await aRunning(b, repo);
     const at = ['hold', capped.id, '--until', target.id, '--why', 'w'.repeat(WHY_CAP), '--by', 'b'.repeat(BY_CAP)];
-    assert.equal((await typed(t, ...at)).error, undefined, 'at the caps, held');
+    assert.equal((await typed(outer, ...at)).error, undefined, 'at the caps, held');
   });
 });
 

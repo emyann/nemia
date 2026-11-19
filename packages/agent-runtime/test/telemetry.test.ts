@@ -4,8 +4,7 @@
  * engine's own telemetry, so a command exports nothing. Against the real worker, a scratch collector and a stub `claude` on PATH that posts
  * what a session would; no real session runs.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -21,7 +20,7 @@ import { STAND_IN } from './attached-held.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
 import { scratch } from 'test-kit/scratch';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns, type Finishes } from 'test-kit/checkpoints';
 import { builtEngine } from './engine.ts';
 
 type Engine = ReturnType<typeof builtEngine>;
@@ -126,7 +125,7 @@ const settled = async (e: Engine, id: string): Promise<TaskView> => {
 };
 
 /** A collector on a free port of this machine, keeping the body of every request posted to it; closed when test `t` ends. */
-const collector = async (t: TestContext) => {
+const collector = async (t: Finishes) => {
   const posts: { path: string; body: unknown }[] = [];
   const server = http.createServer((req, res) => {
     let body = '';
@@ -215,6 +214,7 @@ describe('telemetry handed to each spawn: what a session is told to export, by r
 });
 
 describe("an engine told a collector: each spawn is handed it, a job exports to it labelled in the filing's trace, and no other child exports as the engine", () => {
+  const outer = outlived();
   beforeAll(() => {
     const t = teardowns();
     withEnv(t, ENGINE_OWN);
@@ -246,8 +246,8 @@ describe("an engine told a collector: each spawn is handed it, a job exports to 
   });
   s.test(
     "a job exports to the engine's collector, tagged with its labels and task, in the filing's trace — never as the engine",
-    async (t) => {
-      const { endpoint, posts } = await collector(t);
+    async () => {
+      const { endpoint, posts } = await collector(outer);
       const claude = standInClaude();
       const engine = builtEngine(
         EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness }, telemetry: { endpoint } }),
@@ -318,6 +318,7 @@ describe("an engine told a collector: each spawn is handed it, a job exports to 
 });
 
 describe("an engine told nowhere: a spawn is handed no collector, a job no telemetry, and a task's own env still reaches its claude", () => {
+  const outer = outlived();
   beforeAll(() => {
     const t = teardowns();
     withEnv(t, ENGINE_OWN);
@@ -333,8 +334,8 @@ describe("an engine told nowhere: a spawn is handed no collector, a job no telem
     assert.equal(view.state.traceparent, undefined);
     assert.equal(view.state.labels, undefined);
   });
-  s.test("a job of an engine given no collector is handed no telemetry, the engine's own included, and posts nothing", async (t) => {
-    const { posts } = await collector(t);
+  s.test("a job of an engine given no collector is handed no telemetry, the engine's own included, and posts nothing", async () => {
+    const { posts } = await collector(outer);
     const claude = standInClaude();
     const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));
     const id = await Effect.runPromise(

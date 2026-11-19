@@ -134,9 +134,9 @@ function scopeOf(config: Collector, command: string): string | undefined {
 }
 
 /**
- * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a
- * `cd` into it, some files by `node --test` or `vitest run`, and e2e on every page or some; read at any command of the line, past its wrappers, the
- * last match winning, and never inside a quote, a script's longer name or another flag.
+ * Commands and their scopes, undefined where none is set: the whole suite from the root, one package by a filter, a workspace or a `cd`
+ * into it, some files by `node --test` or `vitest run`, and e2e on every page or some; read at any command of the line, past its wrappers,
+ * the last match winning, and never inside a quote, a script's longer name or another flag.
  */
 const SCOPE_ROWS: [string, string | undefined][] = [
   ['npx turbo run test --force --continue', 'suite'],

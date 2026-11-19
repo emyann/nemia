@@ -14,7 +14,7 @@
  * Every workspace's tests take it from here, `test-kit/checkpoints`.
  */
 
-import { afterEach, beforeAll, beforeEach, vi, type TestAPI, type TestContext } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, vi, type TestAPI, type TestContext } from 'vitest';
 
 /** What a checkpoint's body is handed: the test's own context. */
 type Body<T> = (t: T) => unknown;
@@ -87,6 +87,21 @@ export function teardowns(): Held {
       for (const fn of fns.splice(0)) await fn();
     },
   };
+}
+
+/**
+ * The context a story's checkpoints share, in a `describe`: what a parent test's own context was to its subtests under `node:test`. A
+ * teardown filed on it runs once the describe's tests are done (its `afterAll`, which this files), and its `signal` aborts then.
+ * Called in the describe's body.
+ */
+export function outlived(): Held & { signal: AbortSignal } {
+  const held = teardowns();
+  const control = new AbortController();
+  afterAll(async () => {
+    control.abort();
+    await held.end();
+  });
+  return { ...held, signal: control.signal };
 }
 
 /**

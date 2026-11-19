@@ -8,7 +8,8 @@
  * (`ensureDaemon` starts a unit only where its `WF_ROOT` is the store) and the daemon's engine is the store's own. The daemon a start
  * spawns is given the service's environment alone (`daemonEnv`), so it listens on the daemon's port, 8787, whatever `PORT` says: where
  * another process holds that port — the person's own daemon — the test is skipped, saying so, rather than start one that cannot listen.
- * Run it where the port is free (CI), or in a network namespace of its own: `unshare -rn sh -c 'ip link set lo up && npx vitest run <file>'`.
+ * Run it where the port is free (CI), or in a network namespace of its own: `unshare -rn sh -c 'ip link set lo up && npx vitest run
+ * <file>'`.
  *
  * With the start turned off (`NEMIA_DAEMON_START=off`), on a store of its own, the same read is refused, exit 2, naming the command that
  * starts one here (`nemia up`) and the one that installs the service, and never `--local`, which is refused.

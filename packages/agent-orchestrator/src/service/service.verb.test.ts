@@ -6,7 +6,6 @@
  */
 import { configGiven } from '../../test/config-given.ts';
 import { beforeAll, beforeEach, describe, test } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +18,7 @@ import { testEngine, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { steeredClock, type Steered } from '../../test/steered.ts';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns } from 'test-kit/checkpoints';
 import {
   attachedCalls,
   timeoutGiven,
@@ -852,6 +851,7 @@ test('--size auto on a 16 GiB, 8 CPU machine writes five sessions asking 2.5 GiB
 });
 
 describe('--size auto keeps what --env gives, and on launchd writes no memory limit or request and says so', () => {
+  const outer = outlived();
   test('a variable --env gives is written once, as given', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
     await install({ size: 'auto', env: ['WF_MAX_CONCURRENT=3'] }, host);
@@ -869,11 +869,11 @@ describe('--size auto keeps what --env gives, and on launchd writes no memory li
     assert.equal(env.get('WF_MEMORY_LIMIT'), '2Gi');
     assert.equal(env.has('WF_MEMORY_REQUEST'), false);
   });
-  test('launchd: the sessions sized, no memory limit or request written, and a line saying none applies', async (t) => {
+  test('launchd: the sessions sized, no memory limit or request written, and a line saying none applies', async () => {
     const machine = { platform: 'darwin', wsl: false, systemd: false };
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: { memoryMiB: 16384, cpus: 8 } });
     const done = await install({ size: 'auto' }, host);
-    t.onTestFinished(() => fs.rmSync(done.file, { force: true }));
+    outer.onTestFinished(() => fs.rmSync(done.file, { force: true }));
     const env = new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env);
     assert.equal(env.get('WF_MAX_CONCURRENT'), '5');
     assert.equal(env.has('WF_MEMORY_LIMIT'), false);
@@ -964,6 +964,7 @@ const reloadedOf = (world: World) => {
 };
 
 describe('--size auto caps the sessions together: a slice at what the machine allocates, written before the reload, the unit pointed at it, and uninstall takes it away', () => {
+  const outer = outlived();
   const GIB16 = { memoryMiB: 16384, cpus: 8 };
   test('16 GiB less the 2 GiB kept: MemoryMax 14336 MiB, in bytes, and WF_CGROUP_PARENT names the slice', async () => {
     const { host, seen } = reloadedOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
@@ -1003,7 +1004,7 @@ describe('--size auto caps the sessions together: a slice at what the machine al
       done.lines.join('\n'),
     );
   });
-  test('no --size, and launchd, write no slice and no WF_CGROUP_PARENT', async (t) => {
+  test('no --size, and launchd, write no slice and no WF_CGROUP_PARENT', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
     await install({}, host);
     assert.equal(fs.existsSync(SLICE), false);
@@ -1011,7 +1012,7 @@ describe('--size auto caps the sessions together: a slice at what the machine al
     const machine = { platform: 'darwin', wsl: false, systemd: false };
     const { host: mac } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: GIB16 });
     const done = await install({ size: 'auto' }, mac);
-    t.onTestFinished(() => fs.rmSync(done.file, { force: true }));
+    outer.onTestFinished(() => fs.rmSync(done.file, { force: true }));
     assert.equal(new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env).has('WF_CGROUP_PARENT'), false);
     assert.equal(fs.existsSync(SLICE), false);
   });

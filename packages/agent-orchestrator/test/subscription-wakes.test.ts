@@ -24,9 +24,9 @@
  * `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the
  * next one's deliverer to follow.
  */
-import { beforeAll, describe, test, type TestContext } from 'vitest';
+import { beforeAll, describe, test } from 'vitest';
 import type { Finishes } from 'test-kit/checkpoints';
-import { teardowns } from 'test-kit/checkpoints';
+import { teardowns, outlived } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -261,12 +261,13 @@ const delivering = (
 };
 
 /** Waits in test `t` until `holds` does, asked as the clock moves, as a task is asked to hear, and every 10ms for what is written. */
-const held = (t: TestContext, holds: () => boolean, what: string) => until(t, holds, what, { bell: heard, everyMs: 10 });
+const held = (t: Waiter, holds: () => boolean, what: string) => until(t, holds, what, { bell: heard, everyMs: 10 });
 
 describe(
   'a subscribed task is told each read of the feed in one say, its digest riding a wake, across restarts that drop no line',
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -419,7 +420,7 @@ describe(
       await d.quiet(rests);
       await d.clock.adjust('1 second');
     };
-    s.test('nemia subscribe puts the long-lived task’s subscription from the feed’s end, by the default selector', async (t) => {
+    s.test('nemia subscribe puts the long-lived task’s subscription from the feed’s end, by the default selector', async () => {
       appended(w, line('r-0', 'running'));
       await typed(w, SUBSCRIBE, ['once', task]);
       assert.deepEqual(done(w.subs.subscriptions.list()).listed.find((x) => x.name === 'once')?.subscription, {
@@ -428,18 +429,18 @@ describe(
         digestEvery: 60,
         from: feedSize(w),
       });
-      d = delivering(t, e, w);
+      d = delivering(outer, e, w);
       await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
     });
     s.test(
       'a wake line is said once, the routine lines before it riding it as one digest, and the cursor kept once it is said',
-      async (t) => {
+      async () => {
         appended(w, line('r-1', 'running'), line('r-1', 'verified ✓'), line('r-1', 'awaiting approval'));
         await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
         await d.clock.adjust('999 millis');
         assert.deepEqual(toldTo(task), [], 'a millisecond before its beat, the feed is not read');
         await d.clock.adjust('1 millis');
-        await held(t, () => toldTo(task).length === 1, 'the wake said on the beat');
+        await held(outer, () => toldTo(task).length === 1, 'the wake said on the beat');
         const [first] = toldTo(task);
         assert.deepEqual(fieldsOf(first), ['r-1 build awaiting approval']);
         names(first, 'Since your last news:', '2 routine lines', 'r-1  build  running', 'r-1  build  verified ✓');
@@ -447,26 +448,26 @@ describe(
         assert.ok(first.indexOf('r-1  build  running') < first.indexOf('r-1  build  verified ✓'), 'the digest in feed order');
         appended(w, line('r-2', 'rounds exhausted'));
         await beat();
-        await held(t, () => toldTo(task).length === 2, 'the next wake said');
+        await held(outer, () => toldTo(task).length === 2, 'the next wake said');
         assert.doesNotMatch(toldTo(task)[1], /r-1|Since your last news/, 'neither the first wake nor its digest again');
-        await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+        await held(outer, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
         assert.deepEqual(readDelivery(w, 'once')?.digest, []);
       },
     );
-    s.test("REFUSED: one gate's two lines are one say, holding both in feed order", async (t) => {
+    s.test("REFUSED: one gate's two lines are one say, holding both in feed order", async () => {
       appended(w, ...gate('r-20'));
       await beat();
-      await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+      await held(outer, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       assert.equal(toldTo(task).length, 3, 'one say for one gate');
       assert.deepEqual(fieldsOf(toldTo(task)[2]), [
         'r-20 — awaiting approval · waiting on you: approve land',
         'r-20 land awaiting approval · approve it: nemia approve r-20 land',
       ]);
     });
-    s.test('three gates in one read: one say, their lines in feed order, with the digest once', async (t) => {
+    s.test('three gates in one read: one say, their lines in feed order, with the digest once', async () => {
       appended(w, line('r-21', 'running'), ...gate('r-22'), ...gate('r-23'), ...gate('r-24'));
       await beat();
-      await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+      await held(outer, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       assert.equal(toldTo(task).length, 4, 'one say for one read');
       const said = toldTo(task)[3];
       assert.deepEqual(fieldsOf(said, 2, 4), ['r-22 —', 'r-22 land', 'r-23 —', 'r-23 land', 'r-24 —', 'r-24 land']);
@@ -476,58 +477,58 @@ describe(
     });
     s.test(
       'a digest not yet due is not said: its routine lines wait for their minutes over its checks, or ride the next wake',
-      async (t) => {
+      async () => {
         appended(w, line('r-11', 'running'), line('r-11', 'verified ✓'));
         await beat();
-        await held(t, () => readDelivery(w, 'once')?.digest.length === 2, 'both routine lines folded');
+        await held(outer, () => readDelivery(w, 'once')?.digest.length === 2, 'both routine lines folded');
         const checks = digestChecks();
         for (let i = 0; i < 2; i++) {
           await d.quiet(3);
           await d.clock.adjust('30 seconds');
         }
-        await held(t, () => digestChecks() >= checks + 2, 'two digest checks done after they were folded');
+        await held(outer, () => digestChecks() >= checks + 2, 'two digest checks done after they were folded');
         assert.equal(toldTo(task).length, 4, 'nothing said before the digest is due');
         appended(w, line('r-11', 'awaiting approval'));
         await beat();
-        await held(t, () => toldTo(task).length === 5, 'the wake said');
+        await held(outer, () => toldTo(task).length === 5, 'the wake said');
         names(toldTo(task)[4], 'Since your last news:', '2 routine lines');
       },
     );
-    s.test('a restart reads where the deliverer was off its door: no line said again, none dropped', async (t) => {
+    s.test('a restart reads where the deliverer was off its door: no line said again, none dropped', async () => {
       appended(w, line('r-4', 'failed ✗ check (exit 1)'));
       await beat();
-      await held(t, () => toldTo(task).length === 6, 'the first wake said');
+      await held(outer, () => toldTo(task).length === 6, 'the first wake said');
       appended(w, line('r-4', 'running'));
       await beat();
-      await held(t, () => readDelivery(w, 'once')?.digest.length === 1, 'the routine line folded');
+      await held(outer, () => readDelivery(w, 'once')?.digest.length === 1, 'the routine line folded');
       await d.stop();
       appended(w, line('r-5', 'awaiting approval'));
       d.start();
-      await held(t, () => toldTo(task).length === 7, 'the wake written while it was down said, read off its door as it starts');
+      await held(outer, () => toldTo(task).length === 7, 'the wake written while it was down said, read off its door as it starts');
       const second = toldTo(task)[6];
       assert.deepEqual(fieldsOf(second), ['r-5 build awaiting approval']);
       names(second.split('Since your last news:')[1], '1 routine line of the feed:', 'r-4  build  running');
       assert.doesNotMatch(second, /failed/, 'the first wake not said again');
     });
-    s.test('a restart between a say and its cursor write says the message again: at least once, never dropped', async (t) => {
-      await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+    s.test('a restart between a say and its cursor write says the message again: at least once, never dropped', async () => {
+      await held(outer, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       const from = feedSize(w);
       hanging.add(task);
       appended(w, line('r-26', 'awaiting approval'), line('r-27', 'blocked'));
       await beat();
-      await held(t, () => toldTo(task).length === 8, 'told once, its say never resolving');
+      await held(outer, () => toldTo(task).length === 8, 'told once, its say never resolving');
       await d.stop();
       assert.equal(readDelivery(w, 'once')?.cursor, from, 'the cursor never moved: the say did not resolve');
       d.start();
-      await held(t, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+      await held(outer, () => readDelivery(w, 'once')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       const [first, again] = toldTo(task).slice(7);
       assert.equal(toldTo(task).length, 9, 'said again once the restarted deliverer read from its cursor');
       assert.equal(again, first, 'the same message, whole');
       assert.deepEqual(fieldsOf(first), ['r-26 build awaiting approval', 'r-27 build blocked']);
     });
-    s.test('an unsubscribe stops delivery, and the deliverer drops its delivery once it reads the subscriptions again', async (t) => {
+    s.test('an unsubscribe stops delivery, and the deliverer drops its delivery once it reads the subscriptions again', async () => {
       const staying = await longLived('t-staying');
-      subscribed(t, w, 'staying', staying);
+      subscribed(outer, w, 'staying', staying);
       await d.stop();
       d.start();
       await d.quiet(5, 'the deliverer started again at rest with both subscriptions, its subscriptions read as it starts');
@@ -537,32 +538,32 @@ describe(
       assert.equal(delivered().includes('once'), true, 'a millisecond before the subscriptions are read again, its delivery stands');
       await d.clock.adjust('1 millis');
       await held(
-        t,
+        outer,
         () => !delivered().includes('once'),
         'the deliverer drops a delivery whose subscription is gone, once it has stopped it',
       );
       d.cut(2);
       appended(w, line('r-8', 'awaiting approval'));
       await beat();
-      await held(t, () => toldTo(staying).length === 1, 'the one staying told');
+      await held(outer, () => toldTo(staying).length === 1, 'the one staying told');
       assert.equal(toldTo(task).length, 9, 'the one gone told nothing more');
     });
     s.test(
       "a name subscribed again starts from its own from: a deliverer's delivery written for the last one under it is not its",
-      async (t) => {
+      async () => {
         await d.stop();
         appended(w, line('r-12', 'awaiting approval'));
-        const from = subscribed(t, w, 'once', task);
+        const from = subscribed(outer, w, 'once', task);
         writeDelivery(w, 'once', { of: { task, from: 0 }, cursor: 0, digest: [line('r-12', 'running')] });
         d.start();
         await d.quiet(5);
         appended(w, line('r-13', 'blocked'));
         await d.clock.adjust('1 second');
-        await held(t, () => toldTo(task).length === 10, 'the wake after its from said');
+        await held(outer, () => toldTo(task).length === 10, 'the wake after its from said');
         const said = toldTo(task)[9];
         assert.deepEqual(fieldsOf(said), ['r-13 build blocked']);
         assert.doesNotMatch(said, /r-12|Since your last news/, "neither a line before its from nor the last one's digest");
-        await held(t, () => readDelivery(w, 'once')?.of.from === from, 'its own delivery written');
+        await held(outer, () => readDelivery(w, 'once')?.of.from === from, 'its own delivery written');
       },
     );
   },
@@ -572,6 +573,7 @@ describe(
   'a feed cut under the cursor is read again from its start: on the files, since a cut is a file written shorter under its reader',
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -719,34 +721,34 @@ describe(
       return t.end;
     });
     const s = story(test);
-    s.test('a wake said, and the cursor kept at the end of the file', async (t) => {
+    s.test('a wake said, and the cursor kept at the end of the file', async () => {
       assert.equal(deliveryAtRoot(ROOT, 'cut'), undefined, 'no file of the deliverer before the subscription');
       await stage.main(['subscribe', 'cut', task]);
-      t.onTestFinished(() => {
+      outer.onTestFinished(() => {
         if (listedIn(w).includes('cut')) dropSubscription(w, 'cut');
       });
       assert.deepEqual(listedIn(w), ['cut'], 'nemia subscribe writes its file at the store root the deliverer reads');
-      d = delivering(t, e, w);
+      d = delivering(outer, e, w);
       await d.quiet(3, 'the deliverer at rest: its subscriptions, its digest and its beat');
       appended(w, line('r-9', 'running'), line('r-9', 'verified ✓'), line('r-9', 'awaiting approval'));
       await d.clock.adjust('1 second');
-      await held(t, () => toldTo(task).length === 1, 'the wake said on the beat');
-      await held(t, () => readDelivery(w, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+      await held(outer, () => toldTo(task).length === 1, 'the wake said on the beat');
+      await held(outer, () => readDelivery(w, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the feed');
     });
-    s.test('a feed cut under the cursor is read again from its start', async (t) => {
+    s.test('a feed cut under the cursor is read again from its start', async () => {
       fs.writeFileSync(feedAt(ROOT), `${JSON.stringify(line('r-10', 'blocked'))}\n`);
       assert.ok(feedSize(w) < (readDelivery(w, 'cut')?.cursor ?? 0), 'the file cut shorter than the cursor');
       await d.quiet(3);
       await d.clock.adjust('1 second');
-      await held(t, () => toldTo(task).length === 2, 'the cut feed read again from its start');
+      await held(outer, () => toldTo(task).length === 2, 'the cut feed read again from its start');
       assert.deepEqual(fieldsOf(toldTo(task)[1]), ['r-10 build blocked']);
-      await held(t, () => deliveryAtRoot(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
+      await held(outer, () => deliveryAtRoot(ROOT, 'cut')?.cursor === feedSize(w), 'the cursor at the end of the new feed');
     });
-    s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async (t) => {
+    s.test("unsubscribed through nemia, its file and the deliverer's gone from the files", async () => {
       await stage.main(['unsubscribe', 'cut']);
       assert.deepEqual(listedIn(w), [], 'its file removed');
       await d.clock.adjust('5 seconds');
-      await held(t, () => deliveryAtRoot(ROOT, 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
+      await held(outer, () => deliveryAtRoot(ROOT, 'cut') === undefined, 'the deliverer drops its file once it has stopped it');
     });
   },
 );
@@ -758,6 +760,7 @@ describe(
   'a say that fails is said again whole after a backoff doubling from one second to five minutes, the cursor held until it is taken',
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -917,33 +920,33 @@ describe(
     });
     const s = story(test);
     const tries = () => asked.filter((a) => a.taskId === task);
-    s.test('a routine line is folded into the digest, and nothing said', async (t) => {
+    s.test('a routine line is folded into the digest, and nothing said', async () => {
       await d.quiet(3);
       appended(w, line('r-6', 'running'));
       await d.clock.adjust('1 second');
-      await held(t, () => readDelivery(w, 'held')?.digest.length === 1, 'the routine line folded');
+      await held(outer, () => readDelivery(w, 'held')?.digest.length === 1, 'the routine line folded');
       before = readDelivery(w, 'held');
       assert.deepEqual(tries(), []);
     });
-    s.test('each failed say is said again a backoff later, from one second doubling, never longer than five minutes', async (t) => {
+    s.test('each failed say is said again a backoff later, from one second doubling, never longer than five minutes', async () => {
       await d.stop();
       stage.board().refuseSay(12);
       appended(w, line('r-6', 'blocked'), line('r-6', 'running'), line('r-6b', 'failed ✗ check (exit 1)'));
       let mark = d.clock.asked.length;
       d.start();
-      await held(t, () => tries().length === 1, 'the read as it starts said, and refused');
-      await until(t, () => d.clock.asked.slice(mark).filter((ms) => ms === 1000).length >= 2, 'its beat and the backoff asked', {
+      await held(outer, () => tries().length === 1, 'the read as it starts said, and refused');
+      await until(outer, () => d.clock.asked.slice(mark).filter((ms) => ms === 1000).length >= 2, 'its beat and the backoff asked', {
         bell: d.clock.bell,
       });
       for (const [k, ms] of BACKOFF.entries()) {
-        if (k > 0) await until(t, () => d.clock.asked.slice(mark).includes(ms), `the backoff of ${ms}ms asked`, { bell: d.clock.bell });
+        if (k > 0) await until(outer, () => d.clock.asked.slice(mark).includes(ms), `the backoff of ${ms}ms asked`, { bell: d.clock.bell });
         if (k === BACKOFF.length - 1)
           assert.deepEqual(readDelivery(w, 'held'), before, 'neither the cursor nor the digest moved while say fails');
         await d.clock.adjust(ms - 1);
         assert.equal(tries().length, k + 1, `a millisecond before the backoff of ${ms}ms, no try`);
         mark = d.clock.asked.length;
         await d.clock.adjust(1);
-        await held(t, () => tries().length === k + 2, `said again after ${ms}ms`);
+        await held(outer, () => tries().length === k + 2, `said again after ${ms}ms`);
       }
       const at = tries().map((a) => a.at);
       assert.deepEqual(
@@ -951,9 +954,9 @@ describe(
         BACKOFF,
       );
     });
-    s.test('said once say takes it, the cursor kept after it, every try the message whole and the same', async (t) => {
-      await held(t, () => toldTo(task).length === 1, 'said once say takes it');
-      await held(t, () => readDelivery(w, 'held')?.cursor === feedSize(w), 'the cursor kept after it');
+    s.test('said once say takes it, the cursor kept after it, every try the message whole and the same', async () => {
+      await held(outer, () => toldTo(task).length === 1, 'said once say takes it');
+      await held(outer, () => readDelivery(w, 'held')?.cursor === feedSize(w), 'the cursor kept after it');
       const [said] = toldTo(task);
       assert.deepEqual(new Set(tries().map((a) => a.text)), new Set([said]), 'every try said the message whole, and the same');
       assert.deepEqual(fieldsOf(said), ['r-6 build blocked', 'r-6b build failed ✗ check (exit 1)']);
@@ -968,6 +971,7 @@ describe(
   "the process's hub: a gate published is one say as the daemon delivers it, and lines published while a say is in flight are gathered",
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -1130,39 +1134,39 @@ describe(
         }),
       );
     const awaiting = { run: { word: 'awaiting approval', note: 'waiting on you: approve land' }, steps: [] };
-    s.test("a gate published to the process's hub is one say, with no beat to wait for", async (t) => {
+    s.test("a gate published to the process's hub is one say, with no beat to wait for", async () => {
       const task = await longLived('t-hub');
-      subscribed(t, w, 'hub', task);
+      subscribed(outer, w, 'hub', task);
       const was = following();
-      d = delivering(t, e, w, rt);
-      await held(t, () => following() > was, 'the deliverer following the hub');
+      d = delivering(outer, e, w, rt);
+      await held(outer, () => following() > was, 'the deliverer following the hub');
       await d.quiet(3);
       await published('r-25', { run: awaiting.run, steps: [{ name: 'land', word: 'awaiting approval' }] });
-      await held(t, () => readDelivery(w, 'hub')?.cursor === feedSize(w), 'the cursor at the end of the feed');
+      await held(outer, () => readDelivery(w, 'hub')?.cursor === feedSize(w), 'the cursor at the end of the feed');
       assert.equal(toldTo(task).length, 1, 'one say for the pass');
       assert.deepEqual(fieldsOf(toldTo(task)[0], 2, 4), ['r-25 —', 'r-25 land']);
     });
-    s.test('REFUSED: the lines published while a say is in flight are gathered: one more say holds them all, in feed order', async (t) => {
+    s.test('REFUSED: the lines published while a say is in flight are gathered: one more say holds them all, in feed order', async () => {
       await d.stop();
       dropSubscription(w, 'hub');
       const task = await longLived('t-busy');
-      subscribed(t, w, 'busy', task);
+      subscribed(outer, w, 'busy', task);
       const was = following();
       d.start();
-      await held(t, () => following() > was, 'the deliverer following the hub');
+      await held(outer, () => following() > was, 'the deliverer following the hub');
       await d.quiet(3);
       stage.board().refuseSay(1);
       await published('r-40', awaiting);
-      await held(t, () => asked.filter((a) => a.taskId === task).length >= 1, 'the first message asked, its say refused');
+      await held(outer, () => asked.filter((a) => a.taskId === task).length >= 1, 'the first message asked, its say refused');
       const mark = handed();
       await published('r-41', awaiting);
-      await held(t, () => handed() >= mark + 1, 'r-41 handed on by the reader');
+      await held(outer, () => handed() >= mark + 1, 'r-41 handed on by the reader');
       await published('r-42', awaiting);
-      await held(t, () => handed() >= mark + 2, 'r-42 handed on by the reader');
-      await until(t, () => d.clock.asked.at(-1) === 1000, 'the backoff asked', { bell: d.clock.bell });
+      await held(outer, () => handed() >= mark + 2, 'r-42 handed on by the reader');
+      await until(outer, () => d.clock.asked.at(-1) === 1000, 'the backoff asked', { bell: d.clock.bell });
       await d.clock.adjust('1 second');
       await held(
-        t,
+        outer,
         () => readDelivery(w, 'busy')?.cursor === feedSize(w) && toldTo(task).length === 2,
         'the cursor at the end of the feed',
       );
@@ -1179,6 +1183,7 @@ describe(
   'a digest falls due after its minutes with no wake, said alone; the deliverer’s own pace, at its shipped durations',
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -1324,40 +1329,40 @@ describe(
       return t.end;
     });
     const s = story(test);
-    s.test('a digest due is said alone, as the deliverer starts, then emptied', async (t) => {
+    s.test('a digest due is said alone, as the deliverer starts, then emptied', async () => {
       const task = await longLived('t-quiet');
-      const from = subscribed(t, w, 'quiet', task);
+      const from = subscribed(outer, w, 'quiet', task);
       const folded = line('r-3', 'verified ✓');
       writeDelivery(w, 'quiet', { of: { task, from }, cursor: from, digest: [folded], since: { at: Date.now() - 61 * 60_000 } });
-      d = delivering(t, e, w);
-      await held(t, () => toldTo(task).length === 1, 'the digest said');
+      d = delivering(outer, e, w);
+      await held(outer, () => toldTo(task).length === 1, 'the digest said');
       const [said] = toldTo(task);
       names(said, 'News from the feed, nothing waiting on you:', '1 routine line of the feed:', 'r-3  build  verified ✓');
-      await held(t, () => readDelivery(w, 'quiet')?.digest.length === 0, 'the digest emptied');
+      await held(outer, () => readDelivery(w, 'quiet')?.digest.length === 0, 'the digest emptied');
     });
     s.test(
       'REFUSED: a subscription written after a read is not delivered before five seconds, nor its digest asked again before thirty',
-      async (t) => {
+      async () => {
         await d.stop();
         dropSubscription(w, 'quiet');
         const mark = d.clock.asked.length;
         const since = () => d.clock.asked.slice(mark);
         const rests = (ms: number) => since().filter((asked) => asked === ms).length;
         d.start();
-        await until(t, () => since().length === 1, 'the first read of the subscriptions done', { bell: d.clock.bell });
+        await until(outer, () => since().length === 1, 'the first read of the subscriptions done', { bell: d.clock.bell });
         assert.deepEqual(since(), [5000], 'the subscriptions are read again after the shipped five seconds');
         const woke = d.clock.woken.length;
         const checks = digestChecks();
-        subscribed(t, w, 'steered', await longLived('t-steered'));
+        subscribed(outer, w, 'steered', await longLived('t-steered'));
         await d.clock.adjust('4999 millis');
         assert.deepEqual([d.clock.woken.slice(woke), digestChecks()], [[], checks], 'a millisecond early, no read and no deliverer');
         await d.clock.adjust('1 millis');
-        await until(t, () => rests(30_000) === 1, 'its deliverer at rest after its first digest check', { bell: d.clock.bell });
+        await until(outer, () => rests(30_000) === 1, 'its deliverer at rest after its first digest check', { bell: d.clock.bell });
         assert.equal(digestChecks(), checks + 1);
         await d.clock.adjust('29999 millis');
         assert.deepEqual([digestChecks(), rests(30_000)], [checks + 1, 1], 'a millisecond early, no second check');
         await d.clock.adjust('1 millis');
-        await until(t, () => rests(30_000) === 2, 'its second digest check done', { bell: d.clock.bell });
+        await until(outer, () => rests(30_000) === 2, 'its second digest check done', { bell: d.clock.bell });
         assert.equal(digestChecks(), checks + 2);
       },
     );
@@ -1389,6 +1394,7 @@ describe(
   "a subscription scoped by a floor is told only of the runs of factories at it or above, and every one carries a daemon's line and the store's",
   WAITED,
   () => {
+    const outer = outlived();
     let w!: World;
     let e!: {
       say: (
@@ -1538,7 +1544,7 @@ describe(
     const s = story(test);
     s.test(
       'REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both',
-      async (t) => {
+      async () => {
         for (const name of ['pipao', 'hkb']) addFactoryAt(ROOT, { name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
         writeFactoryLevel(ROOT, 'hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
         await plantRun(door, 'r-pipao', 'pipao');
@@ -1546,9 +1552,15 @@ describe(
         const from = feedSize(w);
         const floored = await longLived('t-floored');
         const everything = await longLived('t-everything');
-        kept(t, w, 'floored', { task: floored, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
-        kept(t, w, 'everything', { task: everything, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
-        d = delivering(t, e, w, undefined, door);
+        kept(outer, w, 'floored', {
+          task: floored,
+          selectors: [...DEFAULT_SELECTORS],
+          digestEvery: 60,
+          from,
+          scope: { atLeast: 'semi-auto' },
+        });
+        kept(outer, w, 'everything', { task: everything, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
+        d = delivering(outer, e, w, undefined, door);
         await d.quiet(5);
         appended(w, line('r-pipao', 'running'), line('r-pipao', 'awaiting approval'), line('r-gone', 'awaiting approval'));
         appended(w, line('r-hkb', 'awaiting approval'));
@@ -1557,8 +1569,8 @@ describe(
           toldTo(everything)
             .flatMap(wakesIn)
             .filter((l) => l.includes('awaiting approval')).length;
-        await held(t, () => wakesTold() === 3, 'every wake said to the one unscoped');
-        await held(t, () => readDelivery(w, 'floored')?.cursor === feedSize(w), "the floored one's cursor past every line");
+        await held(outer, () => wakesTold() === 3, 'every wake said to the one unscoped');
+        await held(outer, () => readDelivery(w, 'floored')?.cursor === feedSize(w), "the floored one's cursor past every line");
         assert.equal(toldTo(floored).length, 1);
         assert.deepEqual(fieldsOf(toldTo(floored)[0]), ['r-hkb build awaiting approval']);
         assert.equal(toldTo(floored)[0].includes('Since your last news'), false);
@@ -1568,67 +1580,79 @@ describe(
     );
     s.test(
       'a daemon’s line is carried by every subscription, scoped or not: routine in a digest kept, a wake where it names daemon',
-      async (t) => {
+      async () => {
         await d.stop();
         dropSubscription(w, 'floored');
         dropSubscription(w, 'everything');
         const from = feedSize(w);
         const scoped = await longLived('t-scoped-d');
         const woken = await longLived('t-woken-d');
-        kept(t, w, 'scoped-d', { task: scoped, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
-        kept(t, w, 'woken-d', { task: woken, selectors: ['kind=Daemon'], digestEvery: 60, from });
+        kept(outer, w, 'scoped-d', {
+          task: scoped,
+          selectors: [...DEFAULT_SELECTORS],
+          digestEvery: 60,
+          from,
+          scope: { atLeast: 'semi-auto' },
+        });
+        kept(outer, w, 'woken-d', { task: woken, selectors: ['kind=Daemon'], digestEvery: 60, from });
         d.start();
         await d.quiet(5);
         const started: FeedLine = { at: new Date().toISOString(), daemon: 5151, word: DAEMON_STARTED, note: 'first daemon on this store' };
         appended(w, started);
         await d.clock.adjust('1 second');
-        await held(t, () => toldTo(woken).length === 1, 'the subscriber that names daemon woken');
+        await held(outer, () => toldTo(woken).length === 1, 'the subscriber that names daemon woken');
         assert.deepEqual(
           wakesIn(toldTo(woken)[0]).map((l) => l.split('  ').slice(2).join(' ')),
           ['pid 5151 daemon started · first daemon on this store'],
         );
-        await held(t, () => readDelivery(w, 'scoped-d')?.cursor === feedSize(w), "the scoped one's cursor past the line");
+        await held(outer, () => readDelivery(w, 'scoped-d')?.cursor === feedSize(w), "the scoped one's cursor past the line");
         assert.deepEqual(readDelivery(w, 'scoped-d')?.digest, [upgraded(started)], 'folded into its digest, and read back upgraded');
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
       },
     );
     s.test(
       'the store’s line is carried by every subscription as a daemon’s is: routine in a scoped digest, a wake where it names kind=Store',
-      async (t) => {
+      async () => {
         await d.stop();
         dropSubscription(w, 'scoped-d');
         dropSubscription(w, 'woken-d');
         const from = feedSize(w);
         const scoped = await longLived('t-scoped-s');
         const woken = await longLived('t-woken-s');
-        kept(t, w, 'scoped-s', { task: scoped, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
-        kept(t, w, 'woken-s', { task: woken, selectors: ['kind=Store'], digestEvery: 60, from });
+        kept(outer, w, 'scoped-s', {
+          task: scoped,
+          selectors: [...DEFAULT_SELECTORS],
+          digestEvery: 60,
+          from,
+          scope: { atLeast: 'semi-auto' },
+        });
+        kept(outer, w, 'woken-s', { task: woken, selectors: ['kind=Store'], digestEvery: 60, from });
         d.start();
         await d.quiet(5);
         const at = new Date().toISOString();
         const paused: FeedLine = { at, store: 'store', word: 'store paused', note: `since ${at}` };
         appended(w, paused);
         await d.clock.adjust('1 second');
-        await held(t, () => toldTo(woken).length === 1, 'the subscriber that names the store woken');
+        await held(outer, () => toldTo(woken).length === 1, 'the subscriber that names the store woken');
         assert.equal(wakesIn(toldTo(woken)[0]).length, 1);
         assert.ok(wakesIn(toldTo(woken)[0])[0].includes(`store paused  · since ${at}`), toldTo(woken)[0]);
-        await held(t, () => readDelivery(w, 'scoped-s')?.cursor === feedSize(w), "the scoped one's cursor past the line");
+        await held(outer, () => readDelivery(w, 'scoped-s')?.cursor === feedSize(w), "the scoped one's cursor past the line");
         assert.deepEqual(readDelivery(w, 'scoped-s')?.digest, [upgraded(paused)], 'a line of no factory is no line below the floor');
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
       },
     );
     s.test(
       'REFUSED: a level that does not read holds a scoped line back, read again each beat, and the beat after it is mended says it',
-      async (t) => {
+      async () => {
         await d.stop();
         dropSubscription(w, 'scoped-s');
         dropSubscription(w, 'woken-s');
         const from = feedSize(w);
         const manual = await longLived('t-manual');
-        kept(t, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
+        kept(outer, w, 'manual', { task: manual, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'manual' } });
         fs.mkdirSync(path.dirname(levelFile(ROOT)), { recursive: true });
         fs.writeFileSync(levelFile(ROOT), '{ not json');
-        t.onTestFinished(() => fs.rmSync(levelFile(ROOT), { force: true }));
+        outer.onTestFinished(() => fs.rmSync(levelFile(ROOT), { force: true }));
         d.start();
         await d.quiet(3);
         const handed = () => Effect.runSync(Metric.value(FEED_FOLLOW_LINES)).count;
@@ -1636,16 +1660,16 @@ describe(
         appended(w, line('r-gone', 'awaiting approval'), line('r-hkb', 'awaiting approval'));
         for (const reads of [1, 2, 3]) {
           await d.clock.adjust('1 second');
-          await held(t, () => handed() >= before + 2 * reads, `the two lines read ${reads} times`);
+          await held(outer, () => handed() >= before + 2 * reads, `the two lines read ${reads} times`);
           await d.quiet(3);
         }
         assert.equal(toldTo(manual).length, 0, 'nothing said while the level does not read');
         assert.equal(readDelivery(w, 'manual')?.cursor ?? from, from, 'the cursor not kept past the lines');
         writeLevel(ROOT, { level: 'manual', since: '2026-10-06T08:00:00.000Z' });
         await d.clock.adjust('1 second');
-        await held(t, () => toldTo(manual).length === 1, 'the line said once the level reads');
+        await held(outer, () => toldTo(manual).length === 1, 'the line said once the level reads');
         assert.deepEqual(fieldsOf(toldTo(manual)[0]), ['r-hkb build awaiting approval'], 'the line of a run gone still passed over');
-        await held(t, () => readDelivery(w, 'manual')?.cursor === feedSize(w), 'the cursor kept past both lines');
+        await held(outer, () => readDelivery(w, 'manual')?.cursor === feedSize(w), 'the cursor kept past both lines');
       },
     );
   },
@@ -1653,7 +1677,7 @@ describe(
 
 /**
  * Of a test file's `source`: how many subscriptions it puts through a door outside its helper `kept`, and whether `kept` drops what it
- * put in a `t.after`. Refuses a source with no `kept` before its `subscribed`.
+ * put in a `t.onTestFinished`. Refuses a source with no `kept` before its `subscribed`.
  */
 const unkept = (source: string): { puts: number; drops: boolean } => {
   const begin = source.indexOf('const kept = ');
@@ -1663,7 +1687,7 @@ const unkept = (source: string): { puts: number; drops: boolean } => {
   const outside = source.slice(0, begin) + source.slice(end);
   return {
     puts: outside.match(/subscriptions\s*\.\s*put\s*\(/g)?.length ?? 0,
-    drops: /t\.after\(\s*\(\)\s*=>\s*\{[^}]*subscriptions\s*\.\s*drop\(\s*SubscriptionName\.read\(\s*name\s*\)\s*\)/.test(body),
+    drops: /t\.onTestFinished\(\s*\(\)\s*=>\s*\{[^}]*subscriptions\s*\.\s*drop\(\s*SubscriptionName\.read\(\s*name\s*\)\s*\)/.test(body),
   };
 };
 
@@ -1672,7 +1696,7 @@ test('REFUSED: every subscription a story here puts is put through kept, which d
   assert.deepEqual(unkept(source), { puts: 0, drops: true });
   const put = ['w.subs.subscriptions', ".put(SubscriptionName.read('loose'), {});"].join('');
   assert.deepEqual(unkept(`${source}\n${put}\n`), { puts: 1, drops: true }, 'a subscription put by hand is refused');
-  const undropped = source.replace(/t\.after\(\s*\(\)\s*=>\s*\{[^}]*subscriptions\s*\.\s*drop\([^;]*;\s*\}\);/, '');
+  const undropped = source.replace(/t\.onTestFinished\(\s*\(\)\s*=>\s*\{[^}]*subscriptions\s*\.\s*drop\([^;]*;\s*\}\);/, '');
   assert.notEqual(undropped, source, 'the fixture took the drop out');
   assert.deepEqual(unkept(undropped), { puts: 0, drops: false }, 'a kept that drops nothing is refused');
 });

@@ -3,7 +3,6 @@
  * transcript written by the test as the worker and Claude Code write them, and what a follower is handed read back in order.
  */
 import { beforeAll, describe, test } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +14,7 @@ import { claudeTranscriptEvents } from '../src/harness/claude/transcript.ts';
 import type { Followed } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns } from 'test-kit/checkpoints';
 
 const line = (o: object) => `${JSON.stringify(o)}\n`;
 const event = (e: object) => line({ type: 'stream_event', event: e, session_id: 'sid-1' });
@@ -77,6 +76,7 @@ const followFailure = async (ops: ReturnType<typeof detachedOps>, name: string) 
 };
 
 describe('a job is followed live to its end, and followed again once settled', WAITED, () => {
+  const outer = outlived();
   let j!: {
     ops: import('../src/index.ts').RunnerOps;
     setState: (s: string) => void;
@@ -92,10 +92,10 @@ describe('a job is followed live to its end, and followed again once settled', W
   });
   const s = story(test);
   const got: Followed[] = [];
-  s.test('a followed job says its state and the text so far', async (t) => {
+  s.test('a followed job says its state and the text so far', async () => {
     ended = follow(j.ops, 'ae/f1/1', got);
     await until(
-      t,
+      outer,
       () => got.length >= 2,
       () => `the state and the text so far: ${JSON.stringify(got)}`,
       { bell: rung },
@@ -105,12 +105,12 @@ describe('a job is followed live to its end, and followed again once settled', W
       { kind: 'partial', key: 'msg_1:0', text: 'Riv', append: false, last: false },
     ]);
   });
-  s.test('then each piece once and in order, though its run file is rewritten between them', async (t) => {
+  s.test('then each piece once and in order, though its run file is rewritten between them', async () => {
     j.stdout(delta(0, 'ers'));
     j.setState('working');
     j.stdout(delta(0, ' run.') + event({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 's' } }));
     await until(
-      t,
+      outer,
       () => got.length >= 4,
       () => `each piece: ${JSON.stringify(got)}`,
       { bell: rung },
@@ -126,11 +126,11 @@ describe('a job is followed live to its end, and followed again once settled', W
       'each piece once, in order, the state not said again for a rewrite of the run file',
     );
   });
-  s.test('then each whole event of its transcript once, and it ends when it settles', async (t) => {
+  s.test('then each whole event of its transcript once, and it ends when it settles', async () => {
     j.stdout(line(said('a-1', 'Rivers run.')) + event({ type: 'content_block_stop', index: 0 }));
     j.transcript(said('a-1', 'Rivers run.'));
     await until(
-      t,
+      outer,
       () => got.some((m) => m.kind === 'events'),
       () => `the whole message: ${JSON.stringify(got)}`,
       { bell: rung },

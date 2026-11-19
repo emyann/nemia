@@ -9,7 +9,7 @@
  * is walked on git in `prune-git.boundary.test.ts`. A file of its own, over its own store at `ROOT`, given as `ENV`; each story
  * reads its own runs, though a prune of every run reads the store's.
  */
-import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -204,7 +204,7 @@ const aShot = (id: string, name = 'shot.png', bytes = 32 * 1024): string => {
 };
 
 /** Runs the prune a refusal offers, as a person would type it, with `--yes`: the command is read off the refusal, never written here. */
-const followed = async (t: TestContext, e: Engine, refusal: string) => {
+const followed = async (e: Engine, refusal: string) => {
   const command = /(nemia prune \S+(?: --[a-z]+)*)\.$/.exec(refusal)?.[1];
   assert.ok(command, `a refusal that offers a prune: ${refusal}`);
   return { command, ...(await typed(e, ...command.split(' ').slice(1), '--yes')) };
@@ -393,7 +393,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
   );
   s.test(
     "`--artifacts` of a run whose worktrees a plain prune removed takes its files alone, the worktrees' time kept; of a run that cut none, its files alone, which then reads pruned",
-    async (t) => {
+    async () => {
       const { run } = await aFinished(b, { merged: true });
       aShot(run.id);
       assert.equal((await runWith(b.e, prune(run.id, { yes: true }))).kind, 'pruned');
@@ -421,7 +421,7 @@ describe('`nemia prune` of a run that landed: listed with its size until --yes, 
         under('runs', inPlace.id, 'artifacts', 'implement', 'shot.png') && !under('runs', `${inPlace.id}.pruned`),
         'refused: kept, unmarked',
       );
-      const bare = await followed(t, b.e, refusal!);
+      const bare = await followed(b.e, refusal!);
       assert.equal(bare.error, undefined, `${bare.command}: the command it offers is the one that prunes them`);
       assert.ok(
         bare.printed.includes(`${inPlace.id}  pruned: removed its files, 44.0 KB freed; its record and branches are kept`),
@@ -632,7 +632,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
   );
   s.test(
     'REFUSED under --artifacts: a run not over, a finished run not merged, a folder run, one at its gate and a worktree holding a change — its files and worktree kept, no mark; the prune each offers takes them',
-    async (t) => {
+    async () => {
       const kept = (id: string, shot: string) => assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), id);
       const running = await runPlaced(startRun({ brief: 'still running', repo: aRepo(), workflowDir: oneStep() }));
       await runWith(b.e, advanceRun(runRecord(ROOT, running.id)));
@@ -662,7 +662,7 @@ describe('`nemia prune` refused, then let through: what holds it is named with t
       );
       assert.ok(fs.existsSync(unmergedShot), 'its files kept by the prune of every run');
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark);
-      const offered = await followed(t, b.e, after.refusal!);
+      const offered = await followed(b.e, after.refusal!);
       assert.equal(offered.error, undefined, `${offered.command}: the command it offers is the one that takes them`);
       assert.ok(
         offered.printed.includes(`${unmerged.run.id}  pruned: removed its files, 44.0 KB freed; its record and branches are kept`),

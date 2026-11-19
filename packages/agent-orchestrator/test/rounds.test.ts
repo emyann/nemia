@@ -10,7 +10,7 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { describe, test, type TestContext } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -161,7 +161,7 @@ const refusedAs =
  * `nemia <argv>` typed on the stage, as a person types it, run on its entry's handler (`told`): each hint it says of a former spelling as
  * the one to type now (`renamedIn`, which the client prints on stderr). The lines it prints are the client's (`apps/cli/test`).
  */
-const typedOn = async (_t: TestContext, argv: string[]): Promise<{ hints: string[] }> => {
+const typedOn = async (argv: string[]): Promise<{ hints: string[] }> => {
   await stage.main(argv);
   const { hint } = renamedIn(argv);
   return { hints: hint === undefined ? [] : [hint] };
@@ -307,8 +307,8 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     for (const f of asksOf(id, 'round')) fs.rmSync(path.join(asksDir(ROOT, id), f));
   });
   let file = '';
-  s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async (t) => {
-    const { hints } = await typedOn(t, ['retry', id, 'review', '--round']);
+  s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async () => {
+    const { hints } = await typedOn(['retry', id, 'review', '--round']);
     file = path.join(asksDir(ROOT, id), 'round-review-4');
     assert.deepEqual([fs.existsSync(file), hints], [true, []], 'the file `nemia round` wrote, and no hint: this is the spelling to type');
     const ask = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -357,17 +357,17 @@ describe('three rounds, then a person accepts the work as it stands', () => {
   let at = '';
   s.test(
     "`nemia approve` of the loop out of rounds ends it on a person's word, refused without `--message`: the acceptance written whole, beside the asks, and no record; the former `nemia accept` still runs as it",
-    async (t) => {
+    async () => {
       const accepted = path.join(asksDir(ROOT, id), 'accept-review-4');
-      await assert.rejects(typedOn(t, ['approve', id, 'review']), refusedAs('Invalid', '--message'));
+      await assert.rejects(typedOn(['approve', id, 'review']), refusedAs('Invalid', '--message'));
       assert.deepEqual(asksOf(id, 'accept'), [], 'refused without your words: nothing written');
-      const { hints } = await typedOn(t, ['approve', id, 'review', '--message', ENOUGH]);
+      const { hints } = await typedOn(['approve', id, 'review', '--message', ENOUGH]);
       assert.deepEqual([fs.existsSync(accepted), hints], [true, []], 'the file `nemia accept` wrote, and no hint');
       const acceptance = JSON.parse(fs.readFileSync(accepted, 'utf8'));
       at = acceptance.at;
       assert.deepEqual([acceptance.step, acceptance.try, acceptance.message], ['review', 4, ENOUGH], 'written whole');
       await assert.rejects(
-        typedOn(t, ['accept', id, 'review', '--message', ENOUGH]),
+        typedOn(['accept', id, 'review', '--message', ENOUGH]),
         refusedAs('Conflict', 'try 4 of review is already accepted'),
         'the former spelling, typed on purpose: `nemia accept` still runs, as `nemia approve` of the loop, which has accepted try 4',
       );
@@ -395,7 +395,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     assert.doesNotMatch(brief, /REVIEWER-SUMMARY|"again"/);
     assert.deepEqual((await tick(id)).filed, [], 'filed once, however many passes');
   });
-  s.test('the gated ending goes to its gate as ever, offered no round, and approved the run succeeds', async (t) => {
+  s.test('the gated ending goes to its gate as ever, offered no round, and approved the run succeeds', async () => {
     stage.board().settle(`${id}-ship`, 'succeeded', SIGNED);
     await tick(id);
     const held = await over(list(stage.board().e, runRecord(ROOT, id)));
@@ -404,7 +404,7 @@ describe('three rounds, then a person accepts the work as it stands', () => {
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['waiting', [], ['ship']]);
     assert.deepEqual(offers, [], 'the loop is over');
     namesFor('accepted', accepted.review, `${at.slice(11, 16)}Z`, ENOUGH);
-    await typedOn(t, ['approve', id, 'ship', '--message', 'the findings are filed as follow-up']);
+    await typedOn(['approve', id, 'ship', '--message', 'the findings are filed as follow-up']);
     assert.ok(fs.existsSync(path.join(asksDir(ROOT, id), 'approve-ship-1')), 'the same verb, at a gate: the approval');
     assert.equal((await tick(id)).status, 'succeeded');
   });
@@ -441,8 +441,8 @@ describe('a loop past its budget waits for a person to raise it, then goes round
   });
   s.test(
     'with `--budget` the round is asked, typed in its former spelling `nemia round`, which still runs as `nemia retry --round` and says so: no step of the loop is held on its budget, and the run waits on nobody',
-    async (t) => {
-      const { hints } = await typedOn(t, ['round', id, '--budget', '10']);
+    async () => {
+      const { hints } = await typedOn(['round', id, '--budget', '10']);
       assert.equal(hints.length, 1, 'one hint line');
       names(hints[0], 'nemia round is now nemia retry --round', `nemia retry ${id} `);
       const ask = JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'round-review-2'), 'utf8'));

@@ -25,7 +25,7 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { codexMcpServerNames, codexMcpServers, everyMcpServer, mcpRefuses, mcpServerOf } from '../src/harness/mcp.ts';
 import type { RemoteMcpServer } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
-import { story } from 'test-kit/checkpoints';
+import { story, outlived } from 'test-kit/checkpoints';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
@@ -137,6 +137,7 @@ const RECORDED: RemoteMcpServer = {
 };
 
 describe("a task's MCP servers reach each runner strictly, the checkout's and the task's own and never the operator's", WAITED, () => {
+  const outer = outlived();
   const s = story(test);
   s.test("no mcp and no .mcp.json: Claude Code is given no server, strict — none of the operator's servers", () => {
     const job = jobServers(tmp('bare'));
@@ -177,8 +178,8 @@ describe("a task's MCP servers reach each runner strictly, the checkout's and th
     assert.deepEqual((await Effect.runPromise(again.view(id))).state.config?.projectMcp, ['a']);
     assert.deepEqual(jobServers(cwd).servers, TWO, 'filed without, the whole file again');
   });
-  s.test("codex is given a task's servers as one mcp_servers override, and a task without mcp is given none", async (t) => {
-    const given = await spawnAtDefaults(t, { cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } });
+  s.test("codex is given a task's servers as one mcp_servers override, and a task without mcp is given none", async () => {
+    const given = await spawnAtDefaults(outer, { cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } });
     assert.ok(given.args, 'codex was spawned');
     const at = given.args.findIndex((a) => a.startsWith('mcp_servers='));
     assert.equal(given.args[at - 1], '-c');
@@ -188,7 +189,7 @@ describe("a task's MCP servers reach each runner strictly, the checkout's and th
     );
     assert.equal(given.args.includes('--strict-mcp-config'), false, "Claude Code's flag is not Codex's");
 
-    const plain = await spawnAtDefaults(t, { cwd: tmp('bare'), harness: 'codex' });
+    const plain = await spawnAtDefaults(outer, { cwd: tmp('bare'), harness: 'codex' });
     assert.ok(plain.args, 'codex was spawned');
     assert.equal(
       plain.args.some((a) => a.startsWith('mcp_servers')),
@@ -196,14 +197,14 @@ describe("a task's MCP servers reach each runner strictly, the checkout's and th
       'no map, no override',
     );
   });
-  s.test('codex is handed the picked entries with the task own in one mcp_servers override, and none for projectMcp: []', async (t) => {
+  s.test('codex is handed the picked entries with the task own in one mcp_servers override, and none for projectMcp: []', async () => {
     const cwd = checkoutOf({ a: { command: 'a-server' }, b: { type: 'http', url: 'https://b.example/mcp' } });
-    const picked = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { projectMcp: ['b'], mcp: { mine: { command: 'x' } } } });
+    const picked = await spawnAtDefaults(outer, { cwd, harness: 'codex', config: { projectMcp: ['b'], mcp: { mine: { command: 'x' } } } });
     assert.equal(
       picked.args?.find((a) => a.startsWith('mcp_servers=')),
       'mcp_servers={"b"={"url"="https://b.example/mcp","transport"="http"},"mine"={"command"="x"}}',
     );
-    const none = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { projectMcp: [] } });
+    const none = await spawnAtDefaults(outer, { cwd, harness: 'codex', config: { projectMcp: [] } });
     assert.ok(none.args, 'codex was spawned');
     assert.equal(
       none.args.some((a) => a.startsWith('mcp_servers')),

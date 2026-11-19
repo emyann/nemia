@@ -26,7 +26,7 @@ const lastOfHead = (test: RunnerTestCase): RunnerTestCase => {
   let head: RunnerTestCase | RunnerTestSuite = test;
   while (head.suite && head.suite !== test.file) head = head.suite;
   const runs = (task: RunnerTestCase | RunnerTestSuite): RunnerTestCase[] =>
-    task.type === 'suite' ? task.tasks.flatMap((t) => runs(t as RunnerTestCase | RunnerTestSuite)) : task.mode === 'run' ? [task] : [];
+    task.type === 'suite' ? task.tasks.flatMap((t) => runs(t)) : task.mode === 'run' ? [task] : [];
   return runs(head).at(-1) ?? test;
 };
 

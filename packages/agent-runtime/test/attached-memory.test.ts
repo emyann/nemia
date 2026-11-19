@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { RunnerError } from '../src/harness/error.ts';
 import { filesOf, writeRun } from '../src/harness/claude/attached-file.ts';
 import { scopeRefusal } from '../src/harness/cgroup.ts';
-import { story } from 'test-kit/checkpoints';
+import { story, outlived } from 'test-kit/checkpoints';
 import { until, WAITED } from '../src/waits/index.ts';
 import { holder, kept, lines, NAME, run } from './attached-held.ts';
 import fs from 'node:fs';
@@ -20,11 +20,12 @@ const NO_SCOPE = { scopeProgram: 'false' };
 const LIMITED = { limits: { memory: '256Mi' } };
 
 describe('a held session under a memory limit, on a host that makes no scope', WAITED, () => {
+  const outer = outlived();
   const s = story(test);
-  s.test('REFUSED: its start is refused, as a refusal, and no run file is written', async (t) => {
+  s.test('REFUSED: its start is refused, as a refusal, and no run file is written', async () => {
     const { root, request } = kept({});
     const h = await holder(root, undefined, undefined, NO_SCOPE);
-    t.onTestFinished(h.close);
+    outer.onTestFinished(h.close);
     const exit = await Effect.runPromiseExit(h.attached.ops.spawn({ ...request, resources: LIMITED }));
     assert.equal(exit._tag, 'Failure', 'the limited spawn fails');
     const err = exit._tag === 'Failure' ? exit.cause.reasons.map((r) => ('error' in r ? r.error : undefined)).find(Boolean) : undefined;

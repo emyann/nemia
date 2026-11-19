@@ -14,7 +14,7 @@
     "board:serve": "node test/e2e/serve.ts serve",
     "board:stop": "node test/e2e/serve.ts stop",
     "storybook": "storybook dev -p 6007 --no-open",
-    "stories": "vitest run --project=storybook"
+    "stories": "node test/e2e/stories/pinned.ts"
   },
   "dependencies": {
     "@blobatar/react": "2.7.0",

@@ -56,16 +56,16 @@ const COMMAND_BOUND = 300_000;
 const OUTPUT_BYTES = 16 * 1024 * 1024;
 
 /** `git -C at args`, trimmed; refuses, saying what could not be told, when it fails. */
-const gitAt = (at: string, what: string, ...args: string[]): string => git(what, '-C', at, ...args);
+const gitAt = (at: string, what: string, ...args: string[]) => git(what, '-C', at, ...args);
 
 /** Whether a merge is in progress in the worktree `at`. */
-const merging = (at: string): boolean => run('git', ['-C', at, 'rev-parse', '-q', '--verify', 'MERGE_HEAD']).status === 0;
+const merging = (at: string) => run('git', ['-C', at, 'rev-parse', '-q', '--verify', 'MERGE_HEAD']).status === 0;
 
 /**
  * Whether the reviewed tip lacks the base as the remote has it now, after a `git fetch origin`; refuses a fetch that fails, since a
  * landing that read a stale base would refresh against the wrong one.
  */
-export function lacksBase(onto: string, tip: string, retry: string): boolean {
+export function lacksBase(onto: string, tip: string, retry: string) {
   const fetched = run('git', ['fetch', 'origin']);
   if (fetched.status !== 0)
     throw new Refusal(`\`git fetch origin\` failed, so the base this landing merges onto is unknown: ${fetched.err}\n${retry}`);
@@ -73,7 +73,7 @@ export function lacksBase(onto: string, tip: string, retry: string): boolean {
 }
 
 /** The worktree of this repository with `branch` checked out, or none: read from `git worktree list --porcelain`. */
-function checkedOut(branch: string): string | undefined {
+function checkedOut(branch: string) {
   const blocks = git('the worktrees of this repository', 'worktree', 'list', '--porcelain').split('\n\n');
   const block = blocks.find((it) => it.split('\n').includes(`branch refs/heads/${branch}`));
   return block
@@ -83,7 +83,7 @@ function checkedOut(branch: string): string | undefined {
 }
 
 /** The worktree `at` read as a refresh needs it: clean, with no merge in progress. Refuses one a person is working in, naming it. */
-function quiet(at: string, branch: string, retry: string): void {
+function quiet(at: string, branch: string, retry: string) {
   const dirty = gitAt(at, `whether ${at} is clean`, 'status', '--porcelain', '--untracked-files=no');
   if (dirty || merging(at))
     throw new Refusal(
@@ -94,7 +94,7 @@ function quiet(at: string, branch: string, retry: string): void {
 }
 
 /** The paths `derives` names, each as a git pathspec left out of a diff: `:(exclude,glob)<path>`. */
-const excluded = (derives: string): string[] =>
+const excluded = (derives: string) =>
   derives
     .split(/\s+/)
     .filter(Boolean)
@@ -105,7 +105,7 @@ const excluded = (derives: string): string[] =>
  * against git's plain merge. Refuses where the command failed, left a path unmerged or a change out of the index, or changed anything
  * outside the derived paths. True where the result is the plain merge and that went clean: there is nothing to refresh.
  */
-function tried(at: string, a: Asked): boolean {
+function tried(at: string, a: Asked) {
   const ran = spawnSync('sh', ['-c', a.command], {
     cwd: at,
     encoding: 'utf8',
@@ -148,7 +148,7 @@ function tried(at: string, a: Asked): boolean {
 }
 
 /** The merge in `at` committed and pushed to the branch, never forced: the head pushed. Takes the commit back where the push failed. */
-function pushed(at: string, a: Asked): string {
+function pushed(at: string, a: Asked) {
   gitAt(at, 'the refreshed merge', 'commit', '-q', '--no-verify', '-m', `Merge ${a.onto} into ${a.branch} at the landing`);
   const head = gitAt(at, 'the refreshed head', 'rev-parse', 'HEAD');
   const push = run('git', ['push', 'origin', `${head}:refs/heads/${a.branch}`]);
@@ -166,7 +166,7 @@ function pushed(at: string, a: Asked): string {
  * The refresh of `a`'s branch, which lacks the base: the lines it says where it pushed a refreshed head, or none where the trial went
  * clean and changed nothing, the landing then merging as before. Refuses as `tried` does, and a worktree a person is working in.
  */
-export function refresh(a: Asked): string[] | undefined {
+export function refresh(a: Asked) {
   const files = process.env.WF_STEP_FILES;
   if (!files || !fs.existsSync(files))
     throw new Refusal(
@@ -210,7 +210,7 @@ export function refresh(a: Asked): string[] | undefined {
 }
 
 /** The refresh recorded in `dir` (the check's `WF_ARTIFACTS`), or none where there is no record or it does not parse as one. */
-export function recorded(dir: string | undefined): Refreshed | undefined {
+export function recorded(dir: string | undefined) {
   if (!dir) return undefined;
   const file = path.join(dir, RECORD);
   if (!fs.existsSync(file)) return undefined;
@@ -225,7 +225,7 @@ export function recorded(dir: string | undefined): Refreshed | undefined {
 }
 
 /** `body` written to a file of a scratch folder, for `gh pr merge --body-file`: its path, and the removal of the folder. */
-export function bodyFileOf(body: string): { file: string; done: () => void } {
+export function bodyFileOf(body: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-land-body-'));
   const file = path.join(dir, 'merge-body.md');
   fs.writeFileSync(file, body);

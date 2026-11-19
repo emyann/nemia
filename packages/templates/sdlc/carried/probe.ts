@@ -39,14 +39,14 @@ const BOUND = 60_000;
 type Row = { name: string; id: string; state: string; waitingFor?: string };
 
 /** The machinery's folder probes run in: `$WF_ROOT/probes`. */
-const probesDir = (): string => path.join(process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows'), 'probes');
+const probesDir = () => path.join(process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows'), 'probes');
 
 /** Claude Code's own `.claude.json`: in `CLAUDE_CONFIG_DIR` when it is set, else in the home folder. */
-const claudeConfigFile = (): string =>
+const claudeConfigFile = () =>
   process.env.CLAUDE_CONFIG_DIR ? path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : path.join(os.homedir(), '.claude.json');
 
 /** Whether Claude Code's `.claude.json` says a person trusted `dir`; false for a file that is not there or does not read so. */
-function trusted(dir: string): boolean {
+function trusted(dir: string) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(claudeConfigFile(), 'utf8'));
@@ -58,7 +58,7 @@ function trusted(dir: string): boolean {
 }
 
 /** The run this workspace's branch is of, `wf/<run>/<leaf>`; refuses any other branch. */
-function runOfBranch(): string {
+function runOfBranch() {
   const head = spawnSync('git', ['symbolic-ref', '--short', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const branch = head.status === 0 ? head.stdout.trim() : '';
   const run = /^wf\/([^/]+)\/[^/]+$/.exec(branch)?.[1];
@@ -71,21 +71,20 @@ function runOfBranch(): string {
 }
 
 /** The name of `run`'s probe `label`. */
-const probeName = (run: string, label: string): string => `${run}-probe-${label}`;
+const probeName = (run: string, label: string) => `${run}-probe-${label}`;
 
 /** Whether `name` is the name of one of `run`'s probes. */
-const isProbeOf = (run: string, name: string): boolean =>
-  name.startsWith(`${run}-probe-`) && LABEL.test(name.slice(`${run}-probe-`.length));
+const isProbeOf = (run: string, name: string) => name.startsWith(`${run}-probe-`) && LABEL.test(name.slice(`${run}-probe-`.length));
 
 /** Run `claude` with `args`, bounded; its exit, streams, and whether no `claude` was found. */
-function claude(args: string[], cwd?: string): { status: number | null; out: string; err: string; missing: boolean } {
+function claude(args: string[], cwd?: string) {
   const r = spawnSync('claude', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '') || (r.error?.message ?? ''), missing };
 }
 
 /** A listed row read as a probe reads it, or undefined for one that does not read so. */
-function rowOf(value: unknown): Row | undefined {
+function rowOf(value: unknown) {
   const r = value as Record<string, unknown> | null;
   if (typeof r?.name !== 'string' || typeof r.state !== 'string') return undefined;
   const id = typeof r.id === 'string' ? r.id : typeof r.sessionId === 'string' ? r.sessionId.split('-')[0] : undefined;
@@ -94,7 +93,7 @@ function rowOf(value: unknown): Row | undefined {
 }
 
 /** `run`'s probes as `claude agents` lists them; none when no `claude` is on the PATH; refuses a listing it cannot read. */
-function probesOf(run: string): Row[] {
+function probesOf(run: string) {
   const listed = claude(LISTING);
   if (listed.missing) return [];
   let parsed: unknown;
@@ -109,20 +108,20 @@ function probesOf(run: string): Row[] {
 }
 
 /** The live ones of `rows`. */
-const live = (rows: Row[]): Row[] => rows.filter((row) => !ENDED.has(row.state));
+const live = (rows: Row[]) => rows.filter((row) => !ENDED.has(row.state));
 
 /** A row as a line. */
-const shown = (row: Row): string => `${row.name} ${row.state}${row.waitingFor ? ` (${row.waitingFor})` : ''} ${row.id}`;
+const shown = (row: Row) => `${row.name} ${row.state}${row.waitingFor ? ` (${row.waitingFor})` : ''} ${row.id}`;
 
 /** The first message of a probe of `run`: whether the person must act, then the prompt. */
-const framed = (run: string, prompt: string, answer: string | undefined): string =>
+const framed = (run: string, prompt: string, answer: string | undefined) =>
   answer === undefined
     ? `[nemia probe] run ${run}: no action needed. A step of this run started this session to measure something; ` +
       `it reads the result itself and stops the session before it signs off.\n\n${prompt}`
     : `[nemia probe] run ${run}: action needed — ${answer}. The step waits, blocked, until you do.\n\n${prompt}`;
 
 /** The options of `start`: its label, what to press, a settings file, and the prompt after `--`. */
-function startArgs(args: string[]): { label: string; answer?: string; settings?: string; prompt: string } {
+function startArgs(args: string[]) {
   const dash = args.indexOf('--');
   const prompt = dash < 0 ? '' : args.slice(dash + 1).join(' ');
   const [label, ...rest] = dash < 0 ? args : args.slice(0, dash);
@@ -140,7 +139,7 @@ function startArgs(args: string[]): { label: string; answer?: string; settings?:
 }
 
 /** `start`: the probe started, as asked, and what the step does next. */
-function start(args: string[]): string[] {
+function start(args: string[]) {
   const { label, answer, settings, prompt } = startArgs(args);
   const run = runOfBranch();
   const dir = probesDir();
@@ -164,7 +163,7 @@ function start(args: string[]): string[] {
 }
 
 /** `stop [label]`: each live probe of the run stopped, or the one named. */
-function stop(args: string[]): string[] {
+function stop(args: string[]) {
   const run = runOfBranch();
   const [label] = args;
   const rows = live(probesOf(run)).filter((row) => label === undefined || row.name === probeName(run, label));
@@ -177,7 +176,7 @@ function stop(args: string[]): string[] {
 }
 
 /** `check`: refuses while a probe of `WF_RUN` is live. */
-function check(): string[] {
+function check() {
   const run = process.env.WF_RUN;
   if (!run) throw new Refusal("WF_RUN is not set: probes are checked in a run's check, where it names the run");
   const left = live(probesOf(run));
@@ -204,7 +203,7 @@ const VERBS: Record<string, (args: string[]) => string[]> = {
 };
 
 /** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr. */
-function main(): number {
+function main() {
   const [verb = '', ...args] = process.argv.slice(2);
   try {
     const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;

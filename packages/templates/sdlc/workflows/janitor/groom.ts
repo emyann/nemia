@@ -39,18 +39,18 @@ export type Amendment = { kind: 'amended'; body: string } | { kind: 'refused'; r
  * `body` with each fact's `was` replaced by its `now`, in order, each found exactly once in the body as the facts before it left it;
  * refused at the first fact that is empty, unchanged, missing or found twice, so no amendment is a guess.
  */
-export function amendment(body: string, facts: readonly Fact[]): Amendment {
-  if (facts.length === 0) return { kind: 'refused', reason: 'no-facts', fact: -1 };
+export function amendment(body: string, facts: readonly Fact[]) {
+  if (facts.length === 0) return { kind: 'refused', reason: 'no-facts', fact: -1 } satisfies Amendment;
   let now = body;
   for (const [i, fact] of facts.entries()) {
-    if (fact.was === '') return { kind: 'refused', reason: 'empty', fact: i };
-    if (fact.was === fact.now) return { kind: 'refused', reason: 'unchanged', fact: i };
+    if (fact.was === '') return { kind: 'refused', reason: 'empty', fact: i } satisfies Amendment;
+    if (fact.was === fact.now) return { kind: 'refused', reason: 'unchanged', fact: i } satisfies Amendment;
     const at = now.indexOf(fact.was);
-    if (at < 0) return { kind: 'refused', reason: 'missing', fact: i };
-    if (now.indexOf(fact.was, at + 1) >= 0) return { kind: 'refused', reason: 'twice', fact: i };
+    if (at < 0) return { kind: 'refused', reason: 'missing', fact: i } satisfies Amendment;
+    if (now.indexOf(fact.was, at + 1) >= 0) return { kind: 'refused', reason: 'twice', fact: i } satisfies Amendment;
     now = now.slice(0, at) + fact.now + now.slice(at + fact.was.length);
   }
-  return { kind: 'amended', body: now };
+  return { kind: 'amended', body: now } satisfies Amendment;
 }
 
 /** A verdict's word. */
@@ -77,7 +77,7 @@ const WHY_NOT: Record<AmendmentRefusal, string> = {
 };
 
 /** The closeout at `file`, parsed; refuses a missing argument, a file that does not read, or one that is not a JSON object. */
-function readCloseout(file: string | undefined): Record<string, unknown> {
+function readCloseout(file: string | undefined) {
   if (!file) throw new Refusal('no closeout reached the check: WF_CLOSEOUT is empty, so there are no verdicts to read');
   let parsed: unknown;
   try {
@@ -91,7 +91,7 @@ function readCloseout(file: string | undefined): Record<string, unknown> {
 }
 
 /** The period's last day, `YYYY-MM-DD`; refuses one that is not a day. */
-function lastDay(closeout: Record<string, unknown>): string {
+function lastDay(closeout: Record<string, unknown>) {
   const to = (closeout.period as { to?: unknown } | undefined)?.to;
   if (typeof to !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(to))
     throw new Refusal(`period.to is ${JSON.stringify(to)}, not a day: say it YYYY-MM-DD, in UTC`);
@@ -102,7 +102,7 @@ function lastDay(closeout: Record<string, unknown>): string {
  * Verdict `i`, checked field by field; refuses a field of the wrong type, a word not known, a replaced with no `by`, a done with no
  * commit. A stale card's facts are `amendment`'s to refuse, once the card is read.
  */
-function verdictOf(value: unknown, i: number): Verdict {
+function verdictOf(value: unknown, i: number) {
   const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const wrong = ['card', 'verdict', 'why', 'commit', 'by'].filter((k) => typeof v[k] !== 'string');
   const facts = Array.isArray(v.facts) ? v.facts : null;
@@ -122,7 +122,7 @@ function verdictOf(value: unknown, i: number): Verdict {
 }
 
 /** The closeout's verdicts, checked whole; refuses a closeout with no list, and two verdicts on one card. */
-function verdictsOf(closeout: Record<string, unknown>): Verdict[] {
+function verdictsOf(closeout: Record<string, unknown>) {
   if (!Array.isArray(closeout.verdicts))
     throw new Refusal('the closeout names no `verdicts` list: sign off with one verdict per card in play, empty when none is');
   const verdicts = closeout.verdicts.map(verdictOf);
@@ -135,19 +135,19 @@ function verdictsOf(closeout: Record<string, unknown>): Verdict[] {
 }
 
 /** Where `nemia` and `git` run: the run's workspace. */
-const workspace = (): string => process.env.WF_WORKSPACE || process.cwd();
+const workspace = () => process.env.WF_WORKSPACE || process.cwd();
 
 /** `nemia <args>`, its stdout parsed as JSON; refuses, naming the command, when it fails. */
-function nemia(args: readonly string[]): unknown {
+function nemia(args: readonly string[]) {
   const ran = spawnSync('nemia', args, { cwd: workspace(), encoding: 'utf8', timeout: 60_000 });
   if (ran.status !== 0)
     throw new Refusal(
       `nemia ${args.join(' ')} failed (${ran.error?.message ?? `exit ${ran.status}`}): ${(ran.stderr ?? '').trim()}; run the check again once it answers`,
     );
   const out = (ran.stdout ?? '').trim();
-  if (!out) return null;
+  if (!out) return null as unknown;
   try {
-    return JSON.parse(out);
+    return JSON.parse(out) as unknown;
   } catch (err) {
     throw new Refusal(`nemia ${args.join(' ')} did not print JSON (${(err as Error).message}): run the check again once it does`, {
       cause: err,
@@ -159,7 +159,7 @@ function nemia(args: readonly string[]): unknown {
  * The factory this run is in: its namespace, as `nemia get runs/<WF_RUN>` serves the run. Refuses where `WF_RUN` is unset or the run
  * does not read: no other factory's cards are this janitor's to judge.
  */
-function factory(): string {
+function factory() {
   const run = process.env.WF_RUN;
   if (!run) throw new Refusal('WF_RUN is not set, so the factory whose cards are groomed is not known: run this check in a run');
   const served = nemia(['get', `runs/${run}`, '-o', 'json']) as { metadata?: { namespace?: unknown } } | null;
@@ -170,13 +170,13 @@ function factory(): string {
 }
 
 /** The cards the api serves in the factory `namespace`, by name. */
-function cards(namespace: string): Map<string, Served> {
+function cards(namespace: string) {
   const page = nemia(['get', 'cards', '-n', namespace, '-o', 'json']) as { items?: Served[] } | null;
   return new Map((page?.items ?? []).map((card) => [card.metadata.name, card]));
 }
 
 /** Refuses a done card whose commit is not on the base, or a base that is not named. */
-function checkLanded(verdicts: readonly Verdict[]): void {
+function checkLanded(verdicts: readonly Verdict[]) {
   const done = verdicts.filter((v) => v.verdict === 'done');
   if (!done.length) return;
   const base = process.env.WF_BASE_REF;
@@ -198,7 +198,7 @@ function checkLanded(verdicts: readonly Verdict[]): void {
 }
 
 /** The stale card `v`, amended, as `nemia apply -f` reads it: refuses a fact `amendment` cannot place. */
-function amended(v: Verdict, namespace: string): Record<string, unknown> {
+function amended(v: Verdict, namespace: string) {
   const served = nemia(['get', `cards/${v.card}`, '-n', namespace, '-o', 'json']) as Served;
   const result = amendment(served.spec.body ?? '', v.facts);
   if (result.kind === 'refused')
@@ -208,7 +208,7 @@ function amended(v: Verdict, namespace: string): Record<string, unknown> {
 }
 
 /** The report's section on `v`, with the command that acts on it where one does. */
-function section(v: Verdict, card: Served, command: string | null): string {
+function section(v: Verdict, card: Served, command: string | null) {
   const lines = [`## ${v.card}: ${v.verdict}`, '', card.status?.title ?? '(no title)', '', v.why.trim()];
   if (v.verdict === 'done') lines.push('', `Landed by ${v.commit.trim()}.`);
   if (v.verdict === 'replaced') lines.push('', `Replaced by ${v.by.trim()}.`);
@@ -218,7 +218,7 @@ function section(v: Verdict, card: Served, command: string | null): string {
 }
 
 /** Checks the closeout whole, then writes the amended cards and the report, and prints what to type. */
-function main(): void {
+function main() {
   const closeout = readCloseout(process.argv[2]);
   const to = lastDay(closeout);
   const verdicts = verdictsOf(closeout);

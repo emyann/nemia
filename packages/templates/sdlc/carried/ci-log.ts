@@ -34,14 +34,14 @@ const ESCAPES = new RegExp(String.raw`${ESC}\[[0-?]*[ -/]*[@-~]|${ESC}\][^${BEL}
  * A line of a job's log as GitHub serves it, without its escape sequences (`ESCAPES`), the timestamp it prefixes each with and the mark
  * it opens the log with.
  */
-const unstamped = (line: string): string =>
+const unstamped = (line: string) =>
   line
     .replace(ESCAPES, '')
     .replace(BOM, '')
     .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?|\r$/g, '');
 
 /** A line without the prefix a monorepo's task runner gave it (`pkg:test: `), as Nemia's own check reads one. */
-const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
+const bare = (line: string) => line.replace(/^\S+:\S+: /, '');
 
 /**
  * A runner's own line for a subject that failed, `<tool>: FAILED — <subject>: <why>`, also said by one of its workers as `<tool>: worker
@@ -52,7 +52,7 @@ const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
 const SUBJECT_FAILED = /^\s*(?:\[[^\]\s]+\] )?[\w.-]+: (?:worker \d+ )?FAILED — (.+)$/;
 
 /** The subject of a runner's failed line (`SUBJECT_FAILED`): what it says before its first `: `, or all of it where it says no reason. */
-const subjectOf = (line: string): string | undefined => {
+const subjectOf = (line: string) => {
   const said = SUBJECT_FAILED.exec(bare(line))?.[1];
   return said === undefined ? undefined : said.split(': ')[0].trim();
 };
@@ -63,7 +63,7 @@ const subjectOf = (line: string): string | undefined => {
  * nothing — a runner's failed subject (`SUBJECT_FAILED`), a TypeScript error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's
  * ` x <rule>: …` (`×` where it draws).
  */
-const failing = (line: string): boolean => {
+const failing = (line: string) => {
   const said = bare(line);
   const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
   if (test !== null) return !test[1].startsWith('✖ failing tests:');
@@ -73,19 +73,19 @@ const failing = (line: string): boolean => {
 };
 
 /** What says a failing line once: a runner's failure by its subject, any other by the line itself. */
-const keyOf = (line: string): string => {
+const keyOf = (line: string) => {
   const subject = subjectOf(line);
   return subject === undefined ? bare(line).trim() : `FAILED — ${subject}`;
 };
 
 /** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
-const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
+const ends = (line: string) => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
 
 /**
  * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), or
  * the location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`).
  */
-const detail = (line: string): boolean => {
+const detail = (line: string) => {
   const said = bare(line).trim();
   return /^[+-](?:\s|$)/.test(said) || /^(?:,-|╭─)\[/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
 };
@@ -94,14 +94,13 @@ const detail = (line: string): boolean => {
  * Whether `line` tells why a runner's subject failed: what it looked like as the runner pictured it (`what it looked like: <file>`) and,
  * where it says one, what it then failed on — its indented `what …: ` lines, and none of the call log or server lines around them.
  */
-const told = (line: string): boolean => /^\s*(?:\[[^\]\s]+\] )?\s*what [^:]*: \S/.test(bare(line));
+const told = (line: string) => /^\s*(?:\[[^\]\s]+\] )?\s*what [^:]*: \S/.test(bare(line));
 
 /**
  * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
  * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
  */
-const postJob = (line: string): boolean =>
-  /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
+const postJob = (line: string) => /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
 
 /**
  * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
@@ -110,7 +109,7 @@ const postJob = (line: string): boolean =>
  * it and again in a headline — bounded by `JOB_LINES`. A log with no such line gives its
  * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
-export function failures(log: string): { lines: string[]; tests: boolean } {
+export function failures(log: string) {
   const all = log.split('\n').map(unstamped);
   const seen = new Map<string, string[]>();
   all.forEach((line, i) => {
@@ -143,35 +142,35 @@ export const PASSED = 'SUCCESS';
 const PENDING = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED', 'EXPECTED']);
 
 /** The name of a check, a check run's or a status context's. */
-export const nameOf = (entry: Check): string => entry.name ?? entry.context ?? '';
+export const nameOf = (entry: Check) => entry.name ?? entry.context ?? '';
 
 /** Whether a check is not over yet. */
-export const pending = (entry: Check): boolean => PENDING.has((entry.status ?? entry.state ?? '').toUpperCase());
+export const pending = (entry: Check) => PENDING.has((entry.status ?? entry.state ?? '').toUpperCase());
 
 /** The verdict of a check, a check run's conclusion or a status context's state, upper-cased; empty where it has neither. */
-export const verdict = (entry: Check): string => (entry.conclusion ?? entry.state ?? '').toUpperCase();
+export const verdict = (entry: Check) => (entry.conclusion ?? entry.state ?? '').toUpperCase();
 
 /** Where a person reads the check: a check run's details, a status context's target. */
-export const linkOf = (entry: Check): string => entry.detailsUrl ?? entry.targetUrl ?? '';
+export const linkOf = (entry: Check) => entry.detailsUrl ?? entry.targetUrl ?? '';
 
 /** How the CI context's checks of a commit read: none reported, none over yet, every one passed, or one that did not. */
 export type Seen = 'absent' | 'pending' | 'passed' | 'failed';
 
 /** How `ours`, the CI context's checks of a commit, read now. */
-export function seenOf(ours: readonly Check[]): Seen {
+export function seenOf(ours: readonly Check[]) {
   if (ours.length === 0) return 'absent';
   if (ours.every(pending)) return 'pending';
   return ours.every((entry) => verdict(entry) === PASSED) ? 'passed' : 'failed';
 }
 
 /** When `entry` started, in milliseconds; a run not started yet — no time, one that does not parse, or Go's zero time — is the newest. */
-const startOf = (entry: Check): number => {
+const startOf = (entry: Check) => {
   const at = Date.parse(entry.startedAt ?? '');
   return Number.isNaN(at) || at < 0 ? Number.POSITIVE_INFINITY : at;
 };
 
 /** What makes two rollup entries runs of one check: a status context's name, or a check run's name within its workflow. */
-export const checkKey = (entry: Check): string =>
+export const checkKey = (entry: Check) =>
   entry.context !== undefined ? `status ${entry.context}` : `run ${entry.name ?? ''}\u0000${entry.workflowName ?? ''}`;
 
 /**
@@ -179,7 +178,7 @@ export const checkKey = (entry: Check): string =>
  * `labeled` after an `opened`), leaves its earlier runs in the rollup, and only the newest is its verdict, as GitHub's branch protection
  * and `gh pr checks` read it. The newest by `startedAt`, one not started counting as newest; of two that tie, the later in the rollup.
  */
-export function latest<T extends Check>(entries: readonly T[]): T[] {
+export function latest<T extends Check>(entries: readonly T[]) {
   const newest = new Map<string, number>();
   entries.forEach((entry, i) => {
     const was = newest.get(checkKey(entry));
@@ -195,19 +194,19 @@ export function latest<T extends Check>(entries: readonly T[]): T[] {
  * `CANCELLED` — as a CI does whose pending run of a branch is replaced by a newer one. A check not over yet has no conclusion, so a
  * context still running is never superseded.
  */
-export const superseded = (ours: readonly Check[]): boolean => ours.every((entry) => verdict(entry) === 'CANCELLED');
+export const superseded = (ours: readonly Check[]) => ours.every((entry) => verdict(entry) === 'CANCELLED');
 
 /** The verdicts of a job that did not fail it: a job that is over with any other did not pass. */
 export const NOT_FAILED: ReadonlySet<string> = new Set([PASSED, 'SKIPPED', 'NEUTRAL']);
 
 /** The entries of `entries` named `check`. */
-export const named = <T extends Check>(entries: readonly T[], check: string): T[] => entries.filter((entry) => nameOf(entry) === check);
+export const named = <T extends Check>(entries: readonly T[], check: string) => entries.filter((entry) => nameOf(entry) === check);
 
 /** The most jobs that did not pass a refusal names, and whose log `pull-request.ts` reads. */
 export const JOBS = 10;
 
 /** `listed` by name and verdict, or state where it has none yet, with its URL, one a line, at most `JOBS` of them. */
-export const listing = (listed: readonly Check[]): string[] => [
+export const listing = (listed: readonly Check[]) => [
   ...listed.slice(0, JOBS).map((e) => `    ${nameOf(e)}: ${verdict(e) || e.status?.toLowerCase() || 'no verdict'} ${linkOf(e)}`.trimEnd()),
   ...(listed.length > JOBS ? [`    … and ${listed.length - JOBS} more`] : []),
 ];
@@ -219,19 +218,19 @@ export const listing = (listed: readonly Check[]): string[] => [
 export type Landing = { number: number; url: string; oid: string; onto: string; check: string };
 
 /** Where a person reads a commit of the repository the landing's pull request is of. */
-const commitUrl = (l: Landing, sha: string): string => `${l.url.replace(/\/pull\/\d+$/, '')}/commit/${sha}`;
+const commitUrl = (l: Landing, sha: string) => `${l.url.replace(/\/pull\/\d+$/, '')}/commit/${sha}`;
 
 /** What every refusal of the wait says: the merge stands, and nothing was taken back. */
-export const stands = (l: Landing): string => `  The merge stands and nothing was taken back: #${l.number} is on \`${l.onto}\`.`;
+export const stands = (l: Landing) => `  The merge stands and nothing was taken back: #${l.number} is on \`${l.onto}\`.`;
 
 /** Why the merge's own `ours`, `superseded`, carry no verdict: every run cancelled, or none reported. */
-export const noVerdict = (ours: readonly Check[]): string =>
+export const noVerdict = (ours: readonly Check[]) =>
   ours.length
     ? "the merge's own run was cancelled, most likely replaced by a newer run of the base's CI"
     : "the merge's own was not reported there";
 
 /** What the receipt says where the context passed at `sha`, the base's tip, which holds the merge: red there, or `none` of its own. */
-export const greenLater = (l: Landing, sha: string, none?: string): string =>
+export const greenLater = (l: Landing, sha: string, none?: string) =>
   none === undefined
     ? `\`${l.check}\` was red on \`${l.onto}\` at the merge ${l.oid.slice(0, 12)}, and is green at ${sha.slice(0, 12)}, the base's tip, which holds it`
     : `\`${l.check}\` is green on \`${l.onto}\` at ${sha.slice(0, 12)}, the base's tip, which holds the merge ${l.oid.slice(0, 12)}: ${none}`;
@@ -240,7 +239,7 @@ export const greenLater = (l: Landing, sha: string, none?: string): string =>
  * What the wait says of the context at the merge once `secs` are out: never read from GitHub, naming the last error `unread`; still
  * running; cancelled; or never reported.
  */
-export function unfinished(l: Landing, entries: readonly Check[], secs: number, unread?: string): string {
+export function unfinished(l: Landing, entries: readonly Check[], secs: number, unread?: string) {
   const [ours, at] = [named(entries, l.check), `\`${l.check}\` on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number},`];
   if (unread !== undefined)
     return `${at} could not be read from GitHub within ${secs} s; the last read said: ${unread}\n  Read ${commitUrl(l, l.oid)}.`;
@@ -262,7 +261,7 @@ export function unfinished(l: Landing, entries: readonly Check[], secs: number, 
  * The refusal of a context never reported at the merge within `secs`: the other checks there still running or not passed, with their
  * URLs, and that CI may not run it on pushes to the base, which the factory's `landingWaitsOnCi` answers, or has not yet.
  */
-function unreported(l: Landing, entries: readonly Check[], secs: number): string {
+function unreported(l: Landing, entries: readonly Check[], secs: number) {
   const told = entries.filter((entry) => pending(entry) || !NOT_FAILED.has(verdict(entry)));
   return [
     `no \`${l.check}\` was reported on \`${l.onto}\` at ${l.oid.slice(0, 12)}, the merge of #${l.number}, within ${secs} s ` +
@@ -279,7 +278,7 @@ function unreported(l: Landing, entries: readonly Check[], secs: number): string
  * does. `rerun`, the lines that say what the receipt re-ran and how it ended, or why it re-ran nothing, follow the first line; where
  * `twice`, a job re-ran red again, so the base is broken, not flaky, and the refusal says so and points at the commit's checks.
  */
-export function reddened(l: Landing, sha: string, entries: readonly Check[], none?: string, rerun: string[] = [], twice = false): string[] {
+export function reddened(l: Landing, sha: string, entries: readonly Check[], none?: string, rerun: string[] = [], twice = false) {
   const [at, merge] = [sha.slice(0, 12), `the merge of #${l.number}`];
   return [
     none === undefined

@@ -38,7 +38,7 @@ const GENERATED = ['package-lock.json'];
 type Change = { path: string; lines: number };
 
 /** What git prints for `args`; refuses, saying `what` could not be told, when git fails. */
-function git(what: string, ...args: string[]): string {
+function git(what: string, ...args: string[]) {
   const ran = spawnSync('git', ['-c', 'core.quotePath=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   if (ran.status !== 0)
     throw new Refusal(
@@ -52,14 +52,14 @@ function git(what: string, ...args: string[]): string {
  * The commit the work is measured from: where `HEAD` left `base`, or the base the branch merged last, the second parent of the newest
  * merge on its first parent since.
  */
-function startOf(base: string): string {
+function startOf(base: string) {
   const left = git('where the work began', 'merge-base', 'HEAD', base).trim();
   const [merge] = git('what the branch merged', 'rev-list', '--first-parent', '--merges', `${left}..HEAD`).split('\n');
   return merge ? git('the base the branch merged', 'rev-parse', `${merge}^2`).trim() : left;
 }
 
 /** The net change from `WF_BASE_REF` to `HEAD`, a file each, a rename once; refuses where `WF_BASE_REF` is not set. */
-function changes(): Change[] {
+function changes() {
   const base = process.env.WF_BASE_REF;
   if (!base) throw new Refusal("WF_BASE_REF is not set: a change is measured in a run's check, where it names the base the work began on");
   const fields = git('what the work changed', 'diff', '--numstat', '-M', '-z', startOf(base), 'HEAD', '--').split('\0');
@@ -74,11 +74,11 @@ function changes(): Change[] {
 }
 
 /** Whether a tool writes `path` in any repository. */
-const generated = (path: string): boolean => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
+const generated = (path: string) => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
 
 /** The paths of `paths` git says are `linguist-generated`, set or true; refuses, as `git` does, when git cannot tell. */
-function marked(paths: readonly string[]): Set<string> {
-  if (paths.length === 0) return new Set();
+function marked(paths: readonly string[]) {
+  if (paths.length === 0) return new Set() satisfies Set<string>;
   const ran = spawnSync('git', ['check-attr', '-z', '--stdin', 'linguist-generated'], {
     encoding: 'utf8',
     input: paths.map((path) => `${path}\0`).join(''),
@@ -92,11 +92,11 @@ function marked(paths: readonly string[]): Set<string> {
   const found = new Set<string>();
   const fields = ran.stdout.split('\0');
   for (let i = 0; i + 2 < fields.length; i += 3) if (fields[i + 2] === 'set' || fields[i + 2] === 'true') found.add(fields[i]);
-  return found;
+  return found satisfies Set<string>;
 }
 
 /** `size`: says the count, and refuses nothing by it. */
-function size(say: (line: string) => void): number {
+function size(say: (line: string) => void) {
   const all = changes();
   const made = marked(all.map((change) => change.path));
   const counted = all.filter((change) => !generated(change.path) && !made.has(change.path));
@@ -106,8 +106,8 @@ function size(say: (line: string) => void): number {
 }
 
 /** The whole run: the exit of the verb asked for, 78 with the refusal on stderr. */
-function main(): number {
-  const say = (line: string): void => void process.stdout.write(`${line}\n`);
+function main() {
+  const say = (line: string) => void process.stdout.write(`${line}\n`);
   const [verb] = process.argv.slice(2);
   try {
     if (verb === 'size') return size(say);

@@ -32,20 +32,20 @@ const BACKUP = 'refs/backup/';
 const PART = /^[^/\s]+$/;
 
 /** What git printed for `args`, trimmed, with its exit; never thrown. */
-function run(args: string[]): { status: number | null; out: string; err: string } {
+function run(args: string[]) {
   const r = spawnSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
   return { status: r.status, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() || (r.error?.message ?? '') };
 }
 
 /** What git printed for `args`, trimmed; refuses, saying what could not be told, when git fails. */
-function git(what: string, ...args: string[]): string {
+function git(what: string, ...args: string[]) {
   const ran = run(args);
   if (ran.status !== 0) throw new Refusal(`cannot tell ${what}, since \`git ${args.join(' ')}\` failed: ${ran.err}`);
   return ran.out;
 }
 
 /** The branch this workspace is on, with the run it names and its leaf; refuses any other branch. */
-function branchOf(): { branch: string; run: string; leaf: string } {
+function branchOf() {
   const head = run(['symbolic-ref', '--short', 'HEAD']);
   const branch = head.status === 0 ? head.out : '';
   const named = /^wf\/([^/]+)\/([^/]+)$/.exec(branch);
@@ -58,7 +58,7 @@ function branchOf(): { branch: string; run: string; leaf: string } {
 }
 
 /** The other branches of the run, each with its tip: `refs/heads/wf/<run>/*` but `own`. */
-function partsOf(id: string, own: string): { branch: string; tip: string }[] {
+function partsOf(id: string, own: string) {
   return git(`the branches of run ${id}`, 'for-each-ref', '--format=%(refname:short) %(objectname)', `refs/heads/wf/${id}/`)
     .split('\n')
     .filter(Boolean)
@@ -70,17 +70,17 @@ function partsOf(id: string, own: string): { branch: string; tip: string }[] {
 }
 
 /** The commits of `tip` whose patch `head` has no equivalent of, each by its short sha. */
-const leftOut = (branch: string, tip: string, head: string): string[] =>
+const leftOut = (branch: string, tip: string, head: string) =>
   git(`what of \`${branch}\` ${head.slice(0, 12)} has no patch of`, 'cherry', head, tip)
     .split('\n')
     .filter((line) => line.startsWith('+ '))
     .map((line) => line.slice(2, 14));
 
 /** The command that declares `parts` replaced, as the engineer types it. */
-const replacedLine = (parts: readonly string[]): string => `node "$WF_CARRIED_FILES/parts.ts" replaced ${parts.join(' ')}`;
+const replacedLine = (parts: readonly string[]) => `node "$WF_CARRIED_FILES/parts.ts" replaced ${parts.join(' ')}`;
 
 /** `check`: refuses while a part of this run holds a commit `HEAD` has no patch of. */
-function check(args: string[]): string[] {
+function check(args: string[]) {
   if (args.length) throw new Refusal(`\`check\` takes nothing, not \`${args.join(' ')}\``);
   const { branch, run: id } = branchOf();
   const head = git('what commit HEAD is', 'rev-parse', 'HEAD');
@@ -102,7 +102,7 @@ function check(args: string[]): string[] {
 }
 
 /** The branches checked out in a worktree of this repository, by full ref name. */
-const checkedOut = (): Set<string> =>
+const checkedOut = () =>
   new Set(
     git('which branches a worktree has checked out', 'worktree', 'list', '--porcelain')
       .split('\n')
@@ -111,7 +111,7 @@ const checkedOut = (): Set<string> =>
   );
 
 /** `replaced <part>…`: removes each part's branch, keeping its tip under `refs/backup/`; refuses all before it removes any. */
-function replaced(args: string[]): string[] {
+function replaced(args: string[]) {
   if (args.length === 0) throw new Refusal('`replaced` names the parts it declares: `node "$WF_CARRIED_FILES/parts.ts" replaced <part>…`');
   const { branch, run: id, leaf } = branchOf();
   const head = git('what commit HEAD is', 'rev-parse', 'HEAD');
@@ -153,7 +153,7 @@ function replaced(args: string[]): string[] {
 const VERBS: Record<string, (args: string[]) => string[]> = { check, replaced };
 
 /** The whole run: exit 0 with what was done on stdout, or the refusal on stderr with 1; each line under `nemia parts`. */
-function main(): number {
+function main() {
   const [verb = '', ...args] = process.argv.slice(2);
   try {
     const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;

@@ -3,8 +3,8 @@
  * conversation itself: her session stopped, the board having lost the daemon, a chat it cannot read at all, and a conversation no live
  * stream of which can be had while the api reads it again on a beat.
  *
- * It is no part of the look (`change-the-board` names none, and `test/look.test.ts` refuses one it does not): a deliberate decision,
- * kept where a reader of either conversation will find it.
+ * It is no part of the look (the board's facts, *The look's parts*, name none, and `test/look.test.ts` refuses one they do not): a
+ * deliberate decision, kept where a reader of either conversation will find it.
  */
 import type { ReactNode } from 'react';
 import { container } from '@/lib/meaning';

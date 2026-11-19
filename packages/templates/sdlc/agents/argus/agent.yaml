@@ -28,6 +28,7 @@ spec:
         - Skill
         - Agent
       allowedTools:
+        - Agent
         - Bash(nemia stats:*)
         - Bash(nemia inbox)
         - { path: fences/read-only.allow.yaml }

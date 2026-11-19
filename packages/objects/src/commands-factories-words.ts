@@ -7,20 +7,21 @@ import { type Args, type CommandWords, type Flag, type Spec } from './command.ts
 import { leftOut } from './commands-flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** `--file <path>`, or `-` for stdin, of `command`: the words to write, read by the command line's runner. */
-const fileFlag = (command: 'rules' | 'instruct', twice: string): Flag => ({
-  flag: '--file',
-  kind: 'text',
-  key: 'file',
-  takes: `--file takes the file whose words to write, or - to read them from stdin: nemia factory ${command} <name> --file <path>`,
-  twice: `nemia factory ${command} takes --file once: ${twice}`,
-  only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
-});
+const fileFlag = (command: 'rules' | 'instruct', twice: string) =>
+  ({
+    flag: '--file',
+    kind: 'text',
+    key: 'file',
+    takes: `--file takes the file whose words to write, or - to read them from stdin: nemia factory ${command} <name> --file <path>`,
+    twice: `nemia factory ${command} takes --file once: ${twice}`,
+    only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
+  }) satisfies Flag;
 
 const RULES_FILE = fileFlag('rules', 'a factory keeps one file of rules.');
 
@@ -85,7 +86,7 @@ const INSTRUCTION_SPEC: Spec = {
  * Why `nemia factory instruction`'s arguments are refused before anything is read, or null: two of `--path`, `--store` and `--clear` given,
  * and a put the api routes (`clear` fixed false) that names neither a path nor the store.
  */
-function instructionCheck(args: Args): string | null {
+function instructionCheck(args: Args) {
   const given = [textOf(args, 'path') !== undefined, args.store === true, args.clear === true].filter(Boolean).length;
   if (given > 1)
     return 'nemia factory instruction takes one of --path, --store and --clear: a factory keeps its instruction in one place. Nothing was changed.';

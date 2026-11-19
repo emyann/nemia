@@ -128,19 +128,20 @@ const WORKS_ON = {
  * `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow; an attach takes `--repo <name>` besides, a detach no
  * flag, an unknown one refused wherever it stands.
  */
-const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
-  positionals: [
-    { key: 'factory', takes: 'required', kind: 'name' },
-    { key: 'workflow', takes: 'required', kind: 'name' },
-  ],
-  flags: verb === 'attach' ? [WORKS_ON] : [],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>${verb === 'attach' ? ' [--repo <name>]' : ''}.`
-      : `nemia factory ${verb} takes one workflow, and ${arg} is a second: nemia factory ${verb} <factory> <workflow>, once per workflow.`,
-  missing: `nemia factory ${verb} takes the factory, then the workflow, by its folder's name: nemia factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
-  flagFirst: true,
-});
+const workflowSpec = (verb: 'attach' | 'detach') =>
+  ({
+    positionals: [
+      { key: 'factory', takes: 'required', kind: 'name' },
+      { key: 'workflow', takes: 'required', kind: 'name' },
+    ],
+    flags: verb === 'attach' ? [WORKS_ON] : [],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>${verb === 'attach' ? ' [--repo <name>]' : ''}.`
+        : `nemia factory ${verb} takes one workflow, and ${arg} is a second: nemia factory ${verb} <factory> <workflow>, once per workflow.`,
+    missing: `nemia factory ${verb} takes the factory, then the workflow, by its folder's name: nemia factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
+    flagFirst: true,
+  }) satisfies Spec;
 
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 export const FACTORY_ATTACH_WORDS = {
@@ -185,7 +186,7 @@ const REVISIONS_SPEC: Spec = {
 };
 
 /** Whether `nemia factory revisions` was given one of the two policies. */
-const isPolicy = (args: Args): boolean => REVISIONS_POLICIES.some((p) => p === args.revisions);
+const isPolicy = (args: Args) => REVISIONS_POLICIES.some((p) => p === args.revisions);
 
 /** `nemia factory revisions`: whether a factory's runs follow merged revisions, written. */
 export const FACTORY_REVISIONS_WORDS = {

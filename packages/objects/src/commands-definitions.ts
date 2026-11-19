@@ -16,27 +16,29 @@ import {
 import { FROM, versionFlag, writerSpec } from './commands-writers.ts';
 
 /** The text `args` holds under `key`, or the empty text. */
-const textIn = (args: Args, key: string): string => {
+const textIn = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : '';
 };
 
 /** The spec of a command taking an agent's name and nothing else. */
-const agentSpec = (name: string): Spec => ({
-  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [],
-  unknown: (arg) => `${CLI} ${name} takes an agent's name, not ${arg}: ${CLI} ${name} <agent>.`,
-});
+const agentSpec = (name: string) =>
+  ({
+    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `${CLI} ${name} takes an agent's name, not ${arg}: ${CLI} ${name} <agent>.`,
+  }) satisfies Spec;
 
 /** The spec of a command taking an agent's name and a rule's id. */
-const ruleSpec = (name: string): Spec => ({
-  positionals: [
-    { key: 'name', takes: 'required', kind: 'name' },
-    { key: 'id', takes: 'required', kind: 'name' },
-  ],
-  flags: [],
-  unknown: (arg) => `${CLI} ${name} takes an agent's name and a rule's id, not ${arg}: ${CLI} ${name} <agent> <id>.`,
-});
+const ruleSpec = (name: string) =>
+  ({
+    positionals: [
+      { key: 'name', takes: 'required', kind: 'name' },
+      { key: 'id', takes: 'required', kind: 'name' },
+    ],
+    flags: [],
+    unknown: (arg) => `${CLI} ${name} takes an agent's name and a rule's id, not ${arg}: ${CLI} ${name} <agent> <id>.`,
+  }) satisfies Spec;
 
 /** `nemia policy <agent>`: an agent's rules for `auto`, the list in force beside its proposal and its custom instruction. */
 export const POLICY_WORDS = {
@@ -84,7 +86,7 @@ export const POLICY_PROPOSE_WORDS = {
 } as const satisfies CommandWords;
 
 /** The refusal of a confirm with no words. */
-const confirmWordless = (agent: string): string =>
+const confirmWordless = (agent: string) =>
   `${CLI} policy confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by ${CLI} policy ${agent}.`;
 
 /** `nemia policy confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it. */

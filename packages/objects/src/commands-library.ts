@@ -11,38 +11,38 @@ const CLI = 'nemia';
 const ADD_USAGE = `<${LIBRARY_KINDS.join('|')}> <name> --factory <factory>`;
 
 /** The factory a library add or removal names, refused in the words of `verb` where it is left out. */
-const factoryFlag = (verb: string): Flag => ({
-  flag: '--factory',
-  kind: 'name',
-  key: 'factory',
-  takes: `--factory takes the factory the item is added to: ${CLI} library ${verb} ${ADD_USAGE}`,
-  twice: `${CLI} library ${verb} takes --factory once: one factory at a time.`,
-});
+const factoryFlag = (verb: string) =>
+  ({
+    flag: '--factory',
+    kind: 'name',
+    key: 'factory',
+    takes: `--factory takes the factory the item is added to: ${CLI} library ${verb} ${ADD_USAGE}`,
+    twice: `${CLI} library ${verb} takes --factory once: one factory at a time.`,
+  }) satisfies Flag;
 
 /** The words a library add or removal parses, refused in the words of `verb`. */
-const addSpec = (verb: string): Spec => ({
-  positionals: [
-    { key: 'kind', takes: 'required', kind: 'name' },
-    { key: 'name', takes: 'required', kind: 'name' },
-  ],
-  flags: [factoryFlag(verb)],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `${CLI} library ${verb} does not take ${arg}: ${CLI} library ${verb} ${ADD_USAGE}.`
-      : `${CLI} library ${verb} takes one kind and one name, and ${arg} is one more: ${CLI} library ${verb} ${ADD_USAGE}, once per item.`,
-  missing: `${CLI} library ${verb} takes the kind, then the name: ${CLI} library ${verb} ${ADD_USAGE}.`,
-});
+const addSpec = (verb: string) =>
+  ({
+    positionals: [
+      { key: 'kind', takes: 'required', kind: 'name' },
+      { key: 'name', takes: 'required', kind: 'name' },
+    ],
+    flags: [factoryFlag(verb)],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `${CLI} library ${verb} does not take ${arg}: ${CLI} library ${verb} ${ADD_USAGE}.`
+        : `${CLI} library ${verb} takes one kind and one name, and ${arg} is one more: ${CLI} library ${verb} ${ADD_USAGE}, once per item.`,
+    missing: `${CLI} library ${verb} takes the kind, then the name: ${CLI} library ${verb} ${ADD_USAGE}.`,
+  }) satisfies Spec;
 
 /** The refusal of an add or a removal with no factory, or a kind the library does not hold. */
-const addCheck =
-  (verb: string) =>
-  (args: Args): string | null => {
-    if (typeof args.factory !== 'string')
-      return `${CLI} library ${verb} names the factory with --factory: ${CLI} library ${verb} ${ADD_USAGE}.`;
-    return (LIBRARY_KINDS as readonly unknown[]).includes(args.kind)
-      ? null
-      : `${CLI} library ${verb} takes a kind the library holds, ${LIBRARY_KINDS.join(', ')}, not ${String(args.kind)}: ${CLI} library ${verb} ${ADD_USAGE}.`;
-  };
+const addCheck = (verb: string) => (args: Args) => {
+  if (typeof args.factory !== 'string')
+    return `${CLI} library ${verb} names the factory with --factory: ${CLI} library ${verb} ${ADD_USAGE}.`;
+  return (LIBRARY_KINDS as readonly unknown[]).includes(args.kind)
+    ? null
+    : `${CLI} library ${verb} takes a kind the library holds, ${LIBRARY_KINDS.join(', ')}, not ${String(args.kind)}: ${CLI} library ${verb} ${ADD_USAGE}.`;
+};
 
 /**
  * `nemia library [skills|agents|mcpservers|workflows] [--factory <factory>]`: the store's library, the user library's beside the builtins;

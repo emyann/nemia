@@ -93,23 +93,23 @@ export const Readiness = Schema.Struct({
 export type Readiness = typeof Readiness.Type;
 
 /** `n` pieces, as a sentence counts them. */
-const counted = (n: number): string => (n === 1 ? 'a piece' : `${n} pieces`);
+const counted = (n: number) => (n === 1 ? 'a piece' : `${n} pieces`);
 
 /** The read's missing pieces. */
-const missingOf = (read: Readiness): Readiness['pieces'] => read.pieces.filter((piece) => piece.state === 'missing');
+const missingOf = (read: Readiness) => read.pieces.filter((piece) => piece.state === 'missing');
 
 /** A piece's cost, a piece that declares none (an older server's) read as `run`. */
-const costOf = (piece: Readiness['pieces'][number]): ReadinessCost => piece.cost ?? 'run';
+const costOf = (piece: Readiness['pieces'][number]) => piece.cost ?? 'run';
 
 /**
  * Whether a run waits on the read: a missing piece costs `run`. Only then is the server not ready to run, and the board's banner
  * raised; a missing piece of another cost is advised, listed on Setup and by `nemia doctor` with its fix.
  * @param read The server's readiness, as read.
  */
-export const runsWait = (read: Readiness): boolean => missingOf(read).some((piece) => costOf(piece) === 'run');
+export const runsWait = (read: Readiness) => missingOf(read).some((piece) => costOf(piece) === 'run');
 
 /** What `n` missing pieces of `cost` cost, as a phrase; `firstRun` where no run was ever started on the server. */
-const phraseOf = (cost: ReadinessCost, n: number, firstRun: boolean): string => {
+const phraseOf = (cost: ReadinessCost, n: number, firstRun: boolean) => {
   if (cost === 'run') return firstRun ? `${counted(n)} the server needs before a factory's first run` : `${counted(n)} a run waits on`;
   if (cost === 'server') return `${counted(n)} that ${n === 1 ? 'keeps' : 'keep'} the server up or open, which no run waits on`;
   return `${counted(n)} of this client's own, which no run waits on`;
@@ -120,7 +120,7 @@ const phraseOf = (cost: ReadinessCost, n: number, firstRun: boolean): string => 
  * it, "before a factory's first run" only where the read says no run was ever started (`ran: false`); none where no piece is missing.
  * @param read The server's readiness, as read.
  */
-export function missingSaid(read: Readiness): string | undefined {
+export function missingSaid(read: Readiness) {
   const missing = missingOf(read);
   const phrases = READINESS_COSTS.flatMap((cost) => {
     const n = missing.filter((piece) => costOf(piece) === cost).length;
@@ -134,7 +134,7 @@ export function missingSaid(read: Readiness): string | undefined {
  * with the pieces advised counted; what the missing pieces cost after either (`missingSaid`).
  * @param read The server's readiness, as read.
  */
-export function readinessSaid(read: Readiness): string {
+export function readinessSaid(read: Readiness) {
   const said = missingSaid(read);
   if (said === undefined) return 'ready';
   if (runsWait(read)) return `not ready: missing ${said}`;

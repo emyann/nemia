@@ -137,20 +137,21 @@ one (${FACTORY_SETTINGS_HARNESS}), a key or a value a factory may not set, a val
 factory, and a setting rm of a key it does not set.`;
 
 /** A spec of `nemia factory setting <verb>`: the factory, the setting, and its value where `valued`. */
-const settingSpec = (verb: string, usage: string, valued: boolean): Spec => ({
-  positionals: [
-    { key: 'factory', takes: 'required', kind: 'name' },
-    { key: 'setting', takes: 'required', kind: 'name' },
-    ...(valued ? [{ key: 'value', takes: 'required', kind: 'text' } as const] : []),
-  ],
-  flags: [],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory setting ${verb} does not take ${arg}: nemia factory setting ${verb} ${usage}.`
-      : `nemia factory setting ${verb} takes one setting, and ${arg} is one more: nemia factory setting ${verb} ${usage}, once per setting (quote a JSON value).`,
-  missing: `nemia factory setting ${verb} takes ${usage}. Nothing was changed.`,
-  flagFirst: true,
-});
+const settingSpec = (verb: string, usage: string, valued: boolean) =>
+  ({
+    positionals: [
+      { key: 'factory', takes: 'required', kind: 'name' },
+      { key: 'setting', takes: 'required', kind: 'name' },
+      ...(valued ? [{ key: 'value', takes: 'required', kind: 'text' } as const] : []),
+    ],
+    flags: [],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia factory setting ${verb} does not take ${arg}: nemia factory setting ${verb} ${usage}.`
+        : `nemia factory setting ${verb} takes one setting, and ${arg} is one more: nemia factory setting ${verb} ${usage}, once per setting (quote a JSON value).`,
+    missing: `nemia factory setting ${verb} takes ${usage}. Nothing was changed.`,
+    flagFirst: true,
+  }) satisfies Spec;
 
 /** `nemia factory setting set`: a harness setting given to every session on its harness of a factory's runs started after. */
 export const FACTORY_SETTING_SET_WORDS = {
@@ -204,29 +205,30 @@ Refused, and nothing written: a workflow the factory does not offer, an amount t
 zero, the default factory, a factory not in the store, and a cost-line rm of a workflow with no line.`;
 
 /** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : '';
 };
 
 /** A spec of `nemia factory cost-line <verb>`: the factory, the workflow, and the line where `valued`. */
-const costSpec = (verb: string, usage: string, valued: boolean): Spec => ({
-  positionals: [
-    { key: 'factory', takes: 'required', kind: 'name' },
-    { key: 'workflow', takes: 'required', kind: 'name' },
-    ...(valued ? [{ key: 'usd', takes: 'required', kind: 'text' } as const] : []),
-  ],
-  flags: [],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory cost-line ${verb} does not take ${arg}${valued ? ', and a line is dollars above zero' : ''}: nemia factory cost-line ${verb} ${usage}. Nothing was changed.`
-      : `nemia factory cost-line ${verb} takes one workflow, and ${arg} is one more: nemia factory cost-line ${verb} ${usage}, once per workflow. Nothing was changed.`,
-  missing: `nemia factory cost-line ${verb} takes ${usage}. Nothing was changed.`,
-  flagFirst: true,
-});
+const costSpec = (verb: string, usage: string, valued: boolean) =>
+  ({
+    positionals: [
+      { key: 'factory', takes: 'required', kind: 'name' },
+      { key: 'workflow', takes: 'required', kind: 'name' },
+      ...(valued ? [{ key: 'usd', takes: 'required', kind: 'text' } as const] : []),
+    ],
+    flags: [],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia factory cost-line ${verb} does not take ${arg}${valued ? ', and a line is dollars above zero' : ''}: nemia factory cost-line ${verb} ${usage}. Nothing was changed.`
+        : `nemia factory cost-line ${verb} takes one workflow, and ${arg} is one more: nemia factory cost-line ${verb} ${usage}, once per workflow. Nothing was changed.`,
+    missing: `nemia factory cost-line ${verb} takes ${usage}. Nothing was changed.`,
+    flagFirst: true,
+  }) satisfies Spec;
 
 /** The command line's amount, refused before anything is read where it is not dollars above zero, in digits. */
-const amountCheck = (args: Args): string | null => {
+const amountCheck = (args: Args) => {
   const usd = args['usd'];
   if (typeof usd !== 'string' || dollarsOf(usd) !== undefined) return null;
   return `a cost line is dollars above zero, in digits, like 80 or 12.50, and ${usd} is not one: nemia factory cost-line set ${textOf(args, 'factory')} ${textOf(args, 'workflow')} <usd>. Nothing was changed.`;

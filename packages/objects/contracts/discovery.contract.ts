@@ -39,10 +39,10 @@ export type Resource = { readonly name: string; readonly kind: string; readonly 
  * The name of `plural`'s sub-resource `sub`, `<plural>/<sub>`. Joined with `+`, which the verifier reads as the strings joined, where it
  * reads a template string as an unknown string of its parts and could not tell two names apart.
  */
-const subName = (plural: string, sub: string): string => plural + '/' + sub;
+const subName = (plural: string, sub: string) => plural + '/' + sub;
 
 /** Whether no kind and no plural is given twice, and no plural holds a `/`. */
-const distinctKinds = (kinds: readonly KindPlural[]): boolean =>
+const distinctKinds = (kinds: readonly KindPlural[]) =>
   kinds.every((k, i) => !k.plural.includes('/') && !kinds.slice(0, i).some((j) => j.kind === k.kind || j.plural === k.plural));
 
 const resourcesOfSpec = spec<(routes: readonly ApiRoute[], kinds: readonly KindPlural[]) => Resource[]>({

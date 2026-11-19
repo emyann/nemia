@@ -41,10 +41,7 @@ export const UNTAKEN_QUERY: readonly string[] = ['watch'];
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null;
 
 /** `schema`, a JSON Schema, with a root `$ref` into `definitions` taken to what it refers to. */
-function resolved(
-  schema: Readonly<Record<string, unknown>>,
-  definitions: Readonly<Record<string, unknown>>,
-): Readonly<Record<string, unknown>> {
+function resolved(schema: Readonly<Record<string, unknown>>, definitions: Readonly<Record<string, unknown>>) {
   const ref = schema.$ref;
   if (typeof ref !== 'string' || !ref.startsWith('#/$defs/')) return schema;
   const target = definitions[ref.slice('#/$defs/'.length)];
@@ -52,7 +49,7 @@ function resolved(
 }
 
 /** The keys of `schema`'s object, each member's where it is a union of objects; none where it is no object. */
-function keysOf(schema: Schema.Top | undefined): string[] {
+function keysOf(schema: Schema.Top | undefined) {
   if (schema === undefined) return [];
   const doc = Schema.toJsonSchemaDocument(schema);
   const root = resolved(doc.schema, doc.definitions);
@@ -62,7 +59,7 @@ function keysOf(schema: Schema.Top | undefined): string[] {
 }
 
 /** Whether `schema` is sent as a form of parts (`multipart/form-data`), as HttpApi marks a multipart payload, buffered or streamed. */
-const formOf = (schema: Schema.Top): boolean => {
+const formOf = (schema: Schema.Top) => {
   const encoding: unknown = schema.ast.annotations?.['~httpApiEncoding'];
   return isRecord(encoding) && encoding._tag === 'Multipart';
 };
@@ -71,7 +68,7 @@ const formOf = (schema: Schema.Top): boolean => {
  * Whether `schema`, or the one it carries headers on, is a stream of server-sent events.
  * @param schema An endpoint's success schema.
  */
-export const streamsOf = (schema: Schema.Top): boolean => {
+export const streamsOf = (schema: Schema.Top) => {
   const inner: object = HttpApiSchema.isWithHeaders(schema) ? schema.schema : schema;
   return '_tag' in inner && inner._tag === 'StreamSse';
 };
@@ -80,7 +77,7 @@ export const streamsOf = (schema: Schema.Top): boolean => {
  * Where `endpoint` takes a call's input, and whether it answers a stream.
  * @param endpoint The endpoint, as the Api declares it.
  */
-export function keysOfEndpoint(endpoint: EndpointShape): EndpointKeys {
+export function keysOfEndpoint(endpoint: EndpointShape) {
   return {
     method: endpoint.method,
     path: endpoint.path,
@@ -97,7 +94,7 @@ export function keysOfEndpoint(endpoint: EndpointShape): EndpointKeys {
  * @param api The Api whose groups are searched.
  * @param name The endpoint's group and name, joined by a dot.
  */
-export function endpointOf(api: ApiShape, name: string): EndpointShape | undefined {
+export function endpointOf(api: ApiShape, name: string) {
   const dot = name.indexOf('.');
   const group = Object.values(api.groups).find((g) => g.identifier === name.slice(0, dot));
   return group === undefined ? undefined : Object.values(group.endpoints).find((e) => e.identifier === name.slice(dot + 1));
@@ -108,7 +105,7 @@ export function endpointOf(api: ApiShape, name: string): EndpointShape | undefin
  * @param api The Api whose groups are searched.
  * @param name The endpoint's group and name, joined by a dot.
  */
-export function endpointKeysOf(api: ApiShape, name: string): EndpointKeys {
+export function endpointKeysOf(api: ApiShape, name: string) {
   const endpoint = endpointOf(api, name);
   if (endpoint === undefined) throw new Error(`${name} is no endpoint of the Api: name one it declares, as <group>.<endpoint>`);
   return keysOfEndpoint(endpoint);

@@ -26,7 +26,7 @@ const TAKES: Readonly<Record<StatsKey, string>> = {
 export const STATS_KEYS = Object.keys(TAKES) as readonly StatsKey[];
 
 /** A `nemia stats` flag's refusal of a value left out, empty, or given apart as a flag. */
-const statsTakes = (key: string): string => `--${key} takes ${TAKES[key as StatsKey] ?? 'a value'}`;
+const statsTakes = (key: string) => `--${key} takes ${TAKES[key as StatsKey] ?? 'a value'}`;
 
 /** What `nemia stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
 export const STATS_MANUAL = `nemia stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [-l <key>=<value>] [--line|--json]
@@ -43,13 +43,13 @@ ${STATS_KEYS.map((key) => `  --${key.padEnd(10)}${TAKES[key]}`).join('\n')}
   --json      the whole answer, as GET /api/stats gives it`;
 
 /** The text under `key`, or undefined where none was given. */
-const textIn = (args: Args, key: string): string | undefined => {
+const textIn = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** Whether `text` is a real day, `YYYY-MM-DD`, in UTC. */
-const isDay = (text: string): boolean =>
+const isDay = (text: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text)) && new Date(text).toISOString().slice(0, 10) === text;
 
 /**
@@ -57,7 +57,7 @@ const isDay = (text: string): boolean =>
  * to go by that is not one of `STATS_BY`; a day that is not a real `YYYY-MM-DD`; a `--from` after the `--to`.
  * @param args The command line's arguments, by key.
  */
-export function statsRefusal(args: Args): string | null {
+export function statsRefusal(args: Args) {
   const left = STATS_KEYS.find((key) => {
     const value = textIn(args, key);
     return value !== undefined && (!value || value.startsWith('--'));

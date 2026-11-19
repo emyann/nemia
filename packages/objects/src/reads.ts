@@ -178,7 +178,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
 };
 
 /** The query keys an endpoint takes, read off its query Schema's fields; none for one with no query. */
-const queryKeys = (endpoint: { readonly query?: unknown }): readonly string[] => {
+const queryKeys = (endpoint: { readonly query?: unknown }) => {
   const query = endpoint.query as { readonly schema?: { readonly fields?: object }; readonly fields?: object } | undefined;
   return Object.keys(query?.schema?.fields ?? query?.fields ?? {});
 };
@@ -200,7 +200,7 @@ type ApiRead = {
  * @param api The Api whose GET endpoints are read.
  * @param reads How each read is bounded, by group and endpoint name; READS by default.
  */
-export const readsUnbounded = (api: ApiRead, reads: Readonly<Record<string, ReadBound>> = READS): string[] =>
+export const readsUnbounded = (api: ApiRead, reads: Readonly<Record<string, ReadBound>> = READS) =>
   Object.values(api.groups).flatMap((group) =>
     Object.entries(group.endpoints)
       .filter(([, endpoint]) => endpoint.method === 'GET')

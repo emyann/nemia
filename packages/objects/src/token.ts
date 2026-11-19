@@ -42,7 +42,7 @@ export type Actor = typeof Actor.Type;
  * or the agent's name alone.
  * @param actor Who did it, a person or an agent, with the token or the run and step it acted by.
  */
-export function actorWords(actor: Actor): string {
+export function actorWords(actor: Actor) {
   if (actor.kind === 'person') return actor.token === undefined ? 'the person' : `the person, on ${actor.token}`;
   const agent = actor.agent ?? 'an agent';
   if (actor.token !== undefined) return `${agent}, by its token ${actor.token}`;

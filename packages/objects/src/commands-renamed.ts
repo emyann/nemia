@@ -50,7 +50,7 @@ export const RETIRED_COMMANDS: ReadonlyMap<string, string> = new Map([
  * matches): the words that say what to type instead, or undefined where it opens with none.
  * @param words A command line's words after the program.
  */
-export function retiredIn(words: readonly string[]): string | undefined {
+export function retiredIn(words: readonly string[]) {
   for (const size of [2, 1]) {
     const said = words.length >= size ? RETIRED_COMMANDS.get(words.slice(0, size).join(' ')) : undefined;
     if (said !== undefined) return said;
@@ -62,14 +62,14 @@ export function retiredIn(words: readonly string[]): string | undefined {
 export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
 
 /** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
-const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {
+const withFlag = (rest: readonly string[], flag: string | undefined) => {
   if (flag === undefined) return [...rest];
   const at = rest.findIndex((w) => w.startsWith('-'));
   return at === -1 ? [...rest, flag] : [...rest.slice(0, at), flag, ...rest.slice(at)];
 };
 
 /** The former name `words` open with, the longest first, and how many words it is; none where they open with no former name. */
-function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: string; size: number; now: Renamed } | undefined {
+function formerAt(words: readonly string[], used: ReadonlySet<string>) {
   for (const size of [2, 1]) {
     const key = words.slice(0, size).join(' ');
     const now = RENAMED.get(key);
@@ -85,7 +85,7 @@ function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: s
  * (`RENAMED_FLAGS`); with the hint naming what was typed and what to type now, or `words` as given and no hint.
  * @param words A command line's words after the program, as typed.
  */
-export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
+export function renamedIn(words: readonly string[]) {
   let named = [...words];
   let name = 0;
   let typed = 0;

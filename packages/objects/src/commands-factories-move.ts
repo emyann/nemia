@@ -60,19 +60,19 @@ const MOVE_SPEC: Spec = {
 };
 
 /** The values of a many flag, as the parser collected them. */
-const valuesOf = (args: Args, key: string): readonly string[] => {
+const valuesOf = (args: Args, key: string) => {
   const value = args[key];
   return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 };
 
 /** The refusal of a `--repo` or `--volume` value with no `=`, or with nothing on either side of it; null where each holds one. */
-const unpaired = (values: readonly string[], flag: string, form: string): string | null => {
+const unpaired = (values: readonly string[], flag: string, form: string) => {
   const bad = values.find((v) => v.indexOf('=') <= 0 || v.indexOf('=') === v.length - 1);
   return bad === undefined ? null : `${flag} takes ${form}, and ${bad} is not one: ${flag} ${form}`;
 };
 
 /** What `nemia factory move` refuses of what was typed, before any daemon is asked; null where it takes it. */
-function moveRefused(args: Args): string | null {
+function moveRefused(args: Args) {
   const left = leftOut(MOVE_SPEC, args);
   if (left !== null) return left;
   const to = args['to'];

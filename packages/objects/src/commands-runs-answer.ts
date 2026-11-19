@@ -19,29 +19,30 @@ export const ANSWER_HELP = [
  * The `--answer` flag of `nemia <verb>`, given once for each question: the command line's alone, the api taking `answers` as data.
  * @param verb The command the flag belongs to, as its refusal names it.
  */
-export const answerFlag = (verb: 'retry' | 'approve'): Flag => ({
-  flag: '--answer',
-  kind: 'text',
-  key: 'answer',
-  many: true,
-  takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
-  only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
-});
+export const answerFlag = (verb: 'retry' | 'approve') =>
+  ({
+    flag: '--answer',
+    kind: 'text',
+    key: 'answer',
+    many: true,
+    takes: `--answer takes a question's number and the letter of its option, as nemia decide <runId> prints them: nemia ${verb} <runId> <step> --answer 1=a`,
+    only: { side: 'cli', why: 'the api takes the answers as data, by question title and option label (`answers`)' },
+  }) satisfies Flag;
 
 /** The `--answer` values typed, in the order given: none where none were. */
-const typedOf = (args: Args): readonly string[] => {
+const typedOf = (args: Args) => {
   const value = args.answer;
   return Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
 };
 
 /** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** The refusal of `nemia retry --round` given what another round does not take: answers, words, or a model. */
-function roundRefusal(args: Args): string | null {
+function roundRefusal(args: Args) {
   const budget = typeof args.budget === 'number' ? { budget: args.budget } : {};
   const line = commandLine(RETRY_WORDS, args, { round: true, ...budget });
   if (typedOf(args).length || textOf(args, 'message') !== undefined || textOf(args, 'model') !== undefined)
@@ -50,14 +51,14 @@ function roundRefusal(args: Args): string | null {
 }
 
 /** The refusal of `nemia retry` naming no step and no round: the step to try again, or `--round` for a loop's. */
-function stepRefusal(args: Args): string | null {
+function stepRefusal(args: Args) {
   if (textOf(args, 'step') !== undefined) return null;
   const runId = textOf(args, 'runId') ?? '<runId>';
   return `nemia retry takes the step to try again: nemia retry ${runId} <step>. For another round of a loop out of rounds, say --round: nemia retry ${runId} [<step>] --round.`;
 }
 
 /** The refusal of `--answer` beside `--recheck`, which files no session to read the answers, or null. */
-function recheckAnswerRefusal(args: Args): string | null {
+function recheckAnswerRefusal(args: Args) {
   const command = commandLine(RETRY_WORDS, args);
   return args.mode === 'recheck' && typedOf(args).length
     ? `--answer carries your answers into the try's brief, and --recheck files no session to read them — it runs the check again, and nothing else. Recheck without answers (${command} --recheck), or give them to a session: ${command} --answer <n>=<letter>.`
@@ -69,8 +70,7 @@ function recheckAnswerRefusal(args: Args): string | null {
  * words or a model; no step and no round; answers beside a recheck. A message or a budget a try does not take is the handler's to refuse.
  * @param args The command line's arguments, by key.
  */
-export const retryRefusal = (args: Args): string | null =>
-  args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args));
+export const retryRefusal = (args: Args) => (args.round === true ? roundRefusal(args) : (stepRefusal(args) ?? recheckAnswerRefusal(args)));
 
 /** `nemia retry`: another try of a step, or with `--round` another round of a loop out of rounds. */
 export const RETRY_WORDS = {
@@ -149,6 +149,7 @@ export const RETRY_WORDS = {
  * The refusal of an approval's words before anything is read: `--message` given only blanks.
  * @param args The command line's arguments, by key.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export const approveRefusal = (args: Args): string | null => {
   const message = textOf(args, 'message');
   if (args.off === true)

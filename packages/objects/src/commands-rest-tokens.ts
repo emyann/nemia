@@ -17,7 +17,7 @@ const CLI_ALONE = {
 const ADD_SHAPE = 'nemia token add <name> [--agent <agent> [--factory <factory>] [--narrow read|act]], as nemia token add laptop';
 
 /** The narrowing `narrow` is, or a refusal naming the two. */
-const narrowRefusal = (narrow: Args[string]): string | null =>
+const narrowRefusal = (narrow: Args[string]) =>
   narrow === undefined || (FLOOR_NARROWINGS as readonly unknown[]).includes(narrow)
     ? null
     : `--narrow takes read or act, not ${typeof narrow === 'string' ? narrow : JSON.stringify(narrow)}: ${ADD_SHAPE}.`;

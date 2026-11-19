@@ -332,7 +332,7 @@ const plan = (configs: string[], files: string[]) => {
       };
       const returnOwnerOf = (node: ts.Node) => {
         for (let at: ts.Node | undefined = node; at?.parent !== undefined; at = at.parent) {
-          const parent = at.parent;
+          const parent: ts.Node = at.parent;
           const value = ts.isReturnStatement(parent) && parent.expression === at ? parent : undefined;
           const arrow = ordinals.get(parent);
           if (arrow !== undefined && (parent as ts.FunctionLikeDeclaration).body === at && !ts.isBlock(at))
@@ -391,7 +391,6 @@ const plan = (configs: string[], files: string[]) => {
           if (diagnostic.start === undefined || diagnostic.start >= aliasStart) continue;
           const node = deepest(source, diagnostic.start);
           const where = `${path.relative(process.cwd(), source.fileName)}:${source.getLineAndCharacterOfPosition(diagnostic.start).line + 1} TS${diagnostic.code}`;
-          console.log('DEBUG', where, ts.SyntaxKind[node.kind], ownerOf(node), ts.SyntaxKind[statementOf(node).kind]);
           if (NOT_INFERRED.has(diagnostic.code)) {
             let declaration: ts.Node | undefined = node;
             while (declaration !== undefined && !ts.isVariableDeclaration(declaration)) declaration = declaration.parent;
@@ -446,7 +445,6 @@ const plan = (configs: string[], files: string[]) => {
             }
           }
           const stripped = suspects.filter((each) => each.stripped);
-          console.log('SUSPECTS', where, stripped, ts.SyntaxKind[statementOf(node).kind], statementOf(node).getText().slice(0, 80));
           if (stripped.length === 0) {
             const returning = returnOwnerOf(node);
             if (returning !== undefined) {

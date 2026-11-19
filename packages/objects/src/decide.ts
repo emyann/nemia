@@ -346,7 +346,7 @@ export type RunDecision = typeof RunDecision.Type;
  * @param decision The run's decision, as it was worked out.
  * @param diffs The paths whose diffs are answered whole, * naming every one; undefined where the read names none.
  */
-export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[] | undefined): RunDecision =>
+export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[] | undefined) =>
   'sensitive' in decision
     ? {
         ...decision,

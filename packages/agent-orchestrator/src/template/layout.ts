@@ -36,8 +36,11 @@ export type Value<T> = T | ParamRef;
 /** Text: the words themselves, a file of the folder (`{ path }`), or a parameter's value. A git or url source is not read yet. */
 export type Text = string | { path: string } | ParamRef;
 
-/** A value the person gives when the template is applied: its type, what it is for, and the value taken when they give none. */
-export type Parameter = { type: TemplateParameterType; description: string; default?: string | number | boolean };
+/**
+ * A value the person gives when the template is applied: its type, what it is for, the value taken when they give none, and, for a
+ * boolean, the host whose clones set it true when it is a factory's first writable volume (`whenOrigin`, `originParams`).
+ */
+export type Parameter = { type: TemplateParameterType; description: string; default?: string | number | boolean; whenOrigin?: string };
 
 /**
  * What a harness's block fences: the word of its fence key, and the tool lists of a harness that takes them, a `{ path }` in one naming
@@ -372,7 +375,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
       rules: 'text',
       parameters: {
         fields: {},
-        rest: { fields: { type: 'string', description: 'string', default: 'any' }, required: ['type', 'description'] },
+        rest: { fields: { type: 'string', description: 'string', default: 'any', whenOrigin: 'string' }, required: ['type', 'description'] },
       },
       hires: { fields: {}, rest: 'string' },
       revisions: 'revisions',

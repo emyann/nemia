@@ -448,6 +448,14 @@ describe('the check of a template folder: the whole folder passes, and each rule
     };
     assert.deepEqual(refusalsOf(declared), []);
   });
+  test("a parameter's whenOrigin is a bare lower-case host on a boolean, refused on another type or as a URL", () => {
+    const at = ['spec', 'parameters', 'follow', 'whenOrigin'];
+    const declared = (parameter: Record<string, unknown>) =>
+      refusalsOf((d) => (d['nemia.yaml'].spec.parameters.follow = { description: 'Follows the host.', ...parameter }));
+    assert.deepEqual(declared({ type: 'boolean', default: false, whenOrigin: 'example.org' }), []);
+    assertRefused(declared({ type: 'string', whenOrigin: 'example.org' }), 'nemia.yaml', at, 'boolean');
+    assertRefused(declared({ type: 'boolean', whenOrigin: 'https://Example.org/' }), 'nemia.yaml', at, 'host');
+  });
   test('a ${{ parameters.<name> }} nemia.yaml does not declare is refused, in a check at its key and in a text the render writes at its file, and a declared one passes', () => {
     const workflow = 'workflows/dev/workflow.yaml';
     const named = (d: Record<string, any>) => (d[workflow].spec.steps[1].check = 'go --check ${{ parameters.nope }}');

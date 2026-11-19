@@ -376,6 +376,18 @@ export const FactoryCommands = Schema.Struct({
   volumeRm: Schema.Record(Schema.String, Schema.String).annotate({
     description: 'The line that takes back each volume, by its stored name.',
   }),
+  follow: Schema.optionalKey(
+    Schema.Struct({
+      host: Schema.String.annotate({ description: 'The host the parameter follows, as its template declares it (whenOrigin).' }),
+      parameter: Schema.String.annotate({ description: "The template's boolean parameter that follows the host." }),
+      line: Schema.String.annotate({
+        description: "The line that previews the factory's parameter set true, which prints the line that files it.",
+      }),
+    }).annotate({
+      description:
+        "How the factory comes to work as a clone of its template's followed host would: absent where its template declares no parameter that follows one.",
+    }),
+  ),
 });
 export type FactoryCommands = typeof FactoryCommands.Type;
 
@@ -444,6 +456,11 @@ export const VolumeAdded = Schema.Struct({
   was: Schema.NullOr(Schema.Boolean).annotate({
     description: 'What a volume of its path was marked before: true if read-only, false if writable; null for none.',
   }),
+  params: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: "The template's parameters the volume set, each <name>=<value>, as the factory's first writable one: absent for none.",
+    }),
+  ),
   trusts: Schema.Array(FactoryPlaceTrust).annotate({
     description: "What was asked of the volume's trust: none for a read-only one, or with noTrust.",
   }),

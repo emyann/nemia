@@ -25,6 +25,8 @@ import {
   type ObjectMeta,
 } from 'objects';
 import { readStatus } from '../applied/applied.store.ts';
+import { declaredAt } from '../applied/applied.verb.ts';
+import type { Parameter } from '../../template/index.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';
 import { generationOf } from '../door/generation.ts';
@@ -308,5 +310,30 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
 export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, name: string) {
   const { factory, listing } = yield* factoryFiled(home, name);
   const scheduled = listing === undefined || 'error' in listing ? [] : Object.keys(listing.schedules).sort(byText);
-  return factoryCommands(factory, scheduled);
+  const commands = factoryCommands(factory, scheduled);
+  const template = listing === undefined || 'error' in listing ? undefined : listing.template;
+  if (template === undefined) return commands;
+  const declared = yield* declaredAt(template.source).pipe(Effect.orElseSucceed(() => ({})));
+  const follow = followOf(name, template.version, declared);
+  return follow === undefined ? commands : { ...commands, follow };
 });
+
+/**
+ * The first parameter of `declared` that follows a host (`whenOrigin`), with the line that previews the factory `name` at `version` with it
+ * set true (`nemia factory diff`), which prints the upgrade's line to type; none where no boolean of it follows one.
+ * @param name The factory's name.
+ * @param version The template's version the factory is applied at.
+ * @param declared The parameters its template declares, by name.
+ */
+export const followOf = (
+  name: string,
+  version: string,
+  declared: Readonly<Record<string, Parameter>>,
+): FactoryCommands['follow'] => {
+  const found = Object.entries(declared)
+    .sort(([a], [b]) => byText(a, b))
+    .find(([, p]) => p.type === 'boolean' && p.whenOrigin !== undefined);
+  if (found === undefined || found[1].whenOrigin === undefined) return undefined;
+  const [parameter, { whenOrigin: host }] = found;
+  return { host, parameter, line: commandLine(named('factory diff'), { factory: name }, { to: version, sets: `${parameter}=true` }) };
+};

@@ -81,6 +81,24 @@ function heldOf(folder: ReadFolder, packageSkills: readonly string[]): Held {
 const stringsOf = (value: unknown): Array<[string, number]> =>
   Array.isArray(value) ? value.flatMap((item, i): Array<[string, number]> => (typeof item === 'string' ? [[item, i]] : [])) : [];
 
+/** A bare lower-case host name: labels of letters, digits and hyphens, joined by dots. */
+const BARE_HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+
+/** Each parameter's `whenOrigin` that is not a bare lower-case host on a boolean. */
+function originRefusals(held: Held): Refusal[] {
+  const parameters = isMap(held.manifest.parameters) ? held.manifest.parameters : {};
+  return Object.entries(parameters).flatMap(([name, parameter]): Refusal[] => {
+    if (!isMap(parameter) || parameter.whenOrigin === undefined) return [];
+    const at = ['spec', 'parameters', name, 'whenOrigin'];
+    const host = String(parameter.whenOrigin);
+    const messages = [
+      ...(parameter.type === 'boolean' ? [] : [`whenOrigin sets a boolean, and ${name} is a ${String(parameter.type)}: make it type: boolean, or remove whenOrigin.`]),
+      ...(BARE_HOST.test(host) ? [] : [`whenOrigin is a bare lower-case host, such as example.org, and ${host} is none: write the host alone.`]),
+    ];
+    return messages.map((message) => ({ file: 'nemia.yaml', at, message }));
+  });
+}
+
 /** What a hire of the manifest names that the folder lacks: a workflow, a step of it, or an agent. */
 function hireRefusals(held: Held): Refusal[] {
   const hires = isMap(held.manifest.hires) ? held.manifest.hires : {};
@@ -472,7 +490,7 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
 
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
- * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
+ * parameter or file named that the folder lacks, a `whenOrigin` that is no bare host on a boolean, a step's words, each harness's block against the runtime's knobs for it, and an
  * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
  * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
  * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin places declare, which a workflow's
@@ -498,6 +516,7 @@ export function checkTemplate(
     ...layoutRefusals(folder, namedPaths(folder)),
     ...documents,
     ...hireRefusals(held),
+    ...originRefusals(held),
     ...agentRefusals(held),
     ...stepRefusals(held),
     ...needRefusals(held, placeNeeds),

@@ -1,11 +1,11 @@
 /**
  * The verbs of the test place that change a repository or a directory: `follow`, `make`, `handoff`, `land`, `remove`, `export`,
- * `seal` and `clone`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
+ * `seal`, `clone` and `init`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkoutAt, committed, dirty, headOf, mergedIn, repositoryAt, takenBack } from './acts.ts';
+import { checkoutAt, commitMade, committed, dirty, headOf, mergedIn, repositoryAt, takenBack } from './acts.ts';
 import { isDirectory, OWN, real, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
 import { commitAt, commitOf, within, type Held, type Repository } from './world.ts';
@@ -188,6 +188,24 @@ function folderOf(url: string): string | undefined {
  * branch alone, as git clones one; `made: false`, nothing copied, where `into` holds a repository already. Refused where `into` holds
  * anything else, and where the URL names no repository the place holds, each leaving `into` as it was.
  */
+/**
+ * `init`: a folder made a repository of the test place, on `main`, with one empty first commit; `made: false` where the folder is a
+ * checkout of a repository already. Refused for a relative `dir` and for a file. The folder's files are left as they are, as git leaves
+ * them untracked.
+ */
+export function initialized(held: Held, { dir }: PlaceRequests['init']): Reply<'init'> {
+  if (!path.isAbsolute(dir)) return refused(`${dir} is not an absolute path: name the folder to make a repository from the root`);
+  if (fs.existsSync(dir) && !isDirectory(dir)) return refused(`${dir} is a file, not a folder: name a folder to make a repository`);
+  fs.mkdirSync(dir, { recursive: true });
+  if (repositoryAt(held, dir)) return { repo: dir, made: false };
+  const root = real(dir);
+  const repo: Repository = { root, commits: new Map(), branches: new Map(), tags: new Map(), checkouts: new Map() };
+  held.repositories.set(root, repo);
+  repo.checkouts.set(root, { dir: root, branch: 'main' });
+  commitMade(held, repo, 'main', {}, [], 'Begin');
+  return { repo: dir, made: true };
+}
+
 export function cloned(held: Held, { url, into }: PlaceRequests['clone']): Reply<'clone'> {
   if (!path.isAbsolute(into)) return refused(`${into} is not an absolute path: name the folder to clone into from the root`);
   if (isDirectory(into) && repositoryAt(held, into)) return { repo: into, made: false };

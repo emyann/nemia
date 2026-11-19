@@ -59,7 +59,7 @@ test('two pages that failed are each given, in the order they failed; a page in 
 /** The escape a terminal's colour code opens with, built from its code so no raw one sits in this file. */
 const ESC = String.fromCharCode(0x1b);
 
-/** The badge Vitest prints a project's name in where it colours, as `formatProjectName` draws it: the name padded with a space. */
+/** The badge Vitest prints a project's name in, as Vitest's project-name formatter prints it: the name padded with a space. */
 const badge = (name: string) => `${ESC}[30m${ESC}[42m ${name} ${ESC}[49m${ESC}[39m `;
 
 /** Vitest's summary line of a failed test or file, coloured as on CI: the red ` FAIL ` mark, then the project's badge, then its name. */

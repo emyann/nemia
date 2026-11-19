@@ -4,7 +4,8 @@
  * client, objects.ts, which every read goes through), so no runtime import cycle can form among them. A type crosses by `import type`,
  * which is erased; the other values they import are react-query's, effect's, the objects' (`objects`, by its entry, whose words and
  * schemas the board reads rather than copies), the feed's pace, the refusals and the decode (read.ts) and the default
- * factory's two converters (namespace.ts); read.ts imports effect alone and namespace.ts the objects' entry alone. The objects' client alone imports effect's HTTP client and HttpApi modules besides, which make it.
+ * factory's two converters (namespace.ts); read.ts imports effect alone and namespace.ts the objects' entry alone. The objects' client
+ * alone imports effect's HTTP client and HttpApi modules besides, which make it.
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

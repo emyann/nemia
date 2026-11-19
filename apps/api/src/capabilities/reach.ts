@@ -16,14 +16,7 @@
  * which reads no `.claude/settings.json`, and nothing of whose sessions was measured: its fence is its sandbox — has nothing else
  * claimed for it.
  */
-import {
-  type CapabilitiesWithSteps,
-  type CapabilityRule,
-  type CapabilityServer,
-  DEFAULT_NAMESPACE,
-  type StepReach,
-  type StepReachAllowed,
-} from 'objects';
+import { type CapabilitiesWithSteps, type CapabilityRule, type CapabilityServer, DEFAULT_NAMESPACE, type StepReach } from 'objects';
 import { FACTORY_SERVERS } from 'agent-orchestrator';
 import { CLAUDE_RULES, DEFAULT_HARNESS, rulesOf, type ClaudeRules } from 'agent-orchestrator/workflow';
 import { type AskServer, capabilitiesOf, SETTINGS, type Capabilities } from './capabilities.ts';
@@ -45,6 +38,9 @@ export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permi
 
 /** Where a step's own deny rules are read from. */
 export const DISALLOW = 'disallowedTools:';
+
+/** What the settings' allow rules give a step (objects' `StepReach`, its `allowed`). */
+type StepReachAllowed = StepReach['allowed'];
 
 /** A tool taken from a step by a deny rule (objects' `StepReach`, its `tools.removed`). */
 type RemovedTool = NonNullable<StepReach['tools']>['removed'][number];

@@ -35,8 +35,9 @@ export const labelCard = (card: { name: string; factory: string | null }, edits:
 
 /**
  * What the label page reads of `GET /api/stats`: the headline of every run the selector takes, and each step's cost summed over every
- * try of those runs, landed, failed, stopped or in flight, over every day the stats hold (no range asked: from the first fact's day). A copy that stays: `objects`' `Stats` carries `all` as JSON
- * (the orchestrator's stats as they print), so the board decodes the totals it shows from it.
+ * try of those runs, landed, failed, stopped or in flight, over every day the stats hold (no range asked: from the first fact's day).
+ * A copy that stays: `objects`' `Stats` carries `all` as JSON (the orchestrator's stats as they print), so the board decodes the totals
+ * it shows from it.
  */
 const LabelStatsSchema = Schema.Struct({
   all: Schema.Struct({

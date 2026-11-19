@@ -261,7 +261,7 @@ function kindSchemaBreaks(texts: ReadonlyMap<string, string>): string[] {
         ts.isIdentifier(node.name) &&
         KIND_NAMES.has(node.name.text) &&
         node.initializer !== undefined &&
-        /^Schema\./.test(node.initializer.getText(source))
+        node.initializer.getText(source).startsWith('Schema.')
       )
         out.push(
           `${file} declares a Schema ${node.name.text}, a kind of objects: import its Schema from 'objects' and read it through lib/api/objects.ts`,

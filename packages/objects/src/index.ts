@@ -423,15 +423,7 @@ export {
   Standing,
   StandingMerge,
 } from './decide.ts';
-export {
-  CapabilityDescribed,
-  CapabilityRule,
-  CapabilityServer,
-  MeasuredTools,
-  ReadOnlyCommands,
-  StepReach,
-  StepReachAllowed,
-} from './capabilities.ts';
+export { CapabilityDescribed, CapabilityRule, CapabilityServer, StepReach } from './capabilities.ts';
 export {
   Ceilings,
   CAPABILITIES_UNREAD,

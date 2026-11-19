@@ -3,17 +3,16 @@
  * `objects`' `CapabilitiesWithSteps`, every list with its shape.
  */
 import { queryOptions } from '@tanstack/react-query';
-import {
-  CapabilitiesWithSteps,
-  type CapabilityDescribed,
-  type CapabilityServer,
-  type MeasuredTools,
-  type ReadOnlyCommands,
-  type StepReach,
-} from 'objects';
+import { CapabilitiesWithSteps, type CapabilityDescribed, type CapabilityServer, type StepReach } from 'objects';
 import { call, read } from './objects.ts';
 
-export type { MeasuredTools, ReadOnlyCommands, StepReach };
+export type { StepReach };
+
+/** What a Claude Code step with no `tools:` has, as measured. */
+export type MeasuredTools = CapabilitiesWithSteps['measured'];
+
+/** The Bash commands Claude Code runs without a rule, unless a rule names them. */
+export type ReadOnlyCommands = CapabilitiesWithSteps['readOnly'];
 
 /** A skill or an agent, and the file it was read from. */
 export type Described = CapabilityDescribed;

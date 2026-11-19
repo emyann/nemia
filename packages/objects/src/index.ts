@@ -404,7 +404,7 @@ export {
   type TranscriptRole,
 } from './words.ts';
 export { BaseHold, RunHolding, RunWaiting } from './run.ts';
-export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState } from './words.ts';
+export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,
   Decidable,
@@ -566,7 +566,6 @@ export {
   AgentSources,
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
-export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,
@@ -800,3 +799,4 @@ export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-
 export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';
 export { RUN_PHASE_OF, runCodesLegal, STEP_PHASE_OF, stepCodesLegal, tryCodesLegal } from './codes.ts';
 export type { RunCodes, StepCodes, TryCodes } from './codes.ts';
+export { refusedIn, type RefusedPlace } from './refused.ts';

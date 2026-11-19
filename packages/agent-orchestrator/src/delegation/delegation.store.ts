@@ -114,7 +114,7 @@ export function readDelegation(home: string, factory: string, agent: string): De
   }
   const read = Schema.decodeUnknownResult(FileSchema)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(FileSchema, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   return { factory, agent, since: read.success.since, spec: read.success.spec };

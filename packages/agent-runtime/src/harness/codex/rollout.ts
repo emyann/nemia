@@ -11,7 +11,7 @@
 import { Predicate, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 
-const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
+const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)), { expected: 'a date and time' }));
 
 /** A content block's text: a string, or a block whose `text` is read. */
 const Text = Schema.Union([Schema.String, Schema.Struct({ text: Schema.optional(Schema.String) })]);
@@ -59,7 +59,7 @@ export const Items = Schema.Union([
 
 /** An item whose `type` is none the runtime reads: only its `type` and `id` are checked. */
 const OtherItem = Schema.Struct({
-  type: Schema.optional(noneOf(Items, (t) => `Expected the fields of a ${t} item`)),
+  type: Schema.optional(noneOf(Items, (t) => `the fields of a ${t} item`)),
   id: Schema.optional(Schema.String),
 });
 
@@ -112,8 +112,8 @@ const kindOf = (entry: unknown): RolloutKind | undefined => {
 };
 
 /** Why `entry`, a `kind` record at `where`, is refused: the record, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema.SchemaError): string => {
-  const { path, words } = firstRefusal(entry, error, 'Codex writes');
+const refusal = (where: string, kind: RolloutKind, entry: unknown): string => {
+  const { path, words } = firstRefusal(ROLLOUT[kind], entry, 'Codex writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')
@@ -133,7 +133,5 @@ export const rolloutRecordOf = (entry: unknown, where: string): RolloutRecord | 
   const kind = kindOf(entry);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
-  return Result.isSuccess(decoded)
-    ? ({ kind, record: decoded.success } as RolloutRecord)
-    : { wrong: refusal(where, kind, entry, decoded.failure) };
+  return Result.isSuccess(decoded) ? ({ kind, record: decoded.success } as RolloutRecord) : { wrong: refusal(where, kind, entry) };
 };

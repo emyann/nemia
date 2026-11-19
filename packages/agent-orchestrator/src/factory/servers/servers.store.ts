@@ -88,7 +88,7 @@ export function readServersAt(file: string, fix: string): FactoryServersFile | u
   }
   const read = Schema.decodeUnknownResult(FactoryServersSchema)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(FactoryServersSchema, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   return read.success;

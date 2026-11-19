@@ -180,8 +180,12 @@ describe("a card's `model:` runs its run's step on it, and a start's `--model` f
 });
 
 describe('a step’s model at start, REFUSED before a run is written', () => {
-  const repo = aRepo();
-  const dir = planned();
+  let repo!: string;
+  let dir!: string;
+  beforeAll(() => {
+    repo = aRepo();
+    dir = planned();
+  });
   const typed = (...flags: string[]) =>
     stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', repo, '--no-worktree', ...flags]);
   const starting = (models: Record<string, string>, workflowDir = dir) =>

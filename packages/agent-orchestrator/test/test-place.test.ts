@@ -3,7 +3,7 @@
  * (`placed.ts`) has a new one for each test, which that test's subtests share; it starts no process, by what its files import; both ways
  * of asking answer the same, and a verb that throws is unread in one sentence; and it declares every sentence the code prints of a place.
  */
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -82,8 +82,8 @@ describe("a test's subtests share its place, and the program it runs is given th
     const opened = await runPlaced(asked);
     assert.ok('answer' in opened && opened.answer.branch === 'main', JSON.stringify(opened));
   });
-  afterAll(() => {
-    assert.equal(stand(), mine, 'and the test still has it after them');
+  test('and the describe still has it after them', () => {
+    assert.equal(stand(), mine);
   });
 });
 

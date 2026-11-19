@@ -180,15 +180,15 @@ const jsonQuoted = (value: unknown, hire: boolean) =>
  * none).
  */
 function jsonChosen(slot: Slot, choice: Choice | undefined) {
-  if (choice === undefined) return undefined satisfies unknown as unknown;
-  if (choice === 'ours') return slot.sides?.[1] satisfies unknown as unknown;
-  if (choice === 'theirs') return slot.sides?.[2] satisfies unknown as unknown;
+  if (choice === undefined) return undefined as unknown;
+  if (choice === 'ours') return slot.sides?.[1] as unknown;
+  if (choice === 'theirs') return slot.sides?.[2] as unknown;
   const text = choice.text;
-  if (slot.hire) return text.trim() satisfies unknown as unknown;
+  if (slot.hire) return text.trim() as unknown;
   try {
-    return JSON.parse(text) satisfies unknown as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
-    return text.trim() satisfies unknown as unknown;
+    return text.trim() as unknown;
   }
 }
 

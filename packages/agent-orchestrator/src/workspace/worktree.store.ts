@@ -166,9 +166,9 @@ export function keptNotes(repo: string, kept: CheckoutKept) {
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
 function parsedLock(text: string) {
   try {
-    return JSON.parse(text) satisfies unknown as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
-    return null satisfies unknown as unknown;
+    return null as unknown;
   }
 }
 

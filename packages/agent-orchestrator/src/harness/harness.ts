@@ -31,7 +31,8 @@ export const declarationOf = (harness: string | undefined) => {
  * @param harness The harness's name, or undefined for the default one.
  */
 export const rulesOf = (harness: string | undefined) =>
-  declarationOf(harness)?.rules satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'];
+  declarationOf(harness)
+    ?.rules satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'] satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'];
 
 /**
  * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`

@@ -43,9 +43,9 @@ import { alive } from '../process/alive.store.ts';
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string) => {
   try {
-    return JSON.parse(text) satisfies unknown as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
-    return undefined satisfies unknown as unknown;
+    return undefined as unknown;
   }
 };
 

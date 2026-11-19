@@ -59,7 +59,7 @@ export type { TryCause };
 export const upgradeAsk = (read: unknown) =>
   (isObjectOrArray(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode')
     ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }
-    : read) satisfies unknown as unknown;
+    : read) as unknown;
 
 /**
  * Every `RetryMode`, as the record's schema reads an ask file's: `objects`' list word for word, held equal by `wordsHeld`

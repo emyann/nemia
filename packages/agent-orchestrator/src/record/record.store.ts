@@ -135,7 +135,7 @@ const FolderRecordSchema = Kept({
 const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
 
 const fieldOf = (value: unknown, key: PropertyKey) =>
-  (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined) satisfies unknown as unknown;
+  (typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined) as unknown;
 
 /** `text` cut to its first 60 characters and marked `…` where it was cut, as the runtime quotes a value it refuses. */
 const shown = (text: string) => (text.length > 60 ? `${text.slice(0, 60)}…` : text);

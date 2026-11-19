@@ -132,11 +132,11 @@ function jsonIn(file: string, fix: string) {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined satisfies unknown as unknown;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined as unknown;
     throw err;
   }
   try {
-    return JSON.parse(text) satisfies unknown as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
     throw new Invalid({ message: `${file} is not JSON: ${fix}.` });
   }

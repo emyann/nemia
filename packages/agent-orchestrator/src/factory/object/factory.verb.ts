@@ -19,6 +19,7 @@
 import { Effect } from 'effect';
 import {
   API_VERSION,
+  COMMAND_WORDS,
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
   type FactoryHome,
@@ -37,7 +38,7 @@ import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
 import { doorAt, doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
 import { fromThrow as tried } from '../../door/door.store.ts';
-import { homeFilesOf, workflowFilesDigest } from '../../frozen/frozen.store.ts';
+import { homeAt, homeFilesOf, workflowFilesDigest } from '../../frozen/frozen.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
@@ -308,13 +309,27 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
 };
 
 /**
+ * The line that opens a person's own session in the home of the factory `name`, typed in the folder it adds beside it: its optional
+ * repository left unsaid. `nemia factory home` is the client's own verb, whose words `objects` holds and this table does not.
+ * @param name The factory's name.
+ */
+const homeLine = (name: string) => {
+  const home = COMMAND_WORDS.find((c) => c.name === 'factory home');
+  if (home === undefined) throw new Error("No command 'factory home' in objects' COMMAND_WORDS: name one it holds.");
+  const positionals = home.spec.positionals.filter((p) => p.takes === 'required');
+  return commandLine({ name: home.name, spec: { ...home.spec, positionals } }, { factory: name });
+};
+
+/**
  * The lines of the factory `name` (`factoryCommands`), read now at `home`, each schedule its file holds taken back by its workflow, by
- * name: none for the default factory or a file that does not read. `Missing` where no factory has the name.
+ * name, and the line that opens its home where its tree holds one (`homeAt`): none for the default factory or a file that does not
+ * read. `Missing` where no factory has the name.
  */
 export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, name: string) {
   const { factory, listing } = yield* factoryFiled(home, name);
   const scheduled = listing === undefined || 'error' in listing ? [] : Object.keys(listing.schedules).sort(byText);
-  const commands = factoryCommands(factory, scheduled);
+  const tree = listing === undefined || 'error' in listing ? undefined : listing.tree;
+  const commands = { ...factoryCommands(factory, scheduled), ...(homeAt(tree) === undefined ? {} : { home: homeLine(name) }) };
   const template = listing === undefined || 'error' in listing ? undefined : listing.template;
   if (template === undefined) return commands;
   const declared = yield* declaredAt(template.source).pipe(Effect.orElseSucceed(() => ({})));

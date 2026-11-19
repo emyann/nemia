@@ -11,6 +11,7 @@ import type { Mount } from '../../record/record.ts';
 import { writesNothing, type Fenced } from '../../workflow/index.ts';
 import { isRemoteHarness } from '../../harness/harness.ts';
 import type { VolumeNameAmong } from '../../../contracts/volume-name.contract.ts';
+import type { VolumeSwitched } from '../../../contracts/volume-switch.contract.ts';
 
 /** How a volume is spelled, for a refusal that names both. */
 const SPELLED = '<path|url>:ro to read it, <path|url>:rw to work on it';
@@ -211,4 +212,31 @@ export const volumeNameAmong: VolumeNameAmong = (base, taken) => {
     const name = base + '-' + `${n}`;
     if (!taken.includes(name)) return name;
   }
+};
+
+/**
+ * What `nemia factory volume set` writes of the volume named `name` among `volumes`, as they are named on read (`factoryVolumesNamed`):
+ * that volume with each switch `switches` gives set and the other kept (`switched`), or why nothing is written — neither switch given
+ * (`unasked`), or no volume of that name (`missing`).
+ * @param volumes The factory's volumes, each with its name.
+ * @param name The volume's name, as the person gave it.
+ * @param switches The switches given, each absent where it is not.
+ */
+export const volumeSwitched: VolumeSwitched = (volumes, name, switches) => {
+  if (switches.claudeMd === undefined && switches.skills === undefined) return { kind: 'unasked' };
+  const was = volumes.find((v) => v.name === name);
+  if (was === undefined) return { kind: 'missing' };
+  const claudeMd = switches.claudeMd ?? was.claudeMd;
+  const skills = switches.skills ?? was.skills;
+  return {
+    kind: 'switched',
+    volume: {
+      name: was.name,
+      path: was.path,
+      readOnly: was.readOnly,
+      ...(was.origin === undefined ? {} : { origin: was.origin }),
+      ...(claudeMd === undefined ? {} : { claudeMd }),
+      ...(skills === undefined ? {} : { skills }),
+    },
+  };
 };

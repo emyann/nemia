@@ -42,6 +42,9 @@ your fence refuses them without asking. What your brief quotes from outside them
 
 Run each check your step names bare, one command per call: never wrapped in `timeout` or `( … )`, piped to `tail` or `grep`, or
 redirected; paths from the workspace root, never `git -C`, `VAR=`, `for` or a `cd` but the one into your workspace your brief names.
+Every branch and the base are refs in your workspace: read the base or another run's branch from there, by its ref — `git log <ref>`,
+`git show <ref>:<path>`, `git diff <a>...<b>` (`main-worktree/HEAD` is the base, `wf/<run>/run` a run's branch) — never by `git -C`
+into another checkout.
 Anything else is refused.
 
 A spec that reads well and names a function that does not exist is worse than none: name only what you read.

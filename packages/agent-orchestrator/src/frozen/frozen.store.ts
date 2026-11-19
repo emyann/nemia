@@ -53,13 +53,23 @@ export const homeFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string) =
 export const homeDirOf = (tree: string | undefined) => (tree === undefined ? undefined : path.join(tree, HOME_FOLDER));
 
 /**
- * Every file of the factory's home in its tree (`homeDirOf`), read and refused as `workflowFilesOf` reads and refuses them; undefined
+ * The factory's home in its tree (`homeDirOf`), where it is a folder; undefined where the factory has no tree or its tree no `home/`.
+ * A look at the folder alone, none of its files read.
+ * @param tree The factory's tree, or undefined for a factory made by hand.
+ */
+export const homeAt = (tree: string | undefined) => {
+  const dir = homeDirOf(tree);
+  return dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? dir : undefined;
+};
+
+/**
+ * Every file of the factory's home in its tree (`homeAt`), read and refused as `workflowFilesOf` reads and refuses them; undefined
  * where the factory has no tree or its tree no `home/`.
  * @param tree The factory's tree, or undefined for a factory made by hand.
  */
 export const homeFilesOf = (tree: string | undefined) => {
-  const dir = homeDirOf(tree);
-  return dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? workflowFilesOf(dir) : undefined;
+  const dir = homeAt(tree);
+  return dir === undefined ? undefined : workflowFilesOf(dir);
 };
 
 /**

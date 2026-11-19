@@ -398,6 +398,11 @@ export const FactoryCommands = Schema.Struct({
         "How the factory comes to work as a clone of its template's followed host would: absent where its template declares no parameter that follows one.",
     }),
   ),
+  home: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The line that opens a person's own session in the factory's home; absent where the factory has no home.",
+    }),
+  ),
 });
 export type FactoryCommands = typeof FactoryCommands.Type;
 

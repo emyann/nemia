@@ -609,7 +609,7 @@ export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
 export { FACTORY_ADD } from './factory/factory.verb.ts';
 export { cloneTarget } from './factory/clones/index.ts';
-export { FACTORY_VOLUME_ADD, FACTORY_VOLUME_RM } from './factory/volume/volume.verb.ts';
+export { FACTORY_VOLUME_ADD, FACTORY_VOLUME_RM, FACTORY_VOLUME_SET } from './factory/volume/volume.verb.ts';
 export { FACTORY_APPLY, reconcileOnce } from './factory/applied/applied.verb.ts';
 export { FACTORY_ADOPT } from './adopt/adopt.verb.ts';
 export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrade/upgrade.verb.ts';

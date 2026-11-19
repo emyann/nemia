@@ -42,7 +42,7 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { LibraryAdd, LibraryAddList } from './library.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
-import { Volume, VolumeList } from './volume.ts';
+import { Volume, VolumeList, VolumeSwitchesWrite } from './volume.ts';
 import {
   cardParams,
   namespaceParams,
@@ -527,7 +527,7 @@ export class LibraryAddsGroup extends HttpApiGroup.make('libraryadds').add(
   ),
 ) {}
 
-/** A factory's volumes, in its namespace, by their stored names: read alone over the api. */
+/** A factory's volumes, in its namespace, by their stored names: read, and their switches set (`patch`). */
 export class VolumesGroup extends HttpApiGroup.make('volumes').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/volumes', {
     params: namespaceParams,
@@ -545,5 +545,14 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
   }).annotate(
     OpenApi.Description,
     "Reads one of a factory's volumes by its stored name, with the runs in play that mount it. Answers the Volume.",
+  ),
+  HttpApiEndpoint.patch('patch', '/api/namespaces/:namespace/volumes/:name', {
+    params: cardParams,
+    payload: VolumeSwitchesWrite,
+    success: VolumeObject,
+    error: objectErrors,
+  }).annotate(
+    OpenApi.Description,
+    "Sets the switches of one of a factory's volumes, by its stored name: those the body gives, the others kept, its folder and mark unmoved. Answers the Volume as it reads after, with the file written.",
   ),
 ) {}

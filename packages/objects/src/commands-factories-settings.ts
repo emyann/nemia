@@ -24,9 +24,11 @@ const VOLUME_HERE = {
 
 const VOLUME_ADD_USAGE = '<factory> <path|url>:ro|:rw [--no-trust] [--claude-md on|off] [--skills on|off]';
 const VOLUME_RM_USAGE = '<factory> <path>';
+const VOLUME_SET_USAGE = '<factory> <volume> [--claude-md on|off] [--skills on|off]';
 
 /** The forms of `nemia factory volume`, as `nemia factory --help` lists them beside the factory's others. */
 export const VOLUME_FORMS = `nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust] [--claude-md on|off] [--skills on|off]  (nemia factory volume add --help)
+nemia factory volume set <factory> <volume> [--claude-md on|off] [--skills on|off]
 nemia factory volume rm <factory> <path>`;
 
 /** `nemia factory volume add --help`: what a volume is, read-only or writable. */
@@ -49,8 +51,10 @@ with. A second add of one path replaces it; nemia factory lists them under the f
 
 Two switches say what a volume gives the factory's sessions, which start in its home when the factory
 has one: --claude-md on lets the volume's CLAUDE.md files load (off by default), and --skills off hides
-the skills of its .claude/skills (on by default). A second add keeps the switches it does not name.
-They are the person's, and no proposal changes them.
+the skills of its .claude/skills (on by default). nemia factory volume set <factory> <volume> sets
+either without giving the volume again, the volume by its stored name (nemia get volumes -n
+<factory>), and keeps the one it does not name, as a second add does. They are the person's, and no
+proposal changes them.
 
 Refused, and nothing written: no :ro or :rw, a folder that is no directory, a writable one that is no
 git repository, a writable folder inside another writable one or holding one, a folder at or inside the
@@ -59,7 +63,7 @@ not reach, and of a writable one a run not ended works on or the wiring names fo
 is refused where a step's harness cannot hold a volume's mount, and in a factory with no writable
 volume.`;
 
-/** `--claude-md on|off`, on `nemia factory volume add`: whether the volume's CLAUDE.md files reach the factory's sessions. */
+/** `--claude-md on|off`, on `nemia factory volume add` and `set`: whether the volume's CLAUDE.md files reach the factory's sessions. */
 const CLAUDE_MD: Flag = {
   flag: '--claude-md',
   kind: 'text',
@@ -67,7 +71,7 @@ const CLAUDE_MD: Flag = {
   takes: "--claude-md takes on or off: whether the volume's CLAUDE.md files reach the factory's sessions",
 };
 
-/** `--skills on|off`, on `nemia factory volume add`: whether the volume's skills are offered to the factory's sessions. */
+/** `--skills on|off`, on `nemia factory volume add` and `set`: whether the volume's skills are offered to the factory's sessions. */
 const SKILLS: Flag = {
   flag: '--skills',
   kind: 'text',
@@ -125,6 +129,46 @@ export const FACTORY_VOLUME_RM_WORDS = {
   writes: true,
   class: 'ask',
   only: VOLUME_HERE,
+} as const satisfies CommandWords;
+
+/** The text under `key`, as the spec read it. */
+const textOf = (args: Args, key: string) => {
+  const value = args[key];
+  return typeof value === 'string' ? value : '';
+};
+
+/** Why `nemia factory volume set` sets nothing: it was given neither switch. */
+const switchCheck = (args: Args) =>
+  args['claudeMd'] !== undefined || args['skills'] !== undefined
+    ? null
+    : `nemia factory volume set sets a switch, and was given neither: nemia factory volume set ${textOf(args, 'factory') || '<factory>'} ${textOf(args, 'volume') || '<volume>'} --claude-md on|off, or --skills on|off. Nothing was changed.`;
+
+/** `nemia factory volume set`: one volume's switches set, by its stored name, without giving it again. */
+export const FACTORY_VOLUME_SET_WORDS = {
+  name: 'factory volume set',
+  served: [{ endpoint: 'volumes.patch' }],
+  usage: VOLUME_SET_USAGE,
+  help: [
+    "set a volume's switches, by its stored name: whether its memory files load",
+    "and its skills are offered to the factory's sessions; one not given is kept",
+  ],
+  spec: {
+    positionals: [
+      { key: 'factory', takes: 'required', kind: 'name' },
+      { key: 'volume', takes: 'required', kind: 'name' },
+    ],
+    flags: [CLAUDE_MD, SKILLS],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `nemia factory volume set does not take ${arg}: nemia factory volume set ${VOLUME_SET_USAGE}.`
+        : `nemia factory volume set takes one volume, and ${arg} is a second: nemia factory volume set ${VOLUME_SET_USAGE}, once per volume.`,
+    missing: `nemia factory volume set takes the factory, then the volume's name: nemia factory volume set ${VOLUME_SET_USAGE}. Nothing was changed.`,
+    flagFirst: true,
+  },
+  check: switchCheck,
+  manual: VOLUME_HELP,
+  writes: true,
+  class: 'ask',
 } as const satisfies CommandWords;
 
 const SETTING_SET_USAGE = '<factory> <harness>.<key> <json>';
@@ -224,12 +268,6 @@ under the factory. A workflow with a line is not detached until the line is take
 
 Refused, and nothing written: a workflow the factory does not offer, an amount that is not dollars above
 zero, the default factory, a factory not in the store, and a cost-line rm of a workflow with no line.`;
-
-/** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string) => {
-  const value = args[key];
-  return typeof value === 'string' ? value : '';
-};
 
 /** A spec of `nemia factory cost-line <verb>`: the factory, the workflow, and the line where `valued`. */
 const costSpec = (verb: string, usage: string, valued: boolean) =>

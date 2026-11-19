@@ -57,10 +57,20 @@ export type FactoryUntrusted = { place: string; harness: string; withheld: strin
 
 /**
  * A volume of a factory: a folder of the person's machine or a repository Nemia cloned (`origin`, its git URL, null where none), by
- * its path; whether it is read-only (`:ro`), mounted for every local step, or writable (`:rw`), a repository the factory works on; and the
- * line that takes it back.
+ * its path, and its stored name (`name`, null where it has none, and its switches are then set by no write); whether it is read-only
+ * (`:ro`), mounted for every local step, or writable (`:rw`), a repository the factory works on; its two switches, whether its memory
+ * files load into the factory's sessions (`claudeMd`, off where the api says nothing) and its skills are offered to them (`skills`, on
+ * where it says nothing); and the line that takes it back.
  */
-export type FactoryVolume = { path: string; readOnly: boolean; origin: string | null; commands: { rm: string } };
+export type FactoryVolume = {
+  path: string;
+  name: string | null;
+  readOnly: boolean;
+  origin: string | null;
+  claudeMd: boolean;
+  skills: boolean;
+  commands: { rm: string };
+};
 
 /**
  * The board's view of a factory (`factoryViewOf`): its name, whether it is the default factory, `worksOn` the repositories it works on
@@ -81,9 +91,9 @@ export type Factory = {
   schedules: FactorySchedule[];
   /**
    * The lines a person types for it: a workflow attached, its file removed, filed again, a workflow scheduled, its places trusted, a
-   * volume mounted.
+   * volume mounted, and its home opened in a person's own session (`home`, null where it has no home).
    */
-  commands: { attach: string; rm: string; add: string; schedule: string; trust: string; volume: string };
+  commands: { attach: string; rm: string; add: string; schedule: string; trust: string; volume: string; home: string | null };
   template: FactoryTemplate | null;
   untrusted: FactoryUntrusted[];
   volumes: FactoryVolume[];
@@ -134,6 +144,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
       schedule: commands.schedule,
       trust: commands.trust,
       volume: commands.volume,
+      home: commands.home ?? null,
     },
     template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,
     untrusted: status.untrusted.map((u) => ({ place: u.place, harness: u.harness, withheld: u.withheld, never: u.never ?? null })),
@@ -142,8 +153,11 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
     ...(commands.follow === undefined ? {} : { follow: commands.follow }),
     volumes: spec.volumes.map((v) => ({
       path: v.path,
+      name: v.name ?? null,
       readOnly: v.readOnly,
       origin: v.origin ?? null,
+      claudeMd: v.claudeMd ?? false,
+      skills: v.skills ?? true,
       commands: { rm: (v.name === undefined ? undefined : commands.volumeRm[v.name]) ?? '' },
     })),
   };

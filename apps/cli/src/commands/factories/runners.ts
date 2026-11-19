@@ -17,6 +17,7 @@ import {
   factorySettingRm,
   factorySettingSet,
   factoryVolumeAdd,
+  factoryVolumeSet,
   factoryVolumeRm,
 } from './settings.ts';
 import { factoryAdopt, factoryApply, factoryDiff, factoryResolve, factoryUpgrade } from './templated.ts';
@@ -43,6 +44,7 @@ export const FACTORY_RUNNERS: Readonly<Record<FactoryCommand, Runner>> = {
   'factory server add': factoryServerAdd,
   'factory server rm': factoryServerRm,
   'factory volume add': factoryVolumeAdd,
+  'factory volume set': factoryVolumeSet,
   'factory volume rm': factoryVolumeRm,
   'factory setting set': factorySettingSet,
   'factory setting rm': factorySettingRm,

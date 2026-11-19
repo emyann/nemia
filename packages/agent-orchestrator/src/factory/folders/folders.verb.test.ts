@@ -14,6 +14,7 @@ import type { Env } from '../../config/config.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { PlaceService } from '../../place/place.store.ts';
 import { testPlace } from '../../../place/memory/index.ts';
+import { FOLDER_NAMES_MOST } from './folders.ts';
 import { foldersNamed, repositoryMade, repositoryNew } from './folders.verb.ts';
 
 /** A scratch root holding the folders `a-one`, `a-two`, `b`, `.hidden` and the file `a-file`, and a store of its own. */
@@ -70,6 +71,44 @@ describe('the folder listing names folders under its roots alone', () => {
       await inside.given(foldersNamed(`${inside.store}/`)),
     ];
     assert.deepEqual(results.map(invalid), [true, true, true, true]);
+  });
+});
+
+/** What the listing answers of the folder `root`, typed with a slash, the root its one root and a store of its own. */
+async function listedIn(root: string) {
+  const env: Env = { ...process.env, WF_ROOT: scratch('wf-folders-store-'), WF_FOLDER_ROOTS: root };
+  const layer = Layer.merge(storeConfigLayer(env), PlaceService.layer(testPlace().place));
+  const read = await Effect.runPromise(Effect.result(Effect.provide(foldersNamed(`${root}/`), layer)));
+  assert.equal(read._tag, 'Success');
+  return read._tag === 'Success' ? { names: read.success.names, more: read.success.more } : { names: [], more: false };
+}
+
+/** A scratch root holding the folders `f-000`, `f-001`, … up to `count` of them, made last first, and their names in order. */
+function plantedMany(count: number) {
+  const root = fs.realpathSync(scratch('wf-folders-many-'));
+  const names = Array.from({ length: count }, (_, i) => `f-${String(i).padStart(3, '0')}`);
+  for (const name of [...names].reverse()) fs.mkdirSync(path.join(root, name));
+  return { names, listed: () => listedIn(root) };
+}
+
+describe("the listing's order, its bound and its more, as folderNamesShown's contract leaves them to these rows", () => {
+  test('the names are answered in order of their code units, each once, whatever order the disk made them in', async () => {
+    const root = fs.realpathSync(scratch('wf-folders-order-'));
+    for (const dir of ['c', 'a', 'B', 'b', 'a-b', 'a.b']) fs.mkdirSync(path.join(root, dir));
+    assert.deepEqual((await listedIn(root)).names, ['B', 'a', 'a-b', 'a.b', 'b', 'c']);
+  });
+  test('every folder is answered or more is said, and more is said only then: at the bound none is left out, past it one is', async () => {
+    const atBound = plantedMany(FOLDER_NAMES_MOST);
+    const past = plantedMany(FOLDER_NAMES_MOST + 1);
+    const at = await atBound.listed();
+    const over = await past.listed();
+    assert.deepEqual([at.names, at.more], [atBound.names, false]);
+    assert.deepEqual([over.names.includes(past.names.at(-1) ?? ''), over.more], [false, true]);
+  });
+  test('where some are left out, the bound is filled with the first ones', async () => {
+    const many = plantedMany(FOLDER_NAMES_MOST + 3);
+    const read = await many.listed();
+    assert.deepEqual([read.names, read.more], [many.names.slice(0, FOLDER_NAMES_MOST), true]);
   });
 });
 

@@ -20,10 +20,6 @@ export const REPOSITORIES = 'repositories';
 /** Whether the absolute path `inner` is `outer` or under it, by whole segments. */
 const under = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer.endsWith('/') ? outer : outer + '/');
 
-/** Whether `e` is a folder the listing names for `prefix`: one that begins with it, a hidden one only when it opens with a dot. */
-const named = (e: FolderEntry, prefix: string): boolean =>
-  e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.'));
-
 /**
  * Where the folder `real` stands for the listing: in a store, under a root, or outside every root.
  * @param real The folder, an absolute path resolved through its links.
@@ -43,9 +39,11 @@ export const folderReach: FolderReachOf = (real: string, roots: readonly string[
  * @param most The most names answered.
  */
 export const folderNamesShown: FolderNamesShownOf = (entries: readonly FolderEntry[], prefix: string, most: number): FolderNamesShown => {
-  const found = entries.filter((e) => named(e, prefix)).map((e) => e.name);
+  const found = entries
+    .filter((e) => e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.')))
+    .map((e) => e.name);
   const names = [...found].sort().slice(0, most);
-  return { names, more: entries.some((e) => named(e, prefix) && !names.includes(e.name)) };
+  return { names, more: found.some((n) => !names.includes(n)) };
 };
 
 /**

@@ -12,6 +12,6 @@ export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleVerb } fro
 export { own } from './own.ts';
 export { firstPiece, unknownTask } from './text.ts';
 export { pathOf } from './path.ts';
-export { firstRefusal } from './event-schema.ts';
+export { firstRefusal, noneOf } from './event-schema.ts';
 export { endOf, firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';
 export type { LifecycleTransition } from './path.ts';

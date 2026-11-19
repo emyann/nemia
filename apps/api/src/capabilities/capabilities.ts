@@ -13,72 +13,14 @@ import { Context, Effect, Layer } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
+import type { CapabilitiesWithSteps, CapabilityDescribed, CapabilityServer } from 'objects';
 
-/** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
-export type Described = { name: string; description: string | null; source: string };
-
-/** A tool a server listed. `denied` is the rule in `permissions.deny` that refuses it, if one does. */
-export type McpTool = { name: string; description: string | null; denied: string | null };
-
-/** A server as `.mcp.json` declares it, and what it answered when the api asked it for its tools. */
-export type McpServer = {
-  name: string;
-  source: string;
-  /**
-   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`HARNESS_TRANSPORTS`, the harness's own, which objects'
-   * `McpTransport` of a url is not): `stdio` for a server with a command and none given, and `unknown` for any other word, or a url with
-   * none, the word as written quoted in `notAsked`.
-   */
-  type: HarnessTransport | 'unknown';
-  /**
-   * `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the
-   * page.
-   */
-  command: string | null;
-  args: string[];
-  url: string | null;
-  /**
-   * Whether `.claude/settings.json` enables it: `enabledMcpjsonServers` or `enableAllProjectMcpServers`, and not `disabledMcpjsonServers`.
-   */
-  enabled: boolean;
-  /** What it listed, or null when it was not asked or did not answer. */
-  tools: McpTool[] | null;
-  /** Why it did not list its tools, and the end of what it printed on stderr. */
-  error: string | null;
-  /** Why the api did not ask it — not enabled, or not a stdio server. */
-  notAsked: string | null;
-  /**
-   * The state the harness reports of the server of this name the default factory records — `connected`, `needs-auth`, `failed`,
-   * `pending` or `disabled`, the harness's own word, carried — or `null`: for a server the default factory does not record, and for one
-   * whose state could not be read, which is not an absence. A server of the checkout's `.mcp.json` alone has none.
-   */
-  factoryState: string | null;
-  /** When it was asked: the api asks each server once while it runs. */
-  checkedAt: string | null;
-};
-
-/** A permission rule of the settings, and the file it was read from. */
-export type DeniedRule = { rule: string; source: string };
-
-export type Capabilities = {
-  /** The checkout everything was read from. */
-  repo: string;
-  skills: Described[];
-  agents: Described[];
-  mcp: McpServer[];
-  denied: DeniedRule[];
-  /**
-   * `permissions.ask` in `.claude/settings.json`, in its order: what asks whatever an allow rule or the harness's own leave says — Claude
-   * Code reads them after the deny rules and before the allow rules. In `dontAsk`, where nothing asks, what they match is denied.
-   */
-  asked: DeniedRule[];
-  /**
-   * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude
-   * Code's read-only commands (`CLAUDE_RULES.readOnlyCommands`) among it. In `dontAsk`, all it runs of what asks.
-   */
-  allowed: DeniedRule[];
-  /** A file that is there and does not read: what was left out because of it, and the fix. */
-  warnings: string[];
+/**
+ * What the repository offers, read from its checkout: the parts of objects' `CapabilitiesWithSteps` that are the checkout's own, and the
+ * checkout it was read from. Each part says what it is on objects' Schema.
+ */
+export type Capabilities = Pick<CapabilitiesWithSteps, 'skills' | 'agents' | 'mcp' | 'denied' | 'asked' | 'allowed' | 'warnings'> & {
+  readonly repo: string;
 };
 
 /** The checkout this api's source is in: the repository a person started it from. */
@@ -139,7 +81,7 @@ export async function capabilitiesOf(
   const enabled = enabledBy(settings, warnings);
   const declared = declaredServers(jsonAt(repo, MCP_JSON, warnings, 'no MCP server is listed from it'), warnings);
   const mcp = await Promise.all(
-    declared.map(async (server): Promise<McpServer> => {
+    declared.map(async (server): Promise<CapabilityServer> => {
       const entry = {
         name: server.name,
         source: MCP_JSON,
@@ -201,14 +143,14 @@ export async function capabilitiesOf(
 }
 
 /** `.claude/skills/*\/SKILL.md`, by directory. A directory without a SKILL.md is not a skill. */
-function skillsOf(repo: string, warnings: string[]): Described[] {
+function skillsOf(repo: string, warnings: string[]): CapabilityDescribed[] {
   return namesIn(repo, '.claude/skills', warnings)
     .map((dir) => describedAt(repo, `.claude/skills/${dir}/SKILL.md`, dir, warnings))
     .filter((skill) => skill !== null);
 }
 
 /** `.claude/agents/*.md`, by file name. */
-function agentsOf(repo: string, warnings: string[]): Described[] {
+function agentsOf(repo: string, warnings: string[]): CapabilityDescribed[] {
   return namesIn(repo, '.claude/agents', warnings)
     .filter((file) => file.endsWith('.md'))
     .map((file) => describedAt(repo, `.claude/agents/${file}`, file.slice(0, -'.md'.length), warnings))
@@ -235,7 +177,7 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
  * @param fallback The name it is listed by where its frontmatter names none.
  * @param warnings The list a warning about the file is added to.
  */
-export function describedAt(repo: string, source: string, fallback: string, warnings: string[]): Described | null {
+export function describedAt(repo: string, source: string, fallback: string, warnings: string[]): CapabilityDescribed | null {
   let text: string;
   try {
     text = fs.readFileSync(path.join(repo, source), 'utf8');

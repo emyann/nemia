@@ -148,7 +148,7 @@ test("with no factory filed, the page reads no repository whatever the api's own
   const answer = (await res.json()) as CapabilitiesWithSteps;
   assert.equal(answer.repo, undefined, "the api's own is not read");
   assert.equal(answer.unread?.reason, 'no-factory');
-  assert.ok(!(answer.skills as Array<{ name: string }>).some((skill) => skill.name === 'own-skill'), 'its skill is never listed');
+  assert.ok(!answer.skills.some((skill) => skill.name === 'own-skill'), 'its skill is never listed');
 });
 
 describe('an install unpacked from an archive, its source an address: the page reads no path built from it, and a factory once filed', () => {
@@ -216,7 +216,7 @@ describe('an install unpacked from an archive, its source an address: the page r
     assert.equal(answer.repo, repoA);
     assert.equal(answer.unread, undefined);
     assert.deepEqual(
-      (answer.skills as Array<{ name: string }>).map((skill) => skill.name),
+      answer.skills.map((skill) => skill.name),
       ['a-skill'],
     );
   });
@@ -233,7 +233,7 @@ describe('an install unpacked from an archive, its source an address: the page r
     const read = await page(`?factory=beta&repo=${encodeURIComponent(repoC)}`);
     assert.equal(read.repo, repoC);
     assert.deepEqual(
-      (read.skills as Array<{ name: string }>).map((skill) => skill.name),
+      read.skills.map((skill) => skill.name),
       ['c-skill'],
     );
   });

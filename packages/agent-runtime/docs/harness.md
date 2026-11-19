@@ -263,6 +263,28 @@ the orchestrator's code holds a fact today, it is named beside it.
   writes no such glob since 2026-11-19 and follows Claude Code's default, a dependency's `CLAUDE.md` included (Effect's is its
   guidance to agents that use it); a task's own `claudeMdExcludes` is passed on whole (`harness/claude/memory.ts`).
 
+## A session in one folder, working on another
+
+A session the orchestrator starts in its factory's home has the folder it works on added beside it (`additionalDirectories`, `--add-dir`),
+held by a `ruled` mount: the task's own rules alone decide what it writes there, and the runtime adds neither the `Edit(//<path>/**)`
+allow of a writable mount nor the deny of a read-only one (`claudeAllows`, `claudeDenies`). Its project servers are read from the folder
+`projectMcpFrom` names, else its `cwd` (`mcpFolderOf`, `harness/mcp.ts`).
+
+Measured by the operator on **Claude Code 2.1.328, 2026-11-19**, `-p` sessions started in a home with `--add-dir repo`: a nested
+`CLAUDE.md` under an added folder (`repo/src/CLAUDE.md`) never loaded — not at start, not after a Read of `repo/src/a.txt`, not after a
+Bash `cd repo/src && cat a.txt`, not with `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` set. With the variable, the added folder's
+root `CLAUDE.md` loaded at start; without it, none of the added folder's did. A skill in `repo/.claude/skills/` was listed with no
+variable.
+
+Not measured yet, and leaned on (the card that added the home, `factory: where a session starts, and the folder it works on`):
+
+- whether `claudeMdExcludes`, with the variable set, skips an added folder's `CLAUDE.md`: its documentation says it applies to User,
+  Project and Local memory, and an added folder's may be none of them. Where it does not, a volume switched on loads every added
+  folder's;
+- whether a job whose `cwd` is a home Claude Code never trusted applies the home's `.claude/settings.json` and lists its skills;
+- whether a Bash `cd <added folder>` holds for the session's next Bash call;
+- whether a skill of an added folder's `.claude/skills` is enabled by its bare name in `Options.skills`.
+
 ## A permission prompt, as `canUseTool` is handed it
 
 What Claude Code hands `canUseTool` (`sdk.d.ts:241`) for a call it would prompt for, and what it does with an always allow, measured

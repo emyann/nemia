@@ -224,7 +224,12 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signIn
   readOutput: claudeStreamOutput,
   keepOutput: claudeStreamKept,
   start: CLAUDE_INIT_START,
-  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords, spent: claudeTranscriptSpent },
+  transcript: {
+    file: claudeTranscriptFile,
+    events: claudeTranscriptEvents,
+    records: claudeTranscriptRecords,
+    spent: claudeTranscriptSpent,
+  },
   streams: true,
   partials: claudePartials,
   prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs, harnessBin),

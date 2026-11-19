@@ -5,7 +5,7 @@ import { expect, userEvent, within } from 'storybook/test';
 import type { PartSize } from '@/lib/stepPart';
 import type { RunDetail } from '@/lib/runView';
 import { StepPart } from './StepPart';
-import { CODES, NOW, PLAN, measured, runOf, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
+import { CODES, NOW, PLAN, measured, runOf, spendingSoFar, stepOf, toldInLayers, tryOf } from '../../../../.storybook/fixtures/steps';
 import { skippedHeadings } from '../../../../.storybook/play';
 
 /**
@@ -21,6 +21,7 @@ const client = new QueryClient({ defaultOptions: { queries: { enabled: false, re
 const RUNS = {
   toCome: runOf(stepOf(CODES.come, [])),
   atWork: runOf(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)])),
+  spendingSoFar: runOf(spendingSoFar(stepOf(CODES.work, [tryOf(1, CODES.refused, true, PLAN, false), tryOf(2, CODES.work, false, null)]))),
   waitsOnYou: runOf(measured(stepOf(CODES.gate, [tryOf(1, CODES.gate, true, PLAN)], true))),
   done: runOf(measured(stepOf(CODES.done, [tryOf(1, CODES.done, true, PLAN)]))),
   told: runOf(toldInLayers(stepOf(CODES.work, [tryOf(1, CODES.work, false, null)]))),
@@ -52,14 +53,20 @@ function Sizes({ run }: { run: RunDetail }) {
  * The step's card at M drawn in `canvas`, in its state: its card's kind, its frame in the step's hue, its five facts whole, a meter
  * only where a spend and its budget are measured, its label the card's small caps as its facts' labels, and its one action.
  */
-async function cardAtM(canvas: HTMLElement, kind: string, hue: string, action: string): Promise<HTMLElement> {
+async function cardAtM(
+  canvas: HTMLElement,
+  kind: string,
+  hue: string,
+  action: string,
+  metered = kind === 'gate' || kind === 'done',
+): Promise<HTMLElement> {
   const card = canvas.querySelector<HTMLElement>('[data-step-part="M"]')!;
   const frame = card.closest('[data-cut-frame]');
   await expect(frame?.getAttribute('data-cut-frame'), "its frame's hue").toBe(hue);
   await expect(card.querySelector('[data-step-card]')?.getAttribute('data-step-kind')).toBe(kind);
   await expect(card.querySelectorAll('[data-step-facts] dd').length, 'the five facts, whole').toBe(5);
   const meter = card.querySelector<HTMLElement>('[data-step-spend="meter"]');
-  await expect(meter !== null, 'a meter where a spend and its budget are measured').toBe(kind === 'gate' || kind === 'done');
+  await expect(meter !== null, 'a meter where a spend and its budget are measured').toBe(metered);
   if (meter) {
     const [spent, fact] = [within(meter).getByText('Spent', { exact: true }), card.querySelector('[data-step-facts] dt span')!].map(
       (label) => ({ case: getComputedStyle(label).textTransform, size: getComputedStyle(label).fontSize }),
@@ -83,6 +90,16 @@ export const AtWork: StoryObj = {
   play: async ({ canvasElement }) => {
     const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step');
     await expect(card.textContent).toMatch(/not measured yet/);
+  },
+};
+
+/** A step at work whose session said what it has spent so far: the earlier try's cost and the live one, so far, on its budget's meter. */
+export const AtWorkSpending: StoryObj = {
+  render: () => <Sizes run={RUNS.spendingSoFar} />,
+  play: async ({ canvasElement }) => {
+    const card = await cardAtM(canvasElement, 'work', 'alive', 'Open the step', true);
+    await expect(card.textContent).toMatch(/\$32\.32 so far of \$40/);
+    await expect(card.textContent).not.toMatch(/not measured yet/);
   },
 };
 

@@ -206,7 +206,7 @@ describe("a session's words, name by name: its journal and view words, the forme
     const done = viewOfState(settled, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'completed', busy: false }]]));
     assert.deepEqual([done.phase, done.session], ['succeeded', undefined], 'a settled task carries no session');
   });
-  test("a view carries what its attempt in flight has spent so far, off the sighting, and drops it once the attempt has ended", () => {
+  test('a view carries what its attempt in flight has spent so far, off the sighting, and drops it once the attempt has ended', () => {
     const spent = { usd: 16.26, capUsd: 23.94, at: '2026-11-18T23:16:38.018Z' };
     const seen = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const, busy: true, spent }]]);
     const inFlight = fold(TASK, [filed(), starting(1), spawned(1)]);

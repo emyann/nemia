@@ -11,6 +11,7 @@ import {
   roundSpans,
   runSpend,
   sessionTasks,
+  spendKnown,
   spentWord,
   stepSpend,
   type SpendOf,
@@ -269,7 +270,7 @@ export function costLine(step: StepSpec | undefined, run: Run, name: string, use
   const all = stepSpend(run, name, spendOf);
   const spent =
     sessions > 1
-      ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`}${read ? ` · ${read}` : ''} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
+      ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`}${read ? ` · ${read}` : ''} · ${spendKnown(all) ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
       : `${current}${read ? ` · ${read}` : ''}`;
   const cap = step ? budgetOf(step, run) : undefined;
   return `cost  ${spent}${cap !== undefined ? ` · budget ${budgetWord(cap)}` : ''}`;

@@ -48,8 +48,8 @@ export type AttemptClock = {
 
 /**
  * A task as the timeline reads it off the engine's view: its brief, when it was filed (`filedAt`, absent on a view of a task never
- * filed), its attempts, whether it settled, and what the attempt in flight has consumed so far; and, for a task held open, the engine's
- * word for it and whether a person closed it (`signedAndHeld`).
+ * filed), its attempts, whether it settled, and what the attempt in flight has consumed and spent so far; and, for a task held open,
+ * the engine's word for it and whether a person closed it (`signedAndHeld`).
  */
 export type TaskClock = {
   phase?: string;
@@ -61,6 +61,8 @@ export type TaskClock = {
     closed?: boolean;
   };
   usage?: Consumed;
+  /** What the attempt in flight has spent so far, as its harness last said it: dollars, and when (`TaskView.spent`). */
+  spent?: { usd: number; at: string };
 };
 
 /** What the filing readers read of a task's view: when it was filed (`State.filedAt`). */

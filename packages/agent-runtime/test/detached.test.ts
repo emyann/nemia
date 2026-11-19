@@ -2897,7 +2897,7 @@ test('a second stop while one is under way signals the harness again, and leaves
   );
 });
 
-describe("observe: a Claude Code run at work says what it has spent so far, by the latest budget line of its transcript written since it began", () => {
+describe('observe: a Claude Code run at work says what it has spent so far, by the latest budget line of its transcript written since it began', () => {
   const BEGAN = '2026-11-18T23:00:00.000Z';
   const budgetLine = (at: string, used: number, total: number) =>
     JSON.stringify({ type: 'attachment', timestamp: at, attachment: { type: 'budget_usd', used, total, remaining: total - used } });
@@ -2961,6 +2961,9 @@ describe("observe: a Claude Code run at work says what it has spent so far, by t
     const wrong = JSON.stringify({ type: 'attachment', timestamp: BEGAN, attachment: { type: 'budget_usd', used: 'a lot', total: 20 } });
     const said = await warned(observing('working', [wrong]));
     assert.equal(said.value?.spent, undefined);
-    assert.ok(said.warnings.some((w) => w.includes('attachment.used')), said.warnings.join('\n'));
+    assert.ok(
+      said.warnings.some((w) => w.includes('attachment.used')),
+      said.warnings.join('\n'),
+    );
   });
 });

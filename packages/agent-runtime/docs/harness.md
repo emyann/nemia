@@ -324,6 +324,29 @@ the newest event any session of its store received, with when it was received, i
 `claudeHeardFile`): a job's own process keeps it, and so does a session held in the holder, and a token's quota carries it as `heard`.
 It costs nothing: the factory's sessions spend anyway. A machine where no session has had a turn since has none to show.
 
+## What a session has spent
+
+**A session with a dollar cap (`maxBudgetUsd`, which Nemia sets from a step's budget) writes its spend into its transcript before
+each request, as an attachment line** (Claude Code 2.1.325, measured by the operator on 2026-11-18). The same figure is handed the
+model as a system reminder, `USD budget: $<used>/$<total>; $<remaining> remaining`; in the transcript it is
+
+```json
+{"type":"attachment","timestamp":"2026-11-18T23:16:38.018Z",
+ "attachment":{"type":"budget_usd","used":0,"total":20,"remaining":20}}
+```
+
+The Vitest move's implement session (`tests-every-workspace-s-suit-ljto`) held about 470 of them, about one per request. **`used` is
+the attempt's own spend and `total` its own cap**: a session continued with `--resume` counts again from nothing, against the budget
+left — that run's try 2 read `$16.26/$23.94`, after a try 1 that cost $16.06, under a step's budget of $40. A session with no cap writes
+none. The line is undocumented and the SDK types none of it (`getSessionMessages` gives no attachments), so it may change in any
+release: `LINES.attachment` decodes it (`harness/claude/lines.ts`), and a line of it that does not decode is refused as any other is.
+
+The runtime reads the latest one written since the attempt began, from the end of the transcript and afresh on every look
+(`claudeTranscriptSpent`, `harness/claude/transcript.ts`), as a job's sighting's `spent`, which the task's view carries while the
+attempt is at work (`TaskView.spent`): a figure still growing, never the measured cost, which replaces it once the attempt ends. A
+resumed transcript holds its parent's lines, so one written before the attempt began is not read as its own. The step transcript the
+board and the MCP port read keeps leaving these lines out.
+
 ## The claude.ai bridge
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,

@@ -267,6 +267,31 @@ source's runs and callers.
 
 Both daemons must run your client's release: upgrade an older one first.
 
+## Open its home yourself
+
+A factory made from a template may have a home: the folder its steps' sessions start in, with its `CLAUDE.md`, its skills under
+`.claude/`, its settings and its `.mcp.json`. To see what its agents see, open a Claude Code session of your own there:
+
+```bash
+nemia factory home shop                       # this folder added beside the home
+nemia factory home shop ~/code/shop --claude-md on
+```
+
+- **The home is a copy, read-only.** `nemia` asks the daemon of the context in use for the home and writes it under your cache,
+  `${XDG_CACHE_HOME:-~/.cache}/nemia/homes/<context>/<factory>/<digest>/`, named as a run names its copy. No file of it is writable and
+  the session is denied editing it: a home changes only by a proposal. Opening it again after the home changed writes a new copy and
+  removes the older ones; the copies of a factory you removed stay until you delete that folder.
+- **Your repository is added beside it**, the folder you typed the command in unless you name one, writable as usual. Its own
+  `CLAUDE.md` is loaded only with `--claude-md on`, as a volume's switch says for a step. A repository inside the copy, or one holding
+  it, is refused.
+- **Only the home's settings are read** (`--setting-sources project`), as a step's session reads them: your own settings, hooks and
+  user `CLAUDE.md` do not apply. For your own, open a plain session instead.
+- **Claude Code asks what a step is never asked**: to trust the copy's folder, and to approve the home's `.mcp.json` servers, once for
+  each new copy.
+
+It needs `claude` on your PATH, and a factory with a home: one made by hand has none, and is refused naming how to take it over by a
+template.
+
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through

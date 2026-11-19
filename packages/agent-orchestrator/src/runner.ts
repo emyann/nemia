@@ -446,7 +446,7 @@ export {
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { runWatchVersion } from './runlist/runlist.ts';
-export { factoryCommandsOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
+export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';

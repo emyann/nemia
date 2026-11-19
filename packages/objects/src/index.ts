@@ -233,6 +233,7 @@ export {
   MOVE_CARDS,
   type MoveCards,
 } from './factory-move.ts';
+export { FactoryHome, FactoryHomeFile } from './factory-home.ts';
 /** What a write of a factory or of one of its parts did, on its answer alone. */
 export { FactoryWritten } from './written.ts';
 export {
@@ -768,7 +769,6 @@ export {
 } from './commands-factories-templated.ts';
 export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
 export { FACTORY_MANUAL } from './commands-factories-manual.ts';
-export { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
 export {
   DEFINITION_WORDS,
   POLICY_CONFIRM_WORDS,

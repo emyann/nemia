@@ -102,6 +102,11 @@
     {
       "term": "Headers",
       "meaning": "`nemia config headers`: the one verb that prints a token, as `{\"Authorization\":\"Bearer …\"}` on stdout for a harness's connection (the nemia plugin's `headersHelper`): `NEMIA_TOKEN` first, then the context's, then this machine's own (`apps/cli/src/context.ts`)."
+    },
+    {
+      "term": "Own session",
+      "meaning": "a person's own Claude Code session in a factory's home, opened by `nemia factory home <factory> [<repo>] [--claude-md on|off]` (`apps/cli/src/commands/factories/home.ts`): the home asked of the api of the context in use (`GET /api/factories/:name/home`), rendered into the client's cache, `${XDG_CACHE_HOME:-~/.cache}/nemia/homes/<context>/<factory>/<digest>/`, the digest a run's copy of the same home is named by, each file's write bits cleared (`apps/cli/src/home/copy.ts`), the earlier copies of it removed but a render in flight (`staleCopiesOf`); then `claude` started there with the person's terminal (`apps/cli/src/home/session.ts`), the repository (the folder typed in, by default) added with `--add-dir`, the copy denied by `Edit(//<copy>/**)` and the project's settings read alone, `--setting-sources project`, as a step's session is (`ownSessionOf`, proved by `apps/cli/contracts/own-session.contract.ts`); the repository's CLAUDE.md loads only with `--claude-md on`. A repository that holds the copy, or lies in it, is refused, exit 2.",
+      "type": "OwnSession"
     }
   ]
 }

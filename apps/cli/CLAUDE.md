@@ -75,7 +75,9 @@ this machine's daemon, reached through its api. It sits beside the board, above 
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
   other file imports `node:child_process` but `src/browser.ts`, which runs this machine's browser opener for `nemia open` (`openerOf`,
-  proved by `contracts/opener.contract.ts`). A daemon started on demand (`src/daemon.ts`) starts through it, spawning the old path's
+  proved by `contracts/opener.contract.ts`), and `src/home/session.ts`, which starts the person's own Claude Code session in a
+  factory's home for `nemia factory home` (`ownSessionOf`, proved by `contracts/own-session.contract.ts`), the home rendered into the
+  client's own cache folder (`${XDG_CACHE_HOME:-~/.cache}/nemia/homes/`, `src/home/copy.ts`), beside its config and never in the store. A daemon started on demand (`src/daemon.ts`) starts through it, spawning the old path's
   `daemon --json`, which that CLI keeps for it; `nemia daemon` typed is a read of the client's (`src/reads/daemon.ts`, `GET
   /api/daemon`). `agent-orchestrator` is in `dependencies` for that resolve alone.
 - **The printers are the client's alone**: each moved command prints from the api's decoded answer, its printer typed by the api's

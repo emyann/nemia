@@ -37,7 +37,7 @@ const ROOT = path.join(BASE, 'store');
 const engine = eachTest(testEngine);
 
 /** A file of `kb` kilobytes under the store. */
-const file = (at: string, kb = 8): string => {
+const file = (at: string, kb = 8) => {
   const full = path.join(ROOT, at);
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, Buffer.alloc(kb * 1024, 1));
@@ -45,6 +45,7 @@ const file = (at: string, kb = 8): string => {
 };
 
 /** The bytes `lstat` says a name of the store holds on disk, and every name under it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const held = (at = ''): number => {
   const full = path.join(ROOT, at);
   const stat = fs.lstatSync(full);
@@ -53,14 +54,17 @@ const held = (at = ''): number => {
 };
 
 /** The bytes a folder of the store holds for itself, the names under it left out. */
-const alone = (at = ''): number => fs.lstatSync(path.join(ROOT, at)).blocks * 512;
+const alone = (at = '') => fs.lstatSync(path.join(ROOT, at)).blocks * 512;
 
 /** A run a pass answered, as far as the sweep reads it: its id, its factory, and the tasks its one step filed. */
-const answered = (id: string, factory?: string, tasks: readonly string[] = []): Answered => ({
-  run: { id, ...(factory ? { factory } : {}), steps: { work: { tries: tasks.map((taskId) => ({ taskId })) } } } as never,
-  status: 'running',
-  feed: {},
-});
+const answered = (id: string, factory?: string, tasks: readonly string[] = []) => {
+  const made: Answered = {
+    run: { id, ...(factory ? { factory } : {}), steps: { work: { tries: tasks.map((taskId) => ({ taskId })) } } } as never,
+    status: 'running',
+    feed: {},
+  };
+  return made;
+};
 
 /** A kept pass that carries no reading. */
 const PASS: RecentPass = {
@@ -82,7 +86,7 @@ const ANSWERS = [answered('a', 'nemia'), answered('b', 'pipao'), answered('c')];
 const DISK_PARTS_BEFORE: readonly string[] = ['worktrees', 'runs', 'engine'];
 
 /** The store afresh: runs `a` of nemia, `b` of pipao and `c` of no factory, a folder of no run, and every part with files of its own. */
-function planted(): void {
+function planted() {
   fs.rmSync(ROOT, { recursive: true, force: true });
   file('worktrees/a/design/src/big.bin', 256);
   file('worktrees/a/review/small.bin', 16);
@@ -102,7 +106,7 @@ function planted(): void {
 }
 
 /** A registry of metrics of a test's own. */
-const registryOf = (): Registry => new Map();
+const registryOf = () => new Map() satisfies Registry;
 type Registry = (typeof Metric.MetricRegistry)['Service'];
 
 /** `program` over `registry` and the test's engine, and each span it made. */
@@ -127,7 +131,7 @@ const over = async <A>(registry: Registry, program: Effect.Effect<A, unknown, En
 };
 
 /** What `registry` holds of the gauge `id`, each series as its labels in words and its value. */
-const gauges = async (registry: Registry, id: string): Promise<Record<string, number>> => {
+const gauges = async (registry: Registry, id: string) => {
   const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
   return Object.fromEntries(
     snapshot
@@ -145,7 +149,7 @@ const gauges = async (registry: Registry, id: string): Promise<Record<string, nu
 /**
  * `entries` by part and factory, in their order, each the sum of its kinds: bytes where any kind read, and every name that did not.
  */
-const byPart = (entries: readonly DiskEntry[]): DiskEntry[] => {
+const byPart = (entries: readonly DiskEntry[]) => {
   const by = new Map<string, DiskEntry>();
   for (const { part, factory, bytes, unread } of entries) {
     const key = JSON.stringify([part, factory ?? null]);
@@ -153,7 +157,7 @@ const byPart = (entries: readonly DiskEntry[]): DiskEntry[] => {
     const sum = bytes === undefined && was.bytes === undefined ? {} : { bytes: (was.bytes ?? 0) + (bytes ?? 0) };
     by.set(key, { ...was, ...sum, unread: was.unread + unread });
   }
-  return [...by.values()];
+  return [...by.values()] satisfies DiskEntry[];
 };
 
 /** The entry of `part` and `factory` among `entries`, its kinds summed (`byPart`). */
@@ -161,7 +165,7 @@ const entryOf = (entries: readonly DiskEntry[], part: string, factory?: string) 
   byPart(entries).find((entry) => entry.part === part && entry.factory === factory);
 
 /** Gauges' values by their labels in words (`gauges`), summed over their kinds: the gauges by part and factory. */
-const summedOverKinds = (values: Record<string, number>): Record<string, number> => {
+const summedOverKinds = (values: Record<string, number>) => {
   const sums: Record<string, number> = {};
   for (const [labels, value] of Object.entries(values)) {
     const key = labels
@@ -170,18 +174,20 @@ const summedOverKinds = (values: Record<string, number>): Record<string, number>
       .join(' ');
     sums[key] = (sums[key] ?? 0) + value;
   }
-  return sums;
+  return sums satisfies Record<string, number>;
 };
 
 /** The bytes of each kind among `entries` of `part` and `factory`, by kind. */
-const kindsOf = (entries: readonly DiskEntry[], part: string, factory?: string): Record<string, number | undefined> =>
-  Object.fromEntries(entries.filter((entry) => entry.part === part && entry.factory === factory).map((entry) => [entry.kind, entry.bytes]));
+const kindsOf = (entries: readonly DiskEntry[], part: string, factory?: string) =>
+  Object.fromEntries(
+    entries.filter((entry) => entry.part === part && entry.factory === factory).map((entry) => [entry.kind, entry.bytes]),
+  ) satisfies Record<string, number | undefined>;
 
 /** The runs of the kept fixtures: `a` of nemia with two tasks, `b` of pipao with one, `c` of no factory with one. */
 const TASKED = [answered('a', 'nemia', ['t-a1', 't-a2']), answered('b', 'pipao', ['t-b1']), answered('c', undefined, ['t-c1'])];
 
 /** Files the stand-in's tasks `ids`, in order, those among `checks` on the checks' harness. */
-const filed = async (ids: readonly string[], checks: readonly string[] = []): Promise<void> => {
+const filed = async (ids: readonly string[], checks: readonly string[] = []) => {
   for (const id of ids) {
     const harness = checks.includes(id) ? { harness: HARNESSES.check.name } : {};
     await Effect.runPromise(engineOf(engine().layer).file({ id, brief: 'b', cwd: '/r', ...harness }));
@@ -332,6 +338,7 @@ describe('a disk sweep: a store of known sizes across factories read by part, ki
     planted();
     const files = 2 * WALK_BURST + 30;
     for (let k = 0; k < files; k++) fs.writeFileSync(path.join(ROOT, 'runs', k % 2 ? 'a' : 'b', `f${k}`), '');
+    // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
     const count = (at: string): number =>
       1 + (fs.lstatSync(at).isDirectory() ? fs.readdirSync(at).reduce((n, name) => n + count(path.join(at, name)), 0) : 0);
     const { value } = await over(registryOf(), diskOnce(ANSWERS, freshDiskMemory()));

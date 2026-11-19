@@ -13,11 +13,11 @@ import { scratch } from 'test-kit/scratch';
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
 /** A marker pair around `body`, in the shape the package docs keep. */
-const marked = (name: string, body: string): string =>
+const marked = (name: string, body: string) =>
   [`<!-- diagram:${name}:begin — generated -->`, '```mermaid', body, '```', `<!-- diagram:${name}:end -->`].join('\n');
 
 /** A scratch repository whose package docs are `docs`, by path from its root. */
-const repoWith = (docs: Record<string, string>): string => {
+const repoWith = (docs: Record<string, string>) => {
   const root = scratch('docs-mermaid-');
   for (const [file, text] of Object.entries(docs)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -27,7 +27,7 @@ const repoWith = (docs: Record<string, string>): string => {
 };
 
 /** A page of one `mermaid` fence with `meta` and `body`, run through the plugin at `root`: what replaced the fence. */
-const drawnPage = (root: string, meta: string | null, body: string): Root['children'][number] => {
+const drawnPage = (root: string, meta: string | null, body: string) => {
   const code: Code = { type: 'code', lang: 'mermaid', meta, value: body };
   const tree: Root = { type: 'root', children: [{ type: 'blockquote', children: [code] }] };
   remarkMermaid({ root })(tree, { path: path.join(root, 'apps/docs/src/content/docs/page.mdx') });
@@ -37,7 +37,7 @@ const drawnPage = (root: string, meta: string | null, body: string): Root['child
 };
 
 /** The message `fn` throws. */
-const thrown = (fn: () => unknown): string => {
+const thrown = (fn: () => unknown) => {
   try {
     fn();
   } catch (error) {

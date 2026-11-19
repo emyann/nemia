@@ -107,7 +107,7 @@ const NAME = { type: 'agent-name', agentName: 'ae/t/1', sessionId: 's' };
 type Row = { name: string; holds: () => void };
 
 /** The words `entry` is refused in, read at `WHERE` as one of every kind. */
-const wrong = (entry: unknown): string => {
+const wrong = (entry: unknown) => {
   const read = decodeLine(entry, KINDS, WHERE);
   assert.ok(read && 'wrong' in read, `${JSON.stringify(entry)} was taken`);
   return read.wrong;
@@ -134,7 +134,7 @@ const inOrder = (message: string, pieces: string[]) => {
 const FIX_NAMES = ['run a Claude Code', '`harness/claude/lines.ts`'];
 
 /** What `entry` holds at the dotted `field`, as a row's name says it. */
-const found = (entry: unknown, field: string): string => {
+const found = (entry: unknown, field: string) => {
   const value = field.split('.').reduce<unknown>((at, key) => (at as Record<string, unknown> | null | undefined)?.[key], entry);
   return value === undefined ? 'missing' : JSON.stringify(value);
 };

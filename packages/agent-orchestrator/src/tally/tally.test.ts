@@ -12,10 +12,11 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { OutputSchema, StepOutput } from '../step/step.ts';
 import { tallyIn, tallyOf, tallyRowsOf } from './tally.ts';
 
-const schema = (properties: OutputSchema['properties']): StepOutput => ({
-  file: 'triage.schema.json',
-  schema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
-});
+const schema = (properties: OutputSchema['properties']) =>
+  ({
+    file: 'triage.schema.json',
+    schema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
+  }) satisfies StepOutput;
 
 const triage = schema({
   issues: {
@@ -54,12 +55,15 @@ const TALLY_OF: TallyOfRow[] = [
     reads: ['issues', 'issues.kind=bug', 'issues.note=a.b'],
   },
   { name: 'REFUSED: a value its enum does not hold', written: 'issues.kind=nope', output: triage, reads: 'refused' },
-  ...['issues.open=true', 'issues.closed=bug', 'score.kind=bug'].map((written): TallyOfRow => ({
-    name: `REFUSED: a key that is no string of the items of an array: ${written}`,
-    written,
-    output: triage,
-    reads: 'refused',
-  })),
+  ...['issues.open=true', 'issues.closed=bug', 'score.kind=bug'].map(
+    (written) =>
+      ({
+        name: `REFUSED: a key that is no string of the items of an array: ${written}`,
+        written,
+        output: triage,
+        reads: 'refused',
+      }) satisfies TallyOfRow,
+  ),
   { name: 'REFUSED: an entry that names a key and no value', written: 'issues.kind=', output: triage, reads: 'refused' },
   { name: 'REFUSED: an entry that names a free string and no value', written: 'issues.title=', output: triage, reads: 'refused' },
   { name: 'REFUSED: a tally on a step with no output', written: 'issues', output: undefined, reads: 'refused' },
@@ -70,19 +74,23 @@ const TALLY_OF: TallyOfRow[] = [
     output: triage,
     reads: 'refused',
   },
-  ...['issues.title', 'issues.closed', 'score.open'].map((written): TallyOfRow => ({
-    name: `REFUSED: a flag that is not a boolean of the items of an array: ${written}`,
-    written,
-    output: triage,
-    reads: 'refused',
-  })),
+  ...['issues.title', 'issues.closed', 'score.open'].map(
+    (written) =>
+      ({
+        name: `REFUSED: a flag that is not a boolean of the items of an array: ${written}`,
+        written,
+        output: triage,
+        reads: 'refused',
+      }) satisfies TallyOfRow,
+  ),
   ...['issues.open.now', 'issues.', '.open', 'issues.kind=bug=x', 'issues.kind.x=bug', 'issues=bug', '=bug', 'issues.=bug'].map(
-    (written): TallyOfRow => ({
-      name: `REFUSED: more than one dot or equals sign, an empty part, or a value with no key: ${written}`,
-      written,
-      output: triage,
-      reads: 'refused',
-    }),
+    (written) =>
+      ({
+        name: `REFUSED: more than one dot or equals sign, an empty part, or a value with no key: ${written}`,
+        written,
+        output: triage,
+        reads: 'refused',
+      }) satisfies TallyOfRow,
   ),
   { name: 'REFUSED: an entry given twice', written: 'issues, score, issues', output: triage, reads: 'refused' },
   { name: 'REFUSED: an entry with a value given twice', written: 'issues.kind=bug, issues.kind=bug', output: triage, reads: 'refused' },
@@ -194,13 +202,13 @@ describe("`tallyRowsOf` totals a step's tries per tally, over the range and on e
 const BUILD_WORDS = /\b(findings|placement)\b/;
 
 /** The source files, tests left out, that read and count tallies. */
-const countingSources = (): Array<[string, string]> =>
+const countingSources = () =>
   ['tally', 'stats'].flatMap((folder) =>
     fs
       .readdirSync(path.join(import.meta.dirname, '..', folder))
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-      .map((f): [string, string] => [`${folder}/${f}`, fs.readFileSync(path.join(import.meta.dirname, '..', folder, f), 'utf8')]),
-  );
+      .map((f) => [`${folder}/${f}`, fs.readFileSync(path.join(import.meta.dirname, '..', folder, f), 'utf8')] satisfies [string, string]),
+  ) satisfies Array<[string, string]>;
 
 test("no source that counts tallies names a field of this repository's build workflow", () => {
   for (const planted of ['const n = tallyIn("findings", output);', "const kinds = ['placement'];"])

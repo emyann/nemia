@@ -20,7 +20,7 @@ const PROPOSAL = {
 };
 
 /** Press `control`, wait for the api's answer to the rule's write by `method`, and refuse any but a 200: the body the board sent. */
-async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string): Promise<unknown> {
+async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string) {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname.startsWith('/api/policy/nemia/rules/'), {
       timeout: WAIT_MS,
@@ -33,7 +33,7 @@ async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', wha
 }
 
 /** Refuse a confirm whose body is not the words `rule` reads on the board. */
-async function expectWordsSent(sent: unknown, rule: Locator, what: string): Promise<void> {
+async function expectWordsSent(sent: unknown, rule: Locator, what: string) {
   const words = (await rule.locator('[data-auto-words]').textContent()) ?? '';
   if (JSON.stringify(sent) !== JSON.stringify({ words }))
     throw new Refused(`${what} sends the words the person read, ${JSON.stringify(words)} — it sent ${JSON.stringify(sent)}`);

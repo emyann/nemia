@@ -40,18 +40,19 @@ const v1: FeedLine = {
 };
 
 /** A run's line in the factory `mill`. */
-const inMill = (run: string): FeedLine => ({
-  at: AT,
-  run,
-  word: 'running',
-  apiVersion: 'nemia/v1',
-  involved: { kind: 'Run', name: run },
-  labels: { run, factory: 'mill' },
-  reason: 'Running',
-  type: 'Normal',
-  source: 'tick',
-  message: 'running',
-});
+const inMill = (run: string) =>
+  ({
+    at: AT,
+    run,
+    word: 'running',
+    apiVersion: 'nemia/v1',
+    involved: { kind: 'Run', name: run },
+    labels: { run, factory: 'mill' },
+    reason: 'Running',
+    type: 'Normal',
+    source: 'tick',
+    message: 'running',
+  }) satisfies FeedLine;
 
 /** A daemon's line, which names no factory. */
 const daemon: FeedLine = { at: AT, daemon: 42, word: 'daemon started' };
@@ -66,16 +67,16 @@ const over = <A, E>(lines: readonly FeedLine[], program: Effect.Effect<A, E>) =>
     }).pipe(Effect.provide(feedDoorMemory())),
   );
 
-const value = <A, E>(exit: Exit.Exit<A, E>): A => {
+const value = <A, E>(exit: Exit.Exit<A, E>) => {
   assert.ok(Exit.isSuccess(exit), `expected a success, got ${String(exit)}`);
-  return exit.value;
+  return exit.value satisfies A;
 };
 
-const failure = <A, E>(exit: Exit.Exit<A, E>): unknown => {
+const failure = <A, E>(exit: Exit.Exit<A, E>) => {
   assert.ok(Exit.isFailure(exit), 'expected a failure');
   const err = exit.cause.reasons.find((r) => r._tag === 'Fail');
   assert.ok(err !== undefined && err._tag === 'Fail', 'expected a refusal');
-  return err.error;
+  return err.error satisfies unknown;
 };
 
 const decode = Schema.decodeUnknownSync(Event);

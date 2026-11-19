@@ -20,27 +20,28 @@ import { FOLDER_WALKS } from './factory-folder-walks.ts';
 type Walk = DoorWalk<FactoryDoorShape>;
 type Door = FactoryDoorShape;
 
-const nameOf = (name: string): FactoryName => FactoryName.read(name);
+const nameOf = (name: string) => FactoryName.read(name) satisfies FactoryName;
 
 /** A factory as `nemia factory add` files one: one writable volume, the repository it works on, nothing attached, hired or scheduled. */
-export const aFactory = (name: string, more: Partial<Factory> = {}): Factory => ({
-  name,
-  volumes: [{ path: '/repo', readOnly: false }],
-  workflows: [],
-  hires: {},
-  schedules: {},
-  ...more,
-});
+export const aFactory = (name: string, more: Partial<Factory> = {}) =>
+  ({
+    name,
+    volumes: [{ path: '/repo', readOnly: false }],
+    workflows: [],
+    hires: {},
+    schedules: {},
+    ...more,
+  }) satisfies Factory;
 
 /** The factory `name` read back from `door` as filed: a read that answers the default factory's record fails the walk. */
-export const readFiled = (door: Door, name: string): Factory => {
+export const readFiled = (door: Door, name: string) => {
   const record = done(door.factories.read(nameOf(name)));
   if (isDefaultFactory(record)) assert.fail(`${name} read as the default factory`);
-  return record;
+  return record satisfies Factory;
 };
 
 /** `name` filed on `door`. */
-const filed = (door: Door, name: string, more: Partial<Factory> = {}): string => done(door.factories.create(aFactory(name, more)));
+const filed = (door: Door, name: string, more: Partial<Factory> = {}) => done(door.factories.create(aFactory(name, more)));
 
 const since = '2026-11-01T00:00:00.000Z';
 

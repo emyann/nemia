@@ -12,28 +12,26 @@ const T0 = Date.parse('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0 + ms).toISOString();
 const TASK = 't-1';
 
-const filed = (longLived: boolean): Event => ({
-  kind: 'filed',
-  at: at(0),
-  brief: 'b',
-  cwd: '/r',
-  queued: false,
-  ...(longLived ? { restartPolicy: 'Always' as const } : {}),
-});
-const inFlight = (longLived: boolean, ...more: Event[]): Event[] => [
-  filed(longLived),
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-  ...more,
-];
-const seen = (usage?: Usage): Sighting => ({
-  sessionId: 's1',
-  state: 'input-required',
-  busy: false,
-  held: true,
-  ...(usage ? { usage } : {}),
-});
-const counted = (usage: Usage, n = 1): Event => ({ kind: 'counted', at: at(10), attempt: n, usage });
+const filed = (longLived: boolean) =>
+  ({
+    kind: 'filed',
+    at: at(0),
+    brief: 'b',
+    cwd: '/r',
+    queued: false,
+    ...(longLived ? { restartPolicy: 'Always' as const } : {}),
+  }) satisfies Event;
+const inFlight = (longLived: boolean, ...more: Event[]) =>
+  [filed(longLived), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }, ...more] satisfies Event[];
+const seen = (usage?: Usage) =>
+  ({
+    sessionId: 's1',
+    state: 'input-required',
+    busy: false,
+    held: true,
+    ...(usage ? { usage } : {}),
+  }) satisfies Sighting;
+const counted = (usage: Usage, n = 1) => ({ kind: 'counted', at: at(10), attempt: n, usage }) satisfies Event;
 
 const TWO_TURNS: Usage = {
   responses: 2,

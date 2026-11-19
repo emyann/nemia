@@ -18,7 +18,7 @@ const NEMIA = { factory: 'nemia', workflow: 'build', repo: '/repos/home' };
 const FILING: RunKeys = { run: 'filing', ...NEMIA };
 
 /** A try of `step` in `run`, ended on `day`, costing `costUsd`. */
-const aTry = (run: string, step: string, costUsd: number | null, more: Partial<TryFact> = {}): TryFact => ({
+const aTry = (run: string, step: string, costUsd: number | null, more: Partial<TryFact> = {}) => ({
   run,
   ...NEMIA,
   day: '2026-10-01',
@@ -40,7 +40,7 @@ const aTry = (run: string, step: string, costUsd: number | null, more: Partial<T
 });
 
 /** A finished run of `steps`, costing `costUsd` whole, on `day`. */
-const aRun = (run: string, costUsd: number | null, more: Partial<RunFact> = {}): RunFact => ({
+const aRun = (run: string, costUsd: number | null, more: Partial<RunFact> = {}) => ({
   run,
   ...NEMIA,
   day: '2026-10-01',

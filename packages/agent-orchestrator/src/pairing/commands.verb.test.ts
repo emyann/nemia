@@ -17,8 +17,7 @@ const ROOT = scratch('wf-pairing-verbs-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
 /** `argv` run on its entry's handler over this file's store: what it answers, as JSON. */
-const answered = async (argv: readonly string[]): Promise<string> =>
-  JSON.stringify(await typed(argv, undefined, undefined, undefined, ENV));
+const answered = async (argv: readonly string[]) => JSON.stringify(await typed(argv, undefined, undefined, undefined, ENV));
 
 test('nemia pairings approve <code> approves the pairing the client shows, which it claims after; ls lists it by client', async () => {
   const asked = pairingAsked(ROOT, 'approved-laptop', Date.now());

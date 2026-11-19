@@ -44,14 +44,14 @@ const UNREAD = 'unread';
 type States = Map<string, string | null>;
 
 /** The record as it stands in the store, by server name, read as the package writes it (`{ servers }`). */
-const recorded = (file: string): Record<string, { url?: string; headers?: Record<string, string> }> =>
-  fs.existsSync(file)
+const recorded = (file: string) =>
+  (fs.existsSync(file)
     ? ((JSON.parse(fs.readFileSync(file, 'utf8')) as { servers?: Record<string, { url?: string; headers?: Record<string, string> }> })
         .servers ?? {})
-    : {};
+    : {}) satisfies Record<string, { url?: string; headers?: Record<string, string> }>;
 
 /** Whether `request` is a read of the factory's servers, which is what reads their states. */
-const isStatesRead = (request: Request): boolean =>
+const isStatesRead = (request: Request) =>
   request.method() === 'GET' && new URL(request.url()).pathname === `/api/namespaces/${FACTORY}/mcpservers`;
 
 /**
@@ -60,7 +60,7 @@ const isStatesRead = (request: Request): boolean =>
  * read issued from the start of `act` until the network idles is counted, one is refused but exactly one, and the answer the chips are
  * judged against is that read's, so it is the one that drew them — never a read an earlier navigation left in flight.
  */
-async function statesRead(page: Page, what: string, act: () => Promise<unknown>): Promise<States> {
+async function statesRead(page: Page, what: string, act: () => Promise<unknown>) {
   const reads: Request[] = [];
   const count = (request: Request) => {
     if (isStatesRead(request)) reads.push(request);
@@ -90,7 +90,7 @@ const answered = (page: Page, method: 'PUT' | 'DELETE') =>
   );
 
 /** Press `button` in the section, wait for the api's answer to `method`, and refuse any but a 200. */
-async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE'): Promise<void> {
+async function wrote(page: Page, section: Locator, button: string, method: 'PUT' | 'DELETE') {
   const [answer] = await Promise.all([answered(page, method), section.getByRole('button', { name: button, exact: true }).click()]);
   if (answer.status() !== 200) throw new Refused(`${button} writes — the api answered ${answer.status()}: ${await answer.text()}`);
   await idle(page);
@@ -101,7 +101,7 @@ async function wrote(page: Page, section: Locator, button: string, method: 'PUT'
  * carries the harness's own word, or `unread` where none was read: a chip that said another state than the one the answer held — the
  * last read's word left on a stale cache, a word invented for an absence — would be the board reporting a state nobody did.
  */
-async function expectRows(section: Locator, states: States): Promise<void> {
+async function expectRows(section: Locator, states: States) {
   await expectCount(section.locator('[data-factory-server]'), 2, 'each server of the record is a row, once');
   const row = section.locator('[data-factory-server="github"]');
   await expectVisible(row.getByText(RECORDED.github.url, { exact: false }), "a row shows the server's address");
@@ -137,7 +137,7 @@ async function expectRows(section: Locator, states: States): Promise<void> {
  * client, Sign out where it answered `connected`, neither for any other state or a server with no client (`docs`). Neither is pressed:
  * the states come from a real harness session, and a press would write that harness's own store.
  */
-async function expectSignIn(section: Locator, name: string, state: string | null): Promise<void> {
+async function expectSignIn(section: Locator, name: string, state: string | null) {
   const row = section.locator(`[data-factory-server="${name}"]`);
   const signs = name in RECORDED && 'oauth' in RECORDED[name as keyof typeof RECORDED];
   const offered = signs && state === 'needs-auth' ? 'Sign in' : signs && state === 'connected' ? 'Sign out' : null;
@@ -156,13 +156,13 @@ async function expectSignIn(section: Locator, name: string, state: string | null
  * draw the same rows off the cache and nothing else would notice — so the page waits for the api's own answer to the read and reads
  * the rows off what came back.
  */
-async function checkAgain(page: Page, section: Locator): Promise<void> {
+async function checkAgain(page: Page, section: Locator) {
   const states = await statesRead(page, 'Check again', () => section.getByRole('button', { name: 'Check again', exact: true }).click());
   await expectRows(section, states);
 }
 
 /** The form records a remote server, which the store's record holds and the list draws; Remove takes it off again. */
-async function recordAndRemove(page: Page, section: Locator, file: string): Promise<void> {
+async function recordAndRemove(page: Page, section: Locator, file: string) {
   await section.getByRole('textbox', { name: 'Name' }).fill(ADDED.name);
   await section.getByRole('textbox', { name: 'Address' }).fill(ADDED.url);
   await section.getByRole('textbox', { name: 'Headers' }).fill(ADDED.header);
@@ -187,7 +187,7 @@ async function recordAndRemove(page: Page, section: Locator, file: string): Prom
  * A recorded server loaded back into the form carries each header as the mask it was read with, and Record sends it back unchanged:
  * the store's record keeps the value it held, never the mask.
  */
-async function keepsTheMask(page: Page, section: Locator, file: string): Promise<void> {
+async function keepsTheMask(page: Page, section: Locator, file: string) {
   await section.locator('[data-server-recorded]').getByRole('button', { name: 'github', exact: true }).click();
   const header = await section.getByRole('textbox', { name: 'Headers' }).inputValue();
   if (header !== `X-MCP-Toolsets=${HEADER_MASK}`)
@@ -204,14 +204,14 @@ async function keepsTheMask(page: Page, section: Locator, file: string): Promise
  * that need a sign-in — none of them the page's subject and none of them the store's seed: the page takes them back itself rather than
  * the e2e's leftover watch being told to ignore a folder another page asserts on.
  */
-function harnessFolder(): () => void {
+function harnessFolder() {
   const dir = path.join(store!, 'claude');
   const was = new Map<string, Buffer>();
   for (const rel of fs.readdirSync(dir, { recursive: true, encoding: 'utf8' })) {
     const file = path.join(dir, rel);
     if (fs.statSync(file).isFile()) was.set(rel, fs.readFileSync(file));
   }
-  return () => {
+  return (() => {
     for (const rel of fs.readdirSync(dir, { recursive: true, encoding: 'utf8' })) {
       const file = path.join(dir, rel);
       if (!fs.statSync(file, { throwIfNoEntry: false })?.isFile()) continue;
@@ -219,7 +219,7 @@ function harnessFolder(): () => void {
       if (bytes === undefined) fs.rmSync(file);
       else if (!bytes.equals(fs.readFileSync(file))) fs.writeFileSync(file, bytes);
     }
-  };
+  }) satisfies () => void;
 }
 
 /** What a person pastes back on the paste page: the address the browser landed on, with a code and a state, and one that is not it. */
@@ -242,13 +242,14 @@ const githubAt = (sub = '') => `/api/namespaces/${FACTORY}/mcpservers/github${su
  * field still holding what was pasted. What the engine does with a paste is the runtime's and the api's tests' (`mcpSignInCallback`,
  * `apps/api/test/sign-in.boundary.test.ts`).
  */
-async function pastesBack(page: Page): Promise<void> {
+async function pastesBack(page: Page) {
   const other = await page.context().newPage();
   try {
     const { problems } = watch(other);
     let taken = false;
     const until = '2099-01-01T00:00:00.000Z';
     const answer = (route: Route, json: unknown) =>
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- servers answered: a state the seed cannot plant
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) });
     await other.route(
       (url) => url.pathname === `/api/namespaces/${FACTORY}/mcpservers`,

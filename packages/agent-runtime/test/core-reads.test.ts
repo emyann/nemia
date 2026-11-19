@@ -61,8 +61,10 @@ const OPENED = [
 ];
 
 /** Each line of `code` that reads a harness argument, as `n: line`. */
-const reads = (code: string): string[] =>
-  code.split('\n').flatMap((line, i) => (NAMED.test(line) || OPENED.some((re) => re.test(line)) ? [`${i + 1}: ${line.trim()}`] : []));
+const reads = (code: string) =>
+  code
+    .split('\n')
+    .flatMap((line, i) => (NAMED.test(line) || OPENED.some((re) => re.test(line)) ? [`${i + 1}: ${line.trim()}`] : [])) satisfies string[];
 
 test("domain.ts, lifecycle.ts and engine.ts name no harness argument, and hand a task's config on without opening it", () => {
   for (const file of CORE) assert.deepEqual(reads(codeOf(fs.readFileSync(file, 'utf8'))), [], `${file} reads a harness argument`);
@@ -125,7 +127,7 @@ const SEAM = ['src/harness/seam.ts', 'src/harness/error.ts'];
 const ARGS_HELPERS = ['argsRefusalOf', 'configForTurn', 'turnArgsRefusalOf', 'FORMER_ARGS', 'HARNESS_ARGS', 'RENAMED_ARGS', 'TAKEN_ARGS'];
 
 /** The values an import statement of `text` from `spec` names, its `type` members left out. */
-const valuesFrom = (text: string, spec: string): string[] =>
+const valuesFrom = (text: string, spec: string) =>
   [...withoutComments(text).matchAll(/^\s*import\s+(?!type\s)\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm)]
     .filter((m) => m[2] === spec)
     .flatMap((m) =>
@@ -133,19 +135,20 @@ const valuesFrom = (text: string, spec: string): string[] =>
         .split(',')
         .map((n) => n.trim())
         .filter((n) => n !== '' && !n.startsWith('type ')),
-    );
+    ) satisfies string[];
 
 /** Each value the core file `file`, holding `text`, takes from a harness file it may not, as `file: spec (names)`. */
-const harnessReads = (file: string, text: string): string[] =>
+const harnessReads = (file: string, text: string) =>
   importsIn(text).flatMap(({ spec, typeOnly }) => {
     const target = resolved(file, spec);
     if (typeOnly || target === undefined || !target.startsWith('src/harness/') || SEAM.includes(target)) return [];
     const values = valuesFrom(text, spec);
     if (target === 'src/harness/args.ts' && values.length > 0 && values.every((v) => ARGS_HELPERS.includes(v))) return [];
     return [`${file}: ${spec} (${values.join(', ') || 'a value'})`];
-  });
+  }) satisfies string[];
 
 /** Every source file of the core, from the package's folder: `src/core/**`, its tests left out. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const coreFiles = (dir = 'src/core'): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const file = path.posix.join(dir, e.name);

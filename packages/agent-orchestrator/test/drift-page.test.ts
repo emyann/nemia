@@ -9,18 +9,19 @@ import type { StepSpec } from '../src/workflow.ts';
 import { driftOf } from '../src/resource/tries.verb.ts';
 
 /** A run of one step `build`. */
-const runWith = (): Run => ({
-  id: 'r-1',
-  workspace: '/w',
-  brief: 'do it',
-  workflowDir: '/w/workflows/team',
-  createdAt: '2026-10-15T00:00:00.000Z',
-  place: { kind: 'folder' },
-  steps: { build: { taskId: 'r-1-build' } },
-});
+const runWith = () =>
+  ({
+    id: 'r-1',
+    workspace: '/w',
+    brief: 'do it',
+    workflowDir: '/w/workflows/team',
+    createdAt: '2026-10-15T00:00:00.000Z',
+    place: { kind: 'folder' },
+    steps: { build: { taskId: 'r-1-build' } },
+  }) satisfies Run;
 
 describe('driftOf: the folder’s own drift is a name-level warning, and none where the names agree', () => {
-  const steps = (...names: string[]): StepSpec[] => names.map((name) => ({ name, after: [], body: '' }));
+  const steps = (...names: string[]) => names.map((name) => ({ name, after: [], body: '' })) satisfies StepSpec[];
   test('the same names: no warning', () => {
     assert.equal(driftOf(runWith(), steps('build')), null);
   });

@@ -363,6 +363,7 @@ describe('Her chat read: a history across two attempts, a stream since its curso
       const gate = new Promise<void>((resolve) => (release = resolve));
       const follows = {
         count: 0,
+        // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
         next(task: string, caught: Effect.Effect<ChatFollowed | undefined>): Stream.Stream<ChatFollowed> {
           this.count += 1;
           assert.equal(task, followed.task, 'her task is the one followed');

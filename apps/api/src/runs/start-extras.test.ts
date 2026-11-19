@@ -20,7 +20,7 @@ import { appOver, eachTest } from '../../test/placed.ts';
 import { runsAtOnce } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -139,7 +139,7 @@ type Branched = { branches?: { branch: string; deleted: boolean }[] };
 
 test("DELETE ?whole=true deletes the run's branch merged into its base with deleteBranches, and keeps it without", async () => {
   const { world } = stand();
-  const forgotten = async (query: string): Promise<{ branch: string; removed: Branched }> => {
+  const forgotten = async (query: string) => {
     const res = await post('runs', { workflow: 'dev', brief: 'Branch me.' });
     assert.equal(res.status, 201, await res.clone().text());
     const { id } = (await res.json()) as { id: string };

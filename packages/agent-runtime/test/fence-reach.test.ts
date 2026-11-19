@@ -14,7 +14,7 @@ import { codex } from '../src/harness/codex/codex.ts';
 const CLAUDES = ['claude'];
 
 /** The word after `flag` in `args`. */
-const after = (args: readonly string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
+const after = (args: readonly string[], flag: string) => args[args.indexOf(flag) + 1];
 
 test('Claude Code drops auto on a listed model, named or with a suffix, and on no other; codex drops nothing', () => {
   for (const model of ['claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {

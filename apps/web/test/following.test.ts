@@ -7,7 +7,6 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { StreamLike } from '../src/lib/follow.ts';
 import { followedFrom, followStep, unread, type Following } from '../src/lib/following.ts';
-import type { TranscriptEvent } from '../src/lib/api/steps.ts';
 
 /** An EventSource as far as `followStep` uses it: its state, its events, and `close`. */
 class Stream implements StreamLike {
@@ -16,10 +15,10 @@ class Stream implements StreamLike {
   /**
    * Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here.
    */
-  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
     this.#target.addEventListener(type, listener as EventListener);
   }
-  dispatchEvent(event: Event): void {
+  dispatchEvent(event: Event) {
     this.#target.dispatchEvent(event);
   }
   close() {
@@ -30,7 +29,7 @@ class Stream implements StreamLike {
   }
 }
 
-const said = (id: string, second: number, text: string): TranscriptEvent => ({
+const said = (id: string, second: number, text: string) => ({
   id,
   at: new Date(Date.UTC(2026, 8, 14, 9, 0, second)).toISOString(),
   role: 'assistant',

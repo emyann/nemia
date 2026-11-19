@@ -20,7 +20,7 @@ import { STORE } from '../../test/ambient.ts';
 const repo = scratch('collisions-repo');
 
 /** An isolated repository run `id` on `repo`'s main, in flight, with `more` over it. */
-const aRun = (id: string, more: Partial<RepositoryRun> = {}): RepositoryRun => ({
+const aRun = (id: string, more: Partial<RepositoryRun> = {}) => ({
   id,
   workspace: repo,
   brief: 'b',

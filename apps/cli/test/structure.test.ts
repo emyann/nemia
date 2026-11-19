@@ -83,7 +83,7 @@ type Way = 'static' | 'dynamic' | 'resolve';
 type Named = { spec: string; way: Way; typeOnly: boolean };
 
 /** Every `.ts` under `src` and `bin` that is no test, by its path from `apps/cli`, with its text. */
-const sourceTexts = (): Map<string, string> =>
+const sourceTexts = () =>
   new Map(
     ['src', 'bin']
       .flatMap((dir) =>
@@ -92,10 +92,10 @@ const sourceTexts = (): Map<string, string> =>
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(CLI, f), 'utf8')]),
-  );
+  ) satisfies Map<string, string>;
 
 /** Whether an import or export's bindings are all types: `import type`, `export type`, or every named binding `type`. */
-function typesOnly(node: ts.ImportDeclaration | ts.ExportDeclaration): boolean {
+function typesOnly(node: ts.ImportDeclaration | ts.ExportDeclaration) {
   if (ts.isExportDeclaration(node))
     return (
       node.isTypeOnly ||
@@ -118,9 +118,9 @@ function typesOnly(node: ts.ImportDeclaration | ts.ExportDeclaration): boolean {
 }
 
 /** Every module a file names, read by TypeScript: imports and re-exports, `import()`, `require()`, a resolve, and `import('x').T`. */
-function namedIn(file: string, text: string): Named[] {
+function namedIn(file: string, text: string) {
   const out: Named[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier))
       out.push({ spec: node.moduleSpecifier.text, way: 'static', typeOnly: typesOnly(node) });
     else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal))
@@ -138,10 +138,11 @@ function namedIn(file: string, text: string): Named[] {
     ts.forEachChild(node, visit);
   };
   visit(ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS));
-  return out;
+  return out satisfies Named[];
 }
 
 /** The strings an argument can be: a literal, or each branch of a conditional of literals (`wf ? 'a/wf' : 'a'`). */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const literalsIn = (node: ts.Node): string[] =>
   ts.isStringLiteralLike(node)
     ? [node.text]
@@ -152,84 +153,104 @@ const literalsIn = (node: ts.Node): string[] =>
         : [];
 
 /** The file a module names, by its path from the repository's root: a relative path resolved, the package `api` under `apps/api`. */
-function targetOf(file: string, spec: string): string | undefined {
-  if (spec.startsWith('.')) return path.posix.normalize(path.posix.join('apps/cli', path.posix.dirname(file), spec));
-  if (spec === 'api' || spec.startsWith('api/')) return path.posix.join('apps/api', spec.slice('api'.length));
-  return undefined;
+function targetOf(file: string, spec: string) {
+  if (spec.startsWith('.'))
+    return path.posix.normalize(path.posix.join('apps/cli', path.posix.dirname(file), spec)) satisfies string | undefined;
+  if (spec === 'api' || spec.startsWith('api/')) return path.posix.join('apps/api', spec.slice('api'.length)) satisfies string | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** What the import of `named` in `file` breaks, if any: a package below the api, a path out, the api other than by its door's types. */
-function importBreak(file: string, { spec, way, typeOnly }: Named): Break | undefined {
+function importBreak(file: string, { spec, way, typeOnly }: Named) {
   const target = targetOf(file, spec);
   if (ENTRIES.test(spec))
-    return way === 'resolve' && file === LOCAL
-      ? undefined
-      : { file, rule: 'spawn', fix: `spawn ${spec} from ${LOCAL}, which resolves it and never imports it` };
+    return (
+      way === 'resolve' && file === LOCAL
+        ? undefined
+        : { file, rule: 'spawn', fix: `spawn ${spec} from ${LOCAL}, which resolves it and never imports it` }
+    ) satisfies Break | undefined;
   if (BELOW.test(spec))
-    return { file, rule: 'workspace', fix: `ask the api over HTTP for what ${spec} gives, or run the old path through ${LOCAL}` };
-  if (HARNESS.test(spec)) return { file, rule: 'harness', fix: 'only agent-runtime reaches a harness: ask the api' };
-  if (spec.startsWith(`${OBJECTS}/`)) return { file, rule: 'objects', fix: `import what ${spec} names from the entry, '${OBJECTS}'` };
+    return { file, rule: 'workspace', fix: `ask the api over HTTP for what ${spec} gives, or run the old path through ${LOCAL}` } satisfies
+      | Break
+      | undefined;
+  if (HARNESS.test(spec))
+    return { file, rule: 'harness', fix: 'only agent-runtime reaches a harness: ask the api' } satisfies Break | undefined;
+  if (spec.startsWith(`${OBJECTS}/`))
+    return { file, rule: 'objects', fix: `import what ${spec} names from the entry, '${OBJECTS}'` } satisfies Break | undefined;
   if (spec === 'node:child_process' || spec === 'child_process')
-    return file === LOCAL || file === BROWSER
-      ? undefined
-      : { file, rule: 'spawn', fix: `spawn through ${LOCAL}'s spawned, the client's one process` };
+    return (
+      file === LOCAL || file === BROWSER
+        ? undefined
+        : { file, rule: 'spawn', fix: `spawn through ${LOCAL}'s spawned, the client's one process` }
+    ) satisfies Break | undefined;
   if (file.startsWith('bin/') && !(target ?? '').startsWith('apps/cli/src/'))
-    return { file, rule: 'bin', fix: `a bin imports ../src/ alone: import ${spec} from a file of src/` };
-  if (target === undefined) return undefined;
+    return { file, rule: 'bin', fix: `a bin imports ../src/ alone: import ${spec} from a file of src/` } satisfies Break | undefined;
+  if (target === undefined) return undefined satisfies Break | undefined;
   if (target.startsWith('packages/'))
-    return { file, rule: 'packages', fix: `import no package's file: ask the api for what ${spec} gives` };
+    return { file, rule: 'packages', fix: `import no package's file: ask the api for what ${spec} gives` } satisfies Break | undefined;
   if (target === 'apps/api' || target.startsWith('apps/api/')) {
-    if (!typeOnly) return { file, rule: 'api-value', fix: `import type it from ${DOOR}, and ask the api over HTTP for the value` };
-    return target === DOOR ? undefined : { file, rule: 'api-door', fix: `import type the shape from ${DOOR}, the api's one door for it` };
+    if (!typeOnly)
+      return { file, rule: 'api-value', fix: `import type it from ${DOOR}, and ask the api over HTTP for the value` } satisfies
+        | Break
+        | undefined;
+    return (
+      target === DOOR ? undefined : { file, rule: 'api-door', fix: `import type the shape from ${DOOR}, the api's one door for it` }
+    ) satisfies Break | undefined;
   }
-  return target.startsWith('apps/cli/') ? undefined : { file, rule: 'leaves', fix: `${spec} leaves apps/cli: reach the api over HTTP` };
+  return (
+    target.startsWith('apps/cli/') ? undefined : { file, rule: 'leaves', fix: `${spec} leaves apps/cli: reach the api over HTTP` }
+  ) satisfies Break | undefined;
 }
 
 /** Each import of the client that reaches past the api, out of `apps/cli`, or into the api other than by its door's types. */
-const importBreaks = (texts: ReadonlyMap<string, string>): Break[] =>
-  [...texts].flatMap(([file, text]) => namedIn(file, text).flatMap((named) => importBreak(file, named) ?? []));
+const importBreaks = (texts: ReadonlyMap<string, string>) =>
+  [...texts].flatMap(([file, text]) => namedIn(file, text).flatMap((named) => importBreak(file, named) ?? [])) satisfies Break[];
 
 /** Each file outside `allowed` whose code, comments blanked, spells `pattern`. */
-const spelledBreaks = (
-  texts: ReadonlyMap<string, string>,
-  pattern: RegExp,
-  allowed: (file: string) => boolean,
-  rule: Rule,
-  fix: string,
-): Break[] =>
-  [...texts].filter(([file, text]) => !allowed(file) && pattern.test(withoutComments(text))).map(([file]) => ({ file, rule, fix }));
+const spelledBreaks = (texts: ReadonlyMap<string, string>, pattern: RegExp, allowed: (file: string) => boolean, rule: Rule, fix: string) =>
+  [...texts]
+    .filter(([file, text]) => !allowed(file) && pattern.test(withoutComments(text)))
+    .map(([file]) => ({ file, rule, fix })) satisfies Break[];
 
 /** Each file other than `WHERE` that spells a store path. */
-const storeBreaks = (texts: ReadonlyMap<string, string>): Break[] =>
-  spelledBreaks(texts, STORE, (file) => file === WHERE, 'store', `read the lease through ${WHERE}'s servedAt, the one store fact`);
+const storeBreaks = (texts: ReadonlyMap<string, string>) =>
+  spelledBreaks(
+    texts,
+    STORE,
+    (file) => file === WHERE,
+    'store',
+    `read the lease through ${WHERE}'s servedAt, the one store fact`,
+  ) satisfies Break[];
 
 /** Each file other than `LOCAL` that names the orchestrator's CLI entries, in a resolve or in any string. */
-const entryBreaks = (texts: ReadonlyMap<string, string>): Break[] =>
+const entryBreaks = (texts: ReadonlyMap<string, string>) =>
   spelledBreaks(
     texts,
     /['"`]agent-orchestrator\/bin(?:\/wf)?['"`]/,
     (file) => file === LOCAL,
     'spawn',
     `run the old path through ${LOCAL}'s spawned`,
-  );
+  ) satisfies Break[];
 
 /** Each file outside `WATCH` that follows the feed. */
-const feedBreaks = (texts: ReadonlyMap<string, string>): Break[] =>
-  spelledBreaks(texts, FEED, (file) => file.startsWith(WATCH), 'feed', `follow the feed from ${WATCH}, which owns its stream`);
+const feedBreaks = (texts: ReadonlyMap<string, string>) =>
+  spelledBreaks(
+    texts,
+    FEED,
+    (file) => file.startsWith(WATCH),
+    'feed',
+    `follow the feed from ${WATCH}, which owns its stream`,
+  ) satisfies Break[];
 
 /** Every break of the client's structure. */
-const breaksOf = (texts: ReadonlyMap<string, string>): Break[] => [
-  ...importBreaks(texts),
-  ...storeBreaks(texts),
-  ...entryBreaks(texts),
-  ...feedBreaks(texts),
-];
+const breaksOf = (texts: ReadonlyMap<string, string>) =>
+  [...importBreaks(texts), ...storeBreaks(texts), ...entryBreaks(texts), ...feedBreaks(texts)] satisfies Break[];
 
 /** The rule of each break, with its file: what a test asserts, never the words of the fix. */
-const ruled = (breaks: Break[]): string[] => breaks.map((b) => `${b.file} ${b.rule}`).sort();
+const ruled = (breaks: Break[]) => breaks.map((b) => `${b.file} ${b.rule}`).sort() satisfies string[];
 
 /** `texts` with one file planted, by its path from `apps/cli`. */
-const plantedIn = (file: string, text: string): Map<string, string> => new Map([...sourceTexts(), [file, text]]);
+const plantedIn = (file: string, text: string) => new Map([...sourceTexts(), [file, text]]) satisfies Map<string, string>;
 
 test('the scan reads the client, its bins among it, and sees each way a file names a module', () => {
   const texts = sourceTexts();
@@ -382,17 +403,17 @@ test('REFUSED: the feed followed outside src/watch/; one named in a JSDoc is let
 });
 
 /** Every `.ts` file under `dir`, by its path, with its text. */
-const tsUnder = (dir: string): Map<string, string> =>
+const tsUnder = (dir: string) =>
   new Map(
     fs
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
       .filter((file) => file.endsWith('.ts'))
       .map((file) => [path.join(dir, file), fs.readFileSync(path.join(dir, file), 'utf8')]),
-  );
+  ) satisfies Map<string, string>;
 
 /** The files of the client's sources whose text `pattern` matches, by their path from the client's folder. */
-const spelling = (pattern: RegExp): string[] =>
-  [...tsUnder(path.join(CLI, 'src'))].filter(([, text]) => pattern.test(text)).map(([file]) => path.relative(CLI, file));
+const spelling = (pattern: RegExp) =>
+  [...tsUnder(path.join(CLI, 'src'))].filter(([, text]) => pattern.test(text)).map(([file]) => path.relative(CLI, file)) satisfies string[];
 
 test("nothing is forwarded: no file of the client's sources spells FORWARD_VARIABLES or NEMIA_SERVER", () => {
   assert.ok(spelling(/\bchosenOf\b/).includes(path.join('src', 'context.ts')), "the scan reads the client: it finds the context's choice");

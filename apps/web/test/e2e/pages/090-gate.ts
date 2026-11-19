@@ -15,7 +15,7 @@ const SEATED = { kind: 'person', token: SEAT_TOKEN };
  * Refuses unless `policy`, the step's policy at the gate `where`, is drawn open once: plan's own words and the deny its file adds, named as
  * a tightening of planner's fence, and what was told before it — never the planner's own instructions, which stay in the Told fold.
  */
-async function expectPolicy(policy: Locator, where: string): Promise<void> {
+async function expectPolicy(policy: Locator, where: string) {
   const { planner } = GATED;
   await expectCount(policy, 1, `${GATED.gated}'s policy is drawn open at its gate, ${where}`);
   await expectVisible(

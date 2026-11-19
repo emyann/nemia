@@ -58,7 +58,7 @@ const STUB = [
 ].join('\n');
 
 /** A release's tree, as the archive tool is handed one: a root manifest, the cli's bin, and a Node that prints its argv. */
-const fixture = (root: string): { tree: string; node: string } => {
+const fixture = (root: string) => {
   const tree = path.join(root, 'tree');
   fs.mkdirSync(path.join(tree, 'apps', 'cli', 'bin'), { recursive: true });
   fs.writeFileSync(path.join(tree, 'package.json'), '{ "name": "nemia", "version": "1.2.3" }\n');
@@ -70,7 +70,7 @@ const fixture = (root: string): { tree: string; node: string } => {
 };
 
 /** Publishes the release `tag` for `platform` under the download base `base`, as the workflow's upload lays it out. */
-const publish = (base: string, tag: string, platform: Platform): string => {
+const publish = (base: string, tag: string, platform: Platform) => {
   const { tree, node } = fixture(scratch('install-tree-'));
   const out = path.join(base, 'download', tag);
   pack({ tree, node, platform, tag, source: `file://${base}`, commit: 'f'.repeat(40), builtAt: '2026-11-11T00:00:00.000Z', out });
@@ -175,7 +175,7 @@ const UNAME: Record<Platform, { s: string; m: string }> = {
  * Stand-in `uname` and `sw_vers` first on PATH, saying the machine `$UNAME_S` and `$UNAME_M` and the macOS `$SW_VERS`, so the
  * installer meets a platform this host is not.
  */
-const machineStandIns = (): string => {
+const machineStandIns = () => {
   const dir = fs.realpathSync(scratch('install-uname-'));
   fs.writeFileSync(path.join(dir, 'uname'), '#!/bin/sh\ncase $1 in -s) echo "$UNAME_S" ;; -m) echo "$UNAME_M" ;; esac\n', {
     mode: 0o755,
@@ -221,7 +221,7 @@ test('REFUSED: a Mac below macOS 13.5 exits 1 before anything is downloaded', ()
  * Stand-in `loginctl` and `systemctl` that answer yes, and the openers `open` and `xdg-open`, which log what they were handed to
  * `$OPEN_LOG` and exit `${OPEN_EXIT:-0}`, first on PATH, so a service install touches neither of the machine's and no browser opens.
  */
-const systemStandIns = (): string => {
+const systemStandIns = () => {
   const dir = fs.realpathSync(scratch('install-system-'));
   for (const name of ['loginctl', 'systemctl']) fs.writeFileSync(path.join(dir, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   for (const name of ['open', 'xdg-open'])

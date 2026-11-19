@@ -20,7 +20,7 @@ import { chosenOf, configFileOf, configWritten, contextOf } from '../src/context
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
 /** A laptop of its own: a config folder, a home, and a store root never made, so whatever reads or starts on it is seen. */
-function aLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string; folder: string } {
+function aLaptop(prefix: string) {
   const folder = scratch(`${prefix}laptop-`);
   const root = path.join(folder, 'store');
   const env = {
@@ -30,11 +30,11 @@ function aLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string; folder
     WF_ROOT: root,
     AE_ROOT: path.join(folder, 'engine'),
   };
-  return { env, root, folder };
+  return { env, root, folder } satisfies { env: NodeJS.ProcessEnv; root: string; folder: string };
 }
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -43,20 +43,20 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** A port nothing listens on: taken and given back. */
-const freePort = (): Promise<number> =>
+const freePort = () =>
   new Promise((resolve) => {
     const server = net.createServer().listen(0, '127.0.0.1', () => {
       const address = server.address();
       server.close(() => resolve(typeof address === 'object' && address !== null ? address.port : 0));
     });
-  });
+  }) satisfies Promise<number>;
 
 /** A token file under `folder`, holding `token` and a line break, as a person's editor or `nemia token add | tail` leaves it. */
-const tokenFile = (folder: string, token: string): string => {
+const tokenFile = (folder: string, token: string) => {
   const file = path.join(folder, 'token');
   fs.writeFileSync(file, `${token}\n`, { mode: 0o600 });
   return file;
@@ -150,7 +150,7 @@ test('under a remote context `nemia ls` asks that daemon with its token, reading
 });
 
 /** A git repository of one commit in a scratch folder of its own, made with git itself, and its `file://` URL. */
-function anOrigin(): { dir: string; url: string } {
+function anOrigin() {
   const dir = path.join(scratch('nemia-context-origin-'), 'o', 'r');
   fs.mkdirSync(dir, { recursive: true });
   const git = (...args: string[]) => {
@@ -161,7 +161,7 @@ function anOrigin(): { dir: string; url: string } {
   fs.writeFileSync(path.join(dir, 'a.txt'), 'one\n');
   git('add', 'a.txt');
   git('commit', '-qm', 'one');
-  return { dir, url: pathToFileURL(dir).href };
+  return { dir, url: pathToFileURL(dir).href } satisfies { dir: string; url: string };
 }
 
 test('under a remote context `nemia factory add --volume <url>:rw` files the factory on the server, cloned there; a URL with a password is refused, exit 2, nothing filed', async (t) => {

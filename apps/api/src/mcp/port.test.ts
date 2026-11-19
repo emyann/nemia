@@ -36,7 +36,7 @@ const standIn = eachTest(testEngine);
 const app = eachTest(() => appOver(standIn(), stand()));
 
 /** A program over the token door of the harness's store, run. */
-const door = <A, E>(use: (d: TokenDoorShape) => Effect.Effect<A, E>): A =>
+const door = <A, E>(use: (d: TokenDoorShape) => Effect.Effect<A, E>) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* use(yield* TokenDoor);
@@ -146,7 +146,7 @@ const askingAtGate = (id: string) => {
 /** A fetch of `on`, as a client off this machine's loopback sends it. */
 const fetchInto =
   (on: () => { request: (input: string | URL, init?: RequestInit) => Response | Promise<Response> }) =>
-  async (url: string | URL, init?: RequestInit): Promise<Response> =>
+  async (url: string | URL, init?: RequestInit) =>
     on().request(url, init);
 
 /** The two eras a host speaks to the port in: the legacy by `initialize`, and the modern by `server/discover`. */
@@ -162,7 +162,7 @@ async function connected(
   era: Era = 'legacy',
   token = personToken,
   fetch: (url: string | URL, init?: RequestInit) => Promise<Response> = fetchInto(on),
-): Promise<Client> {
+) {
   const client = new Client(
     { name: 'port-test', version: '0.0.0' },
     era === 'modern' ? { versionNegotiation: { mode: { pin: '2026-07-28' } } } : {},
@@ -181,7 +181,7 @@ async function connected(
 type Answered = { id?: unknown; method?: string; result?: Record<string, unknown> };
 
 /** Each message of a response's text, whether it is JSON or a stream of `data:` lines. */
-const messagesOf = (text: string, contentType: string): Answered[] =>
+const messagesOf = (text: string, contentType: string) =>
   contentType.includes('text/event-stream')
     ? text
         .split('\n')
@@ -196,7 +196,7 @@ const messagesOf = (text: string, contentType: string): Answered[] =>
 function recording(on: Parameters<typeof fetchInto>[0]) {
   const seen: { method: string | undefined; contentType: string; messages: Answered[] }[] = [];
   const into = fetchInto(on);
-  const fetch = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+  const fetch = async (url: string | URL, init?: RequestInit) => {
     const res = await into(url, init);
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as { method?: string }) : {};
     const contentType = res.headers.get('content-type') ?? '';
@@ -208,7 +208,7 @@ function recording(on: Parameters<typeof fetchInto>[0]) {
 }
 
 /** The first text a tool's result carries. */
-const textOf = (result: object): string => {
+const textOf = (result: object) => {
   const content = 'content' in result && Array.isArray(result.content) ? (result.content as { type: string; text?: string }[]) : [];
   return content.find((c) => c.type === 'text')?.text ?? '';
 };
@@ -274,7 +274,7 @@ test('the port says how a session is told of the feed without polling, most dire
   );
   assert.ok(ways[0] > instructions.indexOf('nemia:///api/events'), "said after the feed's resources");
   const { tools } = await client.listTools();
-  const describedAs = (name: string): string => tools.find((t) => t.name === name)?.description ?? '';
+  const describedAs = (name: string) => tools.find((t) => t.name === name)?.description ?? '';
   const wait = describedAs('wait');
   assert.ok(wait.includes('fallback') && wait.includes('instructions'), 'wait says it is the fallback and the instructions name the rest');
   assert.ok(wait.includes('channel') && wait.includes('subscriptions/listen'), 'wait names the two ways that need no polling');

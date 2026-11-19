@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Interfere's rules for tests that cannot lie (@interfere/landmines, pinned exactly at the root), every one on as shipped but where
+  // a rule below or an override sets it, each with its reason, so that none refuses what a rule of ours asks for.
+  "extends": ["./node_modules/@interfere/landmines/configs/recommended.json"],
   "options": {
     "typeAware": true
   },
@@ -91,7 +94,62 @@
     "max-lines-per-function": ["error", { "max": 80, "skipBlankLines": true, "skipComments": true }],
     // Cyclomatic counts the paths, so it says how many tests a function needs; cognitive weighs the nesting, which cyclomatic does not.
     "complexity": ["error", { "max": 20 }],
-    "sonarjs/cognitive-complexity": ["error", 15]
+    "sonarjs/cognitive-complexity": ["error", 15],
+    // Off: what a thing is for is said where its reader finds it, a file's header or a private declaration's doc, and our own
+    // comments plugin (lint/comments.ts) keeps refusing a comment inside a body.
+    "landmines-style/no-comments": "off",
+    // Off in source, on in tests (an override below): whether source's return types are inferred is a decision of its own card.
+    "landmines-types/no-explicit-return-types": "off",
+    // Each file that waits on a fixed delay today, by its count: the rule refuses a file whose count differs, so one mended is
+    // cut here (a key for a file gone is not reported). A new sleep waits on what it waits for instead.
+    "landmines-testing/no-fixed-sleep": [
+      "error",
+      {
+        "allow": {
+          "apps/api/src/gauges/feed.test.ts": 1,
+          "apps/api/test/harness.test.ts": 1,
+          "apps/api/test/main.test.ts": 1,
+          "apps/web/test/api.test.ts": 1,
+          "apps/web/test/e2e-serve-token.boundary.test.ts": 1,
+          "apps/web/test/read-pages.test.ts": 2,
+          "packages/agent-orchestrator/test/store.test.ts": 1,
+          "packages/agent-runtime/test/detached.test.ts": 2,
+          "packages/agent-runtime/test/engine-verbs.test.ts": 4,
+          "packages/agent-runtime/test/waits.test.ts": 4
+        }
+      }
+    ],
+    // Each retry or raised timeout today, by its count, a vitest.config.ts's testTimeout and hookTimeout among them (120 s, the
+    // repository's ceiling for a test and a hook): the list only shrinks, as no-fixed-sleep's does.
+    "landmines-testing/no-flake-masking": [
+      "error",
+      {
+        "allow": {
+          "apps/api/src/steps/following.test.ts": 2,
+          "apps/api/src/steps/transcript.test.ts": 1,
+          "apps/api/vitest.config.ts": 2,
+          "apps/cli/test/ambient.test.ts": 1,
+          "apps/cli/test/channel.test.ts": 1,
+          "apps/cli/test/watch.test.ts": 1,
+          "apps/cli/vitest.config.ts": 2,
+          "apps/docs/vitest.config.ts": 2,
+          "apps/web/test/e2e/visit.test.ts": 14,
+          "apps/web/vitest.config.ts": 4,
+          "packages/agent-orchestrator/test/mcp-config.test.ts": 2,
+          "packages/agent-orchestrator/test/step-labels.boundary.test.ts": 1,
+          "packages/agent-orchestrator/vitest.config.ts": 2,
+          "packages/agent-runtime/test/fixtures/waits/never.ts": 1,
+          "packages/agent-runtime/test/live-sdk.boundary.test.ts": 3,
+          "packages/agent-runtime/test/live.test.ts": 16,
+          "packages/agent-runtime/test/remote-agent.test.ts": 1,
+          "packages/agent-runtime/vitest.config.ts": 2,
+          "packages/objects/vitest.config.ts": 2,
+          "packages/templates/vitest.config.ts": 2,
+          "tools/guards/vitest.config.ts": 2,
+          "tools/test-kit/vitest.config.ts": 2
+        }
+      }
+    ]
   },
   "overrides": [
     {
@@ -460,6 +518,45 @@
         "max-lines-per-function": "off",
         "complexity": "off",
         "sonarjs/cognitive-complexity": "off"
+      }
+    },
+    // A test's return types are inferred; landmines' rule, off in source above, holds them here.
+    {
+      "files": ["**/test/**", "**/*.test.ts"],
+      "rules": {
+        "landmines-types/no-explicit-return-types": "error"
+      }
+    },
+    // A workspace's own test/ folder holds its tests, beside the tests kept next to their code (root CLAUDE.md, Check your work);
+    // the rule takes a test's owner from the source folder it imports and accepts only that folder or a test/ inside it.
+    {
+      "files": ["packages/*/test/**", "apps/*/test/**", "tools/*/test/**"],
+      "rules": {
+        "landmines-structure/colocated-tests": "off"
+      }
+    },
+    // Three api tests drive their own folder's routes through the app over HTTP, and import from src/objects one constant or helper
+    // of the serving, which the rule takes for their owner: they stay beside the routes they test.
+    {
+      "files": ["apps/api/src/files/files.test.ts", "apps/api/src/runs/actions.test.ts", "apps/api/src/factory/templated.test.ts"],
+      "rules": {
+        "landmines-structure/colocated-tests": "off"
+      }
+    },
+    // apps/api/src/mcp/tools.ts is no test: the rule takes the file's own function named `describe` for a suite's, and its last
+    // argument for a suite's options.
+    {
+      "files": ["apps/api/src/mcp/tools.ts"],
+      "rules": {
+        "landmines-testing/no-flake-masking": "off"
+      }
+    },
+    // apps/web/test/waits.ts and apps/docs/test/waits.ts are the runtime's src/waits/waits.ts byte for byte (neither imports a package;
+    // waits.test.ts holds the copies): their return types are source's, which keeps them.
+    {
+      "files": ["apps/web/test/waits.ts", "apps/docs/test/waits.ts"],
+      "rules": {
+        "landmines-types/no-explicit-return-types": "off"
       }
     },
     // The route tree is generated by TanStack Router's plugin on every build.

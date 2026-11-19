@@ -22,7 +22,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const isTest = (file: string) => file.endsWith('.test.ts') || file.startsWith('test/');
 
 /** The package's source under `src/`, tests beside the code left out, by path from the package. */
-const sourceFiles = (): string[] =>
+const sourceFiles = () =>
   fs
     .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)
@@ -34,7 +34,7 @@ const read = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
  * A part's pure code, read from outside its concept through the part's face: every file that is not a store, a verb, a model or a test,
  * outside the CLI's folder, which is controllers. A model is imported by its own path, as a store or a verb is.
  */
-const isFolderPure = (file: string): boolean => !/\.(store|verb|model|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
+const isFolderPure = (file: string) => !/\.(store|verb|model|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
 
 /** The face rule as this package reads it: concepts under `src`, a part's pure code faced. */
 const FACES = { root: 'src', faced: isFolderPure };

@@ -19,33 +19,33 @@ export const PARSING = new Set(['startsWith', 'endsWith', 'split', 'match', 'rep
  * Whether `name` names a state: it is status, phase, verdict or word in any case, or ends in one at a word's edge — rowStatus,
  * ROW_PHASE, step_verdict — and not inside one, so password and keyword are no state.
  */
-export const namesState = (name: string): boolean =>
+export const namesState = (name: string) =>
   /(?:^|_)(?:status|phase|verdict|word)$/i.test(name) || /[a-z0-9](?:Status|Phase|Verdict|Word)$/.test(name);
 
 /** `node` with what changes no value taken off: parentheses, a `!`, an `as` and a `satisfies`. */
-const bare = (node: ts.Expression): ts.Expression => {
+const bare = (node: ts.Expression) => {
   let at = node;
   while (ts.isParenthesizedExpression(at) || ts.isNonNullExpression(at) || ts.isAsExpression(at) || ts.isSatisfiesExpression(at))
     at = at.expression;
-  return at;
+  return at satisfies ts.Expression;
 };
 
 /** The name `node` reads by, where it is a name or a member (`status`, `row.status`, `row?.status`), else undefined. */
-const nameOf = (node: ts.Expression): string | undefined => {
+const nameOf = (node: ts.Expression) => {
   const at = bare(node);
-  if (ts.isIdentifier(at)) return at.text;
-  if (ts.isPropertyAccessExpression(at)) return at.name.text;
-  return undefined;
+  if (ts.isIdentifier(at)) return at.text satisfies string | undefined;
+  if (ts.isPropertyAccessExpression(at)) return at.name.text satisfies string | undefined;
+  return undefined satisfies string | undefined;
 };
 
 /**
  * Each place `text`, the source of `file`, parses a state out of a string, by its line and what it reads: a parsing method called on a
  * state's name, or any `.test` whose argument is one — a pattern literal's or a pattern kept in a name.
  */
-export const parsedStates = (text: string, file = 'source.tsx'): string[] => {
+export const parsedStates = (text: string, file = 'source.tsx') => {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const found: string[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(bare(node.expression))) {
       const callee = bare(node.expression) as ts.PropertyAccessExpression;
       const method = callee.name.text;
@@ -60,14 +60,14 @@ export const parsedStates = (text: string, file = 'source.tsx'): string[] => {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return found;
+  return found satisfies string[];
 };
 
 /** Where shipped sources are read: each package's `src`, the api's and the board's. */
 const SCOPES = [/^packages\/[^/]+\/src\//, /^apps\/api\/src\//, /^apps\/web\/src\//];
 
 /** Whether `file`, a path from the root, is a shipped source the count reads: a `.ts` or `.tsx` in scope, no test and no story. */
-export const counted = (file: string): boolean =>
+export const counted = (file: string) =>
   SCOPES.some((scope) => scope.test(file)) &&
   /\.tsx?$/.test(file) &&
   !file.endsWith('.d.ts') &&
@@ -75,7 +75,7 @@ export const counted = (file: string): boolean =>
   !file.endsWith('.stories.tsx');
 
 /** Each file of `listed` the count reads that parses a state, by its path from `root`, with how many times it does. */
-export const measure = (listed: readonly string[], root = REPO): Record<string, number> => {
+export const measure = (listed: readonly string[], root = REPO) => {
   const counts: Record<string, number> = {};
   for (const file of listed.filter(counted).sort()) {
     const at = path.join(root, file);
@@ -83,11 +83,11 @@ export const measure = (listed: readonly string[], root = REPO): Record<string, 
     const count = parsedStates(fs.readFileSync(at, 'utf8'), file).length;
     if (count > 0) counts[file] = count;
   }
-  return counts;
+  return counts satisfies Record<string, number>;
 };
 
 /** The repository's counts today, from git's list of its files. */
-export const repositoryCounts = (): Record<string, number> => measure(files());
+export const repositoryCounts = () => measure(files()) satisfies Record<string, number>;
 
 if (import.meta.main) {
   const card = "A step's state crosses the wire as a code, not a sentence";

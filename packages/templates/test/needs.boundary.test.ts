@@ -26,7 +26,7 @@ type Ran = { code: number | null; out: string; err: string };
  * `node needs.ts <args>` with a stub `gh` answering `rules` first on the PATH, a scratch home, git's global file in it, and `env`
  * besides; spawned without blocking, so a stub server in this process answers it. Its exit, its streams and its git file.
  */
-async function needs(args: string[], rules: readonly Rule[], env: Record<string, string> = {}): Promise<Ran & { gitFile: string }> {
+async function needs(args: string[], rules: readonly Rule[], env: Record<string, string> = {}) {
   const gh = ghStub(rules);
   const home = scratch('nemia-needs-home-');
   const gitFile = path.join(home, '.gitconfig');
@@ -46,11 +46,11 @@ async function needs(args: string[], rules: readonly Rule[], env: Record<string,
   child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString()));
   child.stderr.on('data', (chunk: Buffer) => (err += chunk.toString()));
   const code = await new Promise<number | null>((resolve) => child.once('close', resolve));
-  return { code, out, err, gitFile };
+  return { code, out, err, gitFile } satisfies Ran & { gitFile: string };
 }
 
 /** What git's global file `file` holds for `key`, or '' where it holds nothing. */
-const gitConfig = (file: string, key: string): string => {
+const gitConfig = (file: string, key: string) => {
   try {
     return execFileSync('git', ['config', '--file', file, key], { encoding: 'utf8' }).trim();
   } catch {
@@ -59,12 +59,16 @@ const gitConfig = (file: string, key: string): string => {
 };
 
 /** `gh auth status` signed in with `scopes`, the lines as gh prints them. */
-const signedIn = (scopes: string): Rule => ({
-  when: 'auth status',
-  out: ['github.com', '  ✓ Logged in to github.com account octo (keyring)', '  - Active account: true', `  - Token scopes: ${scopes}`].join(
-    '\n',
-  ),
-});
+const signedIn = (scopes: string) =>
+  ({
+    when: 'auth status',
+    out: [
+      'github.com',
+      '  ✓ Logged in to github.com account octo (keyring)',
+      '  - Active account: true',
+      `  - Token scopes: ${scopes}`,
+    ].join('\n'),
+  }) satisfies Rule;
 
 test('identity writes the account name and its noreply email into git, the login where the account has no name', async () => {
   const named = await needs(['identity'], [{ when: 'api user', out: JSON.stringify({ login: 'octo', id: 583231, name: 'Octo Cat' }) }]);
@@ -98,18 +102,18 @@ const VERSION = '9.9.9';
 const ASSET = `gh_${VERSION}_linux_${process.arch === 'arm64' ? 'arm64' : 'amd64'}.tar.gz`;
 
 /** A tarball holding `gh_<version>_linux_<arch>/bin/gh`, a script that prints its version, as gh's release lays it out. */
-function tarball(): Buffer {
+function tarball() {
   const dir = scratch('nemia-needs-tar-');
   const top = ASSET.replace(/\.tar\.gz$/, '');
   fs.mkdirSync(path.join(dir, top, 'bin'), { recursive: true });
   fs.writeFileSync(path.join(dir, top, 'bin', 'gh'), `#!/bin/sh\necho "gh version ${VERSION}"\n`, { mode: 0o755 });
   const file = path.join(scratch('nemia-needs-out-'), ASSET);
   execFileSync('tar', ['-czf', file, '-C', dir, top]);
-  return fs.readFileSync(file);
+  return fs.readFileSync(file) satisfies Buffer;
 }
 
 /** A stub release server on 127.0.0.1 whose checksums say `sum` of the tarball (its true sum unless given): its release URL and stop. */
-async function releaseServer(sum?: string): Promise<{ url: string; close: () => Promise<void> }> {
+async function releaseServer(sum?: string) {
   const tar = tarball();
   const sha = sum ?? createHash('sha256').update(tar).digest('hex');
   const server = http.createServer((req, res) => {
@@ -127,7 +131,10 @@ async function releaseServer(sum?: string): Promise<{ url: string; close: () => 
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as { port: number };
-  return { url: `http://127.0.0.1:${port}/latest`, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  return { url: `http://127.0.0.1:${port}/latest`, close: () => new Promise((resolve) => server.close(() => resolve())) } satisfies {
+    url: string;
+    close: () => Promise<void>;
+  };
 }
 
 test.skipIf(process.platform !== 'linux')(
@@ -175,7 +182,7 @@ test('REFUSED: install-gh with no tools folder named, and a verb the script has 
  * `<PLAYWRIGHT_BROWSERS_PATH>/chromium-<build>/chrome-linux/chrome`, as Playwright's does, and its `cli.js` appends how it was run to the
  * file `INSTALLED_LOG` names, then puts that build there.
  */
-function standInCore(dir: string, build: string): void {
+function standInCore(dir: string, build: string) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'playwright-core', version: `1.0.${build}`, main: 'index.js' }));
   const executable = `require('node:path').join(process.env.PLAYWRIGHT_BROWSERS_PATH, 'chromium-${build}', 'chrome-linux', 'chrome')`;
@@ -195,34 +202,38 @@ function standInCore(dir: string, build: string): void {
 }
 
 /** A stand-in repository, its browsers folder holding `present` builds, and the log its installer writes. */
-function browserRepo(present: string[]): { repo: string; browsers: string; log: string } {
+function browserRepo(present: string[]) {
   const repo = scratch('nemia-needs-browser-repo-');
   const browsers = scratch('nemia-needs-browsers-');
   for (const build of present) fs.mkdirSync(path.join(browsers, `chromium-${build}`, 'chrome-linux'), { recursive: true });
   for (const build of present) fs.writeFileSync(path.join(browsers, `chromium-${build}`, 'chrome-linux', 'chrome'), '');
-  return { repo, browsers, log: path.join(scratch('nemia-needs-browser-log-'), 'installed.jsonl') };
+  return { repo, browsers, log: path.join(scratch('nemia-needs-browser-log-'), 'installed.jsonl') } satisfies {
+    repo: string;
+    browsers: string;
+    log: string;
+  };
 }
 
 /** `node needs.ts browser <args>` run in `at.repo`, as a need of `scope: repository` is, its browsers folder `at.browsers`. */
-function browserRan(at: { repo: string; browsers: string; log: string }, args: string[] = []): Ran {
+function browserRan(at: { repo: string; browsers: string; log: string }, args: string[] = []) {
   const ran = spawnSync(process.execPath, [SCRIPT, 'browser', ...args], {
     cwd: at.repo,
     env: { PATH: process.env.PATH ?? '', HOME: scratch('nemia-needs-home-'), PLAYWRIGHT_BROWSERS_PATH: at.browsers, INSTALLED_LOG: at.log },
     encoding: 'utf8',
     timeout: 60_000,
   });
-  return { code: ran.status, out: ran.stdout, err: ran.stderr };
+  return { code: ran.status, out: ran.stdout, err: ran.stderr } satisfies Ran;
 }
 
 /** How the stand-in installers were run, each as its file and its arguments. */
-const installs = (log: string): string[][] =>
-  fs.existsSync(log)
+const installs = (log: string) =>
+  (fs.existsSync(log)
     ? fs
         .readFileSync(log, 'utf8')
         .trim()
         .split('\n')
         .map((line) => JSON.parse(line) as string[])
-    : [];
+    : []) satisfies string[][];
 
 test("browser is missing, naming the build, where the repository's playwright-core names a build that is absent, and met once it is there", () => {
   const at = browserRepo(['1248']);

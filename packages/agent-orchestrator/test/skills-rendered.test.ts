@@ -23,7 +23,7 @@ const NEMIA_SKILLS = path.join(import.meta.dirname, '..', 'nemia', 'skills');
 const SKILL_FOLDERS = [path.join(TEAM, 'skills'), BUILTIN_SKILLS, NEMIA_SKILLS, path.join(REPO, '.claude', 'skills')];
 
 /** A SKILL.md's frontmatter as YAML reads it, or a throw saying why it does not read: what a skill that Claude Code would drop fails on. */
-function frontmatterOf(file: string, text: string): Record<string, unknown> {
+function frontmatterOf(file: string, text: string) {
   const { block } = splitFrontmatter(file, text);
   if (block === null) throw new Error(`${file} has no frontmatter`);
   const read = yaml.load(block);

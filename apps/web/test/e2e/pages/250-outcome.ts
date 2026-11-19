@@ -89,7 +89,7 @@ const write = (file: string, text: string | Buffer) => {
  * second try, the run's one nudge behind it, so it waits on a person; `garbled`
  * ends on a statement cut off mid-string: no closeout, and still what the agent said.
  */
-function writeRun(root: string): string[] {
+function writeRun(root: string) {
   const { id } = OUTCOME;
   const now = Date.now();
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -229,7 +229,7 @@ function writeRun(root: string): string[] {
       2,
     ),
   );
-  return [record, dir, files, ...tasks];
+  return [record, dir, files, ...tasks] satisfies string[];
 }
 
 /**

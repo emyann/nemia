@@ -58,7 +58,7 @@ import { holder, inCall, kept, lines, NAME, place, run, STAND_IN } from './attac
  * How many results the session's capture holds, as its holder wrote them: each is written in the same take as the run file it leaves
  * behind, so a test that reads one reads the state it left.
  */
-const resultsOf = (root: string): number => {
+const resultsOf = (root: string) => {
   const out = filesOf(root, NAME).out;
   if (!fs.existsSync(out)) return 0;
   return fs
@@ -966,7 +966,7 @@ test('a call held at its hook as the holder lets go is never written in flight: 
  * sum is held to that, never to a wall-clock bound: the share is a ceiling on the long wait, never a floor on the short ones
  * (`letGoOf`, `harness/claude/attached.ts`), so a take debited its whole allowance would leave the last wait nothing.
  */
-const stuck = (facts: Partial<Parameters<typeof writeRun>[1]> = {}): Live =>
+const stuck = (facts: Partial<Parameters<typeof writeRun>[1]> = {}) =>
   ({
     run: {
       name: NAME,

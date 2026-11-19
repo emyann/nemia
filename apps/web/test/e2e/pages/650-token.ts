@@ -12,7 +12,7 @@ import { OUT, store } from '../world.ts';
 const NAME = 'board-e2e';
 
 /** The token field's press, sending what the field holds, and the answer of `POST /api/session` it is sent as. */
-async function sent(other: Page, token: string): Promise<number> {
+async function sent(other: Page, token: string) {
   await other.locator('[data-token-field] input').fill(token);
   const [answered] = await Promise.all([
     other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/session', { timeout: WAIT_MS }),
@@ -22,10 +22,10 @@ async function sent(other: Page, token: string): Promise<number> {
 }
 
 /** The page's next load, waited for from now; a page closed first leaves it unawaited and refused by nothing. */
-const nextLoad = (other: Page): Promise<unknown> => {
+const nextLoad = (other: Page) => {
   const loaded = other.waitForEvent('load', { timeout: WAIT_MS });
   loaded.catch(() => undefined);
-  return loaded;
+  return loaded satisfies Promise<unknown>;
 };
 
 /** The cookie the token is kept in, as the browser holds it, or none. */
@@ -50,7 +50,7 @@ export default {
     const here = await page
       .context()
       .browser()!
-      .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
+      .newContext({ colorScheme: await themeOf(page), viewport: { width: 1280, height: 800 } });
     try {
       const bare = await here.newPage();
       const { problems } = watch(bare);
@@ -83,7 +83,7 @@ export default {
     const context = await page
       .context()
       .browser()!
-      .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
+      .newContext({ colorScheme: await themeOf(page), viewport: { width: 1280, height: 800 } });
     try {
       const token = mintPersonToken(store!, NAME);
       const other = await context.newPage();

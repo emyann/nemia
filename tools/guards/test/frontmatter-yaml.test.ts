@@ -22,13 +22,13 @@ import { scratch } from 'test-kit/scratch';
 const HELD = ['.claude/skills/', 'apps/web/.claude/skills/', 'packages/agent-orchestrator/skills/', 'packages/templates/sdlc/skills/'];
 
 /** A file's frontmatter block, between the `---` that opens its first line and the next line that is just `---`; null for none. */
-const blockOf = (text: string): string | null => {
+const blockOf = (text: string) => {
   const m = /^﻿?---[ \t]*\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
   return m ? (m[1] ?? '') : null;
 };
 
 /** Each file of `held`, by its path from `root`, whose frontmatter a strict YAML parse refuses or reads as no map, with why. */
-function refusedIn(root: string, held: readonly string[]): string[] {
+function refusedIn(root: string, held: readonly string[]) {
   return held.flatMap((file) => {
     const block = blockOf(fs.readFileSync(path.join(root, file), 'utf8'));
     if (block === null) return [];

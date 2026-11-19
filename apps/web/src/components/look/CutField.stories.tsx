@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CutField } from './CutField';
-import { ON_PLAIN } from './stories.fixtures';
+import { ON_PLAIN } from './stories.fixture';
 
 /** The look's cut frame for a field: quiet, and with the focus in it, where the edge takes a session's hue round both cut corners. */
 const meta: Meta = { title: 'Look/CutField' };

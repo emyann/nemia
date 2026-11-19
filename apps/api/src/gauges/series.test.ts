@@ -25,7 +25,7 @@ const kept = (tier: 'minute' | 'hour', lines: ReturnType<typeof line>[]) => {
 
 const minuteAgo = (n: number) => new Date(Math.floor(Date.now() / 60_000) * 60_000 - n * 60_000).toISOString();
 
-const series = async (query = ''): Promise<{ status: number; body: unknown }> => {
+const series = async (query = '') => {
   const res = await app.request(`/api/series${query}`);
   return { status: res.status, body: await res.json() };
 };

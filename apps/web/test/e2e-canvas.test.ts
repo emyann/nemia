@@ -12,7 +12,7 @@ import { setPhotographing } from './e2e/world.ts';
 afterAll(() => setPhotographing(false));
 
 /** A fake that records each property read of it in `reads`, then throws `touched`. */
-const recording = (reads: string[], touched: Error): object =>
+const recording = (reads: string[], touched: Error) =>
   new Proxy(
     {},
     {

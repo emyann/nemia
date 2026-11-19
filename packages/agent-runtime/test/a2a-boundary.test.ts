@@ -26,7 +26,7 @@ const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/holder-follow.ts', 'src/a2a/holde
 const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
 
 /** Where `file` reaches the SDK from outside the seam: each breach, worded with what to do instead. */
-function sdkBreaches(file: string, text: string): string[] {
+function sdkBreaches(file: string, text: string) {
   if (inSeam(file)) return [];
   return specifiersIn(withoutComments(text))
     .filter((spec) => spec === SDK || spec.startsWith(`${SDK}/`))
@@ -124,7 +124,7 @@ const sdkExports = async () => {
 };
 
 /** What an entry of the runtime hands a consumer of the SDK's: by name, or by value under a name of its own. */
-function exportBreaches(entry: string, exported: Record<string, unknown>, sdk: { names: Set<string>; values: Set<unknown> }): string[] {
+function exportBreaches(entry: string, exported: Record<string, unknown>, sdk: { names: Set<string>; values: Set<unknown> }) {
   return Object.entries(exported).flatMap(([name, value]) =>
     sdk.names.has(name) || sdk.values.has(value)
       ? [`${entry} exports ${name}, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/`]

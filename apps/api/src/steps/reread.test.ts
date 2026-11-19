@@ -25,7 +25,7 @@ const TIMERS: readonly [RegExp, string][] = [
 ];
 
 /** The index past the bracket that closes the one opened at `from` (`open`, then `close`), or the text's end. */
-const closing = (text: string, from: number, open: string, close: string): number => {
+const closing = (text: string, from: number, open: string, close: string) => {
   let depth = 0;
   for (let i = from; i < text.length; i++) {
     if (text[i] === open) depth++;
@@ -35,7 +35,7 @@ const closing = (text: string, from: number, open: string, close: string): numbe
 };
 
 /** The body of each `while` and `for` loop in `text`: its block, or its one statement. */
-const loopBodies = (text: string): string[] =>
+const loopBodies = (text: string) =>
   [...text.matchAll(/\b(?:while|for)\s*\(/g)].map((m) => {
     const head = closing(text, m.index + m[0].length - 1, '(', ')');
     const start = text.slice(head).search(/\S/) + head;
@@ -43,17 +43,16 @@ const loopBodies = (text: string): string[] =>
   });
 
 /** What in the source `text` reads again on its own: each timer it starts, named. */
-const timers = (text: string): string[] => TIMERS.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
+const timers = (text: string) => TIMERS.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
 
 /** What each sleep of `text` is given to wait. */
-const sleepsOf = (text: string): string[] => [...text.matchAll(/\.sleep\s*\(([^)]*)\)/g)].map((m) => m[1]);
+const sleepsOf = (text: string) => [...text.matchAll(/\.sleep\s*\(([^)]*)\)/g)].map((m) => m[1]);
 
 /** How many loops of `text` call `name` in their body. */
-const loopsAround = (text: string, name: string): number =>
-  loopBodies(text).filter((body) => new RegExp(`\\b${name}\\s*\\(`).test(body)).length;
+const loopsAround = (text: string, name: string) => loopBodies(text).filter((body) => new RegExp(`\\b${name}\\s*\\(`).test(body)).length;
 
 /** The body of the function `name` declared in `text`: from its head to the bracket that closes it. */
-const bodyOf = (text: string, name: string): string => {
+const bodyOf = (text: string, name: string) => {
   const at = text.indexOf(`function ${name}(`);
   assert.notEqual(at, -1, `${name}: the function this guard is about`);
   const block = text.indexOf('{', closing(text, text.indexOf('(', at), '(', ')'));

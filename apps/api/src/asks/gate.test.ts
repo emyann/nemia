@@ -15,7 +15,7 @@
  * stories write beside the runs, and what they write stays.
  */
 import { root, SEATED } from '../../test/harness.ts';
-import { actorWords, type DecideCommand, type Decidable } from 'objects';
+import { actorWords, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -119,7 +119,7 @@ const ask = (step: string, body: unknown, run = R) =>
   app().request(`/api/namespaces/default/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 /** Every file under a run's asks directory, waiting or consumed. */
-const asked = (run = R): string[] => {
+const asked = (run = R) => {
   const dir = path.join(root, 'runs', `${run}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
@@ -135,7 +135,7 @@ const nothingWritten = (why: string, run = R) => {
 };
 
 /** What the package's `approveRun` refuses, word for word: what `nemia approve` prints. */
-const approveRefuses = async (step: string, message?: string, run = R): Promise<string> => {
+const approveRefuses = async (step: string, message?: string, run = R) => {
   try {
     await runWith(engine(), approveRun(run, step, message));
   } catch (err) {
@@ -148,8 +148,7 @@ const approveRefuses = async (step: string, message?: string, run = R): Promise<
 type Approved = { step: string; try: number; at: string; message: string | null; file: string };
 /** The run object of `id` (`GET /api/runs/:id`). */
 const object = async (id = R) => objectOf(app(), id);
-const commandsOf = async (id = R): Promise<DecideCommand[]> =>
-  ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
+const commandsOf = async (id = R) => ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
 /** The status of `id` as the RunList (`GET /api/runs`) judges it. */
 const summary = async (id = R) => (await listedOf(app(), id)).status;
 
@@ -210,14 +209,14 @@ const askingRun = (id: string) => {
 };
 
 /** What a request answered when its answers were refused (`Invalid`, a 422), and that it wrote nothing beside the run. */
-const refused422 = async (res: Response, id: string): Promise<string> => {
+const refused422 = async (res: Response, id: string) => {
   assert.equal(res.status, 422, await res.clone().text());
   assert.deepEqual(asked(id), [], 'nothing written');
   return ((await res.json()) as { error: string }).error;
 };
 
 /** The error a refused request answered with, its status `status`. */
-const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
+const refusedWith = async (res: Response, status: number, said: string) => {
   assert.equal(res.status, status, said);
   return ((await res.json()) as { error: string }).error;
 };

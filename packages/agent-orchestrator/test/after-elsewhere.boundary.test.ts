@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { type TaskSpec, ForgetRefused } from 'agent-runtime';
-import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
+import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
@@ -36,7 +36,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
@@ -182,7 +182,7 @@ const folder = (implementKeys = '') => {
 };
 
 /** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };

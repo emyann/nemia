@@ -10,7 +10,7 @@ import { OUT, store } from '../world.ts';
 const ON_CHECKOUT = `/factories/${FACTORIES.hiring.name}/skills`;
 
 /** The page at `to`, from where the page is. */
-const visit = async (page: Page, to: string): Promise<void> => {
+const visit = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
@@ -20,7 +20,7 @@ const visit = async (page: Page, to: string): Promise<void> => {
  * factories, as the api answers it; a factory on several repositories and a store with no factory, which the seed has neither of, as an
  * answer held by `route` — each pictured, and the page left on the checkout, in FACTORIES' `hiring`.
  */
-async function unread(page: Page): Promise<void> {
+async function unread(page: Page) {
   const theme = await themeOf(page);
   await visit(page, '/capabilities');
   const several = page.locator('[data-unread="several-factories"]');

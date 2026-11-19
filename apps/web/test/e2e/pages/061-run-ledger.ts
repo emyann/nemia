@@ -28,7 +28,7 @@ const SLOTS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /** The names of `marks` found under `scope`, in the document's order. */
-async function drawnIn(scope: Page | Locator, marks: ReadonlyArray<readonly [string, string]>): Promise<string[]> {
+async function drawnIn(scope: Page | Locator, marks: ReadonlyArray<readonly [string, string]>) {
   const root = 'goto' in scope ? scope.locator('body') : scope;
   return root.evaluate((el, all) => {
     const found = all.flatMap(([name, mark]) => {

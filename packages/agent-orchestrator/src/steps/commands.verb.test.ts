@@ -29,14 +29,14 @@ heldUnasked(engine);
 const noEngine = () => engineOf(engine().layer);
 
 /** A folder workflow of one step. */
-const oneStep = (): string => {
+const oneStep = () => {
   const dir = scratch('wf-pages-one-');
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   return dir;
 };
 
 /** A repository with one commit on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = scratch('wf-pages-repo-');
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
   stand().world.repository(repo, {});

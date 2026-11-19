@@ -51,13 +51,14 @@ const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools',
 type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object; config?: Record<string, unknown> } & Record<string, unknown>;
 
 /** What `f` was filed with under `key`: its schema is the task's, and the rest are its harness's arguments, under `config`. */
-const cachedOf = (f: Filed, key: (typeof CACHED)[number]): unknown => (key === 'closeoutSchema' ? f.closeoutSchema : f.config?.[key]);
+const cachedOf = (f: Filed, key: (typeof CACHED)[number]) =>
+  (key === 'closeoutSchema' ? f.closeoutSchema : f.config?.[key]) satisfies unknown;
 
 /**
  * Each continuation, against the task whose session it continues, named by the field that differs. A session is `native-<task id>` on
  * the board below, so a `resumeFrom` names the task it came from. A continuation of a session nobody here filed is a difference too.
  */
-function chainDifferences(filed: readonly Filed[]): string[] {
+function chainDifferences(filed: readonly Filed[]) {
   const byId = new Map(filed.map((f) => [f.id, f]));
   const out: string[] = [];
   for (const f of filed) {
@@ -71,11 +72,11 @@ function chainDifferences(filed: readonly Filed[]): string[] {
       if (JSON.stringify(cachedOf(f, key)) !== JSON.stringify(cachedOf(from, key))) out.push(`${f.id}: ${key} is not ${from.id}'s`);
     }
   }
-  return out;
+  return out satisfies string[];
 }
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   return repo;
@@ -97,6 +98,7 @@ const board = () => {
  * A value a strict schema accepts: the first of each choice, one item in each array. What a step says matters to the walk only by its
  * shape.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function valueOf(schema: Record<string, unknown>): unknown {
   if (Array.isArray(schema.anyOf)) return valueOf(schema.anyOf[0] as Record<string, unknown>);
   if (Array.isArray(schema.enum)) return schema.enum[0];
@@ -117,10 +119,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  * The target's try 1 ends unsigned, so a nudge follows; try 2 signs blocked, so an answer follows; try 3, round 1, is handed no `replies`;
  * the looping step's rounds 1 and 2 ask again, and its round 3 is done.
  */
-async function walk(
-  dir: string,
-  first: { mode: 'continue' | 'fresh'; model?: string } = { mode: 'continue' },
-): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: StepSpec[] }> {
+async function walk(dir: string, first: { mode: 'continue' | 'fresh'; model?: string } = { mode: 'continue' }) {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
   const steps = stepsOf(run, ROOT);
   const looping = steps.find((s) => s.loop)!;
@@ -168,7 +167,13 @@ async function walk(
     if (pending.some(([id]) => tryOfId(id, target) === 2))
       await runWith(b.e, retryRun(run.id, target, { mode: 'continue', message: 'the --dry-run flag' }));
   }
-  return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
+  return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps } satisfies {
+    id: string;
+    filed: Filed[];
+    target: string;
+    looping: string;
+    steps: StepSpec[];
+  };
 }
 
 for (const name of LOOPED) {

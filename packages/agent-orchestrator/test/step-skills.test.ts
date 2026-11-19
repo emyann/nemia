@@ -46,16 +46,16 @@ import type { Env } from '../src/config/config.store.ts';
 const ROOT = scratch('wf-step-skills-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 /** A workflow folder's version, read through the doors at this file's store. */
-const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]): string =>
+const versionOf = (dir: string, places: Parameters<typeof workflowVersion>[1]) =>
   Effect.runSync(workflowVersion(dir, places).pipe(Effect.provideService(StoreRoot, ROOT)));
 const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
 const { runPlaced } = stage;
 
 /** A SKILL.md named `name` whose body is `body`. */
-const skill = (name: string, body = 'Do it.'): string => `---\nname: ${name}\ndescription: Do the thing.\n---\n${body}\n`;
+const skill = (name: string, body = 'Do it.') => `---\nname: ${name}\ndescription: Do the thing.\n---\n${body}\n`;
 
 /** The files `files`, each by its path under `dir`, written with its text; `dir`. */
-function written(dir: string, files: Record<string, string>): string {
+function written(dir: string, files: Record<string, string>) {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), text);
@@ -64,13 +64,13 @@ function written(dir: string, files: Record<string, string>): string {
 }
 
 /** The runs the store holds, by what their folder lists. */
-const runsNow = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+const runsNow = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
 
 /** The skill `name` of the folder `folder` of `repo`, where a session there finds it; the repository's own for `.`. */
-const nested = (repo: string, folder: string, name: string): string => path.join(repo, folder, '.claude', 'skills', name);
+const nested = (repo: string, folder: string, name: string) => path.join(repo, folder, '.claude', 'skills', name);
 
 /** A repository the test place knows, holding `files`: the folder. */
-function repository(files: Record<string, string> = {}): string {
+function repository(files: Record<string, string> = {}) {
   const repo = written(fs.mkdtempSync(path.join(ROOT, 'repo-')), files);
   fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
   stage.place().world.repository(repo, {});
@@ -78,26 +78,25 @@ function repository(files: Record<string, string> = {}): string {
 }
 
 /** The tests' team, copied, with each of `files` written over the copy's: the copy's `dev/`. */
-function teamWith(files: Record<string, string>): string {
+function teamWith(files: Record<string, string>) {
   return path.join(written(teamCopy('wf-step-skills-team-'), files), 'dev');
 }
 
 /** The team's agent `implementer`, its `skills:` line given `line`: the text of agents/implementer.md. */
-function implementerGiving(line: string): string {
+function implementerGiving(line: string) {
   const text = fs.readFileSync(path.join(TEAM, 'agents', 'implementer.md'), 'utf8');
   assert.ok(text.includes('skills: implement-a-change\n'), text);
   return text.replace('skills: implement-a-change\n', `skills: ${line}\n`);
 }
 
 /** A step of the team's `implement`, its own `skills:` line `line`. */
-const implementAdding = (line: string): string => `---\nplace: git\nagent: implementer\nskills: ${line}\n---\n`;
+const implementAdding = (line: string) => `---\nplace: git\nagent: implementer\nskills: ${line}\n---\n`;
 
 /** The folder of skills the run froze for its step `step`, whose agent is `agent`. */
-const frozen = (run: { id: string }, step: string, agent: string): string =>
-  path.join(agentFilesDir(ROOT, run, step), pluginOf(agent), 'skills');
+const frozen = (run: { id: string }, step: string, agent: string) => path.join(agentFilesDir(ROOT, run, step), pluginOf(agent), 'skills');
 
 /** Every entry under `dir`, by its path in it, as what it is: `link`, `folder` or a file's text. */
-const entriesOf = (dir: string): Record<string, string> =>
+const entriesOf = (dir: string) =>
   Object.fromEntries(
     (fs.readdirSync(dir, { recursive: true }) as string[]).sort().map((entry) => {
       const stat = fs.lstatSync(path.join(dir, entry));
@@ -106,13 +105,13 @@ const entriesOf = (dir: string): Record<string, string> =>
   );
 
 /** The step `name` of `steps`. */
-const stepNamed = (steps: readonly StepSpec[], name: string): StepSpec => steps.find((s) => s.name === name)!;
+const stepNamed = (steps: readonly StepSpec[], name: string) => steps.find((s) => s.name === name)!;
 
 /** The team's one skill told whole after its agent's instructions (`preload: true`): the shipper's merge. */
 const PRELOADED = 'trial-merge-a-branch';
 
 /** The body of the team's skill `name`, as a prompt tells it whole. */
-const teamBody = (name: string): string => {
+const teamBody = (name: string) => {
   const file = path.join(TEAM, 'skills', name, 'SKILL.md');
   return splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body;
 };
@@ -277,15 +276,13 @@ describe('a step given skills from four places: frozen as files under bare names
 });
 
 /** The agents of `files`, by name, each parsed from its file's text. */
-const agentsOf = (files: Record<string, string>): Agents =>
-  new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
+const agentsOf = (files: Record<string, string>) => new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
 /** The step `build` written with `lines` as its frontmatter, resolved with `agents`. */
-const stepOf = (agents: Agents, lines: string): StepSpec =>
-  parseWorkflow('build', `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
+const stepOf = (agents: Agents, lines: string) => parseWorkflow('build', `---\nplace: git\n${lines}\n---\nDo it.\n`, undefined, agents);
 
 /** What `fn` was refused with: a `WorkflowError`'s message, or a failed assertion when it was not refused. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -311,7 +308,7 @@ const AGENTS = agentsOf({
 const hire = (agent: string) => ({ agent, factory: 'acme', step: 'dev/build' });
 
 /** A fence refusal names the step's line, the skill, the agent's file and the fix. */
-const fenced = (said: string, agent: string): void =>
+const fenced = (said: string, agent: string) =>
   names(said, 'build', '`skills: look`', `agents/${agent}.md`, "take `look` off this step's `skills:`");
 
 describe("a step's own `skills:` line, read beside its agent's: what it adds, what it writes back, and its refusals at shipped defaults", () => {
@@ -449,7 +446,7 @@ describe("a step's own `skills:` line, read beside its agent's: what it adds, wh
 });
 
 /** The refusal the program `ran` is rejected with, by its message, and the store left with the runs it had. */
-async function startRefused(ran: () => Promise<unknown>): Promise<string> {
+async function startRefused(ran: () => Promise<unknown>) {
   const before = runsNow();
   let said: string | undefined;
   try {
@@ -468,7 +465,7 @@ describe('REFUSED at a start and at the folder’s check: a skill no session can
   beforeAll(() => {
     outside = written(scratch('wf-step-skills-outside-'), { 'x/SKILL.md': skill('x'), 'secret.md': 'Not the skill.\n' });
   });
-  const checkout = (): string =>
+  const checkout = () =>
     repository({ 'skills/x/SKILL.md': skill('x'), 'skills/x/notes.md': 'Notes.\n', 'app/.claude/skills/y/SKILL.md': skill('y') });
   for (const [what, line, place, facts] of [
     ['a skill of .claude/skills/ linked outside the checkout', 'x', 'step', (_repo: string) => ['x is a link']],

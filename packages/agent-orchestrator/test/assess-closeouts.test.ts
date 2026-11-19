@@ -57,18 +57,16 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
   );
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
 /** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
-const shown =
-  (m: Record<string, ListedPhase>) =>
-  (id: string): ListedPhase =>
-    m[id] ?? 'unknown';
+const shown = (m: Record<string, ListedPhase>) => (id: string) => (m[id] ?? ('unknown' as const)) satisfies ListedPhase;
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
-const said = (outcome: Closeout['outcome']): Closeout => ({
-  outcome,
-  summary: 'rewrote the parser\nand the three tests that pinned it',
-  artifacts: [],
-  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
-});
+const said = (outcome: Closeout['outcome']) =>
+  ({
+    outcome,
+    summary: 'rewrote the parser\nand the three tests that pinned it',
+    artifacts: [],
+    needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
+  }) satisfies Closeout;
 const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);
 const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
 
@@ -95,13 +93,14 @@ const READS: StepSpec = { ...step('respond', ['review']), input: ['review'] };
 const IGNORES: StepSpec = step('respond', ['review']);
 const FOUND = [{ file: 'src/run.ts', line: 183, what: 'a producer with no findings reads as done' }];
 /** How review signed off: the four fields, what it declares, and whatever else it is given. */
-const reviewSaid = (extra: Record<string, unknown> = {}): Closeout => ({
-  outcome: 'done',
-  summary: 'SUMMARY-FOR-THE-DECIDER',
-  artifacts: ['NOTES.md'],
-  needs: undefined,
-  output: { findings: FOUND, ...extra },
-});
+const reviewSaid = (extra: Record<string, unknown> = {}) =>
+  ({
+    outcome: 'done',
+    summary: 'SUMMARY-FOR-THE-DECIDER',
+    artifacts: ['NOTES.md'],
+    needs: undefined,
+    output: { findings: FOUND, ...extra },
+  }) satisfies Closeout;
 const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]);
 const FILES = '/wf/runs/r-1/artifacts/implement';
 
@@ -511,7 +510,8 @@ describe("composeBrief of a step's files", () => {
 });
 
 describe('inputRefusal: what `nemia start --input` refuses, by name', () => {
-  const f = (given: string, kind: InputFile['kind'] = 'file', resolved = `/work/${given}`): InputFile => ({ given, resolved, kind });
+  const f = (given: string, kind: InputFile['kind'] = 'file', resolved = `/work/${given}`) =>
+    ({ given, resolved, kind }) satisfies InputFile;
   test('lets through none, and files that are there, each of its own name', () => {
     assert.equal(inputRefusal([]), null);
     assert.equal(inputRefusal([f('mock.png'), f('notes/brief.md'), f('notes/mock.png.md')]), null);

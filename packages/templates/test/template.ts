@@ -37,7 +37,7 @@ export const SDLC = path.join(TEMPLATES, 'sdlc');
  * engine and the built-in git place: a verb the client holds, which the orchestrator's CLI serves no more. Its data, or refused as the
  * handler refuses it.
  */
-export async function handled<A extends object>(env: NodeJS.ProcessEnv, entry: Served<A>, words: readonly string[]): Promise<A> {
+export async function handled<A extends object>(env: NodeJS.ProcessEnv, entry: Served<A>, words: readonly string[]) {
   const args = parseArgv(entry.spec, [...words]);
   if (args === undefined) throw new Error(`nemia ${entry.name} was given too little: ${words.join(' ')}`);
   const program = Effect.provide(Effect.provide(entry.handler(args as never), PlaceService.layer(builtinGitPlace)), storeConfigLayer(env));
@@ -52,7 +52,7 @@ export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
  * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor its
  * serving ones (`SERVING_VARIABLES`).
  */
-export function storeEnv(root: string): NodeJS.ProcessEnv {
+export function storeEnv(root: string) {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     WF_ROOT: path.join(root, 'store'),
@@ -64,17 +64,17 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
   };
   for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
-  return env;
+  return env satisfies NodeJS.ProcessEnv;
 }
 
 /** `nemia <args>` on the store of `env`, bounded: its exit and its streams. */
-export function nemia(env: NodeJS.ProcessEnv, ...args: string[]): { code: number | null; out: string; err: string } {
+export function nemia(env: NodeJS.ProcessEnv, ...args: string[]) {
   const ran = spawnSync(process.execPath, [BIN, ...args], { env, encoding: 'utf8', timeout: 120_000 });
-  return { code: ran.status, out: ran.stdout, err: ran.stderr };
+  return { code: ran.status, out: ran.stdout, err: ran.stderr } satisfies { code: number | null; out: string; err: string };
 }
 
 /** A scratch copy of the template `from`, as a folder of its own name, each file of it then changed by `edit`, which must change it. */
-export function copyOf(from: string, edit: Record<string, (text: string) => string> = {}): string {
+export function copyOf(from: string, edit: Record<string, (text: string) => string> = {}) {
   const folder = path.join(scratch('nemia-template-'), path.basename(from));
   fs.cpSync(from, folder, { recursive: true });
   for (const [file, change] of Object.entries(edit)) {
@@ -96,7 +96,7 @@ export type Tree = { tree: string | undefined; conditions: Array<{ type: string;
  * Each of `factories` applied on one scratch store, each over a scratch repository of its own, then rendered by `nemia up`, stopped once
  * each factory has its status written: by name, its tree and its conditions. Throws where `nemia factory apply` refuses one.
  */
-export async function rendered(factories: readonly Applied[]): Promise<Record<string, Tree>> {
+export async function rendered(factories: readonly Applied[]) {
   const root = scratch('nemia-applied-');
   const env = storeEnv(root);
   for (const { name, template, sets = [] } of factories) {
@@ -113,14 +113,14 @@ export async function rendered(factories: readonly Applied[]): Promise<Record<st
       ...sets.flatMap((s) => ['--set', s]),
     ]);
   }
-  const folderOf = (name: string): string => path.join(env.WF_ROOT!, 'factories', name);
-  const statusOf = (name: string): Pick<Tree, 'conditions'> | undefined => {
+  const folderOf = (name: string) => path.join(env.WF_ROOT!, 'factories', name);
+  const statusOf = (name: string) => {
     const file = path.join(folderOf(name), 'status.json');
     return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')) as Pick<Tree, 'conditions'>) : undefined;
   };
-  const appliedOf = (name: string): boolean => statusOf(name)?.conditions.some((c) => c.type === 'Applied' && c.status === 'True') ?? false;
-  const treeOf = (name: string): string => path.join(folderOf(name), 'tree');
-  const settled = (): boolean =>
+  const appliedOf = (name: string) => statusOf(name)?.conditions.some((c) => c.type === 'Applied' && c.status === 'True') ?? false;
+  const treeOf = (name: string) => path.join(folderOf(name), 'tree');
+  const settled = () =>
     factories.every(
       ({ name }) => statusOf(name) !== undefined && (!appliedOf(name) || fs.existsSync(path.join(treeOf(name), 'factory.json'))),
     );
@@ -146,16 +146,16 @@ export async function rendered(factories: readonly Applied[]): Promise<Record<st
 }
 
 /** sdlc as one factory gets it, a copy applied with `sets` and rendered (`rendered`): its tree, and the scratch store it is in. */
-export async function renderedSdlc(sets: readonly string[] = []): Promise<{ tree: string; store: string }> {
+export async function renderedSdlc(sets: readonly string[] = []) {
   const { sdlc } = await rendered([{ name: 'sdlc', template: copyOf(SDLC), sets: [...sets] }]);
   if (sdlc?.tree === undefined) throw new Error(`nemia up did not apply sdlc: ${JSON.stringify(sdlc?.conditions)}`);
-  return { tree: sdlc.tree, store: sdlc.store };
+  return { tree: sdlc.tree, store: sdlc.store } satisfies { tree: string; store: string };
 }
 
 /** Every file under `dir`, by its path from it, in order. */
-export const filesUnder = (dir: string): string[] =>
+export const filesUnder = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => fs.statSync(path.join(dir, file)).isFile())
     .map((file) => file.split(path.sep).join('/'))
-    .sort();
+    .sort() satisfies string[];

@@ -50,7 +50,7 @@ import { OUT, photographing, store } from '../world.ts';
  * a click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it
  * from loading the whole page. Nothing else in the e2e presses a link from the keyboard.
  */
-async function enterOnPlace(page: Page, place: string, route: string): Promise<void> {
+async function enterOnPlace(page: Page, place: string, route: string) {
   const before = await page.evaluate(() => {
     (window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded = true;
     return history.length;
@@ -67,7 +67,7 @@ async function enterOnPlace(page: Page, place: string, route: string): Promise<v
 }
 
 /** The path of each request to the api a fresh visit of the page's address makes until it is idle. */
-async function asksOf(page: Page): Promise<string[]> {
+async function asksOf(page: Page) {
   const again = await page.context().newPage();
   const asked: string[] = [];
   again.on('request', (request) => {
@@ -91,7 +91,7 @@ const TWO_READS = [
 ];
 
 /** The page asks its two reads of the RunList by state, and never the whole list. */
-async function twoReads(page: Page): Promise<void> {
+async function twoReads(page: Page) {
   const asked = await asksOf(page);
   for (const read of TWO_READS)
     if (!asked.includes(read)) throw new Refused(`the Runs page asks GET ${read} — it asked ${[...new Set(asked)].join(', ')}`);
@@ -100,17 +100,18 @@ async function twoReads(page: Page): Promise<void> {
 }
 
 /** The three sections, by their names. */
-const section = (page: Page, name: 'waiting' | 'in-flight' | 'finished'): Locator => page.locator(`section[data-section="${name}"]`);
+const section = (page: Page, name: 'waiting' | 'in-flight' | 'finished') =>
+  page.locator(`section[data-section="${name}"]`) satisfies Locator;
 
 /** The card of the waiting run `id`. */
-const cardOf = (page: Page, id: string): Locator => section(page, 'waiting').locator(`article[data-run="${id}"]`);
+const cardOf = (page: Page, id: string) => section(page, 'waiting').locator(`article[data-run="${id}"]`) satisfies Locator;
 
 /**
  * The three parts as the api counts them: a card for every run that waits and no row of it, a row for every run in flight, a page of
  * the finished, each under a count chip that says the api's count in the section's colour, quiet at zero, and stands alone on its
  * line; and nothing of the list the page was.
  */
-async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage) {
   await expectTexts(page.getByRole('heading', { level: 1 }), ['Runs'], "the page's header is its name");
   const heads = (await page.getByRole('heading', { level: 2 }).allTextContents()).map((head) => head.replace(/^\d+/, '').trim());
   if (heads.join('|') !== 'Waiting on you|In flight|Finished')
@@ -160,7 +161,7 @@ async function threeParts(page: Page, open: OpenRuns, finished: FinishedPage): P
  * The card of `run` says how long it has waited on a person this time, since the api's `waitingSince`, and nothing where it is null:
  * its present wait at the instant of the answer the page drew it from (`given`), never of the check's own read a moment later.
  */
-async function waitSaid(page: Page, run: WaitingRun, given: () => Given): Promise<void> {
+async function waitSaid(page: Page, run: WaitingRun, given: () => Given) {
   const figure = cardOf(page, run.id).locator('[data-waited]');
   if (run.waitingSince === null)
     return await expectCount(figure, 0, `the card of ${run.id}, whose wait the api does not date, says no wait`);
@@ -177,7 +178,7 @@ async function waitSaid(page: Page, run: WaitingRun, given: () => Given): Promis
 }
 
 /** The whole minutes a figure says, of `2h 05m` or `25m`; none for `under 1m` and `none`. */
-const minutesIn = (said: string): number => {
+const minutesIn = (said: string) => {
   const [, h, m] = /(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(said.replace(/^under 1m$/, '')) ?? [];
   return Number(h ?? 0) * 60 + Number(m ?? 0);
 };
@@ -186,7 +187,7 @@ const minutesIn = (said: string): number => {
  * REGATED, at its second gate: its card says the present wait, minutes long, while the api keeps every wait on a person summed, over
  * twenty minutes. A card that read the sum would say the sum's figure.
  */
-async function secondGate(page: Page, open: OpenRuns): Promise<void> {
+async function secondGate(page: Page, open: OpenRuns) {
   const run = open.waiting.filter(judged).find((waiting) => waiting.id === REGATED.id);
   if (!run?.clock || run.waitingSince === null) throw new Refused(`${REGATED.id} waits on you, and the api dates its present wait`);
   const [present, summed] = [Date.parse(open.asOf) - Date.parse(run.waitingSince), run.clock.personMs];
@@ -210,7 +211,7 @@ async function secondGate(page: Page, open: OpenRuns): Promise<void> {
  * waits on you at and the words of what is asked (`nowOf`), its own steps as a short rail, each bar a button that opens its step's
  * card, and one quiet button, which opens the run's page.
  */
-async function cardSays(page: Page, run: WaitingRun): Promise<void> {
+async function cardSays(page: Page, run: WaitingRun) {
   const card = cardOf(page, run.id);
   const open = `[href="/runs/${run.id}"]`;
   const now = nowOf(run);
@@ -241,14 +242,14 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
 }
 
 /** Where a card's button stands against its rail, and how far its right edge is from the foot's. */
-const footOf = (card: Locator): Promise<{ beside: boolean; fromRight: number }> =>
+const footOf = (card: Locator) =>
   card.locator('[data-foot]').evaluate((foot) => {
     const [rail, button] = ['[data-run-steps]', '[data-cut-button]'].map((part) => foot.querySelector(part)!.getBoundingClientRect());
     return {
       beside: button.top < rail.bottom && button.bottom > rail.top,
       fromRight: Math.round(foot.getBoundingClientRect().right - button.right),
     };
-  });
+  }) satisfies Promise<{ beside: boolean; fromRight: number }>;
 
 /** A window wider than the visit's, where the cards stand two side by side. */
 const WIDE = 1680;
@@ -257,7 +258,7 @@ const WIDE = 1680;
  * The button of every card stands at the card's right, beside its rail, in the window the visit is in and in one `WIDE` across. The
  * foot of `run`'s card is photographed at each width, and the window put back.
  */
-async function footAtRight(page: Page, open: OpenRuns, run: WaitingRun): Promise<void> {
+async function footAtRight(page: Page, open: OpenRuns, run: WaitingRun) {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   try {
     for (const [width, place] of [
@@ -284,7 +285,7 @@ async function footAtRight(page: Page, open: OpenRuns, run: WaitingRun): Promise
 }
 
 /** A copy control's glyph, its id and the line that holds both, as the browser lays them out, in whole pixels. */
-const copyOf = (holder: Locator): Promise<{ glyph: string; gap: number; line: number }> =>
+const copyOf = (holder: Locator) =>
   holder.evaluate((copy) => {
     const box = (part: string) => copy.querySelector(part)!.getBoundingClientRect();
     const [glyph, id] = [box('[data-copy-glyph]'), box('[data-run-id]')];
@@ -293,13 +294,13 @@ const copyOf = (holder: Locator): Promise<{ glyph: string; gap: number; line: nu
       gap: Math.round(glyph.left - id.right),
       line: Math.round(copy.getBoundingClientRect().height),
     };
-  });
+  }) satisfies Promise<{ glyph: string; gap: number; line: number }>;
 
 /**
  * The copy control as the canvas draws it, on a card and in each table: its glyph 12 pixels across, 7 from the id; and on a card its
  * line, the meta line, 16 pixels tall, over the title.
  */
-async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+async function copyDrawn(page: Page, open: OpenRuns, finished: FinishedPage) {
   const card = cardOf(page, open.waiting[0].id);
   const holders: Array<[Locator, string]> = [
     [card.locator('[data-copy-id]'), 'a card'],
@@ -327,7 +328,7 @@ const OVER = 'A title that runs under the copy control';
  * the control written into the first card and taken out again, the point a pixel inside the title's upper edge, under the control's
  * centre, answers the title's link.
  */
-async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
+async function titleKeepsItsBox(page: Page, open: OpenRuns) {
   const card = cardOf(page, open.waiting[0].id);
   await card.scrollIntoViewIfNeeded();
   const hit = await card.evaluate((article, over) => {
@@ -359,17 +360,17 @@ async function titleKeepsItsBox(page: Page, open: OpenRuns): Promise<void> {
 }
 
 /** The element the keyboard is on. */
-const focused = (page: Page): Locator => page.locator(':focus');
+const focused = (page: Page) => page.locator(':focus') satisfies Locator;
 
 /** The tooltip that shows. */
-const tooltip = (page: Page): Locator => page.locator('[data-slot="tooltip"]');
+const tooltip = (page: Page) => page.locator('[data-slot="tooltip"]') satisfies Locator;
 
 /**
  * The keyboard's path over COSTLY's card: its copy control, which Enter presses; from its title, Tab reaches the rail's bars; from the
  * last bar its cost, whose preview opens on focus with the run's tokens and closes on Escape, asking the api nothing; then the button.
  * The preview is photographed.
  */
-async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
+async function byKeyboard(page: Page, run: WaitingRun) {
   const card = cardOf(page, run.id);
   await card.scrollIntoViewIfNeeded();
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -415,7 +416,7 @@ async function byKeyboard(page: Page, run: WaitingRun): Promise<void> {
  * In a table the keyboard reaches a row, then, with the arrow keys, the title's link and the copy control, which Enter presses: no
  * pointer.
  */
-async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void> {
+async function tableByKeyboard(page: Page, finished: FinishedPage) {
   const run = finished.runs[0];
   const row = section(page, 'finished').locator(`tr[data-run="${run.id}"]`);
   await row.scrollIntoViewIfNeeded();
@@ -447,7 +448,7 @@ async function tableByKeyboard(page: Page, finished: FinishedPage): Promise<void
 }
 
 /** The points `across` to each side of `control`'s centre, `up` above it and `down` below it that do not answer the control. */
-const missed = (control: Locator, across: number, up: number, down: number): Promise<string[]> =>
+const missed = (control: Locator, across: number, up: number, down: number) =>
   control.evaluate(
     (button, [dx, above, below]) => {
       const box = button.getBoundingClientRect();
@@ -463,7 +464,7 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
       );
     },
     [across, up, down] as const,
-  );
+  ) satisfies Promise<string[]>;
 
 /**
  * What the page guarantees a finger on a copy control: 48 pixels across everywhere; on a card from 24 above its centre to 12 below
@@ -471,7 +472,7 @@ const missed = (control: Locator, across: number, up: number, down: number): Pro
  * begins. Probed a pixel inside each edge, the pointer away so that no step's card stands open; and the probe refuses a control whose
  * target something clips.
  */
-async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promise<void> {
+async function finger(page: Page, open: OpenRuns, finished: FinishedPage) {
   const controls: Array<[Locator, number, number, string]> = [
     [cardOf(page, open.waiting[0].id).locator('[data-copy-id] button'), 23, 11, 'a card'],
     [section(page, 'in-flight').locator('tr[data-run] [data-copy-id] button').first(), 23, 15, 'a row in flight'],
@@ -500,13 +501,22 @@ async function finger(page: Page, open: OpenRuns, finished: FinishedPage): Promi
  * started`. A preview over the words breaks that clock down — the rows the waiting card's Clock tile shows, with the wall time as the
  * foot — opened by the keyboard alone, with no request heard, and closed by Escape. Both tables, and the open preview, are pictured.
  */
-async function clocksSay(page: Page, finished: FinishedPage, given: () => Given): Promise<void> {
+async function clocksSay(page: Page, finished: FinishedPage, given: () => Given) {
   type Clocked = ListedRun | FinishedPage['runs'][number];
   const tables = ['in-flight', 'finished'] as const;
-  const drawnWith = (where: (typeof tables)[number]): { at: number; done: boolean; runs: readonly Clocked[] } | null => {
-    if (where === 'finished') return { at: Date.parse(finished.asOf), done: true, runs: finished.runs };
+  const drawnWith = (where: (typeof tables)[number]) => {
+    if (where === 'finished')
+      return { at: Date.parse(finished.asOf), done: true, runs: finished.runs } satisfies {
+        at: number;
+        done: boolean;
+        runs: readonly Clocked[];
+      } | null;
     const open = given().open;
-    return open ? { at: Date.parse(open.asOf), done: false, runs: open.inFlight.filter(judged) } : null;
+    return (open ? { at: Date.parse(open.asOf), done: false, runs: open.inFlight.filter(judged) } : null) satisfies {
+      at: number;
+      done: boolean;
+      runs: readonly Clocked[];
+    } | null;
   };
   let wallsDiffered = 0;
   for (const where of tables) {
@@ -598,21 +608,22 @@ const PRICED = {
 };
 
 /** The runs of each table an answer at `url` carries, if it is one of the two RunLists by state the runs page reads. */
-const rowsAt = (url: URL, body: unknown): Array<[keyof typeof PRICED, RunList['items']]> => {
+const rowsAt = (url: URL, body: unknown) => {
   const field = url.pathname === '/api/runs' ? url.searchParams.get('fieldSelector') : null;
   const items = (body as Partial<RunList>).items ?? [];
-  if (field === OPEN_SELECTOR) return [['in-flight', items.filter((run) => run.status.state === 'inFlight')]];
-  return field === FINISHED_SELECTOR ? [['finished', items]] : [];
+  if (field === OPEN_SELECTOR)
+    return [['in-flight', items.filter((run) => run.status.state === 'inFlight')]] satisfies Array<[keyof typeof PRICED, RunList['items']]>;
+  return (field === FINISHED_SELECTOR ? [['finished', items]] : []) satisfies Array<[keyof typeof PRICED, RunList['items']]>;
 };
 
 /** An answer of the runs page with each table's first run priced (`PRICED`), in its status. */
-const pricedIn = <T>(url: URL, body: T): T => {
+const pricedIn = <T>(url: URL, body: T) => {
   for (const [table, rows] of rowsAt(url, body)) if (rows[0]) Object.assign(rows[0].status, PRICED[table]);
-  return body;
+  return body satisfies T;
 };
 
 /** The runs page's two answers with each table's first row priced, routed in the page and let go by `back`. */
-async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: FinishedPage; back: () => Promise<void> }> {
+async function pricedRows(page: Page) {
   const isRuns = (url: URL) => rowsAt(url, { items: [] }).length > 0;
   await page.route(isRuns, async (route) => {
     const response = await route.fetch();
@@ -620,8 +631,7 @@ async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: Finis
   });
   await page.reload({ waitUntil: 'load' });
   await idle(page);
-  const read = async (pathname: string): Promise<RunList> =>
-    pricedIn(new URL(pathname, page.url()), await answered<RunList>(page, pathname));
+  const read = async (pathname: string) => pricedIn(new URL(pathname, page.url()), await answered<RunList>(page, pathname));
   const open = openOf(await read(runListPath(undefined, { fieldSelector: OPEN_SELECTOR })));
   const finished = finishedOf(await read(runListPath(undefined, { fieldSelector: FINISHED_SELECTOR, limit: String(FINISHED_SIZE) })));
   const back = async () => {
@@ -629,7 +639,7 @@ async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: Finis
     await page.reload({ waitUntil: 'load' });
     await idle(page);
   };
-  return { open, finished, back };
+  return { open, finished, back } satisfies { open: OpenRuns; finished: FinishedPage; back: () => Promise<void> };
 }
 
 /**
@@ -638,7 +648,7 @@ async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: Finis
  * board's own rule gives (`tokensBreakdown`), and the words keep inside their cell. The rows are priced by the page itself (`PRICED`):
  * the one in flight, a session of which measured no tokens, heads with `≥`; the finished one, whole, without.
  */
-async function costsSay(page: Page): Promise<void> {
+async function costsSay(page: Page) {
   const priced = await pricedRows(page);
   try {
     const short = await costSays(page, 'in-flight', priced.open.inFlight.filter(judged));
@@ -652,7 +662,7 @@ async function costsSay(page: Page): Promise<void> {
 }
 
 /** That the first row of `runs` with a cost and tokens, in the table `where`, opens the preview of its tokens; its headline as shown. */
-async function costSays(page: Page, where: 'in-flight' | 'finished', runs: readonly ListedRun[]): Promise<string> {
+async function costSays(page: Page, where: 'in-flight' | 'finished', runs: readonly ListedRun[]) {
   const run = runs.find((r) => r.cost && r.tokens);
   if (!run?.cost || !run.tokens) throw new Refused(`a ${where} row has a cost and tokens, for its preview to be read`);
   const want = tokensBreakdown(run.tokens, run.cost.said);
@@ -703,7 +713,7 @@ type Given = { open?: OpenRuns; finished?: FinishedPage };
  * rows drew their words against. `answered` reads the api apart from the page and a moment later, so near a minute's edge its `asOf`
  * says another word than the page drew.
  */
-function answersDrawn(page: Page): { last: () => Given; stop: () => void } {
+function answersDrawn(page: Page) {
   const last: Given = {};
   const seen = (response: Response) => {
     const url = new URL(response.url());
@@ -717,7 +727,7 @@ function answersDrawn(page: Page): { last: () => Given; stop: () => void } {
     if (keep && response.ok()) response.json().then(keep, () => undefined);
   };
   page.on('response', seen);
-  return { last: () => ({ ...last }), stop: () => page.off('response', seen) };
+  return { last: () => ({ ...last }), stop: () => page.off('response', seen) } satisfies { last: () => Given; stop: () => void };
 }
 
 /**
@@ -725,7 +735,7 @@ function answersDrawn(page: Page): { last: () => Given; stop: () => void } {
  * the chip of what it does now in the tone `nowOf` gives it, its words never cut, and its rail; finished, how it ended, red only when it
  * failed, and when.
  */
-async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => Given): Promise<void> {
+async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given: () => Given) {
   const flying = open.inFlight.filter(judged)[0];
   const row = section(page, 'in-flight').locator(`tr[data-run="${flying.id}"]`);
   await expectTexts(row.locator(`a[href="/runs/${flying.id}"]`), [titleOf(flying)], 'a row in flight says its title, a link to the run');
@@ -820,8 +830,8 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
  * Where a finished run's workflow link leads: its workflow's page in the run's place where its lines page one (`workflowPage`), else the
  * Workflows page.
  */
-const workflowAddress = (workflowPage: WorkflowPageAddress | null): { path: string; search: Record<string, string> } =>
-  workflowPage
+const workflowAddress = (workflowPage: WorkflowPageAddress | null) =>
+  (workflowPage
     ? {
         path: `/workflows/${encodeURIComponent(workflowPage.from)}/${encodeURIComponent(workflowPage.workflow)}`,
         search: {
@@ -829,13 +839,13 @@ const workflowAddress = (workflowPage: WorkflowPageAddress | null): { path: stri
           ...(workflowPage.repo ? { repo: workflowPage.repo } : {}),
         },
       }
-    : { path: '/workflows', search: {} };
+    : { path: '/workflows', search: {} }) satisfies { path: string; search: Record<string, string> };
 
 /** A URL's path and its search, read as the board writes them, the quotes of a JSON string taken off. */
-const addressParts = (href: string): { path: string; search: Record<string, string> } => {
+const addressParts = (href: string) => {
   const url = new URL(href, 'http://board');
   const search = Object.fromEntries([...url.searchParams].map(([key, value]) => [key, value.replace(/^"(.*)"$/, '$1')]));
-  return { path: url.pathname, search };
+  return { path: url.pathname, search } satisfies { path: string; search: Record<string, string> };
 };
 
 /**
@@ -843,7 +853,7 @@ const addressParts = (href: string): { path: string; search: Record<string, stri
  * workflow, and its title is whole on hover too; the first row's workflow link, pressed, leads to that workflow's page, and the page
  * comes back to Runs.
  */
-async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
+async function workflowsSay(page: Page, finished: FinishedPage) {
   const links = section(page, 'finished').locator('tr[data-run] a[data-workflow]');
   await expectTexts(
     links,
@@ -904,7 +914,7 @@ const drawnOf = (page: Page, marks: string) =>
     );
 
 /** Refuses with `said` unless `marks` finds at least one element and each is drawn with `fact` at `want`. */
-async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', want: string, said: string): Promise<void> {
+async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', want: string, said: string) {
   const found = (await drawnOf(page, marks)).map((drawn) => drawn[fact]);
   if (!found.length || found.some((value) => value !== want)) throw new Refused(`${said} — ${marks}: ${found.join(', ') || 'none drawn'}`);
 }
@@ -912,7 +922,7 @@ async function expectDrawn(page: Page, marks: string, fact: 'tracking' | 'cut', 
 const TAG_CUT = 'polygon(0px 0px, calc(100% - 7px) 0px, 100% 7px, 100% 100%, 0px 100%)';
 
 /** What the browser draws of a run's titles, the short ids with no box, the rule under the page's name and the bars of steps done. */
-async function lookRules(page: Page): Promise<void> {
+async function lookRules(page: Page) {
   await page.mouse.move(0, 0);
   const titles = await page
     .locator('[data-runs-page] [data-text-link]')
@@ -953,7 +963,7 @@ async function lookRules(page: Page): Promise<void> {
  * The details of the look, as the browser draws them: each label role's tracking where it is written, the chips that say a state or a
  * count cut, the pager's buttons in the face of a heading, and only the step at work alive with a pulse.
  */
-async function lookDetails(page: Page): Promise<void> {
+async function lookDetails(page: Page) {
   await expectDrawn(page, 'th', 'tracking', '1.1px', 'a heading is the small label, tracked by a tenth of its 11 pixels');
   await expectDrawn(page, '[data-now-word] span', 'tracking', '0.72px', 'a chip is tracked by six hundredths of its 12 pixels');
   await expectDrawn(page, '[data-cut-button] [data-cut-shape]', 'tracking', '0.84px', 'the cut button, by six hundredths of its 14');
@@ -994,9 +1004,9 @@ const CLOSE_UPS = {
  * closed after: a card's foot, the copy control on a card, in a row in flight and in a finished row, and a card's title with the
  * keyboard on it, its ring around it. Opens nothing unless the page is pictured.
  */
-async function closeUps(page: Page): Promise<void> {
+async function closeUps(page: Page) {
   if (!photographing) return;
-  const theme = (await themeOf(page)) as 'light' | 'dark';
+  const theme = await themeOf(page);
   const context = await seated(
     await page.context().browser()!.newContext({ colorScheme: theme, viewport: page.viewportSize(), deviceScaleFactor: 3 }),
     page.url(),
@@ -1044,7 +1054,7 @@ const flightLines = (page: Page) =>
  * The second line of every row in flight lines up: each copy control at one edge and each factory at one edge, whatever the length of
  * each id; and the seed holds ids of more than one length, or the rule would hold for nothing.
  */
-async function flightAligned(page: Page): Promise<void> {
+async function flightAligned(page: Page) {
   await expectVisible(section(page, 'in-flight').locator('tr[data-run]:has([data-factory])').first(), 'the rows in flight, read again');
   const lines = await flightLines(page);
   if (new Set(lines.map((line) => line.id.length)).size < 2)
@@ -1059,7 +1069,7 @@ async function flightAligned(page: Page): Promise<void> {
 }
 
 /** Each row in flight's second line inside its cell, its factory under no copy control's target. */
-async function flightWhole(page: Page): Promise<void> {
+async function flightWhole(page: Page) {
   for (const line of await flightLines(page)) {
     await section(page, 'in-flight').locator(`tr[data-run="${line.id}"] [data-factory]`).scrollIntoViewIfNeeded();
     const [again] = (await flightLines(page)).filter((each) => each.id === line.id);
@@ -1071,7 +1081,7 @@ async function flightWhole(page: Page): Promise<void> {
 }
 
 /** At 390 wide nothing breaks: the document does not scroll sideways, the cards stack, and each table scrolls inside its frame. */
-async function narrow(page: Page): Promise<void> {
+async function narrow(page: Page) {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize({ width: 390, height: 844 });
   try {
@@ -1096,7 +1106,7 @@ async function narrow(page: Page): Promise<void> {
 }
 
 /** REGATED written into the worker's store and said on the feed, and the page loaded again on it. */
-async function regated(page: Page): Promise<void> {
+async function regated(page: Page) {
   writeRegated(store!, Date.now());
   fed(REGATED.id, 'build', 'awaiting approval');
   await page.reload({ waitUntil: 'load' });
@@ -1105,13 +1115,13 @@ async function regated(page: Page): Promise<void> {
 }
 
 /** REGATED taken out of the worker's store, whatever of it was written, and the feed told. */
-function regatedBack(): void {
+function regatedBack() {
   for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
   fed(REGATED.id, 'gone');
 }
 
 /** What the page asserts while REGATED is in the store, from its two reads to the menu's places and back. */
-async function withRegated(page: Page, drawn: () => Given): Promise<void> {
+async function withRegated(page: Page, drawn: () => Given) {
   await regated(page);
   const open = await openAnswered(page);
   const finished = await finishedAnswered(page);

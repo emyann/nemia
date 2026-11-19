@@ -23,7 +23,7 @@ import type { HarnessSpec } from '../src/harness/detached/detached.ts';
 const SDK = '@anthropic-ai/claude-agent-sdk';
 
 /** The installed SDK's `package.json`, found by resolving the SDK as the runtime does and walking up to its package's folder. */
-const installedSdk = (): { version: string; claudeCodeVersion?: string } => {
+const installedSdk = () => {
   let dir = path.dirname(createRequire(import.meta.url).resolve(SDK));
   while (!fs.existsSync(path.join(dir, 'package.json'))) dir = path.dirname(dir);
   return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { version: string; claudeCodeVersion?: string };
@@ -62,7 +62,7 @@ describe('each harness that runs a brief declares what it needs on a machine, an
 });
 
 /** An executable file at `at`, its folder made. */
-const planted = (at: string): string => {
+const planted = (at: string) => {
   fs.mkdirSync(path.dirname(at), { recursive: true });
   fs.writeFileSync(at, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   return at;
@@ -73,7 +73,7 @@ const planted = (at: string): string => {
  * an install lays them out; without, nothing, as a release's tree with no bundled binary. Answers the file the SDK is resolved from,
  * and the bundled `claude` where there is one.
  */
-const sdkFrom = (bundled: boolean): { from: string; claude?: string } => {
+const sdkFrom = (bundled: boolean) => {
   const root = scratch('ae-harness-needs-sdk-');
   const from = path.join(root, 'from.mjs');
   if (!bundled) return { from };
@@ -88,7 +88,7 @@ const sdkFrom = (bundled: boolean): { from: string; claude?: string } => {
 };
 
 /** `run` with `PATH` set to `dir` alone, the process's own put back after. */
-const withPath = <A>(dir: string, run: () => A): A => {
+const withPath = <A>(dir: string, run: () => A) => {
   const was = process.env.PATH;
   process.env.PATH = dir;
   try {

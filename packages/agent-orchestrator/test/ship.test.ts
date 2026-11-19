@@ -101,26 +101,26 @@ const FAILING = [
  */
 const refusedAs =
   (kind: string, ...fixes: string[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
+  (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.equal(err._tag, kind, err.message);
     assert.equal(err.exitCode, 2);
     for (const fix of fixes) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
-    return true;
+    return true as const satisfies true;
   };
 
 /** That a verb's refusal exits 2 and names each of `fixes`, whatever its kind. For `assert.rejects`. */
 const refusedNaming =
   (...fixes: string[]) =>
-  (err: Error & { exitCode?: number }): true => {
+  (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2, err.message);
     for (const fix of fixes) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
-    return true;
+    return true as const satisfies true;
   };
 
 /** A step's record without the revisions every filing pins (`pinned`, `closeoutHash`, `declared`), whose subject is `revisions.test.ts`. */
-const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
+const filedAs = (record: StepRecord | undefined) => {
   const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
-  return rest;
+  return rest satisfies Partial<StepRecord>;
 };
 
 /**
@@ -146,10 +146,10 @@ async function endings(stage: Stage, root: string) {
   fs.cpSync(path.join(TEAM, 'skills'), path.join(root, 'skills'), { recursive: true });
   const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
 
-  const world = (): World => stage.place().world;
+  const world = () => stage.place().world satisfies World;
   const run = (e: Engine, r: Run) => stage.runWith(e, advanceRun(r));
 
-  const folderOf = (prefix: string, files: Record<string, string>): string => {
+  const folderOf = (prefix: string, files: Record<string, string>) => {
     const dir = fs.mkdtempSync(path.join(root, prefix));
     for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
     return dir;
@@ -157,7 +157,7 @@ async function endings(stage: Stage, root: string) {
   const IMPLEMENT = '---\nplace: git\n---\nimplement it\n';
   const REVIEW_SCHEMA = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 
-  const loopingFolder = (rounds = 3): string =>
+  const loopingFolder = (rounds = 3) =>
     folderOf('wf-loop-', {
       'implement.md': IMPLEMENT,
       'review.md': `---\nafter: implement\nplace: git\noutput: review.schema.json\nloop: implement\nrounds: ${rounds}\n---\nreview it\n`,
@@ -168,32 +168,32 @@ async function endings(stage: Stage, root: string) {
   const at = {
     world,
     /** What `checkout` holds uncommitted, a path a line, and empty where it is clean. */
-    uncommitted: (checkout: string): string => world().changes(checkout).join('\n'),
+    uncommitted: (checkout: string) => world().changes(checkout).join('\n'),
     /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand. */
-    mergedByHand: (repo: string, branch: string): void => {
+    mergedByHand: (repo: string, branch: string) => {
       world().stage(repo, branch);
       world().commit(repo, `Merge branch '${branch}'`);
     },
     /** Whether a merge is staged in `repo`'s checkout and not committed. */
-    mergeHead: (repo: string): boolean => world().staged(repo) !== null,
+    mergeHead: (repo: string) => world().staged(repo) !== null,
     /** A repository with one file committed on main. */
-    aRepo: (): string => {
+    aRepo: () => {
       const repo = fs.mkdtempSync(path.join(root, 'repo-'));
       world().repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
       return repo;
     },
     /** `implement → ship`, the team's `dev/ship.md` the ending, its `after:` the one key changed, since this folder has no review. */
-    folder: (): string => {
+    folder: () => {
       assert.match(SHIP_MD, /^after: review$/m);
       return folderOf('wf-', { 'implement.md': IMPLEMENT, 'ship.md': SHIP_MD.replace(/^after: review$/m, 'after: implement') });
     },
     loopingFolder,
     /** A folder whose ONE step merges: its ending is its root, the one way a run with nothing filed can want the checkout. */
-    mergeOnly: (): string => folderOf('wf-merge-', { 'ship.md': SHIP_MD.replace(/^after: review\n/m, '') }),
+    mergeOnly: () => folderOf('wf-merge-', { 'ship.md': SHIP_MD.replace(/^after: review\n/m, '') }),
     /** A folder of one step, for a run started `--after` another. */
-    oneStep: (): string => folderOf('wf-one-', { 'implement.md': IMPLEMENT }),
+    oneStep: () => folderOf('wf-one-', { 'implement.md': IMPLEMENT }),
     /** `implement → review (loop) → ship`, quick's shape: the ship's `gate: true` deleted, so the review's pass files the landing. */
-    ungatedFolder: (): string => {
+    ungatedFolder: () => {
       const dir = loopingFolder();
       const file = path.join(dir, 'ship.md');
       const text = fs.readFileSync(file, 'utf8');
@@ -204,7 +204,7 @@ async function endings(stage: Stage, root: string) {
     /** What implement does in its worktree, by default: add.ts gains `sub`. */
     addSub: (workspace: string) => fs.appendFileSync(path.join(workspace, 'add.ts'), 'export const sub = (a, b) => a - b;\n'),
     /** main moves under the run: a commit on the base branch giving add.ts a `sub` of its own, which the branch's conflicts with. */
-    mainMoves: (repo: string): string => {
+    mainMoves: (repo: string) => {
       fs.appendFileSync(path.join(repo, 'add.ts'), 'export const sub = (a, b) => b - a;\n');
       world().commit(repo, "main's sub");
       return world().head(repo);
@@ -216,19 +216,18 @@ async function endings(stage: Stage, root: string) {
     /** Every branch of a run's repository and its commit, asked of this test's place now (`headsNow`). */
     liveHeads: (r: RepositoryRun) => headsNow(r, stage.place().place),
     /** A run this file started on a repository: a repository run. */
-    repositoryRun: (r: Run): RepositoryRun => {
+    repositoryRun: (r: Run) => {
       assert.ok(isRepositoryRun(r), `${r.id} works on a repository`);
-      return r;
+      return r satisfies RepositoryRun;
     },
     /** What `nemia <argv>` prints, line by line, over the board's engine. */
-    printedBy: async (t: TestContext, argv: string[]): Promise<string[]> => {
+    printedBy: async (t: TestContext, argv: string[]) => {
       const printed: string[] = [];
-      const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-        printed.push(args.map(String).join(' '));
-      });
+      const log = vi.spyOn(console, 'log');
       try {
         await stage.main(argv);
       } finally {
+        printed.push(...log.mock.calls.flatMap((args) => [args.map(String).join(' ')]));
         log.mockRestore();
       }
       return printed;
@@ -246,23 +245,23 @@ async function endings(stage: Stage, root: string) {
       return { dir, pictures, before: artifactFiles(ROOT, { id }, 'ship').reduce((sum, f) => sum + f.bytes, 0) };
     },
     /** The pictures in `dir`, sorted, and none where it is gone. */
-    pngsIn: (dir: string): string[] =>
-      fs.existsSync(dir)
+    pngsIn: (dir: string) =>
+      (fs.existsSync(dir)
         ? fs
             .readdirSync(dir)
             .filter((f) => f.endsWith('.png'))
             .sort()
-        : [],
+        : []) satisfies string[],
     /** Rewrite the record of run `id` through `edit`, as a record a nemia before this one wrote, or an odd one, reads. */
-    rewritten: async (id: string, edit: (record: Record<string, unknown>) => void): Promise<void> => {
+    rewritten: async (id: string, edit: (record: Record<string, unknown>) => void) => {
       const record = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
       edit(record);
       fs.writeFileSync(runFile(ROOT, id), JSON.stringify(record, null, 2));
     },
     /** The asks written for run `id`, in its `.asks` directory. */
-    asksOf: (id: string): string[] => {
+    asksOf: (id: string) => {
       const dir = path.join(root, 'runs', `${id}.asks`);
-      return fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
+      return (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) satisfies string[];
     },
     /** A pass of the run `id` over the board's engine, read from disk now. */
     pass: (id: string, e: Engine = stage.board().e) => run(e, runRecord(ROOT, id)),
@@ -392,10 +391,10 @@ const asks = (id: string) => at.asksOf(id).filter((f) => f.startsWith('merge-'))
 /** A refusal of `nemia refresh --base`: exit 2, naming `facts`, and no merge asked. For `assert.rejects`. */
 const mergeRefused =
   (id: string, ...facts: string[]) =>
-  (err: Error & { exitCode?: number }): true => {
+  (err: Error & { exitCode?: number }) => {
     refusedNaming(...facts)(err);
     assert.deepEqual(asks(id), [], 'no merge is asked');
-    return true;
+    return true as const satisfies true;
   };
 
 describe("a run waits at its ending's gate, is approved, stages its merge, lands it on its check, and a run `--after` it is handed its work", () => {
@@ -735,14 +734,14 @@ describe('a record an older nemia wrote — no staged-merge file, a place skill 
 });
 
 /** This test's place, its `status` answered by `status`. */
-const statusPlace = (status: (request: PlaceRequests['status']) => PlaceOutcome<'status'>): Place =>
-  placeOver(stage.place().place, { status });
+const statusPlace = (status: (request: PlaceRequests['status']) => PlaceOutcome<'status'>) =>
+  placeOver(stage.place().place, { status }) satisfies Place;
 
 /** A place whose `status` gives every request `reply`. */
-const answeringPlace = (reply: PlaceAnswers['status']): Place => statusPlace(() => ({ answer: reply }));
+const answeringPlace = (reply: PlaceAnswers['status']) => statusPlace(() => ({ answer: reply })) satisfies Place;
 
 /** A place whose `status` reads no checkout: it is not heard, in its words. */
-const failingPlace = (): Place => statusPlace(() => unreadBy('status', 'this place cannot read the checkout'));
+const failingPlace = () => statusPlace(() => unreadBy('status', 'this place cannot read the checkout')) satisfies Place;
 
 /** What `landEnding` does with the run `id` as the board reads it now, through the place `place`. */
 async function landedThrough(e: Engine, id: string, place: Place) {

@@ -49,7 +49,7 @@ const PAST_LEASE_MS = STALE_MS + 10_000;
 const LONG_GRACE_MS = 600_000;
 
 /** Whether the process `pid` is there. */
-const alive = (pid: number): boolean => {
+const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
     return true;
@@ -59,7 +59,7 @@ const alive = (pid: number): boolean => {
 };
 
 /** The lines of the stand-in's `file` in `dir`, each parsed; `[]` where it wrote none. */
-const wrote = (dir: string, file: string): unknown[] => {
+const wrote = (dir: string, file: string) => {
   try {
     return fs
       .readFileSync(path.join(dir, file), 'utf8')

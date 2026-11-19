@@ -20,7 +20,7 @@ import yaml from 'js-yaml';
 const OBSERVE = path.join(import.meta.dirname, '..', '..', '..', 'tools', 'observe');
 
 /** A parsed file of `tools/observe/`. */
-const read = (file: string): unknown => yaml.load(fs.readFileSync(path.join(OBSERVE, file), 'utf8'));
+const read = (file: string) => yaml.load(fs.readFileSync(path.join(OBSERVE, file), 'utf8'));
 
 /** The collector overlay, as far as the checker reads it. */
 type Collector = {
@@ -35,7 +35,7 @@ const TRANSFORM = 'transform/command_head';
 const SCOPE = 'transform/test_scope';
 
 /** The OTTL string literals a statement matches the command against, to extract the head and to test it, each as the regex Go reads. */
-const patternsOf = (statement: string): string[] =>
+const patternsOf = (statement: string) =>
   [...statement.matchAll(/(?:ExtractPatterns|IsMatch)\(attributes\["full_command"\],\s*("(?:[^"\\]|\\.)*")\)/g)].map(([, literal]) =>
     (JSON.parse(literal) as string).replaceAll('$$', '$'),
   );
@@ -47,7 +47,7 @@ const groupOf = (config: Collector, processor = TRANSFORM) => config.processors?
 const BASH_SPAN = 'name == "claude_code.tool" and attributes["tool_name"] == "Bash" and ';
 
 /** The command head `config` gives `command`: the pattern's `head` where it matches, else `other`, as the two statements set it. */
-function headOf(config: Collector, command: string): string {
+function headOf(config: Collector, command: string) {
   const [pattern] = patternsOf(groupOf(config)?.statements?.[1] ?? '');
   assert.ok(pattern, 'the second statement extracts the head');
   return new RegExp(pattern).exec(command)?.groups?.head ?? 'other';
@@ -88,7 +88,7 @@ const HEADS: [string, string][] = [
 ];
 
 /** What is wrong with the collector overlay `config`, each said in a line. */
-function collectorFaults(config: Collector): string[] {
+function collectorFaults(config: Collector) {
   const faults: string[] = [];
   const order = config.service?.pipelines?.traces?.processors ?? [];
   if (order.indexOf(TRANSFORM) < 0 || order.indexOf(TRANSFORM) > order.indexOf('batch'))
@@ -116,7 +116,7 @@ const SCOPE_STATEMENT =
   /^set\(attributes\["test_scope"\], ("(?:[^"\\]|\\.)*")\) where IsMatch\(attributes\["full_command"\], "(?:[^"\\]|\\.)*"\)$/;
 
 /** The scope a statement sets and the pattern it matches the command against, or undefined when it is not of that form. */
-function scopeStatementOf(statement: string): { scope: string; pattern: string } | undefined {
+function scopeStatementOf(statement: string) {
   const literal = SCOPE_STATEMENT.exec(statement)?.[1];
   const [pattern, ...more] = patternsOf(statement);
   if (literal === undefined || pattern === undefined || more.length) return undefined;
@@ -124,7 +124,7 @@ function scopeStatementOf(statement: string): { scope: string; pattern: string }
 }
 
 /** The scope `config` gives `command`: the last statement whose pattern matches sets it, as the collector runs them in order. */
-function scopeOf(config: Collector, command: string): string | undefined {
+function scopeOf(config: Collector, command: string) {
   let scope: string | undefined;
   for (const statement of groupOf(config, SCOPE)?.statements ?? []) {
     const read = scopeStatementOf(statement);
@@ -182,7 +182,7 @@ const SCOPE_ROWS: [string, string | undefined][] = [
 ];
 
 /** What is wrong with where the scope's transform runs, what it reads and what it may set, each said in a line. */
-function scopeShapeFaults(config: Collector): string[] {
+function scopeShapeFaults(config: Collector) {
   const faults: string[] = [];
   const order = config.service?.pipelines?.traces?.processors ?? [];
   const batch = order.indexOf('batch');
@@ -201,7 +201,7 @@ function scopeShapeFaults(config: Collector): string[] {
 }
 
 /** What is wrong with the scope's transform `config`, each said in a line: its shape, then each row it reads otherwise. */
-function scopeFaults(config: Collector): string[] {
+function scopeFaults(config: Collector) {
   const faults = scopeShapeFaults(config);
   for (const [command, scope] of SCOPE_ROWS) {
     const read = scopeOf(config, command);
@@ -246,7 +246,7 @@ const DIMENSIONS = [
 const UNBOUNDED = ['run', 'task', 'try', 'full_command', 'agent_id', 'session.id'];
 
 /** A Tempo duration (`336h`, `2m`, `30s`) in milliseconds, or `undefined` for none or one of another shape. */
-const msOf = (duration: string | undefined): number | undefined => {
+const msOf = (duration: string | undefined) => {
   const found = /^(\d+)(ms|s|m|h)$/.exec(duration ?? '');
   return found ? Number(found[1]) * { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[found[2] as 'ms' | 's' | 'm' | 'h'] : undefined;
 };
@@ -262,7 +262,7 @@ const TEMPO_DEFAULTS = { reach: '24h', late: '30s', long: '2m' } as const;
  * names, a subagent's spans counted, a retention left to the default or planned and run at two lengths, a query reaching past the traces
  * kept or no further than the default, and a slack left at its default. The numbers are the config's own; this reads how they relate.
  */
-function tempoFaults(config: Tempo): string[] {
+function tempoFaults(config: Tempo) {
   const faults: string[] = [];
   const spanMetrics = config.metrics_generator?.processor?.span_metrics;
   const dimensions = spanMetrics?.dimensions ?? [];
@@ -306,14 +306,14 @@ const RETENTION = '--storage.tsdb.retention.time=';
 const PROMETHEUS_DEFAULT_DAYS = 15;
 
 /** The days Prometheus keeps metrics, as `service`'s flag writes them (`90d`), or `undefined` where it writes none in days. */
-const metricDays = (service: Service): number | undefined => {
+const metricDays = (service: Service) => {
   const flag = (service.environment?.PROMETHEUS_EXTRA_ARGS ?? '').split(/\s+/).find((arg) => arg.startsWith(RETENTION));
   const found = /^(\d+)d$/.exec(flag?.slice(RETENTION.length) ?? '');
   return found ? Number(found[1]) : undefined;
 };
 
 /** What is wrong with how `service` brings in the overlay and Tempo's config and keeps metrics, each said in a line. */
-function composeFaults(service: Service): string[] {
+function composeFaults(service: Service) {
   const faults: string[] = [];
   const mounted = (from: string, to: string) => (service.volumes ?? []).includes(`${from}:${to}:ro`);
   if (!mounted('./otelcol.yaml', OVERLAY)) faults.push(`./otelcol.yaml is not mounted, read-only, at ${OVERLAY}`);
@@ -329,7 +329,7 @@ function composeFaults(service: Service): string[] {
  * What is wrong with how the README `text` says a change to the mounted files is taken, each said in a line: `up -d` recreates nothing
  * for a bind-mounted file's contents, so it says `up -d --force-recreate`, and that `docker compose restart` fails on WSL.
  */
-function recreateFaults(text: string): string[] {
+function recreateFaults(text: string) {
   const faults: string[] = [];
   if (!/`tempo\.yaml`\s+or\s+`otelcol\.yaml`[^.]*?compose\.yaml\s+up\s+-d\s+--force-recreate`/.test(text))
     faults.push('the README does not say a change to tempo.yaml or otelcol.yaml is taken by up -d --force-recreate');
@@ -343,9 +343,9 @@ function recreateFaults(text: string): string[] {
  * for them, the days a query reaches back, and the days metrics are kept, each read from `tempo` and `service`. A number the README does
  * not state is not refused: the configs are the source, and the README's sentences a copy held to them.
  */
-function readmeFaults(text: string, tempo: Tempo, service: Service): string[] {
+function readmeFaults(text: string, tempo: Tempo, service: Service) {
   const faults: string[] = [];
-  const days = (duration: string | undefined): number | undefined => {
+  const days = (duration: string | undefined) => {
     const ms = msOf(duration);
     return ms === undefined ? undefined : ms / 86_400_000;
   };
@@ -373,7 +373,7 @@ test('a Bash tool span gets the plain words of its command, before the batch, an
 });
 
 test("REFUSED: the head after the batch, on every span, by two patterns, or with an argument in it, a script's or an image's", () => {
-  const changed = (edit: (c: Collector) => void): string[] => {
+  const changed = (edit: (c: Collector) => void) => {
     const config = structuredClone(COLLECTOR);
     edit(config);
     return collectorFaults(config);
@@ -427,7 +427,7 @@ test('a Bash tool span gets the scope of its test command, one of five values, a
 });
 
 test('REFUSED: the scope after the batch, on every span, copied from the command, unfiltered, a cd into a package read as the suite, out of order, or read in a quote', () => {
-  const changed = (edit: (statements: string[], c: Collector) => void): string[] => {
+  const changed = (edit: (statements: string[], c: Collector) => void) => {
     const config = structuredClone(COLLECTOR);
     edit(groupOf(config, SCOPE)!.statements!, config);
     return scopeFaults(config);
@@ -516,7 +516,7 @@ test("Tempo keeps span time by a step's and a tool's names, never a run's, and w
 });
 
 test("REFUSED: span time by run or task, without the command head or the test scope, with a subagent's spans, and a shorter reach or retention", () => {
-  const changed = (edit: (t: Tempo) => void): string[] => {
+  const changed = (edit: (t: Tempo) => void) => {
     const config = structuredClone(TEMPO);
     edit(config);
     return tempoFaults(config);
@@ -589,7 +589,7 @@ test("the compose file mounts the overlay and Tempo's config where the image rea
 });
 
 test("REFUSED: an overlay the collector is not told of, Tempo's config mounted elsewhere, and metrics kept by default", () => {
-  const changed = (more: Service): string[] => composeFaults({ ...SERVICE, ...more });
+  const changed = (more: Service) => composeFaults({ ...SERVICE, ...more });
   const volumes = SERVICE.volumes ?? [];
   assert.deepEqual(changed({ environment: { ...SERVICE.environment, OTELCOL_EXTRA_ARGS: '' } }), [
     `the collector is not given --config=${OVERLAY}`,

@@ -148,7 +148,7 @@ describe('refusedCheck: only a check that failed with an exit code read refused 
 });
 
 describe("checkTaskId and stepTaskId: a try's ids derived from its number", () => {
-  const onTry = (tries: EarlierTry[] = []): Run =>
+  const onTry = (tries: EarlierTry[] = []) =>
     run(
       {},
       {
@@ -237,7 +237,7 @@ describe("the check's harness and its bounds", () => {
  * A PATH directory whose `npm` writes its arguments to `npm.args` beside it and exits `code`, before this machine's PATH: the check's
  * install, seen without a registry.
  */
-const fakeNpm = (code: number): { bin: string; args: string; PATH: string } => {
+const fakeNpm = (code: number) => {
   const bin = scratch('wf-check-npm-');
   const args = path.join(bin, 'npm.args');
   fs.writeFileSync(
@@ -388,7 +388,7 @@ const rig = () => {
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(workspace);
   const e = plainEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: HARNESSES.check } }));
-  const env = (step: string): CheckEnv => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace });
+  const env = (step: string) => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace });
   const file = (step: string, command: string, deadlineSeconds = 60, install?: CheckFirst) =>
     Effect.runPromise(
       e.file({

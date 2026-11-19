@@ -52,7 +52,7 @@ test("routeOfHref: a step's address preloads the run it names, and no run id hol
  * Each set of options the router's link under `said` builds its location from as it renders, which are the options its preload on
  * hover is given: kept by watching `router.buildLocation` for the render alone.
  */
-function linkOptions(router: ReturnType<typeof runsRouter>['router'], said: Parameters<typeof Said>[0]['said']): unknown[] {
+function linkOptions(router: ReturnType<typeof runsRouter>['router'], said: Parameters<typeof Said>[0]['said']) {
   const built: unknown[] = [];
   const build = router.buildLocation.bind(router);
   router.buildLocation = ((options: Parameters<typeof build>[0]) => {

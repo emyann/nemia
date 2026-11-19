@@ -13,18 +13,19 @@ import type { ProposalDoorShape } from '../src/proposal/proposal.store.ts';
 type Walk = DoorWalk<ProposalDoorShape>;
 
 /** A waiting proposal `name` of `factory`, of one Workflow update. */
-export const aProposal = (name: string, factory = 'acme'): Proposal => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Proposal',
-  metadata: { name, namespace: factory, creationTimestamp: '2026-11-01T00:00:00.000Z', resourceVersion: '' },
-  spec: { objects: [{ kind: 'Workflow', metadata: { name: 'dev', resourceVersion: 'abc' }, spec: { steps: [] } }] },
-  status: {
-    phase: 'waiting',
-    proposedBy: { agent: 'implementer' },
-    changes: [{ resource: 'workflows', name: 'dev', verb: 'update', access: 'same' }],
-    widens: false,
-  },
-});
+export const aProposal = (name: string, factory = 'acme') =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Proposal',
+    metadata: { name, namespace: factory, creationTimestamp: '2026-11-01T00:00:00.000Z', resourceVersion: '' },
+    spec: { objects: [{ kind: 'Workflow', metadata: { name: 'dev', resourceVersion: 'abc' }, spec: { steps: [] } }] },
+    status: {
+      phase: 'waiting',
+      proposedBy: { agent: 'implementer' },
+      changes: [{ resource: 'workflows', name: 'dev', verb: 'update', access: 'same' }],
+      widens: false,
+    },
+  }) satisfies Proposal;
 
 /** What a walk reads of a proposal: its name, namespace, phase and whether it carries a version. */
 const seen = (p: Proposal | undefined) =>

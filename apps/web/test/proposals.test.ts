@@ -11,13 +11,14 @@ import { DELEGABLE, proposalsInOrder, widensHue } from '../src/lib/proposals.ts'
 import { PROPOSAL_WORDS } from '../src/lib/words.ts';
 
 /** A proposal named `name` in `phase`, made at `at`. */
-const proposal = (name: string, phase: ProposalPhase, at: string): Proposal => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Proposal',
-  metadata: { name, namespace: 'acme', resourceVersion: '1', creationTimestamp: at },
-  spec: { objects: [] },
-  status: { phase, proposedBy: { agent: 'nemia' }, changes: [], widens: false },
-});
+const proposal = (name: string, phase: ProposalPhase, at: string) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'Proposal',
+    metadata: { name, namespace: 'acme', resourceVersion: '1', creationTimestamp: at },
+    spec: { objects: [] },
+    status: { phase, proposedBy: { agent: 'nemia' }, changes: [], widens: false },
+  }) satisfies Proposal;
 
 test('a proposal link is read as its factory and its name, each decoded', () => {
   assert.deepEqual(proposalLinkOf('/factories/acme/proposals/nemia-ab12c'), { factory: 'acme', name: 'nemia-ab12c' });

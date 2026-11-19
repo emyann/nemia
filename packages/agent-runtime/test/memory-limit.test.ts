@@ -24,7 +24,7 @@ import { asyncStore, type AsyncJournal } from './promise-runner.ts';
  * A journal an older runtime wrote and died in the window between `starting` and `spawned`: its task filed with a limit of its own,
  * its attempt's `starting` entry carrying no `resources`, as no runtime before the defaults moved to `start` journalled them.
  */
-const olderJournal = (taskId: string, cwd: string): AsyncJournal => {
+const olderJournal = (taskId: string, cwd: string) => {
   const at = new Date().toISOString();
   const tasks = new Map<string, Event[]>([
     [
@@ -58,7 +58,7 @@ const olderJournal = (taskId: string, cwd: string): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 describe(

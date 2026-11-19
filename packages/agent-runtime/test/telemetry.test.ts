@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { Engine as EngineService, type HarnessConfig, type TaskView } from '../src/index.ts';
+import { Engine as EngineService, type HarnessConfig } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
 import { claudeTelemetryEnv } from '../src/harness/claude/telemetry.ts';
@@ -72,7 +72,7 @@ const detailed: SpawnRequest = { ...told, telemetry: { endpoint: ENDPOINT, toolD
  * environment carried itself. Read against an environment the seat sets rather than the machine's, and excusing no key for being in
  * `process.env`: a run's checks inherit the daemon's `OTEL_EXPORTER_OTLP_ENDPOINT`, which is the leak such a seat is for.
  */
-const telemetryIn = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+const telemetryIn = (env: NodeJS.ProcessEnv) =>
   Object.fromEntries(
     [...new Set([...Object.keys(claudeTelemetryEnv(detailed)), ...Object.keys(ENGINE_OWN)])]
       .filter((name) => name in env)
@@ -114,7 +114,7 @@ const filedUnder = async (engine: Engine, labels?: Record<string, string>) => {
 };
 
 /** Ticks until the task has settled, under a bound of passes. */
-const settled = async (e: Engine, id: string): Promise<TaskView> => {
+const settled = async (e: Engine, id: string) => {
   for (let i = 0; i < 400; i++) {
     await Effect.runPromise(e.tick());
     const v = await Effect.runPromise(e.view(id));
@@ -363,7 +363,7 @@ describe("an engine told nowhere: a spawn is handed no collector, a job no telem
 });
 
 /** The tag a refusal is thrown or failed with, or the class of an error that has none. */
-const tagOf = (err: unknown): string => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
+const tagOf = (err: unknown) => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
 
 describe('REFUSED: labels no session could say, and a collector that is none, each refused naming the fix and nothing filed or built', () => {
   let engine!: import('../src/index.ts').EngineShape;

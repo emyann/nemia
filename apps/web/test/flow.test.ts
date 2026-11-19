@@ -8,23 +8,28 @@ import type { EdgeStep } from '../src/lib/canvas.ts';
 import { graphOf, GRAPH_SLOTS, UNGRAPHED, windowOf, type StepGraphLayout } from '../src/lib/flow.ts';
 import type { StepState } from '../src/lib/status.ts';
 
-const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
-const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, kind: 'loop', rounds });
-const graphOfEdges = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
-const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}, due: string[] = []): EdgeStep[] =>
-  Object.entries(states).map(([name, state]) => ({ name, state, note: notes[name] ?? null, roundDue: due.includes(name) }));
+const after = (from: string, to: string) => ({ from, to, kind: 'after' }) satisfies GraphEdge;
+const loop = (from: string, to: string, rounds = 3) => ({ from, to, kind: 'loop', rounds }) satisfies GraphEdge;
+const graphOfEdges = (...edges: GraphEdge[]) => ({ roots: [], edges }) satisfies RunGraph;
+const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}, due: string[] = []) =>
+  Object.entries(states).map(([name, state]) => ({
+    name,
+    state,
+    note: notes[name] ?? null,
+    roundDue: due.includes(name),
+  })) satisfies EdgeStep[];
 
 /** Each column's points, left first, top to bottom: what the graph reads as. */
-const readGraph = (g: StepGraphLayout): string[][] => {
+const readGraph = (g: StepGraphLayout) => {
   const xs = [...new Set(g.points.map((p) => p.x))].sort((a, b) => a - b);
   return xs.map((x) =>
     g.points
       .filter((p) => p.x === x)
       .sort((a, b) => a.y - b.y)
       .map((p) => p.label),
-  );
+  ) satisfies string[][];
 };
-const lines = (g: StepGraphLayout): Record<string, string> => Object.fromEntries(g.lines.map((l) => [l.id, l.state]));
+const lines = (g: StepGraphLayout) => Object.fromEntries(g.lines.map((l) => [l.id, l.state])) satisfies Record<string, string>;
 const build = ['design', 'implement', 'review', 'land'];
 const buildGraph: RunGraph = {
   roots: ['design'],

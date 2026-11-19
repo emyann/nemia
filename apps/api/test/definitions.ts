@@ -7,7 +7,7 @@ type Requesting = { request: (url: string, init?: RequestInit) => Response | Pro
 type Obj = { metadata: { name: string; resourceVersion: string }; spec: Record<string, unknown>; status: Record<string, unknown> };
 
 /** An object as its listing: its status, its spec, its name, `from` its origin, `version` its resourceVersion. */
-export const asListing = <T = Record<string, unknown>>(o: Obj): T =>
+export const asListing = <T = Record<string, unknown>>(o: Obj) =>
   ({
     ...o.status,
     ...o.spec,
@@ -58,7 +58,7 @@ export const asAgentListing = (o: Obj) => {
 };
 
 /** The objects of `plural` in `ns`, each as its listing, `query` the list's (`origin=user`, `repo=…`). */
-export async function listedIn<T = Record<string, unknown>>(on: Requesting, plural: string, query = '', ns = 'default'): Promise<T[]> {
+export async function listedIn<T = Record<string, unknown>>(on: Requesting, plural: string, query = '', ns = 'default') {
   const res = await on.request(`/api/namespaces/${ns}/${plural}${query ? `?${query}` : ''}`);
   const body = (await res.json()) as { items?: Obj[]; error?: string };
   if (!body.items) throw new Error(`GET ${plural} answered ${res.status}: ${body.error}`);
@@ -68,7 +68,7 @@ export async function listedIn<T = Record<string, unknown>>(on: Requesting, plur
 }
 
 /** Every origin's of `plural` in `ns`, each listed whole, shadowed or not, in the lookup order. */
-export async function everyOrigin<T = Record<string, unknown>>(on: Requesting, plural: string, ns = 'default', query = ''): Promise<T[]> {
+export async function everyOrigin<T = Record<string, unknown>>(on: Requesting, plural: string, ns = 'default', query = '') {
   const out: T[] = [];
   for (const origin of ['factory', 'repo', 'user', 'builtin'])
     out.push(...(await listedIn<T>(on, plural, `origin=${origin}${query ? `&${query}` : ''}`, ns)));
@@ -80,10 +80,7 @@ export async function everyOrigin<T = Record<string, unknown>>(on: Requesting, p
  * objects' path), laid out as the retired `GET /api/workflows` listed them: the tree's, the repository's and yours, each folder once but
  * the repository's a tree shadows. A refusal is answered as it is, its status and its body.
  */
-export async function workflowsListed<T = ReturnType<typeof asWorkflowListing>>(
-  on: Requesting,
-  query = '',
-): Promise<{ status: number; body: T[] }> {
+export async function workflowsListed<T = ReturnType<typeof asWorkflowListing>>(on: Requesting, query = '') {
   const asked = new URLSearchParams(query);
   const ns = asked.get('factory') ?? 'default';
   const repo = asked.get('repo');
@@ -93,8 +90,8 @@ export async function workflowsListed<T = ReturnType<typeof asWorkflowListing>>(
       `/api/namespaces/${encodeURIComponent(ns)}/workflows?origin=${origin}${repo === null ? '' : `&repo=${encodeURIComponent(repo)}`}`,
     );
     const body = (await res.json()) as { items?: Obj[] };
-    if (!body.items) return { status: res.status, body: body as never };
+    if (!body.items) return { status: res.status, body: body as never } satisfies { status: number; body: T[] };
     out.push(...body.items.filter((o) => o.status.shadowedBy !== 'factory').map((o) => asWorkflowListing(o) as T));
   }
-  return { status: 200, body: out };
+  return { status: 200, body: out } satisfies { status: number; body: T[] };
 }

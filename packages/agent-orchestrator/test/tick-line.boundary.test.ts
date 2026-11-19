@@ -37,7 +37,7 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
 
 /** A workflow folder of `plan → implement`. */
-const planned = (): string => {
+const planned = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\nplace: git\n---\nimplement it\n');
@@ -67,12 +67,11 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     io: undefined,
   } as unknown as Engine;
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
+  const log = vi.spyOn(console, 'log');
   try {
     await main(['tick'], passing, undefined, stand().place, ENV);
   } finally {
+    printed.push(...log.mock.calls.flatMap((args) => [args.join(' ')]));
     log.mockRestore();
   }
   const lines = [gated, asking, broke].map((id) => printed.find((l) => l.startsWith(`${id}  `)));

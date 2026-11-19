@@ -35,7 +35,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** The factory `bench` filed on the scratch repository in the store `home`, the harness's unless another is named. */
-const onRepo = (home = root): void => {
+const onRepo = (home = root) => {
   const was = process.env.WF_ROOT;
   process.env.WF_ROOT = home;
   try {
@@ -111,7 +111,7 @@ const send = (method: string, url: string, body: unknown, headers: Record<string
   sentTo(app, method, url, body, headers);
 const readAt = (url: string, on: { request: typeof app.request } = app) => sentTo(on, 'GET', url);
 
-const snapshot = (dir: string): Record<string, string> =>
+const snapshot = (dir: string) =>
   Object.fromEntries(
     fs
       .readdirSync(dir)
@@ -120,7 +120,7 @@ const snapshot = (dir: string): Record<string, string> =>
   );
 
 /** A request refused with `status` and words `pattern` matches, and yours as it was. */
-async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<{ error: string; users?: string[] }> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp) {
   const before = snapshot(AGENTS);
   const answer = await res;
   const body = (await answer.json()) as { error: string; users?: string[] };
@@ -137,7 +137,7 @@ const scribe = {
   body: 'Write the notes.',
 };
 
-async function listed(): Promise<AgentListing[]> {
+async function listed() {
   return everyOrigin<AgentListing>(app, 'agents', 'default', ON_REPO);
 }
 
@@ -831,7 +831,7 @@ describe('a write of an agent the api or the package refuses â€” the repositoryâ
 });
 
 /** The cell of `row` under the column `name` of `table`. */
-const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+const cellOf = (table: Table, row: Table['rows'][number], name: string) =>
   row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
 
 test('the agents asked as a Table answer the columns of an agent, a row per agent of the page with its metadata alone, and a line each', async () => {

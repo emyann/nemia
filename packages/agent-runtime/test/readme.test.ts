@@ -41,7 +41,7 @@ const missingFiles = (readme: string, exists: (p: string) => boolean) =>
 const TABLES = ['KEEPING', 'WRITING'];
 
 /** The verbs the CLI's table `name` holds, by their keys: the slice from its name to the first `};` after it, none without it. */
-const tableVerbs = (cli: string, name: string): string[] => {
+const tableVerbs = (cli: string, name: string) => {
   const at = cli.indexOf(`const ${name}`);
   if (at < 0) return [];
   return [...cli.slice(at, cli.indexOf('};', at)).matchAll(/^\s*([a-z]+):\s*(?:\w+,?|async \(.*)\s*$/gm)].map((m) => m[1]);

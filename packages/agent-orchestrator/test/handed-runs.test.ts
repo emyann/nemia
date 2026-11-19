@@ -41,19 +41,21 @@ const ENV: Env = {
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
   return repo;
 };
 
 /** A workflow folder of these steps, each `place: git`, by name to its own keys. */
-const folderOf = (steps: Record<string, string>): string => {
+const folderOf = (steps: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, own] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${own}---\n${name} it\n`);

@@ -18,15 +18,15 @@ process.stdin.resume();
 process.stdin.unref();
 
 /** The pid the site's dev-server record names, or null where there is no record or it names none. */
-const registeredPid = (root: string): number | null => {
+const registeredPid = (root: string) => {
   const file = path.join(root, '.astro', 'dev.json');
-  if (!fs.existsSync(file)) return null;
+  if (!fs.existsSync(file)) return null satisfies number | null;
   const record = JSON.parse(fs.readFileSync(file, 'utf8')) as { pid?: unknown };
-  return typeof record.pid === 'number' ? record.pid : null;
+  return (typeof record.pid === 'number' ? record.pid : null) satisfies number | null;
 };
 
 /** A port nothing listens on now: one the system gives a listener on port 0, released before it answers. */
-const freePort = (): Promise<number> =>
+const freePort = () =>
   new Promise((resolve, reject) => {
     const probe = net.createServer();
     probe.once('error', reject);
@@ -34,7 +34,7 @@ const freePort = (): Promise<number> =>
       const address = probe.address();
       probe.close(() => (typeof address === 'object' && address ? resolve(address.port) : reject(new Error('no port given'))));
     });
-  });
+  }) satisfies Promise<number>;
 
 const root = process.argv[2];
 if (!root) throw new Error('dev.ts: name the site root as the first argument');

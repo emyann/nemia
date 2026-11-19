@@ -10,20 +10,17 @@ import assert from 'node:assert/strict';
 import { askToken, onTokenAsked, ReadRefusal, tokenAsked, tokenAskOf, WriteRefusal } from '../src/lib/api/read.ts';
 import { versionQuery } from '../src/lib/api/version.ts';
 import { signIn, signOut } from '../src/lib/api/session.ts';
+import { apiAnswers } from './network.ts';
 
 /** What a request was sent as: its method, its path, and its headers. */
 type Sent = { method: string; path: string; headers: Headers };
 
 /** Every request answered `body` as JSON with `status`, for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
-  const before = globalThis.fetch;
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const sent: Sent[] = [];
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     sent.push({ method: init?.method ?? 'GET', path: String(input), headers: new Headers(init?.headers) });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }

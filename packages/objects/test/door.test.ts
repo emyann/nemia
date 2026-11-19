@@ -23,6 +23,7 @@ type StructAst = {
   propertySignatures?: ReadonlyArray<{ name: PropertyKey; type: { literal?: unknown } }>;
   types?: readonly StructAst[];
 };
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const kindsOf = (ast: StructAst): unknown[] =>
   ast.types ? ast.types.flatMap(kindsOf) : [ast.propertySignatures?.find((p) => p.name === 'kind')?.type.literal];
 
@@ -39,7 +40,7 @@ const answers = Object.values(Api.groups).flatMap((group) =>
  * Whether `path` gets one object of `kind`: its plural (`RESOURCE_PLURALS`, read off the group that serves it), then a name, under
  * `/api/` or under a namespace — the Factory, the Template and the Subscription, which no namespace holds, by their names alone.
  */
-const getsOne = (kind: (typeof KINDS)[number], path: string): boolean => {
+const getsOne = (kind: (typeof KINDS)[number], path: string) => {
   const plural = RESOURCE_PLURALS[kind];
   return new RegExp(`^/api/(namespaces/:namespace/)?${plural}/:[A-Za-z]+$`).test(path);
 };

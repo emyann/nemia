@@ -17,11 +17,11 @@ import { harnessNeedsOf } from '../needs/harness.ts';
 import { adoptBundled, carryHarnesses } from './carry.store.ts';
 
 /** Runs `command` as a harness's fix is run, in the store at `home`: `sh -c`, with `NEMIA_TOOLS` its tools folder. Answers its exit. */
-const ranAsFix = (home: string, command: string, env: NodeJS.ProcessEnv = process.env): number | null =>
+const ranAsFix = (home: string, command: string, env: NodeJS.ProcessEnv = process.env) =>
   spawnSync('sh', ['-c', command], { cwd: home, env: { ...env, NEMIA_TOOLS: toolsDir(home) }, stdio: 'ignore' }).status;
 
 /** The removal of `harness` as the read offers it: its install need's fix of kind `removes`. */
-const removalOf = (harness: string): string => {
+const removalOf = (harness: string) => {
   const command = harnessNeedsOf(HARNESS_DECLARATIONS)
     .find((need) => need.name === harness)
     ?.fixes?.find((fix) => fix.kind === 'removes')?.command;
@@ -30,7 +30,7 @@ const removalOf = (harness: string): string => {
 };
 
 /** A tree that carries the default harness's program in its platform package, as a release that bundled it does. */
-const bundlingTree = (): string => {
+const bundlingTree = () => {
   const tree = scratch('wf-carry-tree-');
   const dir = path.join(tree, 'node_modules', '@anthropic-ai', `claude-agent-sdk-${process.platform}-${process.arch}`);
   fs.mkdirSync(dir, { recursive: true });
@@ -39,7 +39,7 @@ const bundlingTree = (): string => {
 };
 
 /** A folder of a stand-in `npm` that writes what it was asked into `ran` and exits `code`, and the environment that finds it first. */
-const npmStandIn = (code: number): { env: NodeJS.ProcessEnv; ran: string } => {
+const npmStandIn = (code: number) => {
   const stubs = scratch('wf-carry-stubs-');
   const ran = path.join(stubs, 'npm-ran.txt');
   fs.writeFileSync(path.join(stubs, 'npm'), `#!/bin/sh\necho "$*" >> '${ran}'\nexit ${code}\n`, { mode: 0o755 });

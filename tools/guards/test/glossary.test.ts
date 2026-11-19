@@ -42,7 +42,7 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** What `value`, the text of the table `file` parsed, lacks of a table's shape, each as a sentence naming the fix. */
-function shapeBreaks(file: string, value: unknown): string[] {
+function shapeBreaks(file: string, value: unknown) {
   const fix = `write ${file} as a glossary table: ${SHAPE}`;
   if (!isRecord(value)) return [`${file} is no object: ${fix}`];
   const out: string[] = [];
@@ -75,10 +75,10 @@ function shapeBreaks(file: string, value: unknown): string[] {
 }
 
 /** Whether `file`, a path from the root, is `claimed` or under it. */
-const under = (file: string, claimed: string): boolean => file === claimed || file.startsWith(`${claimed}/`);
+const under = (file: string, claimed: string) => file === claimed || file.startsWith(`${claimed}/`);
 
 /** Each path of `tables` that is not on disk under `root`, and each that two tables claim, as a sentence naming the fix. */
-function pathBreaks(root: string, tables: readonly Read[]): string[] {
+function pathBreaks(root: string, tables: readonly Read[]) {
   const out: string[] = [];
   const owner = new Map<string, string>();
   for (const { file, table } of tables)
@@ -99,7 +99,7 @@ function pathBreaks(root: string, tables: readonly Read[]): string[] {
 }
 
 /** Each retired spelling of `tables` that names no card, as a sentence naming the fix. */
-const cardBreaks = (tables: readonly Read[]): string[] =>
+const cardBreaks = (tables: readonly Read[]) =>
   tables.flatMap(({ file, table }) =>
     table.terms.flatMap((term) =>
       (term.retired ?? [])
@@ -109,19 +109,19 @@ const cardBreaks = (tables: readonly Read[]): string[] =>
   );
 
 /** The files the count leaves out: tests, and what `.gitattributes` marks vendored or generated, which no rename of ours reaches. */
-const skipped = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.split('/').includes('test') || !ours(file);
+const skipped = (file: string) => /\.test\.tsx?$/.test(file) || file.split('/').includes('test') || !ours(file);
 
-const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+const escaped = (word: string) => word.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
 
 /** How many times `text` says `spelling`, whole and in any case: no letter, digit, `_` or `$` on either side. */
-const wordsIn = (text: string, spelling: string): number =>
+const wordsIn = (text: string, spelling: string) =>
   [...text.matchAll(new RegExp(`(?<![\\w$])${escaped(spelling)}(?![\\w$])`, 'gi'))].length;
 
 /** A row that retires a spelling: its table, the term to say instead, and the paths it keeps the spelling in. */
 type Retiring = { read: Read; term: string; kept: string[] };
 
 /** Each retired spelling of `tables`, lower-cased, and the rows that retire it. */
-function retirements(tables: readonly Read[]): Map<string, Retiring[]> {
+function retirements(tables: readonly Read[]) {
   const by = new Map<string, Retiring[]>();
   for (const read of tables)
     for (const term of read.table.terms)
@@ -133,7 +133,7 @@ function retirements(tables: readonly Read[]): Map<string, Retiring[]> {
 }
 
 /** The term to say in `file` for `spelling`, and its table: the rows whose table holds the file, else every row that retires it. */
-function insteadOf(spelling: string, file: string, retiring: ReadonlyMap<string, Retiring[]>): string {
+function insteadOf(spelling: string, file: string, retiring: ReadonlyMap<string, Retiring[]>) {
   const rows = retiring.get(spelling) ?? [];
   const holding = rows.filter(({ read }) => read.table.paths.some((p) => under(file, p)));
   return (holding.length ? holding : rows).map(({ read, term }) => `${term} (${read.file})`).join(' or ');
@@ -144,7 +144,7 @@ function insteadOf(spelling: string, file: string, retiring: ReadonlyMap<string,
  * under no path a row keeps it in, each file read once however many of those tables hold it, by `read` (undefined for a file listed but
  * gone).
  */
-function measure(tables: readonly Read[], listed: readonly string[], read: (file: string) => string | undefined): Counts {
+function measure(tables: readonly Read[], listed: readonly string[], read: (file: string) => string | undefined) {
   const counts: Counts = {};
   for (const [spelling, retiring] of retirements(tables)) {
     const paths = retiring.flatMap(({ read }) => read.table.paths);
@@ -164,12 +164,7 @@ function measure(tables: readonly Read[], listed: readonly string[], read: (file
  * What the measure and the baseline disagree on, each a sentence naming the fix: a file the baseline does not hold, a count above the
  * measure or below it, an entry for a file clean or gone, and a spelling no table retires.
  */
-function countBreaks(
-  counts: Counts,
-  baseline: Counts,
-  retiring: ReadonlyMap<string, Retiring[]>,
-  exists: (file: string) => boolean,
-): string[] {
+function countBreaks(counts: Counts, baseline: Counts, retiring: ReadonlyMap<string, Retiring[]>, exists: (file: string) => boolean) {
   const out: string[] = [];
   for (const [spelling, found] of Object.entries(counts)) {
     const held = baseline[spelling] ?? {};
@@ -204,8 +199,8 @@ function countBreaks(
  * Every breach of the tables under `root`, read by the docs' `tablesIn`, and their retired spellings against `baseline`: `listed` is the
  * files git lists, by their path from `root`.
  */
-function glossaryBreaks(root: string, listed: readonly string[], baseline: Counts): string[] {
-  const read = (file: string): string | undefined => {
+function glossaryBreaks(root: string, listed: readonly string[], baseline: Counts) {
+  const read = (file: string) => {
     const at = path.join(root, file);
     return fs.statSync(at, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(at, 'utf8') : undefined;
   };
@@ -216,7 +211,7 @@ function glossaryBreaks(root: string, listed: readonly string[], baseline: Count
     if (broken.length) shapes.push(...broken);
     else tables.push({ file, table });
   }
-  const exists = (file: string): boolean => fs.existsSync(path.join(root, file));
+  const exists = (file: string) => fs.existsSync(path.join(root, file));
   return [
     ...shapes,
     ...pathBreaks(root, tables),
@@ -226,7 +221,7 @@ function glossaryBreaks(root: string, listed: readonly string[], baseline: Count
 }
 
 /** A table of one context, `packages/pkg`, whose term Nemia retires `wf` on `card`. */
-const table = (over: Partial<Read['table']> = {}, card = 'slice-4'): Read['table'] => ({
+const table = (over: Partial<Read['table']> = {}, card = 'slice-4') => ({
   context: 'core',
   title: 'The core',
   about: 'the core of a planted package.',
@@ -236,7 +231,7 @@ const table = (over: Partial<Read['table']> = {}, card = 'slice-4'): Read['table
 });
 
 /** A scratch root holding each of `planted`, by its path from the root, and the list git would give of it. */
-function plant(planted: Record<string, string | object>): { root: string; listed: string[] } {
+function plant(planted: Record<string, string | object>) {
   const root = scratch('glossary-');
   for (const [file, body] of Object.entries(planted)) {
     fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
@@ -249,7 +244,7 @@ function plant(planted: Record<string, string | object>): { root: string; listed
  * The breaches of a root holding the table `packages/pkg/glossary.json` and `packages/pkg/src/a.ts`, which says `wf` twice, against
  * `baseline`.
  */
-const planted = (baseline: Counts, over: Record<string, string | object> = {}): string[] => {
+const planted = (baseline: Counts, over: Record<string, string | object> = {}) => {
   const { root, listed } = plant({
     'packages/pkg/glossary.json': table(),
     'packages/pkg/src/a.ts': '// wf retry, as `wf hold` does\n',
@@ -261,7 +256,7 @@ const planted = (baseline: Counts, over: Record<string, string | object> = {}): 
 const HELD: Counts = { wf: { 'packages/pkg/src/a.ts': 2 } };
 
 /** Asserts `breaks` is one refusal, naming each of `names`. */
-const refusedOnce = (breaks: readonly string[], ...names: string[]): void => {
+const refusedOnce = (breaks: readonly string[], ...names: string[]) => {
   assert.equal(breaks.length, 1, breaks.join('\n'));
   for (const name of names) assert.ok(breaks[0].includes(name), `the refusal names ${name}: ${breaks[0]}`);
 };
@@ -351,7 +346,7 @@ test('REFUSED: a retired spelling in a new file, at a count of 0, with no baseli
 });
 
 /** The table of `packages/pkg`, its `wf` kept in each of `paths`, with why. */
-const keeping = (...paths: string[]): Read['table'] => {
+const keeping = (...paths: string[]) => {
   const kept = table();
   kept.terms[0].retired = [{ spelling: 'wf', card: 'slice-4', kept: paths.map((at) => ({ path: at, why: 'a record on disk says it' })) }];
   return kept;

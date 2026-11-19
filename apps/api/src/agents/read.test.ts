@@ -20,7 +20,7 @@ const read = (body: unknown) =>
   app.request('/api/agents/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 /** Every file under the store, by its path there: what a read must leave as it was. */
-const storeNow = (): string[] => (fs.existsSync(root) ? (fs.readdirSync(root, { recursive: true }) as string[]).sort() : []);
+const storeNow = () => (fs.existsSync(root) ? (fs.readdirSync(root, { recursive: true }) as string[]).sort() : []);
 
 test("an agent's file and the schema beside it read as the spec a GET of the same files in yours answers, and write nothing", async () => {
   fs.mkdirSync(AGENTS, { recursive: true });

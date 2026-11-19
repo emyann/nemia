@@ -24,8 +24,8 @@ export const DROPPED = [
 ] as const;
 
 /** This process's environment without `DROPPED`, and without each of `also`. */
-export function ambient(...also: readonly string[]): NodeJS.ProcessEnv {
+export function ambient(...also: readonly string[]) {
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const name of [...DROPPED, ...also]) delete env[name];
-  return env;
+  return env satisfies NodeJS.ProcessEnv;
 }

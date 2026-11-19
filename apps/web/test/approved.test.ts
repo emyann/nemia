@@ -15,7 +15,7 @@ import { knownIds } from './e2e/stories/changed.ts';
 const WEB = path.resolve(import.meta.dirname, '..');
 
 /** The ids the pictures of `folder` are named by: each `<id>.png` there, no folder below it. */
-const namedIn = (folder: string): string[] =>
+const namedIn = (folder: string) =>
   fs.existsSync(folder)
     ? fs
         .readdirSync(folder, { withFileTypes: true })

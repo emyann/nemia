@@ -23,7 +23,7 @@ const coreDoor = () => {
 };
 
 /** A store in memory the engine journals to, which a row can count. */
-const memoryStore = (): AsyncJournal => {
+const memoryStore = () => {
   const tasks = new Map<string, Event[]>();
   return {
     async append(taskId, event) {
@@ -38,7 +38,7 @@ const memoryStore = (): AsyncJournal => {
     async feed() {
       return { entries: [], cursor: 0 };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 const NUL = `/srv/a${String.fromCharCode(0)}b`;
@@ -63,12 +63,15 @@ const ROWS: Row[] = [
     ['a relative path', 'rel'],
     ['a path not resolved', '/srv/a/'],
     ['a path holding a NUL', NUL],
-  ].map(([name, at]): Row => ({
-    name,
-    at: 'core',
-    config: { mounts: [{ path: at, readOnly: true }] },
-    says: [new RegExp(`^\`mounts\` holds the path ${escaped(JSON.stringify(at))}, `), /not an absolute folder/, /`path\.resolve`/],
-  })),
+  ].map(
+    ([name, at]) =>
+      ({
+        name,
+        at: 'core',
+        config: { mounts: [{ path: at, readOnly: true }] },
+        says: [new RegExp(`^\`mounts\` holds the path ${escaped(JSON.stringify(at))}, `), /not an absolute folder/, /`path\.resolve`/],
+      }) satisfies Row,
+  ),
   {
     name: 'no `readOnly`',
     at: 'core',
@@ -108,16 +111,19 @@ const ROWS: Row[] = [
       ],
     },
   },
-  ...['command', 'remote'].map((harness): Row => ({
-    name: `a read-only mount on the ${harness} harness, which cannot hold one`,
-    at: 'engine',
-    harness,
-    config: one(true),
-    says: [
-      new RegExp(`^\`mounts\` gives the session /srv/a read-only, and the \`${harness}\` harness cannot hold a read-only mount`),
-      /File the task on `claude` or `codex`, or leave the mount off\.$/,
-    ],
-  })),
+  ...['command', 'remote'].map(
+    (harness) =>
+      ({
+        name: `a read-only mount on the ${harness} harness, which cannot hold one`,
+        at: 'engine',
+        harness,
+        config: one(true),
+        says: [
+          new RegExp(`^\`mounts\` gives the session /srv/a read-only, and the \`${harness}\` harness cannot hold a read-only mount`),
+          /File the task on `claude` or `codex`, or leave the mount off\.$/,
+        ],
+      }) satisfies Row,
+  ),
   {
     name: 'a writable mount on Codex',
     at: 'engine',
@@ -125,21 +131,27 @@ const ROWS: Row[] = [
     config: one(false),
     says: [/^`mounts` gives the session \/srv\/a writable, and the `codex` harness/, /File the task on `claude`, or leave/],
   },
-  ...['danger-full-access', 'bypassPermissions'].map((permissionMode): Row => ({
-    name: `a read-only mount on Codex in ${permissionMode}, which writes everywhere`,
-    at: 'engine',
-    harness: 'codex',
-    config: { permissionMode, ...one(true) },
-    says: [/^`mounts` gives the session \/srv\/a read-only, and Codex's `danger-full-access`/, /`workspace-write` or `read-only`/],
-  })),
+  ...['danger-full-access', 'bypassPermissions'].map(
+    (permissionMode) =>
+      ({
+        name: `a read-only mount on Codex in ${permissionMode}, which writes everywhere`,
+        at: 'engine',
+        harness: 'codex',
+        config: { permissionMode, ...one(true) },
+        says: [/^`mounts` gives the session \/srv\/a read-only, and Codex's `danger-full-access`/, /`workspace-write` or `read-only`/],
+      }) satisfies Row,
+  ),
   { name: 'a read-only mount is filed on Claude Code', at: 'engine', harness: 'claude', config: one(true) },
   { name: 'a writable mount is filed on Claude Code', at: 'engine', harness: 'claude', config: one(false) },
-  ...['workspace-write', 'read-only', undefined].map((permissionMode): Row => ({
-    name: `a read-only mount is filed on Codex in ${permissionMode ?? 'its default sandbox'}`,
-    at: 'engine',
-    harness: 'codex',
-    config: { ...(permissionMode ? { permissionMode } : {}), ...one(true) },
-  })),
+  ...['workspace-write', 'read-only', undefined].map(
+    (permissionMode) =>
+      ({
+        name: `a read-only mount is filed on Codex in ${permissionMode ?? 'its default sandbox'}`,
+        at: 'engine',
+        harness: 'codex',
+        config: { ...(permissionMode ? { permissionMode } : {}), ...one(true) },
+      }) satisfies Row,
+  ),
 ];
 
 describe('mounts: what a task may be given beyond its cwd — refused before it is journalled, its shape at both doors, its mode by the harness that cannot hold it — and what Codex is given for one', () => {

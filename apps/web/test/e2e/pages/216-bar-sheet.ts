@@ -49,13 +49,13 @@ async function boxOf(target: Locator, what: string) {
 }
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Presses the pane's Start a run and waits for the bar it opens in the sheet. */
-async function openFromSidebar(page: Page): Promise<Locator> {
+async function openFromSidebar(page: Page) {
   await startOf(page).click();
   const bar = barOf(page);
   await expectVisible(bar, "the pane's Start a run opens its bar in the frame's side sheet");
@@ -63,7 +63,7 @@ async function openFromSidebar(page: Page): Promise<Locator> {
 }
 
 /** Refuses unless the address names no bar on `pathname`, and none is drawn. */
-async function expectClosed(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectClosed(page: Page, pathname: string, assertion: string) {
   await expectCount(barOf(page), 0, assertion);
   const url = new URL(page.url());
   if (url.searchParams.has('bar') || url.pathname !== pathname)
@@ -71,7 +71,7 @@ async function expectClosed(page: Page, pathname: string, assertion: string): Pr
 }
 
 /** Refuses unless the focus is back on the pane's Start a run, which opened the bar. */
-async function expectFocusBack(page: Page, assertion: string): Promise<void> {
+async function expectFocusBack(page: Page, assertion: string) {
   if (!(await startOf(page).evaluate((el) => el === document.activeElement))) {
     const now = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120) ?? 'nothing');
     throw new Refused(`${assertion}: the pane's Start a run holds the focus — ${now} does`);
@@ -79,22 +79,22 @@ async function expectFocusBack(page: Page, assertion: string): Promise<void> {
 }
 
 /** The factory pane is drawn beside the rail when `shown`, and is not drawn when not. */
-const expectPane = (page: Page, shown: boolean, assertion: string): Promise<void> => expectCount(paneOf(page), shown ? 1 : 0, assertion);
+const expectPane = (page: Page, shown: boolean, assertion: string) => expectCount(paneOf(page), shown ? 1 : 0, assertion);
 
 /** This browser's `sidebar_state` pair: none where it was never written. */
-const railCookie = (page: Page): Promise<string | undefined> =>
+const railCookie = (page: Page) =>
   page.evaluate(() =>
     document.cookie
       .split(';')
       .map((pair) => pair.trim())
       .find((pair) => pair.startsWith('sidebar_state=')),
-  );
+  ) satisfies Promise<string | undefined>;
 
 /**
  * The bar stands docked in the frame's layout: the sheet 400 wide at the window's right, the bar inside it, the page ending where the
  * sheet begins, nothing modal over the page.
  */
-async function expectDocked(page: Page, bar: Locator, assertion: string): Promise<void> {
+async function expectDocked(page: Page, bar: Locator, assertion: string) {
   await expectCount(page.locator('[data-slot="side-sheet-overlay"]'), 0, `${assertion}: no scrim over the page`);
   await expectNone(async () => {
     const sheet = await frameSheetOf(page).boundingBox();
@@ -115,7 +115,7 @@ async function expectDocked(page: Page, bar: Locator, assertion: string): Promis
  * At 1600 the bar docks in the sheet beside the page and the factory pane: the page narrows by the sheet's width, the address names it, and
  * nothing floats. A picture of it.
  */
-async function docks(page: Page): Promise<void> {
+async function docks(page: Page) {
   await page.setViewportSize(WIDE);
   await visit(page, FLOOR);
   const main = page.locator('main[data-frame-page]');
@@ -134,7 +134,7 @@ async function docks(page: Page): Promise<void> {
 }
 
 /** The address is the bar's: a reload keeps it, Back closes it, it opens on another page, and a link to another page closes it. */
-async function inTheAddress(page: Page): Promise<void> {
+async function inTheAddress(page: Page) {
   await page.reload({ waitUntil: 'load' });
   await idle(page);
   await expectVisible(barOf(page), 'a reload keeps the bar open');
@@ -153,7 +153,7 @@ async function inTheAddress(page: Page): Promise<void> {
  * Escape closes the bar, from inside it and from the page, in place of the history entry; so does its Close button; both give the focus
  * back to the pane's Start a run.
  */
-async function closes(page: Page): Promise<void> {
+async function closes(page: Page) {
   await visit(page, FLOOR);
   let bar = await openFromSidebar(page);
   if (!(await bar.evaluate((el) => el.contains(document.activeElement)))) throw new Refused('the bar takes the focus as it opens');
@@ -173,7 +173,7 @@ async function closes(page: Page): Promise<void> {
 }
 
 /** Escape in a field of the page that holds text leaves the field and keeps the focus out of the bar; a second Escape closes the bar. */
-async function pageField(page: Page): Promise<void> {
+async function pageField(page: Page) {
   await visit(page, `/inbox?bar=${OPEN}`);
   const bar = barOf(page);
   await expectVisible(bar, 'the bar opens on the Inbox');
@@ -192,7 +192,7 @@ async function pageField(page: Page): Promise<void> {
 }
 
 /** Refuses unless her face says the sheet shows her (`aria-expanded`) exactly when `shown`. */
-async function expectFaceSays(page: Page, shown: boolean, assertion: string): Promise<void> {
+async function expectFaceSays(page: Page, shown: boolean, assertion: string) {
   await expectNone(
     async () => {
       const said = await herFaceOf(page).first().getAttribute('aria-expanded');
@@ -207,7 +207,7 @@ async function expectFaceSays(page: Page, shown: boolean, assertion: string): Pr
  * alone (Forward, as a link would) closes her too, and a bar closed after it leaves no sheet: her chat does not come back. Her chat's
  * stream is opened once and kept throughout, the sheet showing her or not.
  */
-async function oneAtATime(page: Page): Promise<void> {
+async function oneAtATime(page: Page) {
   await page.setViewportSize(WIDE);
   await visit(page, FLOOR);
   const streams: string[] = [];
@@ -259,7 +259,7 @@ async function oneAtATime(page: Page): Promise<void> {
  * At 1280 the factory pane is covered while the bar's sheet is open and comes back when it closes, with no `sidebar_state` written:
  * the person folded nothing. A picture of it covered.
  */
-async function paneCovered(page: Page): Promise<void> {
+async function paneCovered(page: Page) {
   await page.setViewportSize(MEDIUM);
   await visit(page, FLOOR);
   await expectPane(page, true, 'at 1280 the pane stands before the sheet');
@@ -284,7 +284,7 @@ async function paneCovered(page: Page): Promise<void> {
  * On a phone the bar is the kit's modal sheet at the window's right, a dialog named for it. Its Close and Escape close it and give the
  * focus back to the control that opened it, and Back after Escape does not open it again.
  */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, `${FLOOR}?bar=${OPEN}`);
   const dialog = page.getByRole('dialog', { name: 'Start a run' });
@@ -334,7 +334,7 @@ type Room = { at: string; main: number; tables: { scroll: number; client: number
  * is in the page or reached by its own scroll, and the floor's buttons and minimap stand inside the floor. What each gives up is written to
  * `bar-sheet-room.json` beside the pictures, which are taken of each.
  */
-async function pagesBeside(page: Page): Promise<void> {
+async function pagesBeside(page: Page) {
   const run = `run:${ENDING.id}`;
   const rooms: Room[] = [];
   for (const size of [MEDIUM, WIDE]) {

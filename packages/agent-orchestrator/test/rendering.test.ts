@@ -28,7 +28,7 @@ import {
   skillLayers,
   unrendered,
 } from '../src/agents/agents.ts';
-import { composeBrief, PRECEDENCE, toldLayers, type RepositoryRun } from '../src/run.ts';
+import { composeBrief, PRECEDENCE, toldLayers } from '../src/run.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { scratch } from 'test-kit/scratch';
 import { names } from './assessed.ts';
@@ -36,7 +36,7 @@ import { names } from './assessed.ts';
 const ROOT = scratch('wf-render-');
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
-function tree(files: Record<string, string>): string {
+function tree(files: Record<string, string>) {
   const dir = fs.mkdtempSync(path.join(ROOT, 'tree-'));
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
@@ -46,7 +46,7 @@ function tree(files: Record<string, string>): string {
 }
 
 /** What `fn` is refused with: a `WorkflowError`, exit 2, and its message. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -58,7 +58,7 @@ function refusal(fn: () => unknown): string {
 }
 
 /** Each row of `all` a subtest of `t`: its name, and what it asserts. */
-function rows(all: ReadonlyArray<readonly [string, () => void]>): void {
+function rows(all: ReadonlyArray<readonly [string, () => void]>) {
   for (const [name, body] of all) test(name, body);
 }
 
@@ -66,7 +66,7 @@ const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
 /** A team of one step `build` naming `agent: builder` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
-const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
+const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n") =>
   path.join(
     tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': agent, ...files }),
     'workflows',
@@ -74,7 +74,7 @@ const team = (agent: string, files: Record<string, string>, step = "---\nagent: 
   );
 
 /** A step as the parser resolves it from a team of one. */
-const resolved = (agent: string, files: Record<string, string> = {}, step?: string): StepSpec => loadWorkflows(team(agent, files, step))[0];
+const resolved = (agent: string, files: Record<string, string> = {}, step?: string) => loadWorkflows(team(agent, files, step))[0];
 
 /**
  * The heading each layer Nemia composes is told under: its number in the precedence and the owner whose words follow. Written out here,
@@ -88,7 +88,7 @@ const HEAD = {
 } as const;
 
 /** The agent `scribe`, told in English, with `custom` as a person's custom instructions for it when given. */
-const scribeWith = (custom?: string, keys = 'tools: Read'): Agents =>
+const scribeWith = (custom?: string, keys = 'tools: Read') =>
   new Map([
     [
       'scribe',
@@ -97,7 +97,7 @@ const scribeWith = (custom?: string, keys = 'tools: Read'): Agents =>
   ]);
 
 /** The step `build` naming the scribe, its own note in Spanish, with `lines` in its frontmatter, in a factory whose rules are `rules`. */
-const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude'): StepSpec =>
+const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude') =>
   parseWorkflow(
     'build',
     `---\nplace: git\nagent: scribe\n${lines}\n---\nReply in Spanish.\n`,
@@ -111,14 +111,14 @@ const buildWith = (agents: Agents, rules?: string, lines = 'harness: claude'): S
 const RULES = 'Reply in German.';
 
 /** Where `text` is in `told`, which must hold it. */
-const at = (told: string, text: string): number => {
+const at = (told: string, text: string) => {
   const i = told.indexOf(text);
   assert.ok(i >= 0, `told ${JSON.stringify(text)}:\n${told}`);
   return i;
 };
 
 /** Whether `told` says each of `words` in the order given. */
-const inOrder = (told: string, ...words: string[]): boolean => words.every((w, i) => i === 0 || at(told, words[i - 1]) < at(told, w));
+const inOrder = (told: string, ...words: string[]) => words.every((w, i) => i === 0 || at(told, words[i - 1]) < at(told, w));
 
 describe("the layers a step is told — its agent's instructions, the custom instructions, the factory's rules, its own note — in that order", () => {
   rows([
@@ -440,11 +440,11 @@ const AGENTS: Agents = new Map([
 ]);
 
 /** The step `build` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
-const stepOf = (lines: string, note = 'Build it.', rules?: string): StepSpec =>
+const stepOf = (lines: string, note = 'Build it.', rules?: string) =>
   parseWorkflow('build', `---\nplace: git\n${lines}\n---\n${note}\n`, undefined, AGENTS, undefined, undefined, rules);
 
 /** A run of `steps`, none filed, asked for `brief`. */
-const runOf = (steps: readonly StepSpec[], brief = 'add a flag'): RepositoryRun => ({
+const runOf = (steps: readonly StepSpec[], brief = 'add a flag') => ({
   id: 'r-1',
   repo: '/repo',
   workspace: '/wt',
@@ -458,7 +458,7 @@ const runOf = (steps: readonly StepSpec[], brief = 'add a flag'): RepositoryRun 
 });
 
 /** What `step` would be told as the first step of a run of it alone. */
-const briefOf = (step: StepSpec): string => composeBrief(step, runOf([step]), [step]);
+const briefOf = (step: StepSpec) => composeBrief(step, runOf([step]), [step]);
 
 const TASK = '## What was asked for\n\nadd a flag';
 

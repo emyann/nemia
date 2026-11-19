@@ -48,7 +48,7 @@ const KINDS: Record<LifecycleEvent['type'], true> = {
 };
 
 /** Each kind of event, in each shape its fields can take that the laws tell apart. */
-const events = (): LifecycleEvent[] => {
+const events = () => {
   const sighting: Sighting = { sessionId: 's', state: 'working' };
   const all: LifecycleEvent[] = [{ type: 'QUEUED' }, { type: 'NOTHING_OPEN' }, { type: 'AWAITING_INPUT' }, { type: 'CLOSED' }];
   for (const type of ['READY', 'RESTART_DUE'] as const) all.push({ type, attempt: 2 }, { type, attempt: 2, resumeFrom: 'x', nudge: 'n' });
@@ -79,13 +79,13 @@ const events = (): LifecycleEvent[] => {
     { type: 'PARK_HELD', attempt: 1 },
     { type: 'SETTLED', outcome: 'succeeded' },
   );
-  return all;
+  return all satisfies LifecycleEvent[];
 };
 
 test("the lifecycle's table keeps every law decide's contract declares of it, on every state and every kind of event", () => {
   const all = events();
   assert.deepEqual([...new Set(all.map((e) => e.type))].sort(), Object.keys(KINDS).sort());
-  const inputs = STATES.flatMap((from) => all.map((event): [(typeof STATES)[number], LifecycleEvent] => [from, event]));
+  const inputs = STATES.flatMap((from) => all.map((event) => [from, event] satisfies [(typeof STATES)[number], LifecycleEvent]));
   assert.deepEqual(
     brokenOn(edges, inputs).map((b) => [b.law, b.input[0], b.input[1].type]),
     [],
@@ -93,22 +93,23 @@ test("the lifecycle's table keeps every law decide's contract declares of it, on
 });
 
 /** A moment `s` seconds into the hour the attempts below began. */
-const at = (s: number): string => new Date(Date.UTC(2026, 9, 30, 12, 0, s)).toISOString();
-const attempt = (o: Partial<Attempt> = {}): Attempt => ({
-  n: 1,
-  startedAt: at(0),
-  spawnedAt: at(1),
-  ended: null,
-  endedAt: null,
-  reason: null,
-  nativeId: null,
-  usage: null,
-  exitCode: null,
-  ...o,
-});
+const at = (s: number) => new Date(Date.UTC(2026, 9, 30, 12, 0, s)).toISOString();
+const attempt = (o: Partial<Attempt> = {}) =>
+  ({
+    n: 1,
+    startedAt: at(0),
+    spawnedAt: at(1),
+    ended: null,
+    endedAt: null,
+    reason: null,
+    nativeId: null,
+    usage: null,
+    exitCode: null,
+    ...o,
+  }) satisfies Attempt;
 
 test("the restart's wait keeps within its cap, however many ends come in a row", () => {
-  const quick = (n: number): Attempt => attempt({ n, ended: 'failed', endedAt: at(2), reason: 'harness' });
+  const quick = (n: number) => attempt({ n, ended: 'failed', endedAt: at(2), reason: 'harness' }) satisfies Attempt;
   const runs: Array<readonly [ReadonlyArray<Attempt>]> = [[[]], [[attempt()]]];
   for (const n of [1, 2, 3, 5, 10, 40, 60, 1200]) runs.push([Array.from({ length: n }, (_, k) => quick(k + 1))]);
   runs.push([[attempt({ ended: 'failed', endedAt: new Date(Date.UTC(2026, 9, 30, 13)).toISOString(), reason: 'harness' })]]);
@@ -118,11 +119,12 @@ test("the restart's wait keeps within its cap, however many ends come in a row",
 
 test('a deadline is past only where one was set and its turn has started, in whole milliseconds', () => {
   const mono = (ms: number) => ({ boot: 'b1', ms });
-  const journal = (deadlineSeconds: number | undefined, ...more: Event[]): Event[] => [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(deadlineSeconds === undefined ? {} : { deadlineSeconds }) },
-    { kind: 'starting', at: at(1), attempt: 1, mono: mono(1_000) },
-    ...more,
-  ];
+  const journal = (deadlineSeconds: number | undefined, ...more: Event[]) =>
+    [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(deadlineSeconds === undefined ? {} : { deadlineSeconds }) },
+      { kind: 'starting', at: at(1), attempt: 1, mono: mono(1_000) },
+      ...more,
+    ] satisfies Event[];
   const parked: Event[] = [
     { kind: 'ended', at: at(10), attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', parked: {} },
     { kind: 'starting', at: at(20), attempt: 2, mono: mono(20_000) },

@@ -173,13 +173,14 @@ describe('shownFixes: a piece in place shows only what takes it away, any other 
   const puts: ReadinessFix = { message: 'install it', command: 'x', startable: true, index: 0 };
   const removes: ReadinessFix = { message: 'deactivate it', command: 'y', startable: true, index: 1, kind: 'removes' };
   const typed: ReadinessFix = { message: 'type it', command: 'z', startable: false, kind: 'typed' };
-  const piece = (state: ReadinessPiece['state'], fixes: ReadinessFix[]): ReadinessPiece => ({
-    name: 'n',
-    area: 'harness',
-    state,
-    message: 'm',
-    fixes,
-  });
+  const piece = (state: ReadinessPiece['state'], fixes: ReadinessFix[]) =>
+    ({
+      name: 'n',
+      area: 'harness',
+      state,
+      message: 'm',
+      fixes,
+    }) satisfies ReadinessPiece;
   const rows: Array<{ why: string; piece: ReadinessPiece; want: Array<[string, number]> }> = [
     { why: 'in place: its removal alone, at its index', piece: piece('met', [puts, removes]), want: [['deactivate it', 1]] },
     { why: 'missing: what puts it there, never the removal', piece: piece('missing', [puts, removes]), want: [['install it', 0]] },

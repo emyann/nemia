@@ -71,14 +71,14 @@ const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 const engine = () => Object.assign(stage.board().e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
 
 /** A repository with one commit on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
 };
 
 /** `branch` merged into `repo`'s checkout and committed under `message`, as a person or an ending's session merges it. */
-const mergedIn = (repo: string, branch: string, message: string): void => {
+const mergedIn = (repo: string, branch: string, message: string) => {
   world().stage(repo, branch);
   world().commit(repo, message);
 };
@@ -111,7 +111,7 @@ fs.writeFileSync(path.join(GATED, 'work.md'), '---\nplace: git\ngate: true\nharn
 const tasksOf = (id: string) => [...stage.board().tasks].filter(([taskId]) => taskId.startsWith(`${id}-`));
 
 /** Whether a task of the run `id` is filed and not settled: a session of it at work, or about to be. */
-const atWork = (id: string): boolean => tasksOf(id).some(([, t]) => !['succeeded', 'failed', 'stopped'].includes(t.phase));
+const atWork = (id: string) => tasksOf(id).some(([, t]) => !['succeeded', 'failed', 'stopped'].includes(t.phase));
 
 /** Each task of the run `id` not settled signs off, `done` unless told `blocked`, as its harness ends a session that signed. */
 const sign = (id: string, outcome: 'done' | 'blocked' = 'done') => {
@@ -141,7 +141,7 @@ const counting = (asked: Asked) =>
 const tick = (memo?: ReturnType<typeof freshRestMemo>) => stage.runWith(engine(), tickRun({ repo: ROOT, ...(memo ? { memo } : {}) }));
 
 /** Passes until `ok` holds of one, a dozen at most. */
-async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {
+async function ticked(ok: (pass: Pass) => boolean, what: string) {
   for (let k = 0; k < 12; k++) {
     const pass = await tick();
     if (ok(pass)) return pass;
@@ -222,7 +222,7 @@ async function shipped(id: string, repo: string) {
 }
 
 /** What `nemia ls` answers (`RunsListed`) over the stage's engine. */
-const listed = async (): Promise<RunsListed> => (await stage.main(['ls'], engine())) as RunsListed;
+const listed = async () => (await stage.main(['ls'], engine())) as RunsListed;
 
 describe(
   'after a landing, the sweeps free what is finished and leave what is not \u2014 and the daemon frees and measures with no person',

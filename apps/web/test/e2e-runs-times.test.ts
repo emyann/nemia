@@ -5,9 +5,9 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { AGO, agosRefused, type DrawnAgo } from './e2e/runs-times.ts';
+import { AGO, agosRefused } from './e2e/runs-times.ts';
 
-const fits = (words: string, width = 70): DrawnAgo => ({ words, width, room: 96 });
+const fits = (words: string, width = 70) => ({ words, width, room: 96 });
 
 /** A table read across a new year: minutes, hours, days and a run from two years back. */
 const SPREAD = [fits('just now'), fits('3 minutes ago'), fits('2 hours ago'), fits('3 days ago'), fits('2 years ago')];

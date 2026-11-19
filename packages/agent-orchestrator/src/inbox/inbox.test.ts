@@ -45,11 +45,11 @@ import { names } from '../../test/assessed.ts';
  * A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as
  * workflow.test.ts's).
  */
-function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>): string | null {
+function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>) {
   if (JSON.stringify(Object.keys(meanings)) !== JSON.stringify(keys))
-    return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order`;
+    return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order` satisfies string | null;
   const bad = Object.entries(meanings).find(([, line]) => typeof line !== 'string' || !line.trim() || /[\r\n]/.test(line));
-  return bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null;
+  return (bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null) satisfies string | null;
 }
 
 /**
@@ -667,7 +667,9 @@ describe("`cardState`: one closed word per entry — its run's phase whatever th
   const tried = (refused: boolean) => ({ at: '2026-09-16T10:06:00.000Z', repo: '/home/me/code/app', why: 'x', refused });
   const queued = { at: '2026-09-16T10:00:00.000Z', place: null };
   const rows: [string, Parameters<typeof cardState>[0], CardState][] = [
-    ...RUN_PHASES.map((phase): [string, Parameters<typeof cardState>[0], CardState] => [`its run is ${phase}`, { phases: [phase] }, phase]),
+    ...RUN_PHASES.map(
+      (phase) => [`its run is ${phase}`, { phases: [phase] }, phase] satisfies [string, Parameters<typeof cardState>[0], CardState],
+    ),
     ['its run is running, though it is queued and was refused', { phases: ['running'], queued, tried: tried(true) }, 'running'],
     ['two runs, one ended and one still in play: the one in play', { phases: ['succeeded', 'running'] }, 'running'],
     ['two runs, both ended: the last', { phases: ['failed', 'succeeded'] }, 'succeeded'],

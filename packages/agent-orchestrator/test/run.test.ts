@@ -31,7 +31,7 @@ const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [
  * The `## ` headings a markdown reader sees: those outside every fenced block, a fence closed only by a bare run of at least its
  * backticks.
  */
-const headingsOf = (brief: string): string[] => {
+const headingsOf = (brief: string) => {
   const seen: string[] = [];
   let open = 0;
   for (const line of brief.split('\n')) {
@@ -41,7 +41,7 @@ const headingsOf = (brief: string): string[] => {
     } else if (ticks) open = ticks;
     else if (line.startsWith('## ')) seen.push(line);
   }
-  return seen;
+  return seen satisfies string[];
 };
 
 /** `findings`, strict — as the tests' team's `test/fixtures/team/agents/review.schema.json` declares it. */
@@ -77,13 +77,14 @@ const LOOP: StepSpec[] = [
 const IMPLEMENT = LOOP[0];
 
 /** How review signed off: its findings, whether to go round again, and a summary that must travel nowhere. */
-const reviewed = (again: unknown): Closeout => ({
-  outcome: 'done',
-  summary: 'REVIEWER-SUMMARY',
-  artifacts: [],
-  needs: undefined,
-  output: { findings: FOUND, again },
-});
+const reviewed = (again: unknown) =>
+  ({
+    outcome: 'done',
+    summary: 'REVIEWER-SUMMARY',
+    artifacts: [],
+    needs: undefined,
+    output: { findings: FOUND, again },
+  }) satisfies Closeout;
 const REPLIES = [{ finding: 'src/run.ts:183', answer: "won't fix", why: 'an empty list is a review with nothing worth changing' }];
 /** How implement signed off past round 1: its replies, and a summary that must travel nowhere. */
 const answered: Closeout = {
@@ -98,13 +99,13 @@ const answered: Closeout = {
  * The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it — and ship
  * unfiled.
  */
-const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
-  const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}) => {
+  const earlier = (prefix: string, checked: boolean) =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
       cause: 'round' as const,
-    }));
+    })) satisfies EarlierTry[];
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   return run(
     {},
@@ -116,13 +117,13 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
       },
       ...extra,
     },
-  );
+  ) satisfies Run;
 };
 /** implement's closeout — with replies past round 1 — and review's, saying `again`. */
-const saidIn =
-  (n: number, again: unknown) =>
-  (name: string): Closeout | undefined =>
-    name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined;
+const saidIn = (n: number, again: unknown) => (name: string) =>
+  (name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined) satisfies
+    | Closeout
+    | undefined;
 
 test("REFUSED by `sayRefusal` before the engine is asked: a step the run does not have, a cancelled run, a pruned run's step not filed, a step whose tries are behind it with none filed, and a task settled each way — and null for a task in flight, one only the engine can answer for, or a step nothing of which is filed, whose words are kept", () => {
   const live = run({ implement: 't1', review: null });
@@ -193,10 +194,7 @@ test('`saidLines`: each thing said to a step, in order, with its time and try �
 });
 
 test("`nemia ls` notes a step whose current try's session a person told something — `said to 2×` — after the try it is on, and nothing for a step nobody told", () => {
-  const word =
-    (m: Record<string, ListedPhase>) =>
-    (id: string): ListedPhase =>
-      m[id] ?? 'unknown';
+  const word = (m: Record<string, ListedPhase>) => (id: string) => (m[id] ?? ('unknown' as const)) satisfies ListedPhase;
   const rows = (r: Run, words: Record<string, ListedPhase>, told: Record<string, number>) =>
     listing(
       listingInput({

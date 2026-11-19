@@ -48,13 +48,13 @@ const PAGES: readonly string[] = [
 ];
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** The address now, its path and search. */
-const here = (page: Page): string => {
+const here = (page: Page) => {
   const url = new URL(page.url());
   return `${url.pathname}${url.search}`;
 };
@@ -63,7 +63,7 @@ const here = (page: Page): string => {
  * Each old address reaches its page under the factory's path, its other keys kept, with the pane drawn and its place lit; the old address
  * is replaced in the history, so Back from where it led returns to the page before it, never to it.
  */
-async function oldLinks(page: Page): Promise<void> {
+async function oldLinks(page: Page) {
   for (const [from, to, lit] of OLD) {
     await visit(page, AT);
     await visit(page, from);
@@ -79,7 +79,7 @@ async function oldLinks(page: Page): Promise<void> {
 }
 
 /** At 768 wide, no page under the factory's path lays out past its column beside the rail and the pane, nor moves the window sideways. */
-async function inColumn(page: Page): Promise<void> {
+async function inColumn(page: Page) {
   const size = page.viewportSize();
   await page.setViewportSize({ width: 768, height: size?.height ?? 900 });
   try {

@@ -83,7 +83,7 @@ test(
 );
 
 /** The running line's title in Trace's story of it: the animation it runs and the image its text is painted with. */
-const shimmerOf = (page: Page): Promise<{ animation: string; image: string }> =>
+const shimmerOf = (page: Page) =>
   page
     .locator('[data-status="running"] [data-slot="trace-title"]')
     .evaluate((title) => ({ animation: getComputedStyle(title).animationName, image: getComputedStyle(title).backgroundImage }));

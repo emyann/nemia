@@ -65,7 +65,7 @@ const CARD: Spec = {
 };
 
 /** The words `parseArgv` refuses `argv` in, a `CommandRefused`, or none. */
-function refusalOf(argv: readonly string[], spec: Spec = SPEC): string | undefined {
+function refusalOf(argv: readonly string[], spec: Spec = SPEC) {
   try {
     parseArgv(spec, argv);
     return undefined;
@@ -76,7 +76,7 @@ function refusalOf(argv: readonly string[], spec: Spec = SPEC): string | undefin
 }
 
 /** That `words` are a refusal, and name each of `fixes`: the flag, the value or the form its fix turns on. */
-function names(words: string | undefined, line: string, ...fixes: string[]): void {
+function names(words: string | undefined, line: string, ...fixes: string[]) {
   assert.ok(words, line);
   for (const fix of fixes) assert.ok(words.includes(fix), `${line}: ${words} names ${fix}`);
 }

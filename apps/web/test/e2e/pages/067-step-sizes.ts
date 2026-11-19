@@ -9,7 +9,7 @@ import { OUT } from '../world.ts';
 const FLIGHT = 'section[data-section="in-flight"]';
 
 /** What `scope` says in `mark`, as written (no case a style gives it), its spaces made one. */
-const words = async (scope: Locator, mark: string, what: string): Promise<string> => {
+const words = async (scope: Locator, mark: string, what: string) => {
   const at = scope.locator(mark).first();
   await expectVisible(at, what);
   return ((await at.textContent()) ?? '').replace(/\s+/g, ' ').trim();

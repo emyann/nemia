@@ -12,65 +12,66 @@ import type { StepSpec } from '../step/step.ts';
 import { timeline, type AttemptClock, type TaskClock } from './timeline.ts';
 import { atWork, gateWaitOf, ranMs, runTokens, tryEndOf, unionMs } from './took.ts';
 
-const run = (steps: RepositoryRun['steps']): RepositoryRun => ({
-  id: 'r-1',
-  repo: '/repo',
-  workspace: '/wt',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/wf',
-  createdAt: '2026-01-01T00:00:00Z',
-  steps,
-});
+const run = (steps: RepositoryRun['steps']) =>
+  ({
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: '/wf',
+    createdAt: '2026-01-01T00:00:00Z',
+    steps,
+  }) satisfies RepositoryRun;
 
 /** An instant `h` hours and `m` minutes into the fixtures' day. */
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
 
 /** An attempt spawned at `from` and ended at `to` (null: still running), in `turn`, with `usage` on it. */
-const attempt = (from: string, to: string | null, more: Partial<AttemptClock> = {}): AttemptClock => ({
-  startedAt: from,
-  spawnedAt: from,
-  endedAt: to,
-  reason: to ? 'harness' : null,
-  usage: null,
-  ...more,
-});
+const attempt = (from: string, to: string | null, more: Partial<AttemptClock> = {}) =>
+  ({
+    startedAt: from,
+    spawnedAt: from,
+    endedAt: to,
+    reason: to ? 'harness' : null,
+    usage: null,
+    ...more,
+  }) satisfies AttemptClock;
 
 /** A task's view: its attempts, settled as `settled` says, and what the attempt in flight has used so far. */
-const task = (
-  attempts: AttemptClock[],
-  settled: 'succeeded' | 'failed' | 'stopped' | null = 'succeeded',
-  more: Partial<TaskClock> = {},
-): TaskClock => ({
-  state: { brief: 'filed', settled, attempts },
-  ...more,
-});
+const task = (attempts: AttemptClock[], settled: 'succeeded' | 'failed' | 'stopped' | null = 'succeeded', more: Partial<TaskClock> = {}) =>
+  ({
+    state: { brief: 'filed', settled, attempts },
+    ...more,
+  }) satisfies TaskClock;
 
 const MIN = 60_000;
 
-const used = (input: number, output: number, read?: number, write?: number): Consumed => ({
-  inputTokens: input,
-  outputTokens: output,
-  ...(read !== undefined ? { cacheReadTokens: read, cacheWriteTokens: write!, uncachedTokens: input - read - write! } : {}),
-});
+const used = (input: number, output: number, read?: number, write?: number) =>
+  ({
+    inputTokens: input,
+    outputTokens: output,
+    ...(read !== undefined ? { cacheReadTokens: read, cacheWriteTokens: write!, uncachedTokens: input - read - write! } : {}),
+  }) satisfies Consumed;
 
 const ASK = { name: 'ask', gate: true, after: [] } as unknown as StepSpec;
 
 /** A run of one gated step held open on task `T`: it signed off blocked, a person answered, and its second try is that answer's turn. */
-const answered = (approved: { try: number; at: string }): RepositoryRun => ({
-  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', cause: 'continue' }] } }),
-  approvals: [{ step: 'ask', ...approved }],
-});
+const answered = (approved: { try: number; at: string }) =>
+  ({
+    ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', cause: 'continue' }] } }),
+    approvals: [{ step: 'ask', ...approved }],
+  }) satisfies RepositoryRun;
 
 /** The held session: a first turn that ended at 10:05, and the answer's turn from 10:11 to `end`, signed and waiting on a person. */
-const held = (end: string | null = at(10, 20)): TaskClock =>
+const held = (end: string | null = at(10, 20)) =>
   task(
     [attempt(at(10), at(10, 5), { turn: 0, ended: 'succeeded' }), attempt(at(10, 11), end, { turn: 1, ended: end ? 'succeeded' : null })],
     null,
     end ? { phase: 'input-required' } : {},
-  );
+  ) satisfies TaskClock;
 
 describe("`atWork`, `unionMs` and `ranMs`: a run's time at work is the union of the intervals its tasks ran in, a wait counting for nothing", () => {
   test('two steps side by side count once: the union of their intervals, not their sum', () => {

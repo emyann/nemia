@@ -38,13 +38,14 @@ const PLAN = { stream: true, transcript: true };
 type Held = { what: 'held'; taskId: string; url: string; cards: Record<string, Record<string, unknown>> };
 
 /** Every file under `dir`, by its path from it: the store whole, the lease, journals, feed, run files and captures. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const filesUnder = (dir: string, at = ''): string[] =>
   fs
     .readdirSync(path.join(dir, at), { withFileTypes: true })
     .flatMap((e) => (e.isDirectory() ? filesUnder(dir, path.join(at, e.name)) : [path.join(at, e.name)]));
 
 /** The run's record, its one step on the task the holder filed. */
-function writeRun(taskId: string): void {
+function writeRun(taskId: string) {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'runs', `${RUN}.json`),
@@ -75,7 +76,7 @@ type Piped = ChildProcess & {
  * The holder, up and holding: its child, what it said of itself, everything it wrote on either stream — both searched for the
  * token, since its engine logs on its stdout and the SDK's child writes on its stderr — and the way to tell it to go.
  */
-async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; said: () => string; stop: () => void }> {
+async function holder(cwd: string) {
   const child = spawn(process.execPath, [HOLDER], {
     env: { ...process.env, CLAUDE_CONFIG_DIR: config, WF_ROOT: root },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -87,7 +88,7 @@ async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; s
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (chunk: string) => void err.push(chunk));
   child.stdin.end(JSON.stringify({ root, cwd, plan: PLAN }));
-  const held = async (): Promise<Held> => {
+  const held = async () => {
     for (;;) {
       const line = out
         .join('')
@@ -98,7 +99,12 @@ async function holder(cwd: string): Promise<{ child: ChildProcess; held: Held; s
       await new Promise((r) => setTimeout(r, 25));
     }
   };
-  return { child, held: await held(), said: () => `${out.join('')}\n${err.join('')}`, stop: () => void child.kill('SIGKILL') };
+  return { child, held: await held(), said: () => `${out.join('')}\n${err.join('')}`, stop: () => void child.kill('SIGKILL') } satisfies {
+    child: ChildProcess;
+    held: Held;
+    said: () => string;
+    stop: () => void;
+  };
 }
 
 test(
@@ -131,7 +137,7 @@ test(
     const decoder = new TextDecoder();
     let text = '';
     const rung = bell();
-    const pump = async (): Promise<void> => {
+    const pump = async () => {
       const { done, value } = await reader.read();
       if (done) return;
       text += decoder.decode(value, { stream: true });
@@ -161,7 +167,7 @@ test(
       { bell: rung },
     );
 
-    const answered = async (route: string): Promise<string> => (await viewer.app.request(route)).text();
+    const answered = async (route: string) => (await viewer.app.request(route)).text();
     const answers = [await answered('/api/daemon'), await answered(`/api/runs/${RUN}`), text];
 
     const holds = filesUnder(root).filter((f) => fs.readFileSync(path.join(root, f), 'latin1').includes(token));

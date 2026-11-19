@@ -15,7 +15,7 @@ import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from './command-words.
 const SKILL = path.join(import.meta.dirname, '..', 'nemia', 'skills', 'verbs', 'SKILL.md');
 
 /** The section of `text` under the heading `heading`, to the next heading. */
-const sectionOf = (text: string, heading: string): string => {
+const sectionOf = (text: string, heading: string) => {
   const at = text.indexOf(`\n## ${heading}\n`);
   assert.notEqual(at, -1, `the skill has a section ${heading}`);
   const next = text.indexOf('\n## ', at + 1);
@@ -23,8 +23,7 @@ const sectionOf = (text: string, heading: string): string => {
 };
 
 /** Whether `text` lists the command `name` as a usage line of its own. */
-const lists = (text: string, name: string): boolean =>
-  new RegExp(`^  nemia ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: |$)`, 'm').test(text);
+const lists = (text: string, name: string) => new RegExp(`^  nemia ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: |$)`, 'm').test(text);
 
 test('the shipped verbs skill is what the command table renders today', () => {
   assert.equal(
@@ -109,7 +108,7 @@ test('the skill lists no verb named by a refused word but those pending, and no 
 });
 
 /** The lines `text` lists under the command `name`'s usage line, to the next usage line or the block's end. */
-const blockOf = (text: string, name: string): string => {
+const blockOf = (text: string, name: string) => {
   const lines = text.split('\n');
   const at = lines.findIndex((line) => line === `  nemia ${name}` || line.startsWith(`  nemia ${name} `));
   assert.notEqual(at, -1, `${name} is listed`);

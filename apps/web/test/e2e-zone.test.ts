@@ -8,7 +8,7 @@ import { test } from 'vitest';
 import { middayZone } from './e2e/visit.ts';
 
 /** The hour and minute `at` reads in `zone`, as the browser placed there reads them. */
-const clockIn = (at: number, zone: string): { hour: number; minute: number } => {
+const clockIn = (at: number, zone: string) => {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(
     at,
   );

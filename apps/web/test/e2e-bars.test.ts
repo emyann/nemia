@@ -12,7 +12,7 @@ const PAINTED: Rgb = [220, 220, 220];
 const BORDERLINE: Rgb = [18, 18, 18];
 
 /** The points of one depth of the cuts, in the order `cutSpills` reads them: the bottom-left cut's two, then the top-right cut's. */
-const atDepth = (d: number, bottomLeft: Rgb, topRight: Rgb): Record<string, Rgb> => ({
+const atDepth = (d: number, bottomLeft: Rgb, topRight: Rgb) => ({
   [`the bottom-left cut:${d}a`]: bottomLeft,
   [`the bottom-left cut:${d}b`]: bottomLeft,
   [`the top-right cut:${d}`]: topRight,

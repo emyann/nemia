@@ -14,7 +14,7 @@ import { photographing } from './world.ts';
  * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for
  * ever.
  */
-export async function showFinished(page: Page): Promise<void> {
+export async function showFinished(page: Page) {
   const toggle = page.getByRole('switch', { name: 'Show finished' });
   await expectVisible(toggle, 'the Factory has a Show finished switch');
   await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off as the Factory opens');
@@ -26,13 +26,7 @@ export async function showFinished(page: Page): Promise<void> {
  * The fake run on the Factory: its card; the pills of its rail, at rest; and the tiles it opens into, one a step, each a button that opens
  * the step's inspector.
  */
-export function onTheFloor(page: Page): {
-  card: Locator;
-  pills: Locator;
-  tiles: Locator;
-  pill: (name: string) => Locator;
-  tile: (name: string) => Locator;
-} {
+export function onTheFloor(page: Page) {
   const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
   return {
     card,
@@ -40,6 +34,12 @@ export function onTheFloor(page: Page): {
     tiles: card.locator('[data-tile]'),
     pill: (name) => card.locator(`[data-run-steps] [data-step="${name}"]`),
     tile: (name) => card.locator(`[data-tile="${name}"]`),
+  } satisfies {
+    card: Locator;
+    pills: Locator;
+    tiles: Locator;
+    pill: (name: string) => Locator;
+    tile: (name: string) => Locator;
   };
 }
 
@@ -49,17 +49,17 @@ export function onTheFloor(page: Page): {
  * @param card The run's card.
  * @param word What `nemia ls` prints for the run's wait or hold.
  */
-export const wordsSaying = (card: Locator, word: string): Locator =>
-  card.locator('[data-now-words]').and(card.page().getByTitle(new RegExp(`^${literal(word)}(?:\\n|$)`)));
+export const wordsSaying = (card: Locator, word: string) =>
+  card.locator('[data-now-words]').and(card.page().getByTitle(new RegExp(`^${literal(word)}(?:\\n|$)`))) satisfies Locator;
 
 /** A run's card on the Factory. */
-export const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);
+export const cardOf = (page: Page, id: string) => page.locator(`.react-flow__node[data-id="${id}"]`) satisfies Locator;
 
 /**
  * The main press of a card's gate, its split button's Approve, which approves with no words.
  * @param card the run's card on the floor (`cardOf`)
  */
-export const gateApprove = (card: Locator): Locator => card.getByRole('button', { name: 'Approve', exact: true });
+export const gateApprove = (card: Locator) => card.getByRole('button', { name: 'Approve', exact: true }) satisfies Locator;
 
 /**
  * Choose one of a card's gate's other answers from its split button's menu, which opens that answer's form in a popover over the card.
@@ -68,32 +68,32 @@ export const gateApprove = (card: Locator): Locator => card.getByRole('button', 
  * @param step the step that waits at the gate, which names the menu's button
  * @param answer the item to choose
  */
-export async function gateAnswer(page: Page, card: Locator, step: string, answer: 'Approve with words…' | 'Send back…'): Promise<void> {
+export async function gateAnswer(page: Page, card: Locator, step: string, answer: 'Approve with words…' | 'Send back…') {
   await card.getByRole('button', { name: `Other answers to ${step}`, exact: true }).click();
   await page.getByRole('menuitem', { name: answer, exact: true }).click();
 }
 
 /** Where a node is on its canvas, in the canvas's own units, whatever the zoom or the pan: where React Flow put it (`translate(x, y)`). */
-export const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
+export const placeOf = (node: Locator) =>
   node.evaluate((el) => {
     const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec((el as HTMLElement).style.transform) ?? [];
     return { x: Number(m[1]), y: Number(m[2]) };
-  });
+  }) satisfies Promise<{ x: number; y: number }>;
 
 /**
  * How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units.
  */
-export const zoomOf = (page: Page): Promise<number> =>
+export const zoomOf = (page: Page) =>
   page
     .locator('.react-flow__viewport')
     .first()
-    .evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1));
+    .evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1)) satisfies Promise<number>;
 
 /**
  * A drag as a person makes one: the pointer down on `grip`, moved `by` in the canvas's units — through the floor's zoom — in a
  * dozen moves, and up. React Flow moves a node from the second move of a drag, so one move would move nothing.
  */
-export async function dragBy(page: Page, grip: Locator, by: { x: number; y: number }, what: string): Promise<void> {
+export async function dragBy(page: Page, grip: Locator, by: { x: number; y: number }, what: string) {
   const [box, zoom] = [await grip.boundingBox(), await zoomOf(page)];
   if (!box) throw new Refused(`${what} is on the page, to be dragged`);
   const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
@@ -109,7 +109,7 @@ export async function dragBy(page: Page, grip: Locator, by: { x: number; y: numb
  * card photographed alone; and the floor fitted again, as the page found it. Unless the page being visited is pictured (`photographing`),
  * it does nothing, and leaves the floor as it was.
  */
-export async function photographCard(page: Page, card: Locator, file: string): Promise<void> {
+export async function photographCard(page: Page, card: Locator, file: string) {
   if (!photographing) return;
   const floor = page.locator('.react-flow').first();
   const [frame, size] = [
@@ -158,7 +158,7 @@ export async function photographCard(page: Page, card: Locator, file: string): P
  * Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how wide and tall it is
  * drawn.
  */
-export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; width: number; height: number }>> => {
+export const cardsDrawn = async (page: Page) => {
   const zoom = await zoomOf(page);
   return page.locator('.react-flow__node[data-id]').evaluateAll(
     (nodes, z) =>
@@ -177,7 +177,7 @@ export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: num
  * (`CELL_HEIGHT`), so a card drawn taller than its cell is over it wherever it is put; and an open card reaches right across the cells its
  * tiles take (`openSpan`), so a card left in one of them is under it.
  */
-export async function expectClearOfEachOther(page: Page): Promise<void> {
+export async function expectClearOfEachOther(page: Page) {
   const cards = await cardsDrawn(page);
   const over = cards.flatMap((card, i) =>
     cards
@@ -198,7 +198,7 @@ export async function expectClearOfEachOther(page: Page): Promise<void> {
  * and the minimap at its bottom — so each can be read and pressed where it is. Measured, not seen: a card's footer under the legend is
  * drawn, and a press on its Approve lands on the legend. `when` names the moment in the refusal.
  */
-export async function expectClearOfPanels(page: Page, when: string): Promise<void> {
+export async function expectClearOfPanels(page: Page, when: string) {
   const under = await page
     .locator('.react-flow')
     .first()
@@ -220,16 +220,16 @@ export async function expectClearOfPanels(page: Page, when: string): Promise<voi
   if (under.length) throw new Refused(`${when}, the fitted floor puts no card under a panel over it — ${under.join('; ')}`);
 }
 
-export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
-  Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
-export const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
-export const cardsOf = (page: Page, ...ids: string[]): Locator =>
-  page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
+export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
+export const said = ({ x, y }: { x: number; y: number }) => `(${Math.round(x)}, ${Math.round(y)})`;
+export const cardsOf = (page: Page, ...ids: string[]) =>
+  page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', ')) satisfies Locator;
 /** The edge from a run into one that waits on it (`--after`). */
-export const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
+export const edgeOf = (page: Page, from: string, to: string) =>
+  page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`) satisfies Locator;
 /** The edge from a run into a card held until it lands (`wf hold`), which `runEdges` names apart from an `--after` one. */
-export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
-  page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
+export const holdEdgeOf = (page: Page, from: string, to: string) =>
+  page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`) satisfies Locator;
 
 /**
  * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` —
@@ -237,7 +237,7 @@ export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
  * `dragTo`: a handle a drag cannot start from takes no pointer events until a drag is under way, so `dragTo`'s check that the target is
  * what the pointer would hit finds the node over it, and waits for ever.
  */
-export async function drawEdge(page: Page, builder: Locator, from: string, to: string, loop = false): Promise<void> {
+export async function drawEdge(page: Page, builder: Locator, from: string, to: string, loop = false) {
   await settled(page);
   const source = builder.locator(
     `.react-flow__node[data-id="${from}"] .react-flow__handle.source[data-handlepos="${loop ? 'bottom' : 'right'}"]`,

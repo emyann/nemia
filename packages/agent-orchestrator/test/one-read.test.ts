@@ -76,7 +76,7 @@ const tickRead = (e: Engine, run: Run) =>
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
 /** A workflow folder: each step's file, its frontmatter lines as given (each step is placed on git). */
-const folder = (steps: Record<string, readonly string[]>): string => {
+const folder = (steps: Record<string, readonly string[]>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, lines] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${['place: git', ...lines].join('\n')}\n---\n${name} it\n`);
@@ -84,21 +84,21 @@ const folder = (steps: Record<string, readonly string[]>): string => {
 };
 
 /** A repository on the test place, with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'README.md': 'a repo\n' });
   return repo;
 };
 
 /** A run of `workflowDir` started in `repo` and ticked once, so its roots are filed. */
-const started = async (workflowDir: string, repo = aRepo()): Promise<string> => {
+const started = async (workflowDir: string, repo = aRepo()) => {
   const run = await stage.runPlaced(startRun({ brief: 'read me', repo, workflowDir }));
   await tick(run.id);
   return run.id;
 };
 
 /** A run of `workflowDir` whose `implement` committed its work and succeeded, ticked so the steps after it are filed. */
-const worked = async (workflowDir: string, repo = aRepo()): Promise<{ id: string; repo: string; branch: string }> => {
+const worked = async (workflowDir: string, repo = aRepo()) => {
   const id = await started(workflowDir, repo);
   const work = theRun(id).steps.implement;
   fs.writeFileSync(path.join(work.workspace!, `${id}.txt`), 'the work\n');
@@ -109,7 +109,7 @@ const worked = async (workflowDir: string, repo = aRepo()): Promise<{ id: string
 };
 
 /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand: no pass has read it. */
-const mergedByHand = (repo: string, branch: string): void => {
+const mergedByHand = (repo: string, branch: string) => {
   stage.place().world.stage(repo, branch);
   stage.place().world.commit(repo, `Merge branch '${branch}'`);
 };
@@ -139,14 +139,14 @@ type Said = {
 };
 
 /** A `ToDecide`, or the board's, as one comparable word: its kind and what it names. */
-const decideWord = (t: { kind: string; step?: string; branches?: readonly string[] } | null | undefined): string | null =>
+const decideWord = (t: { kind: string; step?: string; branches?: readonly string[] } | null | undefined) =>
   t ? `${t.kind}:${t.step ?? [...(t.branches ?? [])].sort().join(',')}` : null;
 
 /** Whether a run is finished as `nemia cancel` means it: nothing due, nobody waited on, and it succeeded or failed. */
 const finishedOf = (
   a: { ready: unknown[]; check: unknown[]; retry: unknown[]; round: unknown[]; status: string },
   waitingOnYou: readonly string[],
-): boolean =>
+) =>
   !a.ready.length &&
   !a.check.length &&
   !a.retry.length &&
@@ -154,22 +154,22 @@ const finishedOf = (
   !waitingOnYou.length &&
   ['succeeded', 'failed'].includes(a.status);
 
-const sorted = (names: Iterable<string>): string[] => [...new Set(names)].sort();
+const sorted = (names: Iterable<string>) => [...new Set(names)].sort();
 
 /** Each step's tries on a clock (`Timeline`'s steps), as `<step>:<try>`, the steps sorted. */
-const triesOn = (steps: Record<string, readonly { try: number }[]>): string[] =>
+const triesOn = (steps: Record<string, readonly { try: number }[]>) =>
   Object.keys(steps)
     .sort()
     .flatMap((name) => (steps[name] ?? []).map((t) => `${name}:${t.try}`));
 
 /** Where each try's check stands on a clock, as `<step>:<try>:<at>`, the steps sorted: a check the reader did not view reads `unknown`. */
-const checksOn = (steps: Record<string, readonly { try: number; check: { at: string } | null }[]>): string[] =>
+const checksOn = (steps: Record<string, readonly { try: number; check: { at: string } | null }[]>) =>
   Object.keys(steps)
     .sort()
     .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
 
 /** The run whose ending holds the checkout a step of the object waits on (`baseHeldBy`), said only where one waits on it (`on: base`). */
-const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: string } }[]): { checkout?: string | null } => {
+const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: string } }[]) => {
   const waits = steps.find((s) => s.on === 'base');
   return waits ? { checkout: waits.baseHeldBy?.run ?? null } : {};
 };
@@ -178,7 +178,7 @@ const onTheCheckout = (steps: readonly { on: string | null; baseHeldBy?: { run: 
  * What each reader says of the run `id`, the tick's pass first, after a pass wrote where the branches stand; with `pass: false`, off
  * what the last pass wrote, a person's hand on the repository since read by none.
  */
-const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Record<string, Said>> => {
+const readers = async (id: string, { pass: passFirst = true } = {}) => {
   const e = stage.board().e;
   if (passFirst) await aPass();
   const pass = await stage.runWith(e, tickRead(e, theRun(id)));
@@ -259,7 +259,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
  * That every reader that says a fact says it as the tick's pass does, and, of a fact the pass does not say (who waits on you), as the
  * first reader that says it: each disagreement named by its fact and the two readers.
  */
-const agree = (said: Record<string, Said>): void => {
+const agree = (said: Record<string, Said>) => {
   if (process.env.ONE_READ_SHOW) console.log(JSON.stringify(said));
   const facts = new Set(Object.values(said).flatMap((s) => Object.keys(s))) as Set<keyof Said>;
   const apart: string[] = [];
@@ -514,7 +514,7 @@ test("the tables' empty read is `readersOf`'s on an empty view: every task unkno
 });
 
 /** Each line of `text` that compares the engine's `needs-human` itself, as `<file>:<line>`: what `blockedWord` is for. */
-const comparesBlocked = (file: string, text: string): string[] =>
+const comparesBlocked = (file: string, text: string) =>
   text.split('\n').flatMap((line, i) => (/[=!]==\s*'needs-human'|'needs-human'\s*[=!]==/.test(line) ? [`${file}:${i + 1}`] : []));
 
 test("REFUSED: a source file outside src/views/ compares the engine's needs-human itself, where blockedWord says it", () => {

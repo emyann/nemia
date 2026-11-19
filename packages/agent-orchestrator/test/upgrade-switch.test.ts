@@ -35,26 +35,26 @@ const { exportTemplate, reconciled } = programsAt(ROOT);
 const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 
 /** The document `file` of `dir`, changed by `change`. */
-function edit(dir: string, file: string, change: (doc: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (doc: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** Every file under `dir`, by its path in it, with its bytes, so a command is seen to have written nothing there. */
-const bytesUnder = (dir: string): Record<string, string> =>
+const bytesUnder = (dir: string) =>
   Object.fromEntries(
     (fs.readdirSync(dir, { recursive: true }) as string[])
       .filter((f) => fs.statSync(path.join(dir, f)).isFile())
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'base64')]),
-  );
+  ) satisfies Record<string, string>;
 
 /** The text of `file` in `folder`. */
-const textIn = (folder: string, file: string): string => fs.readFileSync(path.join(folder, file), 'utf8');
+const textIn = (folder: string, file: string) => fs.readFileSync(path.join(folder, file), 'utf8');
 
 /** `file` in `folder` with `from` replaced by `to`. */
-const rewrite = (folder: string, file: string, from: string, to: string): void => {
+const rewrite = (folder: string, file: string, from: string, to: string) => {
   const text = textIn(folder, file);
   assert.ok(text.includes(from), `${file} holds ${from}`);
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
@@ -84,7 +84,7 @@ type Preview = {
 };
 
 /** The upgrade `nemia factory diff <argv>` previews, run onto its handler as the api calls it. */
-const previewOf = async (...argv: string[]): Promise<Preview> => (await stage.main(['factory', 'diff', ...argv])) as Preview;
+const previewOf = async (...argv: string[]) => (await stage.main(['factory', 'diff', ...argv])) as Preview;
 
 /** The versions and the switch of `preview`, as its head says them: `[switched from, from, switched to, to]`. */
 const headOf = (preview: Preview) => [preview.switched?.from, preview.from, preview.switched?.to, preview.to];
@@ -97,7 +97,7 @@ const HIRE = 'factory.json#hires.dev/implement';
  * Two templates from the tests' team: `team` at 0.1.0, with rules and an agent `alma` the other holds none of; and `other` at 1.0.0, its
  * own name, other rules, `dev/implement` hired to the reviewer, and other words for the ship step. Each folder named as its template.
  */
-function templates(): { team: string; other: string; repo: string } {
+function templates() {
   const repo = scratch('wf-upgrade-switch-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stage.place().world.repository(repo, {});
@@ -119,7 +119,7 @@ function templates(): { team: string; other: string; repo: string } {
   });
   fs.writeFileSync(path.join(other, RULES), 'Write the tests first.\n\nNever push.\n');
   rewrite(other, 'workflows/dev/ship.md', 'Stage the merge', 'Stage, then check, the merge');
-  return { team, other, repo };
+  return { team, other, repo } satisfies { team: string; other: string; repo: string };
 }
 
 describe('a switch onto another template: previewed with no common base, held to its plan, waited on, resolved, merged', () => {
@@ -250,7 +250,7 @@ describe('a switch onto another template: previewed with no common base, held to
 });
 
 test('a base whose status names no template is refused a switch until a pass names it; an upgrade under way stays three-way', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'later', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('later'));
@@ -282,7 +282,7 @@ test('a base whose status names no template is refused a switch until a pass nam
 });
 
 test('a base unnamed whose template cannot be read is named by no pass, and the refusal says to put the template back', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'moved', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('moved'));
@@ -306,7 +306,7 @@ test('a base unnamed whose template cannot be read is named by no pass, and the 
 });
 
 test('a factory whose template changed under its version is named after that template, and switched from it with no base', async () => {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   const dirs = templates();
   await stage.main(['factory', 'apply', 'kit', '--template', dirs.team, '--volume', `${dirs.repo}:rw`]);
   reconciled(factory('kit'));

@@ -67,15 +67,17 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
 };
 
 /** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness; at a time more, late. */
-const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true, late: true, parked: true });
+const corpus = () => corpusOf(SIGHTINGS, { unread: true, late: true, parked: true }) satisfies Case[];
 
 /** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
-const journalled = (action: Action, ms: number): Event[] => {
+const journalled = (action: Action, ms: number) => {
   switch (action.do) {
     case 'start':
-      return [{ kind: 'starting', at: at(ms), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge }];
+      return [
+        { kind: 'starting', at: at(ms), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge },
+      ] satisfies Event[];
     case 'spawn':
-      return [{ kind: 'spawned', at: at(ms), attempt: action.attempt }];
+      return [{ kind: 'spawned', at: at(ms), attempt: action.attempt }] satisfies Event[];
     case 'record-end':
       return [
         {
@@ -89,12 +91,12 @@ const journalled = (action: Action, ms: number): Event[] => {
           closeout: action.closeout,
           ...(action.closedOut !== undefined ? { closedOut: action.closedOut } : {}),
         },
-      ];
+      ] satisfies Event[];
     case 'settle':
-      return [{ kind: 'settled', at: at(ms), outcome: action.outcome, note: action.note }];
+      return [{ kind: 'settled', at: at(ms), outcome: action.outcome, note: action.note }] satisfies Event[];
     case 'stop':
     case 'nothing':
-      return [];
+      return [] satisfies Event[];
   }
 };
 
@@ -290,7 +292,7 @@ describe('a settled task is final: it decides nothing, before anything is observ
 });
 
 /** The states no move reaches from `submitted`, over the machine's edges and the verbs given. */
-const unreached = (verbs: readonly Verb[]): LifecycleState[] => {
+const unreached = (verbs: readonly Verb[]) => {
   const moves = [...edgesOf(), ...verbs.flatMap((v) => v.from.map((from) => ({ from, to: v.to })))];
   const reached = new Set<string>(['submitted']);
   for (let grew = true; grew;) {
@@ -301,7 +303,7 @@ const unreached = (verbs: readonly Verb[]): LifecycleState[] => {
         grew = true;
       }
   }
-  return STATES.filter((s) => !reached.has(s));
+  return STATES.filter((s) => !reached.has(s)) satisfies LifecycleState[];
 };
 
 /** The machine read as data: what it holds, and what is drawn from it. */

@@ -115,7 +115,7 @@ const writeCustom = (words: string) => {
 };
 
 /** The message `f` refuses with, at exit 2. */
-const refusal = async (f: () => Promise<unknown>): Promise<string> => {
+const refusal = async (f: () => Promise<unknown>) => {
   try {
     await f();
   } catch (err) {
@@ -126,13 +126,13 @@ const refusal = async (f: () => Promise<unknown>): Promise<string> => {
 };
 
 /** Her current task, the last of the keeper's record; empty where she has none. */
-const herTask = (): string => herTasks(ROOT).at(-1) ?? '';
+const herTask = () => herTasks(ROOT).at(-1) ?? '';
 
 /**
  * Her let go in the story told in `t`: every level at manual, her open task stopped from outside, and the keeper's beats run until it
  * owes nothing — her subscription dropped and her end marked — then a moment passed, so a word of the person's comes after the mark.
  */
-const letGo = async (): Promise<void> => {
+const letGo = async () => {
   await level({ level: 'manual' });
   const b = stage.board();
   const task = b.tasks.get(herTask());
@@ -146,7 +146,7 @@ const letGo = async (): Promise<void> => {
  * Her task kept anew in the story told in `t`: any she has let go, then the store's level at semi-auto, a moment later, a fresh task
  * filed, subscribed and at work. Its id.
  */
-const keptAnew = async (): Promise<string> => {
+const keptAnew = async () => {
   withPipao();
   await letGo();
   vi.advanceTimersByTime(2);

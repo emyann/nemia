@@ -28,27 +28,27 @@ const SPAWNS = ['execFileSync', 'execFile', 'spawn', 'spawnSync'];
 const SHELLS = ['exec', 'execSync'];
 
 /** The string `node` is: a literal, a template's head, or a `const` of the file that holds one; else `undefined`. */
-function stringOf(node: ts.Expression | undefined, consts: ReadonlyMap<string, string>): string | undefined {
-  if (!node) return undefined;
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-  if (ts.isTemplateExpression(node)) return node.head.text;
-  if (ts.isIdentifier(node)) return consts.get(node.text);
-  return undefined;
+function stringOf(node: ts.Expression | undefined, consts: ReadonlyMap<string, string>) {
+  if (!node) return undefined satisfies string | undefined;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text satisfies string | undefined;
+  if (ts.isTemplateExpression(node)) return node.head.text satisfies string | undefined;
+  if (ts.isIdentifier(node)) return consts.get(node.text) satisfies string | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** The name a call is called by: an identifier's, or the last name of a property access. */
-function calleeName(call: ts.CallExpression): string | undefined {
-  if (ts.isIdentifier(call.expression)) return call.expression.text;
-  if (ts.isPropertyAccessExpression(call.expression)) return call.expression.name.text;
-  return undefined;
+function calleeName(call: ts.CallExpression) {
+  if (ts.isIdentifier(call.expression)) return call.expression.text satisfies string | undefined;
+  if (ts.isPropertyAccessExpression(call.expression)) return call.expression.name.text satisfies string | undefined;
+  return undefined satisfies string | undefined;
 }
 
 /** Each tool a source text spawns, as `<tool> (<call>, line <n>)`. */
-function spawnedIn(text: string, file = 'file.ts'): string[] {
+function spawnedIn(text: string, file = 'file.ts') {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const consts = new Map<string, string>();
   const calls: ts.CallExpression[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && ts.isStringLiteral(node.initializer))
       consts.set(node.name.text, node.initializer.text);
     if (ts.isCallExpression(node)) calls.push(node);
@@ -61,10 +61,11 @@ function spawnedIn(text: string, file = 'file.ts'): string[] {
     const tool = SPAWNS.includes(name) ? said : SHELLS.includes(name) ? said?.trim().split(/\s+/)[0] : undefined;
     if (tool === undefined || !TOOLS.includes(path.basename(tool))) return [];
     return [`${path.basename(tool)} (${name}, line ${source.getLineAndCharacterOfPosition(call.getStart()).line + 1})`];
-  });
+  }) satisfies string[];
 }
 
 /** Every source file under `dir`, tests left out, by its path from `root`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function sourcesUnder(dir: string, root: string): string[] {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -75,10 +76,12 @@ function sourcesUnder(dir: string, root: string): string[] {
 }
 
 /** Each spawned tool under the `src` of every workspace the root package.json of `root` names, as `<file>: <tool> (…)`. */
-function spawnedTools(root: string): string[] {
+function spawnedTools(root: string) {
   return workspaces(root)
     .flatMap((dir) => sourcesUnder(path.join(root, dir, 'src'), root))
-    .flatMap((file) => spawnedIn(fs.readFileSync(path.join(root, file), 'utf8'), file).map((found) => `${file}: ${found}`));
+    .flatMap((file) =>
+      spawnedIn(fs.readFileSync(path.join(root, file), 'utf8'), file).map((found) => `${file}: ${found}`),
+    ) satisfies string[];
 }
 
 test('no src spawns a tool node:fs stands in for', () => {

@@ -13,7 +13,7 @@ import { OUT, store } from '../world.ts';
  * and the wall time on hover; its tokens with their split, in full, are in the Tokens receipt; photographed, and at the phone's width,
  * where the header wraps and cuts nothing.
  */
-async function tookInTheHeader(page: Page): Promise<void> {
+async function tookInTheHeader(page: Page) {
   const header = page.locator('header[data-run-header]');
   await expectVisible(
     header.locator('[data-run-took][title^="At work "][title*="from start to now"] [data-stat-tile="took"]', { hasText: COSTLY.took }),

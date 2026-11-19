@@ -18,9 +18,9 @@ import { engine, SERVING_VARIABLES, SESSION_VARIABLES, tickRun, withProposalsPas
 import { runWith } from './builtin-place.ts';
 
 /** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
-function importCalls(text: string): string[] {
+function importCalls(text: string) {
   const found: string[] = [];
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) found.push(node.getText());
     ts.forEachChild(node, visit);
   };
@@ -32,7 +32,7 @@ function importCalls(text: string): string[] {
 const API = path.join(import.meta.dirname, '..');
 
 /** Every test file of the api from the package's folder, `test/x.test.ts` and each beside the code, `src/<folder>/x.test.ts`. */
-const testFiles = (): string[] => [
+const testFiles = () => [
   ...fs
     .readdirSync(path.join(API, 'test'))
     .filter((f) => f.endsWith('.test.ts'))
@@ -95,7 +95,7 @@ test('REFUSED: a Vitest config that runs its files without the harness first —
 });
 
 /** The probe's test file, `probe.test.mjs` in `dir`, run through Vitest with the harness loaded first, or with no setup file. */
-const probed = (dir: string, env: NodeJS.ProcessEnv, harnessed: boolean): void => {
+const probed = (dir: string, env: NodeJS.ProcessEnv, harnessed: boolean) => {
   const ran = vitestIn(dir, harnessed ? [path.join(API, 'test', 'harness.ts')] : [], env);
   assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
 };
@@ -143,7 +143,7 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file run un
   );
   const named = 'http://127.0.0.1:9';
   const env: Record<string, string | undefined> = { ...process.env, PROBE_OUT: out, OTEL_EXPORTER_OTLP_ENDPOINT: named };
-  const seen = (harnessed: boolean): unknown => {
+  const seen = (harnessed: boolean) => {
     probed(dir, env, harnessed);
     return JSON.parse(fs.readFileSync(out, 'utf8'));
   };
@@ -176,7 +176,7 @@ test("REFUSED under the daemon's per-session and serving variables: a test file 
     ].join('\n'),
   );
   const env: Record<string, string | undefined> = { ...process.env, PROBE_OUT: out, ...daemons };
-  const seen = (harnessed: boolean): unknown => {
+  const seen = (harnessed: boolean) => {
     probed(dir, env, harnessed);
     return JSON.parse(fs.readFileSync(out, 'utf8'));
   };
@@ -265,7 +265,7 @@ const SDK_FLAGS = [
 type Answered = { type: string; response: { request_id: string; subtype: string; response?: unknown } };
 
 /** A control request line as the SDK writes one. */
-const requested = (id: string, request: object): string => `${JSON.stringify({ type: 'control_request', request_id: id, request })}\n`;
+const requested = (id: string, request: object) => `${JSON.stringify({ type: 'control_request', request_id: id, request })}\n`;
 
 test("the harness's `claude` answers the SDK's control requests under each request's own id, and ends only once its stdin is closed", async () => {
   assert.equal(
@@ -285,7 +285,7 @@ test("the harness's `claude` answers the SDK's control requests under each reque
     }
     waiting.splice(0).forEach((go) => go());
   });
-  const answered = async (): Promise<Answered> => {
+  const answered = async () => {
     while (lines.length === 0) await new Promise<void>((go) => waiting.push(go));
     return JSON.parse(lines.shift()!) as Answered;
   };

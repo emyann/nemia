@@ -13,18 +13,18 @@ import { alive } from './alive.ts';
 import { endProcesses, processesNow } from './processes.ts';
 
 /** A `sleep` child that waits, in `cwd`, with `env` beside the parent's; killed when the test ends. */
-const waiting = (cwd: string, env: Record<string, string>): ChildProcess => {
+const waiting = (cwd: string, env: Record<string, string>) => {
   const child = spawn('sleep', ['60'], {
     cwd,
     env: { ...process.env, ...env },
     stdio: 'ignore',
   });
-  return child;
+  return child satisfies ChildProcess;
 };
 
 /** Waits until `child` is gone, as `exit` says. */
-const exited = (child: ChildProcess): Promise<void> =>
-  child.exitCode !== null || child.signalCode !== null ? Promise.resolve() : new Promise((done) => child.once('exit', () => done()));
+const exited = (child: ChildProcess) =>
+  child.exitCode !== null || child.signalCode !== null ? Promise.resolve() : new Promise<void>((done) => child.once('exit', () => done()));
 
 describe('processesNow reads this user processes with the variables asked for, and endProcesses ends one only while its start matches', () => {
   let folder!: string;

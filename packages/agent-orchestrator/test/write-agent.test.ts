@@ -38,14 +38,14 @@ const STORE = path.join(ROOT, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
 
 /** A store whose agents are the tests' team's, with `dev` beside them: its steps name them. */
-function fresh(): void {
+function fresh() {
   fs.rmSync(STORE, { recursive: true, force: true });
   fs.cpSync(path.join(TEAM, 'agents'), AGENTS, { recursive: true });
   fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
   fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 }
 
-function snapshot(dir: string): Record<string, string> {
+function snapshot(dir: string) {
   return Object.fromEntries(
     fs
       .readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -58,7 +58,7 @@ function snapshot(dir: string): Record<string, string> {
 }
 
 /** `fn` refused as the kind `tag`, exit 2, naming each of `facts`, and the store as it was. */
-function refused(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]): Refusal {
+function refused(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]) {
   const before = snapshot(STORE);
   let caught: unknown;
   try {
@@ -74,7 +74,7 @@ function refused(fn: () => unknown, tag: Refusal['_tag'], ...facts: string[]): R
 }
 
 /** An agent's draft: `skills:` is the agent's own line, carried as the file writes it; what the agent can do is generated from it. */
-const draftOf = (agent: Agent): AgentDraft => ({
+const draftOf = (agent: Agent) => ({
   name: agent.name,
   role: agent.role,
   description: agent.description,

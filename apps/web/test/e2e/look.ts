@@ -52,7 +52,7 @@ export const LOOK_RUNS: readonly LookRun[] = [
  * Runs `run`, its output said as it says it, with `LOOK_STORYBOOK` naming `storybook`; resolves once it passes, rejects naming how to
  * run it again when it does not.
  */
-function runOne(run: LookRun, children: ChildProcess[], storybook: string): Promise<void> {
+function runOne(run: LookRun, children: ChildProcess[], storybook: string) {
   console.log(`e2e: ${run.said}`);
   const child = spawn(run.command, [...run.args], {
     cwd: WEB,
@@ -60,7 +60,7 @@ function runOne(run: LookRun, children: ChildProcess[], storybook: string): Prom
     env: { ...process.env, [LOOK_STORYBOOK]: storybook },
   });
   children.push(child);
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     child.on('error', reject);
     child.on('exit', (code, signal) => {
       if (code === 0) resolve();
@@ -76,9 +76,9 @@ function runOne(run: LookRun, children: ChildProcess[], storybook: string): Prom
  * exit.
  * @param children The runner's children, which a signal stops.
  */
-export async function lookTests(children: ChildProcess[]): Promise<void> {
+export async function lookTests(children: ChildProcess[]) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-look-storybook-'));
-  const away = (): void => fs.rmSync(folder, { recursive: true, force: true });
+  const away = () => fs.rmSync(folder, { recursive: true, force: true });
   process.once('exit', away);
   try {
     const storybook = path.join(folder, 'static');

@@ -28,7 +28,7 @@ const write = (repo: string, file: string, text: string) => {
 };
 
 /** A repository whose base has a workspace package with a source file and its test, and a CLAUDE.md; returns it with its base's sha. */
-function aRepo(): { repo: string; base: string } {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   write(repo, 'package.json', `${JSON.stringify({ name: 'app', workspaces: ['packages/*'], scripts: { test: 'node --test' } })}\n`);
@@ -117,7 +117,7 @@ const decisionOf = async (id: string) => {
 };
 
 /** A decision there is to make: a 200 whose body is `nemia decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
-const decidable = async (id: string): Promise<Decidable> => {
+const decidable = async (id: string) => {
   const { status, body } = await decisionOf(id);
   assert.equal(status, 200, JSON.stringify(body));
   assert.ok('commands' in body, JSON.stringify(body));

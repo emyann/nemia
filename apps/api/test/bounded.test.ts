@@ -64,7 +64,7 @@ const NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
 const COMMON: Readonly<Record<string, string>> = { runId: RUN, step: 'implement', try: '1', namespace: 'default' };
 
 /** `path` with each `:name` filled for the group `group`. */
-const filled = (group: string, at: string): string =>
+const filled = (group: string, at: string) =>
   at.replace(/:([A-Za-z]+)/g, (_, key: string) => NAMES[group]?.[key] ?? COMMON[key] ?? 'nothing-here');
 
 /** The query an endpoint is asked with, where its default would hold the request open. */

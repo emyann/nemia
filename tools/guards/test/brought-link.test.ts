@@ -15,7 +15,7 @@ import { REPO } from 'test-kit/repo';
 const SKILL = 'packages/agent-orchestrator/nemia/skills/bring-what-waits/SKILL.md';
 
 /** Every markdown link of `text` whose address names the placeholders `<run>` and `<step>`: the templates the skill teaches. */
-const templatesIn = (text: string): string[] => [...text.matchAll(/\]\(([^()\s]*<run>[^()\s]*)\)/g)].map((m) => m[1]);
+const templatesIn = (text: string) => [...text.matchAll(/\]\(([^()\s]*<run>[^()\s]*)\)/g)].map((m) => m[1]);
 
 /** The run and the step `text`'s templates name once filled, as the board reads each. */
 const readIn = (text: string) =>

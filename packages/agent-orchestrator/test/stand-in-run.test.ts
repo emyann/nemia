@@ -42,7 +42,7 @@ fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: tru
 fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 
 /** `implement → ship`, the tests' team's ending with its `after:` on implement, as `ship.test.ts` has it. */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const ship = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');

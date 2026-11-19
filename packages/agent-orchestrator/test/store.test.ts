@@ -75,10 +75,10 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 const placed = <A, E, R>(program: EffectOf<A, E, R>) => givenPlace(() => stand().layer, ENV)(program);
 
 /** The paths `checkout` holds uncommitted, a line each. */
-const uncommitted = (checkout: string): string => world().changes(checkout).join('\n');
+const uncommitted = (checkout: string) => world().changes(checkout).join('\n');
 
 /** Every commit the commit `rev` names in `root` follows, itself first, a merge's first parent before its second. */
-const commitsOf = (root: string, rev: string): string[] => {
+const commitsOf = (root: string, rev: string) => {
   const seen: string[] = [];
   const next = [world().tip(root, rev) ?? rev];
   while (next.length) {
@@ -87,26 +87,27 @@ const commitsOf = (root: string, rev: string): string[] => {
     seen.push(at);
     next.push(...world().read(root, at).parents);
   }
-  return seen;
+  return seen satisfies string[];
 };
 
 /** The first line of the message of each commit `rev` follows in `root`, itself first: the commit the checkout is at, given none. */
-const subjects = (root: string, rev = world().head(root)): string[] =>
-  commitsOf(root, rev).map((id) => world().read(root, id).message.split('\n')[0]);
+const subjects = (root: string, rev = world().head(root)) =>
+  commitsOf(root, rev).map((id) => world().read(root, id).message.split('\n')[0]) satisfies string[];
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
-const aRun = (id: string, steps: Run['steps']): Run => ({
-  id,
-  repo: '/repo',
-  workspace: '/repo',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: false,
-  brief: 'add a flag',
-  workflowDir: WORKFLOW,
-  steps,
-  createdAt: '2026-01-01T00:00:00Z',
-});
+const aRun = (id: string, steps: Run['steps']) =>
+  ({
+    id,
+    repo: '/repo',
+    workspace: '/repo',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: false,
+    brief: 'add a flag',
+    workflowDir: WORKFLOW,
+    steps,
+    createdAt: '2026-01-01T00:00:00Z',
+  }) satisfies Run;
 
 /** What the daemon does to the run's json, and the only thing it does to it. */
 const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
@@ -208,7 +209,7 @@ test('REFUSED by the engine: a stop of a task that settled, or was asked to stop
 });
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, {});
   return repo;
@@ -216,6 +217,7 @@ const aRepo = (): string => {
 
 test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async () => {
   let draws = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- fixes the random draws, so a collision is met
   vi.spyOn(Math, 'random').mockImplementation(() => (draws++ === 0 ? 0.5 : draws / 97));
   const first = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   draws = 0;
@@ -386,9 +388,9 @@ const folder = (implementKeys = '') => {
 };
 
 /** A run this file started on a repository: a repository run, whose repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
-  return run;
+  return run satisfies RepositoryRun;
 };
 
 /** `nemia start`, for real, over a fresh repository, the steps working in the checkout itself. */
@@ -477,7 +479,7 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
  * What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something
  * out of.
  */
-const refusal = async (p: Promise<unknown>): Promise<string> => {
+const refusal = async (p: Promise<unknown>) => {
   const err = await p.then(
     () => undefined,
     (e: Error & { exitCode?: number }) => e,
@@ -870,7 +872,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log');
   await onHandler(['retry', run.id, 'implement'], b.e, undefined, stand().place, ENV);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -935,6 +937,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
     JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the asks folder removed as made: a race
   vi.spyOn(fs, 'mkdirSync').mockImplementation(((at: string, ...rest: unknown[]) => {
     if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });
     return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
@@ -1054,8 +1057,10 @@ function _rmProgramTypes() {
  * and this file's store.
  */
 const verbPrograms = async () => {
-  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
-    Effect.runPromise(placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeConfigLayer(ENV))));
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>) =>
+    Effect.runPromise(
+      placed(program).pipe(Effect.provide(EngineService.layer(e)), Effect.provide(storeConfigLayer(ENV))),
+    ) satisfies Promise<A>;
   return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
 };
 
@@ -1106,12 +1111,13 @@ async function _verbProgramTypes() {
 /** The views' programs, a runner of one over `e` as its plain face runs it, and an engine over `e` whose feed says `entries`. */
 const viewPrograms = async () => {
   const live = (ids: readonly string[]) => runPlaced(liveOf(ids));
-  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
-    Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
-  const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']): Engine => ({
-    ...e,
-    feed: (after = 0) => Effect.succeed({ entries: entries.slice(after), cursor: entries.length }),
-  });
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>) =>
+    Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e)))) satisfies Promise<A>;
+  const fed = (e: Engine, entries: Effect.Success<ReturnType<Engine['feed']>>['entries']) =>
+    ({
+      ...e,
+      feed: (after = 0) => Effect.succeed({ entries: entries.slice(after), cursor: entries.length }),
+    }) satisfies Engine;
   return { Effect, over, fed, live, nothingRead: () => standingReader(NOTHING_READ), ...views };
 };
 
@@ -1122,7 +1128,7 @@ const viewPrograms = async () => {
 async function _viewProgramTypes() {
   const v = await viewPrograms();
   const run = aRun('x', {});
-  const failed = (): TaskPhase => 'failed';
+  const failed = () => 'failed' as const satisfies TaskPhase;
   void ([
     v.taskPhasesRead(run) satisfies EffectOf<
       { views: Map<string, TaskView>; phaseOf: (taskId: string) => TaskPhase },

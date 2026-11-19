@@ -34,13 +34,13 @@ type FactoryPlan = import('objects').FactoryPlan;
 type FactoryUpgraded = import('objects').FactoryUpgraded;
 type FactoryResolved = import('objects').FactoryResolved;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** The template `name` in `folder` at `version`: one workflow, `press`, whose step `draft` the agent `drafter` fills. */
-function template(folder: string, name: string, version = '0.1.0'): string {
+function template(folder: string, name: string, version = '0.1.0') {
   const at = path.join(folder, name);
   write(
     path.join(at, 'nemia.yaml'),
@@ -81,7 +81,7 @@ const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown = {}) => app().request(url, { method, headers: json, body: JSON.stringify(body) });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -89,13 +89,13 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 }
 
 /** The factory's file as it is on disk, or null where there is none: what a refusal must leave as it was. */
-const fileOf = (name: string): string | null => {
+const fileOf = (name: string) => {
   const file = path.join(root, 'factories', `${name}.json`);
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 };
 
 /** That `res` was refused with `status`, and the factory `name`'s file is as it was before. */
-async function refused(name: string, res: () => Response | Promise<Response>, status: number): Promise<void> {
+async function refused(name: string, res: () => Response | Promise<Response>, status: number) {
   const before = fileOf(name);
   const answer = await res();
   assert.equal(answer.status, status, await answer.text());
@@ -103,7 +103,7 @@ async function refused(name: string, res: () => Response | Promise<Response>, st
 }
 
 /** The archives the store keeps of the templates sent to it. */
-const sent = (): string[] => {
+const sent = () => {
   const dir = sentTemplatesDir(root);
   return fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
 };
@@ -159,7 +159,7 @@ describe('a person files a factory over the api, then mounts a volume and takes 
 });
 
 /** A repository of this test's place at a folder of its own, one commit on it, its `file://` URL and where the store keeps its clone. */
-function origin(): { url: string; head: string; into: string } {
+function origin() {
   const dir = path.join(scratch('nemia-api-templated-origin-'), 'o', 'r');
   fs.mkdirSync(dir, { recursive: true });
   stand().world.repository(dir, { 'a.txt': 'one\n' });

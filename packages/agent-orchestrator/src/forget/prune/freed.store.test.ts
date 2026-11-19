@@ -17,10 +17,10 @@ import { freedBytes, walk, WALK_BURST, WHOLE, type Sort } from './freed.store.ts
 const ROOT = scratch('wf-freed-');
 
 /** The bytes `lstat` says a path holds on disk. */
-const held = (at: string): number => fs.lstatSync(at).blocks * 512;
+const held = (at: string) => fs.lstatSync(at).blocks * 512;
 
 /** A file of `kb` kilobytes at `at`. */
-const file = (at: string, kb = 8): string => {
+const file = (at: string, kb = 8) => {
   fs.mkdirSync(path.dirname(at), { recursive: true });
   fs.writeFileSync(at, Buffer.alloc(kb * 1024, 1));
   return at;

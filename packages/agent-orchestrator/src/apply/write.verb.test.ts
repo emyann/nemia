@@ -23,7 +23,8 @@ import type { Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** `program` run with what a LibraryAdd's write and read reach alone: the store's root, which they are given. */
-const ran = <A>(program: Effect.Effect<A, Refusal, unknown>): Promise<A> => Effect.runPromise(program as Effect.Effect<A, Refusal>);
+const ran = <A>(program: Effect.Effect<A, Refusal, unknown>) =>
+  Effect.runPromise(program as Effect.Effect<A, Refusal>) satisfies Promise<A>;
 
 test('a LibraryAdd proposal applied writes the add, then its removal takes it off, each read back as the proposal reads it', async () => {
   const home = scratch('wf-apply-adds-');
@@ -80,7 +81,7 @@ const FACTORY = 'acme';
  * A store with `FACTORY`, made from a template, its tree the tests' team rendered by hand, its `dev` README declaring `NEEDS`: the store's
  * root and the README's path.
  */
-function plantedNeeds(prefix: string): { home: string; readme: string } {
+function plantedNeeds(prefix: string) {
   const home = scratch(prefix);
   const factories = path.join(home, 'factories');
   fs.mkdirSync(factories, { recursive: true });
@@ -96,7 +97,7 @@ function plantedNeeds(prefix: string): { home: string; readme: string } {
   fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
   const readme = path.join(tree, 'workflows', 'dev', 'README.md');
   fs.writeFileSync(readme, README);
-  return { home, readme };
+  return { home, readme } satisfies { home: string; readme: string };
 }
 
 /** What there is now of `name`'s `kind` in `FACTORY`, read at the store's root `home`, which the Workflow door reads at. */
@@ -104,21 +105,25 @@ const nowIn = (home: string, kind: 'Workflow' = 'Workflow', name = 'dev') =>
   ran(Effect.provideService(currentOf({ home }, FACTORY, kind, name), StoreRoot, home));
 
 /** `dev` as the api serves it, read now: its spec as its files hold it, at the version it was read. */
-async function servedDev(home: string): Promise<{ version: string; spec: Record<string, unknown> }> {
+async function servedDev(home: string) {
   const now = await nowIn(home);
-  return { version: now.version ?? '', spec: now.spec as Record<string, unknown> };
+  return { version: now.version ?? '', spec: now.spec as Record<string, unknown> } satisfies {
+    version: string;
+    spec: Record<string, unknown>;
+  };
 }
 
 /** The spec `object` will hold once written over `now` (`mergedSpec`), its README read: its needs are declared there, never apart. */
 const previewOf = (object: ProposedObject, now: unknown) => mergedSpec(object, now) as { readme?: string };
 
 /** `dev` proposed back as an update at `version` with `spec`. */
-const devProposed = (version: string, spec: ProposedObject['spec']): ProposedObject => ({
-  kind: 'Workflow',
-  metadata: { name: 'dev', resourceVersion: version },
-  verb: 'update',
-  spec,
-});
+const devProposed = (version: string, spec: ProposedObject['spec']) =>
+  ({
+    kind: 'Workflow',
+    metadata: { name: 'dev', resourceVersion: version },
+    verb: 'update',
+    spec,
+  }) satisfies ProposedObject;
 
 describe('a Workflow read as the api serves it and proposed back writes its README byte for byte, the preview showing it unchanged', () => {
   for (const [label, line] of [

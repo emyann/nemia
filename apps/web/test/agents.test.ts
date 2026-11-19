@@ -36,30 +36,31 @@ import {
   withSkill,
 } from '../src/lib/agents.ts';
 
-const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
-  name: 'scribe',
-  from: 'user',
-  dir: '/store/agents',
-  file: '/store/agents/scribe.md',
-  role: 'Note writer',
-  description: 'Use this when a change needs its notes written.',
-  keys: { model: 'sonnet', effort: 'low' },
-  body: 'You write the notes.\n',
-  schema: null,
-  card: null,
-  cardError: null,
-  skills: null,
-  harnessPrompt: null,
-  mcp: null,
-  given: [],
-  source: '',
-  version: 'v1',
-  usedBy: [],
-  fills: [],
-  error: null,
-  untried: null,
-  ...fields,
-});
+const listing = (fields: Partial<AgentListing> = {}) =>
+  ({
+    name: 'scribe',
+    from: 'user',
+    dir: '/store/agents',
+    file: '/store/agents/scribe.md',
+    role: 'Note writer',
+    description: 'Use this when a change needs its notes written.',
+    keys: { model: 'sonnet', effort: 'low' },
+    body: 'You write the notes.\n',
+    schema: null,
+    card: null,
+    cardError: null,
+    skills: null,
+    harnessPrompt: null,
+    mcp: null,
+    given: [],
+    source: '',
+    version: 'v1',
+    usedBy: [],
+    fills: [],
+    error: null,
+    untried: null,
+    ...fields,
+  }) satisfies AgentListing;
 
 const saying = () =>
   listing({

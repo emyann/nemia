@@ -49,7 +49,7 @@ const git = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one file committed on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'add.ts'), 'export const add = (a, b) => a + b;\n');
@@ -62,7 +62,7 @@ const aRepo = (): string => {
  * `implement → ship`, with the team's `dev/ship.md` as its ending — its keys and its agent — with only its `after:` changed, since this
  * folder has no review.
  */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   assert.match(SHIP_MD, /^after: review$/m);
@@ -171,7 +171,7 @@ async function stagedAndSigned(given: Given & { message?: string; artifacts?: st
   return { ...at, signed, checkId: `${at.id}-ship-check` };
 }
 
-const mergeHead = (repo: string): boolean => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
+const mergeHead = (repo: string) => fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD'));
 
 /** `npm`, offline, in a directory: a workspace-only tree needs no registry, and a test never reaches one. */
 const npm = (cwd: string, ...args: string[]) =>
@@ -181,7 +181,7 @@ const npm = (cwd: string, ...args: string[]) =>
  * A repository as npm workspaces leave it: `packages/a` a workspace package, the lockfile npm writes committed on main, and `node_modules`
  * installed from it in the checkout — as a person's checkout is, by the `npm install` they last ran on main.
  */
-const anNpmRepo = (): string => {
+const anNpmRepo = () => {
   const repo = aRepo();
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
   fs.mkdirSync(path.join(repo, 'packages', 'a'), { recursive: true });
@@ -204,7 +204,7 @@ const addB = (workspace: string) => {
 };
 
 /** The team's folder, its ship's `check:` a line that needs package `b` installed where it runs, as a typecheck needs `@types/js-yaml`. */
-const requiringB = (): string => {
+const requiringB = () => {
   const dir = folder();
   const ship = path.join(dir, 'ship.md');
   const text = fs.readFileSync(ship, 'utf8');
@@ -221,7 +221,7 @@ const runCheck = (tasks: ReturnType<typeof board>['tasks'], checkId: string, rep
 };
 
 /** Each entry under a `node_modules`, a level down, with what it is and when it changed: what an install would change. */
-const modulesOf = (repo: string): string[] =>
+const modulesOf = (repo: string) =>
   fs
     .readdirSync(path.join(repo, 'node_modules'), { recursive: true, withFileTypes: false })
     .map(String)

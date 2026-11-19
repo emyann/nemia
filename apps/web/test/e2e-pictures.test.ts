@@ -10,7 +10,7 @@ import path from 'node:path';
 const E2E = path.resolve(import.meta.dirname, 'e2e');
 
 /** The files of `files`, by their path, that call `.screenshot(` themselves: every one but the helper that stills the animations. */
-export function bareScreenshots(files: Readonly<Record<string, string>>): string[] {
+export function bareScreenshots(files: Readonly<Record<string, string>>) {
   return Object.entries(files)
     .filter(([file, text]) => {
       const calls = text.match(/\.screenshot\(/g)?.length ?? 0;
@@ -20,7 +20,7 @@ export function bareScreenshots(files: Readonly<Record<string, string>>): string
 }
 
 /** Each `.ts` file under `test/e2e/`, by its path from there, with its text. */
-const e2eFiles = (): Record<string, string> =>
+const e2eFiles = () =>
   Object.fromEntries(
     fs
       .readdirSync(E2E, { withFileTypes: true, recursive: true })

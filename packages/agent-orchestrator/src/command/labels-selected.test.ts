@@ -31,7 +31,7 @@ const engine = eachTest(testEngine);
 const noEngine = () => engineOf(engine().layer);
 
 /** A folder workflow of one step, named `name`. */
-const oneStep = (name: string): string => {
+const oneStep = (name: string) => {
   const dir = path.join(scratch('wf-ls-labels-team-'), name);
   fs.mkdirSync(dir);
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
@@ -46,7 +46,7 @@ const started = async (brief: string) => {
 };
 
 /** The runs `nemia ls <argv>` reads, by id, its arguments parsed by its own words. */
-const listedBy = async (...argv: string[]): Promise<string[]> => {
+const listedBy = async (...argv: string[]) => {
   const args = parseArgv(LS.spec, argv) ?? {};
   return (await runWith(noEngine(), LS.handler(args))).runs.map(({ run }) => run.id);
 };

@@ -71,7 +71,7 @@ test("every file under each package's test/, and every test beside its code in s
 });
 
 /** The tests beside the code in a package's `src/`, by absolute path. */
-const testsBeside = (dir: string): string[] => {
+const testsBeside = (dir: string) => {
   const src = path.join(dir, 'src');
   if (!fs.existsSync(src)) return [];
   return (fs.readdirSync(src, { recursive: true }) as string[]).filter((f) => /\.test\.tsx?$/.test(f)).map((f) => path.join(src, f));
@@ -81,7 +81,7 @@ const testsBeside = (dir: string): string[] => {
 const BESIDE_GLOB = 'src/**/*.test.ts';
 
 /** Where a package with tests beside its code has a Vitest config whose `include` does not run them. */
-const unrunBeside = (name: string, include: string[], beside: number): string[] =>
+const unrunBeside = (name: string, include: string[], beside: number) =>
   beside && !include.includes(BESIDE_GLOB)
     ? [
         `${name} has ${beside} tests beside its code, and its Vitest config's include (${include.join(', ')}) runs none: add '${BESIDE_GLOB}' to it`,
@@ -112,7 +112,7 @@ test("every package's Vitest config runs the tests beside its code", () => {
  * Where packages' suites run their files unbounded: each package with a `test` script whose Vitest config gives no `maxWorkers` of one
  * or more, and every package when their bounds differ. A package with no `test` script has nothing to bound.
  */
-const unbounded = (suites: { name: string; script: string; maxWorkers: number | null }[]): string[] => {
+const unbounded = (suites: { name: string; script: string; maxWorkers: number | null }[]) => {
   const run = suites.filter((s) => s.script);
   const missing = run
     .filter((s) => s.maxWorkers === null || s.maxWorkers < 1)
@@ -169,7 +169,7 @@ test("every package's Vitest config bounds how many test files run at once, the 
 });
 
 /** Every file the tsconfigs named by a `typecheck` script (`tsrs --noEmit`, `tsrs --noEmit -p <dir or file>`, joined by `&&`) check. */
-function typecheckedBy(dir: string, script: string): string[] {
+function typecheckedBy(dir: string, script: string) {
   return script.split('&&').flatMap((command) => {
     const words = command.trim().split(/\s+/);
     if (words[0] !== 'tsrs') return [];

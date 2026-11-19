@@ -8,7 +8,8 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { at, routedWith, runWith, textsOf, threeTries } from './markup-fixtures.ts';
+import { at, routedWith, runWith, textsOf, threeTries } from './markup.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -30,8 +31,11 @@ const ACTORS = [
 ] as const;
 
 /** The actor lines of `html`: each one's kind and its words. */
-const actorsIn = (html: string): Array<[string, string]> =>
-  [...html.matchAll(/<span data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [m[1], textsOf(m[2]).join(' ')]);
+const actorsIn = (html: string) =>
+  [...html.matchAll(/<span data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [
+    m[1],
+    textsOf(m[2]).join(' '),
+  ]) satisfies Array<[string, string]>;
 
 test("an actor is drawn in objects' words, its kind marked, whole on hover; none is drawn where the object carries none", () => {
   for (const actor of ACTORS) {
@@ -86,17 +90,13 @@ test("a token's holder and reach in the board's words: yours or the agent's name
 type Sent = { method: string; path: string };
 
 /** Every request answered `body` as JSON with `status` for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
-  const before = globalThis.fetch;
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const sent: Sent[] = [];
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     sent.push({ method: init?.method ?? 'GET', path: String(input) });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
-  return sent;
+  return sent satisfies Sent[];
 }
 
 const LISTED = { name: 'ops', holder: 'agent', agent: 'operator', narrowed: 'read', createdAt: at } as const;

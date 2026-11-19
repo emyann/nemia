@@ -66,7 +66,7 @@ const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord
 const aPass = () => stage.runWith(stage.board().e, passStanding(listRuns(ROOT)));
 
 /** A run this file started on a repository, as `changesOf` reads one: a repository run. */
-const repositoryRun = (run: Run): RepositoryRun => {
+const repositoryRun = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
 };
@@ -75,7 +75,7 @@ const ADD = 'export const add = (a, b) => a + b;\n';
 const TEST = "import assert from 'node:assert';\nassert.equal(add(1, 1), 2);\n";
 
 /** A repository on the test place with a workspace package that has a source file and a test. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {
     'package.json': JSON.stringify({ workspaces: ['packages/*'] }),
@@ -139,7 +139,7 @@ const folder = (implementKeys = '') => {
 };
 
 /** A folder of `implement`, then `last`, its ending, gated and on the base branch, its body `body`, led by `agent` where one is named. */
-const ending = (last: string, body: string, agent?: string, under = ROOT): string => {
+const ending = (last: string, body: string, agent?: string, under = ROOT) => {
   const dir = fs.mkdtempSync(path.join(under, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   const keys = ['after: implement', 'place: git', 'workspace: base', 'gate: true', ...(agent ? [`agent: ${agent}`] : [])];
@@ -180,26 +180,26 @@ type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
  * Run `id`'s decision on this file's stage (`decisionOn`), the globs `sensitive` names read in full: what there is to decide (`Decidable`),
  * the read it came of, and the package's whole reading of the run — refused where it is not a decision a person makes.
  */
-const decidable = async (id: string, sensitive?: readonly string[]): Promise<{ d: Decidable; read: DecisionRead; decided: Decided }> => {
+const decidable = async (id: string, sensitive?: readonly string[]) => {
   const read = await decisionOn(stage, id, sensitive);
   assert.ok('touched' in read.decision && read.decided !== undefined, JSON.stringify(read.decision));
   return { d: read.decision, read, decided: read.decided };
 };
 
 /** The verdicts of `decided`, a run waiting on a person. */
-const awaitingOf = (decided: Decided): Awaiting => {
+const awaitingOf = (decided: Decided) => {
   assert.equal(decided.decision.kind, 'awaiting', JSON.stringify(decided.decision));
   return decided.decision;
 };
 
 /** The command of `d` labelled `label`, refused where it offers none. */
-const offered = (d: Decidable, label: Decidable['commands'][number]['label']): string => {
+const offered = (d: Decidable, label: Decidable['commands'][number]['label']) => {
   const command = d.commands.find((c) => c.label === label)?.command;
   assert.ok(command !== undefined, `${label} is offered: ${JSON.stringify(d.commands)}`);
   return command;
 };
 /** What `nemia ls <id>` answers of the run: its record and its listing (`listedRow`). */
-const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+const listed = async (id: string) => {
   const answered = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
   const row = answered.runs.find((r) => r.run.id === id);
   assert.ok(row, `nemia ls ${id} answers the run`);
@@ -209,7 +209,7 @@ const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
  * The values `nemia ls` gives a person of a run, in one text: each step's word, note, cost and branch, who it waits on, what it holds
  * for, what is to decide and its cost; not the run's record or its assessment, which the listing carries for the doors.
  */
-const lsSaid = ({ run, listing }: { run: Run; listing: Listing }): string =>
+const lsSaid = ({ run, listing }: { run: Run; listing: Listing }) =>
   JSON.stringify({
     steps: listing.steps.map((step) => [step.name, shownStatus(step), shownNote(step), step.cost, step.branch]),
     onYou: onYouWords(listing),
@@ -219,8 +219,7 @@ const lsSaid = ({ run, listing }: { run: Run; listing: Listing }): string =>
     cost: listing.cost,
   });
 /** What `nemia ls` decides of a run's ending (`toDecide`), in the words of the decision (`toDecideWords`); none where nothing is. */
-const decideSaid = ({ run, listing }: { run: Run; listing: Listing }): string | undefined =>
-  listing.toDecide && toDecideWords(run, listing.toDecide);
+const decideSaid = ({ run, listing }: { run: Run; listing: Listing }) => listing.toDecide && toDecideWords(run, listing.toDecide);
 
 /** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {

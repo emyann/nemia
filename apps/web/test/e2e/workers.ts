@@ -21,7 +21,7 @@ export type PageQueue<P> = { next(): P | null; stop(): void; left(): number };
  * handed out, and from `stop` on: once a run names no more failures (`startsAgain`), no worker starts another page. `left` is how many
  * pages are still to hand out, none from `stop` on.
  */
-export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
+export function queueOf<P>(pages: readonly P[]) {
   let at = 0;
   let stopped = false;
   return {
@@ -30,7 +30,7 @@ export function queueOf<P>(pages: readonly P[]): PageQueue<P> {
       stopped = true;
     },
     left: () => (stopped ? 0 : pages.length - at),
-  };
+  } satisfies PageQueue<P>;
 }
 
 /** How many failures a run names before it hands out no more pages: a build that breaks every page is not visited to its end. */
@@ -42,7 +42,7 @@ export const FAILURES_NAMED = 5;
  * before visiting one, so its seat would fail again the same way — nor once the run has `failed` `FAILURES_NAMED` times, nor with no page
  * `left`. The store is a fresh one because the failing page's writes are still in the old: the next page in its place would read them.
  */
-export const startsAgain = ({ handed, failed, left }: { handed: number; failed: number; left: number }): boolean =>
+export const startsAgain = ({ handed, failed, left }: { handed: number; failed: number; left: number }) =>
   handed > 0 && failed < FAILURES_NAMED && left > 0;
 
 /**
@@ -51,17 +51,7 @@ export const startsAgain = ({ handed, failed, left }: { handed: number; failed: 
  * count, never raise it past what free memory holds: two runs that each ask for four workers on a machine with room for three ran it out
  * of memory.
  */
-export function workersFor({
-  cores,
-  freeBytes,
-  pages,
-  asked,
-}: {
-  cores: number;
-  freeBytes: number;
-  pages: number;
-  asked?: number;
-}): number {
+export function workersFor({ cores, freeBytes, pages, asked }: { cores: number; freeBytes: number; pages: number; asked?: number }) {
   return Math.max(1, Math.min(asked ?? Math.floor(cores / 2), Math.floor(freeBytes / PER_WORKER_BYTES), pages));
 }
 
@@ -79,12 +69,10 @@ export function fewerThanAsked({
   workers: number;
   freeBytes: number;
   pages: number;
-}): string | null {
-  if (asked === undefined || workers >= Math.min(asked, pages)) return null;
-  return (
-    `e2e: ${asked} workers asked, ${workers} started: ${Math.round(freeBytes / 2 ** 20)} MB free holds ` +
-    `${Math.floor(freeBytes / PER_WORKER_BYTES)} at ${PER_WORKER_BYTES / 2 ** 20} MB each`
-  );
+}) {
+  if (asked === undefined || workers >= Math.min(asked, pages)) return null satisfies string | null;
+  return (`e2e: ${asked} workers asked, ${workers} started: ${Math.round(freeBytes / 2 ** 20)} MB free holds ` +
+    `${Math.floor(freeBytes / PER_WORKER_BYTES)} at ${PER_WORKER_BYTES / 2 ** 20} MB each`) satisfies string | null;
 }
 
 /** A worker as a run knows it: its number, its store, and once it reports them, the port of its api and the address of its app. */
@@ -100,7 +88,7 @@ const SHARED = [
  * Refuses two workers that share a store, an api port or an app, naming both and what they share: a page's write would cross into the
  * other's pages. A value a worker has not reported yet is shared with no one.
  */
-export function apart(seats: readonly Seat[]): void {
+export function apart(seats: readonly Seat[]) {
   for (const [word, of] of SHARED) {
     const by = new Map<string, number>();
     for (const seat of seats) {
@@ -118,10 +106,11 @@ export function apart(seats: readonly Seat[]): void {
 }
 
 /** The page a failure names, if it names one. */
-export const pageNamed = (failure: string): string | undefined => /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1];
+export const pageNamed = (failure: string) =>
+  /^(?:worker \d+: )?(?:before )?the (\S+) page \(/.exec(failure)?.[1] satisfies string | undefined;
 
 /** The page a failure names, by its place in `order`: a failure that names none goes last. */
-function placeOf(failure: string, order: readonly string[]): number {
+function placeOf(failure: string, order: readonly string[]) {
   const name = pageNamed(failure);
   const at = name === undefined ? -1 : order.indexOf(name);
   return at < 0 ? order.length : at;
@@ -132,6 +121,6 @@ function placeOf(failure: string, order: readonly string[]): number {
  * first is the one a run fails on and says last, whichever worker finished first, and a failure that names no page comes after every
  * one that does.
  */
-export function failedInOrder<R extends { failure: string | null }>(results: readonly R[], order: readonly string[]): R[] {
-  return results.filter((r) => r.failure).sort((a, b) => placeOf(a.failure!, order) - placeOf(b.failure!, order));
+export function failedInOrder<R extends { failure: string | null }>(results: readonly R[], order: readonly string[]) {
+  return results.filter((r) => r.failure).sort((a, b) => placeOf(a.failure!, order) - placeOf(b.failure!, order)) satisfies R[];
 }

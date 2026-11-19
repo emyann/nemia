@@ -42,7 +42,7 @@ const coreDoor = () => {
 };
 
 /** A store in memory a test can read. */
-const memoryStore = (): AsyncJournal => {
+const memoryStore = () => {
   const tasks = new Map<string, Event[]>();
   return {
     async append(taskId, event) {
@@ -57,7 +57,7 @@ const memoryStore = (): AsyncJournal => {
     async feed() {
       return { entries: [], cursor: 0 };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** The `Engine` service, at shipped defaults, over a store a test can read. */
@@ -90,10 +90,13 @@ const ok: Filing = { brief: 'b', cwd: '/r' };
 const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
-  ...['claude', 'codex'].map((harness): [Record<string, unknown>, RegExp] => [
-    { cwd: 'repo', harness },
-    new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`),
-  ]),
+  ...['claude', 'codex'].map(
+    (harness) =>
+      [
+        { cwd: 'repo', harness },
+        new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`),
+      ] satisfies [Record<string, unknown>, RegExp],
+  ),
   [{ cwd: './repo' }, /^`cwd: \.\/repo` is not an absolute path/],
   [{ cwd: '~/repo' }, /^`cwd: ~\/repo` is not an absolute path/],
   [
@@ -114,7 +117,9 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ resumeFrom: '' }, /^`resumeFrom` is empty\./],
   [{ config: { effort: '' } }, /^`effort` is empty\./],
   [{ config: { tools: ['Read,Grep'] } }, /^`tools: \["Read,Grep"\]` is not a list of tool names\./],
-  ...[[''], [' Read'], 'Read'].map((tools): [Record<string, unknown>, RegExp] => [{ config: { tools } }, /is not a list of tool names/]),
+  ...[[''], [' Read'], 'Read'].map(
+    (tools) => [{ config: { tools } }, /is not a list of tool names/] satisfies [Record<string, unknown>, RegExp],
+  ),
   [
     { config: { disallowedTools: ['Bash npm run build'] } },
     /^`disallowedTools: \["Bash npm run build"\]` is not a list of permission rules\./,
@@ -129,16 +134,20 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
     ['Bash()'],
     ['(npm run build)'],
     ['-p'],
-  ].map((disallowedTools): [Record<string, unknown>, RegExp] => [
-    { config: { disallowedTools } },
-    /is not a list of permission rules\. Give one rule per entry/,
-  ]),
+  ].map(
+    (disallowedTools) =>
+      [{ config: { disallowedTools } }, /is not a list of permission rules\. Give one rule per entry/] satisfies [
+        Record<string, unknown>,
+        RegExp,
+      ],
+  ),
   [{ config: { allowedTools: ['Write(**'] } }, /^`allowedTools: \["Write\(\*\*"\]` is not a list of permission rules\./],
   ...['Write(**)', [''], [' Write(**)'], [42], ['Write(**),Edit(**)'], ['Bash npm test'], ['Write()'], ['(**)'], ['-p']].map(
-    (allowedTools): [Record<string, unknown>, RegExp] => [
-      { config: { allowedTools } },
-      /is not a list of permission rules\. Give one rule per entry/,
-    ],
+    (allowedTools) =>
+      [{ config: { allowedTools } }, /is not a list of permission rules\. Give one rule per entry/] satisfies [
+        Record<string, unknown>,
+        RegExp,
+      ],
   ),
   [{ config: { mcp: [] } }, /^`mcp: \[\]` is not a map of MCP servers by name\./],
   [{ config: { mcp: null } }, /`mcp: null` is not a map of MCP servers by name/],
@@ -168,10 +177,13 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ config: { budgetUsd: Number.NaN } }, /^`budgetUsd: NaN` is not an amount of dollars\./],
   [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
   [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
-  ...[0, -1, Number.NaN, Infinity, '5'].map((budgetUsd): [Record<string, unknown>, RegExp] => [
-    { harness: 'claude', config: { budgetUsd } },
-    /is not an amount of dollars\. Give dollars above 0/,
-  ]),
+  ...[0, -1, Number.NaN, Infinity, '5'].map(
+    (budgetUsd) =>
+      [{ harness: 'claude', config: { budgetUsd } }, /is not an amount of dollars\. Give dollars above 0/] satisfies [
+        Record<string, unknown>,
+        RegExp,
+      ],
+  ),
   [
     { priority: 1.5 },
     /^`priority: 1\.5` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\.$/,
@@ -181,10 +193,13 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ priority: '1' }, /^`priority: "1"` is not a priority\./],
   [{ priority: null }, /^`priority: null` is not a priority\./],
   ...['claude', 'codex', 'check'].flatMap((harness) =>
-    [1.5, '1', 2 ** 31, -(2 ** 31) - 1, Number.NaN, null, Infinity].map((priority): [Record<string, unknown>, RegExp] => [
-      { harness, priority },
-      /^`priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
-    ]),
+    [1.5, '1', 2 ** 31, -(2 ** 31) - 1, Number.NaN, null, Infinity].map(
+      (priority) =>
+        [
+          { harness, priority },
+          /^`priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
+        ] satisfies [Record<string, unknown>, RegExp],
+    ),
   ),
   [
     { config: { remoteControl: true } },
@@ -193,17 +208,23 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ config: { remoteControl: 'true' } }, /^`remoteControl` is Claude Code's own flag/],
   [{ config: { remoteControl: false } }, /^`remoteControl` is Claude Code's own flag/],
   [{ remoteControl: true }, /^`remoteControl` is Claude Code's own flag/],
-  ...[true, false, 'yes', 1].flatMap((background): [Record<string, unknown>, RegExp][] => [
-    [{ config: { background } }, /^`background`.*`restartPolicy: 'Always'`/],
-    [{ background }, /^`background`.*`restartPolicy: 'Always'`/],
-  ]),
+  ...[true, false, 'yes', 1].flatMap(
+    (background) =>
+      [
+        [{ config: { background } }, /^`background`.*`restartPolicy: 'Always'`/],
+        [{ background }, /^`background`.*`restartPolicy: 'Always'`/],
+      ] satisfies [Record<string, unknown>, RegExp][],
+  ),
   [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
   [{ config: { contextTokens: 150000.5 } }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
   [{ config: { contextTokens: '200k' } }, /^`contextTokens: "200k"` is not a number of tokens\./],
-  ...[-200000, Number.NaN, Infinity, '200000'].map((contextTokens): [Record<string, unknown>, RegExp] => [
-    { config: { contextTokens } },
-    /`contextTokens: .*` is not a number of tokens\. Give a whole number of tokens, like 200000/,
-  ]),
+  ...[-200000, Number.NaN, Infinity, '200000'].map(
+    (contextTokens) =>
+      [
+        { config: { contextTokens } },
+        /`contextTokens: .*` is not a number of tokens\. Give a whole number of tokens, like 200000/,
+      ] satisfies [Record<string, unknown>, RegExp],
+  ),
   [{ model: 'opus' }, /^`model` is the harness's configuration: file it under `config`, as `config: \{ model: … \}`\.$/],
   [{ permissionMode: 'dontAsk', config: { model: 'opus' } }, /^`permissionMode` is the harness's configuration: file it under `config`/],
   [{ worktree: true }, /^`worktree` is the harness's configuration/],
@@ -217,8 +238,10 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ config: { codex: 'x' } }, /^`codex: "x"` is not a set of Codex's arguments\./],
   [{ config: { codex: { trust: '/r' } } }, /^`codex\.trust` is not one of Codex's arguments\. Its only one is `trustFrom`/],
   [{ config: { codex: { trustFrom: 'repo' } } }, /^`codex\.trustFrom: "repo"` is not an absolute directory\./],
-  ...['yes', 1, null].map((queued): [Record<string, unknown>, RegExp] => [{ queued }, /^`queued: .*` is not a yes or a no/]),
-  ...[false, 'yes', 1].map((holdOpen): [Record<string, unknown>, RegExp] => [{ holdOpen }, /^`holdOpen: .*` is not a yes\. Give true/]),
+  ...['yes', 1, null].map((queued) => [{ queued }, /^`queued: .*` is not a yes or a no/] satisfies [Record<string, unknown>, RegExp]),
+  ...[false, 'yes', 1].map(
+    (holdOpen) => [{ holdOpen }, /^`holdOpen: .*` is not a yes\. Give true/] satisfies [Record<string, unknown>, RegExp],
+  ),
   [
     { restartPolicy: 'Never' },
     /^`restartPolicy: "Never"` is not a restart policy the runtime takes\. Give `'Always'` to keep the session open until it is stopped, or leave it out to run the task to its end\.$/,
@@ -280,18 +303,19 @@ describe('file: every harness-agnostic refusal, in the core and through the engi
 });
 
 /** A harness in eight lines, whose sessions are a map. */
-const fakeHarness = (sessions: Map<string, Sighting>): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    return new Map(sessions);
-  },
-  async stop() {},
-  async logs() {
-    return '';
-  },
-});
+const fakeHarness = (sessions: Map<string, Sighting>) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
+    async stop() {},
+    async logs() {
+      return '';
+    },
+  }) satisfies AsyncRunner;
 
 /** A command a test harness runs: nothing. */
 const check: HarnessSpec = { name: 'check', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };

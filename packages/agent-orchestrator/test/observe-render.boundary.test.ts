@@ -57,8 +57,8 @@ process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH ?? ''}`;
 process.env.NEMIA_RENDER_LOCK = path.join(ROOT, 'render.lock');
 
 /** Every call the stub was given, a line each, and a fresh record for the next test. */
-const calls = (): string[] => (fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8').split('\n').filter(Boolean) : []);
-const fresh = (): void => {
+const calls = () => (fs.existsSync(CALLS) ? fs.readFileSync(CALLS, 'utf8').split('\n').filter(Boolean) : []);
+const fresh = () => {
   for (const file of [CALLS, GONE, lockFile()]) fs.rmSync(file, { force: true });
 };
 
@@ -69,7 +69,7 @@ const RENDER_TMP = scratch('wf-observe-render-tmp-');
  * Run a file of the render with `args`, bounded, its environment this one's but its temp folder (`RENDER_TMP`); its exit and what it
  * said.
  */
-function ran(file: string, args: string[]): { status: number | null; out: string } {
+function ran(file: string, args: string[]) {
   const env: NodeJS.ProcessEnv = { ...process.env, TMPDIR: RENDER_TMP };
   delete env.WF_ARTIFACTS;
   const r = spawnSync(process.execPath, [path.join(RENDER, file), ...args], { env, encoding: 'utf8', timeout: 100_000 });
@@ -77,10 +77,10 @@ function ran(file: string, args: string[]): { status: number | null; out: string
 }
 
 /** The pid of a process that has ended. */
-const deadPid = (): number => spawnSync(process.execPath, ['-e', '0']).pid;
+const deadPid = () => spawnSync(process.execPath, ['-e', '0']).pid;
 
 /** The message of the error `fn` throws. */
-const refused = (fn: () => unknown): string => {
+const refused = (fn: () => unknown) => {
   try {
     fn();
   } catch (err) {
@@ -96,7 +96,7 @@ test("the container is the checkout's own: the pinned image, its binds read-only
   const service = Object.values(COMPOSE.services ?? {})[0];
   assert.equal(argv.at(-1), service.image);
   assert.deepEqual(argv.slice(0, 5), ['run', '-d', '--rm', '--name', name]);
-  const after = (flag: string): string[] => argv.flatMap((word, i) => (argv[i - 1] === flag ? [word] : []));
+  const after = (flag: string) => argv.flatMap((word, i) => (argv[i - 1] === flag ? [word] : []));
   assert.deepEqual(after('-p'), ['127.0.0.1::3000', '127.0.0.1::4318'], 'loopback, the host port left to Docker');
   const binds = after('-v');
   assert.equal(binds.length, (service.volumes ?? []).filter((line) => line.startsWith('./')).length);
@@ -188,8 +188,7 @@ test('a lock is there whole or not at all: one that does not read is taken with 
 });
 
 /** The files of a taking or a breaking left beside the lock. */
-const leftBeside = (): string[] =>
-  fs.readdirSync(path.dirname(lockFile())).filter((file) => file.startsWith(`${path.basename(lockFile())}.`));
+const leftBeside = () => fs.readdirSync(path.dirname(lockFile())).filter((file) => file.startsWith(`${path.basename(lockFile())}.`));
 
 test("a live holder's lock moved aside is put back, and no container is removed", () => {
   fresh();
@@ -207,6 +206,7 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
   const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
   fs.writeFileSync(lockFile(), JSON.stringify(live));
   const link = fs.linkSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- a third holder takes the lock: a race
   vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from).endsWith(`.stale-${process.pid}`) && String(to) === lockFile()) fs.writeFileSync(lockFile(), JSON.stringify(third));
     link(from, to);
@@ -234,12 +234,14 @@ test('REFUSED: a lock this user cannot move, at the bound, naming its holder and
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));
   const rename = fs.renameSync;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the lock's rename refused on cue (EPERM)
   vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from) !== lockFile()) return rename(from, to);
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
   const write = fs.writeFileSync;
   let tries = 0;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- stops a take that loops, else it never ends
   vi.spyOn(fs, 'writeFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, data: string) => {
     if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
     write(file, data);
@@ -288,7 +290,7 @@ test('a hold says its container, how to stop it, where Grafana listens, its coll
 });
 
 /** Start the reaper of the held stack `name` for `seconds`, the lock naming it; the child. */
-function reaping(name: string, seconds: number): ReturnType<typeof spawn> {
+function reaping(name: string, seconds: number) {
   const env: NodeJS.ProcessEnv = { ...process.env };
   const child = spawn(process.execPath, [path.join(RENDER, 'reap.ts'), name, String(seconds)], { env, stdio: 'ignore' });
   fs.writeFileSync(lockFile(), JSON.stringify({ pid: child.pid ?? 0, name, held: true, until: 'soon' } satisfies Lock));
@@ -337,7 +339,7 @@ test('REFUSED: a stop of the live stack, of a pattern, of a render in flight and
 });
 
 /** A panel as the page shows it, drawing nothing. */
-const panel = (title: string, type: string, more: Partial<Seen> = {}): Seen => ({
+const panel = (title: string, type: string, more: Partial<Seen> = {}) => ({
   id: '1',
   title,
   type,
@@ -365,7 +367,7 @@ test("a panel's text: a bar with no name is written (no name), an empty panel no
     ],
     { CPU: 'no profile is sent' },
   );
-  const block = (title: string): string => (text.split('\n\n').find((part) => part.startsWith(`## ${title} `)) ?? '').trimEnd();
+  const block = (title: string) => (text.split('\n\n').find((part) => part.startsWith(`## ${title} `)) ?? '').trimEnd();
   assert.equal(block('Tool errors, across runs'), '## Tool errors, across runs [bargauge]\n  bar: (no name) = 3');
   assert.equal(block('Denied calls'), '## Denied calls [bargauge]\n  bar: Bash(git push) = 2');
   assert.equal(block('Unmeasured'), '## Unmeasured [table]\n  no data');

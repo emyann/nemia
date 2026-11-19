@@ -35,7 +35,7 @@ const AT = '2026-10-12T06:00:00.000Z';
 /** The runs known, each with its factory. */
 const runsOf = (factories: Record<string, string>) => ({
   ids: new Set(Object.keys(factories)),
-  factoryOf: (id: string): string | undefined => factories[id],
+  factoryOf: (id: string) => factories[id] satisfies string | undefined,
 });
 
 /** What a walk read of roots that all read: their bytes, and nothing unread. */
@@ -76,7 +76,7 @@ describe('`partOf`, `kindAt`, `kindIn` and `runOf`: the part, the kind and the r
     );
   });
   test("inside a run's folder, its handed files, agents and inputs are their kinds, and a picture is one only among the handed", () => {
-    const under = (path: string[], start: DiskKind = 'runs-other'): DiskKind => path.reduce<DiskKind>(kindIn, start);
+    const under = (path: string[], start: DiskKind = 'runs-other') => path.reduce<DiskKind>(kindIn, start) satisfies DiskKind;
     assert.deepEqual(
       [
         ['artifacts', 'design', 'shot.png'],
@@ -104,7 +104,7 @@ describe('`partOf`, `kindAt`, `kindIn` and `runOf`: the part, the kind and the r
     assert.deepEqual([kindIn('records', 'artifacts'), kindIn('marks', 'approve-land-1')], ['records', 'marks']);
   });
   test('inside a checkout, everything under a node_modules at any depth is its dependencies, and nothing else is', () => {
-    const under = (path: string[]): DiskKind => path.reduce<DiskKind>(kindIn, 'checkout');
+    const under = (path: string[]) => path.reduce<DiskKind>(kindIn, 'checkout') satisfies DiskKind;
     assert.deepEqual(
       [
         ['node_modules', 'effect', 'package.json'],
@@ -270,18 +270,19 @@ describe('`largestOf` and `vanished`: the runs that hold the most, and the label
 });
 
 /** A walk's entries around an engine folder of `engine` bytes. */
-const walkedWith = (engine: number): DiskEntry[] => [
-  { part: 'runs', kind: 'handed', factory: 'nemia', bytes: 7, unread: 0 },
-  { part: 'engine', kind: 'engine-other', bytes: engine, unread: 0 },
-  { part: 'other', kind: 'other', bytes: 3, unread: 0 },
-];
+const walkedWith = (engine: number) =>
+  [
+    { part: 'runs', kind: 'handed', factory: 'nemia', bytes: 7, unread: 0 },
+    { part: 'engine', kind: 'engine-other', bytes: engine, unread: 0 },
+    { part: 'other', kind: 'other', bytes: 3, unread: 0 },
+  ] satisfies DiskEntry[];
 
 /** The factory of each task of the fixtures: `t-n*` nemia's, `t-p*` pipao's, any other no run's. */
-const factoryOfTask = (taskId: string): string | undefined =>
-  taskId.startsWith('t-n') ? 'nemia' : taskId.startsWith('t-p') ? 'pipao' : undefined;
+const factoryOfTask = (taskId: string) =>
+  (taskId.startsWith('t-n') ? ('nemia' as const) : taskId.startsWith('t-p') ? ('pipao' as const) : undefined) satisfies string | undefined;
 
 /** The bytes of `entries` of `part`. */
-const sumOf = (entries: readonly DiskEntry[], part: DiskEntry['part']): number =>
+const sumOf = (entries: readonly DiskEntry[], part: DiskEntry['part']) =>
   entries.filter((entry) => entry.part === part).reduce((sum, entry) => sum + (entry.bytes ?? 0), 0);
 
 describe("`withKept`: what the runtime keeps by task laid over a walk's entries", () => {

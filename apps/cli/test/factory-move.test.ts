@@ -30,7 +30,7 @@ const target = await servedStore('nemia-move-target-', () => {});
 afterAll(target.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -39,11 +39,11 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** `nemia <argv>` on `env`, its exit code asserted `code`. */
-async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0): Promise<Said> {
+async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0) {
   const said = await nemia(argv, env);
   assert.equal(said.code, code, `nemia ${argv.join(' ')}: ${said.err}${said.out}`);
   return said;
@@ -71,8 +71,7 @@ await typed(here, ['factory', 'add', 'mill', '--volume', `${MILL}:rw`, '--no-tru
 await typed(here, ['factory', 'add', 'lone', '--volume', `${LONE}:rw`, '--no-trust']);
 
 /** Whether `nemia factory ls` on `env` lists the factory `name`. */
-const lists = async (env: NodeJS.ProcessEnv, name: string): Promise<boolean> =>
-  new RegExp(`^${name} `, 'm').test((await typed(env, ['factory', 'ls'])).out);
+const lists = async (env: NodeJS.ProcessEnv, name: string) => new RegExp(`^${name} `, 'm').test((await typed(env, ['factory', 'ls'])).out);
 
 test('a factory moved to the store another context names: filed there, then the trust there and the removal here named', async () => {
   const said = await typed(here, ['factory', 'move', 'mill', '--to', 'far', '--repo', `${MILL}=${MILL_THERE}`]);

@@ -97,7 +97,7 @@ type Plan = {
  * exit 0; `out` signed out, exit 1; `hang` nothing, until it is killed. Each ask is recorded in `auth.jsonl` of `STANDIN_DIR`, where
  * one is named, never in `argv.jsonl`.
  */
-const answerAuth = async (): Promise<never> => {
+const answerAuth = async () => {
   if (process.env.STANDIN_DIR) {
     fs.appendFileSync(path.join(process.env.STANDIN_DIR, 'auth.jsonl'), `${JSON.stringify(process.argv.slice(2))}\n`);
   }
@@ -133,7 +133,7 @@ if (plan.leave) {
 const COST_STATE = path.join(dir, 'cost-state.jsonl');
 
 /** The running total of the session `id` saved by the last process of it that exited cleanly: nothing where none did. */
-const savedCost = (id: string | undefined): number => {
+const savedCost = (id: string | undefined) => {
   if (id === undefined || !fs.existsSync(COST_STATE)) return 0;
   const saved = fs
     .readFileSync(COST_STATE, 'utf8')
@@ -141,7 +141,7 @@ const savedCost = (id: string | undefined): number => {
     .filter(Boolean)
     .map((l) => JSON.parse(l) as { sessionId: string; totalCostUSD: number })
     .filter((l) => l.sessionId === id);
-  return saved.at(-1)?.totalCostUSD ?? 0;
+  return (saved.at(-1)?.totalCostUSD ?? 0);
 };
 
 /** What this process's session has cost so far: a resume's saved total carried on, and each turn's `cost` as it starts. */
@@ -154,10 +154,10 @@ let asked = 0;
 let prompted = 0;
 
 /** Sends a control request and waits for the SDK's answer. */
-const ask = (request: object): Promise<unknown> => {
+const ask = (request: object) => {
   const id = `standin-${++asked}`;
   print({ type: 'control_request', request_id: id, request });
-  return new Promise((resolve) => pending.set(id, resolve));
+  return new Promise((resolve) => pending.set(id, resolve)) satisfies Promise<unknown>;
 };
 
 /** Whether the turn in flight was interrupted, set by the SDK's `interrupt` control request and read by the turn. */
@@ -197,7 +197,7 @@ const hooked = async (event: string, tool: string, id: string, more: object = {}
  * started in: the resource attributes of `OTEL_RESOURCE_ATTRIBUTES` and the trace of `TRACEPARENT`, read off that environment and
  * nothing else. Nothing where it names no collector.
  */
-const postLog = async (): Promise<void> => {
+const postLog = async () => {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint) return;
   const attributes = (process.env.OTEL_RESOURCE_ATTRIBUTES ?? '')
@@ -332,24 +332,24 @@ const wrote = () => {
 };
 
 /** The bridge's facts a `remote_control` request is answered with, and the `bridge_state` messages it drives onto the stream. */
-const bridged = (request: { enabled?: unknown; reattach_session_id?: unknown }): object => {
+const bridged = (request: { enabled?: unknown; reattach_session_id?: unknown }) => {
   const kept = typeof request.reattach_session_id === 'string' ? request.reattach_session_id : undefined;
   const id = kept ?? `cse_${sessionId}`;
   setTimeout(() => {
     print({ type: 'system', subtype: 'bridge_state', session_id: sessionId, state: 'ready' });
     print({ type: 'system', subtype: 'bridge_state', session_id: sessionId, state: 'connected' });
   }, 10);
-  return {
+  return ({
     session_url: `https://claude.ai/s/${id}`,
     connect_url: `https://claude.ai/connect/${id}`,
     environment_id: 'env-stand-in',
     bridge_epoch: 1,
     bridge_session_id: id,
-  };
+  }) satisfies object;
 };
 
 /** The answer to a control request the SDK sent, by its subtype: what the stand-in says back as its `response`. */
-const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<string, unknown>): object => {
+const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<string, unknown>) => {
   note('taken.jsonl', { subtype: request.subtype ?? null, ...request });
   if (request.subtype === 'initialize') {
     hooks = request.hooks ?? {};
@@ -357,10 +357,10 @@ const answered = (request: { subtype?: string; hooks?: typeof hooks } & Record<s
   }
   if (request.subtype === 'interrupt') {
     interrupted = true;
-    return { still_queued: [] };
+    return ({ still_queued: [] }) satisfies object;
   }
-  if (request.subtype !== 'initialize' && process.env.STANDIN_NO_BRIDGE !== '1') return bridged(request as Parameters<typeof bridged>[0]);
-  return {};
+  if (request.subtype !== 'initialize' && process.env.STANDIN_NO_BRIDGE !== '1') return bridged(request as Parameters<typeof bridged>[0]) satisfies object;
+  return ({}) satisfies object;
 };
 
 let working = false;
@@ -387,7 +387,7 @@ const next = () => {
  * own id and after the wait `STANDIN_USAGE_MS` asks for (none by default): a wait longer than the asker's own makes a stand-in that
  * is started and never answers, which the asker must still let go of.
  */
-const usageAnswer = async (id: string | undefined): Promise<void> => {
+const usageAnswer = async (id: string | undefined) => {
   const waitMs = Number(process.env.STANDIN_USAGE_MS ?? 0);
   if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
   const recorded = JSON.parse(fs.readFileSync(process.env.STANDIN_USAGE!, 'utf8')) as { response: { response: object } };

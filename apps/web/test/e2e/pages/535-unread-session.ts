@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page, Route } from 'playwright';
+import type { Page, Route } from 'playwright';
 import { openFold, photograph, themeOf } from '../board.ts';
 import { expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE } from '../seed.ts';
@@ -19,11 +19,12 @@ const unread = async (route: Route) => {
   const response = await route.fetch();
   const body = (await response.json()) as { status: { steps: Array<{ name: string }> } };
   const steps = body.status.steps.map((step) => (step.name === FAKE.unverified ? { ...step, sessionUnread: WHY } : step));
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- sessionUnread on the api's own read: the seed has none
   await route.fulfill({ response, json: { ...body, status: { ...body.status, steps } } });
 };
 
 /** The run's page, its object answered with `FAKE.unverified` unread; that step's Detail, opened once loaded. */
-async function onRun(page: Page): Promise<Locator> {
+async function onRun(page: Page) {
   await page.route(isDetail, unread);
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);

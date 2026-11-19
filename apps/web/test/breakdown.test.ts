@@ -20,14 +20,15 @@ import {
 } from '../src/lib/breakdown.ts';
 import { durationWords } from '../src/lib/duration.ts';
 import { presentWait } from '../src/lib/runWords.ts';
-import { detail, runList, runObject, step, summary, waitingRun } from './run-fixtures.ts';
+import { detail, runList, runObject, step, summary, waitingRun } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 const [S, M] = [1_000, 60_000];
 
 const spent = (usd: number) => ({ usd, measured: 1, unmeasured: 0, said: `$${usd.toFixed(2)}` });
 
 /** A run at its last gate, as the api answers it: a clock whose five parts add up, a cost beyond its steps', tokens beyond their kinds. */
-const answered = (): WaitingRun =>
+const answered = () =>
   waitingRun(
     summary(
       [
@@ -68,7 +69,7 @@ const answered = (): WaitingRun =>
         { step: 'land', cost: null },
       ],
     },
-  );
+  ) satisfies WaitingRun;
 
 const AS_OF = '2026-10-12T12:00:00.000Z';
 
@@ -76,8 +77,7 @@ const AS_OF = '2026-10-12T12:00:00.000Z';
  * `run` as the board reads it: its object, with its frame's parts, in the RunList of the runs not finished, made the frame's waiting row
  * again (`openOf`); the run at its last gate where none is given.
  */
-async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
-  const before = globalThis.fetch;
+async function decoded(run: WaitingRun = answered()) {
   const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
   const steps = run.steps.map((own) => step({ ...own, timeline: [] }));
   const object = runObject(detail({ id: run.id, steps }), {
@@ -94,7 +94,7 @@ async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
     waitingOnYouWords,
   });
   const list = runList([object], { asOf: AS_OF, counts: { waiting: 1, inFlight: 0, finished: 0 } });
-  globalThis.fetch = async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } });
+  apiAnswers(async () => new Response(JSON.stringify(list), { status: 200, headers: { 'content-type': 'application/json' } }));
   const client = new QueryClient();
   try {
     const [waiting] = (await client.fetchQuery(openRunsQuery())).waiting;
@@ -102,18 +102,17 @@ async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
     return waiting;
   } finally {
     client.clear();
-    globalThis.fetch = before;
   }
 }
 
-const sum = (breakdown: Breakdown): number => breakdown.rows.reduce((total, row) => total + row.amount, 0);
-const whats = (breakdown: Breakdown): string[] => breakdown.rows.map((row) => row.what);
+const sum = (breakdown: Breakdown) => breakdown.rows.reduce((total, row) => total + row.amount, 0);
+const whats = (breakdown: Breakdown) => breakdown.rows.map((row) => row.what) satisfies string[];
 
 /** The whole minutes a clock's row says, none for `none` and `under 1m`. */
-const minutesOf = (said: string): number => (/^\d+m$/.test(said) ? Number(said.slice(0, -1)) : 0);
+const minutesOf = (said: string) => (/^\d+m$/.test(said) ? Number(said.slice(0, -1)) : 0);
 
 /** The cents a cost's row says, none for a step with none. */
-const centsOf = (said: string): number => (said.startsWith('$') ? Math.round(Number(said.slice(1)) * 100) : 0);
+const centsOf = (said: string) => (said.startsWith('$') ? Math.round(Number(said.slice(1)) * 100) : 0);
 
 describe('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to its tile, its rest and rounding said', () => {
   test('REFUSED: a breakdown that does not add up to its tile: the clock, the cost and the tokens, each with its last line for the rest', async () => {

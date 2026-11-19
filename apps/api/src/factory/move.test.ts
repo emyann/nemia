@@ -39,7 +39,7 @@ type FactoryPlan = import('objects').FactoryPlan;
 type FactoryRules = import('objects').FactoryRules;
 type FactoryUpgraded = import('objects').FactoryUpgraded;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -48,7 +48,7 @@ const write = (file: string, text: string): void => {
  * The builtin template `mill` in `folder` at `version`: one workflow, `press`, whose step `draft` the agent `drafter` fills; the agent's
  * instructions are `instructions`, the one file a later version changes.
  */
-function mill(folder: string, version: string, instructions: string): string {
+function mill(folder: string, version: string, instructions: string) {
   const at = path.join(folder, 'mill');
   write(
     path.join(at, 'nemia.yaml'),
@@ -89,13 +89,13 @@ const standIn = eachTest(testEngine);
  * A store of its own under a scratch root, shipping the builtins in `builtins`, its app new for each test, the person seated in it
  * (`seatPerson`): every request to the api presents a token, and the harness's is the person's in this store too.
  */
-function store(prefix: string, builtins: string): Store {
+function store(prefix: string, builtins: string) {
   const home = scratch(prefix);
   seatPerson(home);
   const app = eachTest(() =>
     appOver(standIn(), stand(), storeConfigLayer({ ...process.env, WF_ROOT: home }), Layer.succeed(BuiltinTemplates)(builtins)),
   );
-  return { home, app };
+  return { home, app } satisfies Store;
 }
 
 /** The source's store, which ships `mill` at 0.1.0, and the target's, which ships it at 0.2.0. */
@@ -109,7 +109,7 @@ const send = (s: Store, method: string, url: string, body: unknown = {}, headers
   s.app().request(url, { method, headers: { ...json, ...headers }, ...(method === 'GET' ? {} : { body: JSON.stringify(body) }) });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -121,31 +121,40 @@ const reconciled = (s: Store, builtins: string) =>
   Effect.runPromise(reconcileOnce().pipe(Effect.provideService(StoreRoot, s.home), Effect.provideService(BuiltinTemplates, builtins)));
 
 /** Every file under `dir`, by its path from it, with its text: a folder as it reads. */
-function filesOf(dir: string): Record<string, string> {
-  if (!fs.existsSync(dir)) return {};
-  return Object.fromEntries(
-    fs
-      .readdirSync(dir, { recursive: true, withFileTypes: true })
-      .filter((e) => e.isFile())
-      .map((e) => {
-        const at = path.join(e.parentPath, e.name);
-        return [path.relative(dir, at), fs.readFileSync(at, 'utf8')];
-      })
-      .sort(([a], [b]) => a.localeCompare(b)),
-  );
+function filesOf(dir: string) {
+  if (!fs.existsSync(dir)) {
+    const made: Record<string, string> = {};
+    return made;
+  }
+  {
+    const made: Record<string, string> = Object.fromEntries(
+      fs
+        .readdirSync(dir, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => {
+          const at = path.join(e.parentPath, e.name);
+          return [path.relative(dir, at), fs.readFileSync(at, 'utf8')];
+        })
+        .sort(([a], [b]) => a.localeCompare(b)),
+    );
+    return made;
+  }
 }
 
 /** The digest of every file under `dir`, by its path from it: a store as it is on disk, to the byte. */
-function digestsOf(dir: string): Record<string, string> {
-  return Object.fromEntries(
-    Object.keys(filesOf(dir)).map((at) => [
-      at,
-      crypto
-        .createHash('sha256')
-        .update(fs.readFileSync(path.join(dir, at)))
-        .digest('hex'),
-    ]),
-  );
+function digestsOf(dir: string) {
+  {
+    const made: Record<string, string> = Object.fromEntries(
+      Object.keys(filesOf(dir)).map((at) => [
+        at,
+        crypto
+          .createHash('sha256')
+          .update(fs.readFileSync(path.join(dir, at)))
+          .digest('hex'),
+      ]),
+    );
+    return made;
+  }
 }
 
 /** What `s` holds of the factory `name`: its file, its folder, and the inbox's cards of it. */
@@ -160,11 +169,15 @@ const heldOf = (s: Store, name: string) => ({
 const NOTHING = { file: false, folder: false, cards: [] };
 
 /** The factory file of `name` in `s`'s store, as the door wrote it. */
-const fileOf = (s: Store, name: string): { volumes?: Array<{ path: string; readOnly: boolean; name?: string }> } =>
-  JSON.parse(fs.readFileSync(path.join(s.home, 'factories', `${name}.json`), 'utf8'));
+const fileOf = (s: Store, name: string) => {
+  const made: { volumes?: Array<{ path: string; readOnly: boolean; name?: string }> } = JSON.parse(
+    fs.readFileSync(path.join(s.home, 'factories', `${name}.json`), 'utf8'),
+  );
+  return made;
+};
 
 /** The run `id` on `s`'s record, started from the inbox's card `card`. */
-function runFrom(s: Store, id: string, card: string, repo: string): void {
+function runFrom(s: Store, id: string, card: string, repo: string) {
   write(
     path.join(s.home, 'runs', `${id}.json`),
     JSON.stringify({
@@ -186,7 +199,7 @@ function runFrom(s: Store, id: string, card: string, repo: string): void {
 }
 
 /** A session's token minted on `s`'s store for a task no engine runs: a token whose session has ended. */
-const endedToken = (s: Store): string =>
+const endedToken = (s: Store) =>
   Effect.runSync(
     Effect.gen(function* () {
       return yield* (yield* TokenDoor).tokens.mint({
@@ -201,11 +214,11 @@ const endedToken = (s: Store): string =>
   );
 
 /** The repository `mill` works on: one of the test place's world, by its `file://` URL, which each store clones under itself. */
-function originOfMill(): { origin: string; originDir: string } {
+function originOfMill() {
   const originDir = path.join(scratch('nemia-api-move-origin-'), 'acme', 'mill');
   fs.mkdirSync(originDir, { recursive: true });
   stand().world.repository(originDir, { 'README.md': 'mill\n' });
-  return { origin: pathToFileURL(originDir).href, originDir };
+  return { origin: pathToFileURL(originDir).href, originDir } satisfies { origin: string; originDir: string };
 }
 
 describe("a templated factory moved to a store of a later install: its lineage, tree, rules, level, volume and card read there as here, and the source's store is unchanged", () => {

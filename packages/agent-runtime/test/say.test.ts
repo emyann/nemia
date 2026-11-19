@@ -36,7 +36,7 @@ const work = tmp('work');
 const STAND_IN_PLAN = { id: '5e551011-0000-4000-8000-0000000000aa', turns: 'many', hold: true };
 
 /** What the session whose stand-in writes into `dir` was told, in order: every user message it read. */
-const toldIn = (dir: string): string[] | undefined => {
+const toldIn = (dir: string) => {
   try {
     return fs
       .readFileSync(path.join(dir, 'said.jsonl'), 'utf8')
@@ -100,7 +100,7 @@ const job = async (t: Waiter, engine: EngineShape, brief: string, spec: Partial<
 };
 
 /** Whether the worker of `runFile` has closed its session's input and written the state it ended on: nothing writes it after. */
-const workerDone = (runFile: string): true | undefined => {
+const workerDone = (runFile: string) => {
   const run = JSON.parse(fs.readFileSync(runFile, 'utf8')) as { inputClosed?: boolean; state?: string };
   return run.inputClosed === true && run.state !== 'working' ? true : undefined;
 };
@@ -115,7 +115,7 @@ const workerDone = (runFile: string): true | undefined => {
  *
  * @returns the file as it was, to write back once the rule has been read
  */
-const withInputClosed = (runFile: string): string => {
+const withInputClosed = (runFile: string) => {
   const was = fs.readFileSync(runFile, 'utf8');
   const run = JSON.parse(was) as Record<string, unknown>;
   fs.writeFileSync(runFile, JSON.stringify({ ...run, state: 'working', inputClosed: true, exitCode: undefined }));

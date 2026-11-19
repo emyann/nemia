@@ -6,7 +6,7 @@ import { ENDED } from '@/lib/words';
 import { CopyId } from './CopyId';
 import { CutFrame, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE } from './CutFrame';
 import { StepGraph } from './StepGraph';
-import { AT_WORK, CARD, GATE, graphRun, ON_OTHER, ON_PLAIN, REFUSED } from './stories.fixtures';
+import { AT_WORK, CARD, GATE, graphRun, ON_OTHER, ON_PLAIN, REFUSED } from './stories.fixture';
 import { TextLink } from './TextLink';
 
 /** The look's cut-corner frame: in each hue and at each cut, on two grounds, with a link in its cut corner, and around a table. */

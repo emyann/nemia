@@ -51,7 +51,7 @@ const bounded = (t: TestContext, pid: number) =>
   });
 
 /** The pid written in `file`, once it is there. */
-const pidIn = async (t: TestContext, file: string, what: string): Promise<number> => {
+const pidIn = async (t: TestContext, file: string, what: string) => {
   let pid = 0;
   await until(
     t,
@@ -69,7 +69,7 @@ const pidIn = async (t: TestContext, file: string, what: string): Promise<number
 const leaving = (file: string) => ['sh', '-c', `setsid sh -c "trap '' TERM HUP; echo \\$\\$ > '${file}'; exec sleep 600" & exit 0`];
 
 /** The run file of the detached run of the task `id` under `root`, as the worker wrote it. */
-const runFileOf = (root: string, id: string, end = 'json'): { cgroup?: string; unscoped?: string; pid?: number } | undefined => {
+const runFileOf = (root: string, id: string, end = 'json') => {
   try {
     return JSON.parse(fs.readFileSync(path.join(root, 'runs', 'command', `ae_${id.replace(/[^a-zA-Z0-9]+/g, '_')}_1.${end}`), 'utf8'));
   } catch {

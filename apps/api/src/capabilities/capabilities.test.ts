@@ -19,7 +19,6 @@ import { addFactory, removeFactory } from 'agent-orchestrator/testing';
 const { measuredTools: MEASURED_TOOLS, readOnlyCommands: READ_ONLY_COMMANDS } = CLAUDE_RULES;
 
 type CapabilitiesWithSteps = import('./reach.ts').CapabilitiesWithSteps;
-type StepReach = import('./reach.ts').StepReach;
 assert.equal(
   DISALLOW,
   'disallowedTools:',
@@ -31,13 +30,13 @@ const FIXTURE_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtu
 const LEGACY_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'legacy-mcp-server.ts');
 
 /** A checkout with only these files in it. An object is written as JSON. */
-const repoWith = (files: Record<string, string | object>): string => {
+const repoWith = (files: Record<string, string | object>) => {
   const repo = scratch('nemia-api-repo-');
   for (const [file, content] of Object.entries(files)) write(path.join(repo, file), content);
   return repo;
 };
 
-const write = (file: string, content: string | object): void => {
+const write = (file: string, content: string | object) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
 };
@@ -46,7 +45,7 @@ const write = (file: string, content: string | object): void => {
 let filed = 0;
 
 /** `read` of the name of a factory filed on `repo` for it alone, removed once it has answered. */
-const inFactory = async <A>(repo: string, read: (factory: string) => Promise<A>): Promise<A> => {
+const inFactory = async <A>(repo: string, read: (factory: string) => Promise<A>) => {
   const factory = `caps-${++filed}`;
   addFactory({ name: factory, volumes: [repo].map((r) => `${r}:rw`) });
   try {
@@ -67,7 +66,7 @@ const served = (repo: string) =>
 const fixture = (env: Record<string, string> = {}) => ({ command: process.execPath, args: [FIXTURE_SERVER], env });
 
 /** The pids a fixture server wrote to `file`, one per start. */
-const startsIn = (file: string): number[] =>
+const startsIn = (file: string) =>
   fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(Number) : [];
 
 /** `describedAt` on one SKILL.md holding `text`, falling back to `fallback`, with the warnings it left. */
@@ -348,7 +347,7 @@ test('each server is asked once while an app runs: requests after the first, and
   t.onTestFinished(() => {
     removeFactory(factory);
   });
-  const capabilitiesOf = async (): Promise<CapabilitiesWithSteps> => {
+  const capabilitiesOf = async () => {
     const res = await own.request(`/api/capabilities?factory=${factory}`);
     assert.equal(res.status, 200);
     return (await res.json()) as CapabilitiesWithSteps;
@@ -570,7 +569,7 @@ test('a .mcp.json or a settings file that does not read is a warning naming it a
 });
 
 /** Whether `dir` is the checkout: the folder whose `package.json` declares the workspaces. */
-const isCheckout = (dir: string): boolean => {
+const isCheckout = (dir: string) => {
   const file = path.join(dir, 'package.json');
   return fs.existsSync(file) && Array.isArray((JSON.parse(fs.readFileSync(file, 'utf8')) as { workspaces?: unknown }).workspaces);
 };
@@ -638,22 +637,14 @@ const stepsRepo = () =>
   });
 
 /** The steps GET /api/capabilities says each step gets, by `<workflow>/<step>`. */
-const stepsOf = async (repo: string): Promise<Record<string, StepReach>> => {
+const stepsOf = async (repo: string) => {
   const { status, body } = await served(repo);
   assert.equal(status, 200);
   return Object.fromEntries(body.steps.map((s) => [`${s.workflow}/${s.step}`, s]));
 };
 
-/** A Claude Code step's reach, with what was measured of it: a step on another harness has each of these null. */
-type Measured = StepReach & {
-  tools: NonNullable<StepReach['tools']>;
-  skills: NonNullable<StepReach['skills']>;
-  mcp: NonNullable<StepReach['mcp']>;
-  readOnly: NonNullable<StepReach['readOnly']>;
-};
-
 /** The Claude Code steps of `stepsOf`, by `<workflow>/<step>`, each asserted to carry what was measured of it. */
-const claudeStepsOf = async (repo: string): Promise<Record<string, Measured>> => {
+const claudeStepsOf = async (repo: string) => {
   const claude = Object.entries(await stepsOf(repo)).filter(([, step]) => step.claudeCode);
   return Object.fromEntries(
     claude.map(([name, step]) => {

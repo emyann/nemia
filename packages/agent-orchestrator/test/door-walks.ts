@@ -18,25 +18,26 @@ export type DoorSide<D> = { readonly door: D; readonly root: string; readonly la
 export type DoorWalk<D> = { readonly name: string; readonly walk: (side: DoorSide<D>) => unknown; readonly says: unknown };
 
 /** An act of a door, run at once: what it succeeded with, or `{ refused }` naming the refusal's kind. A defect throws. */
-export function act<A>(effect: Effect.Effect<A, { readonly _tag: string }>): A | { refused: string } {
+export function act<A>(effect: Effect.Effect<A, { readonly _tag: string }>) {
   const exit = Effect.runSyncExit(effect);
-  if (Exit.isSuccess(exit)) return exit.value;
+  if (Exit.isSuccess(exit)) return exit.value satisfies A | { refused: string };
   const failed = exit.cause.reasons.find(Cause.isFailReason);
-  if (failed) return { refused: failed.error._tag };
+  if (failed) return { refused: failed.error._tag } satisfies A | { refused: string };
   throw Cause.squash(exit.cause);
 }
 
 /** An act of a door that must succeed: what it succeeded with; a refusal fails the walk. */
-export function done<A>(effect: Effect.Effect<A, { readonly _tag: string }>): A {
+export function done<A>(effect: Effect.Effect<A, { readonly _tag: string }>) {
   const answer = act(effect);
   if (typeof answer === 'object' && answer !== null && 'refused' in answer) assert.fail(`refused as ${String(answer.refused)}`);
-  return answer;
+  return answer satisfies A;
 }
 
 /** The service `tag` gives over `layer`, built once: what a side's walks ask. */
-export const doorFrom = <I, D>(tag: Context.Key<I, D>, layer: Layer.Layer<I>): D => Effect.runSync(Effect.provide(tag, layer));
+export const doorFrom = <I, D>(tag: Context.Key<I, D>, layer: Layer.Layer<I>) => Effect.runSync(Effect.provide(tag, layer)) satisfies D;
 
 /** `value` with the side's root as `<root>`, wherever a string holds it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function told(value: unknown, root: string): unknown {
   if (typeof value === 'string') return value.replaceAll(root, '<root>');
   if (Array.isArray(value)) return value.map((one) => told(one, root));
@@ -46,21 +47,18 @@ export function told(value: unknown, root: string): unknown {
 }
 
 /** Every method of a door, as `<group>.<method>`. */
-export const methodsOf = (door: object): string[] =>
-  Object.entries(door).flatMap(([group, methods]) => Object.keys(methods as object).map((m) => `${group}.${m}`));
+export const methodsOf = (door: object) =>
+  Object.entries(door).flatMap(([group, methods]) => Object.keys(methods as object).map((m) => `${group}.${m}`)) satisfies string[];
 
 /** The methods of `door` no walk of `walks` names in its `<group>.<method>` key. */
-export const unwalked = (door: object, walks: Readonly<Record<string, readonly unknown[]>>): string[] =>
-  methodsOf(door).filter((m) => !walks[m]?.length);
+export const unwalked = (door: object, walks: Readonly<Record<string, readonly unknown[]>>) =>
+  methodsOf(door).filter((m) => !walks[m]?.length) satisfies string[];
 
 /**
  * Each walk of `walks` on the side `sideOf` makes, new for each walk, as a test's name and body; first, that every method of the side's
  * door has a walk.
  */
-export function walksOn<D extends object>(
-  walks: Readonly<Record<string, readonly DoorWalk<D>[]>>,
-  sideOf: () => DoorSide<D>,
-): Array<readonly [name: string, body: () => void]> {
+export function walksOn<D extends object>(walks: Readonly<Record<string, readonly DoorWalk<D>[]>>, sideOf: () => DoorSide<D>) {
   const first = sideOf();
   const covered: readonly [string, () => void] = [
     `every method of the door has a walk, on ${first.layer}`,
@@ -80,5 +78,5 @@ export function walksOn<D extends object>(
           ] as const,
       ),
     ),
-  ];
+  ] satisfies Array<readonly [name: string, body: () => void]>;
 }

@@ -12,13 +12,14 @@ const NOW = Date.parse('2026-10-06T12:00:00Z');
 const EVERY = 2_000;
 
 /** A daemon of `kind` passing every `EVERY` ms. */
-const daemonOf = (kind: Standing['kind']): DaemonStanding => ({
-  kind,
-  file: { every: EVERY } as Standing['file'],
-  last: NOW,
-  quiet: 0,
-  identity: 'same',
-});
+const daemonOf = (kind: Standing['kind']) =>
+  ({
+    kind,
+    file: { every: EVERY } as Standing['file'],
+    last: NOW,
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 /** A snapshot read `ago` ms before `NOW`. */
 const readAgo = (ago: number) => ({ at: new Date(NOW - ago).toISOString() });

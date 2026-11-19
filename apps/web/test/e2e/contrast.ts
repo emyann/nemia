@@ -27,22 +27,22 @@ export const GRAIN_TAIL = 0.02;
 /** A colour as sRGB: red, green and blue from 0 to 255. */
 export type Rgb = readonly [number, number, number];
 
-const linear = (channel: number): number => {
+const linear = (channel: number) => {
   const c = channel / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
 
 /** A colour's relative luminance, as WCAG 2 defines it. */
-export const luminance = ([r, g, b]: Rgb): number => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+export const luminance = ([r, g, b]: Rgb) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
 
 /** The contrast ratio of two colours, from 1 to 21, whichever is the lighter. */
-export function ratio(a: Rgb, b: Rgb): number {
+export function ratio(a: Rgb, b: Rgb) {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
   return (light + 0.05) / (dark + 0.05);
 }
 
 /** A colour as the six digits a stylesheet writes. */
-export const hex = (rgb: Rgb): string => `#${rgb.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
+export const hex = (rgb: Rgb) => `#${rgb.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
 
 /**
  * One pair of colours a page shows text in. `state`: `measured`; `unmeasured`, with `why`, where the ground cannot be read; `exempt`
@@ -68,10 +68,10 @@ export interface Measured {
 }
 
 /** A measured pair's ratio, to two decimals as the table says it. */
-export const ratioOf = (pair: Pair): number => Math.floor(ratio(pair.ink, pair.ground) * 100) / 100;
+export const ratioOf = (pair: Pair) => Math.floor(ratio(pair.ink, pair.ground) * 100) / 100;
 
 /** Whether a pair fails the bar: measured, and under it. */
-export const under = (pair: Pair): boolean => pair.state === 'measured' && ratioOf(pair) < BAR;
+export const under = (pair: Pair) => pair.state === 'measured' && ratioOf(pair) < BAR;
 
 /** A grain's tile as a page draws it: the one colour of its specks, and their strength, from 0 to 1, at the tile's far end. */
 interface Grain {
@@ -104,12 +104,12 @@ interface Reader {
  * Every pair of colours the texts under `target` are drawn in: a page's whole body, or what a locator finds. Runs in the page, and
  * changes nothing in it.
  */
-export async function measure(target: Page | Locator): Promise<Measured> {
+export async function measure(target: Page | Locator) {
   const root = 'viewportSize' in target ? target.locator('body') : target;
   const grains = await root.evaluate(grainsIn, GRAIN_TAIL);
   const reader = await root.evaluateHandle(readerIn, grains);
   try {
-    return await root.evaluate(inPage, reader);
+    return (await root.evaluate(inPage, reader)) satisfies Measured;
   } finally {
     await reader.dispose();
   }
@@ -120,7 +120,7 @@ export async function measure(target: Page | Locator): Promise<Measured> {
  * the address itself, drawn once and read pixel by pixel. A tile is a grain when every pixel it paints is one colour; its strength
  * is the one only `tail` of its pixels are past. A tile of several colours, or one that cannot be drawn or read, is none.
  */
-async function grainsIn(root: Element, tail: number): Promise<Record<string, Grain>> {
+async function grainsIn(root: Element, tail: number) {
   const images = new Set<string>();
   for (const el of Array.from(root.ownerDocument.querySelectorAll('*'))) {
     const image = getComputedStyle(el).backgroundImage;
@@ -148,7 +148,7 @@ async function grainsIn(root: Element, tail: number): Promise<Record<string, Gra
     } catch {
       continue;
     }
-    const at = (i: number): number => data[i] ?? 0;
+    const at = (i: number) => data[i] ?? 0;
     const alphas = new Uint8Array(data.length / 4);
     let top = 0;
     for (let i = 0; i < data.length; i += 4) {
@@ -174,39 +174,40 @@ async function grainsIn(root: Element, tail: number): Promise<Record<string, Gra
  * each ancestor's ground, a cut frame's from the layer that draws it, and carries the far end of a grain among `grains` up to the
  * text; a ground drawn by another image has a `why`.
  */
-function readerIn(_root: Element, grains: Grains): Reader {
+function readerIn(_root: Element, grains: Grains) {
   const pixel = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
   const parsed = new Map<string, Rgba>();
-  const rgba = (color: string): Rgba => {
+  const rgba = (color: string) => {
     const known = parsed.get(color);
-    if (known) return known;
+    if (known) return known satisfies Rgba;
     pixel.clearRect(0, 0, 1, 1);
     pixel.fillStyle = color;
     pixel.fillRect(0, 0, 1, 1);
     const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
     const read: Rgba = [r ?? 0, g ?? 0, b ?? 0, (a ?? 0) / 255];
     parsed.set(color, read);
-    return read;
+    return read satisfies Rgba;
   };
-  const over = (top: Rgba, under: Rgb3): Rgb3 => [
-    top[0] * top[3] + under[0] * (1 - top[3]),
-    top[1] * top[3] + under[1] * (1 - top[3]),
-    top[2] * top[3] + under[2] * (1 - top[3]),
-  ];
-  const painted = (layer: Element, under: Ground): Ground => {
+  const over = (top: Rgba, under: Rgb3) =>
+    [
+      top[0] * top[3] + under[0] * (1 - top[3]),
+      top[1] * top[3] + under[1] * (1 - top[3]),
+      top[2] * top[3] + under[2] * (1 - top[3]),
+    ] satisfies Rgb3;
+  const painted = (layer: Element, under: Ground) => {
     const style = getComputedStyle(layer);
     const paint = rgba(style.backgroundColor);
     const ground = over(paint, under.ground);
     const through = paint[3] >= 1 ? {} : { far: under.far && over(paint, under.far), why: under.why };
-    if (style.backgroundImage === 'none') return { ...through, ground, opacity: under.opacity };
+    if (style.backgroundImage === 'none') return { ...through, ground, opacity: under.opacity } satisfies Ground;
     const grain = grains[style.backgroundImage];
-    if (!grain) return { ground, why: 'its ground is a background-image', opacity: under.opacity };
-    return { ...through, ground, far: over([...grain.speck, grain.alpha], through.far ?? ground), opacity: under.opacity };
+    if (!grain) return { ground, why: 'its ground is a background-image', opacity: under.opacity } satisfies Ground;
+    return { ...through, ground, far: over([...grain.speck, grain.alpha], through.far ?? ground), opacity: under.opacity } satisfies Ground;
   };
   const grounds = new Map<Element, Ground>();
-  const groundOf = (el: Element): Ground => {
+  const groundOf = (el: Element) => {
     const known = grounds.get(el);
-    if (known) return known;
+    if (known) return known satisfies Ground;
     const below: Ground = el.parentElement ? groundOf(el.parentElement) : { ground: [255, 255, 255], opacity: 1 };
     const own = Array.from(el.hasAttribute('data-cut-frame') ? el.querySelectorAll('[data-cut-ground]') : []).filter(
       (layer) => layer.closest('[data-cut-frame]') === el,
@@ -215,16 +216,16 @@ function readerIn(_root: Element, grains: Grains): Reader {
     for (const layer of own) drawn = painted(layer, drawn);
     const found = { ...drawn, opacity: below.opacity * Number(getComputedStyle(el).opacity) };
     grounds.set(el, found);
-    return found;
+    return found satisfies Ground;
   };
-  return { rgba, over, groundOf };
+  return { rgba, over, groundOf } satisfies Reader;
 }
 
 /** `measure`'s walk of the texts, serialised into the page: it reads no name of this file, and its colours through `reader`. */
-function inPage(root: Element, { rgba, over, groundOf }: Reader): Measured {
+function inPage(root: Element, { rgba, over, groundOf }: Reader) {
   const rows = new Map<string, Pair & { count: number }>();
-  const round = (c: Rgb3): Rgb => [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])];
-  const add = (el: Element, color: string, text: string): void => {
+  const round = (c: Rgb3) => [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])] satisfies Rgb;
+  const add = (el: Element, color: string, text: string) => {
     const { ground, far, why, opacity } = groundOf(el);
     const paint = rgba(color);
     const disabled = el.closest('[disabled], [aria-disabled="true"], [data-disabled]') !== null;
@@ -249,7 +250,7 @@ function inPage(root: Element, { rgba, over, groundOf }: Reader): Measured {
         });
     }
   };
-  const shown = (el: Element): boolean => {
+  const shown = (el: Element) => {
     if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return false;
     const box = el.getBoundingClientRect();
     return box.width > 1 && box.height > 1;
@@ -271,7 +272,7 @@ function inPage(root: Element, { rgba, over, groundOf }: Reader): Measured {
     if (field.value) add(field, getComputedStyle(field).color, field.value);
     else if (field.placeholder) add(field, getComputedStyle(field, '::placeholder').color, field.placeholder);
   }
-  return { scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', pairs: [...rows.values()] };
+  return { scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light', pairs: [...rows.values()] } satisfies Measured;
 }
 
 /** One picture's measure as the report reads it: the picture's file name, beside what was measured. */
@@ -279,18 +280,18 @@ export interface Sheet extends Measured {
   readonly picture: string;
 }
 
-const line = (cells: readonly (string | number)[]): string => `| ${cells.join(' | ')} |`;
-const escaped = (text: string): string => text.replace(/\|/g, '\\|').replace(/[<>]/g, (c) => (c === '<' ? '&lt;' : '&gt;'));
-const pageOf = (picture: string): string => picture.replace(/-(?:light|dark)\.png$/, '');
+const line = (cells: readonly (string | number)[]) => `| ${cells.join(' | ')} |`;
+const escaped = (text: string) => text.replace(/\|/g, '\\|').replace(/[<>]/g, (c) => (c === '<' ? '&lt;' : '&gt;'));
+const pageOf = (picture: string) => picture.replace(/-(?:light|dark)\.png$/, '');
 
 /** A pair's ground as the table says it: its six digits, and that it is a grain's far end where it is. */
-const groundSaid = (pair: Pair): string => (pair.grained ? `${hex(pair.ground)} (grain)` : hex(pair.ground));
+const groundSaid = (pair: Pair) => (pair.grained ? `${hex(pair.ground)} (grain)` : hex(pair.ground));
 
 /**
  * Each measured pair of `sheets` whose ground is a grain's far end, once per scheme and colours, with how many texts stand on it,
  * least ratio first.
  */
-export function grainedOf(sheets: readonly Sheet[]): Array<{ pair: Pair; scheme: string; texts: number }> {
+export function grainedOf(sheets: readonly Sheet[]) {
   const found = new Map<string, { pair: Pair; scheme: string; texts: number }>();
   for (const sheet of sheets)
     for (const pair of sheet.pairs.filter((each) => each.grained && each.state === 'measured')) {
@@ -299,11 +300,15 @@ export function grainedOf(sheets: readonly Sheet[]): Array<{ pair: Pair; scheme:
       row.texts += pair.count;
       found.set(key, row);
     }
-  return [...found.values()].sort((a, b) => ratioOf(a.pair) - ratioOf(b.pair));
+  return [...found.values()].sort((a, b) => ratioOf(a.pair) - ratioOf(b.pair)) satisfies Array<{
+    pair: Pair;
+    scheme: string;
+    texts: number;
+  }>;
 }
 
 /** Every failing pair of `sheets`, once per scheme, colours and classes, with the pictures that show it, worst first. */
-export function failing(sheets: readonly Sheet[]): Array<{ pair: Pair; scheme: string; pictures: string[] }> {
+export function failing(sheets: readonly Sheet[]) {
   const found = new Map<string, { pair: Pair; scheme: string; pictures: string[] }>();
   for (const sheet of sheets)
     for (const pair of sheet.pairs.filter(under)) {
@@ -312,7 +317,11 @@ export function failing(sheets: readonly Sheet[]): Array<{ pair: Pair; scheme: s
       row.pictures.push(sheet.picture);
       found.set(key, row);
     }
-  return [...found.values()].sort((a, b) => ratioOf(a.pair) - ratioOf(b.pair));
+  return [...found.values()].sort((a, b) => ratioOf(a.pair) - ratioOf(b.pair)) satisfies Array<{
+    pair: Pair;
+    scheme: string;
+    pictures: string[];
+  }>;
 }
 
 /**
@@ -320,7 +329,7 @@ export function failing(sheets: readonly Sheet[]): Array<{ pair: Pair; scheme: s
  * each failing pair with its colours, a text, its classes and its pictures, what could not be measured, and each pair read at a
  * grain's far end.
  */
-export function tableOf(sheets: readonly Sheet[]): string {
+export function tableOf(sheets: readonly Sheet[]) {
   const sorted = [...sheets].sort((a, b) => (a.picture < b.picture ? -1 : 1));
   const count = (sheet: Sheet, state: Pair['state']) => sheet.pairs.filter((pair) => pair.state === state).length;
   const total = (of: (sheet: Sheet) => number) => sorted.reduce((sum, sheet) => sum + of(sheet), 0);
@@ -396,7 +405,7 @@ export function tableOf(sheets: readonly Sheet[]): string {
 }
 
 /** A page of `pictures` for a person: each page's light picture beside its dark one, by name. */
-export function lookOf(pictures: readonly string[]): string {
+export function lookOf(pictures: readonly string[]) {
   const pages = [...new Set(pictures.map(pageOf))].sort();
   const cell = (page: string, scheme: string) =>
     pictures.includes(`${page}-${scheme}.png`)

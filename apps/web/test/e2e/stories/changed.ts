@@ -50,25 +50,24 @@ const OWN = /^apps\/web\/(src|\.storybook|theme)\//;
 const PREVIEW = `${BOARD}/.storybook/preview.tsx`;
 
 /** Each local stylesheet a stylesheet's text `@import`s, outside its comments, by its specifier. */
-const cssImportsIn = (text: string): string[] =>
+const cssImportsIn = (text: string) =>
   [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/g)].flatMap((m) =>
     m[1]?.startsWith('.') ? [m[1]] : [],
   );
 
 /** The modules `file`'s text names: a stylesheet's `@import`s, a module's imports. */
-const specsOf = (file: string, text: string): string[] =>
-  file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec);
+const specsOf = (file: string, text: string) => (file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec));
 
 /** A story file of the board, from the workspace root: anywhere under `src/components` but the vendored folders. */
-const isStoryFile = (file: string): boolean =>
+const isStoryFile = (file: string) =>
   /^apps\/web\/src\/components\/.+\.stories\.tsx$/.test(file) && !/^apps\/web\/src\/components\/(ui|ai-elements)\//.test(file);
 
 /** The workspace root of the git repository `cwd` is in. */
-const rootOf = (cwd: string): string =>
+const rootOf = (cwd: string) =>
   execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** Runs git in `root`, its output as text; throws naming the command where it fails. */
-const git = (root: string, args: readonly string[]): string => {
+const git = (root: string, args: readonly string[]) => {
   const ran = spawnSync('git', ['-c', 'core.quotePath=false', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 });
   if (ran.status !== 0) throw new Refusal(`git ${args.join(' ')} failed (${(ran.stderr ?? '').trim() || ran.error?.message})`);
   return ran.stdout;
@@ -83,7 +82,7 @@ class Refusal extends Error {}
  * @param root The workspace root.
  * @param base Where the work began: the merge base of HEAD and the base branch.
  */
-const changedSince = (root: string, base: string): string[] => [
+const changedSince = (root: string, base: string) => [
   ...new Set(
     git(root, ['log', '--first-parent', '--cc', '--no-renames', '--format=', '--name-only', `${base}..HEAD`, '--'])
       .split('\n')
@@ -92,7 +91,7 @@ const changedSince = (root: string, base: string): string[] => [
 ];
 
 /** The file `spec`, imported by `from`, resolves to among the workspace's files, from its root; none for a package or a file not there. */
-const resolved = (root: string, from: string, spec: string): string | undefined => {
+const resolved = (root: string, from: string, spec: string) => {
   const named = spec.startsWith('@/')
     ? path.posix.join(BOARD, 'src', spec.slice(2))
     : spec.startsWith('.')
@@ -107,7 +106,7 @@ const resolved = (root: string, from: string, spec: string): string | undefined 
 };
 
 /** Each file of the board's own `file`'s text names, by its path from the workspace root. */
-const ownOf = (root: string, file: string): string[] =>
+const ownOf = (root: string, file: string) =>
   specsOf(file, fs.readFileSync(path.join(root, file), 'utf8')).flatMap((spec) => {
     const next = resolved(root, file, spec);
     return next !== undefined && OWN.test(next) ? [next] : [];
@@ -119,7 +118,7 @@ const ownOf = (root: string, file: string): string[] =>
  * reaches only the stories that import it.
  * @param root The workspace root.
  */
-const drawnIn = (root: string): string[] => {
+const drawnIn = (root: string) => {
   if (!fs.existsSync(path.join(root, PREVIEW))) return [];
   const drawn = [PREVIEW, ...ownOf(root, PREVIEW)];
   for (let at = 1; at < drawn.length; at++) {
@@ -136,19 +135,19 @@ const drawnIn = (root: string): string[] => {
  * @param story The story file, from the workspace root.
  * @param drawn What every story is drawn in (`drawnIn`).
  */
-const reachOf = (root: string, story: string, drawn: readonly string[]): StoryReach => {
+const reachOf = (root: string, story: string, drawn: readonly string[]) => {
   const reaches = [story];
   for (let at = 0; at < reaches.length; at++) {
     for (const next of ownOf(root, reaches[at] ?? story)) if (!reaches.includes(next)) reaches.push(next);
   }
-  return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] };
+  return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] } satisfies StoryReach;
 };
 
 /**
  * Storybook's id of each story of `source`, the story file's text: `toId(title, storyNameFromExport(name))` of each named export.
  * @param source The story file's text.
  */
-export const idsOf = (source: string): string[] => {
+export const idsOf = (source: string) => {
   const module = storyModuleOf(source);
   const title = module.title;
   return title === null ? [] : module.stories.map((story) => toId(title, storyNameFromExport(story.name)));
@@ -158,8 +157,7 @@ export const idsOf = (source: string): string[] => {
  * Every story id of the workspace at `root`, read off its story files, in path order.
  * @param root The workspace root.
  */
-export const knownIds = (root: string): string[] =>
-  storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
+export const knownIds = (root: string) => storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
 
 /**
  * The matches the targets in `dir` ask for; refuses where `dir` is no folder, a target names no story of the workspace at `root`, or
@@ -167,7 +165,7 @@ export const knownIds = (root: string): string[] =>
  * @param root The workspace root.
  * @param dir The targets' folder.
  */
-const matchesIn = (root: string, dir: string): Match[] => {
+const matchesIn = (root: string, dir: string) => {
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     throw new Refusal(`--targets ${dir} is no folder: name the folder the targets are in`);
   const { matches, unknown, lightless } = matchesOf(targetsOf(fs.readdirSync(dir)), knownIds(root), LIGHT_CANARIES);
@@ -183,11 +181,11 @@ const matchesIn = (root: string, dir: string): Match[] => {
         `since only the light canaries have one (LIGHT_CANARIES, .storybook/approved.ts: ${LIGHT_CANARIES.join(', ')}): ` +
         'rename it target-<story id>-dark.png, or make the story a canary there and draw it with npm run stories -- --update',
     );
-  return matches;
+  return matches satisfies Match[];
 };
 
 /** The story files of the workspace at `root`, in path order. */
-const storyFiles = (root: string): string[] =>
+const storyFiles = (root: string) =>
   git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '--', BOARD])
     .split('\n')
     .filter((file) => isStoryFile(file) && fs.existsSync(path.join(root, file)))
@@ -199,7 +197,7 @@ const storyFiles = (root: string): string[] =>
  * @param root The workspace root.
  * @param changed The paths the change touched, from the workspace root.
  */
-const touchedOf = (root: string, changed: readonly string[]): { stories: string[]; bare: string[] } => {
+const touchedOf = (root: string, changed: readonly string[]) => {
   const drawn = drawnIn(root);
   const reach = storyFiles(root).map((story) => reachOf(root, story, drawn));
   const owing = [...new Set(changed.filter((file) => owesAStory(file) && fs.existsSync(path.join(root, file))))];
@@ -215,7 +213,7 @@ const PICTURES = `${BOARD}/${APPROVED}/`;
  * picture; none for a path that is no approved picture.
  * @param file A path from the workspace root.
  */
-export const approvedName = (file: string): string | undefined => {
+export const approvedName = (file: string) => {
   if (!file.startsWith(PICTURES) || !file.endsWith('.png')) return undefined;
   const rest = file.slice(PICTURES.length, -'.png'.length);
   if (!rest.includes('/')) return rest;
@@ -224,7 +222,7 @@ export const approvedName = (file: string): string | undefined => {
 };
 
 /** Whether the tree at `commit` holds `file`. */
-const heldAt = (root: string, commit: string, file: string): boolean =>
+const heldAt = (root: string, commit: string, file: string) =>
   spawnSync('git', ['cat-file', '-e', `${commit}:${file}`], { cwd: root, stdio: 'ignore' }).status === 0;
 
 /**
@@ -234,11 +232,7 @@ const heldAt = (root: string, commit: string, file: string): boolean =>
  * @param changed The paths the change touched, from the workspace root.
  * @param base The commit the change is read against; none where the paths were named, and every picture there counts as changed.
  */
-export const picturesOf = (
-  root: string,
-  changed: readonly string[],
-  base: string | undefined,
-): Record<'added' | 'changed' | 'removed', { name: string; file: string }[]> => {
+export const picturesOf = (root: string, changed: readonly string[], base: string | undefined) => {
   const sorted = { added: [], changed: [], removed: [] } as Record<'added' | 'changed' | 'removed', { name: string; file: string }[]>;
   for (const file of [...changed].sort()) {
     const name = approvedName(file);
@@ -252,7 +246,7 @@ export const picturesOf = (
 };
 
 /** Whether the pictures `before` and `after` differ by a pixel, and where they do, a picture of it: each differing pixel red. */
-async function differ(browser: Browser, before: string, after: string): Promise<{ differs: boolean; png: Buffer }> {
+async function differ(browser: Browser, before: string, after: string) {
   const page = await browser.newPage();
   try {
     const [a, b] = [before, after].map((file) => `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`);
@@ -308,7 +302,7 @@ const EARLIER = /^(?:(?:before|after|diff|match)-.+\.png|approved\.json)$/;
  * not there yet holds none. How many it removed.
  * @param out The pictures' folder, `--out`.
  */
-export const clearEarlier = (out: string): number => {
+export const clearEarlier = (out: string) => {
   if (!fs.statSync(out, { throwIfNoEntry: false })?.isDirectory()) return 0;
   const entries = fs.readdirSync(out, { withFileTypes: true });
   const earlier = entries.filter((entry) => entry.isFile() && EARLIER.test(entry.name));
@@ -356,7 +350,7 @@ export async function handChanged(
   out: string,
   changed: readonly { name: string; file: string }[],
   diff: (before: string, after: string) => Promise<Buffer>,
-): Promise<void> {
+) {
   for (const { name, file } of changed) {
     const before = path.join(out, `before-${name}.png`);
     const after = path.join(out, `after-${name}.png`);
@@ -366,7 +360,7 @@ export async function handChanged(
   }
 }
 
-async function main(): Promise<number> {
+async function main() {
   const { values, positionals } = argsOf(process.argv.slice(2));
   const root = rootOf(process.cwd());
   if (positionals.length > 0 && values.changed === undefined) throw new Refusal(`a path is named after --changed: ${USAGE}`);
@@ -397,7 +391,7 @@ async function main(): Promise<number> {
   fs.mkdirSync(out, { recursive: true });
   const head = git(root, ['rev-parse', 'HEAD']).trim();
   let browser: Browser | undefined;
-  const opened = async (): Promise<Browser> => (browser ??= await (await import('playwright')).chromium.launch());
+  const opened = async () => (browser ??= await (await import('playwright')).chromium.launch());
   try {
     await handChanged(
       root,

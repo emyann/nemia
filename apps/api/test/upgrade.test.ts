@@ -23,7 +23,7 @@ import { withHer } from './her.ts';
 const { app: exposed } = appOf(liveOf({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' }));
 
 /** A person token as the release before this one kept it: its record by its digest, its name and when it was minted, and no holder. */
-function keptByTheOldRelease(name: string): string {
+function keptByTheOldRelease(name: string) {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(root, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -35,7 +35,7 @@ function keptByTheOldRelease(name: string): string {
 }
 
 /** A run planted as its record alone, one step and nothing of it filed: something a person holds. */
-function planted(id: string): void {
+function planted(id: string) {
   const file = path.join(root, 'runs', `${id}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
@@ -57,8 +57,7 @@ function planted(id: string): void {
 }
 
 /** Who the hold on run `id` says put it, as its file keeps it. */
-const holder = (id: string): unknown =>
-  (JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.hold`), 'utf8')) as { actor?: unknown }).actor;
+const holder = (id: string) => (JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.hold`), 'utf8')) as { actor?: unknown }).actor;
 
 /** The board's request, as a browser sends it over plain http from the shared address: no Sec-Fetch-Site, the cookie its only token. */
 const fromTheBoard = (cookie: string, method: string, url: string, body: unknown) =>

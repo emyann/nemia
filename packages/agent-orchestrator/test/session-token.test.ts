@@ -40,19 +40,19 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1'
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
   COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
   return repo;
 };
 
 /** A workflow folder of one step, `implement`, then `review` after it. */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
@@ -63,13 +63,13 @@ const folder = (): string => {
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
 /** The token the engine's task `id` was filed in its environment. */
-const tokenOf = (id: string): string | undefined => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];
+const tokenOf = (id: string) => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];
 
 /** Who a request presenting `token` is from, to a route that needs `need` of it, over the stage's engine and the store's root. */
 const callerBy = (token: string | undefined, need?: TokenNeed) => stage.runWith(stage.board().e, sessionCaller(token, need));
 
 /** Every file under the store's tokens folder, with its text. */
-const tokenFiles = (): Array<{ name: string; text: string }> => {
+const tokenFiles = () => {
   const dir = tokensDir(ROOT);
   return fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => ({ name, text: fs.readFileSync(path.join(dir, name), 'utf8') })) : [];
 };

@@ -92,7 +92,7 @@ describe('gatesAt', () => {
 const QUICK: StepSpec[] = [step('implement'), step('review', ['implement']), step('land', ['review'])];
 
 describe("gatesAfterSection: a step is told the gates after it, the run's own and its workflow's", () => {
-  const named = (section: string): string[] => [...section.matchAll(/`([a-z]+)`/g)].map((m) => m[1] ?? '').filter((n) => n !== 'nemia');
+  const named = (section: string) => [...section.matchAll(/`([a-z]+)`/g)].map((m) => m[1] ?? '').filter((n) => n !== 'nemia');
   test('a run started with `--gate land` tells each step before land of it', () => {
     for (const s of QUICK.slice(0, 2)) assert.deepEqual(named(gatesAfterSection(s, { gates: ['land'] }, QUICK)), ['land'], s.name);
   });
@@ -129,7 +129,7 @@ const PLAN = step('plan');
 const CHECKED_PLAN = { ...PLAN, check: 'npm test' };
 const at = (extra: Partial<RepositoryRun> = {}) => run({ plan: 't1', implement: null }, extra);
 const CHECKING = at({ gates: ['plan'], steps: { plan: { taskId: 't1', check: { taskId: 'c1' } }, implement: { taskId: null } } });
-const said = (outcome: Closeout['outcome']): Closeout => ({
+const said = (outcome: Closeout['outcome']) => ({
   outcome,
   summary: 'rewrote the parser',
   artifacts: [],

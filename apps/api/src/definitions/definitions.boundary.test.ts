@@ -23,12 +23,12 @@ const repo = scratch('nemia-api-definitions-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 /** `url` with the scratch repository's `?repo=`, where it asks the default factory and names no repository. */
-const onRepoUrl = (url: string): string =>
+const onRepoUrl = (url: string) =>
   !/^\/api\/namespaces\/default(?:[/?]|$)/.test(url) || /[?&]repo=/.test(url)
     ? url
     : `${url}${url.includes('?') ? '&' : '?'}repo=${encodeURIComponent(repo)}`;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -61,7 +61,7 @@ type Obj = {
 };
 type List = { kind: string; metadata: { continue?: string; remainingItemCount?: number }; items: Obj[] };
 
-const get = async <T>(url: string): Promise<{ status: number; body: T }> => {
+const get = async <T>(url: string) => {
   const res = await app.request(onRepoUrl(url));
   return { status: res.status, body: (await res.json()) as T };
 };
@@ -287,7 +287,7 @@ test("each status.revision is the number a run's start pins: 1 at the first star
   execFileSync('git', ['-c', 'user.name=dev', '-c', 'user.email=dev@acme.test', 'commit', '-q', '--allow-empty', '-m', 'start'], {
     cwd: repo,
   });
-  const pinnedAtStart = async (): Promise<Record<string, number>> => {
+  const pinnedAtStart = async () => {
     const started = await send('POST', '/api/namespaces/works/runs', { workflow: 'mine', from: 'user', brief: 'Make the plan.' });
     assert.equal(started.status, 201, JSON.stringify(started.body));
     const pins = runsAtOnce(root).runs.read(String(started.body.id)).pinned ?? [];

@@ -65,7 +65,7 @@ const RICH: SpawnRequest = {
 };
 
 /** `RICH` with `claude` as given and nothing else of it changed. */
-const withClaude = (claude: ClaudeFlags): SpawnRequest => ({ ...RICH, config: { ...RICH.config, claude } });
+const withClaude = (claude: ClaudeFlags) => ({ ...RICH, config: { ...RICH.config, claude } });
 
 describe('attachedOptions: a rich task is fenced on the SDK’s own options, each fact of it in its place', () => {
   let given!: ReturnType<typeof attachedOptions>;

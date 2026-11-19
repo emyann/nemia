@@ -26,10 +26,10 @@ export function plantedGit(env: NodeJS.ProcessEnv, refuse?: string) {
     ].join('\n'),
     { mode: 0o755 },
   );
-  const said = (): string[] => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : []);
+  const said = () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : []) satisfies string[];
   return { env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH ?? ''}` }, said, bin };
 }
 
 /** How many `%(ahead-behind:…)` columns each `for-each-ref` among `said` lists, in the order git was asked. */
-export const columnsListed = (said: readonly string[]): number[] =>
-  said.filter((line) => line.startsWith('for-each-ref')).map((line) => line.split('%(ahead-behind:').length - 1);
+export const columnsListed = (said: readonly string[]) =>
+  said.filter((line) => line.startsWith('for-each-ref')).map((line) => line.split('%(ahead-behind:').length - 1) satisfies number[];

@@ -8,13 +8,14 @@ import type { DaemonStanding } from '../daemon/daemon.ts';
 import { DEMAND_OFF, daemonEnv, demandPlan, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
 
 /** A lease of pid 4242 standing as `kind`. */
-const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped'): DaemonStanding => ({
-  kind,
-  file: { pid: 4242, by: 'api', startedAt: '2026-10-06T08:00:00.000Z', cwd: '/', every: 4000, passedAt: null },
-  last: 0,
-  quiet: 0,
-  identity: 'same',
-});
+const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped') =>
+  ({
+    kind,
+    file: { pid: 4242, by: 'api', startedAt: '2026-10-06T08:00:00.000Z', cwd: '/', every: 4000, passedAt: null },
+    last: 0,
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 describe('demandPlan: a ticking daemon is left alone; any other lease is no holder; off starts nothing; a service before a spawn', () => {
   const NO = () => false;

@@ -11,14 +11,14 @@ import { photograph } from './board.ts';
 export type Rgb = [number, number, number];
 
 /** How far two colours are apart: their widest channel's difference. */
-export const apart = (a: Rgb, b: Rgb): number => Math.max(...a.map((channel, i) => Math.abs(channel - b[i])));
+export const apart = (a: Rgb, b: Rgb) => Math.max(...a.map((channel, i) => Math.abs(channel - b[i])));
 
 /** The colour of each of `points` in the picture `file`, read on a canvas in a blank page of `browser`. */
-export async function coloursAt(browser: Browser, file: string, points: ReadonlyArray<readonly [number, number]>): Promise<Rgb[]> {
+export async function coloursAt(browser: Browser, file: string, points: ReadonlyArray<readonly [number, number]>) {
   const page = await browser.newPage();
   try {
     const url = `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
-    return await page.evaluate(
+    return (await page.evaluate(
       async ({ url, points }) => {
         const img = new Image();
         img.src = url;
@@ -31,7 +31,7 @@ export async function coloursAt(browser: Browser, file: string, points: Readonly
         return points.map(([x, y]) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3)) as [number, number, number]);
       },
       { url, points },
-    );
+    )) satisfies Rgb[];
   } finally {
     await page.close();
   }
@@ -43,7 +43,7 @@ export async function coloursOf<K extends string>(
   page: Page,
   file: string,
   points: Record<K, readonly [number, number]>,
-): Promise<Record<K, Rgb>> {
+) {
   await photograph(page, file, { always: true });
   const found = await coloursAt(browser, file, Object.values<readonly [number, number]>(points));
   return Object.fromEntries(Object.keys(points).map((key, i) => [key, found[i]])) as Record<K, Rgb>;
@@ -74,5 +74,7 @@ export async function edgesOf(page: Page, selector: string) {
  * is kept when its colour is more than `apartBy` from `ground`. Sorted, so that which of two cuts a borderline pixel was first seen
  * in does not decide what the caller compares, and the set of names is what is read.
  */
-export const spilledOver = (found: Record<string, Rgb>, ground: Rgb, apartBy: number): string[] =>
-  [...new Set(Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) > apartBy ? [where.split(':')[0]] : [])))].sort();
+export const spilledOver = (found: Record<string, Rgb>, ground: Rgb, apartBy: number) =>
+  [
+    ...new Set(Object.entries(found).flatMap(([where, colour]) => (apart(colour, ground) > apartBy ? [where.split(':')[0]] : []))),
+  ].sort() satisfies string[];

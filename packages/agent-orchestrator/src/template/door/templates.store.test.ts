@@ -57,7 +57,7 @@ describe('a --template is a builtin template where it is a name, and a folder or
 });
 
 /** A folder of builtin templates: `team` and `other` and `link` (whose nemia.yaml is a file), `test` with none, and a file. */
-function builtins(): string {
+function builtins() {
   const dir = scratch('wf-builtin-templates-');
   for (const name of ['team', 'other', 'link']) {
     fs.mkdirSync(path.join(dir, name));

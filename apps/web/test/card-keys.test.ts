@@ -8,7 +8,8 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CARD_KEYS, CARD_KEY_MEANINGS } from 'objects';
 import { cardKeysOf, setCardFrom } from '../src/lib/api/inbox.ts';
-import { cardObject } from './factory-fixtures.ts';
+import { cardObject } from './factory.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with its meaning", () => {
   test('every key set: queued its time, models and from comma-joined, labels as a=b,c=d in key order, factory its namespace', () => {
@@ -47,15 +48,10 @@ describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with
 
 /** Every request answered with `card` as JSON, for the length of the test: what was sent, each as its method, path and body. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, card: unknown) {
-  const before = globalThis.fetch;
   const sent: Array<{ method: string; path: string; body: unknown }> = [];
-  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
-    const body = init?.body === undefined || init.body === null ? undefined : new TextDecoder().decode(init.body as Uint8Array);
-    sent.push({ method: init?.method ?? 'GET', path: new URL(String(url), 'http://board').pathname, body: body && JSON.parse(body) });
+  apiAnswers(async (url, { method, body }) => {
+    sent.push({ method, path: new URL(url, 'http://board').pathname, body: body && JSON.parse(body) });
     return new Response(JSON.stringify(card), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return sent;
 }

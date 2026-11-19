@@ -5,17 +5,17 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { byPerson, centredScroll, litAt, PATH_POLL_MS, pathPoll, stepStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
-import type { LifecycleTransition, MachineEdge, MachineVerb, StepPath } from '../src/lib/api/steps.ts';
+import type { LifecycleTransition, MachineEdge, MachineVerb } from '../src/lib/api/steps.ts';
 
 const FINAL = ['completed', 'failed', 'canceled'];
 
 /** A path through `states`, each moved by the entry named beside it. */
-const pathOf = (...moves: Array<[string, string]>): LifecycleTransition[] =>
+const pathOf = (...moves: Array<[string, string]>) =>
   moves.map(([state, event], i) => ({ state, event, at: new Date(Date.UTC(2026, 8, 29, 8, 0, i)).toISOString() }));
 
 const running = pathOf(['submitted', 'filed'], ['starting', 'starting'], ['working', 'spawned']);
 const settled = [...running, ...pathOf(['ending', 'ended'], ['completed', 'settled'])];
-const read = (path: LifecycleTransition[], taskId: string | null = 't-1'): StepPath => ({
+const read = (path: LifecycleTransition[], taskId: string | null = 't-1') => ({
   taskId,
   try: 1,
   path,

@@ -20,25 +20,26 @@ type Walk = DoorWalk<AgentDoorShape>;
 type Side = DoorSide<AgentDoorShape>;
 
 /** An agent drafted as the board sends one: `scribe` unless named, a description, two keys and its words, each changed by `over`. */
-export const anAgent = (name = 'scribe', over: Partial<AgentDraft> = {}): AgentDraft => ({
-  name,
-  description: `Use ${name} when a change needs its notes written.`,
-  keys: { model: 'sonnet', tools: 'Read, Write' },
-  body: `Write the notes, ${name}.`,
-  ...over,
-});
+export const anAgent = (name = 'scribe', over: Partial<AgentDraft> = {}) =>
+  ({
+    name,
+    description: `Use ${name} when a change needs its notes written.`,
+    keys: { model: 'sonnet', tools: 'Read, Write' },
+    body: `Write the notes, ${name}.`,
+    ...over,
+  }) satisfies AgentDraft;
 
 /** The name `name` as the door takes it. */
-const named = (name: string): AgentName => AgentName.read(name);
+const named = (name: string) => AgentName.read(name) satisfies AgentName;
 
 /** Your folder of agents on a side: `<root>/workflows/agents`. */
-export const yoursAt = ({ root }: Side): AgentAt => ({ dir: `${root}/workflows/agents` });
+export const yoursAt = ({ root }: Side) => ({ dir: `${root}/workflows/agents` }) satisfies AgentAt;
 
 /** A repository of a side, `<root>/repo`, whose agents and custom instructions a walk reads. */
-const repoOf = ({ root }: Side): string => `${root}/repo`;
+const repoOf = ({ root }: Side) => `${root}/repo`;
 
 /** `name` written on a side as a new agent of yours, at the version it is at after. */
-const written = (side: Side, name = 'scribe', draft: AgentDraft = anAgent(name)): string =>
+const written = (side: Side, name = 'scribe', draft: AgentDraft = anAgent(name)) =>
   done(side.door.agents.write(named(name), draft, undefined, yoursAt(side))).version;
 
 /** What your folder holds on a side: the agents listed, by name. */

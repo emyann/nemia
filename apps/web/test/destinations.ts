@@ -26,7 +26,7 @@ export type Destination =
   | { readonly kind: 'exempt'; readonly why: string };
 
 /** The part of the kit `part` is. */
-const kit = (part: KitPart, how?: string): Destination => (how === undefined ? { kind: 'kit', part } : { kind: 'kit', part, how });
+const kit = (part: KitPart, how?: string) => (how === undefined ? { kind: 'kit', part } : { kind: 'kit', part, how }) satisfies Destination;
 
 /** The inline alert the kit lacks, asked of the design system's factory. */
 const ALERT: Destination = { kind: 'ask', what: 'inline alert: a tinted surface with a title and a description', run: null };

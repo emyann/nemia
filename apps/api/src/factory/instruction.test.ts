@@ -28,7 +28,7 @@ const send = (method: string, url: string, body: unknown) =>
   app.request(url, { method, headers: json, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** What the request answered, its status asserted. */
-async function answered(res: Response | Promise<Response>, status = 200): Promise<FactoryInstruction> {
+async function answered(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as FactoryInstruction;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -36,10 +36,10 @@ async function answered(res: Response | Promise<Response>, status = 200): Promis
 }
 
 /** The factory's file and the store's folder: what a refusal must leave as it was. */
-const held = (): [string, string[]] => [fs.readFileSync(RECORD, 'utf8'), fs.existsSync(STORE) ? fs.readdirSync(STORE) : []];
+const held = () => [fs.readFileSync(RECORD, 'utf8'), fs.existsSync(STORE) ? fs.readdirSync(STORE) : []];
 
 /** A request refused with `status`, its words, and the factory's file and the store's folder as they were. */
-async function refused(res: () => Response | Promise<Response>, status: number): Promise<string> {
+async function refused(res: () => Response | Promise<Response>, status: number) {
   const before = held();
   const answer = await res();
   const body = (await answer.json()) as { error: string };
@@ -49,7 +49,7 @@ async function refused(res: () => Response | Promise<Response>, status: number):
 }
 
 /** What the package itself throws for `call`, to compare with what the api answered. */
-function packageSays(call: () => unknown): string {
+function packageSays(call: () => unknown) {
   try {
     call();
   } catch (err) {

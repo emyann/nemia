@@ -28,6 +28,10 @@ const onOff = (args: Args, key: 'claudeMd' | 'skills'): { claudeMd?: boolean; sk
   throw new Refused(`nemia factory volume add takes ${flag} on or ${flag} off, not ${JSON.stringify(given)}. Nothing was changed.`);
 };
 
+/** A volume's switches where they are not the defaults, as a person types them: ` --claude-md on`, ` --skills off`. */
+const switchesSaid = (v: { claudeMd?: boolean; skills?: boolean }): string =>
+  `${v.claudeMd === true ? ' --claude-md on' : ''}${v.skills === false ? ' --skills off' : ''}`;
+
 /**
  * `nemia factory volume add`: a writable volume, a repository the factory works on, its place trusted unless `--no-trust`; or a
  * read-only one, mounted for every local step of its runs; and how it was marked before.
@@ -48,7 +52,7 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
   );
   const { file, volume, was, trusts } = added;
   said([
-    `${factory}  volume ${volume.path} ${markOf(volume.readOnly)}${was === null || was === volume.readOnly ? '' : ` (was ${markOf(was)})`}`,
+    `${factory}  volume ${volume.path} ${markOf(volume.readOnly)}${was === null || was === volume.readOnly ? '' : ` (was ${markOf(was)})`}${switchesSaid(volume)}`,
     ...(volume.readOnly ? [] : ['a repository the factory works on: a run on it works in a worktree of its own']),
     `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
     ...trustedLines(factory, trusts),

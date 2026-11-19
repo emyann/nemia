@@ -73,7 +73,17 @@ import { localFields } from './assess.ts';
 import { stepToken } from '../token/token.store.ts';
 import { sendCards, type Due } from '../send/send.verb.ts';
 import { answerTables, fileScripts } from '../script/script.verb.ts';
-import { filedAt, foldersTold, placeTold, toldOf, type RunRead, type PlaceTold, type StepTold, type Told } from './told.verb.ts';
+import {
+  filedAt,
+  sessionCwd,
+  foldersTold,
+  placeTold,
+  toldOf,
+  type RunRead,
+  type PlaceTold,
+  type StepTold,
+  type Told,
+} from './told.verb.ts';
 import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
@@ -311,7 +321,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
         checked,
         foldersTold(home, run, reads, told.step),
         yield* costsFor(f, step, Boolean(resumeFrom)),
-        { words: told.words, say: told.say, targets: told.targets },
+        { words: told.words, say: told.say, targets: told.targets, workspace: record.workspace ?? run.workspace },
         undefined,
         reads.answers,
       );
@@ -344,7 +354,7 @@ const trySpec = (
 ): Spec => ({
   id: t.taskId,
   brief: t.brief,
-  cwd: record.workspace ?? f.run.workspace,
+  cwd: sessionCwd(step, f.run, f.home, record.workspace ?? f.run.workspace),
   harness: step.harness,
   priority: MOMENTUM,
   labels: stepLabels(f.run, step),
@@ -352,7 +362,7 @@ const trySpec = (
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
-      ...filedAt(f.run, f.home),
+      ...filedAt(f.run, f.home, record.workspace ?? f.run.workspace),
       ...stepToken(f.home, f.run, step, t.taskId, r.try),
       own: t.told.own,
       landingDenied: () => t.told.words?.denied ?? [],
@@ -463,18 +473,18 @@ function roundSpec(
       undefined,
       foldersTold(home, run, reads, told.step),
       said.costs,
-      { words: said.words, say: said.say },
+      { words: said.words, say: said.say, workspace: record.workspace ?? run.workspace },
       undefined,
       reads.answers,
     ),
-    cwd: record.workspace ?? run.workspace,
+    cwd: sessionCwd(target, run, f.home, record.workspace ?? run.workspace),
     harness: target.harness,
     priority: MOMENTUM,
     labels: stepLabels(run, target),
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        ...filedAt(run, f.home),
+        ...filedAt(run, f.home, record.workspace ?? run.workspace),
         ...stepToken(f.home, run, target, taskId, tryOf(run, r.target) + 1),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, run),
@@ -674,11 +684,11 @@ function readySpec(
           said.checked,
           foldersTold(home, run, reads, told.step),
           said.costs,
-          { words: said.words, say: said.say, targets: said.targets },
+          { words: said.words, say: said.say, targets: said.targets, workspace: place.workspace },
           place.merge,
           reads.answers,
         ),
-    cwd: place.workspace,
+    cwd: sessionCwd(step, run, f.home, place.workspace),
     harness: step.harness,
     priority: stepMomentum(step),
     labels: stepLabels(run, step),
@@ -686,7 +696,7 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        ...filedAt(run, f.home),
+        ...filedAt(run, f.home, place.workspace),
         ...stepToken(f.home, run, step, stepTaskId(run, step.name, tryOf(run, step.name)), tryOf(run, step.name)),
         budgetUsd: budgetUsdFor(budgetOf(step, run), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,

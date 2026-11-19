@@ -166,11 +166,13 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
   const spec: FactoryObject['spec'] = {
     workflows: [...listing.workflows],
     hires: { ...listing.hires },
-    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly, origin }) => ({
+    volumes: factoryVolumesNamed(listing).map(({ name, path, readOnly, origin, claudeMd, skills }) => ({
       name,
       path,
       readOnly,
       ...(origin === undefined ? {} : { origin }),
+      ...(claudeMd === undefined ? {} : { claudeMd }),
+      ...(skills === undefined ? {} : { skills }),
     })),
     ...harnessSettingsOf(listing.harnessSettings),
     ...(listing.costLines === undefined || Object.keys(listing.costLines).length === 0 ? {} : { costLines: { ...listing.costLines } }),

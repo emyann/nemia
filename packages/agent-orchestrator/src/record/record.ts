@@ -20,7 +20,16 @@ import { MARK_MEANS, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
  * only read it.
  */
-export type Mount = { path: string; readOnly: boolean };
+export type Mount = {
+  path: string;
+  readOnly: boolean;
+  /** Whether the step's own rules alone decide its writes there (the runtime's `Mount.ruled`): the workspace beside a session's home. */
+  ruled?: true;
+  /** Whether the folder's memory files load, frozen from its volume's switch (`switchesOf`): absent is off. */
+  claudeMd?: true;
+  /** Whether the folder's skills are offered, frozen from its volume's switch (`switchesOf`): absent is on. */
+  skills?: false;
+};
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';

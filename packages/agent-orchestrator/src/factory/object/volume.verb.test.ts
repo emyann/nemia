@@ -17,7 +17,7 @@ const mill: Exclude<FactoryListing, { error: string }> = {
   schedules: {},
   volumes: [
     { path: '/repo', readOnly: false },
-    { path: '/data/notes', readOnly: true, name: 'kept' },
+    { path: '/data/notes', readOnly: true, name: 'kept', claudeMd: true, skills: false },
     { path: '/data/gone', readOnly: false },
   ],
 };
@@ -57,4 +57,10 @@ test('a folder that is gone is not present, and is refused as a mount of it woul
 test('the runs in play whose record mounts the path, and no ended one', () => {
   assert.deepEqual(kept?.status.runs, ['run-1']);
   assert.deepEqual(gone?.status.runs, []);
+});
+
+test("a volume's switches are served on its spec where its file sets them, and absent where it does not", () => {
+  assert.equal(kept?.spec.claudeMd, true);
+  assert.equal(kept?.spec.skills, false);
+  assert.equal(gone !== undefined && 'claudeMd' in gone.spec, false);
 });

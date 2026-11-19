@@ -3,8 +3,8 @@
 # reaches a part whatever comes before; an allow is matched with them stripped, so no allow can refuse what an assignment says.
 # These hold the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, or built from a `$`) passes them.
 #
-# A session's working folder is the step's workspace: moving out of it leaves what its fence keeps inside behind.
-- Bash(cd:*)
+# No `cd` is denied: a read-only agent runs dontAsk, which refuses a `cd` no allow names, and the read set allows one alone, into
+# the step's workspace (read-only.allow.yaml), where a session that starts in its factory's home works.
 # `git grep`'s pager option runs a command on the files that matched. Short, `-O<command>`, bundled after other short options
 # (`-nOsh`): every capital O after `git grep`, a pattern holding one refused with it.
 - Bash(git grep *O*)

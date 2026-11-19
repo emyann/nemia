@@ -245,19 +245,19 @@ export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g
  */
 export const claudeDenies = (config: SpawnRequest['config']): string[] => [
   ...(config?.disallowedTools ?? []),
-  ...(config?.mounts ?? []).filter((m) => m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+  ...(config?.mounts ?? []).filter((m) => m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
 
 /**
  * What a Claude Code session may do without asking: the task's `allowedTools`, and an edit anywhere under each writable mount,
- * `Edit(//<path>/**)`. `dontAsk` refuses a write under an added folder that no allow names, `Edit(**)` included, since it resolves
- * against the session's cwd; the allow lets the Edit tool and a Bash redirection write there. `auto` writes there without it
- * (measured on Claude Code 2.1.288).
+ * `Edit(//<path>/**)`, but a mount the task's own rules rule (`ruled`), which is given no rule of the runtime's. `dontAsk` refuses a write
+ * under an added folder that no allow names, `Edit(**)` included, since it resolves against the session's cwd; the allow lets the Edit tool
+ * and a Bash redirection write there. `auto` writes there without it (measured on Claude Code 2.1.288).
  * @param config The task's spawn config, read for its allowed tools and its mounts; absent, none.
  */
 export const claudeAllows = (config: SpawnRequest['config']): string[] => [
   ...(config?.allowedTools ?? []),
-  ...(config?.mounts ?? []).filter((m) => !m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+  ...(config?.mounts ?? []).filter((m) => !m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
 
 /**
@@ -359,6 +359,17 @@ export const worktreeName = (r: SpawnRequest): string =>
  * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
  */
 export const CLAUDE_CONFIG_FOLDERS: readonly [string, ...string[]] = ['.claude'];
+
+/**
+ * What Claude Code reads of a folder added beside a session's own (`--add-dir`): the skills of its `.claude/skills`, listed with no more
+ * asked; and its memory files (CLAUDE.md), loaded only where `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD` is set, which loads every
+ * added folder's, each one skipped by a glob of the `claudeMdExcludes` setting (code.claude.com/docs/en/memory).
+ */
+export const CLAUDE_ADDED_FOLDER_READS = {
+  skills: ['.claude', 'skills'],
+  memoryEnv: 'CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD',
+  memoryExcludes: 'claudeMdExcludes',
+} as const;
 
 /** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
 const dropsAuto = (model: string | undefined): boolean =>

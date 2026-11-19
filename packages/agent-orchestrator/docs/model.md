@@ -64,6 +64,8 @@ erDiagram
     list cards "optional"
     string workflowFiles "optional"
     string carriedFiles "optional"
+    string homeFiles "optional"
+    object worked "optional"
     object from "optional"
     object scheduled "optional"
     list gates FK "optional"
@@ -109,6 +111,8 @@ erDiagram
     list cards "optional"
     string workflowFiles "optional"
     string carriedFiles "optional"
+    string homeFiles "optional"
+    object worked "optional"
     object from "optional"
     object scheduled "optional"
     list gates FK "optional"
@@ -235,6 +239,8 @@ erDiagram
     boolean readOnly
     string name "optional"
     string origin "optional"
+    boolean claudeMd "optional"
+    boolean skills "optional"
   }
   Template {
     TemplateSource source PK

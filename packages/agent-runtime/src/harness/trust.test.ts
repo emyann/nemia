@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { folderTrust, trustFolder, trustedFolder } from './trust.ts';
-import { claudeTrust } from './claude/trust.ts';
+import { folderTrust, trustFolder, trustedFolder, untrustFolder } from './trust.ts';
+import { claudeTrust, claudeUntrust } from './claude/trust.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A `.claude.json` in a scratch folder holding `projects`, and its path. */
@@ -225,4 +225,103 @@ test('a link to the file is followed, never replaced', () => {
   assert.equal(trustFolder('claude', '/srv/mine', link)?.wrote, true);
   assert.ok(fs.lstatSync(link).isSymbolicLink());
   assert.equal(held(file).projects['/srv/mine'].hasTrustDialogAccepted, true);
+});
+
+describe('untrustFolder: the records of a folder and of every folder inside it are taken back, and no other', () => {
+  const HOME = '/srv/store/runs/r-1/home';
+  const BESIDE = {
+    '/srv/store/runs/r-10/home/abc': { hasTrustDialogAccepted: true },
+    '/srv/store/runs/r-1/homes': { hasTrustDialogAccepted: true },
+    '/srv/store/runs/r-1': { hasTrustDialogAccepted: true },
+  };
+  const rows: { name: string; check: () => void }[] = [
+    {
+      name: "the folder's record and an inner folder's are removed, every other key of the file kept",
+      check: () => {
+        const file = configWith({ [HOME]: { hasTrustDialogAccepted: true }, [`${HOME}/abc`]: { lastCost: 1 }, ...BESIDE });
+        const before = held(file);
+        const taken = untrustFolder('claude', `${HOME}/x/..`, file);
+        assert.deepEqual([[...(taken?.took ?? [])].sort(), taken?.refused], [[HOME, `${HOME}/abc`], null]);
+        assert.deepEqual(held(file), { ...before, projects: BESIDE });
+        assert.deepEqual(beside(file), ['.claude.json']);
+      },
+    },
+    {
+      name: 'a file with no record under the folder is left byte for byte',
+      check: () => {
+        const file = configWith(BESIDE);
+        const bytes = fs.readFileSync(file);
+        const taken = untrustFolder('claude', HOME, file);
+        assert.deepEqual([taken?.took, taken?.refused, taken?.file], [[], null, file]);
+        assert.ok(fs.readFileSync(file).equals(bytes));
+      },
+    },
+    {
+      name: 'a file that is not there is left not there',
+      check: () => {
+        const none = path.join(scratch('ae-trust-'), '.claude.json');
+        const taken = untrustFolder('claude', HOME, none);
+        assert.deepEqual([taken?.took, taken?.refused, taken?.file], [[], null, none]);
+        assert.equal(fs.existsSync(none), false);
+      },
+    },
+    ...['{', '[]', '{"projects":[]}'].map((text) => ({
+      name: `REFUSED: a file that does not read is left byte for byte: ${text}`,
+      check: () => {
+        const file = configWith({});
+        fs.writeFileSync(file, text);
+        const taken = untrustFolder('claude', HOME, file);
+        assert.deepEqual(taken?.took, []);
+        assert.ok((taken?.refused ?? '').includes(file));
+        assert.equal(fs.readFileSync(file, 'utf8'), text);
+      },
+    })),
+    {
+      name: 'REFUSED: the home directory, and a folder holding it, are never taken back, and nothing is written',
+      check: () => {
+        for (const dir of [os.homedir(), path.dirname(os.homedir())]) {
+          const file = configWith({ [path.join(os.homedir(), 'x')]: { hasTrustDialogAccepted: true } });
+          const bytes = fs.readFileSync(file);
+          const taken = untrustFolder('claude', dir, file);
+          assert.deepEqual(taken?.took, []);
+          assert.notEqual(taken?.refused, null);
+          assert.ok(fs.readFileSync(file).equals(bytes));
+        }
+      },
+    },
+    {
+      name: 'a harness that keeps no trust is asked nothing',
+      check: () => {
+        const file = configWith({ [HOME]: { hasTrustDialogAccepted: true } });
+        assert.equal(untrustFolder('codex', HOME, file), undefined);
+        assert.equal(held(file).projects[HOME].hasTrustDialogAccepted, true);
+      },
+    },
+    {
+      name: 'a link to the file is followed, never replaced',
+      check: () => {
+        const file = configWith({ [HOME]: { hasTrustDialogAccepted: true } });
+        const link = path.join(scratch('ae-trust-'), '.claude.json');
+        fs.symlinkSync(file, link);
+        assert.deepEqual(untrustFolder('claude', HOME, link)?.took, [HOME]);
+        assert.ok(fs.lstatSync(link).isSymbolicLink());
+        assert.deepEqual(held(file).projects, {});
+      },
+    },
+  ];
+  for (const row of rows) test(row.name, row.check);
+});
+
+test('a write that lands between the read and the removal is not lost', () => {
+  const file = configWith({ '/srv/home/r': { hasTrustDialogAccepted: true } });
+  let reads = 0;
+  const read = (at: string) => {
+    const bytes = fs.readFileSync(at);
+    reads += 1;
+    if (reads === 1) fs.writeFileSync(at, JSON.stringify({ projects: { ...held(at).projects, '/srv/session': { lastCost: 2 } } }));
+    return bytes;
+  };
+  assert.deepEqual(claudeUntrust('/srv/home', file, read), { took: ['/srv/home/r'], refused: null });
+  assert.deepEqual(held(file).projects, { '/srv/session': { lastCost: 2 } });
+  assert.deepEqual(beside(file), ['.claude.json']);
 });

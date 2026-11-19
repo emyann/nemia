@@ -5,14 +5,14 @@
  * check writes the amended card and the report, changes no card, and each refusal writes nothing. A refusal is held by its exit and by
  * what it wrote, never by its words.
  */
-import { test, type TestContext } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
-import { CLIENT, inbox, nemia, world } from './janitor-world.ts';
+import { inbox, janitorRun as groomWorld, typed } from './janitor-world.ts';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'groom.ts');
 
@@ -78,32 +78,6 @@ function run(env: NodeJS.ProcessEnv, wf: string, repo: string, artifacts: string
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 }
 
-/** `nemia <argv>` typed by a person in the world `env`: its exit and streams. */
-const typed = (env: NodeJS.ProcessEnv, argv: string[]) => {
-  const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
-  return { code: ran.status, out: ran.stdout, err: ran.stderr };
-};
-
-/**
- * The served world (`janitor-world.ts`) with a janitor run started in the factory acme, never ticked: the run's name, which the check
- * is handed as `WF_RUN` and reads its factory by. The workflow is a folder step and its agent a stand-in, the run's subject being its
- * namespace alone.
- */
-async function groomWorld(t: TestContext) {
-  const { env, root } = await world(t);
-  fs.mkdirSync(path.join(root, 'workflows', 'janitor'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'workflows', 'janitor', 'argus.md'), '---\nplace: folder\n---\nRead the stats.\n');
-  fs.writeFileSync(path.join(root, 'workflows', 'agents', 'scout.md'), '---\nharness: claude\n---\nYou are a scout.\n');
-  nemia(env, ['factory', 'attach', 'acme', 'janitor']);
-  nemia(env, ['factory', 'hire', 'acme', 'scout', '--step', 'janitor/argus']);
-  nemia(env, ['start', 'Read the stats', '--workflows', 'janitor', '--factory', 'acme']);
-  const listed = typed(env, ['get', 'runs', '-A', '-o', 'name']);
-  const wf = listed.out.trim().replace(/^runs\//, '');
-  assert.match(wf, /^[\w-]+$/, `one run is started: ${listed.out}${listed.err}`);
-  return { env, root, wf };
-}
-
 /** What the check wrote under `artifacts`, each file by its path from there, with its text. */
 const written = (artifacts: string) =>
   Object.fromEntries(
@@ -166,6 +140,18 @@ test('the groom writes the amended card and the report, changes no card, and the
   const card = inbox(root)['move-the-reads-st4l.md'];
   assert.ok(card.trimEnd().endsWith('Move the reads to src/new.ts\n\nThe verb is `nemia ls`, at line 12.'), card);
   assert.ok(card.includes('factory: acme') && card.includes('workflow: build'), 'its frontmatter is kept');
+});
+
+test('the groom reads a factory’s listing past 1 MiB, the most Node reads from a child by default', async (t) => {
+  const { env, root, wf } = await groomWorld(t);
+  const { dir: repo } = repository();
+  const artifacts = scratch('nemia-groom-artifacts-');
+  const names = ['a-long-card-l0n1', 'a-long-card-l0n2', 'a-long-card-l0n3'];
+  for (const name of names) plant(root, name, `${name}\n\n${'a long body line\n'.repeat(25_000)}`);
+  const ran = run(env, wf, repo, artifacts, [closeoutFile({ verdicts: names.map((name) => verdict(name, 'standing')) })]);
+  assert.equal(ran.code, 0, ran.err);
+  const report = fs.readFileSync(path.join(artifacts, 'groom.md'), 'utf8');
+  for (const name of names) assert.ok(report.includes(name), `the report names ${name}`);
 });
 
 test('REFUSED: an amendment applied after the card was edited by hand exits 1 and leaves the edit', async (t) => {

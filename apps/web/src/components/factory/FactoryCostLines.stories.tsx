@@ -3,7 +3,7 @@ import { DEFAULT_NAMESPACE } from 'objects';
 import { delay, http } from 'msw';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { factoryView, FACTORY } from '../../../.storybook/fixtures/proposals';
-import { atRest } from '../../../.storybook/play';
+import { atRest, settled } from '../../../.storybook/play';
 import { FactoryCostLines } from './FactoryCostLines';
 
 /**
@@ -47,6 +47,7 @@ export const Writing: Story = {
     await userEvent.click(quick.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(quick.getByRole('button', { name: 'Writing…' })).toBeDisabled());
     await expect(quick.getByRole('button', { name: 'Writing…' }).querySelector('[data-pending]')).not.toBeNull();
+    await settled(canvasElement);
   },
 };
 

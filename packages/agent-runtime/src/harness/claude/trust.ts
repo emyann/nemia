@@ -1,8 +1,10 @@
 /**
  * Claude Code's trust of a folder: the trust a person gives by running Claude Code there once and accepting the prompt, kept per path in
- * its `.claude.json` as `projects["<path>"].hasTrustDialogAccepted`. Read by `claudeTrusts`, and written by `claudeTrust` alone, which
- * sets that one key and leaves every other as it was: the file is Claude Code's, rewritten by every session on the machine.
+ * its `.claude.json` as `projects["<path>"].hasTrustDialogAccepted`. Read by `claudeTrusts`, and written by `claudeTrust`, which sets
+ * that one key, and `claudeUntrust`, which removes the entries of a folder its caller made and is removing, each leaving every other key as
+ * it was and replacing the file only while it holds what was read: the file is Claude Code's, rewritten by every session on the machine.
  */
+import type { ClaudeKeyUnder } from '../../../contracts/trust-taken-back.contract.ts';
 import { Option, Schema } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -154,4 +156,69 @@ export function claudeTrust(key: string, file: string = claudeConfigFile(), read
     if (replaced(target, was, next.text, read)) return { wrote: true, refused: null };
   }
   return { wrote: false, refused: `${file} changed under each of ${WRITES} writes and was left as it is: ask again, or ${byHand}` };
+}
+
+/**
+ * Whether the `projects` key `key` is the folder `folder` itself or a folder inside it: the folder, then a separator and more. Proved by
+ * `contracts/trust-taken-back.contract.ts`.
+ * @param key A key of a `.claude.json`'s `projects`, as written.
+ * @param folder The folder taken back, resolved.
+ */
+export const claudeKeyUnder: ClaudeKeyUnder = (key, folder) => key === folder || key.startsWith(folder + '/');
+
+/**
+ * Whether the folder `folder` is the home directory or holds it: whose records in Claude Code's file are a person's, never taken back.
+ * @param folder The folder taken back, resolved.
+ */
+export const claudeHoldsHome = (folder: string) => claudeKeyUnder(path.resolve(os.homedir()), folder);
+
+/** What `claudeUntrustText` answers: no record under the folder, the text without them and the keys it took, or why it cannot be read. */
+type UntrustText = { readonly none: true } | { readonly text: string; readonly took: readonly string[] } | { readonly unread: string };
+
+/**
+ * The text of a `.claude.json` with every `projects` entry at or under `folder` (`claudeKeyUnder`) removed and nothing else changed,
+ * written with two spaces and the last line break the text had. Answers `none` where no entry is under it, and `unread` for a text
+ * that is no JSON object, or whose `projects` is no object. Pure.
+ * Exported only for the tests that import it.
+ * @param text The `.claude.json`'s text, as read.
+ * @param folder The folder whose records are taken back, resolved.
+ */
+export function claudeUntrustText(text: string, folder: string) {
+  const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
+  if (Option.isNone(json)) return { unread: 'it is not JSON' } satisfies UntrustText;
+  const config = record(json.value);
+  if (!config) return { unread: 'it holds no JSON object' } satisfies UntrustText;
+  if (config.projects === undefined) return { none: true } satisfies UntrustText;
+  const projects = record(config.projects);
+  if (!projects) return { unread: 'its `projects` is no object' } satisfies UntrustText;
+  const took = Object.keys(projects).filter((key) => claudeKeyUnder(key, folder));
+  if (took.length === 0) return { none: true } satisfies UntrustText;
+  const kept = Object.fromEntries(Object.entries(projects).filter(([key]) => !claudeKeyUnder(key, folder)));
+  return {
+    text: `${JSON.stringify({ ...config, projects: kept }, null, 2)}${text.endsWith('\n') ? '\n' : ''}`,
+    took,
+  } satisfies UntrustText;
+}
+
+/**
+ * Removes every `projects` entry at or under `folder` from `file` (Claude Code's `.claude.json` by default), as `claudeTrust` writes
+ * it: a file that is not there is left so, a link is followed, and the new text replaces the file only while it still holds the bytes
+ * read (`read`), starting again where it does not, five times at most. Refuses, writing nothing, a file that does not read and one
+ * that changed every time, each in words that name the file and what to do.
+ * @param folder The folder whose records are taken back, resolved.
+ * @param file The `.claude.json` to read and write; Claude Code's own (`claudeConfigFile`) unless given.
+ * @param read What reads the file's bytes, null where it is not there; the file's own bytes unless a test hands its own.
+ */
+export function claudeUntrust(folder: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf) {
+  const byHand = `remove each key of its \`projects\` at or under ${folder} by hand, or make the file read as a JSON object and ask again`;
+  for (let attempt = 0; attempt < WRITES; attempt += 1) {
+    const target = fs.existsSync(file) ? fs.realpathSync(file) : file;
+    const was = read(target);
+    if (was === null) return { took: [], refused: null };
+    const next = claudeUntrustText(was.toString('utf8'), folder);
+    if ('none' in next) return { took: [], refused: null };
+    if ('unread' in next) return { took: [], refused: `${target} was left as it is, since ${next.unread}: ${byHand}` };
+    if (replaced(target, was, next.text, read)) return { took: next.took, refused: null };
+  }
+  return { took: [], refused: `${file} changed under each of ${WRITES} writes and was left as it is: ask again, or ${byHand}` };
 }

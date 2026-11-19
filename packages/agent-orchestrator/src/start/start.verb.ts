@@ -38,6 +38,7 @@ import { CardName } from '../inbox/inbox.model.ts';
 import { inboxNameRefusal } from '../inbox/index.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
+import { trustRunHome } from '../trust/home.verb.ts';
 import { storeRootRefusal } from './store-root.ts';
 import { artifactsDir, cardsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
@@ -869,8 +870,20 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   Object.assign(run, workedSwitches(factory, run));
   const pinned = yield* pinsOf(run, steps, run.createdAt);
   if (pinned.length) run.pinned = pinned;
+  yield* homeTrusted(home, run, steps);
   yield* (yield* RunDoor).runs.create(run);
   return yield* labelled(run, inherited);
+});
+
+/**
+ * The run's home trusted by the harness of each step that starts there (`trustRunHome`), before the run is written: where it cannot be,
+ * the run's files are forgotten and the start refused `Invalid`, in words that name the harness's file and the fix.
+ */
+const homeTrusted = Effect.fnUntraced(function* (home: string, run: Run, steps: readonly StepSpec[]) {
+  const untrusted = trustRunHome(home, run, steps);
+  if (untrusted === undefined) return;
+  yield* (yield* RunDoor).runs.forget(RunId.read(run.id));
+  return yield* Effect.fail(new Invalid({ message: `${untrusted}; then start the run again. Nothing was started.` }));
 });
 
 /** Whether a start hands its run anything to copy into its inputs: a file (`--input`) or a card (`--card`). */

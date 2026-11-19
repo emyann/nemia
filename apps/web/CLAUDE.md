@@ -272,8 +272,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `test/structure.test.ts` refuses a `*.gen.ts` under `src/lib/api` and a Schema of `src` named as a kind of `objects`.
 - Every answer of the api is read through the objects' client (`call` of `lib/api/objects.ts`, with `read` or `write`), its type
   `objects`' own: no file of `src` but that one calls `fetch`, and no `Schema.Struct` of `src` has the keys of a struct `objects`
-  answers (`clientBreaks`, `test/api-files.test.ts`). Where `objects` carries a part as JSON (the capabilities' lists, a pass's phases,
-  the stats' totals) the board decodes the keys it draws from that part, saying beside it why the copy stays. The streams stay
+  answers (`clientBreaks`, `test/api-files.test.ts`). Where `objects` carries a part as JSON (a pass's phases, the stats' totals) the
+  board decodes the keys it draws from that part, saying beside it why the copy stays. The streams stay
   `EventSource`s of the same paths, each event's data decoded by `objects`' schema of it (`STEP_STREAM_SCHEMAS`,
   `CHAT_STREAM_SCHEMAS`). A file imports each read from its own file under `lib/api/`: there is no barrel.
 
@@ -307,8 +307,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
 - A read or a write decodes its answer with `objects`' schema (`call`, `lib/api/objects.ts`): every key it declares required, an unknown
   key dropped; a write says with its `may` words what to look at before sending it again, and an answer that does not decode is an
-  `UnreadAnswer`, never a refusal. A schema the board still keeps (`decodes<X>()(…)`, `lib/api/decodes.ts`) is refused at compile time
-  where its decoded type is not `X` both ways — a word left out, a `null` refused, a `?` key required, a `Schema.Any`.
+  `UnreadAnswer`, never a refusal. A schema the board still keeps gives its type (`typeof XSchema.Type`), never a type written beside it.
 - `Schema.Union` takes the first member that decodes and drops the keys it does not know: put a member that owns more keys before one it
   extends (`objects`' `StepArtifact`, `RunDecision`), and prove the order with an answer the wrong order strips.
 

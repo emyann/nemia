@@ -44,8 +44,14 @@ export const Landed: Story = {
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-next]')).not.toBeNull(),
 };
 
-/** A run that is not the first card's draws no hint. */
+/** A run that is not the first card's draws no hint: the page around it says only what it is. */
 export const NotFirst: Story = {
   args: { run: { ...runOf('awaiting approval', true), labels: { workflow: 'quick' } }, beat: 'gate' },
+  render: (args) => (
+    <section className="flex flex-col gap-2">
+      <p className="m-0 text-body-medium text-on-surface-variant">A run that is no first card&rsquo;s, at its gate.</p>
+      <FirstHint {...args} />
+    </section>
+  ),
   play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint]')).toBeNull(),
 };

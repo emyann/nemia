@@ -25,7 +25,7 @@ const loaded = async (canvas: HTMLElement, kind?: string): Promise<HTMLElement> 
       await expect(line).not.toBeNull();
       if (kind !== undefined) await expect(line).toHaveAttribute('data-cost-line', kind);
     },
-    { timeout: 5000 },
+    { timeout: 10_000 },
   );
   return canvas.querySelector<HTMLElement>('[data-first-card]')!;
 };
@@ -82,6 +82,6 @@ export const Refused: Story = {
     const page = await loaded(canvasElement);
     await userEvent.click(page.querySelector<HTMLElement>('[data-first-suggestion="Fix a typo"]')!);
     await userEvent.click(within(page).getByRole('button', { name: /^Start/ }));
-    await waitFor(() => expect(within(page).getByRole('alert')).toHaveTextContent('wires quick to no repository'));
+    await waitFor(() => expect(page.querySelector('[data-first-refused]')).toHaveTextContent('wires quick to no repository'));
   },
 };

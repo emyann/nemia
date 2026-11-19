@@ -7,7 +7,7 @@ import { FactoryTrust } from './FactoryTrust';
 const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
   name: 'acme',
   untrusted: [
-    { place: '/home/you/code/acme', harness: 'Claude Code', withheld: "the folder's own settings, hooks and MCP servers", never: null },
+    { place: '/home/you/code/acme', harness: 'the harness', withheld: "the folder's own settings, hooks and MCP servers", never: null },
   ],
   commands: {
     attach: 'nemia factory attach acme <workflow>',

@@ -3,19 +3,24 @@
  * `FeedStreamEvent`, and one whose data does not decode said on stderr by its name and left out, never read as `undefined`.
  */
 import assert from 'node:assert/strict';
-import { afterEach, test, vi } from 'vitest';
+import { test, vi } from 'vitest';
 import { type Asked, type At, onSent } from '../src/watch/watch.ts';
 
 const asked: Asked = { once: true, how: {}, selectors: [] };
 
-afterEach(() => vi.restoreAllMocks());
-
-/** What `onSent` said on stderr and stdout of `sent`, and what it answered. */
+/**
+ * What `onSent` said on stderr and stdout of `sent`, and what it answered: the spies are restored after each read, since a second spy on
+ * the same method is the first one, and would count the lines of the reads before it.
+ */
 const read = (sent: Parameters<typeof onSent>[0], at: At = { cursor: 0, hinted: false }) => {
   const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const out = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-  const answered = onSent(sent, asked, at);
-  return { answered, err: err.mock.calls.map((c) => c.join(' ')), out: out.mock.calls.map((c) => c.join(' ')), at };
+  try {
+    const answered = onSent(sent, asked, at);
+    return { answered, err: err.mock.calls.map((c) => c.join(' ')), out: out.mock.calls.map((c) => c.join(' ')), at };
+  } finally {
+    vi.restoreAllMocks();
+  }
 };
 
 test('a hint and a failed read are said on stderr from their decoded data', () => {

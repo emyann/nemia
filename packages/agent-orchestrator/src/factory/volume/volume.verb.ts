@@ -15,7 +15,7 @@ import { tried } from '../../runtime-client.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { isDirectory } from '../../record/record.store.ts';
 import { factoryVolumes, folderName, workedOn, type Factory, type FactoryTemplate, type Volume } from '../factory.ts';
-import { originSetsAt } from '../applied/applied.verb.ts';
+import { originSetsAt } from '../applied/declared.store.ts';
 import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { PlaceService } from '../../place/place.store.ts';

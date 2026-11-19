@@ -90,7 +90,7 @@ function originRefusals(held: Held): Refusal[] {
   return Object.entries(parameters).flatMap(([name, parameter]): Refusal[] => {
     if (!isMap(parameter) || parameter.whenOrigin === undefined) return [];
     const at = ['spec', 'parameters', name, 'whenOrigin'];
-    const host = String(parameter.whenOrigin);
+    const host = typeof parameter.whenOrigin === 'string' ? parameter.whenOrigin : JSON.stringify(parameter.whenOrigin);
     const messages = [
       ...(parameter.type === 'boolean'
         ? []

@@ -23,7 +23,7 @@ import {
 } from '@/lib/firstCard';
 
 /** The factory a first card is filed in: the one chosen, else the first with a writable volume, else the first of the store's. */
-const factoryOf = (factories: readonly Factory[], chosen: string | undefined): Factory | undefined => {
+const factoryFiledIn = (factories: readonly Factory[], chosen: string | undefined): Factory | undefined => {
   const own = factories.filter((f) => !f.default);
   return own.find((f) => f.name === chosen) ?? own.find((f) => f.worksOn.length > 0) ?? own[0];
 };
@@ -61,7 +61,7 @@ function useFirstStart() {
 export function FirstCard() {
   const { data: factories } = useSuspenseQuery(factoriesQuery);
   const [chosen, setChosen] = useState<string | undefined>(undefined);
-  const factory = factoryOf(factories, chosen);
+  const factory = factoryFiledIn(factories, chosen);
   const offered = factory?.workflows ?? [];
   const first = firstWorkflowOf(offered);
   const [picked, setPicked] = useState<string | undefined>(undefined);

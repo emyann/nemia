@@ -47,7 +47,7 @@ const commandsOf = (follows: boolean): FactoryCommands => ({
 });
 
 /** A factory named `name` as the api serves it, offering `workflows` and given `volumes`. */
-const factoryOf = (name: string, workflows: string[], volumes: FactoryVolume[]): Factory => ({
+const factoryFixture = (name: string, workflows: string[], volumes: FactoryVolume[]): Factory => ({
   apiVersion: 'nemia/v1',
   kind: 'Factory',
   metadata: { name, creationTimestamp: '2026-11-18T10:00:00.000Z', resourceVersion: '1' },
@@ -109,7 +109,7 @@ export const firstCardStore = ({ workflows = ['build', 'quick'], origin, landedR
         apiVersion: 'nemia/v1',
         kind: 'FactoryList',
         metadata: {},
-        items: [factoryOf('default', [], []), factoryOf(ACME, workflows, [volume])],
+        items: [factoryFixture('default', [], []), factoryFixture(ACME, workflows, [volume])],
       } satisfies FactoryList),
     ),
     http.get('/api/factories/:name/commands', () => HttpResponse.json(commandsOf(follows))),

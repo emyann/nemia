@@ -223,12 +223,28 @@ async function unlabelRun(page: Page, id: string) {
   if (store !== undefined) fs.rmSync(path.join(store, 'runs', `${id}.labels`), { force: true });
 }
 
+/** The workflows sdlc's render gives a factory made from it, which the board's first card picks quick among. */
+const SDLC_WORKFLOWS = ['build', 'intake', 'janitor', 'quick'];
+
+/**
+ * The factory `name`'s file given `workflows`, as the daemon's render of its template writes them: the worker's api ticks nothing, so a
+ * factory just made from a template offers none until a pass renders it. The factory is taken back whole at the page's end.
+ * @param name The factory's name.
+ * @param workflows The workflows its render offers.
+ */
+function rendered(name: string, workflows: readonly string[]) {
+  if (store === undefined) throw new Refused("the worker's store is not known, so the made factory's workflows cannot be written");
+  const file = path.join(store, 'factories', `${name}.json`);
+  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), workflows }, null, 2));
+}
+
 /**
  * The first card, at `/welcome/card` for the factory made: a suggestion taken, the cost line drawn above Start, and Start filing the
  * card through the real api, labelled as the first card, then starting it in quick gated at its landing, the start answered here with a
  * seeded run at a gate, whose page the board opens. The card filed is answered back in `filed`.
  */
 async function startsTheFirstCard(page: Page, filed: string[]) {
+  rendered(MADE, SDLC_WORKFLOWS);
   await page.goto(new URL('/welcome/card', page.url()).href);
   await idle(page);
   const card = page.locator('article[data-first-card="write"]');

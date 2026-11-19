@@ -41,8 +41,7 @@ export const FREE_A_SWEEP = 4;
 export type FreeMemory = { judged: Set<string>; said: Map<string, string>; turn: number };
 
 /** What a daemon's sweeps remember when it starts: nothing. */
-export const freshFreeMemory = () =>
-  ({ judged: new Set(), said: new Map(), turn: 0 }) satisfies FreeMemory satisfies FreeMemory as FreeMemory;
+export const freshFreeMemory = () => ({ judged: new Set(), said: new Map(), turn: 0 }) satisfies FreeMemory as FreeMemory;
 
 /** What one sweep did: each run it freed, as its prune answered, and each line it said of a run it left. */
 export type Freed = { readonly freed: readonly Pruning[]; readonly said: readonly string[] };

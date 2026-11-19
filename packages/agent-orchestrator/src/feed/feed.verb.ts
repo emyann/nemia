@@ -239,7 +239,7 @@ const readOn = (at: Following) =>
           ],
         ] as const),
     }),
-  ) satisfies Woken as Woken satisfies Woken as Woken;
+  ) satisfies Woken as Woken;
 
 /**
  * One wake of a reader at `at`: an item of the hub (`published`), or a beat (undefined). An item that ends at or before the cursor was

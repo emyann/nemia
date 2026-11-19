@@ -23,7 +23,7 @@ export const meteredPlace = (place: Place) =>
     declared: place.declared,
     ask: (verb, request, options) => withinEffect('place', place.ask(verb, request, options)),
     askNow: (verb, request, options) => within('place', () => place.askNow(verb, request, options)),
-  }) satisfies Place satisfies Place as Place;
+  }) satisfies Place as Place;
 
 /** The git place, metered: one object for every factory and repository of the process it is given to. */
 export const builtinGitPlace: Place = meteredPlace(gitPlace({ started: countSpawn }));

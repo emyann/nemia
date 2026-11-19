@@ -126,7 +126,7 @@ const stepFollower = () => {
       unread: 'The conversation could not be read.',
       refused: 'The api refused to follow this conversation any further. Reload the page to read it again.',
     },
-  } satisfies Follower<Following, Change> satisfies Follower<Following, Change> as Follower<Following, Change>;
+  } satisfies Follower<Following, Change> as Follower<Following, Change>;
 };
 
 /**

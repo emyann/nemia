@@ -111,4 +111,4 @@ export const boardOf = (files: BoardFiles) =>
       return sent(c, files, file, segments[0] === 'assets' ? 'public, max-age=31536000, immutable' : 'no-cache');
     if (segments[0] === 'assets') return c.notFound();
     return sent(c, files, index, 'no-cache');
-  }) satisfies Handler<ApiEnv> satisfies Handler<ApiEnv> as Handler<ApiEnv>;
+  }) satisfies Handler<ApiEnv> as Handler<ApiEnv>;

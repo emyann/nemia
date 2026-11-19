@@ -145,7 +145,7 @@ function ledgerIn(dir: string) {
         return revisionNow(of(at), hash, when);
       },
     },
-  } satisfies LedgerLayer satisfies LedgerLayer as LedgerLayer;
+  } satisfies LedgerLayer as LedgerLayer;
 }
 
 /**

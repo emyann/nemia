@@ -544,7 +544,8 @@ const anys = (record: string, configs: string[]) => {
         if (/\bany\b/.test(inferred) && !/\bany\b/.test(entry.declared)) {
           const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
           console.log(`${entry.file}:${line} ${entry.name} ${entry.declared} -> ${inferred}`);
-          if (process.env.FIX === '1' && /^[A-Za-z_$][\w$]*$/.test(entry.name) && !['try', 'of'].includes(entry.name)) fixes.push([entry.file, entry.name, entry.declared]);
+          if (process.env.FIX === '1' && /^[A-Za-z_$][\w$]*$/.test(entry.name) && !['try', 'of'].includes(entry.name))
+            fixes.push([entry.file, entry.name, entry.declared]);
         }
       }
     }
@@ -575,6 +576,7 @@ const pin = (site: string, type: string, upcast: boolean) => {
     }
     const pinned = isAsync(node) ? (/^Promise<([\s\S]*)>$/.exec(type)?.[1] ?? type) : type;
     for (const value of values) {
+      if (ts.isSatisfiesExpression(value) || ts.isAsExpression(value)) continue;
       const start = value.getStart(source);
       const bare =
         ts.isParenthesizedExpression(value) ||
@@ -608,9 +610,19 @@ const unkeep = (file: string, line: number) => {
   });
   if (node === undefined) throw new Error(`${file}:${line}: no function under the disable`);
   const from = closeParenOf(node, source)!;
-  const start = text.split('\n').slice(0, line - 1).join('\n').length + (line > 1 ? 1 : 0);
+  const start =
+    text
+      .split('\n')
+      .slice(0, line - 1)
+      .join('\n').length + (line > 1 ? 1 : 0);
   const end = start + lines[line - 1]!.length + 1;
-  writeFileSync(file, apply(text, [{ start: from.getEnd(), end: node.type!.getEnd(), text: '' }, { start, end, text: '' }]));
+  writeFileSync(
+    file,
+    apply(text, [
+      { start: from.getEnd(), end: node.type!.getEnd(), text: '' },
+      { start, end, text: '' },
+    ]),
+  );
 };
 
 const [mode, record, ...rest] = process.argv.slice(2);

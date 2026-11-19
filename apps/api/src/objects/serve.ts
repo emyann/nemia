@@ -236,7 +236,5 @@ export function mount(runtime: ApiRuntime) {
     const kind = c.req.method === 'GET' ? listAt(new URL(c.req.url).pathname) : undefined;
     if (kind === undefined) return handed(c);
     return (kind === 'RunList' || kind === 'EventList' ? watched[kind] : watched.plain)(c);
-  }) satisfies (c: RequestContext<ApiEnv>) => Promise<Response> satisfies (c: RequestContext<ApiEnv>) => Promise<Response> as (
-    c: RequestContext<ApiEnv>,
-  ) => Promise<Response>;
+  }) satisfies (c: RequestContext<ApiEnv>) => Promise<Response> as (c: RequestContext<ApiEnv>) => Promise<Response>;
 }

@@ -84,7 +84,7 @@ export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []
     const edge = e.packet && plain.data ? { ...plain, data: { ...plain.data, packet: e.packet } } : plain;
     const labelled = e.label ? { ...edge, label: e.label } : edge;
     return e.kind === 'loop' ? { ...labelled, sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : labelled;
-  }) satisfies StateFlowEdge[] satisfies StateFlowEdge[] as StateFlowEdge[];
+  }) satisfies StateFlowEdge[] as StateFlowEdge[];
 }
 
 /**
@@ -114,5 +114,5 @@ export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: strin
     className: 'context-edge',
     selectable: false,
     focusable: false,
-  })) satisfies StateFlowEdge[] satisfies StateFlowEdge[] as StateFlowEdge[];
+  })) satisfies StateFlowEdge[] as StateFlowEdge[];
 }

@@ -30,9 +30,7 @@ export const declarationOf = (harness: string | undefined) => {
  * How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const rulesOf = (harness: string | undefined) =>
-  declarationOf(harness)
-    ?.rules satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'] satisfies HarnessDeclaration['rules'] as HarnessDeclaration['rules'];
+export const rulesOf = (harness: string | undefined) => declarationOf(harness)?.rules;
 
 /**
  * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`

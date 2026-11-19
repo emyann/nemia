@@ -153,10 +153,7 @@ export const stepPage = (bar: Extract<Bar, { kind: 'spec' }>, place: PagePlace =
     to: '/workflows/$from/$workflow/$step',
     params: { from: bar.from, workflow: bar.workflow, step: bar.step },
     search: place,
-  }) satisfies Extract<BarPage, { search: PagePlace }> satisfies Extract<BarPage, { search: PagePlace }> as Extract<
-    BarPage,
-    { search: PagePlace }
-  >;
+  }) satisfies Extract<BarPage, { search: PagePlace }> as Extract<BarPage, { search: PagePlace }>;
 
 /**
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
@@ -171,23 +168,23 @@ export function barOpens(bar: Bar, place: PagePlace = {}) {
       return {
         to: '/factories/$factory',
         params: { factory: bar.factory },
-      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
+      } satisfies BarPage | null as BarPage | null;
     case 'run':
       return {
         to: '/runs/$runId',
         params: { runId: bar.run },
-      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
+      } satisfies BarPage | null as BarPage | null;
     case 'step':
       return {
         to: '/runs/$runId/steps/$step',
         params: { runId: bar.run, step: bar.step },
-      } satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
+      } satisfies BarPage | null as BarPage | null;
     case 'spec':
-      return stepPage(bar, place) satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
+      return stepPage(bar, place) satisfies BarPage | null as BarPage | null;
     case 'start':
     case 'gauges':
     case 'waiting':
-      return null satisfies BarPage | null as BarPage | null satisfies BarPage | null as BarPage | null;
+      return null satisfies BarPage | null as BarPage | null;
   }
 }
 

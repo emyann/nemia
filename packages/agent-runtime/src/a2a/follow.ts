@@ -65,7 +65,7 @@ const artifactUpdate = (taskId: string, artifactId: string, name: string, conten
         metadata: undefined,
       },
     },
-  }) satisfies StreamResponse satisfies StreamResponse as StreamResponse;
+  }) satisfies StreamResponse as StreamResponse;
 
 /** One moment of a followed session as what `SubscribeToTask` answers of the Task `taskId`. */
 const responseOf = (taskId: string, m: Followed) => {
@@ -80,7 +80,7 @@ const responseOf = (taskId: string, m: Followed) => {
           metadata: undefined,
         },
       },
-    } satisfies StreamResponse satisfies StreamResponse as StreamResponse;
+    } satisfies StreamResponse as StreamResponse;
   if (m.kind === 'events')
     return artifactUpdate(
       taskId,
@@ -89,7 +89,7 @@ const responseOf = (taskId: string, m: Followed) => {
       { $case: 'data', value: { events: m.events, cursor: m.cursor } },
       true,
       false,
-    ) satisfies StreamResponse satisfies StreamResponse as StreamResponse;
+    ) satisfies StreamResponse as StreamResponse;
   return artifactUpdate(
     taskId,
     m.key,
@@ -97,7 +97,7 @@ const responseOf = (taskId: string, m: Followed) => {
     { $case: 'text', value: m.text },
     m.append,
     m.last,
-  ) satisfies StreamResponse satisfies StreamResponse as StreamResponse;
+  ) satisfies StreamResponse as StreamResponse;
 };
 
 /**

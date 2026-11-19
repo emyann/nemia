@@ -2,7 +2,7 @@ import type { RunView } from '@/lib/api/judged';
 import type { RunGraph } from '@/lib/api/graph';
 import type { WaitOn } from 'objects';
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
-import { flowSteps, graphOf, type GraphLine, type GraphPoint } from '@/lib/flow';
+import { flowSteps, graphOf, type GraphGate, type GraphLine, type GraphPoint } from '@/lib/flow';
 import type { Frozen } from '@/lib/frozen';
 import { paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
@@ -54,7 +54,7 @@ function Named({ name, named, mark, x, y }: { name: string; named?: StepNamed; m
 type GraphStep = Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'note' | 'roundDue'>;
 
 /** The run the graph draws: its steps, its graph, its gates, when it was called off and its hold. */
-type GraphRun = { steps: readonly GraphStep[]; graph: Frozen<RunGraph>; gates: readonly string[]; cancelledAt: string | null } & {
+type GraphRun = { steps: readonly GraphStep[]; graph: Frozen<RunGraph>; gates: readonly GraphGate[]; cancelledAt: string | null } & {
   holding?: RunView['holding'];
 };
 
@@ -169,15 +169,15 @@ function Told({ said, children }: { said: string; children: ReactNode }) {
 }
 
 /**
- * A run's steps as its workflow's graph drawn small (`graphOf`), `width` wide, 24 high for a row or a fork: each step a cut diamond by
- * its mark (`stepMark`, a step at work or waiting on you a size larger, at work with a slow pulse), a route a dot, a line solid where the
- * run has gone and dashed ahead, a loop under the row at right angles, violet once gone round, a gate a tick before its step, yellow
- * where that step waits on you. Past what its width holds the columns away from where the run is fold into a count. Read aloud as one
- * group, each step and its word (`railSaid`). With `wrap`, each node is put inside what it gives (a button that opens the step);
- * without, each says its name and word in the kit's tooltip. A run listed without its graph says what to do (`UNGRAPHED`). `width` is
- * 188 pixels by default; `className` is the box's, `nodrag` on the floor. With `named`, each step is named under its node in small caps,
- * its agent and what `named` says of it (its time and cost) under that, a fork's lanes one row each in their order (`namedRows`), and the
- * box is that much taller.
+ * A run's steps as its workflow's graph drawn small (`graphOf`), `width` wide, 24 high for a row or a fork: each step a cut diamond by its
+ * mark (`stepMark`, a step at work or waiting on you a size larger, at work with a slow pulse), a route a dot, a line solid where the run
+ * has gone and dashed ahead, a loop under the row at right angles, violet once gone round, a gate a tick on the side of its step its
+ * approval is (after a step whose closeout waits, before an ending approved first), yellow where that step waits on you. Past what its
+ * width holds the columns away from where the run is fold into a count. Read aloud as one group, each step and its word (`railSaid`). With
+ * `wrap`, each node is put inside what it gives (a button that opens the step); without, each says its name and word in the kit's tooltip.
+ * A run listed without its graph says what to do (`UNGRAPHED`). `width` is 188 pixels by default; `className` is the box's, `nodrag` on
+ * the floor. With `named`, each step is named under its node in small caps, its agent and what `named` says of it (its time and cost)
+ * under that, a fork's lanes one row each in their order (`namedRows`), and the box is that much taller.
  */
 export function StepGraph({
   run,
@@ -244,7 +244,7 @@ export function StepGraph({
   );
 }
 
-/** The graph's lines under its nodes, and each gate's tick before its step, yellow where that step waits on you. */
+/** The graph's lines under its nodes, and each gate's tick on the side of its step its approval is, yellow where that step waits on you. */
 function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: ReadonlyMap<string, { mark: StepMark }> }) {
   return (
     <svg
@@ -260,6 +260,7 @@ function Lines({ layout, at }: { layout: ReturnType<typeof graphOf>; at: Readonl
         <line
           key={gate.step}
           data-gate={gate.step}
+          data-gate-at={gate.at}
           x1={gate.x}
           x2={gate.x}
           y1={gate.y - 5.5}

@@ -64,10 +64,10 @@ export type CallerOf =
   | { readonly kind: 'refused'; readonly reason: TokenRefusal };
 
 /** Whether `output` is a refusal for `reason`. */
-const refusedFor = (output: CallerOf, reason: TokenRefusal): boolean => output.kind === 'refused' && output.reason === reason;
+const refusedFor = (output: CallerOf, reason: TokenRefusal) => output.kind === 'refused' && output.reason === reason;
 
 /** A token presented that is no standing one: a session's, or one the store never minted. */
-const sessionSide = (presented: boolean, standing: StandingRecord | null): boolean => presented && standing === null;
+const sessionSide = (presented: boolean, standing: StandingRecord | null) => presented && standing === null;
 
 const callerOfSpec = spec<
   (presented: boolean, need: TokenNeed, standing: StandingRecord | null, record: TokenRecord | null, live: boolean) => CallerOf

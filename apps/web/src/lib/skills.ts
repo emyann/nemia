@@ -1,6 +1,6 @@
 import type { DefinitionOrigin } from 'objects';
 import type { GivenSkill, SkillCost, SkillSource } from './api/library.ts';
-import type { SkillDetail, SkillDraft, SkillPlace, SkillRow, SkillUser } from './api/skills.ts';
+import type { SkillDetail, SkillPlace, SkillRow, SkillUser } from './api/skills.ts';
 
 /** What each place of skills is called on the board. */
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
@@ -23,7 +23,7 @@ export const SOURCE_BADGES: Readonly<Record<SkillSource, string>> = {
  * and its body only in a turn that loads it; preloaded, the whole of it every turn, cached as Claude Code's own prompt is.
  * @param cost What the skill costs a turn, in tokens, and whether it is preloaded.
  */
-export function costWords(cost: SkillCost): string {
+export function costWords(cost: SkillCost) {
   if (cost.preload) return `loaded every turn — about ${cost.perTurn.toLocaleString('en')} tokens (cached)`;
   return `named — about ${cost.listed.toLocaleString('en')} tokens a turn, and about ${cost.body.toLocaleString('en')} more in a turn that loads it`;
 }
@@ -36,7 +36,7 @@ export function costWords(cost: SkillCost): string {
  * @param given The skills as the agent was read.
  * @param places The picker's list of where an agent of yours finds skills, or undefined while it is not read.
  */
-export function givenRows(names: readonly string[], given: readonly GivenSkill[], places: readonly SkillPlace[] | undefined): GivenSkill[] {
+export function givenRows(names: readonly string[], given: readonly GivenSkill[], places: readonly SkillPlace[] | undefined) {
   const found = (places ?? []).filter((place) => place.from !== 'builtin').flatMap((place) => place.skills);
   return names.map((name) => {
     const row = found.find((skill) => skill.name === name);
@@ -65,10 +65,11 @@ type SkillOffer =
  * @param row The skill as the picker's list has it.
  * @param given The names of the skills the form gives already.
  */
-export function offerOf(row: SkillRow, given: readonly string[]): SkillOffer {
-  if (row.error !== null || row.entry === null) return { kind: 'refused', why: row.error ?? 'Its SKILL.md does not read.' };
-  if (row.from === 'builtin') return row.found ? { kind: 'found', where: row.found } : { kind: 'copy' };
-  return given.includes(row.name) ? { kind: 'given' } : { kind: 'add' };
+export function offerOf(row: SkillRow, given: readonly string[]) {
+  if (row.error !== null || row.entry === null)
+    return { kind: 'refused', why: row.error ?? 'Its SKILL.md does not read.' } satisfies SkillOffer;
+  if (row.from === 'builtin') return (row.found ? { kind: 'found', where: row.found } : { kind: 'copy' }) satisfies SkillOffer;
+  return (given.includes(row.name) ? { kind: 'given' } : { kind: 'add' }) satisfies SkillOffer;
 }
 
 /**
@@ -85,7 +86,7 @@ export const EMPTY_SKILL_FORM: SkillForm = { name: '', title: '', description: '
  * fallbacks. A skill whose SKILL.md does not read has no draft: its form holds its name and its instructions, so it can be mended.
  * @param detail The skill's page as read: the skill, its draft where its file reads, and its instructions.
  */
-export function skillFormOf(detail: Pick<SkillDetail, 'skill' | 'draft' | 'body'>): SkillForm {
+export function skillFormOf(detail: Pick<SkillDetail, 'skill' | 'draft' | 'body'>) {
   const { draft } = detail;
   if (!draft) return { ...EMPTY_SKILL_FORM, name: detail.skill.name, body: detail.body };
   return {
@@ -98,7 +99,7 @@ export function skillFormOf(detail: Pick<SkillDetail, 'skill' | 'draft' | 'body'
   };
 }
 
-const lines = (text: string): string[] | null => {
+const lines = (text: string) => {
   const each = text
     .split('\n')
     .map((line) => line.trim())
@@ -112,7 +113,7 @@ const lines = (text: string): string[] | null => {
  * own.
  * @param form The form as typed.
  */
-export function draftOfForm(form: SkillForm): SkillDraft {
+export function draftOfForm(form: SkillForm) {
   return {
     name: form.name.trim(),
     title: form.title.trim() || null,
@@ -128,7 +129,7 @@ export function draftOfForm(form: SkillForm): SkillDraft {
  * @param form The form as typed now.
  * @param was The form as it was filled.
  */
-export function skillEdited(form: SkillForm, was: SkillForm): boolean {
+export function skillEdited(form: SkillForm, was: SkillForm) {
   return JSON.stringify(draftOfForm(form)) !== JSON.stringify(draftOfForm(was));
 }
 
@@ -137,7 +138,7 @@ export function skillEdited(form: SkillForm, was: SkillForm): boolean {
  * about four characters a token, loaded every turn and cached as Claude Code's own prompt is; off, only its name and what it does.
  * @param cost What the skill costs a turn, in tokens, and whether it is preloaded now.
  */
-export function preloadWords(cost: SkillCost): string {
+export function preloadWords(cost: SkillCost) {
   if (cost.preload) return 'Off, a session is told only its name and what it does, and loads it when it needs it.';
   return `On, its instructions are loaded every turn too — about ${cost.body.toLocaleString('en')} tokens more a turn, cached.`;
 }
@@ -146,7 +147,7 @@ export function preloadWords(cost: SkillCost): string {
  * Who a change of the skill — its switch included — reaches: every agent that gives it, by name, from the next run started; or none yet.
  * @param users The agents that give the skill.
  */
-export function reachWords(users: readonly SkillUser[]): string {
+export function reachWords(users: readonly SkillUser[]) {
   if (!users.length) return 'No agent gives it yet: a change reaches none.';
   const names = users.map((user) => (user.from === 'repo' ? `${user.name} (this repository)` : user.name));
   return `A change, this switch included, changes every agent that gives it, from its next run: ${names.join(', ')}.`;
@@ -161,6 +162,6 @@ export function reachWords(users: readonly SkillUser[]): string {
  * @param now The skill as read now.
  * @param changed Whether the form holds unsaved words.
  */
-export function drawnSkill(drawn: SkillDetail, now: SkillDetail, changed: boolean): SkillDetail {
-  return drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir ? now : drawn;
+export function drawnSkill(drawn: SkillDetail, now: SkillDetail, changed: boolean) {
+  return (drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir ? now : drawn) satisfies SkillDetail;
 }

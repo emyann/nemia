@@ -27,7 +27,7 @@ type Hold = { unstreamed: boolean };
  * The step `step` of the run `runId` as it stands (`StepNow`): its record's task, that task's last attempt, whether the journal has its
  * end, and whether the task settled. Refused (`Missing`) for a run the store has not and for a step with no task filed.
  */
-const stepNowOf = (e: Engine, runId: string, step: string): Effect.Effect<StepNow, Refusal> =>
+const stepNowOf = (e: Engine, runId: string, step: string) =>
   Effect.gen(function* () {
     const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
     const taskId = run.steps[step]?.taskId ?? null;
@@ -48,7 +48,7 @@ const stepNowOf = (e: Engine, runId: string, step: string): Effect.Effect<StepNo
  * again after it dropped. A harness that does not stream, or a session it refuses to follow, ends it with `streamed: false`, said in
  * `hold`; anything else it fails with, it dies of.
  */
-const attemptOf = (e: Engine, taskId: string, history: { after?: string } | undefined, hold: Hold): Stream.Stream<Moment> => {
+const attemptOf = (e: Engine, taskId: string, history: { after?: string } | undefined, hold: Hold) => {
   const unstreamed = Stream.sync(() => {
     hold.unstreamed = true;
     return UNSTREAMED;
@@ -58,12 +58,15 @@ const attemptOf = (e: Engine, taskId: string, history: { after?: string } | unde
       ? live
       : live.pipe(
           Stream.mapAccumEffect(
-            (): Set<string> | undefined => undefined,
-            (seen, m): Effect.Effect<readonly [Set<string>, Moment[]]> => {
-              if (seen) return Effect.succeed([seen, m.kind === 'events' ? unseen(m, seen) : [m]] as const);
+            () => undefined satisfies Set<string> | undefined as Set<string> | undefined,
+            (seen, m) => {
+              if (seen)
+                return Effect.succeed([seen, m.kind === 'events' ? unseen(m, seen) : [m]] as const) satisfies Effect.Effect<
+                  readonly [Set<string>, Moment[]]
+                >;
               return asked('transcript', e.transcript(taskId, history.after)).pipe(
                 Effect.map((h) => [new Set(h.events.map(markOf)), h.events.length ? [m, { kind: 'events' as const, ...h }] : [m]] as const),
-              );
+              ) satisfies Effect.Effect<readonly [Set<string>, Moment[]]>;
             },
           ),
         );
@@ -77,14 +80,14 @@ const attemptOf = (e: Engine, taskId: string, history: { after?: string } | unde
             : told(live.pipe(Stream.catchTag('RunnerError', (err) => (err.refused ? unstreamed : Stream.die(err))))),
       ),
     ),
-  );
+  ) satisfies Stream.Stream<Moment>;
 };
 
 /**
  * Whether the harness of `taskId` streams, as the runtime's `follow` answers before it follows anything: `streamed`, or no, said in `hold`
  * too, for a harness without it. Follows nothing: the task's last attempt may have ended, or there may be none yet.
  */
-const streamedOf = (e: Engine, taskId: string, hold: Hold): Stream.Stream<Moment> =>
+const streamedOf = (e: Engine, taskId: string, hold: Hold) =>
   Stream.fromEffect(
     asked(
       'follow',
@@ -101,10 +104,10 @@ const streamedOf = (e: Engine, taskId: string, hold: Hold): Stream.Stream<Moment
   );
 
 /** An event as one following tells it from another: its kind and its id, since a call's result carries the call's id. */
-const markOf = (ev: TranscriptEvent): string => `${ev.kind} ${ev.id}`;
+const markOf = (ev: TranscriptEvent) => `${ev.kind} ${ev.id}`;
 
 /** The whole events of `m` not in `seen`, as one moment, none when all were: each then counted seen. */
-const unseen = (m: Extract<Moment, { kind: 'events' }>, seen: Set<string>): Moment[] => {
+const unseen = (m: Extract<Moment, { kind: 'events' }>, seen: Set<string>) => {
   const fresh = m.events.filter((ev) => !seen.has(markOf(ev)));
   for (const ev of fresh) seen.add(markOf(ev));
   return fresh.length ? [{ ...m, events: fresh }] : [];
@@ -123,7 +126,7 @@ const wokenBy = (runId: string, step: string, cursor: number, then: (cursor: num
   );
 
 /** `moved` to the task `taskId`. */
-const movedTo = (taskId: string): Moment => ({ kind: 'moved', taskId });
+const movedTo = (taskId: string) => ({ kind: 'moved', taskId }) satisfies Moment;
 
 /**
  * What a following reads with and holds: the engine, how the followed thing stands now (`now`), how a wait for it to move ends (`woken`,
@@ -142,6 +145,7 @@ type Onward = {
  * first — then a wait (`o.woken`) from `cursor`, and a read again; a wait first where `nextOf` says so; `settled` and the end once it has
  * finished. Nothing after a refusal to stream (`Hold`).
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const onward = (o: Onward, at: FollowedAttempt | undefined, cursor: number, read?: StepNow): Stream.Stream<Moment, Refusal> =>
   Stream.unwrap(
     Effect.gen(function* () {
@@ -175,7 +179,7 @@ const onward = (o: Onward, at: FollowedAttempt | undefined, cursor: number, read
  * @param step The step's name.
  * @param after A cursor a read of the step's transcript gave, or undefined to follow from now.
  */
-export const followStep = (runId: string, step: string, after?: string): Stream.Stream<Moment, Refusal, EngineService> =>
+export const followStep = (runId: string, step: string, after?: string) =>
   Stream.unwrap(
     Effect.gen(function* () {
       const e = yield* EngineService;
@@ -190,13 +194,13 @@ export const followStep = (runId: string, step: string, after?: string): Stream.
       };
       return followedFrom(o, now, cursor);
     }),
-  );
+  ) satisfies Stream.Stream<Moment, Refusal, EngineService>;
 
 /**
  * The following `o` from where `now` found it, the wait's cursor `cursor`: `streamed` first, said once whatever opens it — the harness
  * asked where there is nothing live to follow yet — then `onward`.
  */
-const followedFrom = (o: Onward, now: StepNow, cursor: number): Stream.Stream<Moment, Refusal> => {
+const followedFrom = (o: Onward, now: StepNow, cursor: number) => {
   const { taskId } = now;
   const seen = taskId !== null && now.attempt > 0 && !now.live ? { taskId, attempt: now.attempt } : undefined;
   const opened = taskId !== null && nextOf(seen, now) === 'wait' ? streamedOf(o.e, taskId, o.hold) : Stream.empty;
@@ -206,16 +210,16 @@ const followedFrom = (o: Onward, now: StepNow, cursor: number): Stream.Stream<Mo
   ).pipe(
     Stream.mapAccum(
       () => true,
-      (first, m): readonly [boolean, Moment[]] => [false, first && m.kind !== 'streamed' ? [STREAMED, m] : [m]],
+      (first, m) => [false, first && m.kind !== 'streamed' ? [STREAMED, m] : [m]] satisfies readonly [boolean, Moment[]],
     ),
-  );
+  ) satisfies Stream.Stream<Moment, Refusal>;
 };
 
 /** How long a task's following waits before it reads the task's view again, between its attempts (`followTask`). */
 export const TASK_WAIT_MS = 1000;
 
 /** The task `taskId` as it stands (`StepNow`), off its view: its last attempt, whether that is live, and whether it settled. */
-const taskNowOf = (e: Engine, taskId: string): Effect.Effect<StepNow> =>
+const taskNowOf = (e: Engine, taskId: string) =>
   asked('view', e.view(taskId)).pipe(
     Effect.map((view) => {
       const last = view.state.attempts.at(-1);
@@ -233,11 +237,7 @@ const taskNowOf = (e: Engine, taskId: string): Effect.Effect<StepNow> =>
  * @param taskId The task's id.
  * @param after A cursor a read of the task's transcript gave, or undefined to follow from now.
  */
-export const followTask = (
-  taskId: string,
-  after?: string,
-  { waitMs = TASK_WAIT_MS }: { readonly waitMs?: number } = {},
-): Stream.Stream<Moment, Refusal, EngineService> =>
+export const followTask = (taskId: string, after?: string, { waitMs = TASK_WAIT_MS }: { readonly waitMs?: number } = {}) =>
   Stream.unwrap(
     Effect.gen(function* () {
       const e = yield* EngineService;
@@ -251,4 +251,4 @@ export const followTask = (
       };
       return followedFrom(o, now, 0);
     }),
-  );
+  ) satisfies Stream.Stream<Moment, Refusal, EngineService>;

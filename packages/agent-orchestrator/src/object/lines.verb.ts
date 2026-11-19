@@ -5,7 +5,6 @@
  */
 import { commandLine, type CommandSpec } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
-import type { Served } from '../command/entry.verb.ts';
 import { fromNote } from '../start/index.ts';
 import type { Run } from '../record/record.ts';
 
@@ -13,7 +12,7 @@ import type { Run } from '../record/record.ts';
  * The command of the table (`COMMANDS`) named `name`: thrown as this module loads when the table holds none by that name, so a name the
  * table renamed is a failed start, not a page that fails as it is read.
  */
-function named(name: string): Served {
+function named(name: string) {
   const command = COMMANDS.find((c) => c.name === name);
   if (command === undefined) throw new Error(`No command '${name}' in the orchestrator's table (COMMANDS): name one it holds.`);
   return command;
@@ -38,14 +37,14 @@ const DECIDE: Pick<CommandSpec, 'name' | 'spec'> = {
  * The line that prints what there is to decide on a run: `nemia decide <run>`.
  * @param runId The run's id, said as the line's run.
  */
-export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });
+export const decideLine = (runId: string) => commandLine(DECIDE, { runId });
 
 /**
  * The line that takes the new revisions of every kind a run resolved: `nemia refresh <run>`, the run alone — the step refresh takes is
  * `--base`'s (`nemia refresh <run> [<step>] --base`), which this line does not ask, so it is not said, not even as `[<step>]`.
  * @param runId The run's id, said as the line's run.
  */
-export const refreshLine = (runId: string): string =>
+export const refreshLine = (runId: string) =>
   commandLine(
     { name: REFRESH.name, spec: { ...REFRESH.spec, positionals: REFRESH.spec.positionals.filter((p) => p.key === 'runId') } },
     { runId },
@@ -59,7 +58,7 @@ export type StepCommands = { approve: string; retry: string; say: string };
  * @param runId The run's id, said in each line.
  * @param step The step's name, said in each line.
  */
-export const stepCommands = (runId: string, step: string): StepCommands => ({
+export const stepCommands = (runId: string, step: string) => ({
   approve: commandLine(APPROVE, { runId, step }),
   retry: commandLine(RETRY, { runId, step }),
   say: commandLine(SAY, { runId, step }),
@@ -78,7 +77,7 @@ export type RunLines = {
  * (a record with no frozen workflow names its steps there alone).
  * @param run The run's record, its id, frozen workflow and steps read.
  */
-export const runLines = (run: Run): RunLines => {
+export const runLines = (run: Run) => {
   const names = [...new Set([...(run.workflow ?? []).map((s) => s.name), ...Object.keys(run.steps)])];
   return {
     decide: decideLine(run.id),

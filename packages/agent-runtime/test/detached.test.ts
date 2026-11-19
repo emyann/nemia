@@ -1091,7 +1091,7 @@ describe('a composite of harnesses routes every verb to the harness that owns th
     const plain = { ...testOps({ sessions: new Map() }), observe: failing('observe') };
     const blind = composite({ alpha: testOps({ sessions: a }), beta: broken, gamma: plain }, 'alpha');
     const o = await Effect.runPromise(
-      blind.observeFor!([
+      blind.observeFor([
         { name: 'ae/x/1', harness: 'alpha' },
         { name: 'ae/w/1', harness: 'alpha' },
         { name: 'ae/y/1', harness: 'beta' },
@@ -1175,7 +1175,7 @@ const refusedClaudeRun = async (lines: string[], words: string) => {
     { name: 'ae/j0/1', harness: 'claude' },
     { name: 'ae/x/1', harness: 'alpha' },
   ];
-  const working = await Effect.runPromise(ops.observeFor!(expected));
+  const working = await Effect.runPromise(ops.observeFor(expected));
   assert.deepEqual(working.unread, new Set(['ae/j1/1']), 'at work: neither there nor gone, never a job that said nothing');
   assert.deepEqual([...working.seen.keys()].sort(), ['ae/j0/1', 'ae/x/1']);
 
@@ -1191,7 +1191,7 @@ const refusedClaudeRun = async (lines: string[], words: string) => {
     `claude: \`ae/j1/1\`'s output, ${log}, cannot be read: ${words} It is unread while its process runs, and read as failed once it` +
       ' has ended; the other sessions of claude are read. Once its task has settled, `ae forget` lets this session go.',
   ]);
-  const ended = await Effect.runPromise(ops.observeFor!(expected));
+  const ended = await Effect.runPromise(ops.observeFor(expected));
   assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
   assert.equal(ended.seen.get('ae/j1/1')?.state, 'failed');
 };
@@ -1255,14 +1255,14 @@ describe('observe: a run whose output does not decode is unread while it works a
       { name: 'ae/c2/1', harness: 'codex' },
       { name: 'ae/x/1', harness: 'alpha' },
     ];
-    const working = await Effect.runPromise(ops.observeFor!(expected));
+    const working = await Effect.runPromise(ops.observeFor(expected));
     assert.deepEqual([...working.seen.keys()], ['ae/x/1']);
     assert.deepEqual(working.unread, new Set(['ae/c2/1']), 'neither there nor gone');
     assert.deepEqual([...(working.unreadWhy?.keys() ?? [])], ['ae/c2/1'], 'why, as its harness said it, through the composite');
     assert.ok(working.unreadWhy?.get('ae/c2/1')?.includes(log), working.unreadWhy?.get('ae/c2/1'));
 
     codexRun(dir, 'ae/c2/1', bad);
-    const ended = await Effect.runPromise(ops.observeFor!(expected));
+    const ended = await Effect.runPromise(ops.observeFor(expected));
     assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
     assert.equal(ended.seen.get('ae/c2/1')?.state, 'failed');
     assert.equal(ended.seen.get('ae/x/1')?.state, 'working');
@@ -1316,7 +1316,7 @@ describe('observe: a run whose output does not decode is unread while it works a
     const other = new Map<string, Sighting>([['ae/o/1', { sessionId: 'o', state: 'working' }]]);
     const both = composite({ sh: ops, other: testOps({ sessions: other }) }, 'other');
     const told = await Effect.runPromise(
-      both.observeFor!([
+      both.observeFor([
         { name: 'ae/w/1', harness: 'sh' },
         { name: 'ae/o/1', harness: 'other' },
       ]),

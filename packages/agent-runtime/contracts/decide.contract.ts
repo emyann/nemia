@@ -58,10 +58,10 @@ export const edges = assume(transition, {
 });
 
 /** A moment as the runtime stamps one: whole milliseconds, after 1970 and before 2^52 of them. */
-const stamped = (ms: number): boolean => Number.isInteger(ms) && ms >= 0 && ms <= 2 ** 52;
-const monoStamped = (m: Monotonic | undefined): boolean => m === undefined || stamped(m.ms);
-const wallStamped = (at: string | null | undefined): boolean => at === null || at === undefined || stamped(Date.parse(at));
-const attemptStamped = (a: Attempt): boolean =>
+const stamped = (ms: number) => Number.isInteger(ms) && ms >= 0 && ms <= 2 ** 52;
+const monoStamped = (m: Monotonic | undefined) => m === undefined || stamped(m.ms);
+const wallStamped = (at: string | null | undefined) => at === null || at === undefined || stamped(Date.parse(at));
+const attemptStamped = (a: Attempt) =>
   wallStamped(a.startedAt) &&
   monoStamped(a.startedMono) &&
   wallStamped(a.spawnedAt) &&
@@ -76,7 +76,7 @@ const attemptStamped = (a: Attempt): boolean =>
   monoStamped(a.releasedMono);
 
 /** The last attempt, while it has not ended. */
-const inFlight = (state: State): Attempt | undefined => {
+const inFlight = (state: State) => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.ended === null ? last : undefined;
 };

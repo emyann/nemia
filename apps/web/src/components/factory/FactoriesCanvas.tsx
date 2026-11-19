@@ -33,7 +33,7 @@ const REVEAL_MIN_ZOOM = 0.4;
  * none selected, each named for a screen reader. React Flow takes the pointer off a node that is neither, so each is given it back: a block
  * is pressed.
  */
-const nodesOf = (blocks: readonly FactoryBlock[], inspected: string | null): FactoryFlowNode[] =>
+const nodesOf = (blocks: readonly FactoryBlock[], inspected: string | null) =>
   blocks.map((block, i) => ({
     id: block.name,
     type: 'factory',
@@ -46,10 +46,10 @@ const nodesOf = (blocks: readonly FactoryBlock[], inspected: string | null): Fac
     draggable: false,
     selectable: false,
     style: { pointerEvents: 'all' },
-  }));
+  })) satisfies FactoryFlowNode[];
 
 /** The bar a factory's block shows: the factory's. */
-const factoryBar = (factory: string): Bar => ({ kind: 'factory', factory });
+const factoryBar = (factory: string) => ({ kind: 'factory', factory }) satisfies Bar;
 
 /**
  * The Factories: every factory a block on a canvas (`FactoryBlockNode`), laid out on a grid in the order `openBlocks` gives, and fitted

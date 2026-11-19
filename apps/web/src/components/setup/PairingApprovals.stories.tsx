@@ -9,13 +9,14 @@ const meta: Meta = { title: 'Store/PairingApprovals' };
 export default meta;
 
 /** A pairing that waits, asked under `client`. */
-const waiting = (id: string, client: string): Pairing => ({
-  id,
-  client,
-  phase: 'waiting',
-  createdAt: '2026-11-12T10:00:00.000Z',
-  expiresAt: '2026-11-12T10:10:00.000Z',
-});
+const waiting = (id: string, client: string) =>
+  ({
+    id,
+    client,
+    phase: 'waiting',
+    createdAt: '2026-11-12T10:00:00.000Z',
+    expiresAt: '2026-11-12T10:10:00.000Z',
+  }) satisfies Pairing;
 
 /** Two that wait, and one already claimed, which is not listed. */
 const PAIRINGS: Pairing[] = [

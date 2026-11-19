@@ -17,7 +17,7 @@ import { GateBudgetRows, type GateBudgets } from '../../gate/GateBudgets';
 import { isObject } from 'effect/Predicate';
 
 /** A value as one line of text: a string as it is, anything else as its JSON. */
-const textOf = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+const textOf = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 /** What says nothing was given: a dash, muted. */
 const Dash = () => (
@@ -152,7 +152,7 @@ const DRAWS: Record<FieldWidget, (given: Given) => ReactNode | null> = {
 };
 
 /** What a field holds, drawn by its widget; JSON where the value is not what the widget draws. */
-function Drawn({ widget, ...given }: Given & { widget: FieldWidget }): ReactNode {
+function Drawn({ widget, ...given }: Given & { widget: FieldWidget }) {
   if (given.value === null || given.value === undefined) return <Dash />;
   return DRAWS[widget](given) ?? <Json value={given.value} />;
 }

@@ -14,7 +14,7 @@ export const REPO = path.join(import.meta.dirname, '..', '..');
  * folders under `dir` that hold a `package.json`, sorted, as npm reads it; a plain folder as it is. Throws on any other glob, which a
  * guard would otherwise read as nothing.
  */
-export const workspaces = (root = REPO): string[] => {
+export const workspaces = (root = REPO) => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { workspaces?: string[] };
   return (manifest.workspaces ?? []).flatMap((glob) => {
     if (!glob.includes('*')) return [glob];
@@ -37,7 +37,7 @@ export const workspaces = (root = REPO): string[] => {
  * Every file the repository at `root` holds, tracked or not yet added, ignored ones left out: git's list, as a path from the root. A test
  * that proves a guard on a planted repository names its root.
  */
-export const files = (root = REPO): string[] =>
+export const files = (root = REPO) =>
   execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root,
     encoding: 'utf8',
@@ -51,7 +51,7 @@ export const files = (root = REPO): string[] =>
  * Text, not an image: a NUL in its first bytes is a binary file, which says no name a person reads. Undefined for a path that is no file,
  * deleted or not yet staged, or a link.
  */
-export const textOf = (file: string): string | undefined => {
+export const textOf = (file: string) => {
   const at = path.join(REPO, file);
   if (!fs.statSync(at, { throwIfNoEntry: false })?.isFile()) return undefined;
   const bytes = fs.readFileSync(at);
@@ -63,8 +63,8 @@ export const textOf = (file: string): string | undefined => {
  * project's files, vendored unchanged) or `linguist-generated` (what a tool writes). Git says it, through `git check-attr`, so no guard
  * keeps a list of its own: a new vendored folder is one line of `.gitattributes`.
  */
-export const notOurs = (paths: readonly string[], root = REPO): Set<string> => {
-  if (paths.length === 0) return new Set();
+export const notOurs = (paths: readonly string[], root = REPO) => {
+  if (paths.length === 0) return new Set() satisfies Set<string>;
   const out = execFileSync('git', ['check-attr', '-z', '--stdin', 'linguist-vendored', 'linguist-generated'], {
     cwd: root,
     input: paths.join('\0') + '\0',
@@ -74,7 +74,7 @@ export const notOurs = (paths: readonly string[], root = REPO): Set<string> => {
   }).split('\0');
   const marked = new Set<string>();
   for (let at = 0; at + 2 < out.length; at += 3) if (out[at + 2] === 'set' || out[at + 2] === 'true') marked.add(out[at] ?? '');
-  return marked;
+  return marked satisfies Set<string>;
 };
 
 let known: { all: Set<string>; marked: Set<string> } | undefined;
@@ -83,7 +83,7 @@ let known: { all: Set<string>; marked: Set<string> } | undefined;
  * Whether `file`, a path from the root, is ours to read and rewrite: nothing `.gitattributes` marks vendored or generated. Git's list is
  * asked once; a path it does not hold (one a test plants) is asked of git on its own.
  */
-export const ours = (file: string): boolean => {
+export const ours = (file: string) => {
   if (!known) {
     const all = files();
     known = { all: new Set(all), marked: notOurs(all) };
@@ -95,13 +95,13 @@ export const ours = (file: string): boolean => {
 export type Suite = { include: string[]; setupFiles: string[]; maxWorkers: number | null; timeout: number | null };
 
 /** The strings of the array a config gives `key`, or none. */
-const listed = (text: string, key: string): string[] => {
+const listed = (text: string, key: string) => {
   const list = new RegExp(`\\b${key}:\\s*\\[([^\\]]*)\\]`).exec(text)?.[1] ?? '';
   return [...list.matchAll(/['"]([^'"]+)['"]/g)].map(([, value]) => value!);
 };
 
 /** The number a config gives `key`, underscores read as a numeric separator, or null. */
-const numbered = (text: string, key: string): number | null => {
+const numbered = (text: string, key: string) => {
   const m = new RegExp(`\\b${key}:\\s*([\\d_]+)\\b`).exec(text);
   return m ? Number(m[1]!.replaceAll('_', '')) : null;
 };
@@ -114,7 +114,7 @@ const numbered = (text: string, key: string): number | null => {
  *
  * @param dir the workspace's folder, absolute
  */
-export function suiteOf(dir: string): Suite | null {
+export function suiteOf(dir: string) {
   const file = path.join(dir, 'vitest.config.ts');
   if (!fs.existsSync(file)) return null;
   const text = fs

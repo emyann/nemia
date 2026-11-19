@@ -20,7 +20,7 @@ const TIMEOUT_BOUNDS = { least: 1_000, most: 23 * 3_600_000 } as const;
  * Why `text` is no timeout, naming the form, or undefined for one that reads: digits and one unit, from 1s to 23h.
  * @param text The timeout as typed, blanks around it allowed.
  */
-export const timeoutRefusal = (text: string): string | undefined => {
+export const timeoutRefusal = (text: string) => {
   const m = /^(\d+)([smh])$/.exec(text.trim());
   const unit = m?.[2];
   const ms = m && (unit === 's' || unit === 'm' || unit === 'h') ? Number(m[1]) * UNIT_MS[unit] : undefined;
@@ -43,15 +43,16 @@ const PAUSE_SAID: readonly Said[] = [
 const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 
 /** The `--timeout <d>` flag of `nemia pause`, its refusal ending on the verb's `shape`. */
-const timeoutFlag = (shape: string): Flag => ({
-  flag: '--timeout',
-  kind: 'text',
-  key: 'timeout',
-  takes: `--timeout takes how long a call in flight is given, as --timeout 10m: ${shape}.`,
-});
+const timeoutFlag = (shape: string) =>
+  ({
+    flag: '--timeout',
+    kind: 'text',
+    key: 'timeout',
+    takes: `--timeout takes how long a call in flight is given, as --timeout 10m: ${shape}.`,
+  }) satisfies Flag;
 
 /** Why `nemia pause`'s `--timeout` is refused: a timeout out of its form, or one given with `--now`, which cuts at once; null when none. */
-const pauseTimeoutRefusal = (timeout: unknown, now: boolean): string | null => {
+const pauseTimeoutRefusal = (timeout: unknown, now: boolean) => {
   if (typeof timeout !== 'string') return null;
   if (now) return `--timeout gives each call in flight a while to end, and --now cuts them at once: give one, ${PAUSE_SHAPE}.`;
   const wrong = timeoutRefusal(timeout);
@@ -62,7 +63,7 @@ const pauseTimeoutRefusal = (timeout: unknown, now: boolean): string | null => {
  * Why `nemia pause`'s arguments are refused before anything is read, or null: `--why` and `--by` (`saidRefusal`), then `--timeout`.
  * @param args The command line's arguments, by key.
  */
-export const pauseRefusal = (args: Args): string | null =>
+export const pauseRefusal = (args: Args) =>
   PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? pauseTimeoutRefusal(args.timeout, args.now === true);
 
 /**
@@ -119,7 +120,7 @@ const TIMEOUT_SHAPE = 'nemia pause-timeout [<d>]';
  * Why the timeout `nemia pause-timeout` was given is refused, ending on the form it takes; null where none, or one in its form.
  * @param args The command line's arguments, by key: the timeout under timeout, which may be absent.
  */
-export const pauseTimeoutCheck = (args: Args): string | null => {
+export const pauseTimeoutCheck = (args: Args) => {
   const text = args.timeout;
   const wrong = typeof text === 'string' ? timeoutRefusal(text) : undefined;
   return wrong === undefined ? null : `${wrong}: ${TIMEOUT_SHAPE}, as nemia pause-timeout 10m.`;

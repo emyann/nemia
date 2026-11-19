@@ -23,10 +23,10 @@ export type ClaudeSignInAsk =
 export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'timed-out' | 'unknown';
 
 /** Whether the ask ended with an exit the command documents as signed in: 0, its JSON not saying otherwise. */
-const saysIn = (ask: ClaudeSignInAsk): boolean => ask.kind === 'exited' && ask.code === 0 && ask.loggedIn !== false;
+const saysIn = (ask: ClaudeSignInAsk) => ask.kind === 'exited' && ask.code === 0 && ask.loggedIn !== false;
 
 /** Whether the ask ended with an exit the command documents as signed out: its JSON says so, or it exited 1 with no JSON read. */
-const saysOut = (ask: ClaudeSignInAsk): boolean =>
+const saysOut = (ask: ClaudeSignInAsk) =>
   ask.kind === 'exited' && (ask.loggedIn === false || (ask.code === 1 && ask.loggedIn === undefined));
 
 const claudeSignInSpec = spec<(ask: ClaudeSignInAsk) => ClaudeSignIn>({

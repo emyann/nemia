@@ -8,7 +8,7 @@
  * `-$0.13` for an amount below zero, and `—` for none.
  * @param usd The amount, in dollars, or null for none.
  */
-export function dollars(usd: number | null): string {
+export function dollars(usd: number | null) {
   if (usd === null) return '—';
   const size = Math.abs(usd);
   const said = size > 0 && size < 0.01 ? String(Number(size.toPrecision(3))) : size.toFixed(2);
@@ -19,4 +19,4 @@ export function dollars(usd: number | null): string {
  * A budget as its author writes one: `$16` when whole, else as `dollars` says it (`$2.50`).
  * @param usd The budget, in dollars.
  */
-export const budgetWord = (usd: number): string => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));
+export const budgetWord = (usd: number) => (Number.isInteger(usd) ? `$${usd}` : dollars(usd));

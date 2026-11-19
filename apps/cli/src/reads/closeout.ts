@@ -14,14 +14,14 @@ import { textArg } from '../commands/requests.ts';
 import { asked, type ObjectsClient } from '../objects.ts';
 
 /** A field's value on one line: a string as it is, anything else as JSON. */
-const valueLine = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
+const valueLine = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 /**
  * A closeout as a person reads it at the command line: its outcome and summary, the question a blocked step asks (`needs`), its body, the
  * files and values it handed on, the fields its workflow asked for (`output`), each reply to a finding with its why under it, and what it
  * left out or was refused.
  */
-const closeoutLines = (n: number, c: StepCloseout): string[] => [
+const closeoutLines = (n: number, c: StepCloseout) => [
   `try ${n}: ${c.outcome}: ${c.summary}`,
   ...(c.needs ? [`needs: ${c.needs}`] : []),
   ...(c.body && c.body !== c.summary ? ['', c.body] : []),
@@ -38,7 +38,7 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
  * What the command prints of a try: its closeout, or that it has none yet, or why it does not read.
  * @param step The step's name, said where the try has no closeout to print.
  */
-export const closeoutPrinted = ({ try: n, closeout, unreadable }: TryCloseout, step: string): string[] =>
+export const closeoutPrinted = ({ try: n, closeout, unreadable }: TryCloseout, step: string) =>
   closeout
     ? closeoutLines(n, closeout)
     : [`try ${n} of ${step}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`];
@@ -47,7 +47,7 @@ export const closeoutPrinted = ({ try: n, closeout, unreadable }: TryCloseout, s
 const WHOLE = { fields: '*', bodyLimit: String(BODY_PAGE.most) } as const;
 
 /** `read` with its closeout's body whole: each page after the first read from the `bodyNext` the page before answered. */
-const whole = (client: ObjectsClient, runId: string, step: string, read: TryCloseout): Effect.Effect<TryCloseout, unknown> =>
+const whole = (client: ObjectsClient, runId: string, step: string, read: TryCloseout) =>
   Effect.gen(function* () {
     let closeout = read.closeout;
     while (closeout?.bodyNext !== undefined) {
@@ -71,7 +71,7 @@ const whole = (client: ObjectsClient, runId: string, step: string, read: TryClos
  * Prints what the try of the step `args` names signed off with, its latest where no `--try` is given; answers 0.
  * @param args The command's words as parsed against `CLOSEOUT_WORDS`: the run, the step and `--try`.
  */
-export async function closeout(args: Args): Promise<number> {
+export async function closeout(args: Args) {
   const runId = textArg(args, 'runId') ?? '';
   const step = textArg(args, 'step') ?? '';
   const tryNo = textArg(args, 'try');

@@ -48,7 +48,7 @@ export type Collisions = {
  * @param run The repository run whose ending reads the collisions.
  * @param runs The store's runs.
  */
-export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): RepositoryRun[] =>
+export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]) =>
   runs.filter(
     (o): o is RepositoryRun =>
       isRepositoryRun(o) &&
@@ -66,7 +66,7 @@ export const othersInFlight = (run: RepositoryRun, runs: readonly Run[]): Reposi
  * @param ours This run's branches ahead of the base.
  * @param theirs The branches ahead of the base of the other runs in flight.
  */
-export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly Theirs[]): TrialAsked[] => [
+export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly Theirs[]) => [
   ...ours.map((branch) => ({ onto, branch })),
   ...theirs.flatMap((t) => ours.map((branch) => ({ onto: t.branch, branch }))),
 ];
@@ -82,10 +82,10 @@ export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly
  * @param run The run's record.
  * @param decide What the run waits on a person to decide, or undefined where nothing.
  */
-export function collisionsDue(steps: readonly StepSpec[], run: Run, decide: ToDecide | undefined): string | undefined {
+export function collisionsDue(steps: readonly StepSpec[], run: Run, decide: ToDecide | undefined) {
   if (decide?.kind === 'approve') return decide.step;
   if (endedForGood(run)) return undefined;
-  const aborted = (s: StepSpec): boolean => {
+  const aborted = (s: StepSpec) => {
     const landed = run.steps[s.name]?.landed;
     return Boolean(landed && 'aborted' in landed);
   };
@@ -93,7 +93,7 @@ export function collisionsDue(steps: readonly StepSpec[], run: Run, decide: ToDe
 }
 
 /** The run's collisions in one line: how many of the runs in flight it collides with, and which; those git could not say of. */
-function summary(onto: string, inFlight: readonly string[], colliding: readonly Collision[]): string {
+function summary(onto: string, inFlight: readonly string[], colliding: readonly Collision[]) {
   if (!inFlight.length) return `no other run is in flight on ${onto}`;
   const runs = (cs: readonly Collision[]) => [...new Set(cs.map((c) => c.run))];
   const conflicts = runs(colliding.filter((c) => !('error' in c.merge)));
@@ -104,12 +104,7 @@ function summary(onto: string, inFlight: readonly string[], colliding: readonly 
 }
 
 /** The semantic conflict at `ending`: its landing check refused the merged tree on the base as it is now, though every branch merges. */
-function semanticOf(
-  run: RepositoryRun,
-  ending: string | undefined,
-  base: readonly StandingMerge[],
-  sha: string | null,
-): Collisions['semantic'] {
+function semanticOf(run: RepositoryRun, ending: string | undefined, base: readonly StandingMerge[], sha: string | null) {
   if (!ending || !sha || !base.length || !base.every((b) => 'clean' in b && b.clean)) return null;
   const check = landingRefusedOn(run.steps[ending], sha);
   if (!check) return null;
@@ -137,7 +132,7 @@ export function collisionsOf(
   ours: readonly string[],
   theirs: readonly Theirs[],
   answer: Trials,
-): Collisions {
+) {
   const onto = run.branch;
   const word = (i: number) => mergeWordOf(answer.trials[i] ?? { unknown: 'the place answered no trial for it' });
   const base = ours.map((branch, i) => {
@@ -145,12 +140,14 @@ export function collisionsOf(
     return { branch, ...merge, said: mergeWord(merge, onto) };
   });
   const colliding = theirs.flatMap((t, j) =>
-    ours.flatMap((branch, k): Collision[] => {
+    ours.flatMap((branch, k) => {
       const merge = word(ours.length * (j + 1) + k);
-      return 'clean' in merge && merge.clean ? [] : [{ ...t, ours: branch, merge, said: mergeWord(merge, `${t.run}'s ${t.branch}`) }];
+      return (
+        'clean' in merge && merge.clean ? [] : [{ ...t, ours: branch, merge, said: mergeWord(merge, `${t.run}'s ${t.branch}`) }]
+      ) satisfies Collision[];
     }),
   );
   const inFlight = [...new Set(theirs.map((t) => t.run))];
   const semantic = semanticOf(run, ending, base, answer.at[onto] ?? null);
-  return { onto, base, inFlight, colliding, semantic, said: summary(onto, inFlight, colliding) };
+  return { onto, base, inFlight, colliding, semantic, said: summary(onto, inFlight, colliding) } satisfies Collisions;
 }

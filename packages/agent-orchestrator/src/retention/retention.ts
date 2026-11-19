@@ -17,7 +17,7 @@ export const RELEASES_KEPT = 2;
  * The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order.
  * @param installed The installed releases.
  */
-export const newestFirst = (installed: readonly Installed[]): Installed[] =>
+export const newestFirst = (installed: readonly Installed[]) =>
   [...installed].sort((a, b) => (a.builtAt === b.builtAt ? (a.tag < b.tag ? 1 : a.tag > b.tag ? -1 : 0) : a.builtAt < b.builtAt ? 1 : -1));
 
 /**
@@ -38,7 +38,7 @@ export const retention: ReleaseRetention = (installed, inUse) => {
  * @param answer What the retention answered.
  * @param unrecorded How many local sessions in flight recorded no release.
  */
-export function retentionLines(answer: Retention, unrecorded: number): string[] {
+export function retentionLines(answer: Retention, unrecorded: number) {
   if (answer.held === 'no pointer') return [];
   if (answer.held === 'unrecorded')
     return [

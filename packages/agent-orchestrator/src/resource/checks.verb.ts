@@ -11,7 +11,7 @@ import { asked, type Engine } from '../runtime-client.ts';
  * One verb of the engine, `read`, run to a Promise: what it succeeds with; its refusal as an `Error` whose `exitCode` is 2 and whose
  * message is led by `verb` (`output: …`), as `asked` words it; and any other failure as it failed.
  */
-const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(asked(verb, read));
+const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) => Effect.runPromise(asked(verb, read)) satisfies Promise<A>;
 
 /**
  * The command a step is judged by, and what it said once it refused.
@@ -55,10 +55,10 @@ export type StepLog = {
  * @param output The session's output.
  * @param max The most lines kept.
  */
-export function tailOf(output: string, max: number): StepLog {
+export function tailOf(output: string, max: number) {
   const lines = output.split(/\r?\n/);
   if (lines.at(-1) === '') lines.pop();
-  return lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false };
+  return (lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false }) satisfies StepLog;
 }
 
 /** How many lines of each stream a refused check shows: as many as `nemia decide` does (`CHECK_TAIL_LINES`). */
@@ -88,24 +88,29 @@ const refusedIn =
  * @param run The run whose checks are read.
  * @param views The engine's views of the run's tasks, by task id.
  */
-export async function refusedStderr(e: Engine, run: Run, views: Views): Promise<CheckStderr> {
+export async function refusedStderr(e: Engine, run: Run, views: Views) {
   const ids = Object.values(run.steps)
     .flatMap((r) => [r.check?.taskId, ...(r.tries ?? []).map((t) => t.check?.taskId)])
     .filter(refusedIn(views));
   const read = await Promise.all(
-    [...new Set(ids)].map(async (id): Promise<[string, StepLog | string]> => {
+    [...new Set(ids)].map(async (id) => {
       try {
-        return [id, tailOf((await engineRead('output', e.output(id, 'stderr', TAIL_BYTES))) ?? '', CHECK_LINES)];
+        const tail: [string, StepLog | string] = [
+          id,
+          tailOf((await engineRead('output', e.output(id, 'stderr', TAIL_BYTES))) ?? '', CHECK_LINES),
+        ];
+        return tail;
       } catch (err) {
-        return [id, unreadableOutput(run, id, err)];
+        const unread: [string, StepLog | string] = [id, unreadableOutput(run, id, err)];
+        return unread;
       }
     }),
   );
-  return new Map(read);
+  return new Map(read) satisfies CheckStderr;
 }
 
 /** Why the output of a run's check could not be read, and where a person reads it instead. */
-const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
+const unreadableOutput = (run: Run, taskId: string, err: unknown) =>
   `Could not read the output of its check (task ${taskId}): ${err instanceof Error ? err.message : String(err)}. \`nemia decide ${run.id}\` reads it the same way from the command line.`;
 
 /**
@@ -119,8 +124,8 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
  * @param views The engine's views of the run's tasks, by task id.
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  */
-export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr): StepCheck {
-  if (!taskId) return { command, taskId: null, verdict: null, refused: null };
+export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr) {
+  if (!taskId) return { command, taskId: null, verdict: null, refused: null } satisfies StepCheck as StepCheck;
   const view = views.get(taskId);
   const phase = phaseOfView(view);
   const verdict = attemptVerdict(view?.state.attempts.at(-1));
@@ -139,7 +144,7 @@ export function checkIn(command: string, taskId: string | undefined, views: View
           unreadable: typeof said === 'string' ? said : null,
         }
       : null,
-  };
+  } satisfies StepCheck as StepCheck;
 }
 
 /**
@@ -153,13 +158,7 @@ export function checkIn(command: string, taskId: string | undefined, views: View
  * @param views The engine's views of the run's tasks, by task id.
  * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
  */
-export async function checksOf(
-  e: Engine,
-  run: Run,
-  steps: readonly StepSpec[],
-  views: Views,
-  stderr: CheckStderr,
-): Promise<Map<string, StepCheck>> {
+export async function checksOf(e: Engine, run: Run, steps: readonly StepSpec[], views: Views, stderr: CheckStderr) {
   const checks = new Map<string, StepCheck>();
   for (const step of steps) {
     if (!step.check) continue;
@@ -204,7 +203,7 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
  * @param taskId The session's task, or null where there is none.
  * @param said Where the last read of each attempt stopped, updated by this read.
  */
-export async function lastLineOf(e: Engine, views: Views, taskId: string | null, said: LastSaid): Promise<string | null> {
+export async function lastLineOf(e: Engine, views: Views, taskId: string | null, said: LastSaid) {
   const view = taskId === null ? undefined : views.get(taskId);
   if (view === undefined) return null;
   const key = `${view.id}#${view.state.attempts.length}`;

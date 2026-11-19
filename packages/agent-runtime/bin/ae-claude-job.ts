@@ -124,7 +124,7 @@ const inputOf = () => {
 type Requested = { request: SpawnRequest; io: { bridgeFile?: string; heardFile?: string; hold?: HoldIO } };
 
 /** `value` where it is a whole number of milliseconds above 0; `otherwise` where it is absent or anything else. */
-const msOr = (value: unknown, otherwise: number): number =>
+const msOr = (value: unknown, otherwise: number) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : otherwise;
 
 /**
@@ -132,7 +132,7 @@ const msOr = (value: unknown, otherwise: number): number =>
  * where it named both a hold file and the sessions' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the
  * shipped ones otherwise.
  */
-const requestAt = (at: string | undefined): Requested => {
+const requestAt = (at: string | undefined) => {
   if (!at)
     throw new Refused('no spawn request file was given. The runner writes one for a spec with `needsRequest` and names it on the argv.');
   try {
@@ -157,16 +157,16 @@ const requestAt = (at: string | undefined): Requested => {
 };
 
 /** Writes `bridge` whole on `file`, through a file beside it renamed over it (`replaceFile`), so a look never reads half of it. */
-const writeBridge = (file: string, bridge: AttachedBridge): void => void replaceFile(file, JSON.stringify(bridge));
+const writeBridge = (file: string, bridge: AttachedBridge) => void replaceFile(file, JSON.stringify(bridge));
 
 /**
  * The job's bridge, as the session's messages bring it: opened on the message `bridgeDue` names, once, and its state kept from each
  * `bridge_state` after. Nothing where the task asked for none, or the runner named no file to write it on.
  */
 const bridgeOf = (request: SpawnRequest, file: string | undefined) => {
-  if (!bridgeAsked(request) || file === undefined) return async (_q: unknown, _m: unknown): Promise<void> => {};
+  if (!bridgeAsked(request) || file === undefined) return async (_q: unknown, _m: unknown) => {};
   let bridge: AttachedBridge | undefined;
-  return async (q: unknown, m: unknown): Promise<void> => {
+  return async (q: unknown, m: unknown) => {
     if (bridge === undefined && bridgeDue(m)) {
       bridge = await enableBridge(q, request.name, { keepSessionOnExit: false });
       writeBridge(file, bridge);
@@ -181,20 +181,18 @@ const bridgeOf = (request: SpawnRequest, file: string | undefined) => {
 };
 
 /** Writes `text` and answers once it is on the pipe, so nothing printed is dropped by the exit after it. */
-const flushed = (to: NodeJS.WriteStream, text: string): Promise<void> =>
+const flushed = (to: NodeJS.WriteStream, text: string) =>
   new Promise((done) => {
     to.write(text, () => done());
-  });
+  }) satisfies Promise<void>;
 
 /** What keeps a `rate_limit_event` of the session on the heard file the runner named (`keepHeard`); nothing where it named none. */
-const heardBy =
-  (file: string | undefined) =>
-  (m: SDKMessage): void => {
-    if (file !== undefined && m.type === 'rate_limit_event') keepHeard(file, m.rate_limit_info, Date.now());
-  };
+const heardBy = (file: string | undefined) => (m: SDKMessage) => {
+  if (file !== undefined && m.type === 'rate_limit_event') keepHeard(file, m.rate_limit_info, Date.now());
+};
 
 /** The session run to its end; answers whether its last result was an error. Throws `Refused` in words for anything else. */
-const ran = async ({ request, io }: Requested): Promise<boolean> => {
+const ran = async ({ request, io }: Requested) => {
   const abort = new AbortController();
   for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => abort.abort());
   const executable = claudeExecutableOf(process.env.AE_CLAUDE_EXECUTABLE);

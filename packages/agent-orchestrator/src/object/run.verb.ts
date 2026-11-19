@@ -14,9 +14,8 @@ import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { artifactsDir } from '../record/record.store.ts';
-import { addSpend, budgetOf, isRepositoryRun, overBudget, placeOf, type Run, type Spend, type SpendOf, stepSpend } from '../run.ts';
+import { addSpend, budgetOf, isRepositoryRun, overBudget, placeOf, type Run, type SpendOf, stepSpend } from '../run.ts';
 import { LOOP_REPLIES, loopSpan, outputFields, type StepSpec } from '../workflow.ts';
-import type { FieldShape } from 'objects';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
@@ -39,7 +38,7 @@ import { filedOf, type StepFiled, toldOf } from '../resource/told.verb.ts';
 import { folderFiles, workFolderOf } from '../resource/files.store.ts';
 import { type LastSaid, lastLineOf } from '../resource/checks.verb.ts';
 import { readOf, totalOf, usedOf } from '../resource/index.ts';
-import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout, TryShort } from './run.model.ts';
+import type { Run as RunObject, RunSpec, RunStatus, RunStepStatus, StepTold, TryCloseout } from './run.model.ts';
 import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';
 import { prunedKept } from '../forget/prune/prune.ts';
@@ -67,7 +66,7 @@ export type RunObjectAnswer = RunObject | { unjudged: string; steps: readonly Un
  * The short of a try (`TryShort`): its number, round and codes, how it signed off and its check's verdict.
  * @param t The try, as the step's tries read it.
  */
-export const tryShort = (t: StepTry): TryShort => ({
+export const tryShort = (t: StepTry) => ({
   try: t.try,
   round: t.round,
   phase: t.phase,
@@ -77,7 +76,7 @@ export const tryShort = (t: StepTry): TryShort => ({
 });
 
 /** A step's frontmatter as the object's spec holds it, each null where the step does not set it. */
-const specStepOf = (s: StepSpec): RunSpec['steps'][number] => ({
+const specStepOf = (s: StepSpec) => ({
   name: s.name,
   after: [...s.after],
   input: [...(s.input ?? [])],
@@ -102,7 +101,7 @@ const specStepOf = (s: StepSpec): RunSpec['steps'][number] => ({
  * The fields a step's declared output gives, in its schema's order, each with the shape its `x-shape` marked or null, as its closeout
  * serves them (`closeoutIn`): the loop's `replies` aside.
  */
-const declaredFields = (s: StepSpec): Array<{ name: string; shape: FieldShape | null }> =>
+const declaredFields = (s: StepSpec) =>
   outputFields(s)
     .filter((name) => name !== LOOP_REPLIES)
     .map((name) => ({ name, shape: s.output?.shapes?.[name] ?? null }));
@@ -112,21 +111,22 @@ const declaredFields = (s: StepSpec): Array<{ name: string; shape: FieldShape | 
  * commit, branch and worktrees, a folder run's work directory, its workflow folder and the agent a try from an agent's page tried — the
  * runs it waits on and is handed, and the card it was started from.
  */
-const specOf = (run: Run, at: RunReading): RunSpec => ({
-  steps: (run.workflow ?? at.steps).map(specStepOf),
-  brief: run.brief,
-  place: placeOf(run),
-  repo: run.repo ?? null,
-  baseRef: run.baseRef ?? null,
-  branch: run.branch ?? null,
-  isolate: run.isolate ?? null,
-  work: isRepositoryRun(run) ? null : run.workspace,
-  workflowDir: run.workflowDir,
-  try: tryOf(run, at.home),
-  after: [...(run.after ?? [])],
-  context: [...(run.context ?? [])],
-  from: run.from ? { inbox: run.from.inbox } : null,
-});
+const specOf = (run: Run, at: RunReading) =>
+  ({
+    steps: (run.workflow ?? at.steps).map(specStepOf),
+    brief: run.brief,
+    place: placeOf(run),
+    repo: run.repo ?? null,
+    baseRef: run.baseRef ?? null,
+    branch: run.branch ?? null,
+    isolate: run.isolate ?? null,
+    work: isRepositoryRun(run) ? null : run.workspace,
+    workflowDir: run.workflowDir,
+    try: tryOf(run, at.home),
+    after: [...(run.after ?? [])],
+    context: [...(run.context ?? [])],
+    from: run.from ? { inbox: run.from.inbox } : null,
+  }) satisfies RunSpec;
 
 /**
  * What a step's tries have cost, against its cap, and the raise of that cap the package takes — off the views already read, which hold
@@ -134,7 +134,7 @@ const specOf = (run: Run, at: RunReading): RunSpec => ({
  * `budget:`. No raise on a run called off, pruned or held: a raise is asked with a try or a round, which the verb refuses while a hold
  * stands (`heldRefusal`).
  */
-function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'spent' | 'budget' | 'raise'> {
+function costOf(run: Run, name: string, at: RunReading) {
   const { steps, views, judged } = at;
   const step = steps.find((s) => s.name === name);
   const spent = spentOf(stepSpend(run, name, judged.spendOf));
@@ -155,7 +155,7 @@ function costOf(run: Run, name: string, at: RunReading): Pick<RunStepStatus, 'sp
  * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
  * (`loopSpan`), a session each once, which a try a recheck reached has none of — added up (`addSpend`).
  */
-function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: TimelineTotal, spendOf: SpendOf): Spend {
+function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: TimelineTotal, spendOf: SpendOf) {
   const looping = steps.find((s) => s.name === total.loop);
   const names = looping ? loopSpan(steps, looping) : [];
   return addSpend(
@@ -172,7 +172,7 @@ function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: Timeline
  * under the artifacts route: absent where the step has no such folder, as one not filed yet has none, and on a list's item, which reads
  * no artifacts folder: the run's own read carries it.
  */
-function filesOf(run: Run, home: string, step: string, listed: boolean): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
+function filesOf(run: Run, home: string, step: string, listed: boolean) {
   const dir = workFolderOf(run, step);
   const { files, error } = dir ? folderFiles(run, step, dir, 'files') : { files: [], error: null };
   if (listed) return { files, filesError: error };
@@ -185,15 +185,14 @@ function filesOf(run: Run, home: string, step: string, listed: boolean): Pick<Ru
 }
 
 /** What the engine filed a try with (`filedOf`), its fence in this layer's word. */
-const filedIn = (filed: StepFiled | null): RunStepStatus['filed'] =>
-  filed && (({ permissionMode: fence, ...rest }) => ({ ...rest, fence }))(filed);
+const filedIn = (filed: StepFiled | null) => filed && (({ permissionMode: fence, ...rest }) => ({ ...rest, fence }))(filed);
 
 /** A try asked for, as the object says it. */
-const askedOf = (r: Retry | undefined): RunStepStatus['asked'] =>
+const askedOf = (r: Retry | undefined) =>
   r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null, stopFirst: r.stopFirst === true } : null;
 
 /** What `nemia prune` took of a run: when, each worktree and what it held, and its artifacts; null for none. */
-const prunedOf = (run: Run): RunStatus['pruned'] =>
+const prunedOf = (run: Run) =>
   run.pruned
     ? {
         at: run.pruned.at,
@@ -204,20 +203,20 @@ const prunedOf = (run: Run): RunStatus['pruned'] =>
     : null;
 
 /** What of a run `nemia prune` would find on disk: two stats, and no git. */
-function onDiskOf(run: Run, home: string): RunStatus['onDisk'] {
+function onDiskOf(run: Run, home: string) {
   const files = path.dirname(artifactsDir(home, run, '_'));
   return { worktrees: isRepositoryRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
 }
 
 /** The run's timeline: each round with what it cost, by the steps the run is judged by, its own span with what it cost, and its slot. */
-const runTimeline = ({ clock, steps, judged }: RunReading): RunStatus['timeline'] => ({
+const runTimeline = ({ clock, steps, judged }: RunReading) => ({
   rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
   run: { ...clock.run, cost: judged.cost },
   slot: clock.slot,
 });
 
 /** What the sessions of every try of every step read, by price (`RunRead`), off the run's timeline; null where none of it was measured. */
-const runRead = ({ clock, steps, names }: RunReading): RunStatus['read'] =>
+const runRead = ({ clock, steps, names }: RunReading) =>
   readOf(
     totalOf(
       steps,
@@ -236,7 +235,7 @@ type StepAt = RunReading & {
  * The step `name`'s word, as `nemia decide` says it: `assess`'s on the judgement's read (`stepWords`), so the object and the decision say a
  * step alike; a step the run is not judged by (a `bare` one its record names) is worded off the views already read (`stepStatus`).
  */
-const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepStatus['status'] => {
+const stepWord = ({ run, steps, views, judged }: StepAt, name: string) => {
   const judgedWord = judged.assessed.stepWords.get(name)?.status;
   if (judgedWord !== undefined) return judgedWord;
   const reads = raiseReads(run, views, steps);
@@ -244,13 +243,13 @@ const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepS
 };
 
 /** How many questions the step's closeout asks of a person it waits on (`Judged`'s `beside`), where it asks any. */
-const asksOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus, 'asks'> => {
+const asksOf = (judged: RunReading['judged'], name: string) => {
   const asks = judged.beside.get(name)?.asks;
   return asks ? { asks } : {};
 };
 
 /** The run whose ending holds the checkout the step waits on (`Judged`'s `beside`), where it waits on it. */
-const baseHeldByOf = (judged: RunReading['judged'], name: string): Pick<RunStepStatus, 'baseHeldBy'> => {
+const baseHeldByOf = (judged: RunReading['judged'], name: string) => {
   const hold = judged.beside.get(name)?.baseHeldBy;
   return hold ? { baseHeldBy: { run: hold.run, step: hold.step } } : {};
 };
@@ -305,7 +304,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
 });
 
 /** Where the run's work ended up (`resultBranches`), where a result step has a branch. */
-const resultOf = (run: Run, steps: readonly StepSpec[]): Pick<RunStatus, 'result'> => {
+const resultOf = (run: Run, steps: readonly StepSpec[]) => {
   const result = resultBranches(run, steps);
   return result.length ? { result } : {};
 };
@@ -427,11 +426,12 @@ export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>>
  * @param folder The run's workflow folder as it loads now: its steps, or the warning of why it does not load.
  * @param listed Whether the object is a list's item, which reads no step's artifacts folder and lays no `artifactsFolder`.
  */
-export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder'], listed: boolean): RunDiskParts => ({
-  onDisk: onDiskOf(run, home),
-  warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-  files: (step) => filesOf(run, home, step, listed),
-});
+export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder'], listed: boolean) =>
+  ({
+    onDisk: onDiskOf(run, home),
+    warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+    files: (step) => filesOf(run, home, step, listed),
+  }) satisfies RunDiskParts;
 
 /**
  * The object before its disk parts (`runObjectCore`) with them laid over (`RunDiskParts`): a new object, the one handed in left as it
@@ -440,7 +440,7 @@ export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']
  * @param object The run's object before its disk parts, left as it is.
  * @param parts The disk parts laid over it.
  */
-export const withDiskParts = (object: RunObject, parts: RunDiskParts): RunObject => {
+export const withDiskParts = (object: RunObject, parts: RunDiskParts) => {
   const laid = object.status.steps.map((step) => ({ step, files: parts.files(step.name) }));
   const resourceVersion = runVersion({
     core: object.metadata.resourceVersion,

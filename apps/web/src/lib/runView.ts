@@ -61,7 +61,7 @@ export type RunDetail = Omit<RunView, 'steps'> & {
 const NO_LINES: StepCommands = { approve: '', retry: '', say: '' };
 
 /** One step of the detail, from the step, the lines, its tries whole, what it was told, and the try the address asks it to show. */
-const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], told: StepTold | null, asked: number | null): StepView => {
+const stepViewOf = (step: RunStep, lines: RunLines, tries: readonly StepTry[], told: StepTold | null, asked: number | null) => {
   const shown = tryShown(
     tries.map((t) => t.try),
     tries.find((t) => t.current)?.try ?? null,
@@ -97,7 +97,7 @@ export const runDetailOf = (
   tries: Readonly<Record<string, readonly StepTry[] | undefined>>,
   told: Readonly<Record<string, StepTold | null | undefined>>,
   chosen: TryChoices = {},
-): RunDetail => {
+) => {
   const view = runViewOf(object);
   return {
     ...view,
@@ -121,27 +121,28 @@ export const runDetailOf = (
  * What was last read under `key`, at whichever stamp: what a step's tries or told show while those of its new state are read, so a step
  * that moved keeps what it showed rather than draw nothing for a moment.
  */
-const lastRead = <T>(client: QueryClient, key: QueryKey): T | undefined =>
+const lastRead = <T>(client: QueryClient, key: QueryKey) =>
   client
     .getQueryCache()
     .findAll({ queryKey: key })
     .filter((q) => q.state.data !== undefined)
-    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0]?.state.data as T | undefined;
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0]?.state.data as T | undefined satisfies T | undefined;
 
 /** The data of each of a list of reads, in order: a `combine` declared once, so the list keeps its identity while no read changes. */
-const dataOf = <T>(results: UseQueryResult<T>[]): Array<T | undefined> => results.map((r) => r.data);
+const dataOf = <T>(results: UseQueryResult<T>[]) => results.map((r) => r.data);
 
 /** What the reads of every step answered, and the first failure among those that answered nothing, so a reader says it. */
-const readsOf = <T>(results: UseQueryResult<T>[]): { data: Array<T | undefined>; error: unknown } => ({
-  data: dataOf(results),
-  error: results.find((r) => r.data === undefined && r.error)?.error ?? null,
-});
+const readsOf = <T>(results: UseQueryResult<T>[]) =>
+  ({
+    data: dataOf(results),
+    error: results.find((r) => r.data === undefined && r.error)?.error ?? null,
+  }) satisfies { data: Array<T | undefined>; error: unknown } as { data: Array<T | undefined>; error: unknown };
 
 /**
  * The try each step shows, as the address names it (`?try=`, validated at the root): the same on every surface of the page. None where no
  * route matches, as in a part rendered on its own, which then shows each step's current try.
  */
-function useChosenTries(): string | undefined {
+function useChosenTries() {
   return useSearch({ strict: false, shouldThrow: false, select: (search: { try?: string }) => search.try });
 }
 
@@ -152,10 +153,7 @@ const NO_STEPS: readonly RunStepStatus[] = [];
  * Each step's tries and told, read under its stamp (`stepStamp`), so they are read again only when the step moves; while they are, what
  * was read before stays (`lastRead`). Undefined for a read not answered yet.
  */
-function useStepReads(
-  id: string,
-  steps: readonly RunStepStatus[],
-): { tries: Array<readonly StepTry[] | undefined>; told: Array<StepTold | null | undefined>; error: unknown } {
+function useStepReads(id: string, steps: readonly RunStepStatus[]) {
   const client = useQueryClient();
   const tries = useQueries({
     queries: steps.map((step) => ({
@@ -181,7 +179,7 @@ const detailOf = (
   tries: ReadonlyArray<readonly StepTry[] | undefined>,
   told: ReadonlyArray<StepTold | null | undefined>,
   chosen: TryChoices,
-): RunDetail => {
+) => {
   const steps = object.status.steps;
   return runDetailOf(
     object,
@@ -198,7 +196,7 @@ const detailOf = (
  * under its stamp (`useStepReads`).
  * @param id The run's id.
  */
-export function useRunView(id: string): { view: RunDetail; error: unknown } {
+export function useRunView(id: string) {
   const { data: object, error } = useSuspenseQuery(runObjectQuery(id));
   const { data: lines } = useSuspenseQuery(runLinesQuery(id));
   const { tries, told } = useStepReads(id, object.status.steps);
@@ -213,7 +211,7 @@ export function useRunView(id: string): { view: RunDetail; error: unknown } {
  * stays, through a failed read (a run gone keeps what it last read) and while a step that moved is read again.
  * @param id The run's id.
  */
-export function useRunRead(id: string): { view: RunDetail | undefined; error: unknown } {
+export function useRunRead(id: string) {
   const object = useQuery(runObjectQuery(id));
   const lines = useQuery(runLinesQuery(id));
   const { tries, told, error: stepError } = useStepReads(id, object.data?.status.steps ?? NO_STEPS);
@@ -238,7 +236,7 @@ export function useRunRead(id: string): { view: RunDetail | undefined; error: un
  * @param client The board's query client, loaded.
  * @param id The run's id.
  */
-export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolean; namespace?: string }> =>
+export const loadRun = (client: QueryClient, id: string) =>
   client.ensureQueryData(runObjectQuery(id)).then(
     (run) =>
       Promise.all([
@@ -255,4 +253,4 @@ export const loadRun = (client: QueryClient, id: string): Promise<{ gone: boolea
       if (readGone(error)) return { gone: true };
       throw error;
     },
-  );
+  ) satisfies Promise<{ gone: boolean; namespace?: string }> as Promise<{ gone: boolean; namespace?: string }>;

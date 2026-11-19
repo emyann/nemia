@@ -5,9 +5,6 @@
  */
 import { defaultParseSearch } from '@tanstack/react-router';
 
-/** An address cut as the router's link takes it: `to` the path alone, `search` read as the router reads a query, `hash` without its `#`. */
-type RouteOfHref = { to: string; search: Record<string, unknown>; hash?: string };
-
 /** Where the address is resolved from: a board address begins with one slash, so nothing of this base is kept. */
 const BASE = 'http://board.invalid';
 
@@ -16,7 +13,7 @@ const BASE = 'http://board.invalid';
  * router's own `defaultParseSearch` as `search`, and its hash, where it has one. Pure.
  * @param href The board's address, as a message writes it.
  */
-export function routeOfHref(href: string): RouteOfHref {
+export function routeOfHref(href: string) {
   const url = new URL(href, BASE);
   const hash = url.hash.slice(1);
   return { to: url.pathname, search: defaultParseSearch(url.search), ...(hash ? { hash } : {}) };

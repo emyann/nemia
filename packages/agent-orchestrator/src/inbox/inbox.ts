@@ -109,8 +109,7 @@ type CardKeys = Partial<Record<FlatKey, string>> & { labels?: Labels };
  * An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is
  * stable.
  */
-const isInstant = (value: string): boolean =>
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
+const isInstant = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
 /**
  * What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: `objects`' `CARD_KEY_MEANINGS`, the one source of the
@@ -130,7 +129,7 @@ function refuse(why: string): never {
  * @param file The card's file name in the inbox, with its `.md`: its name, and what a refusal names.
  * @param text The file's text, frontmatter and body.
  */
-export function parseInboxCard(file: string, text: string): InboxCard {
+export function parseInboxCard(file: string, text: string) {
   const { block, body } = splitFrontmatter(file, text);
   const keys = block === null ? {} : inboxKeys(file, block);
   const { workflow, queued, gate, model, factory, from } = keys;
@@ -172,7 +171,7 @@ export function parseInboxCard(file: string, text: string): InboxCard {
  * a pair does not read or a step is named twice. Whether each is a step of its workflow, and one that can run on the model, is the start's
  * to say (`cardModels` in inbox.verb.ts, `modelsRefusal`).
  */
-function cardModels(file: string, line: string): Record<string, string> {
+function cardModels(file: string, line: string) {
   const read = modelsOf(line.split(','));
   if ('why' in read)
     refuse(`${file}: \`model: ${line}\` ${read.why}, comma-separated: \`model: implement=fable, review=opus\`. Correct the line.`);
@@ -183,7 +182,7 @@ function cardModels(file: string, line: string): Record<string, string> {
  * A card's `from:` as the runs it names, comma-separated, in the order written: refused, naming the file, where one is blank or named
  * twice. Whether each is a run is the start's to say (`contextRefusal`).
  */
-function fromRuns(file: string, from: string): string[] {
+function fromRuns(file: string, from: string) {
   const runs = from.split(',').map((r) => r.trim());
   if (runs.some((r) => !r || /\s/.test(r)))
     refuse(
@@ -200,11 +199,12 @@ function fromRuns(file: string, from: string): string[] {
  * @param file The card's file name in the inbox, with its `.md`.
  * @param text The file's text.
  */
-export function cardOrWhy(file: string, text: string): { card: InboxCard } | { why: string } {
+export function cardOrWhy(file: string, text: string) {
   try {
-    return { card: parseInboxCard(file, text) };
+    return { card: parseInboxCard(file, text) } satisfies { card: InboxCard } | { why: string } as { card: InboxCard } | { why: string };
   } catch (err) {
-    if (err instanceof WorkflowError) return { why: err.message };
+    if (err instanceof WorkflowError)
+      return { why: err.message } satisfies { card: InboxCard } | { why: string } as { card: InboxCard } | { why: string };
     throw err;
   }
 }
@@ -213,10 +213,10 @@ export function cardOrWhy(file: string, text: string): { card: InboxCard } | { w
  * A card's `from:` line's value, written as `parseInboxCard` reads it back.
  * @param runs The runs the card was started as, none where it names none.
  */
-export const fromLine = (runs: readonly string[] | undefined): string | undefined => (runs?.length ? runs.join(', ') : undefined);
+export const fromLine = (runs: readonly string[] | undefined) => (runs?.length ? runs.join(', ') : undefined);
 
 /** Refuses a card's `factory:` that is not a factory's name (`factoryNameRefusal`), naming the file and the fix. */
-function refuseFactoryKey(file: string, factory: string): void {
+function refuseFactoryKey(file: string, factory: string) {
   const refused = factoryNameRefusal(factory);
   if (refused) refuse(`${file}: \`factory: ${factory}\` — ${refused} Correct it to a factory nemia factory ls lists.`);
 }
@@ -229,7 +229,7 @@ function refuseFactoryKey(file: string, factory: string): void {
  * @param names The names of the store's factories, offered to choose from; none where none is filed.
  * @param fix The start's own words for naming a factory, `--factory <name>` say; absent where the start has none.
  */
-export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string): string {
+export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string) {
   const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --volume <root>:rw';
   const atStart = fix === undefined ? '' : `, or name it at start: ${fix}`;
   return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
@@ -240,7 +240,7 @@ export function unfactoredCardRefusal(file: string, names: readonly string[], fi
  * `filing` is true for a file `nemia inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start
  * that gives the wait, since `file` is where the idea is now, and no card's path.
  */
-function inboxKeys(file: string, block: string, filing = false): CardKeys {
+function inboxKeys(file: string, block: string, filing = false) {
   const entries = readFrontmatter(file, block).entries.filter((entry) => entry.key === 'labels');
   const flatBlock = entries.length ? withKey(file, block, 'labels', undefined) : block;
   const labels = labelsOf(file, entries);
@@ -251,7 +251,7 @@ function inboxKeys(file: string, block: string, filing = false): CardKeys {
  * A card's `labels:` as the map it holds, or undefined where the card has none — refused, naming the file and the line: the key set
  * twice, a value that is not a map, a label's value that is not one line of text, and a pair a label cannot be (`labelRefusal`).
  */
-function labelsOf(file: string, entries: readonly FrontmatterEntry[]): Labels | undefined {
+function labelsOf(file: string, entries: readonly FrontmatterEntry[]) {
   const [entry, twice] = entries;
   if (entry === undefined) return undefined;
   if (twice !== undefined)
@@ -273,7 +273,7 @@ function labelsOf(file: string, entries: readonly FrontmatterEntry[]): Labels | 
 }
 
 /** A card's frontmatter but its `labels:`, as key → one line of text. */
-function flatKeys(file: string, block: string, filing: boolean): Partial<Record<FlatKey, string>> {
+function flatKeys(file: string, block: string, filing: boolean) {
   return frontmatterKeys(file, block, FLAT_KEYS, (key) =>
     key === 'after'
       ? filing
@@ -288,7 +288,7 @@ function flatKeys(file: string, block: string, filing: boolean): Partial<Record<
  * an old card's path, which names no workflow its factory offers.
  * @param workflow The card's `workflow:` value, null or undefined where it has none.
  */
-export const cardWorkflowName = (workflow: string | null | undefined): string | undefined =>
+export const cardWorkflowName = (workflow: string | null | undefined) =>
   workflow == null || workflowNameRefusal(workflow) !== undefined ? undefined : workflow;
 
 /**
@@ -299,7 +299,7 @@ export const cardWorkflowName = (workflow: string | null | undefined): string | 
  * @param workflow The workflow as given.
  * @param notDone What was not done, said last.
  */
-export function cardWorkflowRefusal(where: string, workflow: string, notDone: string): string | undefined {
+export function cardWorkflowRefusal(where: string, workflow: string, notDone: string) {
   const refused = workflow.trim() === '' ? undefined : workflowNameRefusal(workflow);
   return refused === undefined
     ? undefined
@@ -311,7 +311,7 @@ export function cardWorkflowRefusal(where: string, workflow: string, notDone: st
  * dot, a hidden file `nemia inbox` never lists. Whether a card of that name is there is the folder's to say (`noCardLine`).
  * @param name The name as typed.
  */
-export function inboxNameRefusal(name: string): string | undefined {
+export function inboxNameRefusal(name: string) {
   if (!name.trim())
     return 'A card is named by its file in the inbox, minus .md, as nemia inbox lists it, and this name is empty. Give the name: nemia inbox lists them.';
   if (/[\\/\0]/.test(name) || name === '.' || name === '..') {
@@ -328,7 +328,7 @@ export function inboxNameRefusal(name: string): string | undefined {
  * @param name The name as typed.
  * @param cards The names of the cards the inbox has.
  */
-export function noCardLine(name: string, cards: readonly string[]): string {
+export function noCardLine(name: string, cards: readonly string[]) {
   const bare =
     name.endsWith('.md') && cards.includes(name.slice(0, -'.md'.length))
       ? ` A card is named without its .md: \`${name.slice(0, -'.md'.length)}\`.`
@@ -413,7 +413,7 @@ export type CardRun = Pick<Run, 'id' | 'from'> & { phase: RunPhase };
  * refused; else `queued` when it is queued; else `filed` — an entry that does not read as a card among them, its `error` saying why. Pure.
  * @param l The entry: its queue and last try, and the phases of the runs that name it, in the order they were started.
  */
-export const cardState = (l: Pick<InboxListing, 'queued' | 'tried'> & { phases: readonly RunPhase[] }): CardState =>
+export const cardState = (l: Pick<InboxListing, 'queued' | 'tried'> & { phases: readonly RunPhase[] }) =>
   l.phases.find((phase) => CARD_IN_PLAY[phase]) ?? l.phases.at(-1) ?? (l.queued ? (l.tried?.refused ? 'refused' : 'queued') : 'filed');
 
 /**
@@ -432,7 +432,7 @@ export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
  * Whether `l` is a card still in play (`CARD_IN_PLAY`). Pure.
  * @param l The listed entry, its state worked out.
  */
-export const cardInPlay = (l: Pick<InboxListing, 'state'>): boolean => CARD_IN_PLAY[l.state];
+export const cardInPlay = (l: Pick<InboxListing, 'state'>) => CARD_IN_PLAY[l.state];
 
 /** An entry as the inbox lists it before its runs' phases are read: everything but its `state` (`cardsListed`). */
 export type CardListing = Omit<InboxListing, 'state'>;
@@ -454,15 +454,18 @@ export function cardsListed(
   runs: readonly Pick<Run, 'id' | 'from'>[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
-): CardListing[] {
-  const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
+) {
+  const triedOf = (name: string, text: string) => {
     const t = tries.get(name);
-    return t && t.text === text ? { tried: { at: t.at, repo: t.repo, why: t.why, refused: t.refused } } : {};
+    return (t && t.text === text ? { tried: { at: t.at, repo: t.repo, why: t.why, refused: t.refused } } : {}) satisfies Pick<
+      InboxListing,
+      'tried'
+    > as Pick<InboxListing, 'tried'>;
   };
   const listed = files
     .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
     .sort((a, b) => a.file.localeCompare(b.file))
-    .map(({ file, text }): CardListing => {
+    .map<CardListing>(({ file, text }) => {
       if (!file.endsWith('.md')) {
         return {
           name: file,
@@ -517,7 +520,7 @@ export function cardsListed(
   queueOrder(listed).forEach((l, i) => {
     if (l.queued) l.queued.place = i + 1;
   });
-  return listed;
+  return listed satisfies CardListing[];
 }
 
 /**
@@ -533,12 +536,12 @@ export function inboxListing(
   runs: readonly CardRun[],
   tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
-): InboxListing[] {
+) {
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
   return cardsListed(files, runs, tries, factories).map((l) => ({
     ...l,
     state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
-  }));
+  })) satisfies InboxListing[] as InboxListing[];
 }
 
 /**
@@ -547,7 +550,7 @@ export function inboxListing(
  * refused keeps its place, and the tick passes over it (`nextQueued`).
  * @param listing The inbox's entries.
  */
-export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs'>>(listing: readonly L[]): L[] =>
+export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs'>>(listing: readonly L[]) =>
   listing
     .flatMap((l) => (l.queued && !l.startedAs.length ? [{ l, at: l.queued.at }] : []))
     .sort((a, b) => a.at.localeCompare(b.at) || a.l.name.localeCompare(b.l.name))
@@ -563,12 +566,12 @@ export type WiredFactory = Pick<Factory, 'volumes' | 'workflowRepos'>;
  * @param l The card: its workflow and the factory it names, null for the default one.
  * @param factories The store's factories that read, by name.
  */
-export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>): string | null {
+export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>) {
   const factory = l.factory === null ? undefined : factories.get(l.factory);
   const workflow = cardWorkflowName(l.workflow);
   if (factory === undefined || workflow === undefined) return null;
   const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
-  return 'repo' in of ? of.repo : null;
+  return ('repo' in of ? of.repo : null) satisfies string | null;
 }
 
 /**
@@ -580,11 +583,7 @@ export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, fac
  * @param daemonRepo The repository the daemon runs in.
  * @param factories The store's factories that read, by name.
  */
-export function queueRepo(
-  l: Pick<InboxListing, 'workflow' | 'factory'>,
-  daemonRepo: string,
-  factories: ReadonlyMap<string, WiredFactory>,
-): { repo: string; fromDaemon: boolean } {
+export function queueRepo(l: Pick<InboxListing, 'workflow' | 'factory'>, daemonRepo: string, factories: ReadonlyMap<string, WiredFactory>) {
   if (l.factory === null) return { repo: daemonRepo, fromDaemon: true };
   return { repo: factoryRepoOf(l, factories) ?? '', fromDaemon: false };
 }
@@ -601,7 +600,7 @@ export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'star
   listing: readonly L[],
   repo: string,
   factories: ReadonlyMap<string, WiredFactory> = new Map(),
-): L | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
+) => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo)) satisfies L | undefined;
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and, when its `queued:`
@@ -622,7 +621,7 @@ export type QueueStarted =
  * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in inbox.verb.ts is what both are given.
  * @param repo The card's own `repo:` value.
  */
-export const ignoredRepoLine = (repo: string): string =>
+export const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**
@@ -632,7 +631,7 @@ export const ignoredRepoLine = (repo: string): string =>
  * terminal.
  * @param q The pass's start of the card: started, refused or failed.
  */
-export function queueLine(q: QueueStarted): string {
+export function queueLine(q: QueueStarted) {
   if ('refused' in q) {
     const elsewhere = q.on ? `, or run nemia up in the repository it is about` : '';
     return `${q.card} not started${q.on ? ` on ${q.on}` : ''}: ${q.refused} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (nemia inbox queue ${q.card} --off, then nemia inbox queue ${q.card})${elsewhere}`;
@@ -653,7 +652,7 @@ export function queueLine(q: QueueStarted): string {
  * @param l The inbox's entry, with the tick's last try of its start, if any.
  * @param unfactoredStarts Whether a card that names no factory starts on a repository (`WF_DEFAULT_FACTORY_STARTS=1`).
  */
-export function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
+export function triedClause(l: InboxListing, unfactoredStarts: boolean) {
   const t = l.tried;
   if (!t) return '';
   const said = t.repo !== '' && (l.factory !== null || unfactoredStarts);
@@ -678,7 +677,7 @@ export function triedClause(l: InboxListing, unfactoredStarts: boolean): string 
  * given.
  * @param show Which labels each line shows, every one or the keys asked as columns; none where not given.
  */
-export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false, show: LabelsShown = {}): string[] {
+export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false, show: LabelsShown = {}) {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
@@ -695,13 +694,13 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
  * A started card's state as `nemia inbox` says it beside its run: its run's phase, and `waiting on you` for a run that waits on a person.
  * @param state The card's state.
  */
-export const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
+export const phaseSaid = (state: CardState) => (state === 'waiting' ? 'waiting on you' : state);
 
 /** What `nemia inbox` shows of each card's labels: all of them (`--show-labels`), and a segment per key asked for (`-L`), in order. */
 export type LabelsShown = { readonly showLabels?: boolean; readonly columns?: readonly string[] };
 
 /** The segments `show` asks of a card's map: `  labels: a=b,…` and `  <key>: <value>` per column, `<none>` where it has none. Pure. */
-const labelSegments = (map: Labels, show: LabelsShown): string =>
+const labelSegments = (map: Labels, show: LabelsShown) =>
   `${show.showLabels ? `  labels: ${labelsText(map)}` : ''}${(show.columns ?? []).map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;
 
 /**
@@ -709,7 +708,7 @@ const labelSegments = (map: Labels, show: LabelsShown): string =>
  * `default` where it names none, the factory it starts in — as a run's whole map (`metadataLabels`) carries its own. Pure.
  * @param l The entry: its person labels, its workflow and its factory, null for the default one.
  */
-export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>): Labels => ({
+export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>) => ({
   ...l.labels,
   ...(l.workflow ? { workflow: l.workflow } : {}),
   factory: l.factory || DEFAULT_NAMESPACE,
@@ -719,14 +718,14 @@ export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factor
  * `given` without the keys it leaves undefined, so a key given as undefined leaves the text's own, and each value trimmed, as a card's
  * line is read: ` /home/me/app ` is the repository, and a blank one has no value.
  */
-const definedOf = (given: Partial<Record<FlatKey, string | undefined>>): Partial<Record<FlatKey, string>> =>
+const definedOf = (given: Partial<Record<FlatKey, string | undefined>>) =>
   Object.fromEntries(Object.entries(given).flatMap(([key, value]) => (value === undefined ? [] : [[key, value.trim()]])));
 
 /**
  * An idea's text split at its frontmatter (`splitFrontmatter`), or undefined for a text that opens a rule it never closes: such a text is
  * prose, filed whole. Any other failure is no idea's, and is thrown.
  */
-function splitOrProse(from: string, text: string): { block: string | null; body: string } | undefined {
+function splitOrProse(from: string, text: string) {
   try {
     return splitFrontmatter(from, text);
   } catch (err) {
@@ -751,11 +750,7 @@ function splitOrProse(from: string, text: string): { block: string | null; body:
  * @param text The idea as given: a note, or a file's text.
  * @param givenKeys The `workflow`, `factory` and labels given beside the idea, written over the text's own.
  */
-export function ideaCard(
-  from: string,
-  text: string,
-  givenKeys: { workflow?: string; factory?: string; labels?: Labels },
-): { text: string; body: string } {
+export function ideaCard(from: string, text: string, givenKeys: { workflow?: string; factory?: string; labels?: Labels }) {
   const { labels: givenLabels, ...given } = givenKeys;
   if (!text.trim()) {
     refuse(
@@ -802,15 +797,15 @@ export function ideaCard(
  * run — with the attach that names a workflow's repository; then what was not done.
  * @param notDone What was not done, said last.
  */
-export const retiredRepoRefusal = (notDone: string): string =>
+export const retiredRepoRefusal = (notDone: string) =>
   `a card names its factory and its workflow, never a repository: the factory places its run, on the repository its wiring names for the workflow. Leave the repository out, and name it on the factory: nemia factory attach <factory> <workflow> --repo <name>. ${notDone}`;
 
 /**
  * A card's file: its keys in `INBOX_KEYS`' order, written as YAML (`renderFrontmatter`), then its body. A body that opens with a `---`
  * rule of its own, under no key, is given a frontmatter of one YAML comment line, so the rule is not read as the card's frontmatter.
  */
-function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }, body: string): string {
-  const pairs = INBOX_KEYS.flatMap((key): FrontmatterPair[] => {
+function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }, body: string) {
+  const pairs = INBOX_KEYS.flatMap<FrontmatterPair>((key) => {
     if (key !== 'labels') {
       const value = keys[key];
       return value !== undefined ? [[key, value]] : [];
@@ -836,7 +831,7 @@ function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labe
  * @param at The time the card is queued at, an ISO time; null to take its `queued:` off.
  * @param workflow The workflow to write over the card's own; absent to keep the card's.
  */
-export function queuedText(card: InboxCard, at: string | null, workflow?: string): string {
+export function queuedText(card: InboxCard, at: string | null, workflow?: string) {
   return cardText(card, { workflow: workflow ?? card.workflow, queued: at ?? undefined });
 }
 
@@ -846,7 +841,7 @@ export function queuedText(card: InboxCard, at: string | null, workflow?: string
  * @param card The card as read.
  * @param runs The runs to write; none takes the line off.
  */
-export const fromText = (card: InboxCard, runs: readonly string[]): string => cardText(card, { from: fromLine(runs) });
+export const fromText = (card: InboxCard, runs: readonly string[]) => cardText(card, { from: fromLine(runs) });
 
 /**
  * A card's text with `labels:` set to `labels`, in key order — or taken off, for none — every other key kept: what `nemia label inbox`
@@ -854,7 +849,7 @@ export const fromText = (card: InboxCard, runs: readonly string[]): string => ca
  * @param card The card as read.
  * @param labels The labels to write; none takes the line off.
  */
-export const labelledText = (card: InboxCard, labels: Labels): string => cardText(card, { labels });
+export const labelledText = (card: InboxCard, labels: Labels) => cardText(card, { labels });
 
 /**
  * A card's text, its keys written over by `over` and the frontmatter written again in the keys' order, its comments dropped; a body that
@@ -862,7 +857,7 @@ export const labelledText = (card: InboxCard, labels: Labels): string => cardTex
  * @param card The card as read.
  * @param over The keys to write over the card's own; an undefined key is taken off.
  */
-export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }): string {
+export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }) {
   const keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels } = {
     workflow: card.workflow,
     repo: card.repo,
@@ -889,19 +884,17 @@ export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string |
  * @param place The card's place in the queue's order, from 1, null where it has none.
  * @param workflow The workflow given to queue it with, absent where none was.
  */
-export function queueRefusal(
-  card: InboxCard,
-  where: string,
-  startedAs: readonly string[],
-  place: number | null,
-  workflow?: string,
-): string | undefined {
-  if (startedAs.length) return startedRefusal(card, where, startedAs);
+export function queueRefusal(card: InboxCard, where: string, startedAs: readonly string[], place: number | null, workflow?: string) {
+  if (startedAs.length) return startedRefusal(card, where, startedAs) satisfies string | undefined as string | undefined;
   if (card.queued !== undefined) {
-    return `${card.file}: already queued, at ${card.queued}${place ? `, ${place} in the queue's order` : ''}: the tick starts it when its turn comes and a run slot is free. To queue it again, take it back first: nemia inbox queue ${card.name} --off.`;
+    return `${card.file}: already queued, at ${card.queued}${place ? `, ${place} in the queue's order` : ''}: the tick starts it when its turn comes and a run slot is free. To queue it again, take it back first: nemia inbox queue ${card.name} --off.` satisfies
+      | string
+      | undefined as string | undefined;
   }
   if (card.workflow === undefined && workflow === undefined) {
-    return `${card.file}: no workflow — a queued card starts on its own, and nothing says what runs it. Queue it with its workflow: nemia inbox queue ${card.name} --workflow <w> writes both.`;
+    return `${card.file}: no workflow — a queued card starts on its own, and nothing says what runs it. Queue it with its workflow: nemia inbox queue ${card.name} --workflow <w> writes both.` satisfies
+      | string
+      | undefined as string | undefined;
   }
   return undefined;
 }
@@ -917,7 +910,7 @@ export function queueRefusal(
  * @param at The path given.
  * @param dir The inbox's folder.
  */
-export function inboxNameOf(at: string, dir: string): string | null {
+export function inboxNameOf(at: string, dir: string) {
   const rel = path.relative(dir, at);
   if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith(`..${path.sep}`)) return null;
   return rel.endsWith('.md') ? rel.slice(0, -'.md'.length) : rel;
@@ -938,7 +931,7 @@ export function noWorkflowRefusal(
   where: string,
   offered: { by: string; workflows: readonly string[] },
   oldPath?: string,
-): string {
+) {
   const named =
     oldPath === undefined
       ? 'the card names none, and none was given'
@@ -959,6 +952,6 @@ export function noWorkflowRefusal(
  * @param where What `nemia inbox add` is told to file the idea again from: the card's file.
  * @param runs The runs a record says the card was started as.
  */
-export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
+export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]) {
   return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and a card is started once. To run the idea again, file it again under a name of its own: nemia inbox add ${where}.`;
 }

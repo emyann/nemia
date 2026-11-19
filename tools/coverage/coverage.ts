@@ -39,7 +39,7 @@ export type Fall = {
 const NOT_SOURCE = new Set(['node_modules', 'fixtures', '__fixtures__']);
 
 /** Whether `fromPackage`, a path relative to the package's folder, is one of the package's own source files. */
-const isSource = (fromPackage: string): boolean => {
+const isSource = (fromPackage: string) => {
   if (fromPackage === '' || fromPackage.startsWith('..') || path.isAbsolute(fromPackage)) return false;
   const parts = fromPackage.split(path.sep);
   if (parts[0] === 'test' || parts.some((part) => NOT_SOURCE.has(part))) return false;
@@ -58,7 +58,7 @@ type Section = {
 };
 
 /** The `SF:` sections of an lcov text, each with its `DA`, `LF`, `LH`, `BRDA`, `BRF` and `BRH` lines read. */
-const sections = (lcov: string): Section[] => {
+const sections = (lcov: string) => {
   const found: Section[] = [];
   let current: Section | undefined;
   for (const raw of lcov.split('\n')) {
@@ -85,7 +85,7 @@ const sections = (lcov: string): Section[] => {
 };
 
 /** One section's coverage: the summary lines where lcov gives them, else counted from its `DA` and `BRDA` lines. */
-const coverageOf = (section: Section): FileCoverage => {
+const coverageOf = (section: Section) => {
   const hitLines = [...section.lineCounts].filter(([, count]) => count > 0).map(([at]) => at);
   hitLines.sort((a, b) => a - b);
   return {
@@ -99,7 +99,7 @@ const coverageOf = (section: Section): FileCoverage => {
 };
 
 /** Two sections of one file, as a run that reports a file twice leaves: the lines hit in either, and the larger of each count. */
-const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
+const merged = (a: FileCoverage, b: FileCoverage) => {
   const hitLines = [...new Set([...a.lines.hitLines, ...b.lines.hitLines])].sort((x, y) => x - y);
   return {
     lines: { found: Math.max(a.lines.found, b.lines.found), hit: hitLines.length, hitLines },
@@ -124,7 +124,7 @@ export type Istanbul = Record<string, IstanbulFile>;
  * The arms of one file's branches, each by `branch.arm` (lcov's block and branch), to the line it opens on: an arm with no place of
  * its own, the `else` an `if` leaves out, opens on its branch's line.
  */
-const armsIn = (file: IstanbulFile): FileCoverage['arms'] => {
+const armsIn = (file: IstanbulFile) => {
   const arms: FileCoverage['arms'] = { taken: {}, untaken: {} };
   for (const [id, branch] of Object.entries(file.branchMap)) {
     const counts = file.b[id] ?? [];
@@ -145,9 +145,9 @@ const armsIn = (file: IstanbulFile): FileCoverage['arms'] => {
  * @param packageDir the package's folder
  * @param istanbul the istanbul coverage Vitest wrote beside it (`coverage-final.json`), read for each branch's arms
  */
-export const recordOf = (lcov: string, packageDir: string, istanbul: Istanbul): CoverageRecord => {
+export const recordOf = (lcov: string, packageDir: string, istanbul: Istanbul) => {
   const root = path.resolve(packageDir);
-  const keyOfPath = (file: string): string | undefined => {
+  const keyOfPath = (file: string) => {
     const fromPackage = path.relative(root, path.resolve(root, file));
     return isSource(fromPackage) ? fromPackage.split(path.sep).join('/') : undefined;
   };
@@ -163,11 +163,11 @@ export const recordOf = (lcov: string, packageDir: string, istanbul: Istanbul): 
     if (key && key in files) files[key].arms = armsIn(coverage);
   }
   const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
-  return { version: 3, package: path.basename(root), files: sorted };
+  return { version: 3, package: path.basename(root), files: sorted } satisfies CoverageRecord;
 };
 
 /** Whether `arms`, one record's of a file, took the arm `key`. A record without the file took nothing. */
-const takenIn = (arms: FileCoverage['arms'] | undefined, key: string): boolean => arms !== undefined && key in arms.taken;
+const takenIn = (arms: FileCoverage['arms'] | undefined, key: string) => arms !== undefined && key in arms.taken;
 
 /** What the records said of a file that is no fall: the lines and the arms' lines some record reached and another did not. */
 export type Varying = { file: string; lines: number[]; armLines: number[] };
@@ -187,7 +187,7 @@ const verdicts = <K>(keys: Iterable<K>, before: ((key: K) => boolean)[], after: 
   return { lost, varying };
 };
 
-const ordered = (lines: number[]): number[] => [...new Set(lines)].sort((a, b) => a - b);
+const ordered = (lines: number[]) => [...new Set(lines)].sort((a, b) => a - b);
 
 /**
  * The files whose coverage fell from the records `before` to the records `after`, and what varies between the records. A line, or a
@@ -197,7 +197,7 @@ const ordered = (lines: number[]): number[] => [...new Set(lines)].sort((a, b) =
  * fewer hit is a line that varied. The counts said are the fewest any record before hit and the most any after hits. A file only
  * `after` has is no fall; lcov's branch count is said, never judged.
  */
-export const judged = (before: CoverageRecord[], after: CoverageRecord[]): { falls: Fall[]; varying: Varying[] } => {
+export const judged = (before: CoverageRecord[], after: CoverageRecord[]) => {
   const falls: Fall[] = [];
   const varying: Varying[] = [];
   for (const file of [...new Set(before.flatMap((record) => Object.keys(record.files)))].sort()) {
@@ -226,10 +226,10 @@ export const judged = (before: CoverageRecord[], after: CoverageRecord[]): { fal
 };
 
 /** The files of `before` whose coverage fell in `after`, one record on each side (`judged`). */
-export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] => judged([before], [after]).falls;
+export const compared = (before: CoverageRecord, after: CoverageRecord) => judged([before], [after]).falls;
 
 /** A string as one word of a POSIX shell's line: in single quotes, a quote inside it closed, escaped and reopened. */
-const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
+const quoted = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
 
 /**
  * A package's `test` script with Vitest's v8 coverage written into the folder `destination`, as `lcov.info` and
@@ -243,7 +243,7 @@ const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
  * @param script the package's `test` script, as its `package.json` gives it
  * @param destination the folder the coverage is written to
  */
-export const withCoverage = (script: string, destination: string): string | undefined => {
+export const withCoverage = (script: string, destination: string) => {
   const trimmed = script.trimStart();
   const head = /^vitest\s+run\b/.exec(trimmed)?.[0];
   if (!head) return undefined;

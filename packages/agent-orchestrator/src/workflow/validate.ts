@@ -15,14 +15,14 @@ import { fencedItself, writesNothing } from './fence.ts';
  * (`validate`).
  * @param steps The workflow's steps.
  */
-export const isFolderTeam = (steps: readonly Pick<StepSpec, 'place'>[]): boolean =>
+export const isFolderTeam = (steps: readonly Pick<StepSpec, 'place'>[]) =>
   steps.length > 0 && steps.every((s) => stepPlace(s) === 'folder');
 
 /** What `after` reads of a step: its name, and the names of the steps it waits on. */
 type Waits = { readonly name: string; readonly after: readonly string[] };
 
 /** Why `s` cannot wait as its `after:` says among the steps named `names` — a name no step has, or its own — or undefined where it can. */
-const waitRefusal = (s: Waits, names: ReadonlySet<string>): string | undefined => {
+const waitRefusal = (s: Waits, names: ReadonlySet<string>) => {
   for (const a of s.after) {
     if (!names.has(a)) return `${s.name}: waits on "${a}", which is not a step here`;
     if (a === s.name) return `${s.name}: waits on itself`;
@@ -35,7 +35,7 @@ const waitRefusal = (s: Waits, names: ReadonlySet<string>): string | undefined =
  * where each waits on others of them. One rule, read by `validate` and by the model's `Workflow` (`folder/folder.model.ts`).
  * @param steps Each step's name and the names it waits on.
  */
-export function afterRefusal(steps: readonly Waits[]): string | undefined {
+export function afterRefusal(steps: readonly Waits[]) {
   const names = new Set(steps.map((s) => s.name));
   for (const s of steps) {
     const refused = waitRefusal(s, names);
@@ -49,7 +49,7 @@ export function afterRefusal(steps: readonly Waits[]): string | undefined {
  * is taken away. One rule, read by `validate` and by the model's `Workflow`.
  * @param steps Each step's name and the names it waits on.
  */
-export function cycleRefusal(steps: readonly Waits[]): string | undefined {
+export function cycleRefusal(steps: readonly Waits[]) {
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
   for (let moved = true; moved;) {
     moved = false;
@@ -74,7 +74,7 @@ export function cycleRefusal(steps: readonly Waits[]): string | undefined {
  * each other when some are left once every step that waits on nothing left is taken away.
  * @param steps The workflow's steps.
  */
-export function validate(steps: readonly StepSpec[]): void {
+export function validate(steps: readonly StepSpec[]) {
   const names = new Set(steps.map((s) => s.name));
   for (const s of steps) {
     const waits = waitRefusal(s, names);
@@ -130,7 +130,7 @@ export function validate(steps: readonly StepSpec[]): void {
  * whatever its session staged on nobody's word. The rule reads two steps, the ending and what it waits on, which is why it is here and
  * not in `workspaceOf`, given one step's keys.
  */
-function unfilableCheck(steps: readonly StepSpec[], s: StepSpec): string | undefined {
+function unfilableCheck(steps: readonly StepSpec[], s: StepSpec) {
   if (s.check === undefined || s.gate === true) return undefined;
   if (s.after.some((name) => steps.some((x) => x.name === name && x.loop))) return undefined;
   const waits = s.after.length ? `no step with a \`loop:\` (it waits on ${s.after.join(', ')})` : 'nothing';
@@ -151,7 +151,7 @@ function unfilableCheck(steps: readonly StepSpec[], s: StepSpec): string | undef
  * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
  */
-function validateBaseWorkspace(steps: readonly StepSpec[]): void {
+function validateBaseWorkspace(steps: readonly StepSpec[]) {
   for (const s of steps.filter((x) => endsOnBase(x))) {
     const named = `${s.name}: \`workspace: base\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
@@ -179,7 +179,7 @@ function validateBaseWorkspace(steps: readonly StepSpec[]): void {
  * before the key reads as git (`stepPlace`), so a team that says `place: folder` on some steps and not on others would be both. Refused,
  * rather than one of the two guessed.
  */
-function validateFolder(steps: readonly StepSpec[]): void {
+function validateFolder(steps: readonly StepSpec[]) {
   const folder = steps.filter((s) => stepPlace(s) === 'folder').map((s) => s.name);
   const not = steps.filter((s) => stepPlace(s) !== 'folder').map((s) => s.name);
   if (!folder.length || !not.length) return;
@@ -197,7 +197,7 @@ function validateFolder(steps: readonly StepSpec[]): void {
  * work would take the whole run out of the cap, since a slot is a run's and not a step's, so it is refused here rather than let the
  * run's other steps past the cap with nothing said.
  */
-function validateSlot(steps: readonly StepSpec[]): void {
+function validateSlot(steps: readonly StepSpec[]) {
   const watcher = steps.find((s) => s.slot === 'none');
   const beside = steps.filter((s) => s !== watcher).map((s) => s.name);
   if (!watcher || !beside.length) return;
@@ -220,7 +220,7 @@ function validateSlot(steps: readonly StepSpec[]): void {
  * steps that wait on each other go last, as given, rather than nowhere.
  * @param steps The steps, in the order given.
  */
-export function orderSteps<S extends Pick<StepSpec, 'name' | 'after'>>(steps: readonly S[]): S[] {
+export function orderSteps<S extends Pick<StepSpec, 'name' | 'after'>>(steps: readonly S[]) {
   const names = new Set(steps.map((s) => s.name));
   const order: S[] = [];
   const placed = new Set<string>();
@@ -240,7 +240,7 @@ export function orderSteps<S extends Pick<StepSpec, 'name' | 'after'>>(steps: re
  * @param steps The workflow's steps.
  * @param name The step whose upstream is read.
  */
-export function upstreamOf(steps: readonly StepSpec[], name: string): Set<string> {
+export function upstreamOf(steps: readonly StepSpec[], name: string) {
   const found = new Set<string>();
   const queue = [name];
   while (queue.length) {
@@ -262,7 +262,7 @@ export function upstreamOf(steps: readonly StepSpec[], name: string): Set<string
  * @param steps The workflow's steps, in its order.
  * @param looping The step whose `loop:` sends the work back.
  */
-export function loopSpan(steps: readonly StepSpec[], looping: StepSpec): string[] {
+export function loopSpan(steps: readonly StepSpec[], looping: StepSpec) {
   const target = looping.loop;
   if (!target) return [];
   const up = upstreamOf(steps, looping.name);
@@ -282,7 +282,7 @@ export function loopSpan(steps: readonly StepSpec[], looping: StepSpec): string[
  * either; and a target's `output:` may not take the field the run adds to it. A target runs on a harness of ours: each round continues
  * it in the session it kept, and the run keeps none of a remote agent's.
  */
-function validateLoops(steps: readonly StepSpec[]): void {
+function validateLoops(steps: readonly StepSpec[]) {
   const spans = new Map<string, StepSpec>();
   for (const s of steps) {
     const target = s.loop;
@@ -347,7 +347,7 @@ function validateLoops(steps: readonly StepSpec[]): void {
  * Why a loop crosses a condition, or `undefined`: a round files its whole span again (`loopSpan`), and a condition in it would be asked
  * again after its followers were filed. So a span holds no condition but its looping step, and no `when:` node but its target.
  */
-function loopRouteRefusal(steps: readonly StepSpec[]): string | undefined {
+function loopRouteRefusal(steps: readonly StepSpec[]) {
   for (const looping of steps) {
     for (const name of looping.loop ? loopSpan(steps, looping) : []) {
       const s = steps.find((x) => x.name === name);
@@ -366,7 +366,7 @@ function loopRouteRefusal(steps: readonly StepSpec[]): string | undefined {
 const JUDGE_FENCE: JudgeFence = { writesNothing, fencedItself };
 
 /** Refused: a workflow whose routes do not close (`routeRefusal`), or a loop that crosses a condition (`loopRouteRefusal`). */
-function validateRoutes(steps: readonly StepSpec[]): void {
+function validateRoutes(steps: readonly StepSpec[]) {
   const refused = routeRefusal(steps, JUDGE_FENCE) ?? loopRouteRefusal(steps);
   if (refused !== undefined) throw new WorkflowError(refused);
 }
@@ -379,7 +379,7 @@ function validateRoutes(steps: readonly StepSpec[]): void {
  * share a directory, which is the arrangement the whole worktree design exists to prevent.
  * @param steps The workflow's steps.
  */
-export function fansOut(steps: readonly StepSpec[]): boolean {
+export function fansOut(steps: readonly StepSpec[]) {
   const roots = steps.filter((s) => s.after.length === 0);
   if (roots.length > 1) return true;
   return steps.some((s) => steps.filter((x) => x.after.includes(s.name)).length > 1);
@@ -392,7 +392,7 @@ export function fansOut(steps: readonly StepSpec[]): boolean {
  * reports as the result. Usually one step; several when a workflow deliberately ends wide.
  * @param steps The workflow's steps.
  */
-export function terminalSteps(steps: readonly StepSpec[]): StepSpec[] {
+export function terminalSteps(steps: readonly StepSpec[]) {
   return steps.filter((s) => !steps.some((other) => other.after.includes(s.name)));
 }
 
@@ -414,7 +414,7 @@ export function terminalSteps(steps: readonly StepSpec[]): StepSpec[] {
  * @param steps The workflow's steps.
  * @param isolate Whether each step works in a worktree of its own; false where the run works in place (`--no-worktree`).
  */
-export function stepSetRefusal(steps: readonly StepSpec[], isolate: boolean): string | undefined {
+export function stepSetRefusal(steps: readonly StepSpec[], isolate: boolean) {
   if (!isolate && isFolderTeam(steps))
     return (
       `--no-worktree: this workflow's steps say \`place: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +

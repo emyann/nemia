@@ -35,7 +35,7 @@ const WILDCARD = '/*';
  * wildcard, which every path under `/api/` matches.
  * @param c The request's context.
  */
-export const routeOf = (c: Context<ApiEnv>): string | undefined =>
+export const routeOf = (c: Context<ApiEnv>) =>
   routeAt(
     matchedRoutes(c)
       .map((route) => route.path)
@@ -48,7 +48,7 @@ export const routeOf = (c: Context<ApiEnv>): string | undefined =>
  * The HTTP attributes of `c` once it is answered: its method, its path, its status, and its route where one matched.
  * @param c The request's context, once it is answered.
  */
-export const attributesOf = (c: Context<ApiEnv>): RequestAttributes => {
+export const attributesOf = (c: Context<ApiEnv>) => {
   const route = routeOf(c);
   return {
     'http.request.method': c.req.method,
@@ -62,21 +62,23 @@ export const attributesOf = (c: Context<ApiEnv>): RequestAttributes => {
  * How long a request took or a stream was open, in the daemon's words: whole milliseconds under a second, else seconds to one decimal.
  * @param ms How long, in milliseconds.
  */
-export const tookOf = (ms: number): string => (ms < 1_000 ? `${Math.round(ms)}ms` : `${(ms / 1_000).toFixed(1)}s`);
+export const tookOf = (ms: number) => (ms < 1_000 ? `${Math.round(ms)}ms` : `${(ms / 1_000).toFixed(1)}s`);
 
 /** How a request of `status` is said: an answer at Info, a refusal (4xx) at Warning, a failure (5xx) at Error. */
-const sayOf = (status: number): ((message: string) => Effect.Effect<void>) =>
-  status >= 500 ? Effect.logError : status >= 400 ? Effect.logWarning : Effect.logInfo;
+const sayOf = (status: number) =>
+  (status >= 500 ? Effect.logError : status >= 400 ? Effect.logWarning : Effect.logInfo) satisfies (
+    message: string,
+  ) => Effect.Effect<void> as (message: string) => Effect.Effect<void>;
 
 /** The path a request asked for, its query left off. */
-const pathOf = (c: Context<ApiEnv>): string => new URL(c.req.url).pathname;
+const pathOf = (c: Context<ApiEnv>) => new URL(c.req.url).pathname;
 
 /**
  * What a request's span is named and carries before it is answered, read without touching `c.res`, whose getter would answer the request
  * with an empty response: the method and the route as OTel names a server span, the method alone where no route matched, and the method,
  * the path and the route as attributes. Its status is annotated on it once it is answered.
  */
-const spanOf = (c: Context<ApiEnv>): { name: string; attributes: Record<string, string> } => {
+const spanOf = (c: Context<ApiEnv>) => {
   const route = routeOf(c);
   return {
     name: route === undefined ? c.req.method : `${c.req.method} ${route}`,
@@ -89,13 +91,13 @@ const spanOf = (c: Context<ApiEnv>): { name: string; attributes: Record<string, 
 };
 
 /** The request's line, `tail` after its status, at the level its status asks for, annotated with the same attributes its span carries. */
-const line = (attributes: RequestAttributes, tail: string): Effect.Effect<void> =>
+const line = (attributes: RequestAttributes, tail: string) =>
   sayOf(attributes['http.response.status_code'])(
     `${attributes['http.request.method']} ${attributes['url.path']} ${attributes['http.response.status_code']} ${tail}`,
   ).pipe(Effect.annotateLogs(attributes));
 
 /** Whether the answer is a stream of server-sent events, which says a second line when its body is done. */
-const streamed = (c: Context<ApiEnv>): boolean => c.res.headers.get('content-type')?.startsWith('text/event-stream') === true;
+const streamed = (c: Context<ApiEnv>) => c.res.headers.get('content-type')?.startsWith('text/event-stream') === true;
 
 /**
  * `body`, the streamed answer's own, relayed through a response of the same status and headers, which says the closing line with how long
@@ -103,9 +105,9 @@ const streamed = (c: Context<ApiEnv>): boolean => c.res.headers.get('content-typ
  * stream's `onAbort` as the reader's own cancel did before. A line the runtime can no longer say is dropped: the api's own shutdown
  * disposes the runtime as its program ends, and a relay that settles after it would reject with nothing left to say it to.
  */
-const piped = (c: Context<ApiEnv>, body: ReadableStream<Uint8Array>, attributes: RequestAttributes, began: number): Response => {
+const piped = (c: Context<ApiEnv>, body: ReadableStream<Uint8Array>, attributes: RequestAttributes, began: number) => {
   const relay = new TransformStream<Uint8Array, Uint8Array>();
-  const closed = (): void => {
+  const closed = () => {
     const said = line(attributes, `${tookOf(performance.now() - began)} stream closed`);
     void c.var.runtime.runPromise(said).catch(() => undefined);
   };

@@ -20,7 +20,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export type IoCounts = { bytesRead: number; reads: number; spawned: number; writes: number; locks: number; lockWaitMs: number };
 
 /** Nothing counted yet. */
-export const noCounts = (): IoCounts => ({ bytesRead: 0, reads: 0, spawned: 0, writes: 0, locks: 0, lockWaitMs: 0 });
+export const noCounts = () => ({ bytesRead: 0, reads: 0, spawned: 0, writes: 0, locks: 0, lockWaitMs: 0 });
 
 const counts: IoCounts = noCounts();
 
@@ -40,17 +40,17 @@ export type Tally = { counts: IoCounts; observed: Record<string, ObserveCount> }
 const open = new AsyncLocalStorage<readonly Tally[]>();
 
 /** The tallies open where this runs, the outermost first: none outside every `tallied`. */
-export const talliesHere = (): readonly Tally[] => open.getStore() ?? [];
+export const talliesHere = () => open.getStore() ?? [];
 
 /**
  * `f` run with `tally` open, inside every tally already open where it is called: what it and all it starts count goes to each.
  * @param tally The tally to open.
  * @param f What to run with it open.
  */
-export const tallied = <T>(tally: Tally, f: () => T): T => open.run([...talliesHere(), tally], f);
+export const tallied = <T>(tally: Tally, f: () => T) => open.run([...talliesHere(), tally], f);
 
 /** The counts as they stand where this runs: the innermost tally's open here, else the process's; the live object, never a copy. */
-export const countsHere = (): IoCounts => talliesHere().at(-1)?.counts ?? counts;
+export const countsHere = () => talliesHere().at(-1)?.counts ?? counts;
 
 /** `add` applied to the process's totals and to each tally open here. */
 const count = (add: (c: IoCounts) => void) => {
@@ -59,20 +59,20 @@ const count = (add: (c: IoCounts) => void) => {
 };
 
 /** The totals as they stand: a copy, so a caller can take a difference. */
-export const ioCounts = (): IoCounts => ({ ...counts });
+export const ioCounts = () => ({ ...counts });
 
 /**
  * One read of `bytes`, made by a reader of the runtime's that did not go through `readText`.
  * @param bytes How many bytes were read.
  */
-export const countRead = (bytes: number): void =>
+export const countRead = (bytes: number) =>
   count((c) => {
     c.reads++;
     c.bytesRead += bytes;
   });
 
 /** One write of the store's to a journal or the feed: an append, or a rename into place. */
-export const countWrite = (): void =>
+export const countWrite = () =>
   count((c) => {
     c.writes++;
   });
@@ -81,14 +81,14 @@ export const countWrite = (): void =>
  * The feed's lock taken once, after `waitedMs` milliseconds of waiting for it.
  * @param waitedMs How long the lock was waited for, in milliseconds.
  */
-export const countLock = (waitedMs: number): void =>
+export const countLock = (waitedMs: number) =>
   count((c) => {
     c.locks++;
     c.lockWaitMs += waitedMs;
   });
 
 /** One process started. */
-export const countSpawn = (): void =>
+export const countSpawn = () =>
   count((c) => {
     c.spawned++;
   });
@@ -97,7 +97,7 @@ export const countSpawn = (): void =>
  * `fs.readFileSync(file, 'utf8')`, counted: throws as it does.
  * @param file The path of the file to read.
  */
-export const readText = (file: string): string => {
+export const readText = (file: string) => {
   const buf = fs.readFileSync(file);
   countRead(buf.length);
   return buf.toString('utf8');

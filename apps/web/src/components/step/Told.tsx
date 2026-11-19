@@ -36,7 +36,7 @@ export type LayerHomes = {
  *
  * @param agent the agent's name
  */
-export const INSTRUCTIONS = (agent: string): string => `1. Instructions — ${agent}'s`;
+export const INSTRUCTIONS = (agent: string) => `1. Instructions — ${agent}'s`;
 export const CUSTOM_INSTRUCTIONS = '2. Your custom instructions';
 export const FOLDER_FILES = "3. The folder's files";
 export const FACTORY_RULES = "4. The factory's rules";
@@ -59,7 +59,7 @@ const DEEPER = { 2: 4, 3: 5, 4: 6 } as const;
 const PRECEDENCE_NOTE = 'Where two of them say different things, the higher number wins, and the task is above them all.';
 
 /** What the fold says of a step with no agent: Nemia composed no layer above its own words, which are its policy. */
-const noAgent = (will: boolean): string =>
+const noAgent = (will: boolean) =>
   `No agent: of the words Nemia composes, its own are all it ${will ? 'will be' : 'was'} told. ${PRECEDENCE_NOTE}`;
 
 /** What the layer of the folder's files says: the session reads them where it works, and the board has none of them to draw. */
@@ -79,7 +79,7 @@ const NO_RULES_TOLD = 'This step is told none: the factory keeps none that can b
  * @param agent the agent's name
  * @param layers the layers of what the step is told, read for its custom and factory ones
  */
-export function toldBefore(agent: string, layers: Pick<Frozen<StepLayers>, 'custom' | 'factory'>): string {
+export function toldBefore(agent: string, layers: Pick<Frozen<StepLayers>, 'custom' | 'factory'>) {
   const first = `${agent}'s instructions`;
   const rest = [
     ...(layers.custom === null ? [] : ['your custom instructions']),

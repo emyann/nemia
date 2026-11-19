@@ -103,7 +103,7 @@ const SHAPES: Record<FieldShape, object> = {
 const isShape = (shape: unknown): shape is FieldShape => typeof shape === 'string' && Object.hasOwn(SHAPES, shape);
 
 /** Whether `value` holds the marker anywhere, at any depth. */
-const marked = (value: unknown): boolean =>
+const marked = (value: unknown) =>
   Array.isArray(value) ? value.some(marked) : isObject(value) && (Object.hasOwn(value, SHAPE_KEY) || Object.values(value).some(marked));
 
 /**
@@ -112,9 +112,7 @@ const marked = (value: unknown): boolean =>
  * schema key but `description`, and a marker anywhere but on a field itself.
  * @param properties The output schema's `properties`, by field name.
  */
-export function expandShapes(
-  properties: Record<string, unknown>,
-): { properties: Record<string, unknown>; shapes: Record<string, FieldShape> } | { error: string } {
+export function expandShapes(properties: Record<string, unknown>) {
   const expanded: Record<string, unknown> = {};
   const shapes: Record<string, FieldShape> = {};
   for (const [name, field] of Object.entries(properties)) {
@@ -150,19 +148,19 @@ const QUESTIONS_SCHEMAS = knownSchemas([QUESTIONS_SCHEMA, ...FORMER_QUESTIONS_SC
  * Whether a field's schema is `QUESTIONS_SCHEMA`, or a former one a frozen run holds (`FORMER_QUESTIONS_SCHEMAS`), its `description`
  * aside.
  */
-const isQuestionsSchema = (schema: unknown): boolean => sameSchema(schema, QUESTIONS_SCHEMAS);
+const isQuestionsSchema = (schema: unknown) => sameSchema(schema, QUESTIONS_SCHEMAS);
 
 /**
  * The fields a step's `output:` declares whose schema is `QUESTIONS_SCHEMA`, in the schema's order: none for a step without `output:`.
  * @param step The step as its workflow says it; undefined where it is not known.
  */
-export const questionFields = (step: StepSpec | undefined): string[] =>
+export const questionFields = (step: StepSpec | undefined) =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => isQuestionsSchema(schema))
     .map(([name]) => name);
 
 /** An option read, or why it is not one. */
-const optionOf = (value: unknown, at: string): QuestionOption | string => {
+const optionOf = (value: unknown, at: string) => {
   const option = fieldsOf(value);
   if (!option) return `${at} is not an object`;
   // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
@@ -183,18 +181,13 @@ const QUESTION_KEYS = ['body', 'multiple', 'options', 'recommended', 'title'];
  * The labels a question recommends, as a list: none for null, one for a label.
  * @param q The question, whose `recommended` is read.
  */
-export const recommendedOf = (q: Pick<Question, 'recommended'>): readonly string[] =>
+export const recommendedOf = (q: Pick<Question, 'recommended'>) =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
 /**
  * A question's `recommended` read: one label of `labels` or null, or where it takes `multiple`, a list of them; or why it is not one.
  */
-function recommendedRead(
-  given: unknown,
-  multiple: boolean,
-  labels: readonly string[],
-  at: string,
-): { recommended: string | string[] | null } | string {
+function recommendedRead(given: unknown, multiple: boolean, labels: readonly string[], at: string) {
   const offered = labels.map((l) => JSON.stringify(l)).join(', ');
   if (given === null) return { recommended: null };
   const items = itemsOf(given);
@@ -219,7 +212,7 @@ function recommendedRead(
  * One question read, or why it is not one: its keys, their types, its options, and a `recommended` that names one of them, or where it
  * takes `multiple` options, a list of them.
  */
-function questionOf(value: unknown, at: string): Question | string {
+function questionOf(value: unknown, at: string) {
   const q = fieldsOf(value);
   if (!q) return `${at} is not an object`;
   // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
@@ -253,7 +246,7 @@ function questionOf(value: unknown, at: string): Question | string {
  * and no title twice. What it answers is read afresh from `value`, never `value` itself.
  * @param value The field's value, as the closeout gave it.
  */
-export function questionsOf(value: unknown): Question[] | { error: string } {
+export function questionsOf(value: unknown) {
   const items = itemsOf(value);
   if (!items) return { error: 'the questions are not a list' };
   const questions: Question[] = [];
@@ -275,7 +268,7 @@ export function questionsOf(value: unknown): Question[] | { error: string } {
  * @param step The step as its workflow says it, whose `output:` names its question fields; undefined where it is not known.
  * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
  */
-export function askedQuestions(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): Asked[] {
+export function askedQuestions(step: StepSpec | undefined, said: Closeout | { error: string } | undefined) {
   if (!said || 'error' in said) return [];
   const asked = questionFields(step).flatMap((field) => {
     const questions = questionsOf(said.output?.[field]);
@@ -293,7 +286,7 @@ export function askedQuestions(step: StepSpec | undefined, said: Closeout | { er
  * @param step The step as its workflow says it, whose `output:` names its question fields; undefined where it is not known.
  * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
  */
-export function questionRefusals(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): string[] {
+export function questionRefusals(step: StepSpec | undefined, said: Closeout | { error: string } | undefined) {
   if (!said || 'error' in said) return [];
   const read: Question[] = [];
   const refused: string[] = [];
@@ -325,7 +318,7 @@ export function questionRefusals(step: StepSpec | undefined, said: Closeout | { 
  * @param said The closeout the step gave.
  * @param steps The run's steps, whose order says which come after `step`.
  */
-export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, steps: readonly StepSpec[]): string[] => [
+export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, steps: readonly StepSpec[]) => [
   ...envelopeRefusals(said),
   ...questionRefusals(step, said),
   ...budgetRefusals(step, steps, said),
@@ -335,7 +328,7 @@ export const closeoutRefusals = (step: StepSpec | undefined, said: Closeout, ste
 const READ_AGAIN = "Read the step's questions again and answer those.";
 
 /** Why one answer does not fit its question, or null. */
-function oneAnswerRefusal(q: Question, a: Answer): string | null {
+function oneAnswerRefusal(q: Question, a: Answer) {
   const labels = q.options.map((o) => o.label);
   const stray = a.chose.find((label) => !labels.includes(label));
   if (stray !== undefined) {
@@ -358,11 +351,7 @@ function oneAnswerRefusal(q: Question, a: Answer): string | null {
  * @param instead How a person says what they mean to a step that asks none, as the refusal names it: in words, without `answers`, on the
  *   board's side; with `--message`, without `--answer`, at the terminal.
  */
-export function answerRefusal(
-  asked: readonly Question[],
-  answers: readonly Answer[],
-  instead = 'in words, without `answers`',
-): string | null {
+export function answerRefusal(asked: readonly Question[], answers: readonly Answer[], instead = 'in words, without `answers`') {
   if (!asked.length) {
     return `The step asks no questions now, so there is nothing to answer. Read the step again, and say what you mean ${instead}.`;
   }
@@ -390,13 +379,13 @@ export type AnsweredBy = string;
 const ON_THE_BOARD: AnsweredBy = 'the person, on the board';
 
 /** The last line of the words answers become: who answered (`AnsweredBy`). */
-const answeredLine = (by: AnsweredBy): string => `Answered by: ${by}`;
+const answeredLine = (by: AnsweredBy) => `Answered by: ${by}`;
 
 /**
  * Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered
  * (`by`).
  */
-function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note: string | undefined, by: AnsweredBy): string[] {
+function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note: string | undefined, by: AnsweredBy) {
   const blocks = asked.map((q, i) => {
     const a = answers.find((one) => one.question === q.title);
     const chose = (a?.chose ?? []).map((label) => `   Chose: ${label} — ${q.options.find((o) => o.label === label)?.meaning ?? ''}`);
@@ -416,7 +405,7 @@ function answerBlocks(asked: readonly Question[], answers: readonly Answer[], no
  * @param note The person's note under the answers; absent where there is none.
  * @param by Who answered; the person, on the board, where absent.
  */
-export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string, by: AnsweredBy = ON_THE_BOARD): string =>
+export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string, by: AnsweredBy = ON_THE_BOARD) =>
   ['Answers to your questions:', ...answerBlocks(asked, answers, note, by)].join('\n\n');
 
 /**
@@ -435,4 +424,4 @@ export const approvedAnswerText = (
   answers: readonly Answer[],
   note?: string,
   by: AnsweredBy = ON_THE_BOARD,
-): string => [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note, by)].join('\n\n');
+) => [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note, by)].join('\n\n');

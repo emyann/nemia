@@ -8,7 +8,7 @@
 const STEP_LINK = /^\/runs\/([^/?#]+)\?step=([^&#]+)$/;
 
 /** `part` URI-decoded, or undefined where it does not decode or decodes to nothing. */
-const decoded = (part: string): string | undefined => {
+const decoded = (part: string) => {
   try {
     const plain = decodeURIComponent(part);
     return plain === '' ? undefined : plain;
@@ -22,7 +22,7 @@ const decoded = (part: string): string | undefined => {
  * URI-decoded and neither empty); undefined for every other address, a run's page without a step among them. Pure.
  * @param href The link's address, as the message names it.
  */
-export function broughtOf(href: string): { run: string; step: string } | undefined {
+export function broughtOf(href: string) {
   const parts = STEP_LINK.exec(href);
   if (!parts) return undefined;
   const run = decoded(parts[1]);

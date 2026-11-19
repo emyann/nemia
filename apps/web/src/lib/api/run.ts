@@ -38,8 +38,8 @@ export const runObjectQuery = (id: string) =>
 export const stepTriesQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'tries', stamp],
-    queryFn: (): Promise<readonly StepTry[]> =>
-      steps.tries(id, step).then(
+    queryFn: () =>
+      steps.tries(id, step).then<readonly StepTry[], readonly StepTry[]>(
         (read) => read.tries,
         (error: unknown) => {
           if (readGone(error)) return [];
@@ -59,8 +59,8 @@ export const stepTriesQuery = (id: string, step: string, stamp: string) =>
 export const stepToldQuery = (id: string, step: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'steps', step, 'told', stamp],
-    queryFn: (): Promise<StepTold | null> =>
-      steps.told(id, step).then(
+    queryFn: () =>
+      steps.told(id, step).then<StepTold | null, StepTold | null>(
         (read) => read,
         (error: unknown) => {
           if (readGone(error)) return null;

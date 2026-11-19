@@ -19,10 +19,10 @@ const REFUSALS_AGREE: Same<FloorRefusal, FloorRefusalWord> = true;
 void [NARROWINGS_AGREE, REFUSALS_AGREE];
 
 /** The refusal for `reason`. */
-const denied = (reason: FloorRefusal): FloorAnswer => ({ decision: 'deny', reason });
+const denied = (reason: FloorRefusal) => ({ decision: 'deny', reason }) satisfies FloorAnswer;
 
 /** Whether the class `c` is above the narrowing `n`: anything but a read above `read`, an answer above `act`. */
-const above = (c: FloorCall['class'], n: FloorNarrowing | null): boolean => n !== null && c !== 'read' && (n === 'read' || c !== 'act');
+const above = (c: FloorCall['class'], n: FloorNarrowing | null) => n !== null && c !== 'read' && (n === 'read' || c !== 'act');
 
 /**
  * The floor's answer for `call` under a token held as `holder`: refused out of reach (`none`), asked every time (`ask`), above the

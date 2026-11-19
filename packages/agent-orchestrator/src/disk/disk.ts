@@ -33,7 +33,7 @@ const PART_OF: Readonly<Record<string, DiskPart>> = {
  * The part a name of the store's root is: its own for a part's folder, `other` for any other.
  * @param name A name directly under the store's root.
  */
-export const partOf = (name: string): DiskPart => (Object.hasOwn(PART_OF, name) ? PART_OF[name] : undefined) ?? 'other';
+export const partOf = (name: string) => (Object.hasOwn(PART_OF, name) ? PART_OF[name] : undefined) ?? 'other';
 
 /**
  * The kinds of each part, each kind inside one part, so a part's kinds add up to the part:
@@ -58,7 +58,7 @@ export const DISK_KINDS = {
 export type DiskKind = (typeof DISK_KINDS)[DiskPart][number];
 
 /** Every kind, in the parts' order. */
-export const ALL_KINDS: readonly DiskKind[] = DISK_PARTS.flatMap((part): readonly DiskKind[] => DISK_KINDS[part]);
+export const ALL_KINDS: readonly DiskKind[] = DISK_PARTS.flatMap((part) => DISK_KINDS[part]);
 
 /** The kind a folder of a run's names its handed files, its frozen agents and its frozen inputs by. */
 const RUN_FOLDERS: Readonly<Record<string, DiskKind>> = { artifacts: 'handed', agents: 'agents', inputs: 'inputs' };
@@ -67,7 +67,7 @@ const RUN_FOLDERS: Readonly<Record<string, DiskKind>> = { artifacts: 'handed', a
 const PICTURE_ENDS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.svg'];
 
 /** Whether `name` is a picture's, by its end, whatever its case. */
-const isPicture = (name: string): boolean => {
+const isPicture = (name: string) => {
   const lower = name.toLowerCase();
   return PICTURE_ENDS.some((end) => lower.endsWith(end));
 };
@@ -79,7 +79,7 @@ const isPicture = (name: string): boolean => {
  * @param part The root's part.
  * @param name Its name under a part kept by run, or undefined for the part's folder or a part walked whole.
  */
-export function kindAt(part: DiskPart, name?: string): DiskKind {
+export function kindAt(part: DiskPart, name?: string) {
   if (part === 'worktrees') return name === 'node_modules' ? 'dependencies' : 'checkout';
   if (part === 'runs') {
     if (name === undefined || !name.includes('.')) return 'runs-other';
@@ -97,7 +97,7 @@ export function kindAt(part: DiskPart, name?: string): DiskKind {
  * @param kind The kind of the folder the name is in.
  * @param name The name inside it.
  */
-export function kindIn(kind: DiskKind, name: string): DiskKind {
+export function kindIn(kind: DiskKind, name: string) {
   if (kind === 'runs-other') return (Object.hasOwn(RUN_FOLDERS, name) ? RUN_FOLDERS[name] : undefined) ?? 'runs-other';
   if (kind === 'handed' || kind === 'pictures') return isPicture(name) ? 'pictures' : 'handed';
   if (kind === 'checkout') return name === 'node_modules' ? 'dependencies' : 'checkout';
@@ -110,7 +110,7 @@ export function kindIn(kind: DiskKind, name: string): DiskKind {
  * @param name A name under a part kept by run.
  * @param ids The ids of the runs known.
  */
-export function runOf(name: string, ids: ReadonlySet<string>): string | undefined {
+export function runOf(name: string, ids: ReadonlySet<string>) {
   if (ids.has(name)) return name;
   for (let dot = name.lastIndexOf('.'); dot > 0; dot = name.lastIndexOf('.', dot - 1)) {
     if (ids.has(name.slice(0, dot))) return name.slice(0, dot);
@@ -189,7 +189,7 @@ export function readingOf(
   runs: { ids: ReadonlySet<string>; factoryOf: (id: string) => string | undefined },
   space: { free: number; size: number },
   at: string,
-): DiskReading {
+) {
   const entries = new Map<string, DiskEntry & { read: boolean }>();
   const add = (at: Pick<DiskEntry, 'part' | 'kind' | 'factory'>, bytes: number, unread: number, read: boolean) => {
     const entry = entries.get(entryKey(at)) ?? { ...at, bytes: 0, unread: 0, read: false };
@@ -200,8 +200,13 @@ export function readingOf(
     add(at(root.kind), 0, unread, read);
     for (const [kind, bytes] of kinds) add(at(kind), bytes, 0, read);
   }
-  const said = [...entries.values()].map(({ read, bytes, ...entry }): DiskEntry => (read ? { ...entry, bytes } : entry));
-  return { at, ...space, entries: DISK_PARTS.flatMap((part) => said.filter((entry) => entry.part === part)) };
+  const said = [...entries.values()].map(({ read, bytes, ...entry }) => (read ? { ...entry, bytes } : entry));
+  const reading: DiskReading = {
+    at,
+    ...space,
+    entries: DISK_PARTS.flatMap((part) => said.filter((entry) => entry.part === part)),
+  };
+  return reading;
 }
 
 /** The kinds of the folder handed to the runtime that the runtime names by task: all of `engine` but what no task names. */
@@ -220,7 +225,7 @@ export type TaskKept = {
 };
 
 /** `entry` with `bytes` more, absent where both are, and `unread` more names that did not read. */
-const plus = (entry: DiskEntry, bytes: number | undefined, unread: number): DiskEntry => ({
+const plus = (entry: DiskEntry, bytes: number | undefined, unread: number) => ({
   ...entry,
   ...(bytes === undefined ? {} : { bytes: (entry.bytes ?? 0) + bytes }),
   unread: entry.unread + unread,
@@ -230,14 +235,15 @@ const plus = (entry: DiskEntry, bytes: number | undefined, unread: number): Disk
  * `entries` in order: by part in `DISK_PARTS`' order; within a part the entries of no factory first, then each factory in the order
  * first met; within a factory by kind, in `DISK_KINDS`' order.
  */
-const inOrder = (entries: readonly DiskEntry[]): DiskEntry[] => {
+const inOrder = (entries: readonly DiskEntry[]) => {
   const met = new Map<string, number>();
   for (const entry of entries) if (!met.has(entry.factory ?? '')) met.set(entry.factory ?? '', entry.factory === undefined ? -1 : met.size);
-  const rank = (entry: DiskEntry): [part: number, factory: number, kind: number] => [
-    DISK_PARTS.indexOf(entry.part),
-    met.get(entry.factory ?? '') ?? 0,
-    entry.kind === undefined ? -1 : ALL_KINDS.indexOf(entry.kind),
-  ];
+  const rank = (entry: DiskEntry) =>
+    [
+      DISK_PARTS.indexOf(entry.part),
+      met.get(entry.factory ?? '') ?? 0,
+      entry.kind === undefined ? -1 : ALL_KINDS.indexOf(entry.kind),
+    ] satisfies [part: number, factory: number, kind: number];
   return entries
     .map((entry) => ({ entry, rank: rank(entry) }))
     .sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2])
@@ -265,7 +271,7 @@ export function withKept(
   entries: readonly DiskEntry[],
   kept: readonly TaskKept[] | undefined,
   factoryOf: (taskId: string) => string | undefined,
-): DiskEntry[] {
+) {
   const made = new Map<string, DiskEntry>(entries.map((entry) => [entryKey(entry), entry]));
   const add = (part: DiskPart, kind: DiskKind, factory: string | undefined, bytes: number | undefined, unread: number) => {
     const at = { part, kind, ...(factory === undefined ? {} : { factory }) };
@@ -299,7 +305,7 @@ export function largestOf(
   roots: readonly DiskRoot[],
   walked: Walked,
   runs: { ids: ReadonlySet<string>; factoryOf: (id: string) => string | undefined },
-): DiskRun[] {
+) {
   const sums = new Map<string, DiskRun>();
   for (const { root, run, factory, bytes } of told(roots, walked, runs.ids, runs.factoryOf)) {
     if (root.name === undefined) continue;
@@ -317,14 +323,14 @@ export function largestOf(
  * An entry's part, factory and kind as one key, and back.
  * @param entry The entry's part, factory and kind.
  */
-export const entryKey = (entry: Pick<DiskEntry, 'part' | 'factory' | 'kind'>): string =>
+export const entryKey = (entry: Pick<DiskEntry, 'part' | 'factory' | 'kind'>) =>
   JSON.stringify([entry.part, entry.factory ?? null, entry.kind ?? null]);
 
 /**
  * The part, factory and kind a key of `entryKey` names.
  * @param key A key `entryKey` made.
  */
-export const entryOf = (key: string): Pick<DiskEntry, 'part' | 'factory' | 'kind'> => {
+export const entryOf = (key: string) => {
   const [part, factory, kind] = JSON.parse(key) as [DiskPart, string | null, DiskKind | null];
   return { part, ...(factory === null ? {} : { factory }), ...(kind === null ? {} : { kind }) };
 };
@@ -336,7 +342,7 @@ export const entryOf = (key: string): Pick<DiskEntry, 'part' | 'factory' | 'kind
  * @param said The keys said before.
  * @param entries The entries of the reading now.
  */
-export const vanished = (said: ReadonlySet<string>, entries: readonly DiskEntry[]): string[] => {
+export const vanished = (said: ReadonlySet<string>, entries: readonly DiskEntry[]) => {
   const now = new Set(entries.map(entryKey));
   const unknown = new Set(entries.filter((entry) => entry.bytes === undefined).map(({ part, factory }) => entryKey({ part, factory })));
   return [...said].filter((key) => {
@@ -349,5 +355,5 @@ export const vanished = (said: ReadonlySet<string>, entries: readonly DiskEntry[
  * The names that did not read in each part of `entries`, every part said, zero where all read.
  * @param entries The entries of a reading.
  */
-export const unreadByPart = (entries: readonly DiskEntry[]): Array<{ part: DiskPart; unread: number }> =>
+export const unreadByPart = (entries: readonly DiskEntry[]) =>
   DISK_PARTS.map((part) => ({ part, unread: entries.reduce((n, entry) => n + (entry.part === part ? entry.unread : 0), 0) }));

@@ -19,7 +19,7 @@ const STATE_WORDS: Record<LibraryAdd['status']['state'], string> = {
 };
 
 /** The key an addable item is picked by, `<kind>.<name>`, as its add is named. */
-const keyOf = (change: Change): string => (change.kind === 'add' ? `${change.item.kind}.${change.item.name}` : change.name);
+const keyOf = (change: Change) => (change.kind === 'add' ? `${change.item.kind}.${change.item.name}` : change.name);
 
 /**
  * A factory's adds from the store's library, on its settings page: each add with its state — resolved, shadowed by the factory's own, or
@@ -39,7 +39,7 @@ export function LibraryAdds({ name }: { name: string }) {
       void queryClient.invalidateQueries({ queryKey: libraryQuery().queryKey });
     },
   });
-  const offered = adds.data && items.data ? addable(items.data, adds.data).map((item): Change => ({ kind: 'add', item })) : [];
+  const offered = adds.data && items.data ? addable(items.data, adds.data).map((item) => ({ kind: 'add', item }) satisfies Change) : [];
   const chosen = offered.find((one) => keyOf(one) === picked);
   return (
     <section aria-label="From the library" data-library-adds className="flex flex-col gap-4">

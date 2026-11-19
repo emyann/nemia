@@ -11,8 +11,8 @@ import { LEVEL_WORDS, NemiaLevelSet, DEFAULT_NAMESPACE } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Served } from '../command/entry.verb.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
-import { durationOf, durationRefusal, factoryAsked, type FactoryAsk, type FactoryLevel, type FactoryLevelFile } from '../level/level.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { durationOf, durationRefusal, factoryAsked, type FactoryAsk, type FactoryLevel } from '../level/level.ts';
 import { FactoryName } from '../factory/factory.model.ts';
 import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { levelsNow } from '../level/levels.verb.ts';
@@ -53,7 +53,7 @@ export type NemiaLevel = {
  * How a person reaches her session `sessionId`: attached on this machine, then through its web link (`bridge`) where it is up, or why it
  * is not where it was asked; nothing more where it was not.
  */
-const reachOf = (sessionId: string | null, bridge: Bridge | null): string[] => {
+const reachOf = (sessionId: string | null, bridge: Bridge | null) => {
   if (sessionId === null) return [];
   const attach = `${DEFAULT_HARNESS} attach ${sessionId.slice(0, 8)}`;
   if (bridge === null) return [attach];
@@ -61,14 +61,13 @@ const reachOf = (sessionId: string | null, bridge: Bridge | null): string[] => {
 };
 
 /** What her sessions cost, off her task's view: a `Spend`, its share of the step's (`taskSpend`). */
-const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
+const spendOf = (view: Parameters<typeof taskSpend>[0]) => {
   const spent = taskSpend(view);
   return spent === undefined ? null : { usd: spent.usd, measured: spent.measured, unmeasured: spent.unmeasured };
 };
 
 /** Why the keeper could not trust her folder, off its record, while her folder is still not trusted; null otherwise. */
-const untrustedNow = (home: string): string | null =>
-  trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? (readUntrusted(home) ?? null) : null;
+const untrustedNow = (home: string) => (trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) === false ? (readUntrusted(home) ?? null) : null);
 
 /** Where she is, off the level files, the keeper's record of her session and her current task's view. */
 const levelNow = (e: Engine) =>
@@ -106,13 +105,13 @@ const levelNow = (e: Engine) =>
  * The store's level file once the person set a level at `at`, the store's (`level`) or a factory's (`level` the store's as it is):
  * `since` moved where the store's level changed, `asked` always, and a former task the file named carried on as it is read.
  */
-function storeAsked(level: Level, now: NemiaLevel, former: LevelFile | undefined, at: string): LevelFile {
+function storeAsked(level: Level, now: NemiaLevel, former: LevelFile | undefined, at: string) {
   const since = level !== now.level || now.since === null ? at : now.since;
   return { level, since, asked: at, ...(former?.task === undefined ? {} : { task: former.task }) };
 }
 
 /** The factory's file a person's write asks for at `at`, or refused: no such factory (`Missing`), no raise to end, a raise of nothing. */
-const factoryFileAsked = (ask: FactoryAsk, store: Level, at: Date): Effect.Effect<FactoryLevelFile, Refusal> =>
+const factoryFileAsked = (ask: FactoryAsk, store: Level, at: Date) =>
   Effect.gen(function* () {
     const door = yield* FactoryDoor;
     if (!(yield* door.factories.list()).includes(ask.factory))
@@ -130,7 +129,7 @@ const factoryFileAsked = (ask: FactoryAsk, store: Level, at: Date): Effect.Effec
 export type LevelInput = typeof NemiaLevelSet.Type;
 
 /** The factory write `args` asks for, or undefined where they ask the store's level or nothing. */
-const factoryAskOf = (args: LevelInput): FactoryAsk | undefined =>
+const factoryAskOf = (args: LevelInput) =>
   args.factory === undefined || (args.level === undefined && args.end !== true)
     ? undefined
     : {
@@ -170,7 +169,7 @@ const levelBy = (args: LevelInput, home: string) =>
  * The refusal of a factory write's arguments, or null: `--for` or `--end` with no factory, a raise with no level, an end with one, both,
  * the default factory named (the store's level is its own), and a stretch that is none (`durationRefusal`).
  */
-function factoryArgsRefusal(args: Args): string | null {
+function factoryArgsRefusal(args: Args) {
   const level = typeof args.level === 'string';
   const given = typeof args.for === 'string';
   if ((given || args.end === true) && typeof args.factory !== 'string')

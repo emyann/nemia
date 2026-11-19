@@ -19,7 +19,7 @@ export type Browsed = { readonly target: string };
  * it gets (`openapiDocument`).
  * @param browsed The api the page starts on.
  */
-function titled(browsed: Browsed): unknown {
+function titled(browsed: Browsed) {
   const document = openapiDocument() as {
     info: { title?: string; description?: string };
     servers?: unknown;

@@ -11,7 +11,7 @@ import { PieceFixes, type Starts } from '../setup/ReadinessList';
  * Whether `piece` is a need of the factory `factory` still missing: a need of one of its workflows, or one its place declares, as the
  * Setup page draws them; what a host's sign-in is, is the factory's own words.
  */
-const missingOf = (piece: ReadinessPiece, factory: string): boolean =>
+const missingOf = (piece: ReadinessPiece, factory: string) =>
   piece.state === 'missing' && ((piece.area === 'workflow' && piece.factory === factory) || piece.area === 'place');
 
 /**

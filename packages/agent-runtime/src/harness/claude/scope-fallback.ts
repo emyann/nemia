@@ -29,32 +29,33 @@ type Held = {
 };
 
 /** The process the SDK is handed: its streams, `events` for its `exit` and `error`, and `held`'s process for the rest. */
-const spawnedOf = (stdin: PassThrough, stdout: PassThrough, events: EventEmitter, held: Held): SpawnedProcess => ({
-  stdin,
-  stdout,
-  get killed() {
-    return held.asked || held.child?.killed === true;
-  },
-  get exitCode() {
-    return held.ended?.code ?? null;
-  },
-  get signalCode() {
-    return held.ended?.signal ?? null;
-  },
-  kill: (signal) => {
-    held.asked = true;
-    return held.child?.kill(signal) ?? false;
-  },
-  on(event: 'exit' | 'error', listener: Listener) {
-    events.on(event, listener);
-  },
-  once(event: 'exit' | 'error', listener: Listener) {
-    events.once(event, listener);
-  },
-  off(event: 'exit' | 'error', listener: Listener) {
-    events.off(event, listener);
-  },
-});
+const spawnedOf = (stdin: PassThrough, stdout: PassThrough, events: EventEmitter, held: Held) =>
+  ({
+    stdin,
+    stdout,
+    get killed() {
+      return held.asked || held.child?.killed === true;
+    },
+    get exitCode() {
+      return held.ended?.code ?? null;
+    },
+    get signalCode() {
+      return held.ended?.signal ?? null;
+    },
+    kill: (signal) => {
+      held.asked = true;
+      return held.child?.kill(signal) ?? false;
+    },
+    on(event: 'exit' | 'error', listener: Listener) {
+      events.on(event, listener);
+    },
+    once(event: 'exit' | 'error', listener: Listener) {
+      events.once(event, listener);
+    },
+    off(event: 'exit' | 'error', listener: Listener) {
+      events.off(event, listener);
+    },
+  }) satisfies SpawnedProcess;
 
 /**
  * Starts `o.command` behind `scope`, falling back to it bare. `started` is told each process started, scoped then bare, before it is
@@ -69,13 +70,13 @@ export const scopedOrBare = (
   o: SpawnOptions,
   started: (child: ChildProcess) => void,
   bare: (why: string) => void,
-): SpawnedProcess => {
+) => {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const events = new EventEmitter();
   const held: Held = { heard: false, asked: false, stdinEnded: false, kept: [] };
 
-  const start = (argv: readonly string[], scoped: boolean): void => {
+  const start = (argv: readonly string[], scoped: boolean) => {
     const [command, ...args] = argv;
     const c = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
     held.child = c;
@@ -89,7 +90,7 @@ export const scopedOrBare = (
     c.stderr?.on('data', (chunk: Buffer) => {
       if (scoped && !held.heard) said += chunk.toString('utf8');
     });
-    const refused = (why: string): boolean => {
+    const refused = (why: string) => {
       if (!scoped || held.heard || held.asked || o.signal.aborted) return false;
       bare(why.trim().split('\n').at(-1) || 'the scope program exited before Claude Code printed anything');
       start([o.command, ...o.args], false);

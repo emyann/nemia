@@ -17,7 +17,7 @@ export type BellRow = { run: string; title: string; factory: string; waitsFor: s
  * What `run` waits for, in the package's words: each step as the api asks it (`waitingOnYouWords`), else each by name; the run it waits on
  * that never lands without a person (`waiting.word`); and the hold only a person lifts (`holding.word`).
  */
-function waitsForOf(run: RunView): string[] {
+function waitsForOf(run: RunView) {
   const steps = run.waitingOnYouWords.length ? run.waitingOnYouWords : run.waitingOnYou;
   return [...steps, ...(run.waiting?.waitingOnYou ? [run.waiting.word] : []), ...(run.holding?.waitingOnYou ? [run.holding.word] : [])];
 }
@@ -28,22 +28,23 @@ function waitsForOf(run: RunView): string[] {
  * one of them, and no other: which runs wait is the api's to say, and the board only orders and words them.
  * @param waiting The runs the api says wait on a person, as it lists them.
  */
-export const bellRows = (waiting: readonly RunRow[]): BellRow[] => [
-  ...waiting
-    .filter((run) => !judged(run))
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map((run) => ({ run: run.id, title: run.id, factory: namespaceOf(run.factory), waitsFor: [], gate: null })),
-  ...byAge(waiting.filter(judged)).map((run) => ({
-    run: run.id,
-    title: titleOf(run),
-    factory: namespaceOf(run.factory),
-    waitsFor: waitsForOf(run),
-    gate: run.steps.find((step) => step.approve)?.name ?? null,
-  })),
-];
+export const bellRows = (waiting: readonly RunRow[]) =>
+  [
+    ...waiting
+      .filter((run) => !judged(run))
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((run) => ({ run: run.id, title: run.id, factory: namespaceOf(run.factory), waitsFor: [], gate: null })),
+    ...byAge(waiting.filter(judged)).map((run) => ({
+      run: run.id,
+      title: titleOf(run),
+      factory: namespaceOf(run.factory),
+      waitsFor: waitsForOf(run),
+      gate: run.steps.find((step) => step.approve)?.name ?? null,
+    })),
+  ] satisfies BellRow[] as BellRow[];
 
 /**
  * Where a row of the waiting bar opens its run's page: at its gate's step section (`stepAnchor`), or at its top for a run at no gate.
  * @param row The row, its gate's step read, null for a run at no gate.
  */
-export const bellHash = (row: Pick<BellRow, 'gate'>): string | undefined => (row.gate === null ? undefined : stepAnchor(row.gate));
+export const bellHash = (row: Pick<BellRow, 'gate'>) => (row.gate === null ? undefined : stepAnchor(row.gate));

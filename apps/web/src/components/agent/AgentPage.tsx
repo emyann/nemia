@@ -239,7 +239,7 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
  * The repository a repository's agent was read from: the page's `?repo=`, else the only one of the factory it was read in. Undefined while
  * the factories are read, or where the factory names several and the page none.
  */
-const repoOfPlace = (place: { factory?: string; repo?: string }, factories: readonly Factory[] | undefined): string | undefined => {
+const repoOfPlace = (place: { factory?: string; repo?: string }, factories: readonly Factory[] | undefined) => {
   if (place.repo !== undefined) return place.repo;
   const repos = factories?.find((f) => f.name === place.factory)?.worksOn ?? [];
   return repos.length === 1 ? repos[0] : undefined;

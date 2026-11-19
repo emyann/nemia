@@ -9,7 +9,6 @@ import { Option, Schema } from 'effect';
 import { alive, processStart } from '../../process/alive.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { readText } from '../../core/engine/tally.ts';
-import type { WorkerSeen } from './run-file.ts';
 
 /** The `.launched` file: the worker's pid, its start (`processStart`) and its boot's id, each absent where the machine cannot say. */
 const LaunchedSchema = Schema.Struct({
@@ -25,7 +24,7 @@ const decodeLaunched = Schema.decodeUnknownOption(LaunchedSchema);
  * @param file The file written, beside the run (`.launched`).
  * @param pid The worker's pid.
  */
-export const writeLaunched = (file: string, pid: number): void => {
+export const writeLaunched = (file: string, pid: number) => {
   const start = processStart(pid);
   const boot = monoNow()?.boot;
   fs.writeFileSync(file, JSON.stringify({ pid, ...(start ? { start } : {}), ...(boot ? { boot } : {}) }));
@@ -40,7 +39,7 @@ export const writeLaunched = (file: string, pid: number): void => {
  *   judges, as it did for a run spawned before this file was written.
  * @param file The file beside the run that names its worker (`.launched`).
  */
-export const workerSeen = (file: string): WorkerSeen => {
+export const workerSeen = (file: string) => {
   let text: string;
   try {
     text = readText(file);

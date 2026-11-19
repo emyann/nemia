@@ -29,13 +29,13 @@ import type { Kept } from '../../command/entry.verb.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 
 /** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? args[key] : '');
 
 /**
  * How the command line spells a volume's switch, as `objects`' words of `nemia factory volume add` and `set` name it.
  * @param key The switch's key.
  */
-const flagOf = (key: 'claudeMd' | 'skills'): string =>
+const flagOf = (key: 'claudeMd' | 'skills') =>
   [...FACTORY_VOLUME_ADD_WORDS.spec.flags, ...FACTORY_VOLUME_SET_WORDS.spec.flags].find((f) => 'key' in f && f.key === key)?.flag ?? key;
 
 /**
@@ -45,7 +45,7 @@ const flagOf = (key: 'claudeMd' | 'skills'): string =>
  * @param key The switch's key, `claudeMd` or `skills`.
  * @param flag The switch's flag, said in the refusal.
  */
-const switchOf = (args: Args | VolumeSetInput, key: 'claudeMd' | 'skills', flag: string): boolean | undefined | string => {
+const switchOf = (args: Args | VolumeSetInput, key: 'claudeMd' | 'skills', flag: string) => {
   const given: unknown = args[key];
   if (given === undefined || typeof given === 'boolean') return given;
   if (given === 'on') return true;
@@ -69,7 +69,7 @@ const originSets = Effect.fn('originSets')(function* (factory: Factory, volume: 
 });
 
 /** `template`'s parameters with each boolean `--set` word of `sets` written over them. */
-const withSets = (template: FactoryTemplate, sets: readonly string[]): FactoryTemplate => ({
+const withSets = (template: FactoryTemplate, sets: readonly string[]) => ({
   ...template,
   params: {
     ...template.params,
@@ -183,7 +183,7 @@ export const FACTORY_VOLUME_ADD: Served<Added> = {
  * The workflows `factory`'s wiring places on the repository at `at` by its folder name (`workflowRepos`), where it is the only one of
  * that name: taking it off would leave each with none.
  */
-const wiredOn = (factory: Pick<Factory, 'volumes' | 'workflowRepos'>, at: string): string[] => {
+const wiredOn = (factory: Pick<Factory, 'volumes' | 'workflowRepos'>, at: string) => {
   const name = folderName(at);
   if (workedOn(factory).filter((r) => folderName(r) === name).length !== 1) return [];
   return Object.entries(factory.workflowRepos ?? {})

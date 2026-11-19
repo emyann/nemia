@@ -55,7 +55,7 @@ const FLAGS = ['--from', '--engine', '--passes', '--every', '--json', '--compare
  * @param args The command's arguments.
  * @param env The environment its stores default from (`WF_ROOT`, `AE_ROOT`, `HOME`).
  */
-export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv): LoopAsked | string {
+export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv) {
   const given: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
@@ -91,7 +91,7 @@ export function loopArgsOf(args: readonly string[], env: NodeJS.ProcessEnv): Loo
  * The spread of `values`, in ms, each nearest-rank.
  * @param values The times, in ms.
  */
-export const spreadOf = (values: readonly number[]): Spread => {
+export const spreadOf = (values: readonly number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))] ?? 0;
   return { p50: rank(50), p99: rank(99), max: sorted.at(-1) ?? 0, count: sorted.length };
@@ -167,7 +167,7 @@ const said = (s: Spread) => `p50 ${s.p50.toFixed(1)} ms, p99 ${s.p99.toFixed(1)}
  * @param report The measure now.
  * @param before An earlier measure, read from `--compare`.
  */
-export function loopRendered(report: LoopMeasure, before?: LoopMeasure): string {
+export function loopRendered(report: LoopMeasure, before?: LoopMeasure) {
   const rows: [string, (m: LoopMeasure) => string][] = [
     ['open runs', (m) => String(m.openRuns)],
     ['cold pass', (m) => `${m.passes.cold.toFixed(1)} ms`],
@@ -183,7 +183,7 @@ export function loopRendered(report: LoopMeasure, before?: LoopMeasure): string 
  * Run the command on `args`: the exit code.
  * @param args The command's arguments.
  */
-export async function main(args: readonly string[]): Promise<number> {
+export async function main(args: readonly string[]) {
   const asked = loopArgsOf(args, process.env);
   const refused = (words: string, code: number) => {
     process.stderr.write(`store-measure loop: ${words}\n`);

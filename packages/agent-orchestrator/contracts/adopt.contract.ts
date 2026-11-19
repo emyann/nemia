@@ -39,45 +39,41 @@ export const words = [
 ];
 
 /** Whether a card filed and not yet started names a workflow the template's wiring does not offer. */
-const strandsACard = (adoption: Adoption): boolean =>
+const strandsACard = (adoption: Adoption) =>
   adoption.cards.some((c) => !c.started && c.workflow !== null && !adoption.wiring.workflows.includes(c.workflow));
 
 /** Whether the factory schedules a workflow the template's wiring does not offer. */
-const strandsASchedule = (factory: Factory, adoption: Adoption): boolean =>
+const strandsASchedule = (factory: Factory, adoption: Adoption) =>
   Object.keys(factory.schedules).some((w) => !adoption.wiring.workflows.includes(w));
 
 /** Whether a base or a tree is on disk already with other content than the render. */
-const leavesAForeignFolder = (adoption: Adoption): boolean =>
+const leavesAForeignFolder = (adoption: Adoption) =>
   (adoption.leftovers.base !== null && adoption.leftovers.base !== adoption.render) ||
   (adoption.leftovers.tree !== null && adoption.leftovers.tree !== adoption.render);
 
 /** Whether two values are the same, a NaN the same as a NaN. */
-const same = (a: string | number | boolean | undefined, b: string | number | boolean | undefined): boolean =>
-  a === b || (a !== a && b !== b);
+const same = (a: string | number | boolean | undefined, b: string | number | boolean | undefined) => a === b || (a !== a && b !== b);
 
 /**
  * Whether `a` and `b` name the same keys, in the same order: what `keepsItsHarnessSettings` says of a factory's harness settings. Their
  * values are what its file holds, unjudged (`unknown`, so that a hand-edited key still reads and `nemia factory setting rm` can take it
  * off), which the verifier compares by no means: that `adopted` carries each value is held by `src/adopt/adopt.test.ts`, which runs it.
  */
-const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean => {
+const sameKeys = (a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>) => {
   const was = Object.keys(a);
   const now = Object.keys(b);
   return now.length === was.length && now.every((key, i) => was.at(i) === key);
 };
 
 /** Whether two dictionaries hold the same entries, in the same order, a NaN the same as a NaN. */
-const sameDict = (
-  a: Readonly<Record<string, string | number | boolean>>,
-  b: Readonly<Record<string, string | number | boolean>>,
-): boolean => {
+const sameDict = (a: Readonly<Record<string, string | number | boolean>>, b: Readonly<Record<string, string | number | boolean>>) => {
   const was = Object.entries(a);
   const now = Object.entries(b);
   return now.length === was.length && now.every(([key, value], i) => was.at(i)?.[0] === key && same(was.at(i)?.[1], value));
 };
 
 /** Whether two places of an instruction say the same: none, the store, or the same path. */
-const sameInstruction = (a: Factory['instruction'], b: Factory['instruction']): boolean => {
+const sameInstruction = (a: Factory['instruction'], b: Factory['instruction']) => {
   if (a === undefined) return b === undefined;
   if (b === undefined) return false;
   if ('path' in a) return 'path' in b && a.path === b.path;
@@ -85,7 +81,7 @@ const sameInstruction = (a: Factory['instruction'], b: Factory['instruction']): 
 };
 
 /** Whether the factory is made from a template already. */
-const templated = (factory: Factory): boolean => factory.template !== undefined;
+const templated = (factory: Factory) => factory.template !== undefined;
 
 const adoptRefusalSpec = spec<(factory: Factory, adoption: Adoption) => AdoptRefused | null>({
   ensures: {

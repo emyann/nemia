@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import type { SpawnRequest } from '../seam.ts';
 import { sessionMcp, writeMcpConfig } from '../mcp.ts';
-import type { HarnessIO, HarnessSpec, RunInput } from './detached.ts';
+import type { HarnessIO, HarnessSpec } from './detached.ts';
 
 /** Where each of a run's files goes, by what it holds: the names `detachedOps` keeps for the run. */
 type SpawnAt = {
@@ -37,7 +37,7 @@ type SpawnAt = {
  * @param r The spawn asked for: the schema of its final answer, its servers, its `cwd` and `config`.
  * @param at Where each of the run's files goes.
  */
-export const spawnFiles = (spec: HarnessSpec, r: SpawnRequest, at: SpawnAt): HarnessIO => {
+export const spawnFiles = (spec: HarnessSpec, r: SpawnRequest, at: SpawnAt) => {
   for (const f of [at.answer, at.log, at.kept, at.stop, at.launched, at.request, ...Object.values(at.streams)])
     fs.rmSync(f, { force: true });
   let io: HarnessIO = {};
@@ -71,5 +71,5 @@ const sizeOf = (p: string) => {
  * @param r The spawn asked for, whose brief is the first line.
  * @param inbox The run's inbox file, read on from its size now.
  */
-export const spawnInput = (spec: HarnessSpec, r: SpawnRequest, inbox: string): RunInput | undefined =>
+export const spawnInput = (spec: HarnessSpec, r: SpawnRequest, inbox: string) =>
   spec.input && { first: spec.input.line(r.brief), inbox, from: sizeOf(inbox), closesOn: spec.input.closesOn };

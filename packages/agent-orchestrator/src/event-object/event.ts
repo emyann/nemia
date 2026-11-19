@@ -16,7 +16,7 @@ import {
   INVOLVED_KINDS,
   WAIT_ON,
 } from 'objects';
-import type { EventInvolvedKind, EventNamespace, EventReason } from '../../contracts/event.contract.ts';
+import type { EventNamespace, EventReason } from '../../contracts/event.contract.ts';
 import { isFactoryLine, isRunLine, isStoreLine, messageOf, REASON_CODES, sourceOf, typeOf, type FeedLine } from '../feed/index.ts';
 
 /**
@@ -41,7 +41,7 @@ const oneOf = <const W extends string>(words: readonly W[], word: unknown): word
   typeof word === 'string' && (words as readonly string[]).includes(word);
 
 /** What a line is about: its `involved.kind` where it is a word of the Event's, else what the line's shape says it is. */
-const kindOf = (line: FeedLine): EventInvolvedKind => {
+const kindOf = (line: FeedLine) => {
   const said = line.involved?.kind;
   if (oneOf(INVOLVED_KINDS, said)) return said;
   if (isRunLine(line)) return line.step === undefined ? 'Run' : 'Step';
@@ -49,7 +49,7 @@ const kindOf = (line: FeedLine): EventInvolvedKind => {
 };
 
 /** The name of what a line is about, as `involvedOf` reads it. */
-const nameOf = (line: FeedLine): string =>
+const nameOf = (line: FeedLine) =>
   line.involved?.name ??
   (isRunLine(line)
     ? line.step === undefined
@@ -62,7 +62,7 @@ const nameOf = (line: FeedLine): string =>
         : String(line.daemon));
 
 /** The labels a line carries, only those with a string value, or none where it carries none. */
-const labelsOf = (line: FeedLine): Record<string, string> | undefined => {
+const labelsOf = (line: FeedLine) => {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(line.labels ?? {})) if (typeof value === 'string') out[key] = value;
   return Object.keys(out).length > 0 ? out : undefined;
@@ -73,7 +73,7 @@ const labelsOf = (line: FeedLine): Record<string, string> | undefined => {
  * only grows as the feed is written.
  * @param end The byte of the feed just after the event's line.
  */
-export const feedPosition = (end: number): string => String(end);
+export const feedPosition = (end: number) => String(end);
 
 /**
  * The line `line`, which starts at byte `start` of the feed and ends just before `end`, as an Event: who acted (`actor`) carried where the
@@ -82,7 +82,7 @@ export const feedPosition = (end: number): string => String(end);
  * @param start The byte of the feed the line starts at.
  * @param end The byte of the feed just after the line.
  */
-export const eventOf = (line: FeedLine, start: number, end: number): Event => {
+export const eventOf = (line: FeedLine, start: number, end: number) => {
   const labels = labelsOf(line);
   const kind = kindOf(line);
   const namespace = eventNamespace(kind, labels?.factory);
@@ -109,5 +109,5 @@ export const eventOf = (line: FeedLine, start: number, end: number): Event => {
     ...(line.call !== undefined ? { call: line.call } : {}),
     ...(line.try !== undefined ? { try: line.try } : {}),
     ...('actor' in line && line.actor !== undefined ? { actor: line.actor } : {}),
-  };
+  } satisfies Event;
 };

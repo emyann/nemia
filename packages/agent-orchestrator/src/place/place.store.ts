@@ -6,7 +6,7 @@
  */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Context, Effect, Layer, Schedule, Schema, SchemaTransformation } from 'effect';
-import type { Inventory, Opened, PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb, Standing, Trials, Unread } from './place.ts';
+import type { Inventory, PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb, Standing } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { RepositoryRun } from '../record/record.ts';
 
@@ -54,7 +54,7 @@ export const STOP_POLL_MS = 20;
  * @param pgid The id of the process group, its leader's pid.
  * @param signal The signal sent, or 0 to ask only whether the group has a process left.
  */
-export function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
+export function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
   try {
     process.kill(-pgid, signal);
     return true;
@@ -67,7 +67,7 @@ export function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
  * Whether the process group `pgid` leads has no process left within `graceMs`, asked every `STOP_POLL_MS`. The grace is measured on
  * this process's monotonic clock (`performance.now()`), so a wall clock stepped forward never ends it early.
  */
-function emptied(pgid: number, graceMs: number): boolean {
+function emptied(pgid: number, graceMs: number) {
   const pause = new Int32Array(new SharedArrayBuffer(4));
   const until = performance.now() + graceMs;
   while (performance.now() < until) {
@@ -84,7 +84,7 @@ function emptied(pgid: number, graceMs: number): boolean {
  * @param pgid The id of the process group, its leader's pid.
  * @param graceMs How long the group is given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
-export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS): boolean {
+export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS) {
   if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid, graceMs)) return false;
   signalGroup(pgid, 'SIGKILL');
   emptied(pgid, graceMs);
@@ -95,7 +95,7 @@ export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS): boolea
 const SAID_LINES = 4;
 
 /** The last lines a process wrote on stderr, joined for one line, or the empty string. */
-function lastLines(stderr: string): string {
+function lastLines(stderr: string) {
   return stderr
     .split('\n')
     .map((l) => l.trim())
@@ -112,7 +112,7 @@ function lastLines(stderr: string): string {
  * @param stderr What the process running then wrote on stderr.
  * @param graceMs How long the group was given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
-export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string, graceMs: number = STOP_GRACE_MS): string {
+export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string, graceMs: number = STOP_GRACE_MS) {
   const words = lastLines(stderr);
   const kill = killed
     ? `, and a process it started outlived SIGTERM for ${graceMs / 1000} s and was killed, so a lock it held may be left`
@@ -125,7 +125,7 @@ export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string
  * @param verb The place's verb that threw.
  * @param threw What was thrown, an error or any value.
  */
-export const threwWords = (verb: PlaceVerb, threw: unknown): string =>
+export const threwWords = (verb: PlaceVerb, threw: unknown) =>
   `${verb} threw before it answered: ${lastLines(threw instanceof Error ? threw.message : String(threw))}`;
 
 /**
@@ -133,7 +133,7 @@ export const threwWords = (verb: PlaceVerb, threw: unknown): string =>
  * @param verb The place's verb that gave no answer.
  * @param said Why it gave none, in words.
  */
-export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({
+export const unreadNow = (verb: PlaceVerb, said: string) => ({
   unread: { verb, said, at: new Date().toISOString() },
 });
 
@@ -162,7 +162,7 @@ export type Place = {
  */
 export class PlaceService extends Context.Service<PlaceService, Place>()('orchestrator/PlaceService') {
   /** `place` as the layer that gives it to a program. */
-  static readonly layer = (place: Place): Layer.Layer<PlaceService> => Layer.succeed(PlaceService)(PlaceService.of(place));
+  static readonly layer = (place: Place) => Layer.succeed(PlaceService)(PlaceService.of(place)) satisfies Layer.Layer<PlaceService>;
 }
 
 /** A started repository run's place as `nemia rm` and `nemia prune` read it: the place, its `say`, and what its inventory read. */
@@ -176,11 +176,7 @@ export type RunPlaceRead = { readonly place: Place; readonly say: PlaceDeclared[
  * @param place The run's place, asked its inventory.
  * @param under The folder the run's worktrees are read inside.
  */
-export function readRunPlace(
-  run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
-  place: Place,
-  under: string,
-): RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }> {
+export function readRunPlace(run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>, place: Place, under: string) {
   const read = place.askNow('inventory', { repo: run.repo, under, run: run.id, base: run.branch });
   return 'answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read;
 }
@@ -192,11 +188,7 @@ export function readRunPlace(
  * @param place The run's place, asked its inventory.
  * @param under The folder the run's worktrees are read inside.
  */
-export const askRunPlace = (
-  run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
-  place: Place,
-  under: string,
-): Effect.Effect<RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }>> =>
+export const askRunPlace = (run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>, place: Place, under: string) =>
   place
     .ask('inventory', { repo: run.repo, under, run: run.id, base: run.branch })
     .pipe(Effect.map((read) => ('answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read)));
@@ -209,7 +201,7 @@ export const askRunPlace = (
  * @param root The repository the run is started on.
  * @param isolate Whether the run cuts worktrees.
  */
-export function openPlace(place: Place, root: string, isolate: boolean): Opened {
+export function openPlace(place: Place, root: string, isolate: boolean) {
   const outcome = place.askNow('open', { root, isolate });
   if ('refused' in outcome) throw new Invalid({ message: outcome.refused });
   if ('unread' in outcome) throw new Error(`the place's open was not heard: ${outcome.unread.said}. Nothing was started: start it again`);
@@ -224,7 +216,7 @@ export function openPlace(place: Place, root: string, isolate: boolean): Opened 
  * @param trials Each branch and the base it is tried onto, in the order asked.
  * @param place The place asked its `trial` verb.
  */
-export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], place: Place): Trials {
+export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], place: Place) {
   if (!trials.length) return { at: {}, trials: [] };
   const outcome = place.askNow('trial', { repo, trials });
   if ('answer' in outcome && outcome.answer.trials.length === trials.length) return outcome.answer;
@@ -241,7 +233,7 @@ export function trialMerges(repo: string, trials: readonly { readonly onto: stri
 }
 
 /** Whether the group `pgid` leads has no process left within `graceMs`, asked every `STOP_POLL_MS`. */
-const emptiedLater = (pgid: number, graceMs: number): Effect.Effect<boolean> =>
+const emptiedLater = (pgid: number, graceMs: number) =>
   Effect.sync(() => !signalGroup(pgid, 0)).pipe(
     Effect.repeat({ until: (gone) => gone, schedule: Schedule.spaced(STOP_POLL_MS) }),
     Effect.timeoutOrElse({ duration: graceMs, orElse: () => Effect.sync(() => !signalGroup(pgid, 0)) }),
@@ -253,7 +245,7 @@ const emptiedLater = (pgid: number, graceMs: number): Effect.Effect<boolean> =>
  * @param child The child process stopped, the leader of its group.
  * @param graceMs How long the group is given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
-export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number = STOP_GRACE_MS): Effect.Effect<boolean> =>
+export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number = STOP_GRACE_MS) =>
   Effect.gen(function* () {
     const pgid = child.pid;
     if (pgid === undefined) return false;

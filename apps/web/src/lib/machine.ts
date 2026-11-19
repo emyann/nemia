@@ -69,19 +69,19 @@ const MIN_WIDTH = 128;
  * An edge's event, with its guard in brackets when it has one.
  * @param edge The machine's edge: its event and its guard, if any.
  */
-export const eventOf = (edge: MachineEdge): string => `${edge.event}${edge.guard ? ` [${edge.guard}]` : ''}`;
+export const eventOf = (edge: MachineEdge) => `${edge.event}${edge.guard ? ` [${edge.guard}]` : ''}`;
 
 /**
  * A verb as its route lists it: the verb, with the guard its refusal asks first in brackets.
  * @param verb The person's verb: its name and the guard its refusal asks first.
  */
-export const verbOf = (verb: Pick<MachineVerb, 'verb' | 'guard'>): string => `${verb.verb} [${verb.guard}]`;
+export const verbOf = (verb: Pick<MachineVerb, 'verb' | 'guard'>) => `${verb.verb} [${verb.guard}]`;
 
 /**
  * `edges` gathered by action, each action once in the order its first edge comes, its events in the table's order.
  * @param edges The machine's edges, in the table's order.
  */
-export function byAction(edges: readonly MachineEdge[]): ByAction[] {
+export function byAction(edges: readonly MachineEdge[]) {
   const groups = new Map<string, ByAction>();
   for (const edge of edges) {
     const group = groups.get(edge.action) ?? { action: edge.action, events: [] };
@@ -92,7 +92,7 @@ export function byAction(edges: readonly MachineEdge[]): ByAction[] {
 }
 
 /** How many lines a list takes: one per event, and one per action. */
-const linesOf = (list: readonly ByAction[]): number => list.reduce((n, g) => n + g.events.length + 1, 0);
+const linesOf = (list: readonly ByAction[]) => list.reduce((n, g) => n + g.events.length + 1, 0);
 
 /** How wide a list is drawn: its longest event, or its longest action behind its arrow. */
 const widthOf = (list: readonly ByAction[]) =>
@@ -102,7 +102,7 @@ const widthOf = (list: readonly ByAction[]) =>
  * A state's box size: its head, and under it the edges back to it.
  * @param stays The edges back to the state itself, by action.
  */
-export const stateSize = (stays: readonly ByAction[]): { width: number; height: number } => ({
+export const stateSize = (stays: readonly ByAction[]) => ({
   width: Math.ceil(Math.max(MIN_WIDTH, widthOf(stays))),
   height: HEAD_HEIGHT + (stays.length ? LINE_HEIGHT * linesOf(stays) + PAD_Y : 0),
 });
@@ -112,7 +112,7 @@ export const stateSize = (stays: readonly ByAction[]): { width: number; height: 
  * @param edges The route's edges, by action.
  * @param verbs The route's verbs, each as `verbOf` lists it; none by default.
  */
-export const labelSize = (edges: readonly ByAction[], verbs: readonly string[] = []): { width: number; height: number } => ({
+export const labelSize = (edges: readonly ByAction[], verbs: readonly string[] = []) => ({
   width: Math.ceil(Math.max(widthOf(edges), Math.max(0, ...verbs.map((v) => v.length)) * CHAR_WIDTH + PAD_X)),
   height: LINE_HEIGHT * (linesOf(edges) + verbs.length) + PAD_Y,
 });
@@ -130,10 +130,10 @@ export const END_INSET = 12;
  * Half the height of each rank's band, by the rank's y: half its tallest box, a state's or a label's. Dagre lays every box of a rank
  * across one band and leaves the gap between two bands empty; a rank of a route's bends alone is a line, of half height 0.
  */
-function bandsOf(boxes: readonly { y: number; height: number }[]): (y: number) => number {
+function bandsOf(boxes: readonly { y: number; height: number }[]) {
   const half = new Map<number, number>();
   for (const { y, height } of boxes) half.set(Math.round(y), Math.max(half.get(Math.round(y)) ?? 0, height / 2));
-  return (y) => half.get(Math.round(y)) ?? 0;
+  return ((y) => half.get(Math.round(y)) ?? 0) satisfies (y: number) => number;
 }
 
 /** Where a route's end meets its state's box: across at `x`, kept `END_INSET` inside the box. */
@@ -145,7 +145,7 @@ const acrossIn = (x: number, box: StateBox) => Math.min(Math.max(x, box.x + END_
  * out of the foot of `from` onto the head of `to`, or, back up, out of the head of `from` into the foot of `to`. Dagre keeps each bend
  * clear of the other boxes of its rank, so a leg runs past them, never through one.
  */
-function legsOf(points: readonly Point[], from: StateBox, to: StateBox, half: (y: number) => number): Leg[] {
+function legsOf(points: readonly Point[], from: StateBox, to: StateBox, half: (y: number) => number) {
   const [out, into] = [from.y + from.height / 2, to.y + to.height / 2];
   const way = into >= out ? 1 : -1;
   return [
@@ -162,7 +162,7 @@ type Pair = { from: string; to: string; edges: MachineEdge[]; verbs: string[] };
  * The pairs of states an edge or a verb joins, by `from->to`, each once: an edge back to its own state is no pair, and a verb joins one
  * pair for each state it is taken from. Edges come first, in the table's order, then the pairs only verbs join.
  */
-function pairsOf(edges: readonly MachineEdge[], verbs: readonly MachineVerb[]): Map<string, Pair> {
+function pairsOf(edges: readonly MachineEdge[], verbs: readonly MachineVerb[]) {
   const pairs = new Map<string, Pair>();
   const pairOf = (from: string, to: string) => {
     const id = `${from}->${to}`;
@@ -176,14 +176,13 @@ function pairsOf(edges: readonly MachineEdge[], verbs: readonly MachineVerb[]): 
 }
 
 /** Every state of `graph`: those it lists, then any an edge or a verb names that it does not, each once. */
-function namesOf(graph: Pick<MachineGraph, 'states' | 'edges' | 'verbs'>): string[] {
+function namesOf(graph: Pick<MachineGraph, 'states' | 'edges' | 'verbs'>) {
   const named = [...graph.edges.flatMap((e) => [e.from, e.to]), ...graph.verbs.flatMap((v) => [...v.from, v.to])];
   return [...new Set([...graph.states, ...named])];
 }
 
 /** The edges back to `state` itself, by action: what its box lists. */
-const staysOf = (edges: readonly MachineEdge[], state: string): ByAction[] =>
-  byAction(edges.filter((e) => e.from === state && e.to === state));
+const staysOf = (edges: readonly MachineEdge[], state: string) => byAction(edges.filter((e) => e.from === state && e.to === state));
 
 /**
  * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room
@@ -191,7 +190,7 @@ const staysOf = (edges: readonly MachineEdge[], state: string): ByAction[] =>
  * A state an edge or a verb names that the graph does not list is drawn too, so no edge and no verb is lost.
  * @param graph The machine's graph: its first state, its states, its final states, its edges and its verbs.
  */
-export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>): Drawing {
+export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>) {
   const names = namesOf(graph);
   const stays = new Map(names.map((name) => [name, staysOf(graph.edges, name)]));
   const pairs = pairsOf(graph.edges, graph.verbs);
@@ -220,7 +219,7 @@ export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'fi
     path: pathOf(legsOf(points, at.get(route.from)!, at.get(route.to)!, half)),
   }));
   const { width = 0, height = 0 } = g.graph();
-  return { states, routes, width, height };
+  return { states, routes, width, height } satisfies Drawing;
 }
 
 /**
@@ -228,7 +227,7 @@ export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'fi
  * that leaves and arrives upright, so it bends only in the empty gap between two bands. A leg of no length draws no line.
  * @param legs The route's legs, one per rank it crosses, in the order it travels them.
  */
-export function pathOf(legs: readonly Leg[]): string {
+export function pathOf(legs: readonly Leg[]) {
   const [first, ...rest] = legs;
   if (!first) return '';
   const along = (leg: Leg) => (leg.leave === leg.enter ? [] : [`L ${leg.x} ${leg.leave}`]);

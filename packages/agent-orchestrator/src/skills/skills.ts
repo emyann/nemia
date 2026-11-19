@@ -65,7 +65,7 @@ type EntryKey = (typeof ENTRY_KEYS)[number];
  * @param id The skill's folder's name.
  * @param text The SKILL.md's text.
  */
-export function skillEntryOf(file: string, id: string, text: string): AgentSkill {
+export function skillEntryOf(file: string, id: string, text: string) {
   const { words, list } = entryValuesOf(file, text);
   const description = words('description');
   if (description === undefined) {
@@ -87,10 +87,7 @@ export function skillEntryOf(file: string, id: string, text: string): AgentSkill
  * The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one text, or a list of them — and refused as it
  * refuses.
  */
-function entryValuesOf(
-  file: string,
-  text: string,
-): { words: (key: EntryKey) => string | undefined; list: (key: EntryKey) => string[] | undefined } {
+function entryValuesOf(file: string, text: string) {
   const { block } = splitFrontmatter(file, text);
   if (block === null) {
     refuse(
@@ -106,7 +103,7 @@ function entryValuesOf(
       refuse(`${file}: \`${reading}\` is set twice, and YAML reads no file that says two things. Keep one line.`);
     values[reading] = value;
   }
-  const words = (key: EntryKey): string | undefined => {
+  const words = (key: EntryKey) => {
     const value = values[key];
     if (value !== undefined && typeof value !== 'string')
       refuse(
@@ -114,7 +111,7 @@ function entryValuesOf(
       );
     return value?.trim() || undefined;
   };
-  const list = (key: EntryKey): string[] | undefined => {
+  const list = (key: EntryKey) => {
     const value = values[key];
     if (value === undefined || value === '') return undefined;
     const example = key === 'tags' ? '[code, review]' : '["Use this when…"]';
@@ -160,7 +157,7 @@ export type SkillOther = { readonly path: string; readonly text: string };
  * given once. Pure.
  * @param files The other text files a write gives, or undefined where it gives none.
  */
-export function skillFilesRefusal(files: readonly SkillOther[] | undefined): string | undefined {
+export function skillFilesRefusal(files: readonly SkillOther[] | undefined) {
   if (files === undefined) return undefined;
   const fix = "give each file by its path in the skill's folder, with /, as notes/how.md.";
   for (const [i, { path }] of files.entries()) {
@@ -185,7 +182,7 @@ const SKILL_WRITES = ['name', 'title', 'description', 'tags', 'examples', 'prelo
  * @param id The skill's folder's name.
  * @param text The SKILL.md's text.
  */
-export function skillDraftOf(file: string, id: string, text: string): SkillDraft {
+export function skillDraftOf(file: string, id: string, text: string) {
   const { words, list } = entryValuesOf(file, text);
   const { description } = skillEntryOf(file, id, text);
   const { body } = splitFrontmatter(file, text);
@@ -210,23 +207,23 @@ export function skillDraftOf(file: string, id: string, text: string): SkillDraft
  * @param draft The skill as the board's form gives it.
  * @param was The SKILL.md as it is, on an edit; undefined for a skill made.
  */
-export function renderSkill(draft: SkillDraft, was?: string): string {
+export function renderSkill(draft: SkillDraft, was?: string) {
   const named = skillNameRefusal(draft?.name);
   if (named !== undefined) refuse(named);
   const file = `${SKILLS_FOLDER}/${draft.name}/SKILL.md`;
-  const oneLine = (key: string, text: string): string => {
+  const oneLine = (key: string, text: string) => {
     if (/[\r\n]/.test(text)) refuse(`${file}: \`${key}\` holds a line break, and a card's value is one line. Write it on one line.`);
     return text;
   };
-  const words = (key: 'title' | 'description'): FrontmatterPair[] => {
+  const words = (key: 'title' | 'description') => {
     const value = draft[key] == null ? '' : oneLine(key, String(draft[key]).trim());
-    return value ? [[key, value]] : [];
+    return (value ? [[key, value]] : []) satisfies FrontmatterPair[];
   };
-  const list = (key: 'tags' | 'examples'): FrontmatterPair[] => {
+  const list = (key: 'tags' | 'examples') => {
     const value = draft[key];
-    if (value == null) return [];
+    if (value == null) return [] satisfies FrontmatterPair[];
     if (!Array.isArray(value)) refuse(`${file}: \`${key}\` is a list of one-line items, and the draft's is ${JSON.stringify(value)}.`);
-    return [[key, value.map((item) => oneLine(key, String(item).trim())).filter(Boolean)]];
+    return [[key, value.map((item) => oneLine(key, String(item).trim())).filter(Boolean)]] satisfies FrontmatterPair[];
   };
   const preload = draft.preload ?? (was !== undefined && frontmatterKey(was, 'preload') === 'true');
   const block =
@@ -243,7 +240,7 @@ export function renderSkill(draft: SkillDraft, was?: string): string {
  * writes taken out (`withKey`), so a value, its form and a comment stay as they were. None for a file with no frontmatter, one that never
  * closes, or one whose frontmatter reads in neither form, which no reader can tell the keys of.
  */
-function keptKeys(text: string): string {
+function keptKeys(text: string) {
   try {
     const { block } = splitFrontmatter('', text);
     return block === null ? '' : SKILL_WRITES.reduce((kept, key) => withKey('SKILL.md', kept, key, undefined), block);
@@ -261,7 +258,7 @@ function keptKeys(text: string): string {
  * @param text The SKILL.md's text.
  * @param on Whether the skill is to be told whole.
  */
-export function withPreload(file: string, text: string, on: boolean): string {
+export function withPreload(file: string, text: string, on: boolean) {
   const { block } = splitFrontmatter(file, text);
   const normal = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const opened = FRONTMATTER.exec(normal);
@@ -285,7 +282,7 @@ export function withPreload(file: string, text: string, on: boolean): string {
  * a block in the former line form among them.
  * @param text The SKILL.md's whole text.
  */
-export function appliesOf(text: string): string[] {
+export function appliesOf(text: string) {
   let block: string | null;
   try {
     block = splitFrontmatter('', text).block;
@@ -301,7 +298,7 @@ export function appliesOf(text: string): string[] {
 }
 
 /** A glob as a pattern: `**` any folders, `*` any name's characters, `?` one of them, every other character itself. */
-const globPattern = (glob: string): RegExp =>
+const globPattern = (glob: string) =>
   new RegExp(
     `^${glob
       .split(/(\*\*\/?|\*|\?)/)
@@ -324,7 +321,7 @@ const globPattern = (glob: string): RegExp =>
  * @param file A path from the folder a session ran in.
  * @param globs The globs a SKILL.md's `applies:` names.
  */
-export const appliesMatch = (file: string, globs: readonly string[]): boolean => globs.some((g) => globPattern(g).test(file));
+export const appliesMatch = (file: string, globs: readonly string[]) => globs.some((g) => globPattern(g).test(file));
 
 /**
  * The precedence of the lookup roots (`lookupRoots`), pure: which of them — three at most — a name is read from, or the refusal of a
@@ -337,7 +334,7 @@ export type { Looked, LookupRoot } from '../../contracts/lookup.contract.ts';
  * Whether the root `at` of `roots` holds the name where it may be read — a library root only for a name `added` — and is a place of
  * `repo` where one is named.
  */
-const holdsAt = (roots: readonly LookupRoot[], at: number, added: boolean, repo?: string): boolean => {
+const holdsAt = (roots: readonly LookupRoot[], at: number, added: boolean, repo?: string) => {
   const root = roots.at(at);
   return root?.has === true && (!root.library || added) && (repo === undefined || root.repo === repo);
 };

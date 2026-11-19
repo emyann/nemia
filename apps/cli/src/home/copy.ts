@@ -18,14 +18,14 @@ import { staleCopiesOf } from './own-session.ts';
  * @param context The context the home was read through, by its name.
  * @param factory The factory, by its name.
  */
-export const homeCopiesDir = (env: NodeJS.ProcessEnv, context: string, factory: string): string => {
+export const homeCopiesDir = (env: NodeJS.ProcessEnv, context: string, factory: string) => {
   const xdg = env.XDG_CACHE_HOME;
   const home = env.HOME !== undefined && env.HOME !== '' ? env.HOME : os.homedir();
   return path.join(xdg !== undefined && xdg !== '' ? xdg : path.join(home, '.cache'), 'nemia', 'homes', context, factory);
 };
 
 /** A file's path from the home as the api sent it, refused where it would land outside the copy. */
-function pathIn(copy: string, sent: string): string {
+function pathIn(copy: string, sent: string) {
   const parts = sent.split('/');
   if (sent.startsWith('/') || parts.some((p) => p === '' || p === '.' || p === '..'))
     throw new Refused(
@@ -40,7 +40,7 @@ function pathIn(copy: string, sent: string): string {
  * @param dir The folder of the home's copies (`homeCopiesDir`).
  * @param home The home as the api served it.
  */
-export function renderedCopy(dir: string, home: FactoryHome): string {
+export function renderedCopy(dir: string, home: FactoryHome) {
   const copy = path.join(dir, home.digest);
   if (fs.existsSync(copy)) return copy;
   fs.mkdirSync(dir, { recursive: true });
@@ -67,7 +67,7 @@ export function renderedCopy(dir: string, home: FactoryHome): string {
  * @param dir The folder of the home's copies.
  * @param current The digest of the copy just rendered.
  */
-export function prunedCopies(dir: string, current: string): readonly string[] {
+export function prunedCopies(dir: string, current: string) {
   const stale = staleCopiesOf(fs.readdirSync(dir), current);
   for (const name of stale) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
   return stale;

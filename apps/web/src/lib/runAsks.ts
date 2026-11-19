@@ -25,7 +25,7 @@ export type RunAsk = { kind: RunAskKind; step: string | null; line: string };
 type Asks = Exclude<ReturnType<typeof asksOf>, 'none'>;
 
 /** A count of questions in words. */
-const questionsSaid = (n: number): string => `asks ${n} question${n === 1 ? '' : 's'}`;
+const questionsSaid = (n: number) => `asks ${n} question${n === 1 ? '' : 's'}`;
 
 /**
  * What the step `step` of `run` asks (`asks`), in one line and its kind: its gate's, its harness's wait, the questions its closeout asks,
@@ -34,20 +34,31 @@ const questionsSaid = (n: number): string => `asks ${n} question${n === 1 ? '' :
  * @param step The step asked about, one of the run's.
  * @param asks What the step's part asks (`asksOf`), never none.
  */
-export function askOf(run: RunDetail, step: StepView, asks: Asks): { kind: Exclude<RunAskKind, 'decide'>; line: string } {
+export function askOf(run: RunDetail, step: StepView, asks: Asks) {
   const gate = gateOfStep(run, step);
-  if (gate) return { kind: 'gate', line: gateNodeLine(gate) };
+  if (gate) return { kind: 'gate', line: gateNodeLine(gate) } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
   const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
-  if (need?.kind === 'harness') return { kind: 'harness', line: needNodeText(need) };
+  if (need?.kind === 'harness')
+    return { kind: 'harness', line: needNodeText(need) } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
   const questions = asks.questions.reduce((n, a) => n + a.questions.length, 0);
-  if (questions > 0) return { kind: 'questions', line: questionsSaid(questions) };
-  if (need) return { kind: need.kind === 'approve' ? 'gate' : 'needs', line: needNodeText(need) };
+  if (questions > 0)
+    return { kind: 'questions', line: questionsSaid(questions) } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
+  if (need)
+    return { kind: need.kind === 'approve' ? 'gate' : 'needs', line: needNodeText(need) } satisfies {
+      kind: Exclude<RunAskKind, 'decide'>;
+      line: string;
+    };
   const asked = askedOf(run, step.name);
-  if (asked) return { kind: 'asked', line: asked.note ?? `try ${asked.try} asked` };
-  if (asks.denied) return { kind: 'denied', line: asks.denied.words };
-  if (asks.waitingFor) return { kind: 'waiting', line: asks.waitingFor.words };
-  if (asks.needs) return { kind: 'needs', line: asks.needs };
-  return { kind: 'offer', line: PERSON[stepState(step, run.cancelledAt !== null, run.holding != null)].meaning };
+  if (asked)
+    return { kind: 'asked', line: asked.note ?? `try ${asked.try} asked` } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
+  if (asks.denied) return { kind: 'denied', line: asks.denied.words } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
+  if (asks.waitingFor)
+    return { kind: 'waiting', line: asks.waitingFor.words } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
+  if (asks.needs) return { kind: 'needs', line: asks.needs } satisfies { kind: Exclude<RunAskKind, 'decide'>; line: string };
+  return { kind: 'offer', line: PERSON[stepState(step, run.cancelledAt !== null, run.holding != null)].meaning } satisfies {
+    kind: Exclude<RunAskKind, 'decide'>;
+    line: string;
+  };
 }
 
 /**
@@ -56,20 +67,20 @@ export function askOf(run: RunDetail, step: StepView, asks: Asks): { kind: Exclu
  * next try a person asked for, its note, until the tick files it. None on a run called off: nobody waits for an answer any more.
  * @param run The run's detail.
  */
-export function runAsksOf(run: RunDetail): RunAsk[] {
-  if (run.cancelledAt !== null) return [];
+export function runAsksOf(run: RunDetail) {
+  if (run.cancelledAt !== null) return [] satisfies RunAsk[];
   const decide = toDecideOf(run);
   const decided = decide?.kind === 'approve' ? decide.step : null;
   const top: RunAsk[] = decide ? [{ kind: 'decide', step: decided, line: decide.said }] : [];
   const held = run.holding != null;
   return [
     ...top,
-    ...run.steps.flatMap((step): RunAsk[] => {
-      if (step.name === decided) return [];
+    ...run.steps.flatMap((step) => {
+      if (step.name === decided) return [] satisfies RunAsk[];
       const asks = asksOf(step, stepState(step, false, held), run.waitingOnYou.includes(step.name));
-      if (asks !== 'none') return [{ step: step.name, ...askOf(run, step, asks) }];
+      if (asks !== 'none') return [{ step: step.name, ...askOf(run, step, asks) }] satisfies RunAsk[];
       const asked = askedOf(run, step.name);
-      return asked ? [{ kind: 'asked', step: step.name, line: asked.note ?? `try ${asked.try} asked` }] : [];
+      return (asked ? [{ kind: 'asked', step: step.name, line: asked.note ?? `try ${asked.try} asked` }] : []) satisfies RunAsk[];
     }),
-  ];
+  ] satisfies RunAsk[];
 }

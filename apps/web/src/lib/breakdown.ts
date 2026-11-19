@@ -21,17 +21,17 @@ export type Breakdown = { head: string; rows: BreakdownRow[]; foot: string };
  * @param unit How much of that unit one whole unit is: 60000 for a minute of ms, 0.01 for a cent.
  * @param total How many whole units the shares add up to.
  */
-export function shared(parts: readonly number[], unit: number, total: number): number[] {
+export function shared(parts: readonly number[], unit: number, total: number) {
   const floors = parts.map((part) => Math.floor(part / unit));
   const owed = total - floors.reduce((sum, n) => sum + n, 0);
-  const lost = (part: number, i: number): number => Math.round((part / unit - floors[i]) * 1e6);
+  const lost = (part: number, i: number) => Math.round((part / unit - floors[i]) * 1e6);
   const byLoss = parts.map((part, i) => ({ i, lost: lost(part, i) })).sort((a, b) => b.lost - a.lost || a.i - b.i);
   for (const { i } of byLoss.slice(0, Math.max(0, owed))) floors[i] += 1;
   return floors;
 }
 
 /** What a part of the clock says for `minutes` whole minutes of `ms`: `none`, or its minutes as the tile says them (`1h 05m`). */
-const minutesSaid = (ms: number, minutes: number): string => (ms <= 0 ? 'none' : durationWords(minutes * 60_000, 'minute'));
+const minutesSaid = (ms: number, minutes: number) => (ms <= 0 ? 'none' : durationWords(minutes * 60_000, 'minute'));
 
 /** The clock's last line: the time none of its four parts covers. */
 export const CLOCK_REST = 'Everything else';
@@ -47,7 +47,7 @@ export const CLOCK_REST = 'Everything else';
  * @param head What the tile or the cell this hangs under shows, verbatim.
  * @param from When the run was created, as the page says a time.
  */
-export function clockBreakdown(clock: RunClock, head: string, from: string): Breakdown {
+export function clockBreakdown(clock: RunClock, head: string, from: string) {
   const parts: Array<[string, number]> = [
     ['Sessions at work', clock.sessionsMs],
     ['Checks running', clock.checksMs],
@@ -64,7 +64,7 @@ export function clockBreakdown(clock: RunClock, head: string, from: string): Bre
     head,
     rows: parts.map(([what, ms], i) => ({ what, amount: ms, said: minutesSaid(ms, minutes[i]), none: ms <= 0 })),
     foot: `Wall time ${durationWords(clock.wallMs, 'minute')}, from ${from}.`,
-  };
+  } satisfies Breakdown;
 }
 
 /** The cost's last line: what the run cost beyond its steps' own costs. */
@@ -76,7 +76,7 @@ export const COST_REST = 'Outside its steps';
  * @param cost What the run cost, in the api's words and dollars.
  * @param steps What each step cost, in the answer's order, a step with no cost measured carrying null.
  */
-export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdown {
+export function costBreakdown(cost: Spent, steps: readonly StepCost[]) {
   const rest = cost.usd - steps.reduce((sum, step) => sum + (step.cost?.usd ?? 0), 0);
   const parts = [...steps.map((step) => ({ what: step.step, usd: step.cost?.usd ?? 0, run: step.cost !== null })), ...restOf(rest)];
   const cents = shared(
@@ -93,18 +93,17 @@ export function costBreakdown(cost: Spent, steps: readonly StepCost[]): Breakdow
       none: !part.run,
     })),
     foot: cost.unmeasured > 0 ? 'A session that ended with no cost on it is counted in none of these.' : '',
-  };
+  } satisfies Breakdown;
 }
 
 /** The cost's rest as a part, none under half a cent either way. */
-const restOf = (usd: number): Array<{ what: string; usd: number; run: boolean }> =>
-  Math.abs(usd) < 0.005 ? [] : [{ what: COST_REST, usd, run: true }];
+const restOf = (usd: number) => (Math.abs(usd) < 0.005 ? [] : [{ what: COST_REST, usd, run: true }]);
 
 /**
  * A count of tokens in three figures: `86`, `73.9k`, `4.10M`.
  * @param count The number of tokens.
  */
-export function tokensSaid(count: number): string {
+export function tokensSaid(count: number) {
   if (count < 1_000) return String(count);
   if (count < 999_500) return `${(count / 1_000).toPrecision(3)}k`;
   return `${(count / 1_000_000).toPrecision(3)}M`;
@@ -120,20 +119,20 @@ export const TOKENS_REST = 'Counted in no kind';
 export type TokenCounts = Pick<RunTokens, 'total' | 'input' | 'output' | 'cacheRead' | 'cacheWrite' | 'uncached' | 'unmeasured'>;
 
 /** The kinds tokens are counted in: the four the harness bills apart, or in and out where a session gave no parts. */
-function kindsOf(tokens: TokenCounts): Array<[string, number]> {
+function kindsOf(tokens: TokenCounts) {
   const { cacheWrite, uncached, cacheRead } = tokens;
   if (cacheWrite === null || uncached === null || cacheRead === null) {
     return [
       ['In', tokens.input],
       ['Out', tokens.output],
-    ];
+    ] satisfies Array<[string, number]>;
   }
   return [
     ['Written to the cache', cacheWrite],
     ['Uncached, in', uncached],
     ['Out', tokens.output],
     ['Read back from the cache', cacheRead],
-  ];
+  ] satisfies Array<[string, number]>;
 }
 
 /**
@@ -144,7 +143,7 @@ function kindsOf(tokens: TokenCounts): Array<[string, number]> {
  * @param tokens The counts to break down.
  * @param cost The words of the dollars the tokens are, or undefined where the breakdown hangs under no cost.
  */
-export function tokensBreakdown(tokens: TokenCounts, cost?: string): Breakdown {
+export function tokensBreakdown(tokens: TokenCounts, cost?: string) {
   const kinds = kindsOf(tokens);
   const rest = tokens.total - kinds.reduce((sum, [, count]) => sum + count, 0);
   const parts = rest === 0 ? kinds : [...kinds, [TOKENS_REST, rest] as [string, number]];
@@ -159,7 +158,7 @@ export function tokensBreakdown(tokens: TokenCounts, cost?: string): Breakdown {
       'Each kind is billed at its own rate, reads from the cache at the lowest.',
       ...(least ? ['A session measured no tokens: these are the least they were.'] : []),
     ].join(' '),
-  };
+  } satisfies Breakdown;
 }
 
 /** A round of a loop on the clock, or the run's whole time, as the run's timeline totals them. */
@@ -171,7 +170,7 @@ type RoundTotal = Pick<RunView['timeline']['run'], 'loop' | 'round' | 'ranMs' | 
  * @param rounds The run's timeline's rounds, each loop's round with its total.
  * @param started Whether the run has started.
  */
-export const roundsOf = (rounds: readonly RoundTotal[], started: boolean): number =>
+export const roundsOf = (rounds: readonly RoundTotal[], started: boolean) =>
   rounds.reduce((most, r) => Math.max(most, r.round ?? 1), started ? 1 : 0);
 
 /**
@@ -181,7 +180,7 @@ export const roundsOf = (rounds: readonly RoundTotal[], started: boolean): numbe
  * @param run The run's whole time, whose wall time the foot says.
  * @param head The breakdown's headline, what the rounds tile shows.
  */
-export function roundsBreakdown(rounds: readonly RoundTotal[], run: RoundTotal, head: string): Breakdown | null {
+export function roundsBreakdown(rounds: readonly RoundTotal[], run: RoundTotal, head: string) {
   if (!rounds.length) return null;
   return {
     head,

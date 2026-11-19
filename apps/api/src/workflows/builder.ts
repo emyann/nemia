@@ -45,7 +45,7 @@ import {
 } from 'agent-orchestrator/workflow';
 import { type Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
-import { STEP_KEY_FORM, type KeyForm, type WorkflowFile } from 'objects';
+import { STEP_KEY_FORM, type WorkflowFile } from 'objects';
 import { schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
 import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
@@ -81,7 +81,7 @@ export const yourAgentsRead = (home: string) =>
  * the parser and shown as the listing shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step
  * saved naming it is refused in its words.
  */
-function agentValues(agents: Agents): Record<string, Partial<WorkflowStepSpec>> {
+function agentValues(agents: Agents) {
   const values: Record<string, Partial<WorkflowStepSpec>> = {};
   for (const [name, agent] of [...agents].sort(([a], [b]) => a.localeCompare(b))) {
     if (agent instanceof WorkflowError) continue;
@@ -102,7 +102,7 @@ function agentValues(agents: Agents): Record<string, Partial<WorkflowStepSpec>> 
  * under the store's root `home`). An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents —
  * the form is still drawn, a step already naming one keeps its word, and `nemia start` and `nemia up` say what is wrong with the file.
  */
-function harnessChoices(home: string): readonly string[] {
+function harnessChoices(home: string) {
   try {
     return [...HARNESSES, ...[...remoteAgents(home).keys()].map((name) => `${REMOTE_PREFIX}${name}`)];
   } catch {
@@ -126,7 +126,7 @@ function harnessChoices(home: string): readonly string[] {
  * @param yours Your agents: the names listed and the agents a workflow of yours finds.
  * @param home The store's root folder, read for the harnesses offered.
  */
-export const keyForm = (yours: YourAgents, home: string): KeyForm => ({
+export const keyForm = (yours: YourAgents, home: string) => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
@@ -156,7 +156,7 @@ export type BuildRefused = { error: string; steps: string[] };
  * @param message The package's refusal.
  * @param names The steps' names the request sent.
  */
-export function stepsNamed(message: string, names: readonly string[]): string[] {
+export function stepsNamed(message: string, names: readonly string[]) {
   const [, cycle] = /^these steps wait on each other: (.+)$/.exec(message) ?? [];
   if (cycle !== undefined) return cycle.split(', ').filter((name) => names.includes(name));
   const refusedName = names.find((name) => stepNameRefusal(name) === message);
@@ -218,7 +218,7 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
  * @param route The route, as a refusal names it.
  * @param shape The shape a request is sent in, as a refusal says it.
  */
-export function draftOf(step: StepBody, at: string, route: string, shape: string): StepDraft | Refusal {
+export function draftOf(step: StepBody, at: string, route: string, shape: string) {
   const { name, spec = {}, body, own } = step;
   const called = `${at} (${name})`;
   const draft: Record<string, unknown> = { after: [] };
@@ -230,19 +230,19 @@ export function draftOf(step: StepBody, at: string, route: string, shape: string
       return {
         status: 400,
         error: `${route}: ${called}'s \`${key}\` is ${TYPES[kind].said}, or null for unset, and this request's was ${JSON.stringify(value)}. Send ${shape}.`,
-      };
+      } satisfies StepDraft | Refusal;
     }
     if (mine && isRoleKey(key) && !mine.keys.includes(key)) continue;
     draft[key] = key === 'output' ? { file: value } : value;
   }
-  return { ...draft, name, body: mine ? mine.body : body } as StepDraft;
+  return { ...draft, name, body: mine ? mine.body : body } as StepDraft satisfies StepDraft | Refusal;
 }
 
 /**
  * Whether key is one an agent may set on a step (ROLE_KEYS).
  * @param key A key of a step's spec.
  */
-export const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
+export const isRoleKey = (key: string) => (ROLE_KEYS as readonly string[]).includes(key);
 
 /** A schema a save writes beside the steps: its file's name and its text, as it is written. */
 export type SchemaFile = { file: string; text: string };
@@ -255,24 +255,23 @@ export type SchemaFile = { file: string; text: string };
  * @param route The route, as a refusal names it.
  * @param shape The shape a request is sent in, as a refusal says it.
  */
-export function schemasOf(schemas: readonly SchemaFile[] | undefined, route: string, shape: string): SchemaFile[] | Refusal {
+export function schemasOf(schemas: readonly SchemaFile[] | undefined, route: string, shape: string) {
   const out: SchemaFile[] = [];
   for (const schema of schemas ?? []) {
     const wrong = schemaNameRefusal(schema.file);
-    if (wrong !== undefined) return { status: 400, error: `${route}: ${wrong}` };
+    if (wrong !== undefined) return { status: 400, error: `${route}: ${wrong}` } satisfies SchemaFile[] | Refusal;
     if (out.some((s) => s.file === schema.file))
       return {
         status: 400,
         error: `${route}: ${schema.file} is given twice, and a file holds one schema. Give it once. Send ${shape}.`,
-      };
+      } satisfies SchemaFile[] | Refusal;
     out.push({ file: schema.file, text: schema.text.endsWith('\n') ? schema.text : `${schema.text}\n` });
   }
-  return out;
+  return out satisfies SchemaFile[] | Refusal;
 }
 
 /** The steps whose `output:` names `file`, which a refusal of its schema is shown by. */
-const namingSchema = (steps: readonly StepDraft[], file: string): string[] =>
-  steps.filter((s) => s.output?.file === file).map((s) => s.name);
+const namingSchema = (steps: readonly StepDraft[], file: string) => steps.filter((s) => s.output?.file === file).map((s) => s.name);
 
 /**
  * Why the folder at `dir` would not read with `steps` and `schemas` written, or null: each schema a JSON object, then each step rendered
@@ -285,7 +284,7 @@ function judgedWith(
   steps: readonly StepDraft[],
   schemas: readonly SchemaFile[],
   found: { readonly agents: Agents; readonly skills: SkillsFound },
-): BuildRefused | null {
+) {
   for (const { file, text } of schemas) {
     let schema: unknown;
     try {
@@ -303,7 +302,7 @@ function judgedWith(
       };
   }
   const given = new Map(schemas.map((s) => [s.file, s.text]));
-  const read = (file: string): string | undefined => {
+  const read = (file: string) => {
     const pasted = given.get(path.normalize(file));
     if (pasted !== undefined) return pasted;
     try {
@@ -336,7 +335,7 @@ function judgedWith(
  * Whether `writeWorkflow` refuses the steps by their names — none, one not a file's, one twice — before it renders any: its words, not
  * these.
  */
-const unnamed = (steps: readonly StepDraft[]): boolean =>
+const unnamed = (steps: readonly StepDraft[]) =>
   !steps.length || steps.some((s) => stepNameRefusal(s.name) !== undefined) || new Set(steps.map((s) => s.name)).size < steps.length;
 
 /** A schema as the folder held it before a save wrote it: its text, or undefined where the folder had no such file. */
@@ -353,7 +352,7 @@ export type SchemaWas = { file: string; was: string | undefined };
  * @param dir The workflow's folder.
  * @param written Each schema the save wrote, and what its file held before, undefined where there was none.
  */
-export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void {
+export function putSchemasBack(dir: string, written: readonly SchemaWas[]) {
   for (const { file, was } of written) {
     const at = path.join(dir, file);
     if (was === undefined) {
@@ -366,7 +365,7 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
 }
 
 /** What the file `at` holds now, or why it holds nothing to keep — gone, or not readable — in the disk's words: either is written back. */
-function heldAt(at: string): { text: string } | { unread: string } {
+function heldAt(at: string) {
   try {
     return { text: fs.readFileSync(at, 'utf8') };
   } catch (err) {
@@ -418,9 +417,9 @@ export async function write(
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
   files?: readonly WorkflowFile[],
-): Promise<WorkflowSaved | BuildRefused> {
+) {
   const places = placesOf(repo, home);
-  const refused = (message: string): BuildRefused => ({
+  const refused = (message: string) => ({
     error: message,
     steps: stepsNamed(
       message,
@@ -491,7 +490,7 @@ export async function write(
  * for one it cannot read), and a folder's files by path.
  * @param at The file's path.
  */
-export const writtenAt = (at: string): string => {
+export const writtenAt = (at: string) => {
   try {
     return fs.statSync(at).mtime.toISOString();
   } catch {
@@ -503,7 +502,7 @@ export const writtenAt = (at: string): string => {
  * The names of the .md files directly in a folder, sorted, without their extension; none where it cannot be read.
  * @param dir The folder.
  */
-export const markdownNamesIn = (dir: string): string[] => {
+export const markdownNamesIn = (dir: string) => {
   try {
     return fs
       .readdirSync(dir, { withFileTypes: true })
@@ -519,7 +518,7 @@ export const markdownNamesIn = (dir: string): string[] => {
  * The folders directly in a folder that hold a SKILL.md, a link among them, sorted; none where it cannot be read.
  * @param dir The folder.
  */
-export const skillFoldersIn = (dir: string): string[] => {
+export const skillFoldersIn = (dir: string) => {
   try {
     return fs
       .readdirSync(dir, { withFileTypes: true })
@@ -536,12 +535,17 @@ export const skillFoldersIn = (dir: string): string[] => {
  * @param dir The skill's folder.
  * @param refused Whether the picker refused the skill, so a link is not followed.
  */
-export const skillTextOf = (dir: string, refused: boolean): { text: string } | { unread: string | null } => {
+export const skillTextOf = (dir: string, refused: boolean) => {
   try {
-    if (refused && fs.lstatSync(dir).isSymbolicLink()) return { unread: null };
-    return { text: fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') };
+    if (refused && fs.lstatSync(dir).isSymbolicLink())
+      return { unread: null } satisfies { text: string } | { unread: string | null } as { text: string } | { unread: string | null };
+    return { text: fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') } satisfies { text: string } | { unread: string | null } as
+      | { text: string }
+      | { unread: string | null };
   } catch (err) {
-    return { unread: `${path.join(dir, 'SKILL.md')} cannot be read: ${err instanceof Error ? err.message : String(err)}` };
+    return { unread: `${path.join(dir, 'SKILL.md')} cannot be read: ${err instanceof Error ? err.message : String(err)}` } satisfies
+      | { text: string }
+      | { unread: string | null } as { text: string } | { unread: string | null };
   }
 };
 
@@ -550,6 +554,7 @@ export const skillTextOf = (dir: string, refused: boolean): { text: string } | {
  * @param dir The folder the paths are said from.
  * @param under The folder inside it to list, by its path from it; the folder itself by default.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export const filesUnder = (dir: string, under = ''): string[] =>
   fs
     .readdirSync(path.join(dir, under), { withFileTypes: true })

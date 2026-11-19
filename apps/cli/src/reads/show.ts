@@ -12,7 +12,7 @@ import { switchArg, textArg } from '../commands/requests.ts';
  * Prints the run `args` names, as one object or, with `--raw`, its record; answers 0.
  * @param args The command's words as parsed against `SHOW_WORDS`: the run's id and `--raw`.
  */
-export async function show(args: Args): Promise<number> {
+export async function show(args: Args) {
   const runId = textArg(args, 'runId') ?? '';
   const raw = switchArg(args, 'raw');
   const answer = raw

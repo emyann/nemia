@@ -15,10 +15,10 @@ import { LedgerDoor, ledgerDoorOver, type LedgerLayer, type RevisionOf } from '.
 export const MEMORY_ROOT = '/memory';
 
 /** A fresh Ledger door over a map: no ledger written. */
-export function ledgerDoorMemory(): Layer.Layer<never> {
+export function ledgerDoorMemory() {
   const ledgers = new Map<string, Revision[]>();
   const keyOf = ({ kind, name }: RevisionOf) => `${kind}/${name}`;
-  const of = (at: RevisionOf): Revision[] => (ledgers.get(keyOf(at)) ?? []).map((e) => ({ ...e }));
+  const of = (at: RevisionOf) => (ledgers.get(keyOf(at)) ?? []).map((e) => ({ ...e }));
   const layer: LedgerLayer = {
     entries: {
       of,

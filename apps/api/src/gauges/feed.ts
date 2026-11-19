@@ -25,7 +25,7 @@ type SSEMessage = FeedStreamEvent;
  * the store (`daemon`), a factory, its upgrade's conflicts pending or settled (`factory`), a step's word (`step`), a run gone from the
  * store (`removed`), or a run's own word (`run`). Read off the line's shape alone — the api relays the feed and judges nothing from it.
  */
-const feedEventOf = (line: FeedLine): 'store' | 'daemon' | 'factory' | 'step' | 'removed' | 'run' =>
+const feedEventOf = (line: FeedLine) =>
   'store' in line
     ? 'store'
     : 'daemon' in line
@@ -43,7 +43,7 @@ const feedEventOf = (line: FeedLine): 'store' | 'daemon' | 'factory' | 'step' | 
  * watch` start — or why it cannot. The package says which numbers the feed has a line boundary at (`feedCursorRefusal`); the api keeps no
  * rule of its own about them, and says only how a reader of the stream comes by a cursor.
  */
-function feedCursorOf(home: string, raw: string | undefined): number | { error: string } {
+function feedCursorOf(home: string, raw: string | undefined) {
   if (!raw) return 0;
   const how =
     'A feed cursor is the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start.';
@@ -64,7 +64,7 @@ const END = 'end';
  * @param raw the `from` asked for, none for the feed's start
  * @returns the byte of the feed to read from, or why `from` cannot be read
  */
-function feedStartOf(home: string, raw: string | undefined): number | { error: string } {
+function feedStartOf(home: string, raw: string | undefined) {
   if (raw === undefined) return 0;
   if (raw !== END)
     return {
@@ -81,7 +81,7 @@ function feedStartOf(home: string, raw: string | undefined): number | { error: s
  * @param raw the `until` asked for, none to follow the feed
  * @returns the byte of the feed to stop at, none to follow it, or why `until` cannot be read
  */
-function feedEndOf(home: string, raw: string | undefined): number | undefined | { error: string } {
+function feedEndOf(home: string, raw: string | undefined) {
   if (raw === undefined) return undefined;
   if (raw !== END)
     return {
@@ -91,7 +91,7 @@ function feedEndOf(home: string, raw: string | undefined): number | undefined | 
 }
 
 /** A hint for a selector a reader typed (`formerHints`), as an event of its own: its data the sentence a person reads. */
-const hinted = (message: string): SSEMessage => ({ event: 'hint', data: { message } });
+const hinted = (message: string) => ({ event: 'hint', data: { message } }) satisfies SSEMessage;
 
 /**
  * How a selector reaches this stream, said after the package's refusal of one and a full stop, since the package's words end on its
@@ -102,24 +102,25 @@ const SELECTOR_ASKED =
   'A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line.';
 
 /** A failure of a read as an event with `retrying`: true while the reader reads again on its next beat, false when it ends the stream. */
-const unreadable = (err: unknown, retrying: boolean): SSEMessage => ({
-  event: 'unreadable',
-  data: { error: err instanceof Error ? err.message : String(err), retrying },
-});
+const unreadable = (err: unknown, retrying: boolean) =>
+  ({
+    event: 'unreadable',
+    data: { error: err instanceof Error ? err.message : String(err), retrying },
+  }) satisfies SSEMessage;
 
 /**
  * Where the stream has read to, as an event of its own: its id the cursor, its data an empty field — present, so an EventSource both
  * remembers the id and dispatches a `bookmark` event, and empty, since where it has read to is the whole of what it says.
  */
-const bookmark = (cursor: number): SSEMessage => ({ event: 'bookmark', data: '', id: String(cursor) });
+const bookmark = (cursor: number) => ({ event: 'bookmark', data: '', id: String(cursor) }) satisfies SSEMessage;
 
 /** What the reader handed on, as the stream's event: a line, its id the cursor after it; a failed read; and the read after it. */
-const messageOf = (f: Followed): SSEMessage =>
-  f.kind === 'line'
+const messageOf = (f: Followed) =>
+  (f.kind === 'line'
     ? { event: feedEventOf(f.line), data: f.line, id: String(f.cursor) }
     : f.kind === 'unreadable'
       ? unreadable(f.error, true)
-      : { event: 'readable', data: {} };
+      : { event: 'readable', data: {} }) satisfies SSEMessage;
 
 /**
  * What the stream sends the moment it opens, before any line: an event of its own, `opened`, with nothing in it, which every reader of the
@@ -241,7 +242,7 @@ export const feedOpened = (
   beats: BeatsShape,
   context: Context.Context<never>,
   home: string,
-): Effect.Effect<Stream.Stream<SSEMessage>, BadRequest | Invalid> =>
+) =>
   Effect.gen(function* () {
     const start = feedStartOf(home, query.from);
     if (typeof start !== 'number') return yield* Effect.fail(new BadRequest({ error: start.error }));
@@ -260,4 +261,4 @@ export const feedOpened = (
       Stream.provideContext(context),
     );
     return Stream.concat(Stream.fromIterable([OPENED, ...hints]), relayed);
-  });
+  }) satisfies Effect.Effect<Stream.Stream<SSEMessage>, BadRequest | Invalid>;

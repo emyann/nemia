@@ -20,7 +20,7 @@ import { libraryUsers, recordedAt } from './library.verb.ts';
  * @param home The store's root.
  * @param name The server's name.
  */
-export const libraryServerThere = (home: string, name: string): 'user' | 'builtin' | 'none' => {
+export const libraryServerThere = (home: string, name: string) => {
   if (libraryServers(home)[name] !== undefined) return 'user';
   return builtinServers(BUILTIN_SERVERS).some((s) => s.name === name) ? 'builtin' : 'none';
 };
@@ -30,18 +30,20 @@ export const libraryServerThere = (home: string, name: string): 'user' | 'builti
  * name shadows, each with the factories that add it.
  * @param home The store's root.
  */
-export function libraryServerObjects(home: string): McpServer[] {
+export function libraryServerObjects(home: string) {
   const mine = libraryServers(home);
   const filedAt = recordedAt(home, DEFAULT_NAMESPACE);
   const own = Object.entries(mine).map(([name, server]) => serverObject(home, name, specOf(server), 'user', filedAt));
   const builtin = builtinServers(BUILTIN_SERVERS)
     .filter((s) => mine[s.name] === undefined)
     .map(({ name, ...server }) => serverObject(home, name, specOf(server, false), 'builtin', filedAt));
-  return [...own, ...builtin].sort((a, b) => (a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0));
+  return [...own, ...builtin].sort((a, b) =>
+    a.metadata.name < b.metadata.name ? -1 : a.metadata.name > b.metadata.name ? 1 : 0,
+  ) satisfies McpServer[] as McpServer[];
 }
 
 /** The object of the library server `name` at `origin`, with the factories that add it. */
-const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string): McpServer => {
+const serverObject = (home: string, name: string, spec: McpServer['spec'], origin: 'user' | 'builtin', filedAt: string) => {
   const status = { origin, factories: libraryUsers(home, { kind: 'McpServer', name }) };
   return {
     apiVersion: API_VERSION,
@@ -49,7 +51,7 @@ const serverObject = (home: string, name: string, spec: McpServer['spec'], origi
     metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, status) },
     spec,
     status,
-  };
+  } satisfies McpServer;
 };
 
 /**
@@ -59,7 +61,7 @@ const serverObject = (home: string, name: string, spec: McpServer['spec'], origi
  * @param name The server's name.
  * @param write The server's write as it was sent.
  */
-export function libraryServerWritten(home: string, name: string, write: McpServerWrite): void {
+export function libraryServerWritten(home: string, name: string, write: McpServerWrite) {
   const bad = serverNameRefusal(name) ?? writeRefusal(write);
   if (bad !== undefined) throw new Invalid({ message: bad });
   const { type, ...rest } = write;
@@ -75,7 +77,7 @@ export function libraryServerWritten(home: string, name: string, write: McpServe
  * @param home The store's root.
  * @param name The server's name.
  */
-export function libraryServerRemoved(home: string, name: string): void {
+export function libraryServerRemoved(home: string, name: string) {
   const { [name]: _gone, ...rest } = libraryServers(home);
   writeLibraryServers(home, rest);
 }

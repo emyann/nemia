@@ -21,7 +21,7 @@ export type Point = { x: number; y: number };
  * @param names The run's steps, by name, in the run's order.
  * @param edges The graph's edges, each with where it comes from, where it goes and its kind.
  */
-export function stepsOf(names: readonly string[], edges: ReadonlyArray<{ from: string; to: string; kind: string }>): StepEdges[] {
+export function stepsOf(names: readonly string[], edges: ReadonlyArray<{ from: string; to: string; kind: string }>) {
   return names.map((name) => ({
     name,
     after: [...new Set(edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === name).map((e) => e.from))],
@@ -39,7 +39,7 @@ export const ROW_HEIGHT = 150;
  * `after` says. Throws, naming the steps it could not place, on a cycle: a step never taken is in or behind one.
  * @param steps The run's steps, each with the steps it waits on.
  */
-export function layers(steps: readonly StepEdges[]): string[][] {
+export function layers(steps: readonly StepEdges[]) {
   const order = new Map<string, number>();
   const afterOf = new Map<string, readonly string[]>();
   for (const step of steps) {
@@ -90,7 +90,7 @@ export function layers(steps: readonly StepEdges[]): string[][] {
  * Each step's top-left corner: the first column at x = 0, every column centred on y = 0.
  * @param steps The run's steps, each with the steps it waits on.
  */
-export function layout(steps: readonly StepEdges[]): Map<string, Point> {
+export function layout(steps: readonly StepEdges[]) {
   const at = new Map<string, Point>();
   layers(steps).forEach((column, c) =>
     column.forEach((name, i) => at.set(name, { x: c * COLUMN_WIDTH, y: (i - (column.length - 1) / 2) * ROW_HEIGHT })),
@@ -102,7 +102,7 @@ export function layout(steps: readonly StepEdges[]): Map<string, Point> {
  * The room a layout takes: a column's width per column, and a row's height per row of its tallest column.
  * @param at Each step's top-left corner, as `layout` gives it.
  */
-export function extentOf(at: ReadonlyMap<string, Point>): { width: number; height: number } {
+export function extentOf(at: ReadonlyMap<string, Point>) {
   if (!at.size) return { width: 0, height: 0 };
   const xs = [...at.values()].map((p) => p.x);
   const ys = [...at.values()].map((p) => p.y);

@@ -19,7 +19,7 @@ type FixFollowed = { output: string; phase: FixPhase; ended?: Fix; unread?: stri
  * @param fix The started fix, as the api answered its start.
  * @param onEnded Told the fix as it ended; undefined where nobody is told.
  */
-export function useFixFollow(fix: Fix, onEnded?: (ended: Fix) => void): FixFollowed {
+export function useFixFollow(fix: Fix, onEnded?: (ended: Fix) => void) {
   const [followed, setFollowed] = useState<FixFollowed>({ output: fix.output, phase: fix.phase });
   const id = fix.id;
   const told = useRef(onEnded);

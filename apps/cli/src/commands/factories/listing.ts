@@ -15,10 +15,10 @@ import { dollars, fireWord, worksOnLine } from './lines.ts';
 export type Beside = { readonly schedules: readonly Schedule[]; readonly instruction: FactoryInstruction | undefined };
 
 /** The lines under a factory, indented past the names' `width`. */
-const under = (width: number, line: string): string => `${' '.repeat(width)}  ${line}`;
+const under = (width: number, line: string) => `${' '.repeat(width)}  ${line}`;
 
 /** The places of `o` a harness does not trust, each with the command that repairs it, or why nothing can. */
-const untrustedLines = (o: Factory, width: number): string[] =>
+const untrustedLines = (o: Factory, width: number) =>
   o.status.untrusted.map((one) =>
     under(
       width,
@@ -30,7 +30,7 @@ const untrustedLines = (o: Factory, width: number): string[] =>
  * The template a factory was made from: its folder and version, the version applied or that none is yet, and each condition that is not
  * as it should be — `Applied` false, `ConflictsPending` true — with its sentence.
  */
-function templateLines(o: Factory, width: number): string[] {
+function templateLines(o: Factory, width: number) {
   const template = o.spec.template;
   if (template === undefined) return [];
   const applied = o.status.applied ?? null;
@@ -44,26 +44,26 @@ function templateLines(o: Factory, width: number): string[] {
 
 /** A factory's read-only volumes, by path, once each: `volume /home/me/notes :ro`; its writable ones are what its first line says it works
  * on. */
-function volumeLines(o: Factory, width: number): string[] {
+function volumeLines(o: Factory, width: number) {
   const seen = new Map<string, boolean>();
   for (const v of o.spec.volumes) if (v.readOnly && !seen.has(v.path)) seen.set(v.path, v.readOnly);
   return [...seen.keys()].sort((a, b) => a.localeCompare(b)).map((at) => under(width, `volume ${at} :ro`));
 }
 
 /** A factory's harness settings: `setting claude.attribution {"commit":"","pr":""}`. */
-const settingLines = (o: Factory, width: number): string[] =>
+const settingLines = (o: Factory, width: number) =>
   Object.entries(o.spec.harnessSettings ?? {}).flatMap(([harness, keys]) =>
     Object.entries(keys).map(([key, value]) => under(width, `setting ${harness}.${key} ${JSON.stringify(value)}`)),
   );
 
 /** A factory's cost lines, sorted by workflow: `cost line build $80.00`. */
-const costLineLines = (o: Factory, width: number): string[] =>
+const costLineLines = (o: Factory, width: number) =>
   Object.entries(o.spec.costLines ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([workflow, usd]) => under(width, `cost line ${workflow} ${dollars(usd)}`));
 
 /** A factory's hires, sorted by step: `dev/implement ← implementer`. */
-const hireLines = (o: Factory, width: number): string[] =>
+const hireLines = (o: Factory, width: number) =>
   Object.keys(o.spec.hires)
     .sort()
     .map((step) => under(width, `${step} ← ${o.spec.hires[step] ?? ''}`));
@@ -72,7 +72,7 @@ const hireLines = (o: Factory, width: number): string[] =>
  * A factory's schedules, by workflow: `schedule janitor  0 9 * * 1  "Read the stats"`, then its next fire and last run at `now`, and the
  * refusal kept of its latest fire.
  */
-const scheduleLines = (schedules: readonly Schedule[], width: number, now: number): string[] =>
+const scheduleLines = (schedules: readonly Schedule[], width: number, now: number) =>
   [...schedules]
     .sort((a, b) => a.metadata.name.localeCompare(b.metadata.name))
     .flatMap(({ metadata, spec, status }) => {
@@ -87,14 +87,14 @@ const scheduleLines = (schedules: readonly Schedule[], width: number, now: numbe
     });
 
 /** Where a factory's instruction is kept, where its file says: a path, or the store. */
-function instructionLine(instruction: FactoryInstruction | undefined, width: number): string[] {
+function instructionLine(instruction: FactoryInstruction | undefined, width: number) {
   if (instruction === undefined) return [];
   if (instruction.store) return [under(width, 'instruction: kept in the store')];
   return instruction.path === null ? [] : [under(width, `instruction: ${instruction.path}`)];
 }
 
 /** The lines of one factory that reads: its places, template, workflows, volumes, settings, lines, hires, schedules and the rest. */
-const factoryLines = (o: Factory, beside: Beside, width: number, now: number): string[] => [
+const factoryLines = (o: Factory, beside: Beside, width: number, now: number) => [
   `${o.metadata.name.padEnd(width)}  ${worksOnLine(o.spec.volumes)}`,
   ...untrustedLines(o, width),
   ...templateLines(o, width),
@@ -118,7 +118,7 @@ const unread = (o: Factory): o is Factory & { status: { error: string } } => o.s
  * @param beside What was read beside each factory, its schedules and its instruction, by the factory's name.
  * @param now The time the schedules' fires are measured from, in ms since the epoch.
  */
-export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<string, Beside>, now: number): string[] {
+export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<string, Beside>, now: number) {
   const sorted = factories
     .filter((o) => o.metadata.name !== DEFAULT_NAMESPACE)
     .sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));
@@ -132,11 +132,11 @@ export function listingLines(factories: readonly Factory[], beside: ReadonlyMap<
         : factoryLines(o, beside.get(o.metadata.name) ?? none, width, now),
     ),
     "\nfile one: nemia factory add <name> [--volume <path|url>:rw] — remove one: nemia factory rm <name> — in the daemon's store",
-  ];
+  ] satisfies string[];
 }
 
 /** What `read` answers, or undefined where the api refuses it: a part of a factory's listing that does not read is left out. */
-const orNone = async <A>(read: () => Promise<A>): Promise<A | undefined> => {
+const orNone = async <A>(read: () => Promise<A>) => {
   try {
     return await read();
   } catch (err) {
@@ -146,19 +146,19 @@ const orNone = async <A>(read: () => Promise<A>): Promise<A | undefined> => {
 };
 
 /** What the listing reads beside the factory `name`: its schedules, every page, and its instruction. */
-async function besideOf(command: string, name: string): Promise<Beside> {
+async function besideOf(command: string, name: string) {
   const [schedules, instruction] = await Promise.all([
     orNone(() => asked(command, (c) => everyPage((page) => c.schedules.list({ params: { namespace: name }, query: page })))),
     orNone(() => asked(command, (c) => c.factories.instruction({ params: { name } }))),
   ]);
-  return { schedules: schedules?.items ?? [], instruction };
+  return { schedules: schedules?.items ?? [], instruction } satisfies Beside as Beside;
 }
 
 /**
  * `nemia factory` and `nemia factory ls`' runner: every factory read of the api, and what is read beside each, printed.
  * @param command The command typed, `factory` or `factory ls`, said in the api's refusals.
  */
-export async function factoryListed(command: string): Promise<number> {
+export async function factoryListed(command: string) {
   const listed = await factoriesListed(command);
   const reading = listed.items.filter((o) => o.metadata.name !== DEFAULT_NAMESPACE && !unread(o));
   const beside = new Map(await Promise.all(reading.map(async (o) => [o.metadata.name, await besideOf(command, o.metadata.name)] as const)));

@@ -49,7 +49,7 @@ export const routeOf: RouteOf = ({ name, local, help, remote }) => {
  * its first word. A word a command does not take is refused by its own words, before the api is asked anything.
  * @param argv The words typed after the bin's name.
  */
-export const nameOf = (argv: readonly string[]): string => {
+export const nameOf = (argv: readonly string[]) => {
   const opens = moved.filter((name) => {
     const words = name.split(' ');
     return words.every((word, at) => argv[at] === word);

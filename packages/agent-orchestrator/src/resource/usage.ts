@@ -50,7 +50,7 @@ export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
  * @param cap The `context:` of the step whose peak it is, in tokens, or undefined where it names none.
  * @param read The usage the words of what was read and the peak's mark are of, `usage` where absent.
  */
-export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | undefined = usage): StepUsed {
+export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | undefined = usage) {
   const [used = ''] = usedLines(usage);
   return {
     usage: usage ?? null,
@@ -62,7 +62,7 @@ export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | und
     read: readWords(read, cap) || null,
     peak: peakMark(read, cap),
     rebuilt: read?.rebuiltCaches ?? 0,
-  };
+  } satisfies StepUsed;
 }
 
 /**
@@ -72,16 +72,20 @@ export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | und
  * @param steps The run's steps, whose `context:` caps are read.
  * @param usages Each step's usage by its name, undefined where none was measured.
  */
-export function totalOf(steps: readonly StepSpec[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
+export function totalOf(steps: readonly StepSpec[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>) {
   const total = sumUsage(usages.map(([, u]) => u));
   const peakOf = usages.find(([, u]) => total?.peakContextTokens !== undefined && u?.peakContextTokens === total.peakContextTokens)?.[0];
   const compactions = sumUsage(usages.filter(([name]) => name === peakOf).map(([, u]) => u))?.compactions;
   const { compactions: _all, ...rest } = total ?? {};
-  return usedOf(total, steps.find((s) => s.name === peakOf)?.context, total && { ...rest, ...(compactions ? { compactions } : {}) });
+  return usedOf(
+    total,
+    steps.find((s) => s.name === peakOf)?.context,
+    total && { ...rest, ...(compactions ? { compactions } : {}) },
+  ) satisfies StepUsed;
 }
 
 /**
  * What a run's sessions read, off a usage in words: null where it says nothing of what they read.
  * @param u The usage in words.
  */
-export const readOf = (u: StepUsed): RunRead | null => (u.read === null ? null : { said: u.read, peak: u.peak, rebuilt: u.rebuilt });
+export const readOf = (u: StepUsed) => (u.read === null ? null : { said: u.read, peak: u.peak, rebuilt: u.rebuilt });

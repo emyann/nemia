@@ -13,11 +13,11 @@ import { Refused } from '../refused.ts';
  * list's `labelSelector`. A refusal of another output is the command's own `check`, run before.
  * @param args The list's command's words, parsed.
  */
-export function tableAsked(args: Args): { selector: readonly string[]; asked: TableAsked } {
+export function tableAsked(args: Args) {
   return {
     selector: listArg(args, 'selector'),
     asked: { wide: textArg(args, 'output') === 'wide', showLabels: switchArg(args, 'showLabels'), columns: listArg(args, 'labelColumns') },
-  };
+  } satisfies { selector: readonly string[]; asked: TableAsked };
 }
 
 /**
@@ -26,8 +26,8 @@ export function tableAsked(args: Args): { selector: readonly string[]; asked: Ta
  * @param verb The verb the person typed, named in the refusal.
  * @param listed What the api answered the list: its `Table`, or its objects.
  */
-export function tableOf<L extends object>(verb: string, listed: L | Table): Table {
-  if ('columnDefinitions' in listed) return listed;
+export function tableOf<L extends object>(verb: string, listed: L | Table) {
+  if ('columnDefinitions' in listed) return listed satisfies Table;
   throw new Refused(
     `the daemon answered nemia ${verb} a list where this nemia asked for its table: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );

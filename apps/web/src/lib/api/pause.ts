@@ -38,7 +38,7 @@ export const pauseQuery = queryOptions({
  */
 export const pauseNowQuery = queryOptions({
   queryKey: ['pause', 'now'],
-  queryFn: (): Promise<PauseNowRead> => call((c) => c.server.pauseNow(), read(PauseNowRead)),
+  queryFn: () => call((c) => c.server.pauseNow(), read(PauseNowRead)),
   gcTime: 0,
 });
 
@@ -50,7 +50,7 @@ export const pauseNowQuery = queryOptions({
  * @param why Why the store is paused, as the person said it; none or empty for no words.
  * @param now Whether to pause at once, asking what runs to stop; false or none for a pause at the next tool call's end.
  */
-export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
+export const putPause = (why?: string, now?: boolean) =>
   call(
     (c) => c.server.pause({ payload: { ...(why ? { why } : {}), ...(now ? { now: true } : {}) } }),
     write(
@@ -65,5 +65,5 @@ export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
  * Resumes the store, as the package's `resume` does: the next pass files what waits. Rejects as `putPause` does, for a store none stands
  * on.
  */
-export const resumePause = (): Promise<Resumed> =>
+export const resumePause = () =>
   call((c) => c.server.resume(), write(Resumed, 'The store may be resumed: read the board again before resuming it again.'));

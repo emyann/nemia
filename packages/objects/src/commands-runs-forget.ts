@@ -13,7 +13,7 @@ const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unme
  * deletes, and alone would delete nothing, silently — then a switch with no run to forget.
  * @param args The command line's arguments, by key.
  */
-export function rmRefusal(args: Args): string | null {
+export function rmRefusal(args: Args) {
   if (args.forceUnmerged === true && args.deleteBranches !== true)
     return "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
   const none = args.runId === undefined || (Array.isArray(args.runId) && args.runId.length === 0);

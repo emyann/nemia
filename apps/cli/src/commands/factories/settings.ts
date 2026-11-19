@@ -11,7 +11,7 @@ import { Refused } from '../../refused.ts';
 import { dollars, repoSent, textOf, trustedLines, volumeSent, writtenOf } from './lines.ts';
 
 /** How a volume is said: `:ro` or `:rw`, as docker compose marks it. */
-const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
+const markOf = (readOnly: boolean) => (readOnly ? ':ro' : ':rw');
 
 /**
  * A volume's switch as typed, `on` or `off`, as the api takes it: `{ [key]: true }` or `{ [key]: false }`, nothing where it was not given,
@@ -20,7 +20,7 @@ const markOf = (readOnly: boolean): ':ro' | ':rw' => (readOnly ? ':ro' : ':rw');
  * @param key The switch's key, `claudeMd` or `skills`.
  * @param command The command it was typed to, named in the refusal.
  */
-const onOff = (args: Args, key: 'claudeMd' | 'skills', command = 'factory volume add'): { claudeMd?: boolean; skills?: boolean } => {
+const onOff = (args: Args, key: 'claudeMd' | 'skills', command = 'factory volume add') => {
   const given = args[key];
   if (given === 'on') return { [key]: true };
   if (given === 'off') return { [key]: false };
@@ -30,7 +30,7 @@ const onOff = (args: Args, key: 'claudeMd' | 'skills', command = 'factory volume
 };
 
 /** A volume's switches where they are not the defaults, as a person types them: ` --claude-md on`, ` --skills off`. */
-const switchesSaid = (v: { claudeMd?: boolean; skills?: boolean }): string =>
+const switchesSaid = (v: { claudeMd?: boolean; skills?: boolean }) =>
   `${v.claudeMd === true ? ' --claude-md on' : ''}${v.skills === false ? ' --skills off' : ''}`;
 
 /**
@@ -38,7 +38,7 @@ const switchesSaid = (v: { claudeMd?: boolean; skills?: boolean }): string =>
  * read-only one, mounted for every local step of its runs; and how it was marked before.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryVolumeAdd(args: Args): Promise<number> {
+export async function factoryVolumeAdd(args: Args) {
   const factory = textOf(args, 'factory');
   const added = await asked('factory volume add', (c) =>
     c.factories.addVolume({
@@ -65,7 +65,7 @@ export async function factoryVolumeAdd(args: Args): Promise<number> {
  * `nemia factory volume set`: one volume's switches set, by its stored name, the other kept; printed as the Volume reads after.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryVolumeSet(args: Args): Promise<number> {
+export async function factoryVolumeSet(args: Args) {
   const [factory, volume] = [textOf(args, 'factory'), textOf(args, 'volume')];
   const answer = await asked('factory volume set', (c) =>
     c.volumes.patch({
@@ -84,7 +84,7 @@ export async function factoryVolumeSet(args: Args): Promise<number> {
  * `nemia factory volume rm`: a volume taken off a factory, by its path or the git URL it was cloned from.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryVolumeRm(args: Args): Promise<number> {
+export async function factoryVolumeRm(args: Args) {
   const factory = textOf(args, 'factory');
   const { file, removed } = await asked('factory volume rm', (c) =>
     c.factories.removeVolume({ params: { factory }, query: { path: repoSent(textOf(args, 'path')) } }),
@@ -97,7 +97,7 @@ export async function factoryVolumeRm(args: Args): Promise<number> {
  * `nemia factory setting set`: a harness setting given to a factory's runs, printed as its file now holds it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factorySettingSet(args: Args): Promise<number> {
+export async function factorySettingSet(args: Args) {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting set', (c) =>
     c.factories.putSetting({ params: { name: factory, setting }, payload: { value: textOf(args, 'value') } }),
@@ -115,7 +115,7 @@ export async function factorySettingSet(args: Args): Promise<number> {
  * `nemia factory setting rm`: a harness setting taken off a factory, by its key.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factorySettingRm(args: Args): Promise<number> {
+export async function factorySettingRm(args: Args) {
   const [factory, setting] = [textOf(args, 'factory'), textOf(args, 'setting')];
   const answer = await asked('factory setting rm', (c) => c.factories.deleteSetting({ params: { name: factory, setting } }));
   said([`${factory}  setting ${setting} removed`, `changed: ${writtenOf(answer, 'factory setting rm').file}`]);
@@ -126,7 +126,7 @@ export async function factorySettingRm(args: Args): Promise<number> {
  * `nemia factory cost-line set`: the cost line of a workflow in a factory, and the line it replaced.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryCostLineSet(args: Args): Promise<number> {
+export async function factoryCostLineSet(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const usd = Number(textOf(args, 'usd'));
   const answer = await asked('factory cost-line set', (c) =>
@@ -144,7 +144,7 @@ export async function factoryCostLineSet(args: Args): Promise<number> {
  * `nemia factory cost-line rm`: the cost line of a workflow taken off a factory.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryCostLineRm(args: Args): Promise<number> {
+export async function factoryCostLineRm(args: Args) {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
   const answer = await asked('factory cost-line rm', (c) => c.factories.deleteCostLine({ params: { name: factory, workflow } }));
   said([

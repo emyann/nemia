@@ -20,15 +20,15 @@ export type UpgradeStartRefusal = 'in-flight' | 'below-floor';
 export type InstalledVersion = { readonly tag: string; readonly version: Version | null };
 
 /** Whether `a` is an older release than `b`. */
-const older = (a: Version, b: Version): boolean =>
+const older = (a: Version, b: Version) =>
   a.major < b.major || (a.major === b.major && (a.minor < b.minor || (a.minor === b.minor && a.patch < b.patch)));
 
 /** A version's three numbers are whole and not negative. */
-const whole = (v: Version): boolean =>
+const whole = (v: Version) =>
   Number.isInteger(v.major) && Number.isInteger(v.minor) && Number.isInteger(v.patch) && v.major >= 0 && v.minor >= 0 && v.patch >= 0;
 
 /** Whether the tag asked for goes back past the store's floor: both are versions, and the tag's is older. */
-const pastTheFloor = (target: Version | null, floor: Version | null): boolean => target !== null && floor !== null && older(target, floor);
+const pastTheFloor = (target: Version | null, floor: Version | null) => target !== null && floor !== null && older(target, floor);
 
 const upgradeStartSpec = spec<(target: Version | null, floor: Version | null, inFlight: boolean) => UpgradeStartRefusal | null>({
   requires: ({ input: [target, floor] }) => (target === null || whole(target)) && (floor === null || whole(floor)),
@@ -52,12 +52,11 @@ const upgradeStartSpec = spec<(target: Version | null, floor: Version | null, in
 export type UpgradeStartRefused = Implementation<typeof upgradeStartSpec>;
 
 /** Whether the installed release `i` is older than the release the server runs. */
-const olderThanRunning = (i: InstalledVersion, running: Version | null): boolean =>
+const olderThanRunning = (i: InstalledVersion, running: Version | null) =>
   running !== null && i.version !== null && older(i.version, running);
 
 /** Whether the installed release `i` is not older than `j`: both versions, `i`'s at least `j`'s. */
-const atLeast = (i: InstalledVersion, j: InstalledVersion): boolean =>
-  i.version !== null && j.version !== null && !older(i.version, j.version);
+const atLeast = (i: InstalledVersion, j: InstalledVersion) => i.version !== null && j.version !== null && !older(i.version, j.version);
 
 /**
  * The newest installed release older than the one the server runs, as `newestOlder` keeps it while it reads the installed ones: whether
@@ -72,11 +71,11 @@ export type Newest = {
 };
 
 /** Whether the installed release `i` carries the version of `n`: a version, number by number the same. */
-const carries = (i: InstalledVersion, n: Newest): boolean =>
+const carries = (i: InstalledVersion, n: Newest) =>
   i.version !== null && i.version.major === n.major && i.version.minor === n.minor && i.version.patch === n.patch;
 
 /** Whether the installed release `j`, a version, is not newer than `n`. */
-const noNewerThan = (j: InstalledVersion, n: Newest): boolean =>
+const noNewerThan = (j: InstalledVersion, n: Newest) =>
   j.version !== null && !older({ major: n.major, minor: n.minor, patch: n.patch }, j.version);
 
 /**

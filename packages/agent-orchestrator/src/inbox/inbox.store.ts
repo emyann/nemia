@@ -75,14 +75,14 @@ export const readInbox = Effect.fn('readInbox')(function* () {
  * The store's factories that read, by name, as the Factory door lists them: what a queued card's repository is chosen from (`queueRepo`).
  * One not read is none.
  */
-export const readableFactories = (): Effect.Effect<Map<string, Factory>, Refusal> =>
+export const readableFactories = () =>
   Effect.map(
     Effect.flatMap(FactoryDoor, (door) => door.factories.listed()),
     (listed) => new Map(listed.flatMap((f) => ('error' in f ? [] : [[f.name, f] as const]))),
-  );
+  ) satisfies Effect.Effect<Map<string, Factory>, Refusal> as Effect.Effect<Map<string, Factory>, Refusal>;
 
 /** The names of the factories filed, as the door lists them, the default left out: what a refusal names to choose from. */
-export const filedNames = (): Effect.Effect<string[], Refusal> =>
+export const filedNames = () =>
   Effect.map(
     Effect.flatMap(FactoryDoor, (door) => door.factories.list()),
     (names) => names.filter((name) => name !== DEFAULT_NAMESPACE),
@@ -174,10 +174,10 @@ export type InboxQueued = {
 };
 
 /** What `queueInInbox` answers, as its type says it. */
-const queued = (done: InboxQueued): InboxQueued => done;
+const queued = (done: InboxQueued) => done;
 
 /** A queue `queueRefusal` refused, by its kind: a card a run's record names, or one already queued, is a `Conflict`; the rest `Invalid`. */
-const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]): Conflict | WorkflowError =>
+const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]) =>
   startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
 
 /**
@@ -281,7 +281,7 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
  * @param home The store's root, whose inbox is read.
  * @param given What was typed: a path, a card's name with or without its `.md`, or any other text.
  */
-export const inboxNameAt = (home: string, given: string): string | null => {
+export const inboxNameAt = (home: string, given: string) => {
   const at = cardNameAt(home, given);
   if (at !== null) return at;
   if (inboxNameRefusal(given) !== undefined || fs.existsSync(given)) return null;

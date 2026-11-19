@@ -5,7 +5,7 @@
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type StepSpec } from '../step/step.ts';
-import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS, type HarnessDeclaration, type HarnessKnobs } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none: the runtime's. */
 export { DEFAULT_HARNESS };
@@ -21,7 +21,7 @@ export { CLAUDE_RULES, type ClaudeRules, type Dated } from 'agent-runtime/vocabu
  * for, a remote agent's among them. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const declarationOf = (harness: string | undefined): HarnessDeclaration | undefined => {
+export const declarationOf = (harness: string | undefined) => {
   const name = harness ?? DEFAULT_HARNESS;
   return Object.hasOwn(HARNESS_DECLARATIONS, name) ? HARNESS_DECLARATIONS[name] : undefined;
 };
@@ -30,22 +30,21 @@ export const declarationOf = (harness: string | undefined): HarnessDeclaration |
  * How harness `harness` matches its permission rules, and the tool sets measured on it: `undefined` where it declares none. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const rulesOf = (harness: string | undefined): HarnessDeclaration['rules'] => declarationOf(harness)?.rules;
+export const rulesOf = (harness: string | undefined) => declarationOf(harness)?.rules;
 
 /**
  * The key harness `harness`'s fence is named by — its mode, or `sandbox` — `DEFAULT_HARNESS`'s where it is `undefined`, and `undefined`
  * for a harness with no knobs. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const fenceKeyOf = (harness: string | undefined): HarnessKnobs['fence']['key'] | undefined =>
-  declarationOf(harness)?.knobs?.fence.key;
+export const fenceKeyOf = (harness: string | undefined) => declarationOf(harness)?.knobs?.fence.key;
 
 /**
  * The tool lists harness `harness`'s fence takes (`tools` and its allow and deny rules), `DEFAULT_HARNESS`'s where it is
  * `undefined`: none where its fence is one word, and `undefined` for a harness with no knobs. Pure.
  * @param harness The harness's name, or undefined for the default one.
  */
-export const fenceListsOf = (harness: string | undefined): readonly string[] | undefined => declarationOf(harness)?.knobs?.fence.lists;
+export const fenceListsOf = (harness: string | undefined) => declarationOf(harness)?.knobs?.fence.lists;
 
 /**
  * How a step names a remote A2A agent, one another party runs: `harness: a2a:<name>`, the name one the store's `a2a-agents.json` declares
@@ -61,13 +60,13 @@ export const REMOTE_NAME = /^[a-z][a-z0-9-]*$/;
  * Whether a step's harness is a remote A2A agent (`REMOTE_PREFIX`). Pure.
  * @param harness The step's harness, or undefined where it names none.
  */
-export const isRemoteHarness = (harness: string | undefined): boolean => harness?.startsWith(REMOTE_PREFIX) ?? false;
+export const isRemoteHarness = (harness: string | undefined) => harness?.startsWith(REMOTE_PREFIX) ?? false;
 
 /**
  * The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure.
  * @param harness The step's harness, or undefined where it names none.
  */
-export const remoteNameOf = (harness: string | undefined): string | undefined =>
+export const remoteNameOf = (harness: string | undefined) =>
   harness !== undefined && isRemoteHarness(harness) ? harness.slice(REMOTE_PREFIX.length) : undefined;
 
 const RUNS_AS_CONFIGURED =
@@ -117,7 +116,7 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
  * @param value The flag's value, as given.
  * @param command The retry to ask instead, without the flag.
  */
-export function remoteRetryRefusal(step: StepSpec, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
+export function remoteRetryRefusal(step: StepSpec, flag: 'model' | 'budget', value: string | number, command: string) {
   if (!isRemoteHarness(step.harness)) return undefined;
   return `\`--${flag} ${value}\` ${REMOTE_REFUSED[flag]}, and ${step.name} runs on \`harness: ${step.harness}\`, a remote A2A agent: its try would be sent without it. Ask without --${flag}: ${command}.`;
 }
@@ -136,7 +135,7 @@ export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) =>
  * @param meta The step's lines, by key, its agent's given among them.
  * @param harness The step's harness, a remote agent's.
  */
-export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
+export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string) {
   const said = (key: string, why: string) =>
     refuse(
       `${step}: \`${key}: ${meta[key as StepKey]}\` ${why}, and \`harness: ${harness}\` is a remote A2A agent. Delete the line — from the step, or from the agent it names if the agent gives it.`,
@@ -175,7 +174,7 @@ export const HARNESS_FENCE_KEYS: readonly string[] = [
  * The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness.
  * @param harness The harness's name.
  */
-export const fenceKeysOf = (harness: string): readonly string[] | undefined => {
+export const fenceKeysOf = (harness: string) => {
   if (!Object.hasOwn(HARNESS_KNOBS, harness)) return undefined;
   const knobs = HARNESS_KNOBS[harness];
   return knobs === undefined ? undefined : [knobs.fence.key, ...knobs.fence.lists];

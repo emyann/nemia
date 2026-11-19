@@ -44,7 +44,7 @@ const POLL_EVERY = '100 millis';
 export type Probe = 'answers' | 'silent' | 'refused';
 
 /** The release a health answer says: `Health.release` where the body reads as `Health` and says one, else null. */
-const releaseIn = (body: string): string | null => {
+const releaseIn = (body: string) => {
   return Option.match(Schema.decodeUnknownOption(Schema.fromJsonString(Health))(body), {
     onNone: () => null,
     onSome: (health) => health.release ?? null,
@@ -59,19 +59,22 @@ const releaseIn = (body: string): string | null => {
  * @param base The daemon's url to ask.
  * @param env The environment whose token the probe presents (`sessionHeaders`).
  */
-export async function probed(
-  base: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<{ readonly probe: Probe; readonly release: string | null }> {
+export async function probed(base: string, env: NodeJS.ProcessEnv = process.env) {
   try {
     const response = await fetch(new URL(READY_PATH, base), { headers: sessionHeaders(env), signal: AbortSignal.timeout(PROBE_MS) });
     if (!response.ok) {
       await response.body?.cancel();
-      return { probe: 'answers', release: null };
+      return { probe: 'answers', release: null } satisfies { readonly probe: Probe; readonly release: string | null };
     }
-    return { probe: 'answers', release: releaseIn(await response.text()) };
+    return { probe: 'answers', release: releaseIn(await response.text()) } satisfies {
+      readonly probe: Probe;
+      readonly release: string | null;
+    };
   } catch (err) {
-    return { probe: err instanceof Error && err.name === 'TimeoutError' ? 'silent' : 'refused', release: null };
+    return { probe: err instanceof Error && err.name === 'TimeoutError' ? 'silent' : 'refused', release: null } satisfies {
+      readonly probe: Probe;
+      readonly release: string | null;
+    };
   }
 }
 
@@ -80,7 +83,7 @@ export async function probed(
  * @param base The daemon's url to ask.
  * @param env The environment whose token the probe presents (`sessionHeaders`).
  */
-export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env): Promise<Probe> => (await probed(base, env)).probe;
+export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env) => (await probed(base, env)).probe satisfies Probe;
 
 /**
  * `base`, where the daemon there says a release this client's meets or says none (`releaseMet`); refused, exit 2, where the two differ,
@@ -90,7 +93,7 @@ export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env):
  * @param daemon The release the daemon's health says, null where it says none.
  * @param client This client's release, null for a checkout.
  */
-export function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null): string {
+export function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null) {
   if (releaseMet(client, daemon) !== 'differs') return base;
   throw new Refused(
     `nemia ${verb}: this nemia is ${client ?? 'a checkout'} and the daemon at ${base} runs ${daemon ?? 'a checkout'}, and a client asks only a daemon of its own release. ` +
@@ -102,13 +105,13 @@ export function releaseHeld(verb: string, base: string, daemon: string | null, c
 const urlOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ url: Schema.String })));
 
 /** The url a `nemia daemon --json` answered on its last line, where it names one. */
-const urlIn = (stdout: string): string | undefined => {
+const urlIn = (stdout: string) => {
   const url = Option.getOrUndefined(urlOf(stdout.trim().split('\n').at(-1) ?? ''))?.url;
   return url === '' ? undefined : url;
 };
 
 /** Why none serves the store, and what to type: a daemon started here, the service installed, and the setting where it is why. */
-const unserved = (verb: string, off: boolean): Refused =>
+const unserved = (verb: string, off: boolean) =>
   new Refused(
     `nemia ${verb}: no daemon serves this store` +
       (off ? `, and ${START_OFF}=off here, so none is started on demand. ` : ', and none came up when one was started. ') +
@@ -122,11 +125,7 @@ const unserved = (verb: string, off: boolean): Refused =>
  * @param withinMs How long the polls go on before none is answered, in ms.
  * @param env The environment whose token each probe presents (`sessionHeaders`).
  */
-export const readyAt = (
-  urlNow: () => string | undefined,
-  withinMs: number,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string | undefined> =>
+export const readyAt = (urlNow: () => string | undefined, withinMs: number, env: NodeJS.ProcessEnv = process.env) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const base = urlNow();
@@ -144,11 +143,7 @@ export const readyAt = (
  * @param env The environment the start runs with and the lease is read by: `NEMIA_DAEMON_START`, the store, the token.
  * @param withinMs How long the started daemon has to answer, in ms: `READY_WITHIN_MS` where it is left out.
  */
-export async function daemonStarted(
-  verb: string,
-  env: NodeJS.ProcessEnv = process.env,
-  withinMs: number = READY_WITHIN_MS,
-): Promise<string> {
+export async function daemonStarted(verb: string, env: NodeJS.ProcessEnv = process.env, withinMs: number = READY_WITHIN_MS) {
   if (env[START_OFF] === 'off') throw unserved(verb, true);
   const { code, stdout } = await captured(['daemon', '--json'], env);
   const said = code === 0 ? urlIn(stdout) : undefined;
@@ -158,7 +153,7 @@ export async function daemonStarted(
 }
 
 /** A remote context's daemon that takes no connection: refused, naming the context, how to see the contexts, and how to leave it. */
-const remoteDown = (verb: string, name: string, server: string): Refused =>
+const remoteDown = (verb: string, name: string, server: string) =>
   new Refused(
     `nemia ${verb}: the daemon of the context ${name}, at ${server}, takes no connection. See that it runs there (\`nemia service status\` on its machine), check its address with \`nemia config get-contexts\`, or read this machine's store after \`nemia config use-context local\``,
   );
@@ -175,12 +170,8 @@ export type Served = { readonly base: string; readonly release: string | null };
  * @param env The environment read for the context in use, the store and the token.
  * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.
  */
-export async function servedWith(
-  verb: string,
-  env: NodeJS.ProcessEnv = process.env,
-  client: string | null = clientRelease(),
-): Promise<Served> {
-  const held = (base: string, release: string | null): Served => ({ base: releaseHeld(verb, base, release, client), release });
+export async function servedWith(verb: string, env: NodeJS.ProcessEnv = process.env, client: string | null = clientRelease()) {
+  const held = (base: string, release: string | null) => ({ base: releaseHeld(verb, base, release, client), release });
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   if (chosen.kind === 'remote') {
@@ -203,8 +194,5 @@ export async function servedWith(
  * @param env The environment read for the context in use, the store and the token.
  * @param client This client's release, null for a checkout: `clientRelease()` where it is left out.
  */
-export const served = async (
-  verb: string,
-  env: NodeJS.ProcessEnv = process.env,
-  client: string | null = clientRelease(),
-): Promise<string> => (await servedWith(verb, env, client)).base;
+export const served = async (verb: string, env: NodeJS.ProcessEnv = process.env, client: string | null = clientRelease()) =>
+  (await servedWith(verb, env, client)).base;

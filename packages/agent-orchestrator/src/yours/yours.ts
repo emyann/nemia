@@ -23,24 +23,24 @@ export type YoursKind = 'agents' | 'workflows' | 'skills';
  * Your workflows, in the store `home`: where a workflow of yours is a folder.
  * @param home The store's root folder.
  */
-export const yourWorkflowsDir = (home: string): string => path.join(home, 'workflows');
+export const yourWorkflowsDir = (home: string) => path.join(home, 'workflows');
 
 /**
  * Your library of skills, in the store `home`: where a skill of yours is a folder.
  * @param home The store's root folder.
  */
-export const yourSkillsDir = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
+export const yourSkillsDir = (home: string) => path.join(home, 'workflows', SKILLS_FOLDER);
 
 /**
  * The folder a writer of `kind` writes into, in the store `home`.
  * @param kind What is written: agents, skills or workflows.
  * @param home The store's root folder.
  */
-export const yoursOf = (kind: YoursKind, home: string): string =>
+export const yoursOf = (kind: YoursKind, home: string) =>
   kind === 'agents' ? path.join(home, 'workflows', AGENTS_FOLDER) : kind === 'skills' ? yourSkillsDir(home) : yourWorkflowsDir(home);
 
 /** The repository's folder of `kind`, in `repo`, or as a placeholder where none is known. */
-const theirsOf = (kind: YoursKind, repo: string): string => {
+const theirsOf = (kind: YoursKind, repo: string) => {
   const at = repo || '<repo>';
   return kind === 'agents'
     ? path.join(at, 'workflows', AGENTS_FOLDER)
@@ -50,7 +50,7 @@ const theirsOf = (kind: YoursKind, repo: string): string => {
 };
 
 /** What a person does to put the `kind` named `name` into the repository: make it in yours, then copy it there by hand. */
-function copyWords(kind: YoursKind, name: string | null, yours: string, theirs: string): string {
+function copyWords(kind: YoursKind, name: string | null, yours: string, theirs: string) {
   if (kind === 'skills') {
     const copy = skillCopyCommand(path.join(yours, name ?? '<name>'), theirs);
     return `Write the skill in your library, then copy its folder into the repository by hand — \`${copy}\` — where git shows it as a change to commit.`;
@@ -72,7 +72,7 @@ function copyWords(kind: YoursKind, name: string | null, yours: string, theirs: 
  * @param repo The repository's folder; empty where none is known, said as the placeholder `<repo>`.
  * @param home The store's root folder.
  */
-export function repoWriteRefusal(who: string, kind: YoursKind, name: string | null, repo: string, home: string): string {
+export function repoWriteRefusal(who: string, kind: YoursKind, name: string | null, repo: string, home: string) {
   const yours = yoursOf(kind, home);
   const theirs = theirsOf(kind, repo);
   const noun = kind === 'skills' ? 'your library' : 'yours';
@@ -102,7 +102,7 @@ export function yoursOnlyRefusal(
   repo: string,
   home: string,
   target?: Pick<FactoryTarget, 'factory'>,
-): string | null {
+) {
   if (from === 'user' && target?.factory !== undefined)
     return `${who}: user is the store's library, and --factory names a factory's tree: write \`${who} factory … --factory ${target.factory}\` for its tree, or leave out --factory for the library.`;
   if (from === 'user') return null;
@@ -134,7 +134,7 @@ export function yoursOrRefused(
   repo: string,
   home: string,
   target?: FactoryTarget,
-): string {
+) {
   const refused = yoursOnlyRefusal(who, kind, from, name, repo, home, target);
   if (refused) throw new Invalid({ message: refused });
   return from === 'factory' && target?.factory !== undefined ? yoursOf(kind, target.treeOf(target.factory)) : yoursOf(kind, home);
@@ -145,7 +145,7 @@ export function yoursOrRefused(
  * @param args The command's parsed arguments.
  * @param key The argument's name.
  */
-export const writerText = (args: Args, key: string): string | undefined => {
+export const writerText = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };

@@ -22,7 +22,7 @@ const NAME_TAKES = `${NAME_OPENS}._-/`;
  * Whether `name` opens with a lowercase letter or a digit and holds only the characters `NAME_TAKES` holds.
  * @param name The name asked to speak under.
  */
-export const wellSpelt = (name: string): boolean => {
+export const wellSpelt = (name: string) => {
   if (!NAME_OPENS.includes(name.charAt(0))) return false;
   for (let i = 1; i < name.length; i++) if (!NAME_TAKES.includes(name.charAt(i))) return false;
   return true;

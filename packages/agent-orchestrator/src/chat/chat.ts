@@ -166,11 +166,11 @@ export type TaskSpan = { task: string; offset: number; attempts: readonly number
  * The number the attempts of the task after `span` are counted on from: past its last attempt, or its own where it holds none. Pure.
  * @param span The task before, or undefined where there is none.
  */
-export const offsetAfter = (span: TaskSpan | undefined): number =>
+export const offsetAfter = (span: TaskSpan | undefined) =>
   span === undefined ? 0 : span.attempts.reduce((max, n) => Math.max(max, span.offset + n), span.offset);
 
 /** The last of `spans` that `holds`, or undefined. */
-const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean): TaskSpan | undefined => [...spans].reverse().find(holds);
+const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean) => [...spans].reverse().find(holds);
 
 /**
  * The words said across `spans` and the chat's marks that name an attempt, each numbered across the tasks, so one chat draws them all
@@ -180,11 +180,7 @@ const lastSpan = (spans: readonly TaskSpan[], holds: (span: TaskSpan) => boolean
  * @param delivered The keeper's delivered marks, as the chat's file keeps them.
  * @param stops The turns the person stopped, as the chat's file keeps them.
  */
-export function spanned(
-  spans: readonly TaskSpan[],
-  delivered: readonly DeliveredMark[],
-  stops: readonly SourceStop[],
-): { said: SourceSaid[]; delivered: DeliveredMark[]; stops: SourceStop[] } {
+export function spanned(spans: readonly TaskSpan[], delivered: readonly DeliveredMark[], stops: readonly SourceStop[]) {
   const last = spans.at(-1)?.offset ?? 0;
   const ofMark = (m: DeliveredMark) => lastSpan(spans, (s) => s.said.some((x) => x.attempt === m.attempt && x.at === m.said));
   const ofStop = (st: SourceStop) =>
@@ -268,16 +264,16 @@ const MARKER_MAX = 120;
 export const STOPPED = 'Stopped';
 
 /** The key a said is claimed by: its attempt and its time. */
-const saidKey = (attempt: number, at: string): string => `${attempt} ${at}`;
+const saidKey = (attempt: number, at: string) => `${attempt} ${at}`;
 
 /** A keeper's marker of what it said: its first line, cut. */
-const markerOf = (text: string): string => {
+const markerOf = (text: string) => {
   const line = text.trim().split('\n')[0] ?? '';
   return line.length > MARKER_MAX ? `${line.slice(0, MARKER_MAX - 1)}…` : line;
 };
 
 /** The sentence a tool call is drawn with: its description, command, file or pattern where it gives one, else its name. */
-const sentenceOf = (name: string, input: unknown): string => {
+const sentenceOf = (name: string, input: unknown) => {
   const given = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
   const said = ['description', 'command', 'file_path', 'pattern', 'url', 'query']
     .map((key) => given[key])
@@ -286,14 +282,14 @@ const sentenceOf = (name: string, input: unknown): string => {
 };
 
 /** The time between two moments, as a person reads it, or undefined where either does not parse. */
-const durationOf = (from: string, to: string): string | undefined => {
+const durationOf = (from: string, to: string) => {
   const ms = Date.parse(to) - Date.parse(from);
   if (!Number.isFinite(ms) || ms < 0) return undefined;
   return ms < 1000 ? `${ms} ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`;
 };
 
 /** A tool call: done or failed by its result, else at work, or waiting on the person where the task needs one. */
-function callOf(attempt: number, use: SourceEvent, result: SourceEvent | undefined, open: CallState): ChatEvent {
+function callOf(attempt: number, use: SourceEvent, result: SourceEvent | undefined, open: CallState) {
   const name = use.tool?.name ?? 'tool';
   const fact = result === undefined ? undefined : durationOf(use.at, result.at);
   const state: CallState = result === undefined ? open : result.result?.isError ? 'error' : 'done';
@@ -305,7 +301,7 @@ function callOf(attempt: number, use: SourceEvent, result: SourceEvent | undefin
     sentence: sentenceOf(name, use.tool?.input),
     ...(fact === undefined ? {} : { fact }),
     state,
-  };
+  } satisfies ChatEvent;
 }
 
 /**
@@ -314,17 +310,17 @@ function callOf(attempt: number, use: SourceEvent, result: SourceEvent | undefin
  * conversation whichever face it was written from; everything else none. Words the host pushed on her input carry no origin and are
  * drawn from the outbox, where they were written, so one sent message is one bubble.
  */
-function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: CallState): ChatEvent[] {
+function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: CallState) {
   if (e.role === 'assistant' && e.kind === 'text' && (e.text ?? '').trim() !== '')
-    return [{ kind: 'message', id: `m:${attempt}:${e.id}`, at: e.at, from: 'agent', text: e.text ?? '' }];
+    return [{ kind: 'message', id: `m:${attempt}:${e.id}`, at: e.at, from: 'agent', text: e.text ?? '' }] satisfies ChatEvent[];
   if (e.role === 'user' && e.kind === 'text' && e.origin?.kind === 'human' && (e.text ?? '').trim() !== '')
-    return [{ kind: 'message', id: `h:${attempt}:${e.id}`, at: e.at, from: 'person', text: e.text ?? '' }];
-  if (e.kind === 'tool_use') return [callOf(attempt, e, results.get(e.id), open)];
-  return [];
+    return [{ kind: 'message', id: `h:${attempt}:${e.id}`, at: e.at, from: 'person', text: e.text ?? '' }] satisfies ChatEvent[];
+  if (e.kind === 'tool_use') return [callOf(attempt, e, results.get(e.id), open)] satisfies ChatEvent[];
+  return [] satisfies ChatEvent[];
 }
 
 /** What claims each said: the outbox entry its delivered mark names, by the said's key. */
-const claimsOf = (sources: ChatSources): Map<string, OutboxEntry> => {
+const claimsOf = (sources: ChatSources) => {
   const byId = new Map(sources.outbox.map((entry) => [entry.id, entry]));
   const claims = new Map<string, OutboxEntry>();
   for (const mark of sources.delivered) {
@@ -338,17 +334,19 @@ const claimsOf = (sources: ChatSources): Map<string, OutboxEntry> => {
  * An outbox entry as the chat draws it, delivered by the said at `delivered` (null while it waits): the person's message, or a peer's
  * under the name it spoke under where an agent wrote it, never the person's.
  */
-const entryEvent = (entry: OutboxEntry, delivered: string | null): ChatEvent =>
-  entry.from?.kind === 'agent'
+const entryEvent = (entry: OutboxEntry, delivered: string | null) =>
+  (entry.from?.kind === 'agent'
     ? { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'peer', name: entry.from.name, text: entry.text, delivered }
-    : { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'person', text: entry.text, delivered };
+    : { kind: 'message', id: `p:${entry.id}`, at: entry.at, from: 'person', text: entry.text, delivered }) satisfies ChatEvent;
 
 /** A said as the chat draws it: the entry's message where a delivered mark claims it, else the keeper's marker. */
-const saidEvent = (said: SourceSaid, claims: ReadonlyMap<string, OutboxEntry>): ChatEvent => {
+const saidEvent = (said: SourceSaid, claims: ReadonlyMap<string, OutboxEntry>) => {
   const entry = claims.get(saidKey(said.attempt, said.at));
-  return entry === undefined
-    ? { kind: 'message', id: `k:${said.attempt}:${said.at}`, at: said.at, from: 'keeper', text: markerOf(said.text) }
-    : entryEvent(entry, said.at);
+  return (
+    entry === undefined
+      ? { kind: 'message', id: `k:${said.attempt}:${said.at}`, at: said.at, from: 'keeper', text: markerOf(said.text) }
+      : entryEvent(entry, said.at)
+  ) satisfies ChatEvent;
 };
 
 /**
@@ -374,13 +372,14 @@ function sessionEvents(session: ChatSession, said: readonly SourceSaid[], claims
 }
 
 /** A turn the person stopped, as the chat draws it: the keeper's quiet marker, placed in time among the session's events. */
-const stopEvent = (stop: SourceStop): ChatEvent => ({
-  kind: 'message',
-  id: `x:${stop.attempt}:${stop.at}`,
-  at: stop.at,
-  from: 'keeper',
-  text: STOPPED,
-});
+const stopEvent = (stop: SourceStop) =>
+  ({
+    kind: 'message',
+    id: `x:${stop.attempt}:${stop.at}`,
+    at: stop.at,
+    from: 'keeper',
+    text: STOPPED,
+  }) satisfies ChatEvent;
 
 /**
  * The chat, oldest first: each session's events with each turn the person stopped in its place in time, a session line where an attempt
@@ -389,7 +388,7 @@ const stopEvent = (stop: SourceStop): ChatEvent => ({
  * person. Pure.
  * @param sources Everything the chat is projected from: the sessions, the saids, the files of the chat, and the task's phase.
  */
-export function projectChat(sources: ChatSources): ChatEvent[] {
+export function projectChat(sources: ChatSources) {
   const claims = claimsOf(sources);
   const live = blockedWord(sources.phase) ? 'waits' : 'running';
   const lastAttempt = sources.sessions.at(-1)?.attempt;
@@ -416,7 +415,7 @@ export function projectChat(sources: ChatSources): ChatEvent[] {
  * The events `own` with each of `marks` where its time puts it: after the last event not later than it, and first where every event is
  * later. A session's own events keep their order among themselves, whatever a clock reads.
  */
-function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): ChatEvent[] {
+function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]) {
   if (marks.length === 0) return [...own];
   const out = [...own];
   for (const mark of marks) {
@@ -431,7 +430,7 @@ function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): C
 const RECOMMENDED = /\s*\(recommended\)\s*$/i;
 
 /** One choice as the board draws it: its label without the suffix she marked it with, and `recommended` where it carried one. */
-const optionOf = (o: { label: string; description: string }): AskOption => {
+const optionOf = (o: { label: string; description: string }) => {
   const label = o.label.replace(RECOMMENDED, '');
   return { label, description: o.description, recommended: label !== o.label };
 };
@@ -454,18 +453,19 @@ export const askOf = (raw: {
     options: readonly { label: string; description: string }[];
     multiSelect: boolean;
   }[];
-}): Ask => ({
-  id: raw.id,
-  at: raw.at,
-  kind: raw.kind === 'permission' && raw.permission !== undefined ? 'permission' : 'question',
-  questions: raw.questions.map((q) => ({
-    question: q.question,
-    header: q.header,
-    options: q.options.map(optionOf),
-    multiSelect: q.multiSelect,
-  })),
-  ...(raw.kind === 'permission' && raw.permission !== undefined ? { permission: { ...raw.permission } } : {}),
-});
+}) =>
+  ({
+    id: raw.id,
+    at: raw.at,
+    kind: raw.kind === 'permission' && raw.permission !== undefined ? 'permission' : 'question',
+    questions: raw.questions.map((q) => ({
+      question: q.question,
+      header: q.header,
+      options: q.options.map(optionOf),
+      multiSelect: q.multiSelect,
+    })),
+    ...(raw.kind === 'permission' && raw.permission !== undefined ? { permission: { ...raw.permission } } : {}),
+  }) satisfies Ask;
 
 /**
  * An ask as one key: a question's by each question's own words, in order, so two asks of the same words key the same and a question
@@ -473,7 +473,7 @@ export const askOf = (raw: {
  * next of the same words, and two such calls are two asks. Pure.
  * @param ask The ask: its id, its kind and its questions.
  */
-export const askKey = (ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string =>
+export const askKey = (ask: Pick<Ask, 'id' | 'kind' | 'questions'>) =>
   ask.kind === 'permission' ? `permission:${ask.id}` : JSON.stringify(ask.questions.map((q) => q.question));
 
 /**
@@ -481,7 +481,7 @@ export const askKey = (ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string =>
  * @param asks The asks the chat holds.
  * @param ask The ask whose questions are matched: its id, its kind and its questions.
  */
-export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string | undefined => {
+export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | 'questions'>) => {
   const key = askKey(ask);
   return asks.find((one) => one.id !== ask.id && askKey(one) === key)?.id;
 };
@@ -494,11 +494,7 @@ export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | '
  * @param answers The answers the person gave, oldest first.
  * @param ask The ask asked again: its id, its kind and its questions.
  */
-export const answeredBefore = (
-  asks: readonly Ask[],
-  answers: readonly AskAnswer[],
-  ask: Pick<Ask, 'id' | 'kind' | 'questions'>,
-): AskAnswer | undefined => {
+export const answeredBefore = (asks: readonly Ask[], answers: readonly AskAnswer[], ask: Pick<Ask, 'id' | 'kind' | 'questions'>) => {
   const key = askKey(ask);
   const same = new Set(asks.filter((one) => one.id !== ask.id && askKey(one) === key).map((one) => one.id));
   return answers.filter((answer) => same.has(answer.id)).at(-1);
@@ -513,14 +509,14 @@ export type AskDrawn = 'actions' | 'form' | 'many';
  * every other one question. Pure.
  * @param ask The ask, by its questions.
  */
-export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
+export const drawnAsk = (ask: Pick<Ask, 'questions'>) => {
   if (ask.questions.length !== 1) return 'many';
   const one = ask.questions[0];
   return one !== undefined && one.options.every((o) => o.description.trim() === '') ? 'actions' : 'form';
 };
 
 /** The event kind an ask is drawn as: a permission as one, else a proposal where its drawing is her action buttons, else a question. */
-const kindOfAsk = (ask: Pick<Ask, 'kind' | 'questions'>): ChatAskKind =>
+const kindOfAsk = (ask: Pick<Ask, 'kind' | 'questions'>) =>
   ask.kind === 'permission' ? 'permission' : drawnAsk(ask) === 'actions' ? 'proposal' : 'question';
 
 /**
@@ -529,7 +525,7 @@ const kindOfAsk = (ask: Pick<Ask, 'kind' | 'questions'>): ChatAskKind =>
  * @param answer The person's answer to it, or undefined where they gave none.
  * @param cutAt When its call stopped waiting on the person (`cutOf`), or undefined where it is waiting.
  */
-export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string): ChatEvent => {
+export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string) => {
   const drawn: AskEvent = {
     id: `q:${ask.id}`,
     at: ask.at,
@@ -540,8 +536,8 @@ export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string
     ...(answer === undefined && cutAt !== undefined ? { cutAt } : {}),
   };
   const kind = kindOfAsk(ask);
-  if (kind === 'permission' && ask.permission !== undefined) return { kind, ...drawn, permission: ask.permission };
-  return { kind: kind === 'proposal' ? 'proposal' : 'question', ...drawn };
+  if (kind === 'permission' && ask.permission !== undefined) return { kind, ...drawn, permission: ask.permission } satisfies ChatEvent;
+  return { kind: kind === 'proposal' ? 'proposal' : 'question', ...drawn } satisfies ChatEvent;
 };
 
 /**
@@ -549,7 +545,7 @@ export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string
  * that holds, so an ask marked `cut` and then `again` is waiting once more and is in no entry of this. Pure.
  * @param closed The keeper's marks of what became of each ask's call, in the order it made them.
  */
-export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
+export const cutOf = (closed: readonly AskClose[]) => {
   const cut = new Map<string, string>();
   for (const mark of closed) {
     if (mark.how === 'cut') cut.set(mark.id, mark.at);
@@ -565,7 +561,7 @@ export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
  * Pure.
  * @param closed The keeper's marks of what became of each ask's call, in the order it made them.
  */
-export const callsOf = (closed: readonly AskClose[]): Map<string, string> => {
+export const callsOf = (closed: readonly AskClose[]) => {
   const calls = new Map<string, string>();
   for (const mark of closed) {
     if (mark.how === 'again' && mark.call !== undefined) calls.set(mark.id, mark.call);
@@ -585,7 +581,7 @@ export type AskPick = { question: string; labels?: readonly string[]; words?: st
  * @param ask The ask, by its questions.
  * @param picks What the person chose for each question.
  */
-export function answerFor(ask: Pick<Ask, 'questions'>, picks: readonly AskPick[]): Record<string, string> {
+export function answerFor(ask: Pick<Ask, 'questions'>, picks: readonly AskPick[]) {
   const answers: Record<string, string> = {};
   for (const q of ask.questions) {
     const pick = picks.find((p) => p.question === q.question);
@@ -596,7 +592,7 @@ export function answerFor(ask: Pick<Ask, 'questions'>, picks: readonly AskPick[]
 }
 
 /** One question's answer, off the person's pick: their own words where they wrote some, else the labels they ticked. */
-function answerOne(q: AskQuestion, pick: AskPick): string {
+function answerOne(q: AskQuestion, pick: AskPick) {
   if (pick.words !== undefined) {
     if (pick.words.trim() === '')
       throw new Invalid({ message: `the words answering \`${q.question}\` are empty: write something, or pick a choice.` });
@@ -624,7 +620,7 @@ export type AnswerOwed = 'return' | 'words' | 'mark';
  * @param open Whether the ask's held call is still waiting.
  * @param taken Whether the held call took an answer already.
  */
-export const askDue = (open: boolean, taken: boolean): AnswerOwed => (taken ? 'mark' : open ? 'return' : 'words');
+export const askDue = (open: boolean, taken: boolean) => (taken ? 'mark' : open ? 'return' : 'words');
 
 /**
  * The words an answer whose call was cut is said to her in, naming each question and what the person answered: she was asking, the
@@ -632,7 +628,7 @@ export const askDue = (open: boolean, taken: boolean): AnswerOwed => (taken ? 'm
  * @param ask The ask, by its questions.
  * @param answers The person's answer to each question, by the question's own words.
  */
-export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, string>): string =>
+export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, string>) =>
   [
     'The person answered on the board a question of yours whose call did not wait for them.',
     ...ask.questions.map((q) => `You asked: ${q.question} They answered: ${answers[q.question] ?? '(nothing)'}`),
@@ -648,7 +644,7 @@ const asked = (e: ChatEvent): e is Extract<ChatEvent, { kind: ChatAskKind }> =>
  * session let go between a question and its answer would leave the count wrong for as long as the chat lasts. Pure.
  * @param events The chat's events.
  */
-export const asksWaiting = (events: readonly ChatEvent[]): number =>
+export const asksWaiting = (events: readonly ChatEvent[]) =>
   events.filter((e) => asked(e) && e.chose === undefined && e.cutAt === undefined).length;
 
 /** A page of a chat: its events, oldest first, and the id to ask `before` for the page older than it, null where there is none. */
@@ -665,7 +661,7 @@ export const PAGE_DEFAULT = 50;
  * @param before The id of the event the page ends before, or undefined for the last page.
  * @param limit How many events the page holds at most: `PAGE_DEFAULT` where none is given.
  */
-export function chatPage(events: readonly ChatEvent[], before: string | undefined, limit: number = PAGE_DEFAULT): ChatPage {
+export function chatPage(events: readonly ChatEvent[], before: string | undefined, limit: number = PAGE_DEFAULT) {
   if (!Number.isInteger(limit) || limit < 1 || limit > PAGE_MAX)
     throw new Invalid({ message: `limit ${String(limit)} is no page size: ask for a whole number from 1 to ${PAGE_MAX}.` });
   const end = before === undefined ? events.length : events.findIndex((e) => e.id === before);
@@ -694,7 +690,7 @@ export type ChatCursor = {
  * The cursor of everything `sources` holds. Pure.
  * @param sources Everything the chat is projected from.
  */
-export const cursorOf = (sources: ChatSources): ChatCursor => ({
+export const cursorOf = (sources: ChatSources) => ({
   attempts: sources.sessions.length,
   events: sources.sessions.at(-1)?.events.length ?? 0,
   said: sources.said.length,
@@ -710,7 +706,7 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
  * A cursor as a stream's event id: its counts, dot-separated. Pure.
  * @param c The cursor.
  */
-export const chatCursor = (c: ChatCursor): string =>
+export const chatCursor = (c: ChatCursor) =>
   [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops, c.asks, c.answers, c.closed].join('.');
 
 /** How many counts a cursor holds, and the fewest a tab open across a deploy that added one still carries. */
@@ -729,7 +725,7 @@ const NOT_A_CURSOR = (text: string) =>
  * counts. Pure.
  * @param text The cursor as a client sent it back.
  */
-export function readChatCursor(text: string): ChatCursor {
+export function readChatCursor(text: string) {
   const parts = text.split('.');
   if (parts.length < COUNTS_LEAST || parts.length > COUNTS || parts.some((p) => !/^(0|[1-9]\d*)$/.test(p)))
     throw new Invalid({ message: NOT_A_CURSOR(text) });
@@ -744,7 +740,7 @@ export function readChatCursor(text: string): ChatCursor {
  * @param c The cursor read off `text` (`readChatCursor`).
  * @param text The cursor as a client sent it, named in the refusal.
  */
-export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): ChatSources {
+export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string) {
   const last = sources.sessions[c.attempts - 1];
   const beyond =
     c.attempts > sources.sessions.length ||
@@ -781,7 +777,7 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
  * @param events The transcript events read since.
  * @param cursor Where the session's transcript was read through, kept on the session.
  */
-export function withEvents(sources: ChatSources, attempt: number, events: readonly SourceEvent[], cursor: string): ChatSources {
+export function withEvents(sources: ChatSources, attempt: number, events: readonly SourceEvent[], cursor: string) {
   const at = sources.sessions.findIndex((s) => s.attempt === attempt);
   const session = sources.sessions[at];
   if (session === undefined) return sources;
@@ -798,7 +794,7 @@ export function withEvents(sources: ChatSources, attempt: number, events: readon
  * @param then The events the reader has.
  * @param now The events the chat holds now.
  */
-export function changedSince(then: readonly ChatEvent[], now: readonly ChatEvent[]): ChatEvent[] {
+export function changedSince(then: readonly ChatEvent[], now: readonly ChatEvent[]) {
   const seen = new Map(then.map((e) => [e.id, JSON.stringify(e)]));
   return now.filter((e) => seen.get(e.id) !== JSON.stringify(e));
 }
@@ -844,20 +840,20 @@ const ANSWERING: Record<EnginePhase, boolean> = {
  * Whether a runtime phase is a session that is live: one that hears what is said to it (`UP`).
  * @param phase The task's phase in the runtime's words.
  */
-export const upOf = (phase: EnginePhase): boolean => UP[phase];
+export const upOf = (phase: EnginePhase) => UP[phase];
 
 /** Whether a runtime phase is a turn in progress (`ANSWERING`). */
-const answeringOf = (phase: EnginePhase): boolean => ANSWERING[phase];
+const answeringOf = (phase: EnginePhase) => ANSWERING[phase];
 
 /** Whether a chat event is a message of the agent's own, which is what goes unread. */
-const hers = (e: ChatEvent): boolean => e.kind === 'message' && e.from === 'agent';
+const hers = (e: ChatEvent) => e.kind === 'message' && e.from === 'agent';
 
 /**
  * How many of the agent's messages the person has not read, off their read `mark`: those after the event it names, every one where
  * there is no mark, and those said after the moment it was set where the chat no longer holds that event — a said drawn as the keeper's
  * marker is drawn as the person's message under another id once a delivered mark claims it, and the mark's own moment outlives the flip.
  */
-const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): number => {
+const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined) => {
   if (mark === undefined) return events.filter(hers).length;
   const from = events.findIndex((e) => e.id === mark.through);
   if (from >= 0) return events.slice(from + 1).filter(hers).length;
@@ -880,7 +876,7 @@ export function presenceOf(
   events: readonly ChatEvent[],
   mark: ReadMark | undefined,
   wakes = false,
-): Presence {
+) {
   const up = phase !== undefined && upOf(phase);
   return {
     up,

@@ -122,7 +122,7 @@ export type HarnessPrompt = (typeof HARNESS_PROMPTS)[number];
  * Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name.
  * @param name The name asked for, of any type as it was sent.
  */
-export function skillNameRefusal(name: unknown): string | undefined {
+export function skillNameRefusal(name: unknown) {
   if (typeof name === 'string' && SKILL_NAME.test(name) && name.length <= 64) return undefined;
   const shown = typeof name === 'string' ? `\`${name}\`` : JSON.stringify(name);
   return `${shown} is not a skill's name: a skill is a folder in ${SKILLS_FOLDER}/, named in lowercase words joined by dashes, 64 characters at most, as Claude Code names one — write-a-note, say.`;
@@ -141,7 +141,7 @@ export type SkillCost = { preload: boolean; listed: number; body: number; perTur
  * Tokens, about: four characters to a token, rounded up.
  * @param text The text whose tokens are counted.
  */
-export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
+export const tokensAbout = (text: string) => Math.ceil(text.length / 4);
 
 /**
  * `SkillCost` of the skill `id`, from its SKILL.md's `text`: one whose frontmatter never closes is read as all body, and one whose
@@ -149,14 +149,14 @@ export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
  * @param id The skill's id, its name.
  * @param text Its SKILL.md's text.
  */
-export function skillTurnCost(id: string, text: string): SkillCost {
+export function skillTurnCost(id: string, text: string) {
   let block: string | null = null;
   let body = text;
   try {
     ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text));
   } catch {}
   const entries = block === null ? [] : (frontmatterOrNull(block)?.entries ?? []);
-  const said = (key: string): string => {
+  const said = (key: string) => {
     const value = entries.find((entry) => entry.key === key)?.value;
     return typeof value === 'string' ? value.trim() : '';
   };
@@ -224,7 +224,7 @@ export const CUSTOM_INSTRUCTIONS_FOLDER = 'custom-instructions';
  * @param file The file of the custom instructions, named in the refusal.
  * @param text Its text.
  */
-export function customInstructionsRefusal(file: string, text: string): string | undefined {
+export function customInstructionsRefusal(file: string, text: string) {
   if (!/^\uFEFF?---[ \t]*(\r?\n|$)/.test(text)) return undefined;
   return `${file} opens with a frontmatter block, a first line of \`---\`. Custom instructions only add words: they set no key, and so never widen an agent's fence, give it a tool, or change its model, mode or skills. Put a key in the agent's own file or on a step, and start the words with a word.`;
 }
@@ -258,7 +258,7 @@ const CLAUDE_CODE_REFUSED: Record<string, string> = {
  * Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. `name` is
  * one it may: Claude Code's own agent files say their name, and `parseAgent` holds it to the file's.
  */
-function agentKeyRefusal(file: string, key: string): string | undefined {
+function agentKeyRefusal(file: string, key: string) {
   if (isAgentKey(key) || key === 'name' || Object.hasOwn(FORMER_OWN_KEYS, key) || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
   if (key === 'card') return cardRetired(file, 'card');
   if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
@@ -286,7 +286,7 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
  * @param read Reads a file beside the agent by its name, as the result schema its `output:` names, undefined where it is not there;
  *   absent where the agent was read from no folder.
  */
-export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
+export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined) {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   const {
@@ -337,14 +337,14 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
     keys,
     body,
     read: read ?? (() => undefined),
-  };
+  } satisfies Agent as Agent;
 }
 
 /**
  * `overridable:` as the agent's field, the list of what a step may override of it, each one of `OVERRIDABLE` — none for no line.
  * Refused: a word not in the list, naming it and the list.
  */
-function overridableOf(file: string, written: string | undefined): { overridable?: Overridable[] } {
+function overridableOf(file: string, written: string | undefined) {
   if (written === undefined) return {};
   const words = written
     .split(',')
@@ -363,7 +363,7 @@ function overridableOf(file: string, written: string | undefined): { overridable
  * Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so.
  * @param value The `skills:` line's value.
  */
-export const isCardFile = (value: string): boolean => !value.includes(',') && /\.json$/i.test(value.trim());
+export const isCardFile = (value: string) => !value.includes(',') && /\.json$/i.test(value.trim());
 
 /**
  * The refusal of a card file an agent names — by `card:`, or by a `skills:` line that names one (`isCardFile`) — since an agent's card is
@@ -373,7 +373,7 @@ export const isCardFile = (value: string): boolean => !value.includes(',') && /\
  * @param key The line that names the card: `card`, or `skills`.
  * @param named The card file the line names, where it is known; undefined says the file it names.
  */
-export function cardRetired(file: string, key: 'card' | 'skills', named?: string): string {
+export function cardRetired(file: string, key: 'card' | 'skills', named?: string) {
   const line = named === undefined ? `\`${key}\`` : `\`${key}: ${named}\``;
   const it = named === undefined ? 'the file it names' : named;
   return `${file}: ${line} names a card file, which is retired: an agent's card is generated from its \`skills:\`, an entry for each skill made from its SKILL.md's frontmatter (its \`title:\` or \`name:\`, \`description:\`, \`tags:\` and \`examples:\`), and from the agent's own \`description:\` when it has none. Delete the line, and ${it} beside the agent; to say what the agent can do, give it skills.`;
@@ -384,7 +384,7 @@ export function cardRetired(file: string, key: 'card' | 'skills', named?: string
  * (`harnessPromptNamed`); refused otherwise, and when both lines are set. Under the new key only the new words are read: a file that says
  * `harnessPrompt:` was written after the rename, and a former word there is a slip, refused naming the word it is now.
  */
-function harnessPromptOf(file: string, written: string | undefined, former: string | undefined): HarnessPrompt | undefined {
+function harnessPromptOf(file: string, written: string | undefined, former: string | undefined) {
   if (written !== undefined && former !== undefined) {
     refuse(
       `${file}: \`harnessPrompt: ${written}\` and \`systemPrompt: ${former}\` are both set, and they are one key: \`systemPrompt:\` is the former name of \`harnessPrompt:\`. Keep the \`harnessPrompt:\` line and delete the other.`,
@@ -429,7 +429,7 @@ export type AgentDraft = {
  * Refuses what a draft from a page older than the format sends, and nothing writes: the former `systemPrompt` (`FORMER_OWN_KEYS`), a
  * `card`, or a `skills:` naming a card file (`cardRetired`).
  */
-function refuseStale(file: string, draft: AgentDraft): void {
+function refuseStale(file: string, draft: AgentDraft) {
   if ((draft as { systemPrompt?: unknown }).systemPrompt != null) refuse(formerKeyWritten(file, 'systemPrompt'));
   const sent = (draft as { card?: unknown }).card;
   if (sent != null)
@@ -455,7 +455,7 @@ function refuseStale(file: string, draft: AgentDraft): void {
  * (`: `, ` #`), and a value with a line break as a literal block.
  * @param draft The agent as the person wrote it: its own lines, its role keys and its instructions.
  */
-export function renderAgent(draft: AgentDraft): string {
+export function renderAgent(draft: AgentDraft) {
   const file = `${AGENTS_FOLDER}/${draft.name}.md`;
   const keys = (draft.keys ?? {}) as Record<string, string | null | undefined>;
   for (const key of Object.keys(keys)) {
@@ -480,7 +480,7 @@ export function renderAgent(draft: AgentDraft): string {
     overridable: draft.overridable,
   };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
-  const pairs = values.flatMap(([key, value]): FrontmatterPair[] => (value == null ? [] : [[key, String(value).trim()]]));
+  const pairs = values.flatMap(([key, value]) => (value == null ? [] : [[key, String(value).trim()]]) satisfies FrontmatterPair[]);
   const body = String(draft.body ?? '').trim();
   if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs, keys.harness?.trim() || undefined))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
@@ -494,7 +494,7 @@ export function renderAgent(draft: AgentDraft): string {
  * @param text Its file's text.
  * @param read Reads a file beside the agent by its name, undefined where it is not there; absent where it was read from no folder.
  */
-export function agentDraftOf(name: string, text: string, read?: (file: string) => string | undefined): AgentDraft {
+export function agentDraftOf(name: string, text: string, read?: (file: string) => string | undefined) {
   const agent = parseAgent(name, text, read);
   return {
     name,
@@ -549,7 +549,7 @@ export type AgentCardShape = {
  * @param version The agent's version, the card's.
  * @param skills The card's entries, generated from the skills the agent is given.
  */
-export function agentCard(agent: Agent, version: string, skills: readonly AgentSkill[]): AgentCardShape {
+export function agentCard(agent: Agent, version: string, skills: readonly AgentSkill[]) {
   const named = `${AGENTS_FOLDER}/${agent.name}.md`;
   if (!agent.description?.trim()) refuse(noDescription(agent.name));
   if (!skills.length) {
@@ -569,7 +569,7 @@ export function agentCard(agent: Agent, version: string, skills: readonly AgentS
 }
 
 /** The refusal of a card for an agent with no `description:`. */
-const noDescription = (name: string): string =>
+const noDescription = (name: string) =>
   `${AGENTS_FOLDER}/${name}.md has no \`description:\`, and the A2A protocol marks a card's description REQUIRED. Write one line saying when to attach this agent to a step.`;
 
 /**
@@ -577,7 +577,7 @@ const noDescription = (name: string): string =>
  * a skill with no tags is tagged with its own. Refused for an agent with no `description:`, which the entry and the card both need.
  * @param agent The agent, by its name and description.
  */
-export function ownSkill(agent: Pick<Agent, 'name' | 'description'>): AgentSkill {
+export function ownSkill(agent: Pick<Agent, 'name' | 'description'>) {
   const description = agent.description?.trim();
   if (!description) refuse(noDescription(agent.name));
   return { id: agent.name, name: agent.name, description, tags: [agent.name] };
@@ -588,7 +588,7 @@ export function ownSkill(agent: Pick<Agent, 'name' | 'description'>): AgentSkill
  * `agent: <name>`: so a name is one file's in that folder, not hidden, not the README's, and one a line of frontmatter can hold.
  * @param name The name asked for, of any type as it was sent.
  */
-export function agentNameRefusal(name: unknown): string | undefined {
+export function agentNameRefusal(name: unknown) {
   const fix = 'Name it as its file is named, without .md — reviewer, say.';
   if (typeof name !== 'string' || !name.trim())
     return `An agent has no name, and an agent is named by its file in ${AGENTS_FOLDER}/. ${fix}`;
@@ -618,10 +618,10 @@ export const NO_CODING_STYLE = 'no-coding';
  * The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`.
  * @param agent The agent's name.
  */
-export const pluginOf = (agent: string): string => `nemia-${agent}`;
+export const pluginOf = (agent: string) => `nemia-${agent}`;
 
 /** Whether the frozen `agent` carries words of a layer above its step's note: its instructions, custom instructions or factory's rules. */
-const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || agent.customInstructions || agent.factoryRules);
+const toldWords = (agent: StepAgent) => Boolean(agent.instructions || agent.customInstructions || agent.factoryRules);
 
 /**
  * Whether `nemia start` renders the step's agent and the tick files the step with it: a step whose harness declares it takes Claude
@@ -632,7 +632,7 @@ const toldWords = (agent: StepAgent): boolean => Boolean(agent.instructions || a
  * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
  * @param step The step, from its frozen record.
  */
-export const rendersAgent = (step: StepSpec): boolean => {
+export const rendersAgent = (step: StepSpec) => {
   const agent = step.agent;
   if (!agent || declarationOf(step.harness)?.can.includes('claudeFlags') !== true || step.resume) return false;
   return Boolean(toldWords(agent) || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
@@ -642,7 +642,7 @@ export const rendersAgent = (step: StepSpec): boolean => {
  * What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise.
  * @param step The step, from its frozen record.
  */
-export const briefBody = (step: StepSpec): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
+export const briefBody = (step: StepSpec) => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
 
 /**
  * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
@@ -650,7 +650,7 @@ export const briefBody = (step: StepSpec): string => (rendersAgent(step) && step
  * step's, one its agent names too among them. A step with no agent has neither.
  * @param step The step, from its frozen record.
  */
-export function skillLayers(step: StepSpec): { agent: string[]; added: string[] } {
+export function skillLayers(step: StepSpec) {
   if (!step.agent) return { agent: [], added: [] };
   const added = step.agent.addedSkills ?? step.skills ?? [];
   return { agent: (step.agent.skills ?? []).filter((skill) => !added.includes(skill)), added };
@@ -672,10 +672,10 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * @param step The step, from its frozen record.
  * @param skills Each skill its `skills:` line names, read again: its SKILL.md's body, or why it cannot be read; none where absent.
  */
-export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []): StepSpec => {
-  if (!step.agent) return step;
+export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []) => {
+  if (!step.agent) return step satisfies StepSpec;
   const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
-  if (!skills.length) return { ...step, agent };
+  if (!skills.length) return { ...step, agent } satisfies StepSpec as StepSpec;
   return {
     ...step,
     body: [
@@ -686,7 +686,7 @@ export const unrendered = (step: StepSpec, skills: readonly SkillAgain[] = []): 
       ),
     ].join('\n\n'),
     agent,
-  };
+  } satisfies StepSpec as StepSpec;
 };
 
 /**
@@ -706,7 +706,7 @@ export type RenderedSkill = { name: string; whole?: string };
  * @param step The step, from its frozen record.
  * @param skills The skills it is given, each by its bare name, and whole where it asks to be.
  */
-export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[]): string {
+export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[]) {
   const agent = step.agent;
   if (agent === undefined)
     refuse(
@@ -737,7 +737,7 @@ export function renderedPrompt(step: StepSpec, skills: readonly RenderedSkill[])
  * The output style `harnessPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`.
  * @param agent The agent's name, whose plugin the style is written into.
  */
-export const noCodingStyle = (agent: string): string =>
+export const noCodingStyle = (agent: string) =>
   [
     '---',
     renderFrontmatter([
@@ -754,7 +754,7 @@ export const noCodingStyle = (agent: string): string =>
  * The manifest of a step's plugin, naming its namespace on purpose.
  * @param agent The agent's name, which the plugin is named for.
  */
-export const pluginManifest = (agent: string): string =>
+export const pluginManifest = (agent: string) =>
   JSON.stringify(
     { name: pluginOf(agent), version: '0.0.0', description: `The skills of the ${agent} agent, for one step of one run.` },
     null,
@@ -765,13 +765,13 @@ export const pluginManifest = (agent: string): string =>
  * Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`).
  * @param step The step, from its frozen record.
  */
-export const namesPlugin = (step: StepSpec): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
+export const namesPlugin = (step: StepSpec) => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
 
 /**
  * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`).
  * Which skills the session holds is no setting: the step's task names them (`enabledSkillsOf`).
  */
-function sessionSettings(agent: StepAgent): string | undefined {
+function sessionSettings(agent: StepAgent) {
   return agent.harnessPrompt === 'no-coding' ? JSON.stringify({ outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }) : undefined;
 }
 
@@ -784,12 +784,15 @@ function sessionSettings(agent: StepAgent): string | undefined {
  * none, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
  * @param step The step, from its frozen record.
  */
-export const enabledSkillsOf = (step: StepSpec): string[] | 'default' => {
-  if (declarationOf(step.harness)?.can.includes('enabledSkills') !== true) return 'default';
+export const enabledSkillsOf = (step: StepSpec) => {
+  if (declarationOf(step.harness)?.can.includes('enabledSkills') !== true)
+    return 'default' satisfies string[] | 'default' as string[] | 'default';
   const agent = step.agent;
-  if (!rendersAgent(step) || agent === undefined) return [];
+  if (!rendersAgent(step) || agent === undefined) return [] satisfies string[] | 'default' as string[] | 'default';
   const plugin = pluginOf(agent.name);
-  return [...new Set((agent.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
+  return [...new Set((agent.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))] satisfies string[] | 'default' as
+    | string[]
+    | 'default';
 };
 
 /**
@@ -800,12 +803,12 @@ export const enabledSkillsOf = (step: StepSpec): string[] | 'default' => {
  * @param step The step, from its frozen record.
  * @param dir Its rendered folder (`agentFilesDir`).
  */
-export function renderedFlags(
-  step: StepSpec,
-  dir: string,
-): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
+export function renderedFlags(step: StepSpec, dir: string) {
   const agent = step.agent;
-  if (!rendersAgent(step) || agent === undefined) return undefined;
+  if (!rendersAgent(step) || agent === undefined)
+    return undefined satisfies
+      | { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string }
+      | undefined as { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined;
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
   const told = Boolean(toldWords(agent) || agent.skills?.length);
@@ -814,7 +817,9 @@ export function renderedFlags(
     ...(told ? (agent.harnessPrompt === 'replace' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),
     ...(namesPlugin(step) ? { pluginDir: [path.join(dir, plugin)] } : {}),
     ...(settings !== undefined && { settings }),
-  };
+  } satisfies { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined as
+    | { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string }
+    | undefined;
 }
 
 export type { DefinitionThere } from '../../contracts/definition-version.contract.ts';
@@ -846,27 +851,22 @@ export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, d
 };
 
 /** A write where no definition is held: `Missing` given a version it was read at, else a `Conflict` where something else is. */
-const notHeldRefusal = (
-  what: 'agent' | 'skill',
-  named: string,
-  kind: 'none' | 'other',
-  given: string | undefined,
-): VersionRefused | null => {
+const notHeldRefusal = (what: 'agent' | 'skill', named: string, kind: 'none' | 'other', given: string | undefined) => {
   if (given !== undefined)
     return {
       kind: 'Missing',
       message: `${named} is not there: it was removed since it was read. Write it as a new ${what} to have it back.`,
-    };
+    } satisfies VersionRefused | null;
   if (kind === 'none') return null;
   return {
     kind: 'Conflict',
     message: `${named} is there already, and is no ${what}. Give the new ${what} another name, or remove what is there first.`,
-  };
+  } satisfies VersionRefused | null;
 };
 
 /** An act with no version over a definition held at `version`: a write is a `Conflict`, a removal `Invalid`. */
-const unversionedRefusal = (what: 'agent' | 'skill', named: string, does: 'write' | 'remove', version: string): VersionRefused =>
-  does === 'write'
+const unversionedRefusal = (what: 'agent' | 'skill', named: string, does: 'write' | 'remove', version: string) =>
+  (does === 'write'
     ? {
         kind: 'Conflict',
         message: `${named} is there already. Give the new ${what} another name, or open it and change it${takenAt(version)}.`,
@@ -874,4 +874,4 @@ const unversionedRefusal = (what: 'agent' | 'skill', named: string, does: 'write
     : {
         kind: 'Invalid',
         message: `${named} is at version ${version}, and a removal is checked against the version it was read at, so ${what === 'agent' ? 'an agent' : 'a skill'} changed since is not removed unseen. Give that version to remove it.`,
-      };
+      }) satisfies VersionRefused;

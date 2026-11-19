@@ -18,10 +18,9 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { cardsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
-import type { StepSpec } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
-import { modelsOf, type RunModels } from './models.ts';
+import { modelsOf } from './models.ts';
 import { volumeMounts } from '../factory/volume/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { pausedRead } from '../list/list.verb.ts';
@@ -63,10 +62,10 @@ export type Started = {
 };
 
 /** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
-const startedSteps = (run: Run): StepSpec[] => frozenStepsOf(run) ?? [];
+const startedSteps = (run: Run) => frozenStepsOf(run) ?? [];
 
 /** The factory's volumes a run mounts: the paths of those read-only, and each writable one with the local steps whose fence writes it. */
-function volumesOf(run: Run): { reads: string[]; writes: { path: string; steps: string[] }[] } {
+function volumesOf(run: Run) {
   const volumes = run.volumes ?? [];
   const local = startedSteps(run).filter((s) => !isRemoteHarness(s.harness));
   return {
@@ -78,7 +77,7 @@ function volumesOf(run: Run): { reads: string[]; writes: { path: string; steps: 
 }
 
 /** The steps of a run just started that wait on a person: those gated (`held`), and the endings a person approves first (`ends`). */
-function gatesHeld(run: Run): { held: string[]; ends: string[] } {
+function gatesHeld(run: Run) {
   const steps = startedSteps(run);
   const ends = endingSteps(steps, run)
     .filter((s) => approvedFirst(s, run))
@@ -87,7 +86,7 @@ function gatesHeld(run: Run): { held: string[]; ends: string[] } {
 }
 
 /** `list` under `key` where it holds any, else nothing: a key an answer leaves out rather than send empty. */
-const some = <K extends string, V>(key: K, list: readonly V[] | undefined): Partial<Record<K, V[]>> =>
+const some = <K extends string, V>(key: K, list: readonly V[] | undefined) =>
   list?.length ? ({ [key]: [...list] } as Record<K, V[]>) : {};
 
 /**
@@ -95,7 +94,7 @@ const some = <K extends string, V>(key: K, list: readonly V[] | undefined): Part
  * (`apps/cli`, `startedLines`): its steps, where it came from, its factory and repository, the folders and volumes it mounts, where it
  * works and copied its files, what it waits on and reads, the steps a person approves, its models and labels.
  */
-export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>): RunStartedFacts {
+export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>) {
   const steps = startedSteps(run);
   const { reads, writes } = volumesOf(run);
   const { held, ends } = gatesHeld(run);
@@ -140,7 +139,7 @@ export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>): RunS
       'labelsLeftOut',
       run.labelsLeftOut?.map(({ key, values }) => ({ key, values: values.map((v) => ({ run: v.run, value: v.value })) })),
     ),
-  };
+  } satisfies RunStartedFacts as RunStartedFacts;
 }
 
 /**
@@ -149,14 +148,14 @@ export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>): RunS
  */
 const hintsOf = Effect.fnUntraced(function* (run: Run) {
   const hints = (yield* WorkflowDoor).workflows.hints(WorkflowDir.read(run.workflowDir));
-  return yield* hints.pipe(Effect.orElseSucceed((): readonly string[] => []));
+  return yield* hints.pipe(Effect.orElseSucceed(() => []));
 });
 
 /**
  * Why a card's start takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run.
  * @param card The card's name, as the start names it.
  */
-export const cardRepoRefusal = (card: string): string =>
+export const cardRepoRefusal = (card: string) =>
   `nemia start ${card} does not take --repo: a card's run works on the repository its factory names for its workflow, never one its start names. Start it without --repo, and name the repository on the factory: nemia factory attach <factory> <workflow> --repo <name>. Nothing was started.`;
 
 /**
@@ -293,7 +292,7 @@ export const CONCLUDED: Served<Concluded, typeof ConcludedInput.Type> = {
  * The models `nemia start --model <step>=<model>` names (`modelsOf`), as the start is handed them: none where no `--model` was typed.
  * Refused (`Invalid`) where a pair does not read, before anything is read or written.
  */
-const modelsGiven = (given: Pick<StartInput, 'models'>): { models?: RunModels } => {
+const modelsGiven = (given: Pick<StartInput, 'models'>) => {
   if (!given.models?.length) return {};
   const read = modelsOf(given.models);
   if ('why' in read) throw new Invalid({ message: `nemia start --model ${read.why}, once per step. Nothing was started.` });

@@ -11,7 +11,7 @@ import { FENCE_KEYS } from '../workflow/index.ts';
 const [, ALLOWS, DENIES, MODE] = FENCE_KEYS;
 
 /** Whether `after` holds a rule `before` does not. */
-const gained = (before: readonly string[], after: readonly string[]): boolean => after.some((rule) => !before.includes(rule));
+const gained = (before: readonly string[], after: readonly string[]) => after.some((rule) => !before.includes(rule));
 
 /**
  * Whether going from `before` to `after` widens access, narrows it, or leaves it the same; widening is judged first, so a
@@ -47,7 +47,7 @@ const UNKNOWN_MODE = Math.max(0, ...Object.values(MODE_RANKS)) + 1;
  * The rank of the mode `mode` names: the runtime's given mode's where none is named.
  * @param mode The permission mode as written; undefined, null or empty where none is named.
  */
-export const modeRank = (mode: unknown): number => {
+export const modeRank = (mode: unknown) => {
   const named = mode === undefined || mode === null || mode === '' ? REACH?.given : mode;
   return typeof named === 'string' ? (MODE_RANKS[named] ?? UNKNOWN_MODE) : UNKNOWN_MODE;
 };
@@ -56,7 +56,7 @@ export const modeRank = (mode: unknown): number => {
  * A list of rules as a line writes them, `Read, Bash(git diff *)`, split at the commas outside parentheses; a list given as is.
  * @param value A line of rules, or a list of them; anything else holds none.
  */
-export function rulesIn(value: unknown): string[] {
+export function rulesIn(value: unknown) {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string').map((v) => v.trim());
   if (typeof value !== 'string') return [];
   const out: string[] = [];
@@ -75,11 +75,11 @@ export function rulesIn(value: unknown): string[] {
 }
 
 /** The keys of a step or an agent, read as a record. */
-const recordOf = (value: unknown): Readonly<Record<string, unknown>> =>
+const recordOf = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
 /** What one set of keys lets through and refuses, each rule led by `at`: its tools, allows, servers, sandbox and agent; its denials. */
-const keysAccess = (keys: Readonly<Record<string, unknown>>, at: string): Access => ({
+const keysAccess = (keys: Readonly<Record<string, unknown>>, at: string) => ({
   allows: [
     ...rulesIn(keys[ALLOWS]).map((r) => `${at}allow ${r}`),
     ...rulesIn(keys.tools).map((r) => `${at}tool ${r}`),
@@ -92,7 +92,7 @@ const keysAccess = (keys: Readonly<Record<string, unknown>>, at: string): Access
 });
 
 /** Accesses joined: every rule of each, and the furthest mode. */
-const joined = (all: readonly Access[]): Access => ({
+const joined = (all: readonly Access[]) => ({
   allows: all.flatMap((a) => a.allows),
   denies: all.flatMap((a) => a.denies),
   mode: all.reduce((m, a) => Math.max(m, a.mode), 0),
@@ -106,7 +106,7 @@ const joined = (all: readonly Access[]): Access => ({
  * @param name The object's name, which an McpServer's rule carries.
  * @param spec The object's spec; undefined or null where the object is not there.
  */
-export function accessOf(kind: string, name: string, spec: unknown): Access {
+export function accessOf(kind: string, name: string, spec: unknown) {
   if (spec === undefined || spec === null) return NO_ACCESS;
   const s = recordOf(spec);
   switch (kind) {

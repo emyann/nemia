@@ -12,7 +12,7 @@ import { procStartOf } from '../../daemon/daemon.store.ts';
 import { emitLeftEnded } from '../../feed/feed.verb.ts';
 import { leftEndedLine } from '../../feed/index.ts';
 import { StoreRoot } from '../../config/root.store.ts';
-import { finishedAtRest, LEFT_MARKS, leftBehindOf, leftLineNote, runOfEnvironment, type Answered, type SweptRun } from './prune.ts';
+import { finishedAtRest, LEFT_MARKS, leftBehindOf, leftLineNote, runOfEnvironment, type Answered } from './prune.ts';
 
 /** How long a process the sweep sent SIGTERM is given to end before it is sent SIGKILL. */
 export const LEFT_GRACE: Duration.Input = '2 seconds';
@@ -27,10 +27,10 @@ export type LeftEnded = {
 };
 
 /** Whether `p` still runs: its pid names the process that was read, by its start. */
-const stillRuns = (p: ProcessNow): boolean => String(procStartOf(p.pid)) === p.start;
+const stillRuns = (p: ProcessNow) => String(procStartOf(p.pid)) === p.start;
 
 /** `folder` as the kernel names a working folder: its real path where it is there, else as it was given. */
-const real = (folder: string): string => {
+const real = (folder: string) => {
   try {
     return fs.realpathSync(folder);
   } catch {
@@ -61,7 +61,7 @@ export const endLeftBehind = Effect.fn('endLeftBehind')(function* (
     p,
     as: { own: p.pid === process.pid, runOf: runOfEnvironment(p.env, home), cwd: p.cwdDeleted ? undefined : p.cwd },
   }));
-  const swept = (id: string): SweptRun => ({ id, finished: finished.has(id), worktree: path.join(worktrees, id) });
+  const swept = (id: string) => ({ id, finished: finished.has(id), worktree: path.join(worktrees, id) });
 
   const toEnd = new Map<string, ProcessNow[]>();
   for (const { p, as } of seen) {

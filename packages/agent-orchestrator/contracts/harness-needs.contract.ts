@@ -18,10 +18,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type StepHarness = { readonly harness: string | undefined; readonly runsSession: boolean };
 
 /** The harness `step` runs on: the one it names, else `defaultHarness`. */
-const harnessOfStep = (step: StepHarness, defaultHarness: string): string => step.harness ?? defaultHarness;
+const harnessOfStep = (step: StepHarness, defaultHarness: string) => step.harness ?? defaultHarness;
 
 /** Whether `list` holds no name twice. */
-const noneTwice = (list: readonly string[]): boolean => list.every((name, i) => !list.slice(0, i).includes(name));
+const noneTwice = (list: readonly string[]) => list.every((name, i) => !list.slice(0, i).includes(name));
 
 const harnessesOfRunSpec = spec<(steps: readonly StepHarness[], defaultHarness: string, withNeeds: readonly string[]) => readonly string[]>(
   {

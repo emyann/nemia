@@ -6,19 +6,7 @@
  * `workflowsOf`, `runObject`).
  */
 import { Context, Effect, Layer, Tracer } from 'effect';
-import {
-  asked,
-  engine,
-  engineOf,
-  runsAtOnce,
-  runWith,
-  PlaceService,
-  type EngineService,
-  stepNames,
-  type Unreadable,
-  type Views,
-  workflowsOf,
-} from 'agent-orchestrator';
+import { asked, engine, engineOf, runsAtOnce, runWith, PlaceService, type EngineService, stepNames, workflowsOf } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 
 /**
@@ -30,13 +18,13 @@ import type { Run } from 'agent-orchestrator/run';
  */
 export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
   /** The package's engine over the store and the settings `env` names (`engine(env)`). */
-  static readonly live = (env: Parameters<typeof engine>[0]): Layer.Layer<Engine> => Layer.sync(Engine)(() => engine(env));
+  static readonly live = (env: Parameters<typeof engine>[0]) => Layer.sync(Engine)(() => engine(env));
 
   /**
    * The api's engine over the runtime's layer `runtime`, wrapped as `live` wraps its own (`engineOf`, which files every task queued):
    * how a test gives the app the runtime's stand-in, `Engine.over(engine().layer)` of `testEngine`.
    */
-  static over(runtime: Parameters<typeof engineOf>[0]): Layer.Layer<Engine> {
+  static over(runtime: Parameters<typeof engineOf>[0]) {
     return Layer.sync(Engine)(() => engineOf(runtime));
   }
 }
@@ -63,7 +51,7 @@ type Reader = Engine['Service'];
  * @param verb The verb's name, which leads a refusal's message.
  * @param read The verb's Effect, as the request's engine gives it.
  */
-export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(asked(verb, read));
+export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>) => Effect.runPromise(asked(verb, read));
 
 /**
  * The engine's view of every task in its store, over one observation, by task id.
@@ -74,7 +62,7 @@ export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promi
  * (`judgedUnlessUnreadable`).
  * @param e The engine's reader of tasks.
  */
-export async function everyView(e: Reader): Promise<{ views: Views; unreadable: Unreadable }> {
+export async function everyView(e: Reader) {
   const listed = await engineRead('list', e.list());
   return {
     views: new Map(listed.views.map((view) => [view.id, view])),
@@ -87,7 +75,7 @@ export async function everyView(e: Reader): Promise<{ views: Views; unreadable: 
  * @param home The store's root folder.
  * @param id The run's id, as the request gives it.
  */
-export const findRun = (home: string, id: string): Run | undefined => runsAtOnce(home).runs.find(id);
+export const findRun = (home: string, id: string) => runsAtOnce(home).runs.find(id);
 
 /**
  * The words of a refusal of a run this store has no record of, naming where its runs are listed.
@@ -103,13 +91,20 @@ export const noSuchRun = (id: string) =>
  * @param step The step's name, as the request gives it.
  * @param home The store's root folder.
  */
-export function taskOfStep(id: string, step: string, home: string): { run: Run; taskId: string | null } | { error: string } {
+export function taskOfStep(id: string, step: string, home: string) {
   const run = findRun(home, id);
-  if (!run) return { error: noSuchRun(id) };
+  if (!run)
+    return { error: noSuchRun(id) } satisfies { run: Run; taskId: string | null } | { error: string } as
+      | { run: Run; taskId: string | null }
+      | { error: string };
   if (!stepNames(run, workflowsOf(run, home).steps).includes(step)) {
-    return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` };
+    return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` } satisfies
+      | { run: Run; taskId: string | null }
+      | { error: string } as { run: Run; taskId: string | null } | { error: string };
   }
-  return { run, taskId: run.steps[step]?.taskId ?? null };
+  return { run, taskId: run.steps[step]?.taskId ?? null } satisfies { run: Run; taskId: string | null } | { error: string } as
+    | { run: Run; taskId: string | null }
+    | { error: string };
 }
 
 /**
@@ -125,7 +120,7 @@ export const runPlaced = <A, E>(
   at: Placed,
   e: Engine['Service'],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-): Promise<A> =>
+) =>
   runWith(
     e,
     tracedIn(
@@ -146,7 +141,7 @@ export const runPlaced = <A, E>(
 export type RequestTrace = { readonly tracer: Tracer.Tracer; readonly span: Tracer.AnySpan };
 
 /** `program` traced on the request's tracer under its span, or as it was where there is none. */
-const tracedIn = <A, E, R>(trace: RequestTrace | undefined, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+const tracedIn = <A, E, R>(trace: RequestTrace | undefined, program: Effect.Effect<A, E, R>) =>
   trace === undefined ? program : program.pipe(Effect.withParentSpan(trace.span), Effect.withTracer(trace.tracer));
 
 /**

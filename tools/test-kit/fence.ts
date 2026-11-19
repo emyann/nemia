@@ -28,7 +28,7 @@ export const HOME = '/home/u';
 export const WORK = '/work/checkout';
 
 /** A call as a rule would name it, for a message. */
-export const shown = (call: Call): string => {
+export const shown = (call: Call) => {
   if (call.command !== undefined) return `Bash(${call.command})`;
   const param = PARAMS.find((name) => call[name] !== undefined);
   return param === undefined ? call.tool : `${call.tool}(${param}:${call[param]})`;
@@ -46,13 +46,13 @@ export const shown = (call: Call): string => {
  * `WebFetch(domain:<host>)`, reaches a fetch of exactly that host and no other, and no fetch that says none; a bare `WebFetch` reaches
  * every one. Throws on a `*` in a tool's name and on any other parameter, which this matcher does not model.
  */
-export function reaches(rule: string, call: Call): boolean {
+export function reaches(rule: string, call: Call) {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
   return bash === undefined ? toolReaches(rule, call) : bashReaches(bash, call);
 }
 
 /** Whether the words `bash` of a `Bash(…)` rule reach a call: the command exactly, or as a prefix or a pattern (`reaches`). */
-function bashReaches(bash: string, call: Call): boolean {
+function bashReaches(bash: string, call: Call) {
   if (call.command === undefined) return false;
   const prefix = /^(.*?)(?::\*| \*)$/s.exec(bash)?.[1];
   const exact = prefix ?? bash;
@@ -61,7 +61,7 @@ function bashReaches(bash: string, call: Call): boolean {
 }
 
 /** Whether a rule on a tool other than Bash reaches a call (`reaches`). */
-function toolReaches(rule: string, call: Call): boolean {
+function toolReaches(rule: string, call: Call) {
   const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
   if (tool?.startsWith('mcp__')) return paramReaches(rule, tool, call);
   if (tool === 'WebFetch') return hostReaches(rule, call);
@@ -74,7 +74,7 @@ function toolReaches(rule: string, call: Call): boolean {
 }
 
 /** Whether a rule on the MCP tool `tool`'s parameter, `url:` or `filename:`, reaches a call; throws on any other. */
-function paramReaches(rule: string, tool: string, call: Call): boolean {
+function paramReaches(rule: string, tool: string, call: Call) {
   const said = rule.slice(tool.length + 1, -1);
   const param = MCP_PARAMS.find((name) => said.startsWith(`${name}:`));
   if (param === undefined || tool.includes('*'))
@@ -84,14 +84,14 @@ function paramReaches(rule: string, tool: string, call: Call): boolean {
 }
 
 /** Whether a rule on `WebFetch`'s host reaches a call: a fetch of exactly that host; throws on any other parameter. */
-function hostReaches(rule: string, call: Call): boolean {
+function hostReaches(rule: string, call: Call) {
   const said = rule.slice('WebFetch('.length, -1);
   if (!said.startsWith('domain:')) throw new Error(`${rule}: a rule on WebFetch is modelled for \`domain:\` alone; say how it reads, here`);
   return call.tool === 'WebFetch' && call.domain === said.slice('domain:'.length);
 }
 
 /** Whether a bare tool name, or an MCP server's, reaches a call; throws on a wildcard in a name. */
-function nameReaches(rule: string, call: Call): boolean {
+function nameReaches(rule: string, call: Call) {
   const server = rule.startsWith('mcp__') ? rule.replace(/__\*$/, '') : undefined;
   if (server !== undefined && !server.includes('*') && server.split('__').length === 2)
     return rule === call.tool || call.tool.startsWith(`${server}__`);
@@ -103,7 +103,7 @@ function nameReaches(rule: string, call: Call): boolean {
  * The words of a Bash rule with a `*` inside them, as a pattern of the whole command: each `*` any run of characters, none included;
  * `open`, where the rule ends in `:*` or ` *`, the words alone or followed by a space and more.
  */
-const globbed = (words: string, open: boolean): RegExp =>
+const globbed = (words: string, open: boolean) =>
   new RegExp(
     `^${words
       .split('*')
@@ -118,7 +118,7 @@ const globbed = (words: string, open: boolean): RegExp =>
  * with a slash inside it. Throws on a path from the project (`/x`), on a bare name, which gitignore matches at any depth, and on
  * `<name>/**`, whose depth Claude Code reads differently by rule type: this matcher does not model them.
  */
-export function covers(rulePath: string, file: string): boolean {
+export function covers(rulePath: string, file: string) {
   const fromWork = !/^[/.~]/.test(rulePath) && /\/[^/]+$/.test(rulePath) && !/^[^/]+\/\*\*$/.test(rulePath);
   const from = rulePath.startsWith('//')
     ? rulePath.slice(1)
@@ -142,7 +142,7 @@ export function covers(rulePath: string, file: string): boolean {
  * The rules of an allow list as this matcher may read them: all of them. Throws on a rule on an MCP tool's parameter, which Claude Code
  * was measured to read in a deny list alone: what such a rule allows is not modelled, and a guess would make a fence pass for nothing.
  */
-export function granting(rules: readonly string[]): readonly string[] {
+export function granting(rules: readonly string[]) {
   const odd = rules.find((rule) => /^mcp__[^(]*\(/.test(rule));
   if (odd !== undefined)
     throw new Error(`${odd}: a parameter rule on an MCP tool in an allow list is not modelled; say how it reads, here`);
@@ -153,7 +153,7 @@ export function granting(rules: readonly string[]): readonly string[] {
 const WRAPPER = /^(?:[A-Za-z_]\w*=\S*|timeout \d+(?:\.\d+)?[smhd]?|nohup)\s+/;
 
 /** A part with every leading wrapper stripped (`WRAPPER`). */
-export function unwrapped(part: string): string {
+export function unwrapped(part: string) {
   let rest = part.trim();
   let wrapper = WRAPPER.exec(rest);
   while (wrapper) {
@@ -167,7 +167,7 @@ export function unwrapped(part: string): string {
  * The parts of a shell command as typed: split on `&&`, `||`, `;`, `|&`, `|`, `&` and a newline outside quotes, each trimmed. Throws on
  * a substitution, a redirection, an escape, an unclosed quote or a separator inside quotes, which this matcher does not model.
  */
-export function typedPartsOf(command: string): string[] {
+export function typedPartsOf(command: string) {
   if (/\$\(|[`<>\\]/.test(command))
     throw new Error(`${command}: a substitution, redirection or escape is not modelled; say how it reads, here`);
   const tokens = [...command.matchAll(/'[^']*'|"[^"]*"|&&|\|\||\|&|[;|&\n]|[^'"&|;\n]+/g)].map((token) => token[0]);
@@ -182,17 +182,17 @@ export function typedPartsOf(command: string): string[] {
 }
 
 /** The parts of a shell command Claude Code matches an allow against: each part as typed (`typedPartsOf`), `unwrapped`. */
-export const partsOf = (command: string): string[] => typedPartsOf(command).map(unwrapped).filter(Boolean);
+export const partsOf = (command: string) => typedPartsOf(command).map(unwrapped).filter(Boolean);
 
 /** A call as the parts Claude Code matches an allow against: each part of a shell command (`partsOf`), or the tool call itself. */
-export const partsOfCall = (call: Call): Call[] =>
+export const partsOfCall = (call: Call) =>
   call.command === undefined ? [call] : partsOf(call.command).map((command) => ({ tool: 'Bash', command }) as const);
 
 /**
  * A call as the parts Claude Code matches a deny against: each part of a shell command unwrapped, and as typed too, its leading
  * assignment and wrappers kept, so a deny of what an assignment says reaches it; or the tool call itself.
  */
-export const deniedPartsOfCall = (call: Call): Call[] =>
+export const deniedPartsOfCall = (call: Call) =>
   call.command === undefined
     ? [call]
     : [...new Set([...partsOf(call.command), ...typedPartsOf(call.command)])].map((command) => ({ tool: 'Bash', command }) as const);
@@ -213,13 +213,13 @@ export const CLAUDE_KEEPS_INSIDE = ['cat', 'head', 'tail', 'wc', 'cut', 'ls'];
  * that opens `/`, `~` or `$`, or that climbs with `..`. A link is not modelled here, having no file system: measured, it is refused.
  * A `..` that climbs back inside is refused here and run by Claude Code, a read inside either way.
  */
-export function readsOutside(part: Call): boolean {
+export function readsOutside(part: Call) {
   const [verb = '', ...words] = (part.command ?? '').split(/\s+/);
   return CLAUDE_KEEPS_INSIDE.includes(verb) && words.some((word) => /^[/~$]/.test(word) || /(?:^|\/)\.\.(?:\/|$)/.test(word));
 }
 
 /** A shell command as the call a session makes of it. */
-export const bash = (command: string): Call => ({ tool: 'Bash', command });
+export const bash = (command: string) => ({ tool: 'Bash', command }) satisfies Call;
 
 /** A fence as Claude Code reads it: its allows, those of the settings and of a loaded skill among them, and its denies. */
 export type Fence = { allow: readonly string[]; deny: readonly string[] };
@@ -233,7 +233,7 @@ export function runsUnder(
   fence: Fence,
   calls: readonly Call[],
   { dontAsk = true, inside = true }: { dontAsk?: boolean; inside?: boolean } = {},
-): string[] {
+) {
   const allows = granting(fence.allow);
   return calls
     .filter(

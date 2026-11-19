@@ -6,7 +6,7 @@
  */
 import { useId, useState } from 'react';
 import type { Question } from '../../lib/api/tries.ts';
-import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
+import type { RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, type Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk } from './Ask';
@@ -24,7 +24,7 @@ const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [
  * The labels `q` recommends, as a list: none for null, one for a label, and every label of a list, which a question that takes several
  * may recommend.
  */
-const recommendedOf = (q: Frozen<Question>): readonly string[] =>
+const recommendedOf = (q: Frozen<Question>) =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
 /**
@@ -33,14 +33,14 @@ const recommendedOf = (q: Frozen<Question>): readonly string[] =>
  * @param questions the questions a step asks
  * @param draft what the person chose and wrote so far
  */
-export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft): Draft =>
+export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft) =>
   Object.fromEntries([
     ...Object.entries(draft),
     ...questions.flatMap((q) => {
       const chose = recommendedOf(q);
       return chose.length ? [[q.title, { ...said(draft, q), chose }]] : [];
     }),
-  ]);
+  ]) satisfies Draft as Draft;
 
 /**
  * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes
@@ -51,7 +51,7 @@ export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: 
  * @param label the option chosen or no longer chosen
  * @param on whether the option is chosen
  */
-export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on: boolean): Draft => {
+export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on: boolean) => {
   const before = said(draft, q).chose.filter((l) => q.multiple && l !== label);
   return { ...draft, [q.title]: { ...said(draft, q), chose: on ? [...before, label] : before } };
 };
@@ -62,7 +62,7 @@ export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on
  * @param questions the questions a step asks, in the order asked
  * @param draft what the person chose and wrote so far
  */
-export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft): string[] =>
+export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft) =>
   questions.filter((q) => said(draft, q).chose.length === 0 && !said(draft, q).own.trim()).map((q) => q.title);
 
 /**
@@ -71,7 +71,7 @@ export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft)
  * @param questions the questions a step asks, in the order asked
  * @param draft what the person chose and wrote so far
  */
-export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft): QuestionAnswer[] =>
+export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft) =>
   questions.map((q) => {
     const { chose, own } = said(draft, q);
     return own.trim() ? { question: q.title, chose, own: own.trim() } : { question: q.title, chose };

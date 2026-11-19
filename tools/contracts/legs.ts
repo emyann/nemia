@@ -78,7 +78,7 @@ export const ALONE: Readonly<Record<Exclude<Leg, 'rest'>, Alone>> = {
 };
 
 /** The one leg that proves the file at `file`, from the repository's root. */
-export const legOf = (file: string): Leg =>
+export const legOf = (file: string) =>
   (Object.entries(ALONE) as [Exclude<Leg, 'rest'>, Alone][]).find(([, alone]) => alone.file === file)?.[0] ?? 'rest';
 
 /** Whether `word` names a leg. */
@@ -90,7 +90,7 @@ export const isLeg = (word: string): word is Leg => (LEGS as readonly string[]).
  * file `ALONE` names is not among `files` — moved, its leg would prove nothing and its time would land in `rest` again — whichever leg
  * is asked, so every leg refuses it alike.
  */
-export const commandsOf = (files: readonly string[], leg: Leg): string[][] => {
+export const commandsOf = (files: readonly string[], leg: Leg) => {
   const lost = Object.entries(ALONE).filter(([, alone]) => !files.includes(alone.file));
   if (lost.length > 0)
     throw new Error(
@@ -98,7 +98,7 @@ export const commandsOf = (files: readonly string[], leg: Leg): string[][] => {
         ': point ALONE in tools/contracts/legs.ts at the file its contract is in now, or take its leg out of ALONE and of the contracts job in .github/workflows/ci.yml',
     );
   const ours = files.filter((f) => legOf(f) === leg);
-  const under = (root: string, file: string): boolean => file === root || file.startsWith(`${root}/`);
+  const under = (root: string, file: string) => file === root || file.startsWith(`${root}/`);
   return [...ROOTS.map((root) => ours.filter((f) => under(root, f))), ours.filter((f) => !ROOTS.some((root) => under(root, f)))]
     .filter((group) => group.length > 0)
     .map((group) => [...[...group].sort(), '--cache']);
@@ -108,6 +108,7 @@ export const commandsOf = (files: readonly string[], leg: Leg): string[][] => {
 const IMPORTS_TSVERIFY = /["']@emyann\/tsverify(?:\/[^"'\n]*)?["']/;
 
 /** Every TypeScript file under `dir`, outside `node_modules` and dot folders, declaration files left out. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const typeScriptUnder = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(dir, e.name);
@@ -116,7 +117,7 @@ const typeScriptUnder = (dir: string): string[] =>
   });
 
 /** The file a relative import names, as TypeScript finds it. */
-const imported = (from: string, specifier: string): string | undefined => {
+const imported = (from: string, specifier: string) => {
   const base = path.resolve(path.dirname(from), specifier);
   const tried = [
     base,
@@ -134,11 +135,11 @@ const imported = (from: string, specifier: string): string | undefined => {
  * folder it is given (`contractFilesUnder` in its `cli.js`, 0.7.0): a TypeScript file that imports tsverify, or that imports, by a
  * relative path, a file that does. Absolute paths, sorted.
  */
-export const contractFilesUnder = (root: string): string[] => {
+export const contractFilesUnder = (root: string) => {
   const at = path.resolve(root);
-  if (!fs.statSync(at).isDirectory()) return [at];
+  if (!fs.statSync(at).isDirectory()) return [at] satisfies string[];
   const known = new Map<string, boolean>();
-  const importsTsverify = (f: string): boolean => {
+  const importsTsverify = (f: string) => {
     let yes = known.get(f);
     if (yes === undefined) {
       yes = IMPORTS_TSVERIFY.test(fs.readFileSync(f, 'utf8'));
@@ -156,5 +157,5 @@ export const contractFilesUnder = (root: string): string[] => {
           return target !== undefined && importsTsverify(target);
         }),
     )
-    .sort();
+    .sort() satisfies string[];
 };

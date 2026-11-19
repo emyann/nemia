@@ -35,7 +35,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The step in `canvas` once its reads are in. */
-const loaded = async (canvas: HTMLElement): Promise<HTMLElement> => {
+const loaded = async (canvas: HTMLElement) => {
   await waitFor(() => expect(canvas.querySelector('[data-factory-step]')).not.toBeNull(), { timeout: 5000 });
   return canvas.querySelector<HTMLElement>('[data-factory-step]')!;
 };

@@ -29,10 +29,10 @@ export const runEndingOf: RunEndingOf = (status) => RUN_ENDING[status];
  * Whether a run has ended: it is broken or over, and files nothing until a person tries a step of it again.
  * @param status The run in one word, as a pass worked it out from its steps.
  */
-export const runEnded = (status: RunStatusWord): boolean => runEndingOf(status) !== 'going';
+export const runEnded = (status: RunStatusWord) => runEndingOf(status) !== 'going';
 
 /**
  * Whether a run is over for good: it succeeded or was called off, and nothing of it is tried again.
  * @param status The run in one word, as a pass worked it out from its steps.
  */
-export const runOver = (status: RunStatusWord): boolean => runEndingOf(status) === 'over';
+export const runOver = (status: RunStatusWord) => runEndingOf(status) === 'over';

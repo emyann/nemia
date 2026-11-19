@@ -26,12 +26,12 @@ import {
   type WorkflowStep,
   DEFAULT_NAMESPACE,
 } from 'objects';
-import { Conflict, Forbidden, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
+import { Conflict, Forbidden, Invalid, Missing } from '../refusal/refusal.ts';
 import { brokenBy } from '../door/door.store.ts';
 import { mayPropose } from '../approval/index.ts';
 import { accessChange, accessOf } from './access.ts';
 import { readmeComposed } from '../folder/folder.ts';
-import { currentOf, workflowStepsWritten, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
+import { currentOf, workflowStepsWritten, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
 import { skillFilesRefusal } from '../skills/skills.ts';
@@ -69,17 +69,16 @@ const PERSONS_SETTINGS: Readonly<Record<string, string>> = {
  * The verb an object is proposed with: as given, else `create` where it carries no version and `update` where it carries one.
  * @param object The object proposed.
  */
-export const verbOf = (object: ProposedObject): ChangeVerb =>
-  object.verb ?? (object.metadata.resourceVersion === undefined ? 'create' : 'update');
+export const verbOf = (object: ProposedObject) => object.verb ?? (object.metadata.resourceVersion === undefined ? 'create' : 'update');
 
 /** An object's label in a refusal: `Workflow build`. */
-const labelOf = (object: ProposedObject): string => `${object.kind} ${object.metadata.name}`;
+const labelOf = (object: ProposedObject) => `${object.kind} ${object.metadata.name}`;
 
 /**
  * Why a Factory or an Agent `object` carries what is the person's, or undefined where it carries none: settings, custom instructions. An
  * Agent's result schema (`output`) is not one: it grants no access, and is written beside the agent with it.
  */
-function personsRefusal(object: ProposedObject, label: string, verb: ChangeVerb): string | undefined {
+function personsRefusal(object: ProposedObject, label: string, verb: ChangeVerb) {
   const spec = typeof object.spec === 'object' && object.spec !== null ? (object.spec as Record<string, unknown>) : undefined;
   if (object.kind === 'Factory') {
     const setting = spec === undefined ? undefined : Object.keys(spec).find((key) => PERSONS_SETTINGS[key] !== undefined);
@@ -94,7 +93,7 @@ function personsRefusal(object: ProposedObject, label: string, verb: ChangeVerb)
 }
 
 /** Why `object`'s verb does not go with what it carries, or undefined where it does: a spec, a version, a Skill removed. */
-function verbRefusal(object: ProposedObject, label: string, verb: ChangeVerb, factory: string): string | undefined {
+function verbRefusal(object: ProposedObject, label: string, verb: ChangeVerb, factory: string) {
   if (object.kind === 'Skill' && verb === 'delete')
     return `${label}: a skill of the factory's tree is changed by a proposal, never removed: take it off the agents that name it instead.`;
   if (verb === 'delete' && object.spec !== undefined) return `${label}: a removal carries no spec: leave spec out.`;
@@ -110,7 +109,7 @@ function verbRefusal(object: ProposedObject, label: string, verb: ChangeVerb, fa
  * Why a Workflow's spec is not its files' form, or undefined where it is: one that still carries `needs` or `description` apart, which its
  * README's frontmatter and first paragraph say and the read serves under `status`, so that a proposal sending them loses none unsaid.
  */
-function workflowSpecRefusal(object: ProposedObject, label: string): string | undefined {
+function workflowSpecRefusal(object: ProposedObject, label: string) {
   const spec = recordOf(object.spec);
   const apart = ['needs', 'description'].filter((key) => spec !== undefined && key in spec);
   if (apart.length === 0) return undefined;
@@ -125,7 +124,7 @@ function workflowSpecRefusal(object: ProposedObject, label: string): string | un
  * Why `object`'s spec is not its kind's, or undefined where it is: the kind's schema, a Skill's file at a path out of its folder or given
  * twice (`skillFilesRefusal`), a Workflow's needs or description apart (`workflowSpecRefusal`), and a Hire named after its step.
  */
-function specRefusal(object: ProposedObject, label: string): string | undefined {
+function specRefusal(object: ProposedObject, label: string) {
   const broken = brokenBy(SPECS[object.kind], object.spec);
   if (broken !== null) return `${label}: its spec ${broken}: write it as nemia explain ${RESOURCE_PLURALS[object.kind]}.spec says.`;
   if (object.kind === 'Workflow') return workflowSpecRefusal(object, label);
@@ -146,7 +145,7 @@ function specRefusal(object: ProposedObject, label: string): string | undefined 
  * @param object The object proposed.
  * @param factory The factory the proposal is in.
  */
-export function objectRefusal(object: ProposedObject, factory: string): string | undefined {
+export function objectRefusal(object: ProposedObject, factory: string) {
   const label = labelOf(object);
   const verb = verbOf(object);
   if (object.metadata.namespace !== undefined && object.metadata.namespace !== factory)
@@ -159,7 +158,7 @@ export function objectRefusal(object: ProposedObject, factory: string): string |
 }
 
 /** The objects of a proposal, each named once per kind; refused (`Invalid`) where one is no object a proposal carries. */
-const objectsChecked = (objects: readonly ProposedObject[], factory: string): Effect.Effect<void, Invalid> => {
+const objectsChecked = (objects: readonly ProposedObject[], factory: string) => {
   if (objects.length === 0)
     return Effect.fail(new Invalid({ message: 'a proposal carries one object at least: give its objects as spec.objects.' }));
   const seen = new Set<string>();
@@ -177,7 +176,7 @@ const objectsChecked = (objects: readonly ProposedObject[], factory: string): Ef
  * A proposal's name: its proposer and five lowercase letters or digits.
  * @param proposer Who proposes, as the name's first part.
  */
-export const proposalNameOf = (proposer: string): string => {
+export const proposalNameOf = (proposer: string) => {
   const letters = randomBytes(5)
     .reduce((word, byte) => word + (byte % 36).toString(36), '')
     .slice(0, 5);
@@ -238,7 +237,7 @@ const folderShaped = (place: ProposalPlace, factory: string, object: ProposedObj
 };
 
 /** `value` as a record, or none where it is not an object. */
-const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
+const recordOf = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 
 /**
@@ -246,7 +245,7 @@ const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined
  * README the write writes (`readmeComposed`), as given where it opens with a frontmatter of its own, under `now`'s frontmatter where it
  * does not, `now`'s own where none is given.
  */
-const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonly<Record<string, unknown>> | undefined): unknown => {
+const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonly<Record<string, unknown>> | undefined) => {
   const was = typeof now?.readme === 'string' ? now.readme : undefined;
   const body = typeof spec.readme === 'string' ? spec.readme : undefined;
   const readme = readmeComposed(was ?? '', body) ?? was;
@@ -260,7 +259,7 @@ const workflowAsWritten = (spec: Readonly<Record<string, unknown>>, now: Readonl
  * @param object The object proposed.
  * @param now The spec the object holds now; undefined where nothing is there.
  */
-export const mergedSpec = (object: ProposedObject, now: unknown): unknown => {
+export const mergedSpec = (object: ProposedObject, now: unknown) => {
   const spec = recordOf(object.spec);
   const was = recordOf(now);
   if (spec === undefined) return object.spec;
@@ -269,7 +268,7 @@ export const mergedSpec = (object: ProposedObject, now: unknown): unknown => {
 };
 
 /** A spec read for a proposal, refused (`Invalid`) where it is no proposal's: the body as `ProposalSpec` decodes it. */
-const specRead = (body: unknown): Effect.Effect<ProposalSpec, Invalid> => {
+const specRead = (body: unknown) => {
   const read = Schema.decodeUnknownResult(ProposalSpec)(body);
   return Result.isSuccess(read)
     ? Effect.succeed(read.success)
@@ -290,7 +289,7 @@ export const proposeProgram = Effect.fn('proposeProgram')(function* (
   factory: string,
   body: unknown,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
+) {
   if (!mayPropose(caller, factory))
     return yield* Effect.fail(
       new Forbidden({
@@ -337,7 +336,7 @@ export const undoProgram = Effect.fn('undoProgram')(function* (
   factory: string,
   name: string,
   place: ProposalPlace,
-): Effect.fn.Return<Proposal, Refusal, ProposalNeeds> {
+) {
   const door = (yield* ProposalDoor).proposals;
   const applied = yield* door.read(factory, name);
   if (applied === undefined)

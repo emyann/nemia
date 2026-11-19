@@ -56,13 +56,13 @@ const RowLabels = Schema.Struct({
 });
 
 /** The labels `object` carries, none where it carries none. */
-const labelsOf = (object: unknown): Readonly<Record<string, string>> => {
+const labelsOf = (object: unknown) => {
   const read = Schema.decodeUnknownOption(RowLabels)(object);
   return read._tag === 'Some' ? (read.value.metadata.labels ?? {}) : {};
 };
 
 /** A cell as a person reads it: a string as it is, nothing as `<none>`, anything else as JSON. */
-const cellText = (cell: unknown): string =>
+const cellText = (cell: unknown) =>
   typeof cell === 'string' ? cell : cell === null || cell === undefined ? '<none>' : JSON.stringify(cell);
 
 /**
@@ -72,7 +72,7 @@ const cellText = (cell: unknown): string =>
  * @param table The table, its columns and rows.
  * @param asked How it is asked: wide, with its labels, and the label keys to show as columns.
  */
-export function tableLines(table: Table, asked: TableAsked): string[] {
+export function tableLines(table: Table, asked: TableAsked) {
   if (table.rows.length === 0) return [];
   const shown = table.columnDefinitions.flatMap((column, at) =>
     column.priority === 0 || asked.wide || (asked.showLabels && column.name === LABELS) ? [{ name: column.name, at }] : [],

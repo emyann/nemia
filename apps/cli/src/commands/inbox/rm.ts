@@ -13,7 +13,7 @@ const { name: COMMAND } = INBOX_RM_WORDS;
  * `nemia inbox rm`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function inboxRm(args: Args): Promise<number> {
+export async function inboxRm(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const namespace = await namespaceOfCard(COMMAND, name);
   const dropped = await asked(COMMAND, (c) => c.cards.delete({ params: { namespace, name } }));

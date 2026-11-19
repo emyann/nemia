@@ -16,14 +16,14 @@ export const KEPT = Duration.days(30);
 export const KEPT_SECONDS = Duration.toSeconds(KEPT);
 
 /** The first value of `header`, a proxy's list (`https, http`) read at its first, in lower case. */
-const firstOf = (header: string | undefined): string => (header ?? '').split(',')[0]?.trim().toLowerCase() ?? '';
+const firstOf = (header: string | undefined) => (header ?? '').split(',')[0]?.trim().toLowerCase() ?? '';
 
 /**
  * Whether a request came over https: a proxy in front that says so (`X-Forwarded-Proto: https`), else its own URL's scheme.
  * @param forwardedProto The request's `X-Forwarded-Proto` header, or undefined where it sends none.
  * @param url The request's URL, as it was sent.
  */
-export function httpsBy(forwardedProto: string | undefined, url: string): boolean {
+export function httpsBy(forwardedProto: string | undefined, url: string) {
   if (firstOf(forwardedProto) === 'https') return true;
   try {
     return new URL(url).protocol === 'https:';

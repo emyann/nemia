@@ -27,7 +27,7 @@ export type Starts = {
 };
 
 /** What a fix's press says: starting while its start is sent, Deactivate for a removal, else whether it asks before it starts. */
-const pressWord = (fix: ReadinessFix, pending: boolean): string =>
+const pressWord = (fix: ReadinessFix, pending: boolean) =>
   pending ? 'Starting…' : fix.kind === 'removes' ? 'Deactivate' : fix.asks?.length ? 'Answer and start' : 'Start the fix';
 
 /**

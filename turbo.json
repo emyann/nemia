@@ -6,7 +6,8 @@
       "dependsOn": ["^transit"]
     },
     "typecheck": {
-      "dependsOn": ["^transit"]
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.base.json"]
     },
     "test": {
       "dependsOn": ["^transit"]

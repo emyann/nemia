@@ -8,7 +8,6 @@ import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
 import type { Served } from '../../command/entry.verb.ts';
 import { Effect, Schema } from 'effect';
 import { FACTORY_RULES_WORDS, FactoryRulesWrite } from 'objects';
-import type { Refusal } from '../../refusal/refusal.ts';
 import { FactoryName } from '../factory.model.ts';
 
 /**
@@ -24,7 +23,7 @@ export type FactoryRules = { name: string; file: string; words: string | null; e
  * @param home The store's root.
  * @param name The factory's name, read as a slug.
  */
-export function factoryRules(home: string, name: string): FactoryRules {
+export function factoryRules(home: string, name: string) {
   return { name, ...doorAtOnce(home, (door) => door.rules.read(FactoryName.read(name))) };
 }
 
@@ -43,7 +42,7 @@ export type RulesInput = typeof RulesInput.Type;
  * The rules of the factory `name`, after they are written from `words` or removed with `clear`, where they ask either. Refused, writing
  * nothing: as `FACTORY_RULES` says.
  */
-function ruled({ factory: name, words, clear }: RulesInput): Effect.Effect<FactoryRules, Refusal> {
+function ruled({ factory: name, words, clear }: RulesInput) {
   return Effect.gen(function* () {
     const door = yield* FactoryDoor;
     const factory = FactoryName.read(name);

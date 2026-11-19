@@ -72,26 +72,26 @@ export type World = {
 };
 
 /** A new id for a commit of `held`: forty hexadecimal characters, counted in its first seven, so a short id tells two commits apart. */
-export function nextId(held: Held): string {
+export function nextId(held: Held) {
   held.made += 1;
   return held.made.toString(16).padStart(7, '0').padEnd(40, '0');
 }
 
 /** The commit `rev` names in `repo` — a branch, a tag or a commit's id — or undefined where it names none. */
-export function commitAt(repo: Repository, rev: string): Commit | undefined {
+export function commitAt(repo: Repository, rev: string) {
   const id = repo.branches.get(rev.replace(/^refs\/heads\//, '')) ?? repo.tags.get(rev.replace(/^refs\/tags\//, '')) ?? rev;
   return repo.commits.get(id);
 }
 
 /** The commit `id` names in `repo`, which holds it. */
-export function commitOf(repo: Repository, id: string): Commit {
+export function commitOf(repo: Repository, id: string) {
   const commit = repo.commits.get(id);
   if (!commit) throw new Error(`${repo.root} holds no commit ${id}`);
   return commit;
 }
 
 /** Every commit `id` follows in `repo`, itself among them. */
-export function ancestors(repo: Repository, id: string): Set<string> {
+export function ancestors(repo: Repository, id: string) {
   const seen = new Set<string>();
   const next = [id];
   for (let at = next.pop(); at !== undefined; at = next.pop()) {
@@ -103,16 +103,16 @@ export function ancestors(repo: Repository, id: string): Set<string> {
 }
 
 /** Whether `id` is `of` or a commit it follows. */
-export const within = (repo: Repository, id: string, of: string): boolean => ancestors(repo, of).has(id);
+export const within = (repo: Repository, id: string, of: string) => ancestors(repo, of).has(id);
 
 /** How many commits `tip` holds that `base` does not. */
-export function ahead(repo: Repository, base: string, tip: string): number {
+export function ahead(repo: Repository, base: string, tip: string) {
   const below = ancestors(repo, base);
   return [...ancestors(repo, tip)].filter((id) => !below.has(id)).length;
 }
 
 /** The latest commit `a` and `b` both follow: the shared one that follows the most, or undefined where they share none. */
-export function baseOf(repo: Repository, a: string, b: string): Commit | undefined {
+export function baseOf(repo: Repository, a: string, b: string) {
   const ofB = ancestors(repo, b);
   const shared = [...ancestors(repo, a)].filter((id) => ofB.has(id));
   const depth = (id: string) => ancestors(repo, id).size;
@@ -121,14 +121,14 @@ export function baseOf(repo: Repository, a: string, b: string): Commit | undefin
 }
 
 /** `text` with both sides of a conflict in it, between the marks a person resolves. */
-const conflictText = (ours: string | undefined, theirs: string | undefined): string =>
+const conflictText = (ours: string | undefined, theirs: string | undefined) =>
   `<<<<<<< ours\n${ours ?? ''}=======\n${theirs ?? ''}>>>>>>> theirs\n`;
 
 /**
  * `theirs` merged into `ours`, both changed from `base`, by file: a path one side alone changed is that side's, one both changed alike is
  * theirs, and one both changed differently is a conflict, listed in order and left in `tree` with both texts between marks.
  */
-export function merged(base: Tree, ours: Tree, theirs: Tree): { readonly tree: Tree; readonly conflicts: readonly string[] } {
+export function merged(base: Tree, ours: Tree, theirs: Tree) {
   const tree: Record<string, string> = {};
   const conflicts: string[] = [];
   for (const path of [...new Set([...Object.keys(ours), ...Object.keys(theirs), ...Object.keys(base)])].sort()) {
@@ -143,15 +143,15 @@ export function merged(base: Tree, ours: Tree, theirs: Tree): { readonly tree: T
 }
 
 /** A text's lines, its last one counted whether or not it ends in a line break. */
-export const linesOf = (text: string): string[] => (text === '' ? [] : text.replace(/\n$/, '').split('\n'));
+export const linesOf = (text: string) => (text === '' ? [] : text.replace(/\n$/, '').split('\n'));
 
 /**
  * What turns the lines `from` into `to`, in order: each line kept (` `), taken away (`-`) or added (`+`), the lines taken away at one
  * spot before those added there, found on the longest run of lines both keep.
  */
-export function lineChanges(from: readonly string[], to: readonly string[]): string[] {
+export function lineChanges(from: readonly string[], to: readonly string[]) {
   const kept = Array.from({ length: from.length + 1 }, () => Array.from({ length: to.length + 1 }, () => 0));
-  const at = (i: number, j: number): number => kept[i]?.[j] ?? 0;
+  const at = (i: number, j: number) => kept[i]?.[j] ?? 0;
   for (const [i, row] of [...kept.entries()].reverse().slice(1))
     for (let j = to.length - 1; j >= 0; j--) row[j] = from[i] === to[j] ? at(i + 1, j + 1) + 1 : Math.max(at(i + 1, j), at(i, j + 1));
   const changes: string[] = [];
@@ -177,7 +177,7 @@ export type Change = {
 };
 
 /** The files that differ between `from` and `to`, by path in order, each with its line counts and a diff of the whole file. */
-export function changesOf(from: Tree, to: Tree): Change[] {
+export function changesOf(from: Tree, to: Tree) {
   return [...new Set([...Object.keys(from), ...Object.keys(to)])]
     .sort()
     .filter((path) => from[path] !== to[path])
@@ -193,9 +193,9 @@ export function changesOf(from: Tree, to: Tree): Change[] {
         removed: lines.filter((l) => l.startsWith('-')).length,
         diff: `${[...heads, ...lines].join('\n')}\n`,
       };
-    });
+    }) satisfies Change[];
 }
 
 /** Whether `path` is a file, a directory or absent in `tree`. */
-export const kindIn = (tree: Tree, path: string): 'file' | 'directory' | 'absent' =>
+export const kindIn = (tree: Tree, path: string) =>
   tree[path] !== undefined ? 'file' : Object.keys(tree).some((p) => p.startsWith(`${path}/`)) ? 'directory' : 'absent';

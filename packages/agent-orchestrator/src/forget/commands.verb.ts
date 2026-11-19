@@ -49,7 +49,7 @@ const tryAlone = Effect.fnUntraced(function* (runId: string, home: string) {
  * What removed nothing, as a refusal: refused or held, a `Conflict` in `forget`'s words; a record gone since, `Missing`; else none.
  * @param forgot What `forget` did with the run.
  */
-export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
+export const forgetRefusal = (forgot: Forgot) => {
   const { kind } = forgot;
   if (kind === 'forgotten') return null;
   const message = notForgottenLine({ ...forgot, kind });
@@ -96,7 +96,7 @@ export type PruneInput = typeof PruneInput.Type;
  * What pruned nothing, as a refusal: refused, or nothing to prune, a `Conflict` in `nemia prune`'s words; else none.
  * @param pruning What `prune` judged of the run.
  */
-export const pruneRefusal = (pruning: Pruning): Conflict | null => {
+export const pruneRefusal = (pruning: Pruning) => {
   if (pruning.kind === 'refused') return new Conflict({ message: pruning.refusal ?? pruneLines(pruning).join('\n') });
   return pruning.kind === 'nothing' ? new Conflict({ message: `Nothing to prune: ${pruning.nothing}.` }) : null;
 };

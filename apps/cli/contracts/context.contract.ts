@@ -32,11 +32,10 @@ export type Chosen =
   | { readonly kind: 'refused'; readonly name: string };
 
 /** The name a command asks for: `NEMIA_CONTEXT` where it is set and not empty, else the file's own. */
-const named = (config: ClientConfig, asked: string | undefined): string | undefined =>
-  asked !== undefined && asked !== '' ? asked : config.current;
+const named = (config: ClientConfig, asked: string | undefined) => (asked !== undefined && asked !== '' ? asked : config.current);
 
 /** The context of `name` in the file, if it holds one. */
-const held = (config: ClientConfig, name: string): Context | undefined => config.contexts.find((c) => c.name === name);
+const held = (config: ClientConfig, name: string) => config.contexts.find((c) => c.name === name);
 
 const contextOfSpec = spec<(config: ClientConfig, asked: string | undefined) => Chosen>({
   ensures: {

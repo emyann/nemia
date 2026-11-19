@@ -115,20 +115,21 @@ export const stepMove: StepMove = (from, to) => {
 };
 
 /** A step's lifecycle as plain data, a fresh copy each call. */
-export const stepMachineGraph = (): StepMachineGraph => ({
-  initial: 'pending',
-  states: Object.keys(STEP_STATES).filter(isStepStatus),
-  final: [],
-  edges: STEP_EDGES.map((e) => ({ ...e })),
-});
+export const stepMachineGraph = () =>
+  ({
+    initial: 'pending',
+    states: Object.keys(STEP_STATES).filter(isStepStatus),
+    final: [],
+    edges: STEP_EDGES.map((e) => ({ ...e })),
+  }) satisfies StepMachineGraph;
 
 /**
  * A step's lifecycle as a Mermaid state diagram: each word named once, then the edges. Held in the package's README between `diagram:step`
  * markers.
  * @param graph The machine drawn; the step's own where not given.
  */
-export const stepDiagram = (graph: StepMachineGraph = stepMachineGraph()): string => {
-  const id = (s: StepStatus): string => STEP_STATES[s].id;
+export const stepDiagram = (graph: StepMachineGraph = stepMachineGraph()) => {
+  const id = (s: StepStatus) => STEP_STATES[s].id;
   return [
     'stateDiagram-v2',
     `  [*] --> ${id(graph.initial)}`,

@@ -13,7 +13,7 @@ import type { Carried } from './run-file.ts';
  * @param ownTokens The process's own token counts, where its output gives them beside its whole session's; undefined where the counts it
  *   gives are its own already, and kept whole.
  */
-export const lessCarried = (usage: Usage, carried: Carried, ownTokens?: Usage): Usage | undefined => {
+export const lessCarried = (usage: Usage, carried: Carried, ownTokens?: Usage) => {
   const { costUsd, apiMs, ...own } = usage;
   const less = (mine: number | undefined, theirs: number | undefined) =>
     mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
@@ -31,7 +31,7 @@ const CARRIED_TOKENS = ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens',
  * A resumed session's whole counts (`mine`), its parent's taken off each class: where the parent's were not kept in every class, or
  * one would go below nothing, the process's own counts (`own`, `HarnessOutput.ownTokens`) instead — never its parent's too.
  */
-const tokensLess = (mine: Usage, carried: Carried, own: Usage): Usage => {
+const tokensLess = (mine: Usage, carried: Carried, own: Usage) => {
   const { inputTokens: _, uncachedTokens: _u, cacheWriteTokens: _w, cacheReadTokens: _r, outputTokens: _o, ...others } = mine;
   const less = (k: (typeof CARRIED_TOKENS)[number]) => (mine[k] ?? NaN) - (carried[k] ?? NaN);
   const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
@@ -51,7 +51,7 @@ const tokensLess = (mine: Usage, carried: Carried, own: Usage): Usage => {
  * are its whole session's (`ownTokens` beside them), in every class it gave.
  * @param told What the parent's output says, or undefined where it says nothing, which carries nothing.
  */
-export const carriedOf = (told: HarnessOutput | undefined): Carried => {
+export const carriedOf = (told: HarnessOutput | undefined) => {
   const usage = told?.usage ?? {};
   const keys = ['costUsd', 'apiMs', ...(told?.ownTokens ? CARRIED_TOKENS : [])] as const;
   return Object.fromEntries(keys.flatMap((k) => (usage[k] !== undefined ? [[k, usage[k]]] : [])));

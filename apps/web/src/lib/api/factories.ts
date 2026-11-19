@@ -9,23 +9,13 @@ import { queryOptions } from '@tanstack/react-query';
 import {
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
-  type FactoryApplied,
   type FactoryCommands,
   type FactoryCondition,
-  type FactoryCreated,
-  type FactoryInstruction,
   type FactoryInstructionWrite,
-  type FactoryRules,
-  type FactoryTrusted,
-  type Hire,
   type McpServer,
   type McpServerWrite,
   type McpTransport,
   type Schedule,
-  type SignedOut,
-  type SignInStarted,
-  type SignInState,
-  type VolumeAdded,
 } from 'objects';
 import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
 
@@ -119,7 +109,7 @@ export type Factory = {
  * A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. Its retired `repo` is not carried: the
  * factory's wiring places its runs.
  */
-const scheduleViewOf = (schedule: Schedule, unschedule: string): FactorySchedule => ({
+const scheduleViewOf = (schedule: Schedule, unschedule: string) => ({
   workflow: schedule.metadata.name,
   cron: schedule.spec.cron,
   tz: schedule.spec.tz ?? null,
@@ -137,7 +127,7 @@ const scheduleViewOf = (schedule: Schedule, unschedule: string): FactorySchedule
  * @param commands The lines a person types for it, a schedule's and a volume's line that takes it back by name among them.
  * @param scheduled Its schedules; none for the default factory, which keeps none.
  */
-export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands, scheduled: readonly Schedule[] = []): Factory => {
+export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands, scheduled: readonly Schedule[] = []) => {
   const { spec, status } = factory;
   return {
     name: factory.metadata.name,
@@ -174,7 +164,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
 };
 
 /** The view of one factory: its object, its lines and, for a factory a person made, its schedules, read together. */
-const viewRead = async (factory: FactoryObject): Promise<Factory> => {
+const viewRead = async (factory: FactoryObject) => {
   const name = factory.metadata.name;
   const [commands, scheduled] = await Promise.all([
     factories.commands(name),
@@ -189,7 +179,7 @@ const viewRead = async (factory: FactoryObject): Promise<Factory> => {
  */
 export const factoriesQuery = queryOptions({
   queryKey: ['factories'],
-  queryFn: async (): Promise<Factory[]> => Promise.all((await factories.listAll()).items.map(viewRead)),
+  queryFn: async () => Promise.all((await factories.listAll()).items.map(viewRead)),
 });
 
 /**
@@ -198,14 +188,13 @@ export const factoriesQuery = queryOptions({
  * @param name The factory's name.
  * @param volume The volume as the factory's volume line spells it: a path or a git URL, marked `:ro` or `:rw`.
  */
-export const addVolumeUntrusted = (name: string, volume: string): Promise<VolumeAdded> =>
-  factories.addVolume(name, { volume, noTrust: true });
+export const addVolumeUntrusted = (name: string, volume: string) => factories.addVolume(name, { volume, noTrust: true });
 
 /**
  * The places of the factory `name` trusted, asking each harness that keeps a trust. Rejects with a `WriteRefusal` in the package's words.
  * @param name The factory's name.
  */
-export const trustFactory = (name: string): Promise<FactoryTrusted> => factories.trust(name);
+export const trustFactory = (name: string) => factories.trust(name);
 
 /**
  * The view of the factory `name` alone, with its lines and no schedules: what the volume step reads of the factory it gives a volume, its
@@ -215,7 +204,7 @@ export const trustFactory = (name: string): Promise<FactoryTrusted> => factories
 export const factoryViewQuery = (name: string) =>
   queryOptions({
     queryKey: ['factories', 'view', name],
-    queryFn: async (): Promise<Factory> => {
+    queryFn: async () => {
       const [factory, commands] = await Promise.all([factories.get(name), factories.commands(name)]);
       return factoryViewOf(factory, commands);
     },
@@ -226,7 +215,7 @@ export const factoryViewQuery = (name: string) =>
  * name it does not take, or a factory of that name already filed.
  * @param name The factory's name.
  */
-export const createFactory = (name: string): Promise<FactoryCreated> => factories.create({ name });
+export const createFactory = (name: string) => factories.create({ name });
 
 /**
  * Make the factory `name` from the builtin template `template`, with no volume and every parameter at its default: what the apply
@@ -235,8 +224,7 @@ export const createFactory = (name: string): Promise<FactoryCreated> => factorie
  * @param name The factory's name.
  * @param template The builtin template's name.
  */
-export const applyTemplate = (name: string, template: string): Promise<FactoryApplied> =>
-  factories.apply(name, { template: { name: template } });
+export const applyTemplate = (name: string, template: string) => factories.apply(name, { template: { name: template } });
 
 /**
  * The names of the factories a person made, the default factory left out, in the order the api lists them: what the welcome's factory
@@ -244,8 +232,7 @@ export const applyTemplate = (name: string, template: string): Promise<FactoryAp
  */
 export const factoryNamesQuery = queryOptions({
   queryKey: ['factories', 'names'],
-  queryFn: async (): Promise<string[]> =>
-    (await factories.listAll()).items.map((f) => f.metadata.name).filter((name) => name !== DEFAULT_NAMESPACE),
+  queryFn: async () => (await factories.listAll()).items.map((f) => f.metadata.name).filter((name) => name !== DEFAULT_NAMESPACE),
 });
 
 /**
@@ -261,13 +248,13 @@ export const factoryRulesQuery = (name: string) =>
  * @param name The factory's name.
  * @param words The rules to write.
  */
-export const writeRules = (name: string, words: string): Promise<FactoryRules> => factories.putRules(name, words);
+export const writeRules = (name: string, words: string) => factories.putRules(name, words);
 
 /**
  * Remove the rules of the factory `name`: the rules as they then read, none.
  * @param name The factory's name.
  */
-export const clearRules = (name: string): Promise<FactoryRules> => factories.deleteRules(name);
+export const clearRules = (name: string) => factories.deleteRules(name);
 
 /**
  * The instruction of the factory `name`, read where its file says it is kept, on each request.
@@ -285,14 +272,13 @@ type InstructionPlace = FactoryInstructionWrite;
  * @param name The factory's name.
  * @param place Where the instruction is to be kept: a file in its first folder, by its path from it, or the store.
  */
-export const placeInstruction = (name: string, place: InstructionPlace): Promise<FactoryInstruction> =>
-  factories.putInstruction(name, place);
+export const placeInstruction = (name: string, place: InstructionPlace) => factories.putInstruction(name, place);
 
 /**
  * Read the instruction of the factory `name` from `NEMIA.md` in its first folder again: the instruction as it then reads.
  * @param name The factory's name.
  */
-export const resetInstructionPlace = (name: string): Promise<FactoryInstruction> => factories.deleteInstruction(name);
+export const resetInstructionPlace = (name: string) => factories.deleteInstruction(name);
 
 /**
  * Write `words` as the instruction the store keeps for the factory `name`: the instruction as it then reads. Rejects with a `WriteRefusal`
@@ -300,13 +286,13 @@ export const resetInstructionPlace = (name: string): Promise<FactoryInstruction>
  * @param name The factory's name.
  * @param words The instruction to keep.
  */
-export const writeInstruction = (name: string, words: string): Promise<FactoryInstruction> => factories.putInstructionWords(name, words);
+export const writeInstruction = (name: string, words: string) => factories.putInstructionWords(name, words);
 
 /**
  * Remove the instruction the store keeps for the factory `name`: the instruction as it then reads.
  * @param name The factory's name.
  */
-export const clearInstruction = (name: string): Promise<FactoryInstruction> => factories.deleteInstructionWords(name);
+export const clearInstruction = (name: string) => factories.deleteInstructionWords(name);
 
 /**
  * Set the cost line of `workflow` in the factory `name` to `usd` dollars: the factory as it then reads. A run started from then on keeps
@@ -316,8 +302,7 @@ export const clearInstruction = (name: string): Promise<FactoryInstruction> => f
  * @param workflow The workflow whose cost line is set.
  * @param usd The cost line, in dollars.
  */
-export const setCostLine = (name: string, workflow: string, usd: number): Promise<FactoryObject> =>
-  factories.putCostLine(name, workflow, usd);
+export const setCostLine = (name: string, workflow: string, usd: number) => factories.putCostLine(name, workflow, usd);
 
 /**
  * Take the cost line of `workflow` off the factory `name`: the factory as it then reads. Rejects with a `WriteRefusal` where it sets
@@ -325,10 +310,10 @@ export const setCostLine = (name: string, workflow: string, usd: number): Promis
  * @param name The factory's name.
  * @param workflow The workflow whose cost line is taken off.
  */
-export const clearCostLine = (name: string, workflow: string): Promise<FactoryObject> => factories.deleteCostLine(name, workflow);
+export const clearCostLine = (name: string, workflow: string) => factories.deleteCostLine(name, workflow);
 
 /** The name of the hire into `step`, `<workflow>/<step>`: the two joined by a dot, the Hire's name. */
-const hireNamed = (step: string): string => {
+const hireNamed = (step: string) => {
   const at = step.indexOf('/');
   return at < 0 ? step : hireName(step.slice(0, at), step.slice(at + 1));
 };
@@ -341,14 +326,14 @@ const hireNamed = (step: string): string => {
  * @param step The step hired into, as `<workflow>/<step>`.
  * @param agent The name of the agent hired.
  */
-export const hireAgent = (name: string, step: string, agent: string): Promise<Hire> => hires.put(name, hireNamed(step), agent);
+export const hireAgent = (name: string, step: string, agent: string) => hires.put(name, hireNamed(step), agent);
 
 /**
  * Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none.
  * @param name The factory's name.
  * @param step The step whose hire is fired, as `<workflow>/<step>`.
  */
-export const fireAgent = (name: string, step: string): Promise<Hire> => hires.delete(name, hireNamed(step));
+export const fireAgent = (name: string, step: string) => hires.delete(name, hireNamed(step));
 
 /**
  * One MCP server a factory records, from its `McpServer`: its wire facts — `type`, `url`, `headers`, each value served as the mask — and
@@ -373,7 +358,7 @@ export type BuiltinServer = Omit<FactoryServer, 'state' | 'tools' | 'error'>;
 export type FactoryServers = { factory: string; servers: readonly FactoryServer[]; builtin: readonly BuiltinServer[] };
 
 /** `server` as the board draws it: its spec beside its name, and what its status says. */
-const serverViewOf = (server: McpServer): FactoryServer => ({
+const serverViewOf = (server: McpServer) => ({
   name: server.metadata.name,
   ...server.spec,
   state: server.status?.state ?? null,
@@ -382,7 +367,7 @@ const serverViewOf = (server: McpServer): FactoryServer => ({
 });
 
 /** A builtin server as the form offers it: its name and its spec. */
-const builtinViewOf = (server: McpServer): BuiltinServer => ({ name: server.metadata.name, ...server.spec });
+const builtinViewOf = (server: McpServer) => ({ name: server.metadata.name, ...server.spec });
 
 /**
  * The MCP servers of the factory `name`, with the state its harness reports of each, and Nemia's builtin ones. **Not polled**: the read
@@ -395,7 +380,7 @@ const builtinViewOf = (server: McpServer): BuiltinServer => ({ name: server.meta
 export const factoryServersQuery = (name: string) =>
   queryOptions({
     queryKey: ['factory-servers', name],
-    queryFn: async (): Promise<FactoryServers> => {
+    queryFn: async () => {
       const [listed, offered] = await Promise.all([mcpServers.list(name), library.mcpServers()]);
       return { factory: name, servers: listed.items.map(serverViewOf), builtin: offered.items.map(builtinViewOf) };
     },
@@ -411,14 +396,14 @@ export const factoryServersQuery = (name: string) =>
  * @param server The server's name.
  * @param body What is recorded of it: its transport, address, headers and OAuth client.
  */
-export const recordServer = (name: string, server: string, body: McpServerWrite): Promise<McpServer> => mcpServers.put(name, server, body);
+export const recordServer = (name: string, server: string, body: McpServerWrite) => mcpServers.put(name, server, body);
 
 /**
  * Take the server `server` off the factory `name`'s record. Rejects as `recordServer` does, and 404 for a server it does not record.
  * @param name The factory's name.
  * @param server The server's name.
  */
-export const removeServer = (name: string, server: string): Promise<McpServer> => mcpServers.delete(name, server);
+export const removeServer = (name: string, server: string) => mcpServers.delete(name, server);
 
 /**
  * Start a sign-in to the factory `name`'s server `server`: resolves with the address the person opens. Rejects with a `WriteRefusal`:
@@ -426,7 +411,7 @@ export const removeServer = (name: string, server: string): Promise<McpServer> =
  * @param name The factory's name.
  * @param server The server's name.
  */
-export const signInServer = (name: string, server: string): Promise<SignInStarted> => mcpServers.signIn(name, server);
+export const signInServer = (name: string, server: string) => mcpServers.signIn(name, server);
 
 /**
  * The state of `server`'s last sign-in, from the engine's memory: it spawns nothing, so the board polls it while a sign-in waits,
@@ -451,12 +436,11 @@ export const signInStateQuery = (name: string, server: string) =>
  * @param server The server's name.
  * @param url The address the person's browser landed on once they approved.
  */
-export const completeSignIn = (name: string, server: string, url: string): Promise<SignInState> =>
-  mcpServers.signInCallback(name, server, url);
+export const completeSignIn = (name: string, server: string, url: string) => mcpServers.signInCallback(name, server, url);
 
 /**
  * Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits.
  * @param name The factory's name.
  * @param server The server's name.
  */
-export const signOutServer = (name: string, server: string): Promise<SignedOut> => mcpServers.signOut(name, server);
+export const signOutServer = (name: string, server: string) => mcpServers.signOut(name, server);

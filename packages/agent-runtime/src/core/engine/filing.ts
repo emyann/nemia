@@ -82,7 +82,7 @@ export const CEILING_INSTEAD =
 const PRIORITY_MOST = 2 ** 31 - 1;
 
 /** Why a task's `priority` cannot be carried, or `undefined`: anything but a whole number in int32. */
-const priorityRefusalOf = (priority: unknown): string | undefined =>
+const priorityRefusalOf = (priority: unknown) =>
   priority === undefined ||
   (typeof priority === 'number' && Number.isInteger(priority) && priority >= -PRIORITY_MOST - 1 && priority <= PRIORITY_MOST)
     ? undefined
@@ -95,7 +95,7 @@ const shownValue = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.str
  * Why a task's `resources.<part>` (`limits` or `requests`) cannot be held, or `undefined`: anything but an object of `memory` alone,
  * and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words).
  */
-const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown): string | undefined => {
+const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown) => {
   if (given === undefined) return undefined;
   const noun = part === 'limits' ? 'limit' : 'request';
   if (!Predicate.isObject(given))
@@ -117,7 +117,7 @@ const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown): strin
  * limit, which Kubernetes refuses too: a task promised more than it may use. A container's other limits (`cpu`) are refused rather
  * than dropped: a limit taken and never held is a promise nobody keeps.
  */
-const resourcesRefusalOf = (resources: unknown): string | undefined => {
+const resourcesRefusalOf = (resources: unknown) => {
   if (resources === undefined) return undefined;
   if (!Predicate.isObject(resources))
     return `\`resources: ${shownValue(resources)}\` is not a container's resources. Give \`{ limits: { memory: '8Gi' } }\`, or leave it out.`;
@@ -157,7 +157,7 @@ const resourcesRefusalOf = (resources: unknown): string | undefined => {
  * `service/harness-refusal.ts`), which the core never learns.
  * @param spec The task as it is to be filed.
  */
-export const refusalOf = (spec: Filing): string | undefined => {
+export const refusalOf = (spec: Filing) => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
   if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
   if (!path.isAbsolute(spec.cwd)) {
@@ -184,7 +184,7 @@ export const refusalOf = (spec: Filing): string | undefined => {
 };
 
 /** Why a task's `briefParts` cannot be its brief's, or `undefined`: anything but a list of texts, or texts that do not join into it. */
-const partsRefusalOf = ({ brief, briefParts }: Filing): string | undefined => {
+const partsRefusalOf = ({ brief, briefParts }: Filing) => {
   if (briefParts === undefined) return undefined;
   if (!Array.isArray(briefParts) || !briefParts.every((part) => typeof part === 'string')) {
     return `\`briefParts: ${JSON.stringify(briefParts)}\` is not a list of texts. Give the brief cut into parts, each a string, or leave it out.`;
@@ -200,7 +200,7 @@ const partsRefusalOf = ({ brief, briefParts }: Filing): string | undefined => {
  * ends a session it keeps open until a stop — `holdOpen`, which settles a turn's end to wait for an answer; `deadlineSeconds`,
  * which stops it at a time; and `closeoutSchema`, whose statement ends an attempt.
  */
-const restartRefusalOf = (spec: Filing): string | undefined => {
+const restartRefusalOf = (spec: Filing) => {
   if (spec.restartPolicy === undefined) return undefined;
   if (spec.restartPolicy !== 'Always') {
     return `\`restartPolicy: ${JSON.stringify(spec.restartPolicy)}\` is not a restart policy the runtime takes. Give \`'Always'\` to keep the session open until it is stopped, or leave it out to run the task to its end.`;
@@ -265,7 +265,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
  * The Task door's refusal of a filing as the caller's (`FileRefused`, which `ae` exits 2 on): an id no file can be named by, or one
  * already filed. Any other failure of the journal is the store's, and stays a `JournalError`.
  */
-const filingRefused = (error: JournalError): FileRefused | undefined =>
+const filingRefused = (error: JournalError) =>
   error.reason === 'malformed-id' || error.reason === 'filed-twice' ? new FileRefused({ message: error.message }) : undefined;
 
 /** An `admit` the runtime would not journal, and why, in words that say what to do instead. Nothing was written. */
@@ -274,7 +274,7 @@ export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefus
 }) {}
 
 /** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
-const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+const admitRefusalOf = (taskId: string, state: State | undefined) => {
   if (!state) return unknownTask(taskId);
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
@@ -330,7 +330,7 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
  * whose ending session its harness recorded, since the answer is told to that session. Otherwise the words say why not. Read
  * off the record alone, so it costs no registry call.
  */
-const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
+const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined) => {
   if (!state) return unknownTask(taskId);
   const last = state.attempts.at(-1);
   if (verbTakes(verb, state)) {
@@ -361,7 +361,7 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
  * @param text The words the next turn is to begin with, as the caller gave them.
  * @param config What the turn gives its configuration, as the caller gave it, or undefined where it gives none.
  */
-export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown): string | undefined => {
+export const answerRefusalOf = (taskId: string, state: State | undefined, text: unknown, config?: unknown) => {
   if (typeof text !== 'string' || !text.trim()) return '`text` is empty. Give the words the next turn should begin with.';
   return turnArgsRefusalOf(config) ?? waitRefusalOf('answer', taskId, state);
 };
@@ -372,7 +372,7 @@ export const answerRefusalOf = (taskId: string, state: State | undefined, text: 
  * @param taskId The task's id, named in the words of a refusal.
  * @param state The task's fold, or undefined where it has no journal.
  */
-export const closeRefusalOf = (taskId: string, state: State | undefined): string | undefined => waitRefusalOf('close', taskId, state);
+export const closeRefusalOf = (taskId: string, state: State | undefined) => waitRefusalOf('close', taskId, state);
 
 /**
  * A person's answer to a task held open that waits for one. Journalled as an `input`, and returned; the next pass
@@ -406,7 +406,7 @@ export const close = Effect.fn('close')(function* (taskId: string) {
  * @param state The task's fold.
  * @param turn The turn's own configuration, or undefined where it gives none.
  */
-export const filingOf = (state: State, turn?: HarnessArgs): Filing => ({
+export const filingOf = (state: State, turn?: HarnessArgs) => ({
   brief: state.brief,
   cwd: state.cwd,
   harness: state.harness,

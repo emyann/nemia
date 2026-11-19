@@ -19,7 +19,7 @@ export type SkillSource = DefinitionOrigin;
  * other origin, the factory's own tree among them, which those routes read under `repo`.
  * @param from The origin a page's address names.
  */
-export const sourceOf = (from: string): Extract<DefinitionOrigin, 'repo' | 'user'> => (from === 'user' ? 'user' : 'repo');
+export const sourceOf = (from: string) => (from === 'user' ? 'user' : 'repo');
 
 /**
  * A card entry as an object says it, its lists copied into the board's plain type.
@@ -33,7 +33,7 @@ export const cardEntryOf = (entry: {
   readonly examples?: readonly string[];
   readonly inputModes?: readonly string[];
   readonly outputModes?: readonly string[];
-}): AgentSkill => ({
+}) => ({
   id: entry.id,
   name: entry.name,
   description: entry.description,
@@ -47,7 +47,7 @@ export const cardEntryOf = (entry: {
  * The origin a page's address names (its `$from`), as the api reads `?origin=`: one of its words, else none, the one it serves.
  * @param from The origin a page's address names (its `$from`).
  */
-export const originWord = (from: string): DefinitionOrigin | undefined => DEFINITION_ORIGINS.find((origin) => origin === from);
+export const originWord = (from: string) => DEFINITION_ORIGINS.find((origin) => origin === from);
 
 /**
  * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its

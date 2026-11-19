@@ -6,10 +6,10 @@
  * factory step reads (`Pages/Welcome factory`).
  */
 import { http, HttpResponse } from 'msw';
-import type { Fix, HarnessCheck, HarnessTurn, Milestones, Quota, Readiness, ReadinessPiece } from 'objects';
+import type { Fix, HarnessCheck, HarnessTurn, Milestones, Quota, ReadinessPiece } from 'objects';
 
 /** The harness's install piece, in `state`, carrying `checks` where it is met. */
-const install = (state: ReadinessPiece['state'], checks?: HarnessCheck[]): ReadinessPiece => ({
+const install = (state: ReadinessPiece['state'], checks?: HarnessCheck[]) => ({
   name: 'claude',
   area: 'harness',
   state,
@@ -24,10 +24,10 @@ const install = (state: ReadinessPiece['state'], checks?: HarnessCheck[]): Readi
   harness: { name: 'claude', part: 'install' },
   cost: 'run',
   ...(checks === undefined ? {} : { checks }),
-});
+}) satisfies ReadinessPiece;
 
 /** The harness's sign-in piece, in `state`. */
-const signIn = (state: ReadinessPiece['state']): ReadinessPiece => ({
+const signIn = (state: ReadinessPiece['state']) => ({
   name: 'claude-sign-in',
   area: 'harness',
   state,
@@ -38,7 +38,7 @@ const signIn = (state: ReadinessPiece['state']): ReadinessPiece => ({
       : [{ message: 'sign in with your Claude account, as the user the daemon runs as', command: 'claude auth login', startable: false, kind: 'typed' }],
   harness: { name: 'claude', part: 'sign-in' },
   cost: 'run',
-});
+}) satisfies ReadinessPiece;
 
 /** No factory filed. */
 const NO_FACTORY: ReadinessPiece = {
@@ -73,7 +73,7 @@ const TURN_PASSED: HarnessCheck = {
 };
 
 /** The read of a store with the pieces `pieces`. */
-const read = (pieces: ReadinessPiece[]): Readiness => ({ ready: false, ran: false, pieces });
+const read = (pieces: ReadinessPiece[]) => ({ ready: false, ran: false, pieces });
 
 /** A fresh store's milestones: the harness next. */
 const FRESH_MILESTONES: Milestones = {

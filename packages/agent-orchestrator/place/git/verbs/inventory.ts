@@ -10,7 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { git, gitSays, isDirectory, printed, runBranches, type Asking, type Reply } from '../git.ts';
+import { git, gitSays, isDirectory, printed, runBranches } from '../git.ts';
 import type { Held, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A worktree as `git worktree list --porcelain` lists it. */
@@ -20,7 +20,7 @@ type Listed = { path: string; head?: string; branch?: string; detached?: true; l
  * `git worktree list --porcelain`, read: each record starts at `worktree <path>`, and its `HEAD`, `branch`, `detached`, `locked` and
  * `prunable` lines are kept, a lock's reason with its spaces.
  */
-function parseWorktrees(porcelain: string): Listed[] {
+function parseWorktrees(porcelain: string) {
   const listed: Listed[] = [];
   for (const line of porcelain.split('\n')) {
     const [word, ...more] = line.split(' ');
@@ -34,10 +34,11 @@ function parseWorktrees(porcelain: string): Listed[] {
     else if (word === 'locked') at.locked = rest;
     else if (word === 'prunable') at.prunable = true;
   }
-  return listed;
+  return listed satisfies Listed[];
 }
 
 /** A path with every link on the way followed, as far as it exists, as git names a worktree. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function resolved(p: string): string {
   try {
     return fs.realpathSync(p);
@@ -48,13 +49,13 @@ function resolved(p: string): string {
 }
 
 /** Whether `p` lies inside `dir`, and is not `dir` itself. */
-function inside(dir: string, p: string): boolean {
+function inside(dir: string, p: string) {
   const rel = path.relative(dir, resolved(p));
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
 /** The paths `git status --porcelain` lists in `worktree`, untrimmed so a first line's leading space stays; undefined when git fails. */
-function* changesIn(worktree: string): Asking<string[] | undefined> {
+function* changesIn(worktree: string) {
   try {
     const said = yield* printed({ cmd: 'git', cwd: worktree, args: ['status', '--porcelain'] });
     return said
@@ -67,7 +68,7 @@ function* changesIn(worktree: string): Asking<string[] | undefined> {
 }
 
 /** One listed worktree, as the contract's `Held` has it. */
-function* held(repo: string, w: Listed): Asking<Held> {
+function* held(repo: string, w: Listed) {
   const readable = w.locked === undefined && !w.prunable;
   const changes = readable ? yield* changesIn(w.path) : undefined;
   const contained =
@@ -84,11 +85,11 @@ function* held(repo: string, w: Listed): Asking<Held> {
     clean,
     onBranch: !w.detached || (clean === true && Boolean(contained)),
     ...(changes?.length ? { changes } : {}),
-  };
+  } satisfies Held as Held;
 }
 
 /** The verb's body. */
-export function* inventory(request: PlaceRequests['inventory']): Asking<Reply<'inventory'>> {
+export function* inventory(request: PlaceRequests['inventory']) {
   const { repo, run, base } = request;
   const under = resolved(request.under);
   if (!isDirectory(repo)) return { workspaces: [], branches: [] };

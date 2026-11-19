@@ -19,7 +19,7 @@ import type { StepState } from './status.ts';
 export type Wait = { step: string | null; done: number };
 
 /** The words of a wait: the card's tag, its one sentence, and its button, given the step whose work there is to read, if one. */
-export interface WaitWords {
+interface WaitWords {
   readonly tag: (wait: Wait) => string;
   readonly sentence: (wait: Wait) => string;
   readonly open: (wait: Wait, read: string | null) => string;
@@ -44,13 +44,13 @@ export const OPENS = 'Open the run';
 const COUNTED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
 
 /** How many steps are done, as a sentence and its space; nothing for none. */
-const doneSaid = (done: number): string =>
+const doneSaid = (done: number) =>
   done === 0 ? '' : done === 1 ? 'One step is done. ' : `${COUNTED[done] ?? String(done)} steps are done. `;
 
 /** A step's name as a sentence starts with it. */
-const named = (step: string | null): string => (step ? step.charAt(0).toUpperCase() + step.slice(1) : 'A step');
+const named = (step: string | null) => (step ? step.charAt(0).toUpperCase() + step.slice(1) : 'A step');
 
-const opens = (): string => OPENS;
+const opens = () => OPENS;
 
 /** No wait: the words of a state that waits on nobody. */
 const NONE = { tag: null, sentence: null, open: null } as const;
@@ -182,7 +182,7 @@ export const HELD_TO_COME: Pick<PersonWords, 'rail' | 'meaning'> = {
  * @param on What the step waits on, or null where it waits on nothing.
  * @param runHeld Whether a person holds the run.
  */
-export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boolean): Pick<PersonWords, 'rail' | 'meaning'> => {
+export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boolean) => {
   if (state === 'waiting' && on === 'pause') return PAUSED;
   if (runHeld && (state === 'waiting' || state === 'waiting-for-slot')) return HELD_TO_COME;
   return PERSON[state];
@@ -196,7 +196,7 @@ export const stateWordsOf = (state: StepState, on: WaitOn | null, runHeld: boole
  * @param message The api's sentence of the step, or undefined where it says none.
  * @param note The step's note, or null where it has none.
  */
-export const chipTitle = (state: StepState, meaning: string, message: string | undefined, note: string | null): string =>
+export const chipTitle = (state: StepState, meaning: string, message: string | undefined, note: string | null) =>
   [meaning, state === 'paused' && message && message !== PERSON.paused.rail ? message : null, note || null]
     .filter((line) => line !== null)
     .join('\n');
@@ -205,7 +205,7 @@ export const chipTitle = (state: StepState, meaning: string, message: string | u
  * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),
  * `unfinished` for one that did not finish, `checking` while it runs, and `unknown` for a task the engine has no record of.
  */
-export function verdictWords({ result, exit }: CheckVerdict): string {
+export function verdictWords({ result, exit }: CheckVerdict) {
   if (result === 'failed') return exit === null ? 'failed' : `exit ${exit}`;
   return result === 'running' ? 'checking' : result;
 }
@@ -237,10 +237,10 @@ export const NOW_WORDS = {
   slot: 'a run slot',
   until: '· until',
   lands: 'lands',
-  over: (cap: string): string => `over its ${cap}`,
-  round: (at: number, of: number): string => `round ${at} of ${of}`,
-  ring: (spent: string, cap: string): string => `its step: ${spent} of its ${cap} cap`,
-  waitedBy: (count: number): string => (count === 1 ? 'a run waits on it' : `${count} runs wait on it`),
+  over: (cap: string) => `over its ${cap}`,
+  round: (at: number, of: number) => `round ${at} of ${of}`,
+  ring: (spent: string, cap: string) => `its step: ${spent} of its ${cap} cap`,
+  waitedBy: (count: number) => (count === 1 ? 'a run waits on it' : `${count} runs wait on it`),
 } as const;
 
 /** The words of a wait the board has no kind for. */
@@ -297,7 +297,7 @@ export const PROPOSAL_WORDS: Record<ProposalPhase, { word: string; title: string
 const TELL_IT = 'Anything to tell it (optional): the next try is told it.';
 
 /** What a try's box is called, for a case that may tell it something. */
-const toTell = (step: string): string => `What to tell ${step}, if anything`;
+const toTell = (step: string) => `What to tell ${step}, if anything`;
 
 /**
  * A person's words for each offer of a run's page, by why its step waits (`OfferCase`): what its row says after the step's name — null

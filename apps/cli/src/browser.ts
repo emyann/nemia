@@ -29,7 +29,7 @@ const WAITED_MS = 5_000;
  * Whether a display is set in `env`, as `openerOf` takes it.
  * @param env The environment, whose `DISPLAY` and `WAYLAND_DISPLAY` are read.
  */
-export const displayed = (env: NodeJS.ProcessEnv): boolean => Boolean(env.DISPLAY?.trim() || env.WAYLAND_DISPLAY?.trim());
+export const displayed = (env: NodeJS.ProcessEnv) => Boolean(env.DISPLAY?.trim() || env.WAYLAND_DISPLAY?.trim());
 
 /**
  * Whether `program` opened `url`: run with its output ignored, true where it exits 0 or is still running after `WAITED_MS`, false where
@@ -38,7 +38,7 @@ export const displayed = (env: NodeJS.ProcessEnv): boolean => Boolean(env.DISPLA
  * @param url The link it opens.
  * @param env The environment it runs with, whose `PATH` finds it.
  */
-export function opened(program: 'open' | 'xdg-open', url: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+export function opened(program: 'open' | 'xdg-open', url: string, env: NodeJS.ProcessEnv) {
   return new Promise((resolve) => {
     const child = spawn(program, [url], { env, stdio: 'ignore', detached: true });
     const waited = setTimeout(() => {

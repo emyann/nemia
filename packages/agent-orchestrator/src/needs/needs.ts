@@ -45,7 +45,7 @@ export const fixRefusal: FixRefusalOf = (origin) => (origin.kind === 'workflow' 
  * @param place The needs of the run's place.
  * @param harness The needs of the harnesses the run runs on, none when absent.
  */
-export function needsOfRun(workflow: readonly Need[], place: readonly Need[], harness: readonly Need[] = []): Need[] {
+export function needsOfRun(workflow: readonly Need[], place: readonly Need[], harness: readonly Need[] = []) {
   const fillers = new Map<string, NeedFix[]>();
   const own: Need[] = [];
   for (const need of workflow) {
@@ -57,7 +57,7 @@ export function needsOfRun(workflow: readonly Need[], place: readonly Need[], ha
   }
   const placed = place
     .filter((p) => !own.some((n) => n.name === p.name))
-    .map((p): Need => {
+    .map((p) => {
       const filled = fillers.get(p.name) ?? [];
       return filled.length ? { ...p, fixes: [...filled, ...(p.fixes ?? [])] } : p;
     });
@@ -74,7 +74,7 @@ export type FixAt = { readonly factory: string; readonly workflow?: string };
  * @param need The need's name.
  * @param at The factory, and the workflow where there is one, the need is declared by; undefined for a need declared by neither.
  */
-export const fixCommandOf = (need: string, at?: FixAt): string =>
+export const fixCommandOf = (need: string, at?: FixAt) =>
   `nemia doctor fix ${need}${at === undefined ? '' : ` --factory ${at.factory}`}${at?.workflow === undefined ? '' : ` --workflow ${at.workflow}`}`;
 
 /** What a run waits on for one need: its name, what it is, and what puts it in place, the command to type or the words of its need. */
@@ -92,7 +92,7 @@ export type NeedHeld = NeedRead & Omit<NeedWaited, 'name'>;
  * @param filedAny Whether the run has filed a task.
  * @param needs The needs of the run as the pass hands them, each with its words.
  */
-export function needsWaited(filedAny: boolean, needs: readonly NeedHeld[]): NeedWaited[] {
+export function needsWaited(filedAny: boolean, needs: readonly NeedHeld[]) {
   return [...new Set(needsHolding(filedAny, needs))].flatMap((name) => {
     const need = needs.find((n) => n.name === name);
     return need === undefined ? [] : [{ name, message: need.message, fix: need.fix }];
@@ -103,4 +103,4 @@ export function needsWaited(filedAny: boolean, needs: readonly NeedHeld[]): Need
  * `waiting on <need>: <fix>` for each need a run waits on, joined: the words its listing says beside its phase.
  * @param waited The needs the run waits on.
  */
-export const waitingOnNeedsWord = (waited: readonly NeedWaited[]): string => waited.map((w) => `waiting on ${w.name}: ${w.fix}`).join('; ');
+export const waitingOnNeedsWord = (waited: readonly NeedWaited[]) => waited.map((w) => `waiting on ${w.name}: ${w.fix}`).join('; ');

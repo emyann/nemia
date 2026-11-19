@@ -12,11 +12,11 @@ import { saysReading } from '../../../.storybook/unread';
 class Routed extends Component<{ children: ReactNode }, { error: unknown }> {
   override state = { error: null as unknown };
 
-  static getDerivedStateFromError(error: unknown): { error: unknown } {
+  static getDerivedStateFromError(error: unknown) {
     return { error };
   }
 
-  override render(): ReactNode {
+  override render() {
     if (this.state.error !== null) return <RunsFailed error={this.state.error} />;
     return <Suspense fallback={<RunsLoading />}>{this.props.children}</Suspense>;
   }
@@ -41,7 +41,7 @@ export default meta;
 type Story = StoryObj<typeof RunsPage>;
 
 /** The page drawn in `canvas` once its reads are in. */
-const loaded = async (canvas: HTMLElement): Promise<HTMLElement> => {
+const loaded = async (canvas: HTMLElement) => {
   await waitFor(() => expect(canvas.querySelector('[data-runs-page="loaded"]')).not.toBeNull(), { timeout: 5000 });
   return canvas.querySelector<HTMLElement>('[data-runs-page="loaded"]')!;
 };

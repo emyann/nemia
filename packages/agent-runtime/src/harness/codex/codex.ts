@@ -23,7 +23,7 @@ import { quote, WORDS_QUOTE } from '../../core/quote.ts';
  * Exported only for the tests that import it.
  * @param toml The text of the harness's config file.
  */
-export const trustedProjects = (toml: string): Set<string> => {
+export const trustedProjects = (toml: string) => {
   const trusted = new Set<string>();
   let current: string | undefined;
   for (const raw of toml.split('\n')) {
@@ -54,7 +54,7 @@ const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
  * A word that is not a sandbox never arrives through `file()`, which refuses it; a direct caller
  * gets the default.
  */
-const sandboxOf = (r: Pick<SpawnRequest, 'config'>): string => {
+const sandboxOf = (r: Pick<SpawnRequest, 'config'>) => {
   if (r.config?.tools && !r.config?.tools.some((t) => WRITES.includes(t))) return 'read-only';
   const asked = r.config?.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.config?.permissionMode;
   return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : CODEX_DEFAULT_SANDBOX;
@@ -65,7 +65,7 @@ const sandboxOf = (r: Pick<SpawnRequest, 'config'>): string => {
  * sandboxes, so a read-only mount is held as it is and given no flag. It refuses a writable mount, which only `--add-dir` would
  * give and `exec resume` rejects after the id, and a read-only one in `danger-full-access`, which writes everywhere.
  */
-const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>) => {
   const mounts = task.config?.mounts ?? [];
   const writable = mounts.find((m) => !m.readOnly);
   if (writable) {
@@ -79,11 +79,10 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
 };
 
 /** A session's servers as Codex's one `mcp_servers` override, or no argument when it has none. */
-const codexMcpArgs = (mcp: Record<string, McpServer>): string[] =>
-  Object.keys(mcp).length ? ['-c', `mcp_servers=${codexMcpServers(mcp)}`] : [];
+const codexMcpArgs = (mcp: Record<string, McpServer>) => (Object.keys(mcp).length ? ['-c', `mcp_servers=${codexMcpServers(mcp)}`] : []);
 
 /** Why Codex cannot connect to one of these servers, or `undefined`: an SSE server, which it has no transport for. */
-const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefined => {
+const sseRefusal = (mcp: Record<string, McpServer> | undefined) => {
   const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
   return sse
     ? `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`
@@ -95,7 +94,7 @@ const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefi
  * task that names none. Refused: an entry not in the shape a task's own `mcp` takes (`mcpRefuses`), which Codex's table cannot
  * say, and an SSE server.
  */
-const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
+const codexPicked = (r: SpawnRequest) => {
   const names = r.config?.projectMcp;
   if (!names?.length) return undefined;
   const picked = pickedProjectMcp(mcpFolderOf(r.cwd, r.config), names);
@@ -124,7 +123,7 @@ export type CodexSignIn =
  * `codex` on PATH.
  * @param harnessBin The folder the engine keeps harness programs in, or undefined for the program on PATH.
  */
-export const codexProgramOf = (harnessBin?: string): string => programIn(harnessBin, 'codex') ?? 'codex';
+export const codexProgramOf = (harnessBin?: string) => programIn(harnessBin, 'codex') ?? 'codex';
 
 /**
  * Asks `<program> login status` (`CodexSignIn`): the `codex` on PATH unless a caller names the one it runs (`codexProgramOf`).
@@ -133,16 +132,16 @@ export const codexProgramOf = (harnessBin?: string): string => programIn(harness
  * @param cwd The folder the command runs in, or undefined for the runtime's own.
  * @param program The program to run, the one on PATH unless a caller names another.
  */
-export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string, program: string = 'codex'): CodexSignIn => {
+export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string, program: string = 'codex') => {
   const ran = spawnSync(program, ['login', 'status'], { ...(cwd === undefined ? {} : { cwd }), encoding: 'utf8', timeout: ms, env });
-  if (ran.error !== undefined || ran.status === null) return { state: 'unknown' };
-  if (ran.status === 0) return { state: 'signed-in' };
+  if (ran.error !== undefined || ran.status === null) return { state: 'unknown' } satisfies CodexSignIn;
+  if (ran.status === 0) return { state: 'signed-in' } satisfies CodexSignIn;
   const said = `${ran.stdout ?? ''}\n${ran.stderr ?? ''}`
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
     .at(-1);
-  return { state: 'signed-out', said, code: ran.status };
+  return { state: 'signed-out', said, code: ran.status } satisfies CodexSignIn;
 };
 
 export { CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
@@ -153,7 +152,7 @@ export { CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
  * — as the user the engine runs as, which is the user Codex would run as. Signed out, the words quote the last line Codex printed and
  * name the command that signs in. Unknown refuses nothing: a missing binary fails the spawn in its own words, as it did before.
  */
-const signedOutRefusal = (r: SpawnRequest, ms: number, program: string): string | undefined => {
+const signedOutRefusal = (r: SpawnRequest, ms: number, program: string) => {
   const read = codexSignIn({ ...withoutTelemetry(process.env), ...r.config?.env }, ms, r.cwd, program);
   if (read.state !== 'signed-out') return undefined;
   const answer = read.said === undefined ? `exited ${read.code}` : `said "${quote(read.said, WORDS_QUOTE)}"`;
@@ -161,7 +160,7 @@ const signedOutRefusal = (r: SpawnRequest, ms: number, program: string): string 
 };
 
 /** The argv of `codex exec` for `r`, in the order `codexHarness` gives it. */
-const codexExecArgs = (r: SpawnRequest, io?: HarnessIO): string[] => [
+const codexExecArgs = (r: SpawnRequest, io?: HarnessIO) => [
   'exec',
   '--json',
   '--skip-git-repo-check',
@@ -201,7 +200,7 @@ const codexExecArgs = (r: SpawnRequest, io?: HarnessIO): string[] => [
  * command with the operator's args and env — or fails to load when the
  * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
  */
-const codexPrepare = (r: SpawnRequest, signInMs: number, program: string): Partial<HarnessIO> => {
+const codexPrepare = (r: SpawnRequest, signInMs: number, program: string) => {
   const signedOut = signedOutRefusal(r, signInMs, program);
   if (signedOut) throw new Error(signedOut);
   const pickedMcp = codexPicked(r);
@@ -270,6 +269,7 @@ const codexPrepare = (r: SpawnRequest, signInMs: number, program: string): Parti
  * @param o The harness's options: `signInMs`, how long its sign-in is asked for, in milliseconds (`CODEX_SIGN_IN_MS` where unset),
  *   and `harnessBin`, the folder its program is looked for in first (PATH alone where unset).
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export const codexHarness = (o: { signInMs?: number; harnessBin?: string } = {}): HarnessSpec => ({
   name: 'codex',
   can: CODEX_DECLARATION.can,

@@ -39,10 +39,10 @@ export type OutOfMemoryKill =
   | { by: 'machine'; kills: number; limitBytes: number; peakBytes: number | null };
 
 /** Whether `m` says the kernel's OOM killer ended a process of the cgroup, whoever's memory ran out. */
-const killed = (m: AttemptMemory | undefined): boolean => m !== undefined && m.oomKills >= 1;
+const killed = (m: AttemptMemory | undefined) => m !== undefined && m.oomKills >= 1;
 
 /** Whether `m` says the cgroup's own limit was reached: a record that predates the count (`oom` absent) is read as it was then, yes. */
-const limitReached = (m: AttemptMemory): boolean => m.oom === undefined || m.oom >= 1;
+const limitReached = (m: AttemptMemory) => m.oom === undefined || m.oom >= 1;
 
 const outOfMemorySpec = spec<(memory: AttemptMemory | undefined, own: string | undefined) => OutOfMemoryKill | undefined>({
   /**

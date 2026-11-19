@@ -17,7 +17,7 @@ import { factoryNameRefusal } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { Invalid } from '../../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
-import type { FactoryServers, FactoryServersFile, BuiltinServer } from './servers.ts';
+import type { FactoryServers } from './servers.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /**
@@ -47,7 +47,7 @@ const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Sche
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function factoryServersFile(home: string, name: string): string {
+export function factoryServersFile(home: string, name: string) {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name, 'servers.json');
@@ -59,7 +59,7 @@ export function factoryServersFile(home: string, name: string): string {
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function readFactoryServers(home: string, name: string): FactoryServersFile | undefined {
+export function readFactoryServers(home: string, name: string) {
   return readServersAt(
     factoryServersFile(home, name),
     `add the server again with nemia factory server add ${name} <server> --url <address>`,
@@ -72,7 +72,7 @@ export function readFactoryServers(home: string, name: string): FactoryServersFi
  * @param file The servers file.
  * @param fix The command that writes it again, as a refusal names it.
  */
-export function readServersAt(file: string, fix: string): FactoryServersFile | undefined {
+export function readServersAt(file: string, fix: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -96,7 +96,7 @@ export function readServersAt(file: string, fix: string): FactoryServersFile | u
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const factoryServers = (home: string, name: string): FactoryServers => readFactoryServers(home, name)?.servers ?? {};
+export const factoryServers = (home: string, name: string) => readFactoryServers(home, name)?.servers ?? {};
 
 /**
  * Writes the factory `name`'s servers whole, keeping every other key the file held — a key a newer tick wrote, which this one does not
@@ -110,7 +110,7 @@ export const factoryServers = (home: string, name: string): FactoryServers => re
  * @param name The factory's name.
  * @param servers The factory's servers by name, all of them; none removes the record.
  */
-export function writeFactoryServers(home: string, name: string, servers: FactoryServers): void {
+export function writeFactoryServers(home: string, name: string, servers: FactoryServers) {
   writeServersAt(factoryServersFile(home, name), servers);
 }
 
@@ -119,7 +119,7 @@ export function writeFactoryServers(home: string, name: string, servers: Factory
  * @param file The servers file.
  * @param servers Every server, by name; none removes the record.
  */
-export function writeServersAt(file: string, servers: FactoryServers): void {
+export function writeServersAt(file: string, servers: FactoryServers) {
   if (!Object.keys(servers).length) {
     fs.rmSync(file, { force: true });
     return;
@@ -149,14 +149,14 @@ export const BUILTIN_SERVERS = path.join(import.meta.dirname, '..', '..', '..', 
  * rather than failing the read, since one bad builtin file must not blank the add form.
  * @param dir The folder the builtin servers' files are read from, the package's `BUILTIN_SERVERS` in use.
  */
-export const builtinServers = (dir: string): readonly BuiltinServer[] => {
+export const builtinServers = (dir: string) => {
   let files: string[];
   try {
     files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
   } catch {
     return [];
   }
-  return files.flatMap((file): BuiltinServer[] => {
+  return files.flatMap((file) => {
     const name = file.slice(0, -'.json'.length);
     if (serverNameRefusal(name) !== undefined) return [];
     let text: string;

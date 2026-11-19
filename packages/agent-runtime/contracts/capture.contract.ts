@@ -19,7 +19,7 @@ export type InitRead = {
  * What a reader reads once `line` follows what `read` already said: the first folder, the first model, the last version and the last
  * mode named.
  */
-const readOf = (read: InitRead | undefined, line: InitRead): InitRead => ({
+const readOf = (read: InitRead | undefined, line: InitRead) => ({
   cwd: read?.cwd ?? line.cwd,
   model: read?.model ?? line.model,
   claude_code_version: line.claude_code_version ?? read?.claude_code_version,
@@ -27,7 +27,7 @@ const readOf = (read: InitRead | undefined, line: InitRead): InitRead => ({
 });
 
 /** Whether two readings say the same. */
-const same = (a: InitRead, b: InitRead): boolean =>
+const same = (a: InitRead, b: InitRead) =>
   a.cwd === b.cwd && a.model === b.model && a.claude_code_version === b.claude_code_version && a.ranIn === b.ranIn;
 
 const initKeptSpec = spec<(line: InitRead, read: InitRead | undefined) => InitRead | undefined>({

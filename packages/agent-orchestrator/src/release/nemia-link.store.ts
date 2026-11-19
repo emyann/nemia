@@ -7,7 +7,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Need } from 'objects';
 import { toolsBinDir } from '../config/root.store.ts';
 import { CURRENT } from './release.ts';
 import { releasesDir } from './release.store.ts';
@@ -16,16 +15,16 @@ import { releasesDir } from './release.store.ts';
  * The tools folder's `nemia` of the store at `home`.
  * @param home The store's folder.
  */
-export const toolsNemia = (home: string): string => path.join(toolsBinDir(home), 'nemia');
+export const toolsNemia = (home: string) => path.join(toolsBinDir(home), 'nemia');
 
 /**
  * What the link names: the launcher under the store's pointer, never a release's own folder, so it follows every upgrade.
  * @param home The store's folder.
  */
-export const currentNemia = (home: string): string => path.join(releasesDir(home), CURRENT, 'bin', 'nemia');
+export const currentNemia = (home: string) => path.join(releasesDir(home), CURRENT, 'bin', 'nemia');
 
 /** `text` as one word of `sh`. */
-const shellWord = (text: string): string => `'${text.replaceAll("'", `'\\''`)}'`;
+const shellWord = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
 
 /**
  * Links the tools folder's `nemia` of the store at `home` to `currentNemia`, where the pointer's release holds a launcher there; a link
@@ -33,7 +32,7 @@ const shellWord = (text: string): string => `'${text.replaceAll("'", `'\\''`)}'`
  * linked one now. A store with no pointer, or whose release holds no `bin/nemia`, is left as it is.
  * @param home The store's folder.
  */
-export function linkNemia(home: string): boolean {
+export function linkNemia(home: string) {
   const target = currentNemia(home);
   if (!fs.existsSync(target)) return false;
   const link = toolsNemia(home);
@@ -58,7 +57,7 @@ export function linkNemia(home: string): boolean {
  * its fix refused (exit 1) where the pointer's release holds no launcher, as on a store a checkout runs.
  * @param home The store's folder.
  */
-export const toolsNeed = (home: string): Need => {
+export const toolsNeed = (home: string) => {
   const target = shellWord(currentNemia(home));
   return {
     name: 'tools',

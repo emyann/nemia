@@ -22,7 +22,7 @@ import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.
  * @param s The schedule as listed.
  * @param listing The factory's file, which reads, that holds the schedule.
  */
-export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>): Schedule => {
+export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>) => {
   const since = listing.schedules[s.workflow]?.since ?? '';
   const spec: Schedule['spec'] = {
     cron: s.cron,
@@ -42,7 +42,7 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
     metadata: { name: s.workflow, namespace: s.factory, creationTimestamp: since, resourceVersion: versionOf(spec, status) },
     spec,
     status,
-  };
+  } satisfies Schedule;
 };
 
 /**

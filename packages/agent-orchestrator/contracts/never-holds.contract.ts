@@ -6,7 +6,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import type { Condition } from '../src/auto/auto.ts';
 
 /** The two conditions read off the step's own closeout and check, which an approved-first ending has neither of at its gate. */
-const ownWork = (c: Condition): boolean => c === 'recommends' || c === 'checked';
+const ownWork = (c: Condition) => c === 'recommends' || c === 'checked';
 
 const neverHoldsSpec = spec<(site: GateSite, condition: Condition) => NeverWhy | null>({
   ensures: {

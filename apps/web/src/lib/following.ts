@@ -30,7 +30,7 @@ export type Following = Followed & {
  * What a page holds of a conversation before it is read: nothing, being read when there is one (`loading`).
  * @param loading Whether there is a conversation to read, its first read in flight.
  */
-export const unread = (loading: boolean): Following => ({
+export const unread = (loading: boolean) => ({
   events: [],
   partial: null,
   live: false,
@@ -59,7 +59,7 @@ const wholeText = (event: TranscriptEvent) => event.role === 'assistant' && even
  * block, and the message dropped and its block closed at its `last`; a piece of a closed block ignored; a move to another attempt or
  * task (`moved`) starts the conversation afresh, its history to come; and `streamed` says whether the api pushes the session.
  */
-function changed(s: Following, c: Change, closed: Set<string>): Following {
+function changed(s: Following, c: Change, closed: Set<string>) {
   if (c.kind === 'streamed') return { ...s, streamed: c.streamed };
   if (c.kind === 'moved') return { ...s, events: [], partial: null };
   if (c.kind === 'events') {
@@ -85,7 +85,7 @@ function changed(s: Following, c: Change, closed: Set<string>): Following {
  * @param first The first read: whether its task is live, the cursor it gave (null for none), and whether its task is open.
  * @param waiting Whether the step waits on a person.
  */
-export const followedFrom = (first: { live: boolean; cursor: string | null; open: boolean }, waiting: boolean): string | null =>
+export const followedFrom = (first: { live: boolean; cursor: string | null; open: boolean }, waiting: boolean) =>
   first.live || (waiting && first.open) ? first.cursor : null;
 
 /**
@@ -94,11 +94,11 @@ export const followedFrom = (first: { live: boolean; cursor: string | null; open
  * with the blocks this following has seen written whole, consecutive whole events joined as they queue, `settled` the end, and a
  * following that ends dropping the message being written. A following of its own, since the blocks it closes are its own.
  */
-const stepFollower = (): Follower<Following, Change> => {
+const stepFollower = () => {
   const closed = new Set<string>();
   const one =
     <K extends keyof StreamData>(event: K, of: (said: StreamData[K]) => Change) =>
-    (m: MessageEvent): (Change | UnreadAnswer)[] => {
+    (m: MessageEvent) => {
       const got = streamDataOf(STEP_STREAM_SCHEMAS, event, m.data);
       return [got instanceof UnreadAnswer ? got : of(got)];
     };
@@ -126,7 +126,7 @@ const stepFollower = (): Follower<Following, Change> => {
       unread: 'The conversation could not be read.',
       refused: 'The api refused to follow this conversation any further. Reload the page to read it again.',
     },
-  };
+  } satisfies Follower<Following, Change> as Follower<Following, Change>;
 };
 
 /**
@@ -135,5 +135,5 @@ const stepFollower = (): Follower<Following, Change> => {
  * @param update Writes a change to the conversation the page holds.
  * @param frames The frames the arrivals that come together are folded on.
  */
-export const followStep = (stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames): (() => void) =>
+export const followStep = (stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames) =>
   follow(stream, stepFollower(), update, frames);

@@ -12,7 +12,7 @@ import type { Frozen } from './frozen.ts';
  * on a person — and nobody called it off. The api has the last word (`isDecidable`); this only says when to ask.
  * @param run The run: its status, when it was called off (null where it was not) and the steps that wait on you.
  */
-export const decidableRun = (run: Frozen<Pick<RunView, 'status' | 'cancelledAt' | 'waitingOnYou'>>): boolean =>
+export const decidableRun = (run: Frozen<Pick<RunView, 'status' | 'cancelledAt' | 'waitingOnYou'>>) =>
   run.cancelledAt === null && run.status !== 'cancelled' && (run.status !== 'running' || run.waitingOnYou.length > 0);
 
 /**
@@ -39,7 +39,7 @@ export const decisionStamp = (
       steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
     }
   >,
-): string =>
+) =>
   JSON.stringify([
     run.status,
     run.waitingOnYou,
@@ -62,7 +62,7 @@ export const decisionStamp = (
  * its own, is where the whole of it is. A binary file adds no lines.
  * @param touched What each branch the decision reads touched, or the error that its radius could not be read.
  */
-export function touchedSummary(touched: readonly Touched[]): string {
+export function touchedSummary(touched: readonly Touched[]) {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
   const unread = touched.length - read.length;
   if (!touched.length) return 'touched nothing — no branch to read';
@@ -89,7 +89,7 @@ export function touchedSummary(touched: readonly Touched[]): string {
  * @param group The group's added and removed lines.
  * @param most The most lines any group on the branch changed (`mostLines`); zero or less gives no bar.
  */
-export function barOf(group: Pick<Group, 'added' | 'removed'>, most: number): { added: number; removed: number } {
+export function barOf(group: Pick<Group, 'added' | 'removed'>, most: number) {
   if (most <= 0) return { added: 0, removed: 0 };
   const pct = (n: number) => Math.round((n / most) * 10_000) / 100;
   return { added: pct(group.added), removed: pct(group.removed) };
@@ -99,7 +99,7 @@ export function barOf(group: Pick<Group, 'added' | 'removed'>, most: number): { 
  * The most lines any of these groups changed: what `barOf` measures a bar against.
  * @param groups The groups of a branch's radius.
  */
-export const mostLines = (groups: readonly Group[]): number => Math.max(0, ...groups.map((g) => g.added + g.removed));
+export const mostLines = (groups: readonly Group[]) => Math.max(0, ...groups.map((g) => g.added + g.removed));
 
 export type DiffLine = 'meta' | 'hunk' | 'added' | 'removed' | 'context';
 
@@ -109,7 +109,7 @@ export type DiffLine = 'meta' | 'hunk' | 'added' | 'removed' | 'context';
  * removed one, or context.
  * @param line One line of the diff, without its line break.
  */
-export function diffLine(line: string): DiffLine {
+export function diffLine(line: string) {
   if (line.startsWith('@@')) return 'hunk';
   if (line.startsWith('+++ ') || line.startsWith('--- ')) return 'meta';
   if (line.startsWith('+')) return 'added';
@@ -123,7 +123,7 @@ export function diffLine(line: string): DiffLine {
  * @param touched What the branch touched, or undefined where it is not known; a radius that could not be read gives undefined.
  * @param file The file's path as the diff names it, or `from → to` for a rename.
  */
-export function changeOf(touched: Touched | undefined, file: string): { added: number | null; removed: number | null } | undefined {
+export function changeOf(touched: Touched | undefined, file: string) {
   if (!touched || 'error' in touched.radius) return undefined;
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));
 }

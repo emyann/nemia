@@ -109,7 +109,7 @@ export const worktreeDeps: WorktreeDepsOf = (seen) => {
  * @param root The folder.
  * @param p The path asked about.
  */
-export const inside = (root: string, p: string): string | null => {
+export const inside = (root: string, p: string) => {
   const rel = path.relative(root, p);
   return rel && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel) ? rel : null;
 };
@@ -137,12 +137,7 @@ export const inside = (root: string, p: string): string | null => {
  * @param main The listing of the main checkout's root `node_modules`.
  * @param nested The listing of each workspace's own `node_modules`, by the workspace's folder; none by default.
  */
-export function depsPlan(
-  mainRoot: string,
-  worktree: string,
-  main: DepsListing,
-  nested: Readonly<Record<string, DepsListing>> = {},
-): DepsAction[] {
+export function depsPlan(mainRoot: string, worktree: string, main: DepsListing, nested: Readonly<Record<string, DepsListing>> = {}) {
   return [
     ...modulesPlan(mainRoot, worktree, '', main),
     ...Object.keys(nested)
@@ -155,7 +150,7 @@ export function depsPlan(
 }
 
 /** One `node_modules` of `depsPlan`'s, the one in `folder` (`''` for the root's), from main's listing of it. */
-function modulesPlan(mainRoot: string, worktree: string, folder: string, main: DepsListing): DepsAction[] {
+function modulesPlan(mainRoot: string, worktree: string, folder: string, main: DepsListing) {
   const rootModules = path.join(mainRoot, 'node_modules');
   const mainModules = path.join(mainRoot, folder, 'node_modules');
   const modules = path.join(worktree, folder, 'node_modules');
@@ -213,13 +208,13 @@ export type Installed = { link: true; resolved: string } | { link: false; versio
  * Whether a lockfile key names an installed package — `node_modules/a`, `node_modules/a/node_modules/b`, `apps/web/node_modules/c`.
  * @param key The lockfile's package path.
  */
-export const isModuleKey = (key: string): boolean => key.startsWith('node_modules/') || key.includes('/node_modules/');
+export const isModuleKey = (key: string) => key.startsWith('node_modules/') || key.includes('/node_modules/');
 
 /**
  * The folder whose `node_modules` a lockfile's package path installs into: `''` for the root's, a workspace's folder (`apps/web` of
  * `apps/web/node_modules/a`), or null for a folder the plan never makes — absolute, climbing out with `..`, or inside a `node_modules`.
  */
-const moduleFolder = (key: string): string | null => {
+const moduleFolder = (key: string) => {
   if (key.startsWith('node_modules/')) return '';
   const folder = key.slice(0, key.indexOf('/node_modules/'));
   return folder.split('/').every((s) => s && s !== '.' && s !== '..' && s !== 'node_modules') ? folder : null;
@@ -229,7 +224,7 @@ const moduleFolder = (key: string): string | null => {
  * The workspace folders whose own `node_modules` a lockfile installs into, sorted: `['apps/web']`. None for what is not a lockfile.
  * @param lock The lockfile, as parsed.
  */
-export function workspaceModules(lock: unknown): string[] {
+export function workspaceModules(lock: unknown) {
   const folders = Object.keys(lockfilePackages(lock) ?? {})
     .filter(isModuleKey)
     .map(moduleFolder)
@@ -241,7 +236,7 @@ export function workspaceModules(lock: unknown): string[] {
  * A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile.
  * @param lock The lockfile, as parsed.
  */
-export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | null => {
+export const lockfilePackages = (lock: unknown) => {
   const packages = (lock as { packages?: unknown } | null)?.packages;
   return packages && typeof packages === 'object' ? (packages as Record<string, LockEntry>) : null;
 };
@@ -266,7 +261,7 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * @param wanted The worktree's lockfile, as parsed.
  * @param installed What is on disk in the main checkout at each of the lockfile's package paths; null or undefined where nothing is.
  */
-export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>): string | null {
+export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>) {
   const want = lockfilePackages(wanted);
   if (!want) return 'package-lock.json';
   for (const [key, entry] of Object.entries(want)) {
@@ -287,7 +282,7 @@ export function lockfileParting(wanted: unknown, installed: Readonly<Record<stri
  * link it: a tree of its own that `npm ci` installed, or one it could not make.
  * @param deps What the run made of the step's `node_modules`; undefined where it made nothing.
  */
-export function depsLines(deps: Provisioned | undefined): string[] {
+export function depsLines(deps: Provisioned | undefined) {
   if (deps?.tree === 'own') {
     return [
       "Its `node_modules` is its own: this branch's `package-lock.json` asks for packages the main checkout has not",
@@ -333,7 +328,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
  * @param run The run whose steps are read.
  * @param phaseOf The phase of a task, by its id.
  */
-export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskId: string) => TaskPhase) {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
     .filter(([name]) => !endsOnBase(steps.find((s) => s.name === name) ?? {}))
@@ -354,7 +349,7 @@ export function handOffDue(steps: readonly StepSpec[], run: Run, phaseOf: (taskI
  * @param steps The workflow's steps.
  * @param name The step whose downstream is read.
  */
-export function downstreamOf(steps: readonly StepSpec[], name: string): Set<string> {
+export function downstreamOf(steps: readonly StepSpec[], name: string) {
   const found = new Set<string>();
   const queue = [name];
   for (let current = queue.pop(); current !== undefined; current = queue.pop()) {
@@ -424,7 +419,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * @param run The run: its place, its inputs and cards, and its steps.
  * @param plan The step's workspace plan (`workspacePlan`).
  */
-export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan): Given {
+export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>, plan: WorkspacePlan) {
   if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
   const inputs = run.inputs?.length || run.cards?.length ? `${GIVEN}/inputs` : null;
   if (plan.kind === 'inherit') return { inputs, from: [] };
@@ -444,15 +439,15 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'cards' | 'steps'>
  * @param steps The workflow's steps.
  * @param step The step asked about.
  */
-export function workspacePlan(steps: readonly StepSpec[], step: StepSpec): WorkspacePlan {
-  if (endsOnBase(step)) return { kind: 'base' };
+export function workspacePlan(steps: readonly StepSpec[], step: StepSpec) {
+  if (endsOnBase(step)) return { kind: 'base' } satisfies WorkspacePlan;
   const [first, ...also] = [...step.after].sort();
-  if (first === undefined) return { kind: 'fork', from: null };
-  if (also.length) return { kind: 'merge', from: first, also };
+  if (first === undefined) return { kind: 'fork', from: null } satisfies WorkspacePlan;
+  if (also.length) return { kind: 'merge', from: first, also } satisfies WorkspacePlan;
 
   const parent = first;
   const siblings = steps.filter((s) => s.after.includes(parent));
-  return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
+  return (siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent }) satisfies WorkspacePlan;
 }
 
 /** The leaf a run's own line of work is cut under: `worktrees/<run>/run`, on the branch its place names for that leaf. */
@@ -473,7 +468,7 @@ export const LINE_NAME = 'run';
  * @param steps The run's frozen steps, in the workflow's order.
  * @param step The step whose cut is named.
  */
-export function cutName(steps: readonly StepSpec[], step: StepSpec): string {
+export function cutName(steps: readonly StepSpec[], step: StepSpec) {
   const line = steps.find((s) => {
     const plan = workspacePlan(steps, s);
     return plan.kind === 'fork' && plan.from === null;

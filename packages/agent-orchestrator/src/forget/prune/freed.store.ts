@@ -60,7 +60,7 @@ const into = (tally: Tally, kind: string, bytes: number) => {
  * several names once every one of them was met inside the folders walked, to the folder and the kind where the last was. Answers
  * whether it is a folder, to be read in its turn, and undefined for a name that is not there, which counts nothing.
  */
-function counted(at: string, tally: Tally, kind: string, walked: Walked): boolean | undefined {
+function counted(at: string, tally: Tally, kind: string, walked: Walked) {
   const stat = fs.lstatSync(at, { bigint: true, throwIfNoEntry: false });
   if (!stat) return undefined;
   const bytes = Number(stat.blocks * BLOCK);
@@ -77,7 +77,7 @@ function counted(at: string, tally: Tally, kind: string, walked: Walked): boolea
 }
 
 /** The names in the folder `dir` of the folder asked whose count is `tally`; none for one that does not list, counted unread. */
-function namesIn(dir: string, tally: Tally): string[] {
+function namesIn(dir: string, tally: Tally) {
   try {
     return fs.readdirSync(dir);
   } catch {
@@ -87,7 +87,7 @@ function namesIn(dir: string, tally: Tally): string[] {
 }
 
 /** `counted`, one more name of the walk: a name that is not there, or whose `lstat` throws, is undefined and counted unread. */
-function countedOrNot(at: string, tally: Tally, kind: string, walked: Walked): boolean | undefined {
+function countedOrNot(at: string, tally: Tally, kind: string, walked: Walked) {
   walked.names += 1;
   let folder: boolean | undefined;
   try {
@@ -100,7 +100,7 @@ function countedOrNot(at: string, tally: Tally, kind: string, walked: Walked): b
 }
 
 /** Whether the walk just read the last name of a burst (`WALK_BURST`), the burst then counted: a plain test, no step of its own. */
-const burstEnded = (walked: Walked): boolean => {
+const burstEnded = (walked: Walked) => {
   if (walked.names % WALK_BURST !== 0) return false;
   walked.bursts += 1;
   return true;

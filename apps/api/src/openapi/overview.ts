@@ -38,12 +38,13 @@ type ObjectSchema = { readonly properties?: { readonly kind?: { readonly enum?: 
 const VERBS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 /** A schema's name as a person reads it: the document numbers a second schema of one name, and the number says nothing. */
-const named = (name: string): string => name.replace(/_\d+$/, '');
+const named = (name: string) => name.replace(/_\d+$/, '');
 
 /**
  * A shape in a word: the schema it refers to, each of those it may be, a list of one, its type, or nothing where the document says
  * none.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const said = (shape: Shape | undefined): string => {
   if (shape === undefined) return '';
   if (shape.$ref !== undefined) return named(shape.$ref.split('/').at(-1) ?? '');
@@ -53,20 +54,20 @@ const said = (shape: Shape | undefined): string => {
 };
 
 /** The first body among `content`, in a word: JSON's where there is one, else the media type it is served as. */
-const bodyOf = (content: Content | undefined): string => {
+const bodyOf = (content: Content | undefined) => {
   const [type, body] = Object.entries(content ?? {})[0] ?? [];
   if (type === undefined) return '';
   return type === 'application/json' ? said(body?.schema) : type;
 };
 
 /** What an operation takes and what a success of it answers, as `<body> → <answer>`. */
-const takesAndAnswers = (op: Operation): string => {
+const takesAndAnswers = (op: Operation) => {
   const ok = Object.entries(op.responses ?? {}).find(([code]) => code.startsWith('2'));
   return [bodyOf(op.requestBody?.content), '→', ok ? bodyOf(ok[1].content) || ok[0] : ''].filter(Boolean).join(' ');
 };
 
 /** `rows` as columns, each as wide as its widest cell, the last left ragged. */
-const columns = (rows: readonly string[][]): string[] => {
+const columns = (rows: readonly string[][]) => {
   const widths = rows.reduce<number[]>((w, row) => row.map((cell, i) => Math.max(w[i] ?? 0, cell.length)), []);
   return rows.map((row) =>
     row
@@ -89,7 +90,7 @@ for (const [path, item] of Object.entries(document.paths))
   }
 
 /** Who answers for a command when an agent calls it, in a word: its class, or that it reads bare and asks to set. */
-const classOf = (words: (typeof COMMAND_WORDS)[number]): string => (typeof words.class === 'string' ? words.class : 'read, ask to set');
+const classOf = (words: (typeof COMMAND_WORDS)[number]) => (typeof words.class === 'string' ? words.class : 'read, ask to set');
 
 const groups = new Map<string, string[][]>();
 const linked = new Set<string>();

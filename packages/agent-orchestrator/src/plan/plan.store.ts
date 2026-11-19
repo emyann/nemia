@@ -5,14 +5,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { WorkflowError } from '../step/step.ts';
-import { parsePlan, planOrder, type Card } from './plan.ts';
+import { parsePlan, planOrder } from './plan.ts';
 
 /**
  * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it
  * by its name and a trailing `/`, a markdown file with its text.
  * @param dir The plan folder's path.
  */
-export function readPlan(dir: string): Card[] {
+export function readPlan(dir: string) {
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);

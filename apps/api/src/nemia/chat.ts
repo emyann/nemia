@@ -54,7 +54,6 @@ import {
   StoreRoot,
   type ChatChanges,
   type ChatFollow,
-  type ChatReads,
   type ChatSent,
 } from 'agent-orchestrator';
 import type { ChatAnswerWrite, ChatSend, ChatStreamEvent } from 'objects';
@@ -78,32 +77,36 @@ export type ChatReadAnswer = Effect.Success<ReturnType<typeof readThrough>>;
 type Frame = typeof ChatStreamEvent.Type;
 
 /** How her chat reads the runs that wait on the person: as the board's list does, off the app's informer. */
-const readsOf = ({ informer }: Served): ChatReads => (informer ? { runs: informer } : {});
+const readsOf = ({ informer }: Served) => (informer ? { runs: informer } : {});
 
 /**
  * One read's changes as frames, and the presence shown after them: the presence where it changed since `shown`, then each event, the
  * cursor the id of the last frame — the presence's where no event came.
  */
-const framesOf = (read: ChatChanges, shown: string): { frames: Frame[]; shown: string } => {
+const framesOf = (read: ChatChanges, shown: string) => {
   const presence = JSON.stringify(read.presence);
   const said: Frame[] =
     presence === shown ? [] : [{ event: 'presence', data: read.presence, ...(read.events.length ? {} : { id: read.cursor }) }];
-  const events = read.events.map((event, i): Frame => ({
-    event: 'chat',
-    data: event,
-    ...(i === read.events.length - 1 ? { id: read.cursor } : {}),
-  }));
-  return { frames: [...said, ...events], shown: presence };
+  const events = read.events.map(
+    (event, i) =>
+      ({
+        event: 'chat',
+        data: event,
+        ...(i === read.events.length - 1 ? { id: read.cursor } : {}),
+      }) satisfies Frame,
+  );
+  return { frames: [...said, ...events], shown: presence } satisfies { frames: Frame[]; shown: string };
 };
 
 /** One thing `followChat` sends, as frames, and the presence shown after them. */
-const framesAfter = (shown: string, x: ChatSent): readonly [string, Frame[]] => {
+const framesAfter = (shown: string, x: ChatSent) => {
   if (x.kind === 'changes') {
     const read = framesOf(x.changes, shown);
-    return [read.shown, read.frames];
+    return [read.shown, read.frames] satisfies readonly [string, Frame[]];
   }
-  if (x.kind === 'unreadable') return [shown, [{ event: 'unreadable', data: { error: x.error, retrying: true } }]];
-  return [shown, [{ event: 'readable', data: {} }]];
+  if (x.kind === 'unreadable')
+    return [shown, [{ event: 'unreadable', data: { error: x.error, retrying: true } }]] satisfies readonly [string, Frame[]];
+  return [shown, [{ event: 'readable', data: {} }]] satisfies readonly [string, Frame[]];
 };
 
 /**
@@ -146,7 +149,7 @@ export const chatStream = (after: string | undefined) =>
     const paces = { ...(s.beats.chat ? { beatMs: s.beats.chat } : {}), ...(s.beats.chatFiles ? { filesMs: s.beats.chatFiles } : {}) };
     const { first, rest } = await s.inRequest(followChat(() => nemiaChatPlace(s.home), after, readsOf(s), follow, paces));
     const opening = framesOf(first, '');
-    const relayed = placed(s)(rest).pipe(Stream.mapAccum((): string => opening.shown, framesAfter));
+    const relayed = placed(s)(rest).pipe(Stream.mapAccum(() => opening.shown, framesAfter));
     return Stream.concat(Stream.fromIterable(opening.frames), relayed);
   });
 

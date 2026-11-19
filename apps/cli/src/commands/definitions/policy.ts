@@ -15,7 +15,7 @@ type Listed = typeof PolicyList.Type;
  * The lines `nemia policy` prints of an agent's rules.
  * @param list The agent's rules as the api answers them: those in force, and its proposal where it made one.
  */
-export function listLines(list: Listed): string[] {
+export function listLines(list: Listed) {
   const inForce = list.rules.length
     ? list.rules.map((r) => `  ${r.id}${r.from === 'default' ? ' (default)' : ''}: ${r.words}`)
     : ['  none: every answer is asked'];
@@ -36,16 +36,16 @@ export function listLines(list: Listed): string[] {
 }
 
 /** The agent `args` name. */
-const agentOf = (args: Args): string => textArg(args, 'name') ?? '';
+const agentOf = (args: Args) => textArg(args, 'name') ?? '';
 
 /** The rule's id `args` name. */
-const idOf = (args: Args): string => textArg(args, 'id') ?? '';
+const idOf = (args: Args) => textArg(args, 'id') ?? '';
 
 /**
  * `nemia policy <agent>`'s runner: the agent's rules, read.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function policy(args: Args): Promise<number> {
+export async function policy(args: Args) {
   const name = agentOf(args);
   said(listLines(await asked(POLICY_WORDS.name, (c) => c.nemia.policy({ params: { name } }))));
   return 0;
@@ -55,7 +55,7 @@ export async function policy(args: Args): Promise<number> {
  * `nemia policy propose <agent> --file <path>|-`'s runner: the proposal's words read here, sent, and the list after printed.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function policyPropose(args: Args): Promise<number> {
+export async function policyPropose(args: Args) {
   const name = agentOf(args);
   const words = wordsRead(textArg(args, 'file') ?? '-', POLICY_PROPOSE_WORDS.name);
   const list = await asked(POLICY_PROPOSE_WORDS.name, (c) => c.nemia.propose({ params: { name }, payload: { words } }));
@@ -68,7 +68,7 @@ export async function policyPropose(args: Args): Promise<number> {
  * `nemia policy confirm <agent> <id> --words <words>`'s runner: the rule put in force as the person read it.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function policyConfirm(args: Args): Promise<number> {
+export async function policyConfirm(args: Args) {
   const name = agentOf(args);
   const id = idOf(args);
   const words = textArg(args, 'words') ?? '';
@@ -81,7 +81,7 @@ export async function policyConfirm(args: Args): Promise<number> {
  * `nemia policy rm <agent> <id>`'s runner: the rule taken out of force.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function policyRm(args: Args): Promise<number> {
+export async function policyRm(args: Args) {
   const name = agentOf(args);
   const id = idOf(args);
   const list = await asked(POLICY_RM_WORDS.name, (c) => c.nemia.dropRule({ params: { name, id } }));

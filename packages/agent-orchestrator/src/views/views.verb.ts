@@ -9,7 +9,7 @@
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
-import { EngineService, asked, denialText, tried, type AdmissionWait, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   attemptVerdict,
   CHECK_TAIL_LINES,
@@ -19,13 +19,11 @@ import {
   type CheckHanded,
   type CheckRefusal,
   type LandingSaid,
-  type Verdict,
 } from '../check/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';
-import { isRepositoryRun, stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
-import type { Said } from '../say/say.ts';
+import { isRepositoryRun, stepTasks, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
 import { taskSpend, type SpendOf } from '../status/status.ts';
 import { type Consumed } from '../usage/usage.ts';
 import { waitedOn, type ParentRun } from '../wait/wait.ts';
@@ -50,7 +48,7 @@ import { RunId } from '../record/record.model.ts';
  * What tells a turn a pass started and died before writing down (`adoptTries`) from one the record already holds.
  * @param view The engine's view of the task; undefined for one nobody read.
  */
-export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? (view.state.inputs?.length ?? 0) : 0);
+export const answersIn = (view: TaskView | undefined) => (view?.state.holdOpen ? (view.state.inputs?.length ?? 0) : 0);
 
 /**
  * The engine a pass's `advance` reads, whose `view` of a task the runtime's pass reported is that report's (`TickReport.views`): a view
@@ -72,7 +70,7 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
  * @param e The engine the pass reads through.
  * @param views The views the runtime's pass reported (`TickReport.views`).
  */
-export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
+export function reportedEngine(e: Engine, views: readonly TaskView[]) {
   const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
   let writes = 0;
   const keep = (read: readonly TaskView[], at: number) => {
@@ -85,6 +83,7 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
       const at = writes;
       return e.view(taskId).pipe(Effect.tap((read) => Effect.sync(() => keep([read], at))));
     });
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const list = (ids: readonly string[]): ReturnType<Engine['list']> =>
     Effect.suspend(() => {
       const wanted = [...new Set(ids)];
@@ -140,7 +139,7 @@ type TaskList = Effect.Success<ReturnType<Engine['list']>>;
  * read.
  * @param e The engine the command reads through.
  */
-export function viewedOnce(e: Engine): Engine {
+export function viewedOnce(e: Engine) {
   type Read = Deferred.Deferred<TaskView, Effect.Error<ReturnType<Engine['view']>>>;
   const read = new Map<unknown, Read>();
   return droppingOnWrite(
@@ -176,7 +175,7 @@ function droppingOnWrite(
   dropAll: () => void,
   own: Partial<Engine>,
   passes: (verb: string) => boolean,
-): Engine {
+) {
   const wrapped: Record<string, unknown> = { ...e, ...own };
   for (const [verb, value] of Object.entries(e)) {
     if (verb in own || typeof value !== 'function' || passes(verb)) continue;
@@ -192,7 +191,7 @@ function droppingOnWrite(
 }
 
 /** Whether the engine's verb `key` changes no task a call's reads name: a read, or a pass of the runtime (`ENGINE_VERBS`). */
-const changesNone = (key: string): boolean => {
+const changesNone = (key: string) => {
   const changes = verbOf(key)?.changes;
   return changes === 'none' || changes === 'pass';
 };
@@ -227,7 +226,7 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   }
   return {
     views,
-    phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
+    phaseOf: (taskId: string) => phaseOfView(views.get(taskId)),
   };
 });
 
@@ -251,13 +250,11 @@ export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run
  * words a step as `nemia ls` does.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const closeoutAsked =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): CloseoutAsked => {
-    const state = views.get(taskId)?.state;
-    if (!state?.closeoutSchema) return false;
-    return unsignedEnd(state, currentTurn(state).at(-1)) ? 'unsigned' : true;
-  };
+export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => {
+  const state = views.get(taskId)?.state;
+  if (!state?.closeoutSchema) return false;
+  return unsignedEnd(state, currentTurn(state).at(-1)) ? 'unsigned' : true;
+};
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
@@ -265,10 +262,7 @@ export const closeoutAsked =
  * Exported, log-free, for a consumer that asks `retry` for such a step as `nemia retry` does.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const harnessBlocked =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): boolean =>
-    blockedWord(views.get(taskId)?.phase);
+export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => blockedWord(views.get(taskId)?.phase);
 
 /**
  * What the harness says a task's blocked session waits for, in its own words (`TaskView.waitingFor`), off views already read — as a remote
@@ -279,10 +273,7 @@ export const harnessBlocked =
  * list/list.ts, which is the only place this repository turns the harness's word into a sentence.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const waitingOf =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): string | undefined =>
-    views.get(taskId)?.waitingFor;
+export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => views.get(taskId)?.waitingFor;
 
 /**
  * Why the runtime holds a queued task back from its admission (`TaskView.waits`), off views already read: a slot of its pool, under its
@@ -292,10 +283,7 @@ export const waitingOf =
  * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `admissionWords` in list/list.ts.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const admissionWaitOf =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): AdmissionWait | undefined =>
-    views.get(taskId)?.waits;
+export const admissionWaitOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => views.get(taskId)?.waits;
 
 /**
  * Why the runtime could not read a task's session alone, in its own words (`TaskView.unreadWhy`), off its view already read: what one
@@ -303,7 +291,7 @@ export const admissionWaitOf =
  * on the first look that reads it: the runtime says it afresh on every look, and nothing here keeps it.
  * @param view The engine's view of the task; undefined for none.
  */
-export const unreadOf = (view: TaskView | undefined): string | null => view?.unreadWhy ?? null;
+export const unreadOf = (view: TaskView | undefined) => view?.unreadWhy ?? null;
 
 /**
  * A session's web link, as a person opens it from a browser or a phone: `url` where it is up, else null and `why` says what keeps it
@@ -318,13 +306,11 @@ export type Bridge = { url: string | null; why: string | null };
  * Exported, log-free, for a consumer that shows a person where to reach a session, as `nemia level` and a run's step detail do.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const bridgeOf =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): Bridge | null => {
-    const bridge = views.get(taskId)?.bridge;
-    if (bridge === undefined) return null;
-    return bridge.url === null ? { url: null, why: bridge.why } : { url: bridge.url, why: null };
-  };
+export const bridgeOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => {
+  const bridge = views.get(taskId)?.bridge;
+  if (bridge === undefined) return null;
+  return bridge.url === null ? { url: null, why: bridge.why } : { url: bridge.url, why: null };
+};
 
 /**
  * What a task's sessions were denied, off views already read: every call the harness refused on an attempt, a running one's so far, as
@@ -341,12 +327,10 @@ export const bridgeOf =
  * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `deniedWords` in list/list.ts.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const deniedOf =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): string[] => {
-    const state = views.get(taskId)?.state;
-    return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
-  };
+export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string) => {
+  const state = views.get(taskId)?.state;
+  return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
+};
 
 /**
  * What the session of a task at work runs on, in words (`ranOnWords`): `on v1.2.0, <harness> <version>`, off what its last attempt
@@ -356,15 +340,13 @@ export const deniedOf =
  * @param views The engine's views of tasks, already read, by task id.
  * @param releases The store's real releases folder, which the image is placed under.
  */
-export const ranOnOf =
-  (views: ReadonlyMap<string, TaskView>, releases: string) =>
-  (taskId: string): string | undefined => {
-    const state = views.get(taskId)?.state;
-    const last = state && state.settled === null ? state.attempts.at(-1) : undefined;
-    if (!state || !last || last.ended !== null) return undefined;
-    const { release, harness } = sessionRanOn(last, state.harness ?? DEFAULT_HARNESS, releases);
-    return ranOnWords(release, harness) ?? undefined;
-  };
+export const ranOnOf = (views: ReadonlyMap<string, TaskView>, releases: string) => (taskId: string) => {
+  const state = views.get(taskId)?.state;
+  const last = state && state.settled === null ? state.attempts.at(-1) : undefined;
+  if (!state || !last || last.ended !== null) return undefined;
+  const { release, harness } = sessionRanOn(last, state.harness ?? DEFAULT_HARNESS, releases);
+  return ranOnWords(release, harness) ?? undefined;
+};
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `nemia ls` and
@@ -372,12 +354,11 @@ export const ranOnOf =
  * log-free, for a consumer that words a step as `nemia ls` does. A task with no view read has no spend known.
  * @param views The engine's views of tasks, already read, by task id.
  */
-export const spendReader =
-  (views: ReadonlyMap<string, TaskView>): SpendOf =>
-  (taskId) => {
+export const spendReader = (views: ReadonlyMap<string, TaskView>) =>
+  ((taskId) => {
     const spent = taskSpend(views.get(taskId));
     return spent && { ...spent, denied: deniedOf(views)(taskId) };
-  };
+  }) satisfies SpendOf;
 
 /**
  * What each step's current check exited with, off the engine's record (`attemptVerdict`): the code its process gave, or `unfinished` when
@@ -389,12 +370,10 @@ export const spendReader =
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
  */
-export const exitVerdicts =
-  (views: ReadonlyMap<string, TaskView>, run: Run) =>
-  (step: string): Verdict | undefined => {
-    const taskId = run.steps[step]?.check?.taskId;
-    return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
-  };
+export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string) => {
+  const taskId = run.steps[step]?.check?.taskId;
+  return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
+};
 
 /**
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory` over `killedMemoryOf`), off the
@@ -403,12 +382,11 @@ export const exitVerdicts =
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name their checks' tasks.
  */
-export const checkKills =
-  (views: ReadonlyMap<string, TaskView>, run: Run): CheckKillOf =>
-  (step) => {
+export const checkKills = (views: ReadonlyMap<string, TaskView>, run: Run) =>
+  ((step) => {
     const taskId = run.steps[step]?.check?.taskId;
     return taskId ? outOfMemory(killedMemoryOf(views.get(taskId)), undefined) : undefined;
-  };
+  }) satisfies CheckKillOf;
 
 /**
  * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
@@ -416,8 +394,8 @@ export const checkKills =
  * @param views The engine's views of tasks, already read, by task id.
  * @param taskId The task the next try continues.
  */
-export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
-  continuesFrom(views.get(taskId)?.state.attempts);
+export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string) =>
+  continuesFrom(views.get(taskId)?.state.attempts) satisfies string | undefined;
 
 /** The word of a step on a run left unjudged, a task of which does not read (`unjudgedWord`). */
 export const UNREADABLE = 'unreadable';
@@ -433,8 +411,7 @@ export type UnjudgedWord = typeof UNREADABLE | EnginePhase | 'unknown';
  * @param unreadable The tasks that do not read, each by its id with why.
  */
 export const unjudgedWord =
-  (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
-  (step: StepRecord | undefined): UnjudgedWord =>
+  (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) => (step: StepRecord | undefined) =>
     step && stepTasks(step).some((id) => unreadable.has(id)) ? UNREADABLE : !step?.taskId ? 'pending' : wordOfView(views.get(step.taskId));
 
 /**
@@ -443,18 +420,16 @@ export const unjudgedWord =
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name the tasks.
  */
-export const saidCount =
-  (views: ReadonlyMap<string, TaskView>, run: Run) =>
-  (stepName: string): number => {
-    const taskId = run.steps[stepName]?.taskId;
-    return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
-  };
+export const saidCount = (views: ReadonlyMap<string, TaskView>, run: Run) => (stepName: string) => {
+  const taskId = run.steps[stepName]?.taskId;
+  return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
+};
 
 /**
  * What was said to a task's sessions while they ran (`nemia say`), off its view: none for a task with no view, or a view with no `said`.
  * @param view The engine's view of the task; undefined for none.
  */
-export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
+export const saidIn = (view: TaskView | undefined) => view?.state.said ?? [];
 
 /**
  * What a settled check said, for a person to read.
@@ -533,7 +508,7 @@ export const landingSaidRead = Effect.fn('landingSaid')(function* (step: string,
 });
 
 /** Why what a check's task printed cannot be given: the engine's words for the read that failed. */
-const unreadWords = (taskId: string, cause: Cause.Cause<unknown>): string => {
+const unreadWords = (taskId: string, cause: Cause.Cause<unknown>) => {
   const failed = Cause.squash(cause);
   return `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}`;
 };
@@ -584,27 +559,26 @@ const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, std
  * @param run The run whose steps name the tasks.
  * @param stepName The step asked about.
  */
-export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
+export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string) {
   const taskId = run.steps[stepName]?.taskId;
-  return taskId ? closeoutSaid(views, taskId) : undefined;
+  return (taskId ? closeoutSaid(views, taskId) : undefined) satisfies Closeout | { error: string } | undefined;
 }
 
 /** The closing statement a task's current turn made (`currentTurn`), parsed; undefined where it made none. */
-function closeoutSaid(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | { error: string } | undefined {
-  return closeoutGiven(views, taskId)?.read;
+function closeoutSaid(views: ReadonlyMap<string, TaskView>, taskId: string) {
+  return closeoutGiven(views, taskId)?.read satisfies Closeout | { error: string } | undefined;
 }
 
 /**
  * The closing statement a task's current turn made, as it came back (`said`) and as the run read it (`read`, `parseCloseout`): what the
  * feed's `closed out` line is logged with, an unreadable one's error beside what came back. Undefined where the turn made none.
  */
-function closeoutGiven(
-  views: ReadonlyMap<string, TaskView>,
-  taskId: string,
-): { said: unknown; read: Closeout | { error: string } } | undefined {
+function closeoutGiven(views: ReadonlyMap<string, TaskView>, taskId: string) {
   const state = views.get(taskId)?.state;
   const said = state ? currentTurn(state).at(-1)?.closeout : undefined;
-  return said === undefined ? undefined : { said, read: parseCloseout(said) };
+  return (said === undefined ? undefined : { said, read: parseCloseout(said) }) satisfies
+    | { said: unknown; read: Closeout | { error: string } }
+    | undefined;
 }
 
 /**
@@ -614,13 +588,9 @@ function closeoutGiven(
  * @param run The run whose steps name the tasks.
  * @param stepName The step asked about.
  */
-export function closeoutTold(
-  views: ReadonlyMap<string, TaskView>,
-  run: Run,
-  stepName: string,
-): { said: unknown; read: Closeout | { error: string } } | undefined {
+export function closeoutTold(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string) {
   const taskId = run.steps[stepName]?.taskId;
-  return taskId ? closeoutGiven(views, taskId) : undefined;
+  return (taskId ? closeoutGiven(views, taskId) : undefined) satisfies { said: unknown; read: Closeout | { error: string } } | undefined;
 }
 
 /**
@@ -628,9 +598,9 @@ export function closeoutTold(
  * @param views The engine's views of tasks, already read, by task id.
  * @param taskId The task asked about.
  */
-export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | undefined {
+export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: string) {
   const c = closeoutSaid(views, taskId);
-  return c && !('error' in c) ? c : undefined;
+  return (c && !('error' in c) ? c : undefined) satisfies Closeout | undefined;
 }
 
 /**
@@ -640,16 +610,12 @@ export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: strin
  * @param run The run whose steps name the tasks.
  * @param steps The run's workflow, whose script conditions are read as closeouts; left out, none is.
  */
-export const closeoutReader = (
-  views: ReadonlyMap<string, TaskView>,
-  run: Run,
-  steps?: readonly StepSpec[],
-): ((stepName: string) => Closeout | undefined) => {
-  const read = (stepName: string): Closeout | undefined => {
+export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run, steps?: readonly StepSpec[]) => {
+  const read = (stepName: string) => {
     const taskId = run.steps[stepName]?.taskId;
-    return taskId ? taskCloseout(views, taskId) : undefined;
+    return (taskId ? taskCloseout(views, taskId) : undefined) satisfies Closeout | undefined;
   };
-  return steps ? scriptCloseouts(steps, attemptIn(views), run, read) : read;
+  return (steps ? scriptCloseouts(steps, attemptIn(views), run, read) : read) satisfies (stepName: string) => Closeout | undefined;
 };
 
 /**
@@ -730,7 +696,7 @@ export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
  * The runs a pass reads as runs others wait on (`Parents`), none read yet, through `git`.
  * @param git What reads the runs' branches.
  */
-export const passParents = (git: BranchReader): Parents => ({ git, read: new Map() });
+export const passParents = (git: BranchReader) => ({ git, read: new Map() }) satisfies Parents;
 
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
@@ -741,7 +707,7 @@ export const passParents = (git: BranchReader): Parents => ({ git, read: new Map
 export const parentsRead = Effect.fnUntraced(function* (run: Run, git: BranchReader, read = new Map<string, ParentRun>()) {
   const mine = new Map<string, ParentRun>();
   for (const id of new Set(waitedOn(run))) mine.set(id, yield* keptParent(id, git, read));
-  return (id: string): ParentRun => mine.get(id) ?? { landed: false };
+  return (id: string) => mine.get(id) ?? { landed: false };
 });
 
 /**
@@ -754,7 +720,7 @@ export const parentsRead = Effect.fnUntraced(function* (run: Run, git: BranchRea
  * @param views The engine's views of tasks, already read, by task id.
  * @param run The run whose steps name the tasks.
  */
-export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Record<string, Consumed | undefined> {
+export function consumption(views: ReadonlyMap<string, TaskView>, run: Run) {
   const used: Record<string, Consumed | undefined> = {};
   for (const [name, { taskId }] of Object.entries(run.steps)) {
     const v = taskId ? views.get(taskId) : undefined;

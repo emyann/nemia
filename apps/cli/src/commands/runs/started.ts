@@ -9,11 +9,11 @@ import type { RunStarted, RunStartedFacts } from 'objects';
 import { pausedWords } from '../../watch/lines.ts';
 
 /** The steps of the run and their agents: `<id>  3 step(s): implement (implementer) → review → …`. */
-const headLine = (id: string, { steps }: RunStartedFacts): string =>
+const headLine = (id: string, { steps }: RunStartedFacts) =>
   `${id}  ${steps.length} step(s): ${steps.map((s) => (s.agent !== undefined ? `${s.name} (${s.agent})` : s.name)).join(' → ')}`;
 
 /** Where an inbox card's run came from, the card kept in the inbox as started, and why its `queued:` line is still on it. */
-const fromLines = ({ id, card, queueLeft }: RunStarted, { from }: RunStartedFacts): string[] =>
+const fromLines = ({ id, card, queueLeft }: RunStarted, { from }: RunStartedFacts) =>
   card === undefined
     ? []
     : [
@@ -26,7 +26,7 @@ const fromLines = ({ id, card, queueLeft }: RunStarted, { from }: RunStartedFact
       ];
 
 /** The run's factory, the repository it is on, and a `--repo` that only found the factory, its wiring placing the run on another. */
-const factoryLines = ({ repoFoundFactory }: RunStarted, { factory, repo, repository, workflow }: RunStartedFacts): string[] => [
+const factoryLines = ({ repoFoundFactory }: RunStarted, { factory, repo, repository, workflow }: RunStartedFacts) => [
   ...(factory !== undefined ? [`factory: ${factory}${repository ? `, on ${repo}` : ''}`] : []),
   ...(repoFoundFactory !== undefined
     ? [`--repo ${repoFoundFactory} only found the factory ${factory ?? ''}: ${workflow} works on ${repo}`]
@@ -34,7 +34,7 @@ const factoryLines = ({ repoFoundFactory }: RunStarted, { factory, repo, reposit
 ];
 
 /** The folders of its factory a run mounts, read-only but where written, and those left out, being no directory. */
-const mountLines = (notMounted: readonly string[], { mounts = [], writable = [] }: RunStartedFacts): string[] => [
+const mountLines = (notMounted: readonly string[], { mounts = [], writable = [] }: RunStartedFacts) => [
   ...(mounts.length
     ? [`mounts: ${mounts.join(', ')} — read-only, for every local step${writable.length ? ' but where written below' : ''}`]
     : []),
@@ -45,7 +45,7 @@ const mountLines = (notMounted: readonly string[], { mounts = [], writable = [] 
 ];
 
 /** The factory's volumes a run mounts, read-only, then each writable one with the steps that write it; then those left out. */
-const volumeLines = (notVolumes: readonly string[], { volumes = [], writableVolumes = [] }: RunStartedFacts): string[] => [
+const volumeLines = (notVolumes: readonly string[], { volumes = [], writableVolumes = [] }: RunStartedFacts) => [
   ...(volumes.length ? [`volumes: ${volumes.join(', ')} — read-only, for every local step`] : []),
   ...writableVolumes.map(
     (w) =>
@@ -57,7 +57,7 @@ const volumeLines = (notVolumes: readonly string[], { volumes = [], writableVolu
 ];
 
 /** Where the run works, and where it copied its inputs, the cards it is handed, and its workflow's and carried files. */
-const placeLines = ({ workspace, repository, inputs, cards, workflowFiles, carriedFiles }: RunStartedFacts): string[] => [
+const placeLines = ({ workspace, repository, inputs, cards, workflowFiles, carriedFiles }: RunStartedFacts) => [
   `workspace: ${workspace}${repository ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
   ...(inputs !== undefined ? [`inputs: ${inputs.names.join(', ')} — copied into ${inputs.dir}`] : []),
   ...(cards !== undefined ? [`cards: ${cards.names.join(', ')} — copied into ${cards.dir}`] : []),
@@ -66,7 +66,7 @@ const placeLines = ({ workspace, repository, inputs, cards, workflowFiles, carri
 ];
 
 /** What the run waits on to land, and each run it reads as context, landed or still in flight. */
-const waitLines = (landed: readonly string[], { after = [], branch, context = [] }: RunStartedFacts): string[] => [
+const waitLines = (landed: readonly string[], { after = [], branch, context = [] }: RunStartedFacts) => [
   ...(after.length ? [`waits on: ${after.join(', ')} — nothing is filed until nemia decide says each has landed on ${branch}`] : []),
   ...context.map((id) =>
     landed.includes(id)
@@ -76,7 +76,7 @@ const waitLines = (landed: readonly string[], { after = [], branch, context = []
 ];
 
 /** The steps that wait on a person: each gated, and the endings a person approves before they are filed. */
-const gateLines = (id: string, { gated = [], ends = [] }: RunStartedFacts): string[] => [
+const gateLines = (id: string, { gated = [], ends = [] }: RunStartedFacts) => [
   ...(gated.length
     ? [
         `gated at: ${gated.join(', ')} — nothing after ${gated.length > 1 ? 'each' : 'it'} is filed until nemia approve ${id} <step>, once it has signed off`,
@@ -90,7 +90,7 @@ const gateLines = (id: string, { gated = [], ends = [] }: RunStartedFacts): stri
 ];
 
 /** The models the run names for its steps, for it alone; its labels, by key; and each label it did not inherit, with how to set it. */
-const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStartedFacts): string[] => [
+const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStartedFacts) => [
   ...(models !== undefined
     ? [
         `models: ${Object.entries(models)
@@ -116,11 +116,11 @@ const ownLines = (id: string, { models, labels, labelsLeftOut = [] }: RunStarted
  * A card's own `repo:`, which is retired and was not read.
  * @param repo The `repo:` the card names.
  */
-export const ignoredRepoLine = (repo: string): string =>
+export const ignoredRepoLine = (repo: string) =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /** The line of a start whose api said nothing of the run: it started, and what reads it. */
-const bareLine = (id: string): string =>
+const bareLine = (id: string) =>
   `${id}  started on the daemon — nemia show ${id} reads it, and the daemon's next pass files its first step`;
 
 /**
@@ -128,7 +128,7 @@ const bareLine = (id: string): string =>
  * @param answer The api's answer to the start: the run's id, its facts, and what stands beside it.
  * @param now The time the pause that stands is measured from; the present by default.
  */
-export function startedLines(answer: RunStarted, now: Date = new Date()): string[] {
+export function startedLines(answer: RunStarted, now: Date = new Date()) {
   const { id, run } = answer;
   if (run === undefined) return [bareLine(id)];
   const paused = answer.paused === undefined ? null : pausedWords(answer.paused, now);

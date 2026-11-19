@@ -16,10 +16,10 @@ export type RunStateSelector = { readonly state: RunState; readonly equal: boole
 const FIELD = 'status.state';
 
 /** Whether `word` is a run's state. */
-const isState = (word: string): boolean => word === 'waiting' || word === 'inFlight' || word === 'finished';
+const isState = (word: string) => word === 'waiting' || word === 'inFlight' || word === 'finished';
 
 /** Whether `text` is the field, `operator`, then a run's state. */
-const spelled = (text: string, operator: string): boolean =>
+const spelled = (text: string, operator: string) =>
   text.startsWith(FIELD + operator) && isState(text.slice(FIELD.length + operator.length));
 
 const runStateSelectorSpec = spec<(text: string) => RunStateSelector | null>({

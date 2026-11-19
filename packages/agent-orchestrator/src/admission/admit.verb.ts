@@ -14,7 +14,7 @@ import type { Ran } from '../command/entry.verb.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
-import { RULE_ANSWERS, factsOf, listInForce, type PolicyRule, type Facts } from '../auto/index.ts';
+import { RULE_ANSWERS, factsOf, listInForce, type Facts } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
 import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope, type Typed } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
@@ -86,8 +86,7 @@ const CallSchema: Schema.Decoder<AdmissionCall> = Schema.Struct({
 });
 
 /** The call `given` names, or undefined where it is no JSON of a tool, its input and its folder. */
-const callOf = (given: string): AdmissionCall | undefined =>
-  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(CallSchema))(given));
+const callOf = (given: string) => Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(CallSchema))(given));
 
 /**
  * The scope of a call at least at `atLeast`, each run the line `line` names read for its factory and level, and each factory it names
@@ -113,7 +112,7 @@ const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<t
 });
 
 /** The rules in force for `agent` in the store `home`: none where the person's list does not read, so nothing is let through by it. */
-function rulesOf(home: string, agent: string): readonly PolicyRule[] {
+function rulesOf(home: string, agent: string) {
   try {
     return listInForce(readConfirmed(home, agent)?.rules);
   } catch {

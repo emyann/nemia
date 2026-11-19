@@ -24,7 +24,7 @@ const COUNTED_KEYS = [
 ] as const satisfies ReadonlyArray<keyof Usage>;
 
 /** The counts of `usage` (`COUNTED_KEYS`), each one it has a value for. */
-const countsOf = (usage: Usage): Usage => {
+const countsOf = (usage: Usage) => {
   const counts: Usage = {};
   for (const key of COUNTED_KEYS) if (usage[key] !== undefined) counts[key] = usage[key];
   return counts;
@@ -40,12 +40,12 @@ const countsOf = (usage: Usage): Usage => {
  * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
  * @param at The moment the entry is stamped, an ISO time.
  */
-export function countedFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
+export function countedFacts(state: State, sighting: Sighting | undefined, at: string) {
   const last = state.attempts.at(-1);
-  if (state.restartPolicy !== 'Always' || state.settled || !last || last.ended !== null || !sighting?.usage) return [];
+  if (state.restartPolicy !== 'Always' || state.settled || !last || last.ended !== null || !sighting?.usage) return [] satisfies Event[];
   const counts = countsOf(sighting.usage);
   const record = last.usage ?? {};
-  if ((counts.responses ?? 0) < (record.responses ?? 0)) return [];
-  if (COUNTED_KEYS.every((key) => counts[key] === record[key])) return [];
-  return [{ kind: 'counted', at, attempt: last.n, usage: counts }];
+  if ((counts.responses ?? 0) < (record.responses ?? 0)) return [] satisfies Event[];
+  if (COUNTED_KEYS.every((key) => counts[key] === record[key])) return [] satisfies Event[];
+  return [{ kind: 'counted', at, attempt: last.n, usage: counts }] satisfies Event[];
 }

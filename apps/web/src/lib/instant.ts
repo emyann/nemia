@@ -15,7 +15,7 @@ import { timeOfDay, timeToTheSecond, unreadable, UNREADABLE, zoneOf } from './ti
  * @param now The instant it is now, which sets how much of the date is said.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function instantWords(at: Date, now: Date, timeZone?: string): string {
+export function instantWords(at: Date, now: Date, timeZone?: string) {
   if (unreadable(at, now)) return UNREADABLE;
   const zone = zoneOf(timeZone);
   const then = dateParts(at, timeZone);
@@ -30,7 +30,7 @@ export function instantWords(at: Date, now: Date, timeZone?: string): string {
  * @param at The instant to say.
  * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
-export function instantWhole(at: Date, timeZone?: string): string {
+export function instantWhole(at: Date, timeZone?: string) {
   if (unreadable(at)) return UNREADABLE;
   const then = dateParts(at, timeZone);
   return `${then.day} ${then.month} ${then.year}, ${timeToTheSecond(at, timeZone)}`;

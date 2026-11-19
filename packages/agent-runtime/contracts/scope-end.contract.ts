@@ -13,16 +13,16 @@ import { type Implementation, spec } from '@emyann/tsverify';
 const CGROUP_ROOT = '/sys/fs/cgroup/';
 
 /** Whether `folder` names a cgroup by a plain path under the mount: no step climbs out of it. */
-const underTheMount = (folder: string): boolean => folder.startsWith(CGROUP_ROOT) && !folder.includes('/..');
+const underTheMount = (folder: string) => folder.startsWith(CGROUP_ROOT) && !folder.includes('/..');
 
 /** Whether `folder` is a transient scope's: systemd names a scope's unit, and so its cgroup, `<name>.scope`. */
-const aScope = (folder: string): boolean => folder.endsWith('.scope');
+const aScope = (folder: string) => folder.endsWith('.scope');
 
 /**
  * Whether ending `folder` would end `own`: the same cgroup, or one of its ancestors. Joined with `+`, never a template: the verifier
  * reads a template string as an unknown string of its parts, which no law can tie to the code's own.
  */
-const holds = (folder: string, own: string): boolean => own === folder || own.startsWith(folder + '/');
+const holds = (folder: string, own: string) => own === folder || own.startsWith(folder + '/');
 
 const scopeToEndSpec = spec<(recorded: string | undefined, own: string | undefined) => boolean>({
   ensures: {

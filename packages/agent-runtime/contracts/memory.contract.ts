@@ -28,7 +28,7 @@ const UNIT_BYTES: Readonly<Record<MemoryUnit, number>> = {
 };
 
 /** The bytes one of `unit` is. */
-const unitBytes = (unit: MemoryUnit): number => UNIT_BYTES[unit];
+const unitBytes = (unit: MemoryUnit) => UNIT_BYTES[unit];
 
 /** The most bytes a limit may be: the largest whole number a JavaScript number holds exactly. */
 const MOST = 9_007_199_254_740_991;
@@ -48,7 +48,7 @@ const MOST_OF: Readonly<Record<MemoryUnit, number>> = {
   Gi: 8_388_607,
   Ti: 8_191,
 };
-const mostOf = (unit: MemoryUnit): number => MOST_OF[unit];
+const mostOf = (unit: MemoryUnit) => MOST_OF[unit];
 
 /**
  * A whole amount is what is asked for: a fraction (`1.5Gi`) is refused by the reader, naming the same limit as a whole of the next

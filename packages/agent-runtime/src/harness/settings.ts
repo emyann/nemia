@@ -12,10 +12,10 @@ import { CLAUDE_CONFIG_FOLDERS } from './claude/vocabulary.ts';
  * Claude Code's shared project settings inside `dir`: the file a job reads (`--setting-sources project`), in the folder it reads as its
  * own configuration. Never `settings.local.json` beside it, which a job does not read.
  */
-const claudeProjectFile = (dir: string): string => path.join(dir, CLAUDE_CONFIG_FOLDERS[0], 'settings.json');
+const claudeProjectFile = (dir: string) => path.join(dir, CLAUDE_CONFIG_FOLDERS[0], 'settings.json');
 
 /** Whether `harness` reads a project configuration of its own in the directory a session is started in. */
-const readsProject = (harness: string): boolean => harness === 'claude';
+const readsProject = (harness: string) => harness === 'claude';
 
 /** The strings of `value` where it is an array, `[]` for anything else: a file's own JSON, which arrives as it is. */
 /** A project configuration's `permissions.allow`, as `projectAllows` reads it: anything there, its strings the rules. */
@@ -23,7 +23,7 @@ const allowsIn = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ permissions: Schema.optional(Schema.Struct({ allow: Schema.optional(Schema.Unknown) })) })),
 );
 
-const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((rule) => typeof rule === 'string') : []);
+const stringsOf = (value: unknown) => (Array.isArray(value) ? value.filter((rule) => typeof rule === 'string') : []);
 
 /**
  * The allow rules harness `harness`'s own project configuration in `dir` grants a session started there, as the file writes them: for
@@ -39,7 +39,7 @@ const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.fi
  * @param harness The harness's name.
  * @param dir The folder the session is started in, whose project configuration is read.
  */
-export function projectAllows(harness: string, dir: string): readonly string[] | undefined {
+export function projectAllows(harness: string, dir: string) {
   if (!readsProject(harness)) return undefined;
   let text: string;
   try {

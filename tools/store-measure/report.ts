@@ -94,7 +94,7 @@ const USAGE =
   'usage: node --expose-gc tools/store-measure/report.ts [--from <wf-root>] [--engine <ae-root>] [--repeat N] [--json <file>] [--compare <baseline.json>]';
 
 /** The arguments, each store an existing folder, or the words that say how to call it. */
-export function argsOf(args: readonly string[], env: NodeJS.ProcessEnv): Asked | string {
+export function argsOf(args: readonly string[], env: NodeJS.ProcessEnv) {
   const given: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
@@ -119,17 +119,17 @@ export function argsOf(args: readonly string[], env: NodeJS.ProcessEnv): Asked |
 }
 
 /** The middle of `values`, the mean of the two middle ones for an even count. */
-const median = (values: readonly number[]): number => {
+const median = (values: readonly number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
 /** Collect the heap, which `--expose-gc` gives. */
-const gc = (): void => (globalThis as { gc?: () => void }).gc!();
+const gc = () => (globalThis as { gc?: () => void }).gc!();
 
 /** `read` timed, with the heap it left held after a collection. */
-async function timed(read: () => Promise<unknown>): Promise<Timed> {
+async function timed(read: () => Promise<unknown>) {
   gc();
   const before = process.memoryUsage().heapUsed;
   const t0 = performance.now();
@@ -140,10 +140,10 @@ async function timed(read: () => Promise<unknown>): Promise<Timed> {
 }
 
 /** The medians of `calls`. */
-const medianOf = (calls: readonly Timed[]): Timed => ({ ms: median(calls.map((c) => c.ms)), heapMb: median(calls.map((c) => c.heapMb)) });
+const medianOf = (calls: readonly Timed[]) => ({ ms: median(calls.map((c) => c.ms)), heapMb: median(calls.map((c) => c.heapMb)) });
 
 /** A store's root as a report writes it: under the home folder as `~/…`, so a committed baseline names no one's home. */
-export const rootAsWritten = (root: string, home = os.homedir()): string =>
+export const rootAsWritten = (root: string, home = os.homedir()) =>
   root === home || root.startsWith(`${home}${path.sep}`) ? `~${root.slice(home.length)}` : root;
 
 /**
@@ -152,7 +152,7 @@ export const rootAsWritten = (root: string, home = os.homedir()): string =>
  * is no JSON left to the unreadable count. The model is reached through the package's root, as `RunModel`, and imported after the
  * store is copied, as the rest is.
  */
-export async function invariantRefusals(wf: string): Promise<number> {
+export async function invariantRefusals(wf: string) {
   const { Exit, Schema } = await import('effect');
   const { RunModel } = await import('agent-orchestrator');
   const decode = Schema.decodeUnknownExit(RunModel.Run);
@@ -170,11 +170,10 @@ export async function invariantRefusals(wf: string): Promise<number> {
 }
 
 /** The files of `dir` whose name ends with `suffix`, none where it is not there. */
-const filesOf = (dir: string, suffix: string): string[] =>
-  fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => name.endsWith(suffix)) : [];
+const filesOf = (dir: string, suffix: string) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => name.endsWith(suffix)) : []);
 
 /** The lines of `file` and the byte each starts at, none where it is not there. */
-function lineStarts(file: string): number[] {
+function lineStarts(file: string) {
   if (!fs.existsSync(file)) return [];
   const text = fs.readFileSync(file);
   const starts: number[] = [];
@@ -204,7 +203,7 @@ export type Place = Parameters<Orchestrator['PlaceService']['layer']>[0];
 export type CopyEnv = Readonly<Record<string, string | undefined>>;
 
 /** The environment of the copy at `root` (`CopyEnv`), and the workflows' store of the copy. */
-export function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
+export function copyEnvOf(root: string) {
   const wf = path.join(root, 'wf');
   const env: Record<string, string | undefined> = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith('OTEL_')),
@@ -223,7 +222,7 @@ export function copyEnvOf(root: string): { wf: string; env: CopyEnv } {
  * An api app over the copy whose environment is `env`, its runtime built and every memo of it empty, reading through `place`, saying no
  * line.
  */
-export const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv): Promise<Built> => {
+export const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv) => {
   const built = api.appOf(Layer.mergeAll(api.liveOf(env), orch.PlaceService.layer(place), Logger.layer([])));
   await built.runtime.runPromise(Effect.void);
   return built;
@@ -233,7 +232,7 @@ export const appOver = async (api: Api, orch: Orchestrator, place: Place, env: C
  * A token of the person's kept in the copy's workflows' store `wf`, as the store keeps one: its record under `person-tokens/` named by
  * its sha-256 digest. Every route of the api takes a token, so each read presents it. Written on the copy alone, before the fence is armed.
  */
-export function seatedOn(wf: string): string {
+export function seatedOn(wf: string) {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(wf, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -244,7 +243,7 @@ export function seatedOn(wf: string): string {
 }
 
 /** `GET url` of `app` under the person's `token`, its body read as JSON; thrown where it is not a 200. */
-export async function getJson(app: App, url: string, token: string): Promise<unknown> {
+export async function getJson(app: App, url: string, token: string) {
   const res = await app.request(url, { headers: { authorization: `Bearer ${token}` } });
   const body = await res.text();
   if (res.status !== 200) throw new Error(`GET ${url} answered ${res.status} on the copy: ${body.slice(0, 300)}`);
@@ -255,7 +254,7 @@ export async function getJson(app: App, url: string, token: string): Promise<unk
  * `read` over a fresh app for each of `repeat` cold calls, then over one app kept, after a first call that is not counted; with the run
  * records each call read (`recordsReadBy`), counted on a call apart from the timed ones so the count costs the time nothing.
  */
-async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise<unknown>, repeat: number): Promise<Measured> {
+async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise<unknown>, repeat: number) {
   const cold: Timed[] = [];
   for (let i = 0; i < repeat; i++) {
     const { app, runtime } = await fresh();
@@ -279,7 +278,7 @@ async function overApps(fresh: () => Promise<Built>, read: (app: App) => Promise
 type FeedRead = { file: string; lines: number; cursor: number; end: number; read: number };
 
 /** The workflow feed of the copy at `wf`: its lines, the cursor `FEED_BACK` lines before its end, and its end. */
-function feedOf(wf: string): FeedRead {
+function feedOf(wf: string) {
   const file = path.join(wf, 'feed.jsonl');
   const starts = lineStarts(file);
   const end = fs.existsSync(file) ? fs.statSync(file).size : 0;
@@ -287,7 +286,7 @@ function feedOf(wf: string): FeedRead {
 }
 
 /** The lines the events of `chunk` carry, and the cursor after the last; whether the stream's opening event (`opened`) is among them. */
-function eventsIn(chunk: readonly string[], cursor: number): { lines: number; cursor: number; opened: boolean } {
+function eventsIn(chunk: readonly string[], cursor: number) {
   let lines = 0;
   let opened = false;
   for (const event of chunk) {
@@ -305,7 +304,7 @@ function eventsIn(chunk: readonly string[], cursor: number): { lines: number; cu
  * `GET /api/feed/stream` from `feed.cursor` under the person's `token`, read until its last line came and then let go, or for two minutes
  * at most.
  */
-async function feedStreamed(app: App, feed: FeedRead, token: string): Promise<void> {
+async function feedStreamed(app: App, feed: FeedRead, token: string) {
   const gone = new AbortController();
   const res = await app.request(`/api/feed/stream${feed.cursor ? `?after=${feed.cursor}` : ''}`, {
     signal: gone.signal,
@@ -418,7 +417,7 @@ const chatFold = <R>(rest: Stream.Stream<unknown, never, R>) =>
 async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env: CopyEnv, repeat: number) {
   const placed = Layer.merge(orch.PlaceService.layer(place), orch.storeConfigLayer(env));
   const root = orch.wfRoot(env);
-  const fresh = (): ChatOver => ({
+  const fresh = () => ({
     e: passEngine(orch.engine(env), fence),
     reads: { runs: orch.informerMemo() },
   });
@@ -445,7 +444,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
     if (!(await orch.runWith(at.e, chatFold(rest).pipe(Effect.provide(placed)))))
       throw new Error(`a moment of her session was folded and nothing was sent within ${FOLD_BOUND_MS} ms`);
   };
-  const over = async (read: (at: ChatOver) => Promise<unknown>): Promise<Measured> => {
+  const over = async (read: (at: ChatOver) => Promise<unknown>) => {
     const cold: Timed[] = [];
     for (let i = 0; i < repeat; i++) {
       const at = fresh();
@@ -457,7 +456,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
     for (let i = 0; i < repeat; i++) warm.push(await timed(() => read(kept)));
     return { cold: medianOf(cold), warm: medianOf(warm) };
   };
-  const foldOver = async (): Promise<Measured> => {
+  const foldOver = async () => {
     const cold: Timed[] = [];
     for (let i = 0; i < repeat; i++) {
       const at = fresh();
@@ -487,7 +486,7 @@ async function chatMeasured(orch: Orchestrator, place: Place, fence: Fence, env:
 type Listed = { id: string; status: string; createdAt: string };
 
 /** The runs a `RunList` holds, as the measure reads them, and how many it could not judge. */
-const listedOf = (list: unknown): { runs: Listed[]; unjudged: number } => {
+const listedOf = (list: unknown) => {
   const { items, unjudged } = list as {
     items: Array<{ metadata: { name: string; creationTimestamp: string }; status: { status: string } }>;
     unjudged?: unknown[];
@@ -499,7 +498,7 @@ const listedOf = (list: unknown): { runs: Listed[]; unjudged: number } => {
 };
 
 /** The newest run of `listing`, by `createdAt`, finished or not; null where there is none. */
-const newestOf = (listing: readonly Listed[], finished: boolean): string | null =>
+const newestOf = (listing: readonly Listed[], finished: boolean) =>
   listing
     .filter((r) => FINISHED.has(r.status) === finished)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -600,7 +599,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
 }
 
 /** The commit the checkout of this file is at, or `unknown`. */
-export const commitHere = (): string => {
+export const commitHere = () => {
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd: import.meta.dirname,
@@ -613,7 +612,7 @@ export const commitHere = (): string => {
 };
 
 /** What the machine is, as the report says it. */
-export const machineNow = (): StoreMeasure['machine'] => {
+export const machineNow = () => {
   const cpus = os.cpus();
   return {
     cpu: cpus[0]?.model ?? 'unknown',
@@ -626,7 +625,7 @@ export const machineNow = (): StoreMeasure['machine'] => {
 };
 
 /** The report on the stores `asked` names, copied into `root` and measured there, the fence over every read. */
-async function reportOn(asked: Asked, root: string, commit: string): Promise<StoreMeasure> {
+async function reportOn(asked: Asked, root: string, commit: string) {
   const t0 = performance.now();
   const wf = copyStore(asked.from, path.join(root, 'wf'));
   const ae = copyStore(asked.engine, path.join(root, 'ae'), AE_LEFT_OUT);
@@ -667,7 +666,7 @@ async function reportOn(asked: Asked, root: string, commit: string): Promise<Sto
 }
 
 /** Run the command on `args`: the exit code. */
-export async function main(args: readonly string[]): Promise<number> {
+export async function main(args: readonly string[]) {
   const asked = argsOf(args, process.env);
   const said = (words: string, code: number) => {
     process.stderr.write(`store-measure: ${words}\n`);

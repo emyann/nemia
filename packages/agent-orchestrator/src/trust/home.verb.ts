@@ -16,10 +16,10 @@ import type { StepSpec } from '../workflow.ts';
 import { homeTrustRefused, homeUntrustRefused } from './trust.ts';
 
 /** The words of what a write threw. */
-const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const threwWords = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** `dir` as the harness's session sees its own folder, its links resolved, where it is there; else as given. */
-const realOf = (dir: string): string => {
+const realOf = (dir: string) => {
   try {
     return fs.realpathSync(dir);
   } catch {
@@ -35,7 +35,7 @@ const realOf = (dir: string): string => {
  * @param run The run: its id and the digest of its frozen home.
  * @param steps The steps whose sessions are about to be filed.
  */
-export function trustRunHome(home: string, run: Pick<Run, 'id' | 'homeFiles'>, steps: readonly StepSpec[]): string | undefined {
+export function trustRunHome(home: string, run: Pick<Run, 'id' | 'homeFiles'>, steps: readonly StepSpec[]) {
   if (run.homeFiles === undefined) return undefined;
   const dir = homeFilesDir(home, run, run.homeFiles);
   const startsThere = steps.filter((step) => startOf(step, '/', { home: dir, mcp: false, skills: {} }).cwd === dir);
@@ -58,7 +58,7 @@ export function trustRunHome(home: string, run: Pick<Run, 'id' | 'homeFiles'>, s
  * @param home The store's root.
  * @param id The run's id.
  */
-export function untrustRunHome(home: string, id: string): string | undefined {
+export function untrustRunHome(home: string, id: string) {
   const dir = homeFilesDir(home, { id });
   const folders = [...new Set([dir, realOf(dir)])];
   const left: string[] = [];

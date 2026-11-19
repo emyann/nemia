@@ -7,13 +7,13 @@ import { denialText, type Attempt, type Event, type State, type TaskView, type U
  * The sessions a pass left running, by harness, as `ae tick` and `ae up` print them: `claude:2 codex:1`, or empty where none runs.
  * @param running How many sessions run, by harness name.
  */
-export const runningText = (running: Readonly<Record<string, number>>): string =>
+export const runningText = (running: Readonly<Record<string, number>>) =>
   Object.entries(running)
     .map(([h, n]) => `${h}:${n}`)
     .join(' ');
 
 /** `text` up to its first line break, or the whole of it where there is none. */
-const firstLine = (text: string): string => {
+const firstLine = (text: string) => {
   const at = text.indexOf('\n');
   return at === -1 ? text : text.slice(0, at);
 };
@@ -22,7 +22,7 @@ const firstLine = (text: string): string => {
  * What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one.
  * @param state The task's state, whose `config` holds the limits.
  */
-export const limitLines = (state: Pick<State, 'config'>): string[] => [
+export const limitLines = (state: Pick<State, 'config'>) => [
   ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
   ...(state.config?.contextTokens !== undefined
     ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`]
@@ -38,13 +38,13 @@ const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ?
  * Exported only for the tests that import it.
  * @param u What the attempt consumed, or null where its runner measured nothing.
  */
-export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
+export const usageLine = (u: Usage | null) => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
 
 /** What an attempt has consumed so far, for a person, with no cost: a long-lived attempt's is written only at its end. */
-const runningLine = (u: Usage): string => `${countsLine(u)}${readLine(u)}`;
+const runningLine = (u: Usage) => `${countsLine(u)}${readLine(u)}`;
 
 /** An attempt's responses, tool calls and tokens, for a person, each one its runner could not see named not measured. */
-const countsLine = (u: Usage): string => {
+const countsLine = (u: Usage) => {
   const tokens =
     u.inputTokens !== undefined && u.outputTokens !== undefined
       ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out`
@@ -60,7 +60,7 @@ const countsLine = (u: Usage): string => {
  * short of its window, so its peak alone never says it got there. Nothing for an attempt whose runner counted no
  * tokens, which already says so; a class or a peak its runner could not see is named not measured.
  */
-const readLine = (u: Usage): string => {
+const readLine = (u: Usage) => {
   if (u.inputTokens === undefined) return '';
   const classes =
     u.cacheReadTokens !== undefined && u.cacheWriteTokens !== undefined && u.uncachedTokens !== undefined
@@ -76,14 +76,14 @@ const readLine = (u: Usage): string => {
  * Exported only for the tests that import it.
  * @param n The amount, in dollars.
  */
-export const usd = (n: number): string => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
+export const usd = (n: number) => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
 
 /** What an attempt cost, for a person: dollars, or that nobody measured it — and why, when the harness said. */
-const costLine = (u: Usage | null | undefined): string =>
+const costLine = (u: Usage | null | undefined) =>
   u?.costUsd !== undefined ? usd(u.costUsd) : u?.unpricedModel ? 'cost not measured (a model without a price)' : 'cost not measured';
 
 /** A length of time for a person: 42s, 4m 59s, 1h 02m. */
-const duration = (ms: number): string => {
+const duration = (ms: number) => {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
@@ -95,7 +95,7 @@ const duration = (ms: number): string => {
  * above it are. One still running has no end to print, and a length up to now would need a clock
  * this line is not handed.
  */
-const ranLine = (a: Attempt): string =>
+const ranLine = (a: Attempt) =>
   a.endedAt === null
     ? `since ${a.startedAt.slice(11, 19)}`
     : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
@@ -104,7 +104,7 @@ const ranLine = (a: Attempt): string =>
  * `succeeded (no statement)` for an end whose task asked for a closing statement and was given none (`closedOut: false`): the fact
  * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
  */
-const noStatement = (closedOut: boolean | undefined): string => (closedOut === false ? ' (no statement)' : '');
+const noStatement = (closedOut: boolean | undefined) => (closedOut === false ? ' (no statement)' : '');
 
 /**
  * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
@@ -112,7 +112,7 @@ const noStatement = (closedOut: boolean | undefined): string => (closedOut === f
  * session is said as the rules a person would write to allow it: the calls it went on without, a running attempt's so far.
  * @param a The attempt, as the task's record holds it.
  */
-export const attemptLine = (a: Attempt): string => {
+export const attemptLine = (a: Attempt) => {
   const when = ranLine(a);
   const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
   if (a.ended === null) return `attempt ${a.n}  running ${when}${denied}`;
@@ -161,7 +161,7 @@ const KINDS: Record<string, string> = {
 };
 
 /** Bytes as a person reads a memory size: in GiB to one place. */
-const gib = (bytes: number): string => `${(bytes / 2 ** 30).toFixed(1)}Gi`;
+const gib = (bytes: number) => `${(bytes / 2 ** 30).toFixed(1)}Gi`;
 
 /** What follows each kind of journal entry's word, for a person; nothing for a kind not named. */
 const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => string } = {

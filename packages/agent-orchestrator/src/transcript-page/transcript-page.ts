@@ -12,10 +12,10 @@ import type { TranscriptCut } from '../../contracts/transcript-page.contract.ts'
 import { Invalid } from '../refusal/refusal.ts';
 
 /** The smaller of two counts. */
-const least = (a: number, b: number): number => (a < b ? a : b);
+const least = (a: number, b: number) => (a < b ? a : b);
 
 /** Whether a `limit` or a `last` is one a read takes: none, or a whole number from 1. */
-const taken = (n: number | null): boolean => n === null || (Number.isInteger(n) && n >= 1);
+const taken = (n: number | null) => n === null || (Number.isInteger(n) && n >= 1);
 
 /**
  * The events `[from, to)` of the `count` a read holds after its cursor: the first `limit` (the default page where neither is asked), or
@@ -50,14 +50,14 @@ export type TranscriptAt = { readonly engine: string | undefined; readonly skip:
  * @param engine The engine's cursor the events were read after; undefined for the start.
  * @param skip How many events after it the read has answered.
  */
-export const transcriptCursorOf = (engine: string | undefined, skip: number): string => `${engine ?? ''}${MARK}${skip}`;
+export const transcriptCursorOf = (engine: string | undefined, skip: number) => `${engine ?? ''}${MARK}${skip}`;
 
 /**
  * Where the cursor `after` starts a read (`TranscriptAt`): none for the start; a bare engine cursor, with no `~`, at its first event, as a
  * read before the api paged gave it; `<engine>~<n>` past `n` events after it — or `Invalid` where `n` is no whole number from 0.
  * @param after The cursor the request gave; undefined or empty for the start.
  */
-export const transcriptCursorRead = (after: string | undefined): TranscriptAt | Invalid => {
+export const transcriptCursorRead = (after: string | undefined) => {
   if (after === undefined || after === '') return { engine: undefined, skip: 0 };
   const mark = after.lastIndexOf(MARK);
   if (mark === -1) return { engine: after, skip: 0 };
@@ -76,7 +76,7 @@ export const transcriptCursorRead = (after: string | undefined): TranscriptAt | 
  * asked; `Invalid` for a word that is no kind.
  * @param kinds The `?kinds=` the request gave; undefined where it gave none.
  */
-export const transcriptKindsOf = (kinds: string | undefined): readonly SaidAfter[] | undefined | Invalid => {
+export const transcriptKindsOf = (kinds: string | undefined) => {
   if (kinds === undefined || kinds.trim() === '') return undefined;
   const asked = kinds.split(',').map((k) => k.trim());
   const unknown = asked.find((k) => !(SAID_AFTER as readonly string[]).includes(k));
@@ -88,7 +88,7 @@ export const transcriptKindsOf = (kinds: string | undefined): readonly SaidAfter
 };
 
 /** A count as a query carries it: null where none is given; the number a whole decimal spells; NaN, which no read takes, otherwise. */
-const countOf = (text: string | undefined): number | null =>
+const countOf = (text: string | undefined) =>
   text === undefined || text === '' ? null : /^[0-9]+$/.test(text) ? Number(text) : Number.NaN;
 
 /** What a read of a conversation asks, as its query spells it: the first `limit` events or the last `last`, and the `kinds` to answer. */
@@ -110,10 +110,7 @@ export type TranscriptPaged<E> = { readonly events: E[]; readonly cursor: string
  * @param asked What the request asked: its limit, its last and its kinds.
  * @param bounds The page sizes: the default and the most a page holds.
  */
-export const transcriptAskedRead = (
-  asked: TranscriptAsked,
-  bounds: PageBounds,
-): { readonly kinds: readonly SaidAfter[] | undefined } | Invalid => {
+export const transcriptAskedRead = (asked: TranscriptAsked, bounds: PageBounds) => {
   const cut = transcriptCut(0, countOf(asked.limit), countOf(asked.last), bounds);
   if ('refused' in cut)
     return new Invalid({
@@ -141,7 +138,7 @@ export const transcriptPaged = <E extends Said>(
   at: TranscriptAt,
   asked: TranscriptAsked,
   bounds: PageBounds,
-): TranscriptPaged<E> | Invalid => {
+) => {
   const checked = transcriptAskedRead(asked, bounds);
   if (checked instanceof Invalid) return checked;
   const after = read.events.slice(at.skip);

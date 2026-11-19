@@ -8,7 +8,7 @@
 const PROPOSAL_LINK = /^\/factories\/([^/?#]+)\/proposals\/([^/?#]+)$/;
 
 /** `part` URI-decoded, or undefined where it does not decode or decodes to nothing. */
-const decoded = (part: string): string | undefined => {
+const decoded = (part: string) => {
   try {
     const plain = decodeURIComponent(part);
     return plain === '' ? undefined : plain;
@@ -22,7 +22,7 @@ const decoded = (part: string): string | undefined => {
  * (`/factories/<factory>/proposals/<name>`, both parts URI-decoded and neither empty); undefined for every other address. Pure.
  * @param href The link's address, as a message names it.
  */
-export function proposalLinkOf(href: string): { factory: string; name: string } | undefined {
+export function proposalLinkOf(href: string) {
   const parts = PROPOSAL_LINK.exec(href);
   if (!parts) return undefined;
   const factory = decoded(parts[1]);

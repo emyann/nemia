@@ -112,7 +112,7 @@ export type StepCloseout = typeof StepCloseout.Type;
  *
  * @param fields The query's text, as it was sent.
  */
-export const fieldsNamed = (fields: string): string[] =>
+export const fieldsNamed = (fields: string) =>
   fields
     .split(',')
     .map((name) => name.trim())
@@ -122,7 +122,7 @@ export const fieldsNamed = (fields: string): string[] =>
  * A closeout as it came (`raw`), its `body` cut to the characters `[from, to)` a read answers of the closeout's own, so the page bounds
  * both: a `raw` that is no object, or whose `body` is no string, as it is.
  */
-const rawPaged = (raw: unknown, from: number, to: number): unknown =>
+const rawPaged = (raw: unknown, from: number, to: number) =>
   typeof raw === 'object' && raw !== null && !Array.isArray(raw) && typeof (raw as { body?: unknown }).body === 'string'
     ? { ...raw, body: (raw as { body: string }).body.slice(from, to) }
     : raw;
@@ -146,13 +146,12 @@ export const closeoutNarrowed = (
   closeout: StepCloseout,
   fields: readonly string[] | undefined,
   body: BodyPage = { from: 0, limit: BODY_PAGE.byDefault },
-): StepCloseout => {
-  const keeps = (name: string): boolean =>
+) => {
+  const keeps = (name: string) =>
     fields === undefined
       ? (JSON.stringify(closeout.output[name]) ?? '').length <= SHORT_FIELD
       : fields.includes('*') || fields.includes(name);
-  const kept = <V>(record: Readonly<Record<string, V>>): Record<string, V> =>
-    Object.fromEntries(Object.entries(record).filter(([name]) => keeps(name)));
+  const kept = <V>(record: Readonly<Record<string, V>>) => Object.fromEntries(Object.entries(record).filter(([name]) => keeps(name)));
   const from = Math.max(0, body.from);
   const to = from + Math.min(Math.max(1, body.limit), BODY_PAGE.most);
   const whole = closeout.body;

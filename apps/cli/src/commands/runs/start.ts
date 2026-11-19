@@ -37,7 +37,7 @@ export type PlanCard = { body: string; workflow?: string; after: string[] };
  * @param text The file's text.
  * @param after The run ids `--after` gives; an `after:` with none is refused.
  */
-export function planCardOf(file: string, text: string, after: readonly string[]): PlanCard | null {
+export function planCardOf(file: string, text: string, after: readonly string[]) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(text);
   if (!m) return null;
   const pairs = (m[1] ?? '')
@@ -53,7 +53,7 @@ export function planCardOf(file: string, text: string, after: readonly string[])
     throw new Refused(
       `${file}: \`${stray.key}\` is not a key a plan's card has: nemia start reads a file that opens with a frontmatter block as a plan's card, whose keys are ${CARD_KEYS.join(' and ')}, and never takes the block into its brief. If they are an inbox card's keys, file it in the inbox: nemia inbox add ${file}, then nemia start the card by its name. Else delete the line, or the whole block to start the file as a brief.`,
     );
-  const keyed = (key: string): string | undefined => pairs.find((p) => p.key === key)?.value;
+  const keyed = (key: string) => pairs.find((p) => p.key === key)?.value;
   const waits = (keyed('after') ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -84,7 +84,7 @@ const MEDIA_TYPES: Readonly<Record<string, string>> = {
 };
 
 /** A size as a refusal says it: its unit and its bytes. */
-const sizeSaid = (bytes: number): string => `${ByteSize.format(ByteSize.bytes(bytes))} (${bytes} bytes)`;
+const sizeSaid = (bytes: number) => `${ByteSize.format(ByteSize.bytes(bytes))} (${bytes} bytes)`;
 
 /**
  * The files `--input` names, each read here, before anything is sent: refused, exit 2, for one that is not there or no file, and for one
@@ -92,8 +92,8 @@ const sizeSaid = (bytes: number): string => `${ByteSize.format(ByteSize.bytes(by
  * shrink or leave out before a byte is sent.
  * @param files The paths of the files to hand, as `--input` typed them.
  */
-export function inputsOf(files: readonly string[]): InputFile[] {
-  const inputs = files.map((file): InputFile => {
+export function inputsOf(files: readonly string[]) {
+  const inputs = files.map((file) => {
     const at = fs.statSync(file, { throwIfNoEntry: false });
     if (!at?.isFile())
       throw new Refused(
@@ -115,7 +115,7 @@ export function inputsOf(files: readonly string[]): InputFile[] {
  * @param namespace The namespace the start is sent to, whose files it names.
  * @param inputs The files `inputsOf` read.
  */
-async function uploaded(namespace: string, inputs: readonly InputFile[]): Promise<{ name: string; file: string }[]> {
+async function uploaded(namespace: string, inputs: readonly InputFile[]) {
   const sent: { name: string; file: string }[] = [];
   for (const input of inputs) {
     const form = new FormData();
@@ -136,7 +136,7 @@ async function uploaded(namespace: string, inputs: readonly InputFile[]): Promis
  * `--model <step>=<model>`s as the api takes them, step by step; refused, exit 2, for one that is not a step and a model.
  * @param typed Each `--model` as typed, `<step>=<model>`; none gives undefined.
  */
-export function modelsOf(typed: readonly string[]): Record<string, string> | undefined {
+export function modelsOf(typed: readonly string[]) {
   if (!typed.length) return undefined;
   return Object.fromEntries(
     typed.map((value) => {
@@ -156,7 +156,7 @@ export function modelsOf(typed: readonly string[]): Record<string, string> | und
  * What a start sends beside its workflow and brief, of either door: the runs and cards it is handed, its labels, gates, models, and its
  * inputs, each file uploaded first to `namespace`'s files (`uploaded`), once every other word has read, and named by its id.
  */
-async function extrasOf(args: Args, namespace: string): Promise<Omit<RunStart, 'workflow' | 'brief' | 'from' | 'card'>> {
+async function extrasOf(args: Args, namespace: string) {
   const after = listArg(args, 'after');
   const context = listArg(args, 'context');
   const cards = listArg(args, 'cards');
@@ -178,7 +178,7 @@ async function extrasOf(args: Args, namespace: string): Promise<Omit<RunStart, '
 }
 
 /** A workflow named by its name; refused, exit 2, given as a path, naming the start by name. */
-function byName(workflow: string, brief: string): string {
+function byName(workflow: string, brief: string) {
   if (/[\\/]/.test(workflow) || workflow.startsWith('.'))
     throw new Refused(
       `nemia start takes a workflow by its name, as its factory offers it (nemia workflows lists them), never a path: nemia start ${brief} --workflows <name>.`,
@@ -187,7 +187,7 @@ function byName(workflow: string, brief: string): string {
 }
 
 /** The inbox card `word` names, by its name with or without `.md`, and its namespace; none where the inbox has no such card. */
-async function cardNamed(word: string): Promise<{ name: string; namespace: string } | undefined> {
+async function cardNamed(word: string) {
   if (word === '' || /\s/.test(word) || /[\\/]/.test(word) || word.startsWith('.')) return undefined;
   const name = word.endsWith('.md') && word.length > 3 ? word.slice(0, -3) : word;
   try {
@@ -200,11 +200,11 @@ async function cardNamed(word: string): Promise<{ name: string; namespace: strin
 }
 
 /** `--brief`'s words in place of a card's body: a file's text where it names one here, else the words. */
-const insteadOf = (instead: string): string =>
+const insteadOf = (instead: string) =>
   fs.statSync(instead, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(instead, 'utf8') : instead;
 
 /** `nemia start` of the inbox card `card`: its body, or `--brief` in its place, on its own workflow unless `--workflows` names one. */
-async function cardStart(card: { name: string; namespace: string }, args: Args): Promise<number> {
+async function cardStart(card: { name: string; namespace: string }, args: Args) {
   const workflows = textArg(args, 'workflows');
   const instead = textArg(args, 'instead');
   if (textArg(args, 'repo') !== undefined)
@@ -227,7 +227,7 @@ async function cardStart(card: { name: string; namespace: string }, args: Args):
  * `nemia start <brief.md|card|"text"> --workflows <name> [...]`: a run of the workflow, or of the inbox card, started on the daemon.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function start(args: Args): Promise<number> {
+export async function start(args: Args) {
   const arg = textArg(args, 'brief') ?? '';
   const at = fs.statSync(arg, { throwIfNoEntry: false });
   if (at?.isDirectory())

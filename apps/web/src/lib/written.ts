@@ -19,6 +19,6 @@ const WRITTEN: Record<Written, (name: string) => string> = {
  * @param name The run's id, the card's or the proposal's name.
  * @param open Opens the thing's page, offered as Open; none where it has no page to go to.
  */
-export function sayWritten(written: Written, name: string, open?: () => void): void {
+export function sayWritten(written: Written, name: string, open?: () => void) {
   snackbar(WRITTEN[written](name), open ? { action: { label: 'Open', onPress: open } } : {});
 }

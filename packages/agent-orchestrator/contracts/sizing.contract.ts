@@ -33,13 +33,13 @@ export type Sized = {
 export const MIB_PER_SESSION = 2560;
 
 /** The floor kept for the daemon and the machine, in MiB: an eighth of the machine, and 1 GiB at least. */
-const reservedFor = (memoryMiB: number): number => Math.max(1024, Math.floor(memoryMiB / 8));
+const reservedFor = (memoryMiB: number) => Math.max(1024, Math.floor(memoryMiB / 8));
 
 /**
  * The smallest machine Nemia sizes: 2 GiB and one CPU; the installer refuses a smaller one, naming what it found. And the largest: a
  * pebibyte and 65,536 CPUs, past any machine's, so that no count is so large that a double's arithmetic on it rounds.
  */
-const sizable = (m: Machine): boolean =>
+const sizable = (m: Machine) =>
   Number.isInteger(m.memoryMiB) &&
   Number.isInteger(m.cpus) &&
   m.memoryMiB >= 2048 &&
@@ -48,10 +48,10 @@ const sizable = (m: Machine): boolean =>
   m.cpus <= 2 ** 16;
 
 /** What the machine allocates to sessions, in MiB: its memory less the floor `out` keeps. */
-const allocatable = (m: Machine, out: Sized): number => m.memoryMiB - out.memoryReservedMiB;
+const allocatable = (m: Machine, out: Sized) => m.memoryMiB - out.memoryReservedMiB;
 
 /** Whether one more session than `out` admits would fit: its request within what the machine allocates, and a CPU left over. */
-const roomForMore = (m: Machine, out: Sized): boolean =>
+const roomForMore = (m: Machine, out: Sized) =>
   (out.maxConcurrent + 1) * out.memoryRequestMiB <= allocatable(m, out) && out.maxConcurrent + 1 <= m.cpus - 1;
 
 const sizedForSpec = spec<(machine: Machine) => Sized>({
@@ -135,17 +135,17 @@ export type MemoryFit =
   | { readonly verdict: 'limitOver'; readonly limitBytes: number; readonly allocatableBytes: number };
 
 /** What a session asks where its step names nothing: its request, else its limit, as Kubernetes defaults a request; null for neither. */
-const perSession = (c: Configured): number | null => c.requestBytes ?? c.limitBytes;
+const perSession = (c: Configured) => c.requestBytes ?? c.limitBytes;
 
 /**
  * The most each session may ask with every session at once in what the machine allocates, in whole bytes: the sessions together ask
  * more than it allocates exactly when each asks more than this (`n × p > r` of whole numbers is `p > ⌊r / n⌋`), said without the
  * product, which a double may round.
  */
-const eachMayAsk = (c: Configured): number => Math.floor((c.totalBytes - c.reservedBytes) / c.maxConcurrent);
+const eachMayAsk = (c: Configured) => Math.floor((c.totalBytes - c.reservedBytes) / c.maxConcurrent);
 
 /** A whole number of bytes above nothing, up to a pebibyte. */
-const someBytes = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= 2 ** 50;
+const someBytes = (n: number) => Number.isInteger(n) && n >= 1 && n <= 2 ** 50;
 
 const memoryFitSpec = spec<(configured: Configured) => MemoryFit>({
   requires: ({ input: [c] }) =>

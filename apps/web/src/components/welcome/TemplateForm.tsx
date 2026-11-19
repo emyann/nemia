@@ -6,10 +6,10 @@ import { applyTemplate } from '@/lib/api/factories';
 import { useFactoryWrite } from '@/lib/useFactoryWrite';
 
 /** Whether a template can be applied: Nemia read it with no problem. */
-const readable = (template: Template): boolean => (template.status.problems ?? []).length === 0;
+const readable = (template: Template) => (template.status.problems ?? []).length === 0;
 
 /** What a template's tile says: its description, or for one that cannot be applied, its problems. */
-const lineOf = (template: Template): string =>
+const lineOf = (template: Template) =>
   readable(template) ? (template.spec.description ?? '') : (template.status.problems ?? []).join('; ');
 
 /**

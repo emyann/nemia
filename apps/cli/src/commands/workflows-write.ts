@@ -15,7 +15,7 @@ import { namespaceOf, pathArg, placeOf, textArg, writtenLine } from './written.t
 const { name: COMMAND, usage: USAGE } = WORKFLOWS_WRITE_WORDS;
 
 /** `files` with each of `over` in place of the one at its path, the rest kept, sorted by path. */
-const merged = (files: readonly WorkflowFile[], over: readonly WorkflowFile[]): WorkflowFile[] => {
+const merged = (files: readonly WorkflowFile[], over: readonly WorkflowFile[]) => {
   const byPath = new Map(files.map((file) => [file.path, file] as const));
   for (const file of over) byPath.set(file.path, file);
   return [...byPath.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
@@ -25,7 +25,7 @@ const merged = (files: readonly WorkflowFile[], over: readonly WorkflowFile[]): 
  * `nemia workflows write`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function workflowsWrite(args: Args): Promise<number> {
+export async function workflowsWrite(args: Args) {
   const place = placeOf(args, COMMAND, USAGE);
   const name = textArg(args, 'name') ?? '';
   const folder = pathArg(args, 'folder', COMMAND, USAGE, 'the draft folder whose steps and README to write');

@@ -16,7 +16,7 @@ export type FollowedMemo = { cursor?: number; runs: Map<string, unknown> };
  * @param held How many runs the memo held.
  * @param err Why the feed did not read.
  */
-export const feedUnread = (held: number, err: unknown): string =>
+export const feedUnread = (held: number, err: unknown) =>
   `the engine's feed did not read (${err instanceof Error ? err.message : String(err)}): the memo's ${held} run(s) are cleared, and read afresh on the next call`;
 
 /**

@@ -24,10 +24,10 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { filedFolders, startOf, type FiledFolders, type HandedRunFolders, type StartFound } from '../filed/filed.ts';
+import { filedFolders, startOf } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
-import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
+import type { RetryBriefing } from '../brief/index.ts';
 import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import {
@@ -63,7 +63,6 @@ import { carriedFilesDir, startFoundAt, workflowFilesDir } from '../frozen/froze
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import type { FactoryServers } from '../factory/servers/index.ts';
 import { addedServers } from '../library/library.verb.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -125,7 +124,7 @@ const skillsTold = Effect.fnUntraced(function* (step: StepSpec, run: Run) {
 });
 
 /** The skill `name` of the folder `from` as its brief tells it: the body of its SKILL.md's `text`, or why it could not be read. Pure. */
-function skillAgainOf(name: string, from: string, text: string, why: string): SkillAgain {
+function skillAgainOf(name: string, from: string, text: string, why: string) {
   const file = path.join(from, 'SKILL.md');
   if (!text) return { name, missing: `${file} could not be read — ${why}.` };
   try {
@@ -184,7 +183,7 @@ export type Told = StepTold & PlaceTold;
  * @param steps The steps the run is judged by.
  * @param step The step asked of.
  */
-export function workflowTargets(run: Run, steps: readonly StepSpec[], step: StepSpec): Record<string, string> {
+export function workflowTargets(run: Run, steps: readonly StepSpec[], step: StepSpec) {
   if (step.route?.kind !== 'judge') return {};
   const named = steps.filter((s) => s.after.includes(step.name)).flatMap((s) => (s.workflow === undefined ? [] : [s.workflow]));
   return Object.fromEntries(
@@ -204,13 +203,7 @@ export function workflowTargets(run: Run, steps: readonly StepSpec[], step: Step
  * @param place The run's place, whose declaration says the words.
  * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
  */
-export function placeTold(
-  run: Run,
-  steps: readonly StepSpec[],
-  step: StepSpec,
-  place: Place,
-  heads?: Readonly<Record<string, string>>,
-): PlaceTold {
+export function placeTold(run: Run, steps: readonly StepSpec[], step: StepSpec, place: Place, heads?: Readonly<Record<string, string>>) {
   const targets = workflowTargets(run, steps, step);
   return {
     words: landingWords(run, steps, step, place, heads),
@@ -228,17 +221,7 @@ export function placeTold(
  * @param home The store's root folder.
  * @param run The run, read down to what names its folders.
  */
-export const filedFoldersAt = (
-  home: string,
-  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>,
-): {
-  runArtifacts: string;
-  inbox: string;
-  inputs?: string;
-  workflowFiles?: string;
-  carriedFiles?: string;
-  runs?: HandedRunFolders[];
-} => ({
+export const filedFoldersAt = (home: string, run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'workflowFiles' | 'carriedFiles'>) => ({
   runArtifacts: path.dirname(artifactsDir(home, run, 'step')),
   inbox: inboxDir(home),
   ...(run.inputs?.length || run.cards?.length ? { inputs: inputsDir(home, run) } : {}),
@@ -251,7 +234,7 @@ export const filedFoldersAt = (
  * The folders of each run in `ids` (the runs a run is handed, its `context`) as they are on disk now, read on every filing: its
  * `artifacts/` and its `inputs/` in the store `home`, each only where it is a directory, so a run forgotten since is mounted nothing.
  */
-const handedRunsAt = (home: string, ids: readonly string[]): HandedRunFolders[] =>
+const handedRunsAt = (home: string, ids: readonly string[]) =>
   [...new Set(ids)].map((id) => {
     const artifacts = path.dirname(artifactsDir(home, { id }, 'step'));
     const inputs = inputsDir(home, { id });
@@ -275,17 +258,7 @@ export const filedAt = (
   run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles' | 'homeFiles' | 'mounts' | 'volumes'>,
   home: string,
   workspace: string,
-): {
-  runArtifacts: string;
-  inbox: string;
-  inputs?: string;
-  workflowFiles?: string;
-  carriedFiles?: string;
-  runs?: HandedRunFolders[];
-  servers: FactoryServers;
-  workspace: string;
-  start?: StartFound;
-} => ({
+) => ({
   ...filedFoldersAt(home, run),
   servers: recordedServers(run.factory, home),
   workspace,
@@ -300,12 +273,8 @@ export const filedAt = (
  * @param home The store's root.
  * @param workspace The step's workspace, absolute.
  */
-export const sessionCwd = (
-  step: StepSpec,
-  run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>,
-  home: string,
-  workspace: string,
-): string => startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
+export const sessionCwd = (step: StepSpec, run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>, home: string, workspace: string) =>
+  startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
 
 /**
  * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —
@@ -317,7 +286,7 @@ export const sessionCwd = (
  * @param factory The run's factory, or undefined for the default one.
  * @param home The store's root.
  */
-export const recordedServers = (factory: string | undefined, home: string): FactoryServers => {
+export const recordedServers = (factory: string | undefined, home: string) => {
   try {
     const name = factory ?? DEFAULT_NAMESPACE;
     const own = doorAtOnce(home, (door) => door.servers.read(FactoryName.read(name)));
@@ -336,7 +305,7 @@ export const recordedServers = (factory: string | undefined, home: string): Fact
  * @param steps The steps the run is judged by.
  * @param place The run's place.
  */
-export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], place: Place): string {
+export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], place: Place) {
   const told = placeTold(run, steps, step, place);
   const none = [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const;
   return composeBrief(step, run, steps, ...none, told);
@@ -350,7 +319,7 @@ export function briefNow(step: StepSpec, run: Run, steps: readonly StepSpec[], p
  * @param name The step's name.
  * @param record The step's record, whose ended try's closeout is read.
  */
-export const lacksTold = (home: string, run: Run, name: string, record: StepRecord): Pick<RetryBriefing, 'lacks'> => {
+export const lacksTold = (home: string, run: Run, name: string, record: StepRecord) => {
   const lacked = lackedOf(record);
   if (!lacked.length) return {};
   const there = artifactFiles(home, run, name).map((file) => file.path);
@@ -371,7 +340,7 @@ export const foldersTold = (
   run: Run,
   reads: { steps: readonly StepSpec[]; signedOff: (step: string) => Closeout | undefined },
   step: StepSpec,
-): FiledFolders => {
+) => {
   const folders = filedFolders(step, reads.steps, filedFoldersAt(home, run));
   const closeouts = folders.handed.filter((m) => holdsCloseout(home, run, path.basename(m.path))).map((m) => m.path);
   const named = folders.handed
@@ -401,7 +370,7 @@ type TriedReads = {
  * @param value What the pass read, or undefined where it has none.
  * @param what What it is, as the thrown words name it.
  */
-export const found = <T>(value: T | undefined, what: string): T => {
+export const found = <T>(value: T | undefined, what: string) => {
   if (value === undefined) throw new Error(`the pass named ${what}, which it does not have: report it as a defect of the tick`);
   return value;
 };
@@ -411,14 +380,14 @@ export const found = <T>(value: T | undefined, what: string): T => {
  * @param run The run.
  * @param name The step's name.
  */
-export const recordNamed = (run: Run, name: string): StepRecord => found(run.steps[name], `the record of step ${name} of run ${run.id}`);
+export const recordNamed = (run: Run, name: string) => found(run.steps[name], `the record of step ${name} of run ${run.id}`);
 
 /**
  * The task of the session a try stops first (`Retry.stopFirst`), which runs: a step with none on the record is thrown (`found`).
  * @param run The run.
  * @param name The step's name.
  */
-export const taskToStop = (run: Run, name: string): string =>
+export const taskToStop = (run: Run, name: string) =>
   found(recordNamed(run, name).taskId ?? undefined, `a task of step ${name} of run ${run.id}`);
 
 /**
@@ -426,14 +395,14 @@ export const taskToStop = (run: Run, name: string): string =>
  * @param f What the pass read: the run and its steps.
  * @param name The step's name.
  */
-export const stepNamed = (f: TriedReads, name: string): StepSpec =>
+export const stepNamed = (f: TriedReads, name: string) =>
   found(
     f.reads.steps.find((s) => s.name === name),
     `the step ${name}`,
   );
 
 /** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
-const endingSaid = (f: TriedReads, ending: StepSpec): EndingStopped => {
+const endingSaid = (f: TriedReads, ending: StepSpec) => {
   const { run, reads } = f;
   const said = reads.signedOff(ending.name);
   return {
@@ -460,7 +429,7 @@ export const tryTold = (
   r: Retry,
   record: StepRecord,
   t: { status: StepStatus; resumeFrom: string | undefined; refusal: RetryBriefing['refusal'] },
-): RetryBriefing => ({
+) => ({
   try: r.try,
   by: r.by,
   mode: r.mode,
@@ -483,7 +452,7 @@ export const tryTold = (
  * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
  * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
  */
-const underBudget = (steps: readonly StepSpec[], run: Run): boolean => steps.some((s) => budgetOf(s, run) !== undefined);
+const underBudget = (steps: readonly StepSpec[], run: Run) => steps.some((s) => budgetOf(s, run) !== undefined);
 
 /**
  * The readers a run is judged by, made once of the engine's views of its tasks: each task's phase, how each step signed off, whether a
@@ -494,7 +463,7 @@ const underBudget = (steps: readonly StepSpec[], run: Run): boolean => steps.som
  * @param steps The steps the run is judged by.
  */
 export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps: readonly StepSpec[]) => ({
-  phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
+  phaseOf: (taskId: string) => phaseOfView(views.get(taskId)),
   signedOff: closeoutReader(views, run, steps),
   asked: closeoutAsked(views),
   verdictOf: exitVerdicts(views, run),
@@ -552,7 +521,7 @@ export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: Ru
  * @param read The pass's read of the run.
  * @param standing The pass's reading of the branches, or undefined where none is given.
  */
-export const withStandings = <R extends AssessRead>(read: R, standing: PassStanding | undefined): R => {
+export const withStandings = <R extends AssessRead>(read: R, standing: PassStanding | undefined) => {
   if (!standing) return read;
   const { status } = assess(read);
   if (status === 'running' || status === 'cancelled') return read;

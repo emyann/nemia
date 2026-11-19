@@ -25,13 +25,13 @@ export type RunResult =
   | { readonly kind: 'stands'; readonly why: Exclude<Stands, 'done' | 'skipped'>; readonly step: string | null };
 
 /** The final steps the run will run: a final step on a branch not taken is no part of its result. */
-const owed = (steps: readonly ResultStep[]): readonly ResultStep[] => steps.filter((s) => s.final && s.stands !== 'skipped');
+const owed = (steps: readonly ResultStep[]) => steps.filter((s) => s.final && s.stands !== 'skipped');
 
 /** Whether every final step the run will run is done and gave, and there is at least one. */
-const given = (steps: readonly ResultStep[]): boolean => owed(steps).length > 0 && owed(steps).every((s) => s.stands === 'done' && s.gave);
+const given = (steps: readonly ResultStep[]) => owed(steps).length > 0 && owed(steps).every((s) => s.stands === 'done' && s.gave);
 
 /** Whether some step stands as `why`. */
-const some = (steps: readonly ResultStep[], why: Stands): boolean => steps.some((s) => s.stands === why);
+const some = (steps: readonly ResultStep[], why: Stands) => steps.some((s) => s.stands === why);
 
 /**
  * One law is held outside this spec: what the box draws as given is exactly the final steps the run will run, in the run order. It

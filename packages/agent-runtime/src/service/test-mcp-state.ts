@@ -2,7 +2,6 @@
 import { Effect } from 'effect';
 import type { McpServerState, McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
-import type { EngineShape } from './engine.ts';
 import { McpStateRefused } from './mcp-state.ts';
 import { mcpStateRefusal } from './options.ts';
 
@@ -19,11 +18,7 @@ export type TestMcpState = Omit<McpServerState, 'name'>;
  *
  * It keeps no harness, so unlike the real verb it refuses no engine for having none: that difference is declared on `APART`.
  */
-const mcpStateOf = (
-  planted: Map<string, TestMcpState>,
-  reads: Array<readonly string[]>,
-  failures: { why: string | undefined },
-): EngineShape['mcpState'] =>
+const mcpStateOf = (planted: Map<string, TestMcpState>, reads: Array<readonly string[]>, failures: { why: string | undefined }) =>
   function (servers: Record<string, RemoteMcpServer>) {
     const refused = mcpStateRefusal(servers);
     if (refused) return Effect.fail(new McpStateRefused({ message: refused }));

@@ -20,20 +20,20 @@ export const TRY_BUDGET = 1;
  * Where every try's folder is: `tries/` in the store `home`, beside `workflows/`.
  * @param home The store's root folder.
  */
-export const triesDir = (home: string): string => path.join(home, 'tries');
+export const triesDir = (home: string) => path.join(home, 'tries');
 
 /**
  * The folder the agent `name`'s try is started from.
  * @param name The agent's name.
  * @param home The store's root folder.
  */
-export const tryDir = (name: string, home: string): string => path.join(triesDir(home), name);
+export const tryDir = (name: string, home: string) => path.join(triesDir(home), name);
 
 /**
  * Where your agents are, in the store `home`: what a copy into yours copies into, and the one place an agent is tried from.
  * @param home The store's root folder.
  */
-export const yourAgentsDir = (home: string): string => path.join(home, 'workflows', AGENTS_FOLDER);
+export const yourAgentsDir = (home: string) => path.join(home, 'workflows', AGENTS_FOLDER);
 
 /** What the step's frontmatter records the agent's version under: a comment, which the parser skips. */
 const VERSION_LINE = '# version ';
@@ -48,7 +48,7 @@ export type TryFence = { permissionMode: string; allowedTools: string[] };
  * `text` quoted for a POSIX shell, as a command a person pastes says a path.
  * @param text The text to quote.
  */
-export const shellQuoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}'`;
+export const shellQuoted = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
 
 /**
  * The fence a try of agent `name`, whose keys are `keys`, writes (`directoryFence`), or why it has none: the agent's mode asks first and
@@ -56,7 +56,7 @@ export const shellQuoted = (text: string): string => `'${text.replace(/'/g, `'\\
  * @param name The agent's name, said in the refusal.
  * @param keys The agent's keys that say its fence: its mode and its allow rules.
  */
-export function tryFence(name: string, keys: FencedKeys): TryFence | string {
+export function tryFence(name: string, keys: FencedKeys) {
   return (
     directoryFence(keys.permissionMode, keys.allowedTools) ??
     `${name} allows \`${keys.allowedTools}\` in a mode that asks first (\`${keys.permissionMode}\`), and a try runs in a folder of its own, fenced no wider than its agent: none of those rules is inside the folder, and a step cannot allow nothing, so the try would run with them all. To try it, allow it an edit inside its folder — \`Edit(**)\` — or give it a mode that edits unasked, \`acceptEdits\`.`
@@ -70,7 +70,7 @@ export function tryFence(name: string, keys: FencedKeys): TryFence | string {
  * @param version The agent's version, written as a comment line.
  * @param fence The try's fence (`tryFence`).
  */
-export const tryText = (name: string, version: string, fence: TryFence): string =>
+export const tryText = (name: string, version: string, fence: TryFence) =>
   [
     '---',
     `${VERSION_LINE}${version}`,
@@ -95,7 +95,7 @@ export const tryText = (name: string, version: string, fence: TryFence): string 
  * @param name The agent's name.
  * @param home The store's root folder.
  */
-export function tryNameRefusal(name: string, home: string): string | null {
+export function tryNameRefusal(name: string, home: string) {
   if (name !== AGENTS_FOLDER && name !== SKILLS_FOLDER) return null;
   return `An agent named \`${name}\` cannot be tried: its try's folder would be ${tryDir(name, home)}, where every try looks for its ${name} first, and a folder named \`${name}\` is not a workflow. Rename the agent to try it.`;
 }
@@ -128,14 +128,14 @@ export type TriedAgent = {
 };
 
 /** Why the agent `name`, whose `mcp:` line is written `line`, cannot be tried: a try has no checkout to load a server from. */
-const serversUntried = (name: string, line: string): string =>
+const serversUntried = (name: string, line: string) =>
   `${name} names MCP servers (\`mcp: ${line}\`), which a session loads from its checkout's \`.mcp.json\`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own \`mcp:\` adds to its agent's.`;
 
 /**
  * Why the agent `name`, whose `overridable:` line is written `line` and leaves out `fence`, cannot be tried: a try is a step of its own,
  * and the narrowing to its folder is a step's override of the agent's fence, which the line does not offer (`offerRefusal`).
  */
-const offerUntried = (name: string, line: string): string =>
+const offerUntried = (name: string, line: string) =>
   `${name} offers its steps \`overridable: ${line}\`, without \`fence\`, and a try is a step of its own that narrows the agent's fence to the try's folder — so nothing it reads or writes reaches outside the run — which is a step overriding the fence. Add \`fence\` to the line to try it: a step's fence only ever narrows its agent's, never widens it.`;
 
 /**
@@ -145,7 +145,7 @@ const offerUntried = (name: string, line: string): string =>
  * @param agent The agent asked about: where it is from, its file and its keys.
  * @param home The store's root folder.
  */
-export function untriedOf(agent: TriedAgent, home: string): Untried | null {
+export function untriedOf(agent: TriedAgent, home: string) {
   if (agent.from === 'repo') {
     const into = yourAgentsDir(home);
     const files = [agent.file, ...(agent.schemaFile ? [path.join(path.dirname(agent.file), agent.schemaFile)] : [])];
@@ -190,7 +190,7 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
  * @param dir The skill's folder.
  * @param into The skills folder it is copied into.
  */
-export const skillCopyCommand = (dir: string, into: string): string =>
+export const skillCopyCommand = (dir: string, into: string) =>
   `mkdir -p ${shellQuoted(into)} && cp -r ${shellQuoted(dir)} ${shellQuoted(`${into}/`)}`;
 
 /**
@@ -200,7 +200,7 @@ export const skillCopyCommand = (dir: string, into: string): string =>
  * @param theirs The skills only the repository has, each its name and folder.
  * @param library Your library's skills folder, which the copies go into.
  */
-export function repoSkillsRefusal(name: string, theirs: ReadonlyArray<{ name: string; dir: string }>, library: string): string | null {
+export function repoSkillsRefusal(name: string, theirs: ReadonlyArray<{ name: string; dir: string }>, library: string) {
   if (!theirs.length) return null;
   const copies = theirs.map((skill) => `\`${skillCopyCommand(skill.dir, library)}\``).join(', ');
   return `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`;

@@ -4,7 +4,7 @@ import { FILE_LIMIT } from 'objects';
 import { StartInputs } from './StartInputs';
 
 /** A file named `name` of `size` bytes, as a browser hands one; its size set, so a story lists a large one without holding it. */
-const fileOf = (name: string, size: number, type = 'image/png'): File => {
+const fileOf = (name: string, size: number, type = 'image/png') => {
   const file = new File(['x'], name, { type });
   Object.defineProperty(file, 'size', { value: size });
   return file;

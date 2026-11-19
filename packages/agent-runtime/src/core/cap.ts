@@ -19,17 +19,16 @@ import { turnOf, type Attempt, type Parked, type Sighting, type State } from './
  * @param cap The session's spend cap, in US dollars, or undefined where it has none.
  * @param spent What the session has spent so far, in US dollars, or undefined where that is not known.
  */
-export const capLeft = (cap: number | undefined, spent: number | undefined): number | undefined =>
-  cap === undefined ? undefined : cap - (spent ?? 0);
+export const capLeft = (cap: number | undefined, spent: number | undefined) => (cap === undefined ? undefined : cap - (spent ?? 0));
 
 /**
  * Whether `left`, what `capLeft` answers, is a cap spent whole: at or below nothing. No cap is never spent.
  * @param left What is left of the cap, in US dollars, or undefined where there is no cap.
  */
-export const capSpent = (left: number | undefined): boolean => left !== undefined && left <= 0;
+export const capSpent = (left: number | undefined) => left !== undefined && left <= 0;
 
 /** Attempt `attempt`'s turn's cap, and the attempts of that turn before it: what `parkedCapLeft` counts from. */
-const turnBefore = (state: State, attempt: number): { cap: number | undefined; before: Attempt[] } => {
+const turnBefore = (state: State, attempt: number) => {
   const at = state.attempts.findIndex((a) => a.n === attempt);
   const turn = at === -1 ? state.inputs.length : (state.attempts[at]?.turn ?? 0);
   const cap = configForTurn(state.config, turnOf(state, turn).config)?.budgetUsd;
@@ -49,13 +48,13 @@ const turnBefore = (state: State, attempt: number): { cap: number | undefined; b
  * @param state The task's fold.
  * @param attempt The number of the attempt whose cap is asked.
  */
-export const parkedCapLeft = (state: State, attempt: number): number | undefined => {
+export const parkedCapLeft = (state: State, attempt: number) => {
   const { cap, before } = turnBefore(state, attempt);
   return capLeft(cap, spentParked(before));
 };
 
 /** What the run of parked attempts at the end of `attempts` cost, counting an unpriced one as 0. */
-const spentParked = (attempts: readonly Attempt[]): number => {
+const spentParked = (attempts: readonly Attempt[]) => {
   let spent = 0;
   for (const a of [...attempts].reverse()) {
     if (a.parked === undefined) break;
@@ -72,7 +71,7 @@ const spentParked = (attempts: readonly Attempt[]): number => {
  * @param n The number of the attempt being spawned.
  * @param config The turn's configuration, or undefined where it gives none.
  */
-export const continuedCap = (state: State, n: number, config: HarnessArgs | undefined): { config?: HarnessArgs } => {
+export const continuedCap = (state: State, n: number, config: HarnessArgs | undefined) => {
   const at = state.attempts.findIndex((a) => a.n === n);
   const before = at > 0 ? state.attempts[at - 1] : undefined;
   const continues = before?.parked !== undefined && (before.turn ?? 0) === (state.attempts[at]?.turn ?? 0);
@@ -89,12 +88,10 @@ export const continuedCap = (state: State, n: number, config: HarnessArgs | unde
  * @param n The number of the attempt that ended.
  * @param seen What was last seen of the attempt's session: whether it parked and what it spent; undefined where nothing was seen.
  */
-export const parkedEnd = (
-  state: State,
-  n: number,
-  seen: Pick<Sighting, 'parked' | 'usage'> | undefined,
-): { parked?: Parked; limit?: 'budget' } => {
-  if (seen?.parked === undefined) return {};
+export const parkedEnd = (state: State, n: number, seen: Pick<Sighting, 'parked' | 'usage'> | undefined) => {
+  if (seen?.parked === undefined) return {} satisfies { parked?: Parked; limit?: 'budget' };
   const { cap, before } = turnBefore(state, n);
-  return capSpent(capLeft(cap, spentParked(before) + (seen.usage?.costUsd ?? 0))) ? { limit: 'budget' } : { parked: seen.parked };
+  return (
+    capSpent(capLeft(cap, spentParked(before) + (seen.usage?.costUsd ?? 0))) ? { limit: 'budget' } : { parked: seen.parked }
+  ) satisfies { parked?: Parked; limit?: 'budget' };
 };

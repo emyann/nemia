@@ -5,7 +5,7 @@
  * session token, so every write is the person's.
  */
 import { queryOptions } from '@tanstack/react-query';
-import type { Delegation, DelegationWrite, Proposal } from 'objects';
+import type { DelegationWrite } from 'objects';
 import { pace } from '../feed.ts';
 import { retryUnlessGone } from './gone.ts';
 import { agents, delegations, proposals } from './objects.ts';
@@ -39,7 +39,7 @@ export const proposalKey = (factory: string, name: string) => ['proposal', facto
 export const proposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: proposalsKey(factory),
-    queryFn: async (): Promise<readonly Proposal[]> => (await proposals.list(factory)).items,
+    queryFn: async () => (await proposals.list(factory)).items,
     refetchInterval: () => pace(15_000),
   });
 
@@ -51,7 +51,7 @@ export const proposalsQuery = (factory: string) =>
 export const waitingProposalsQuery = (factory: string) =>
   queryOptions({
     queryKey: waitingProposalsKey(factory),
-    queryFn: async (): Promise<readonly Proposal[]> => (await proposals.list(factory, WAITING_SELECTOR)).items,
+    queryFn: async () => (await proposals.list(factory, WAITING_SELECTOR)).items,
     refetchInterval: () => pace(15_000),
   });
 
@@ -74,14 +74,14 @@ export const proposalQuery = (factory: string, name: string) =>
  * @param factory The factory's name.
  * @param name The proposal's name.
  */
-export const approveProposal = (factory: string, name: string): Promise<Proposal> => proposals.approve(factory, name);
+export const approveProposal = (factory: string, name: string) => proposals.approve(factory, name);
 
 /**
  * Decline the proposal `name` of `factory`, the person's: the proposal as it then reads. Rejects with a `WriteRefusal`.
  * @param factory The factory's name.
  * @param name The proposal's name.
  */
-export const declineProposal = (factory: string, name: string): Promise<Proposal> => proposals.decline(factory, name);
+export const declineProposal = (factory: string, name: string) => proposals.decline(factory, name);
 
 /**
  * The key of the factory `factory`'s delegations, which a write invalidates.
@@ -96,7 +96,7 @@ export const delegationsKey = (factory: string) => ['delegations', factory] as c
 export const delegationsQuery = (factory: string) =>
   queryOptions({
     queryKey: delegationsKey(factory),
-    queryFn: async (): Promise<readonly Delegation[]> => (await delegations.list(factory)).items,
+    queryFn: async () => (await delegations.list(factory)).items,
   });
 
 /**
@@ -105,15 +105,14 @@ export const delegationsQuery = (factory: string) =>
  * @param agent The name of the agent the delegation lets approve proposals.
  * @param spec The delegation, written whole.
  */
-export const putDelegation = (factory: string, agent: string, spec: DelegationWrite): Promise<Delegation> =>
-  delegations.put(factory, agent, spec);
+export const putDelegation = (factory: string, agent: string, spec: DelegationWrite) => delegations.put(factory, agent, spec);
 
 /**
  * Remove the delegation of `agent` in `factory`, the person's. Rejects with a `WriteRefusal` in the api's words.
  * @param factory The factory's name.
  * @param agent The name of the agent the delegation lets approve proposals.
  */
-export const removeDelegation = (factory: string, agent: string): Promise<Delegation> => delegations.delete(factory, agent);
+export const removeDelegation = (factory: string, agent: string) => delegations.delete(factory, agent);
 
 /** An agent a delegation may name: its file's name, and its `role:` line, null where it has none. */
 export type DelegableAgent = { readonly name: string; readonly role: string | null };
@@ -126,7 +125,7 @@ export type DelegableAgent = { readonly name: string; readonly role: string | nu
 export const delegableAgentsQuery = (factory: string) =>
   queryOptions({
     queryKey: ['delegable-agents', factory],
-    queryFn: async (): Promise<readonly DelegableAgent[]> => {
+    queryFn: async () => {
       const byName = new Map<string, DelegableAgent>();
       for (const a of await agents.list(factory))
         if (!byName.has(a.metadata.name)) byName.set(a.metadata.name, { name: a.metadata.name, role: a.spec.role ?? null });

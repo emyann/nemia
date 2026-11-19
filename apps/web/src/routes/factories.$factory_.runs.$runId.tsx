@@ -9,8 +9,8 @@ import { objectHome } from '../lib/factoryAddress';
  * default one, is loaded again at the address it belongs at (`objectHome`), its search kept; `step` opens that step in the bar.
  */
 export const Route = createFileRoute('/factories/$factory_/runs/$runId')({
-  validateSearch: (search: Record<string, unknown>): { step?: string } =>
-    typeof search.step === 'string' && search.step ? { step: search.step } : {},
+  validateSearch: (search: Record<string, unknown>) =>
+    (typeof search.step === 'string' && search.step ? { step: search.step } : {}) satisfies { step?: string } as { step?: string },
   beforeLoad: ({ search, params }) => {
     if (!search.step) return;
     const bar = barValue({ kind: 'step', run: params.runId, step: search.step });

@@ -43,7 +43,7 @@ export const STEP_ATTRIBUTE_KEYS: readonly string[] = ['factory', 'workflow', 's
  * run's id, a task's, or anything else that grows with the store.
  * @param attributes The attributes a metric or a span is to carry, by key.
  */
-export function boundedAttributes(attributes: Readonly<Record<string, string>>): Record<string, string> {
+export function boundedAttributes(attributes: Readonly<Record<string, string>>) {
   const loose = Object.keys(attributes).find((key) => !STEP_ATTRIBUTE_KEYS.includes(key));
   if (loose !== undefined) {
     throw new Invalid({
@@ -62,7 +62,7 @@ export type StepKeys = { factory: string; workflow: string; step: string; agent:
  * The two labels a run is known by, whatever the step: its factory or the default, and its workflow's folder.
  * @param run The run, its factory and its workflow's folder.
  */
-export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKeys, 'factory' | 'workflow'> => ({
+export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>) => ({
   factory: runNamespace(run.factory),
   workflow: path.basename(run.workflowDir),
 });
@@ -73,7 +73,7 @@ export const runKeys = (run: Pick<Run, 'factory' | 'workflowDir'>): Pick<StepKey
  * @param run The run, its factory and its workflow's folder.
  * @param step The step, with its agent where it has one.
  */
-export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec): StepKeys => ({
+export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec) => ({
   ...runKeys(run),
   step: step.name,
   agent: step.agent?.name ?? 'none',
@@ -85,8 +85,8 @@ export const stepKeys = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSp
  * @param step The step, with its agent where it has one.
  * @param outcome How the try, the check, the round or the gate came out.
  */
-export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec, outcome: string): Record<string, string> =>
-  boundedAttributes({ ...stepKeys(run, step), outcome });
+export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: StepSpec, outcome: string) =>
+  boundedAttributes({ ...stepKeys(run, step), outcome }) satisfies Record<string, string> as Record<string, string>;
 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
@@ -138,7 +138,7 @@ export type FactReads = {
  * Each of a step's tasks, its session's and its check's, of every try: which it is. Each once, its first mention kept: a session held open
  * and answered is the step's task and one of its tries', and one task.
  */
-function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 'try' | 'check' }> {
+function tasksOf(record: Run['steps'][string]) {
   const all = [
     ...(record.taskId ? [{ taskId: record.taskId, metric: 'try' as const }] : []),
     ...(record.check ? [{ taskId: record.check.taskId, metric: 'check' as const }] : []),
@@ -148,7 +148,10 @@ function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 
     ]),
   ];
   const seen = new Set<string>();
-  return all.filter((t) => !seen.has(t.taskId) && seen.add(t.taskId));
+  return all.filter((t) => !seen.has(t.taskId) && seen.add(t.taskId)) satisfies Array<{
+    taskId: string;
+    metric: 'try' | 'check';
+  }> as Array<{ taskId: string; metric: 'try' | 'check' }>;
 }
 
 /**
@@ -157,7 +160,7 @@ function tasksOf(record: Run['steps'][string]): Array<{ taskId: string; metric: 
  * @param current Whether the task is the step's current one, whose closeout says blocked.
  * @param closeout The step's closeout, or undefined where it has none.
  */
-export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined): string {
+export function tryOutcome(view: FactView, current: boolean, closeout: Closeout | undefined) {
   if (view.state.settled !== 'succeeded') return view.state.settled ?? 'failed';
   return current && closeout?.outcome === 'blocked' ? 'blocked' : 'done';
 }
@@ -166,7 +169,7 @@ export function tryOutcome(view: FactView, current: boolean, closeout: Closeout 
  * How a check ended: `passed` on exit 0, `refused` on another exit, `unfinished` with none (`attemptVerdict`).
  * @param view The engine's view of the check's task.
  */
-export function checkOutcome(view: FactView): string {
+export function checkOutcome(view: FactView) {
   const verdict = attemptVerdict(view.state.attempts.at(-1));
   return verdict === 'unfinished' ? verdict : verdict === 0 ? 'passed' : 'refused';
 }
@@ -176,7 +179,7 @@ export function checkOutcome(view: FactView): string {
  * writes, uncached) where every attempt measured it (`sumUsage`), never 0 in its place, and `task` on the
  * step's first try (`stepTaskId`), the one settle a step of a run is counted by as a task, whatever tries and rounds follow it.
  */
-function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads: FactReads): StepFact {
+function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads: FactReads) {
   const record = run.steps[step.name];
   const outcome = tryOutcome(view, record?.taskId === taskId, reads.signedOff(step.name));
   const spend = reads.spendOf(taskId);
@@ -192,7 +195,7 @@ function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads
     ...(usage?.uncachedTokens !== undefined ? { uncachedTokens: usage.uncachedTokens } : {}),
     ...(taskId === stepTaskId(run, step.name) ? { task: true as const } : {}),
     ms: ranMs(view),
-  };
+  } satisfies StepFact;
 }
 
 /**
@@ -204,12 +207,12 @@ function tryFact(run: Run, step: StepSpec, taskId: string, view: FactView, reads
  * @param settled The ids of the tasks that settled and are due.
  * @param reads What the pass already read of the run's tasks.
  */
-export function settledFacts(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): StepFact[] {
-  if (!settled.size) return [];
-  return steps.flatMap((step) => {
+export function settledFacts(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads) {
+  if (!settled.size) return [] satisfies StepFact[] as StepFact[];
+  return steps.flatMap<StepFact>((step) => {
     const record = run.steps[step.name];
     if (!record) return [];
-    const facts = tasksOf(record).flatMap(({ taskId, metric }): StepFact[] => {
+    const facts = tasksOf(record).flatMap<StepFact>(({ taskId, metric }) => {
       const view = settled.has(taskId) ? reads.views.get(taskId) : undefined;
       if (!view) return [];
       if (metric === 'check') return [{ metric, attributes: stepAttributes(run, step, checkOutcome(view)) }];
@@ -230,14 +233,14 @@ export function settledFacts(run: Run, steps: readonly StepSpec[], settled: Read
  * @param steps The steps of the run's workflow.
  * @param views The engine's views of the run's tasks, by task id.
  */
-export function settlesDue(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>): Set<string> {
+export function settlesDue(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>) {
   const counted = run.settlesCounted;
-  if (!counted) return new Set();
+  if (!counted) return new Set() satisfies Set<string>;
   const tasks = steps.flatMap((step) => {
     const record = run.steps[step.name];
     return record ? tasksOf(record).map((t) => t.taskId) : [];
   });
-  return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId)));
+  return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId))) satisfies Set<string>;
 }
 
 /**
@@ -248,14 +251,13 @@ export function settlesDue(run: Run, steps: readonly StepSpec[], views: Readonly
  * @param steps The steps of the run's workflow.
  * @param reads What the pass already read of the run's tasks.
  */
-export function settledOnce(
-  run: Run,
-  steps: readonly StepSpec[],
-  reads: FactReads,
-): { facts: StepFact[]; marks: Pick<Run, 'settlesCounted'> } {
+export function settledOnce(run: Run, steps: readonly StepSpec[], reads: FactReads) {
   const due = settlesDue(run, steps, reads.views);
   const facts = [...settledFacts(run, steps, due, reads), ...settledWaits(run, steps, due, reads)];
-  return { facts, marks: due.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} };
+  return { facts, marks: due.size ? { settlesCounted: [...(run.settlesCounted ?? []), ...due] } : {} } satisfies {
+    facts: StepFact[];
+    marks: Pick<Run, 'settlesCounted'>;
+  } as { facts: StepFact[]; marks: Pick<Run, 'settlesCounted'> };
 }
 
 /**
@@ -264,8 +266,10 @@ export function settledOnce(
  * @param steps The steps of the run's workflow.
  * @param looped The names of the steps whose loop the pass took round again.
  */
-export const roundsGranted = (run: Run, steps: readonly StepSpec[], looped: readonly string[]): StepFact[] =>
-  steps.filter((s) => looped.includes(s.name)).map((step) => ({ metric: 'round', attributes: stepAttributes(run, step, 'granted') }));
+export const roundsGranted = (run: Run, steps: readonly StepSpec[], looped: readonly string[]) =>
+  steps
+    .filter((s) => looped.includes(s.name))
+    .map((step) => ({ metric: 'round', attributes: stepAttributes(run, step, 'granted') })) satisfies StepFact[];
 
 /** The three waits a step is timed by outside its sessions. */
 export type Wait = 'queue' | 'check' | 'gate';
@@ -289,26 +293,25 @@ export type WaitFact = {
 export type Waited = { from: string; to: string; ms: number };
 
 /** The interval from `from` to `to`, or null where either is not known. */
-const between = (from: string | null | undefined, to: string | null | undefined): Waited | null =>
+const between = (from: string | null | undefined, to: string | null | undefined) =>
   from && to ? { from, to, ms: Math.max(0, Date.parse(to) - Date.parse(from)) } : null;
 
 /**
  * A task's wait in the queue: from its filing to its first attempt's spawn, the timeline's `queuedMs`; null where either is not known.
  * @param view The engine's view of the session's task.
  */
-export const queueWait = (view: FactView): Waited | null =>
-  between(view.state.filedAt, view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt);
+export const queueWait = (view: FactView) => between(view.state.filedAt, view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt);
 
 /**
  * A check's run: from its first attempt's spawn to its last attempt's end, the timeline's `ranMs` of a check; null where either is not
  * known.
  * @param view The engine's view of the check's task.
  */
-export const checkWait = (view: FactView): Waited | null =>
+export const checkWait = (view: FactView) =>
   between(view.state.attempts.find((a) => a.spawnedAt)?.spawnedAt, view.state.attempts.at(-1)?.endedAt);
 
 /** Each task of a step's record, its session's and its check's, with the try it was first filed for: a recheck's session is not its own. */
-function triesOf(record: Run['steps'][string]): Array<{ taskId: string; try: number; check: boolean }> {
+function triesOf(record: Run['steps'][string]) {
   const tries = [...(record.tries ?? []), ...(record.taskId ? [{ taskId: record.taskId, check: record.check }] : [])];
   const seen = new Set<string>();
   return tries.flatMap((t, i) => {
@@ -326,27 +329,29 @@ function triesOf(record: Run['steps'][string]): Array<{ taskId: string; try: num
  * @param settled The ids of the tasks that settled and are due.
  * @param reads What the pass already read of the run's tasks.
  */
-export function settledWaits(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads): WaitFact[] {
-  if (!settled.size) return [];
+export function settledWaits(run: Run, steps: readonly StepSpec[], settled: ReadonlySet<string>, reads: FactReads) {
+  if (!settled.size) return [] satisfies WaitFact[];
   return steps.flatMap((step) => {
     const record = run.steps[step.name];
     if (!record) return [];
-    return triesOf(record).flatMap((t): WaitFact[] => {
+    return triesOf(record).flatMap((t) => {
       const view = settled.has(t.taskId) ? reads.views.get(t.taskId) : undefined;
       const interval = view && (t.check ? checkWait(view) : queueWait(view));
-      if (!view || !interval) return [];
+      if (!view || !interval) return [] satisfies WaitFact[];
       const outcome = t.check ? checkOutcome(view) : tryOutcome(view, record.taskId === t.taskId, reads.signedOff(step.name));
       const wait = t.check ? 'check' : 'queue';
-      return [{ metric: 'wait', wait, attributes: stepAttributes(run, step, outcome), run: run.id, try: t.try, ...interval }];
+      return [
+        { metric: 'wait', wait, attributes: stepAttributes(run, step, outcome), run: run.id, try: t.try, ...interval },
+      ] satisfies WaitFact[];
     });
-  });
+  }) satisfies WaitFact[];
 }
 
 /**
  * Whether try `t` ends at the turn it ran of an earlier try's session, with no check of its own, on a `run` whose timeline is handed over
  * or was never to be (`runTimed` other than `false`): a gate `gateWaits` leaves untimed, whatever pass reads it.
  */
-const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Boolean(t.turn) && !t.check && run.runTimed !== false;
+const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry) => Boolean(t.turn) && !t.check && run.runTimed !== false;
 
 /**
  * The gate wait of each approval of `run` at a gated step that the tick has not timed (`gatesTimed`), off its `timeline` of `views`: the ms
@@ -358,21 +363,21 @@ const answeredLate = (run: Pick<Run, 'runTimed'>, t: TimelineTry): boolean => Bo
  * @param steps The steps of the run's workflow.
  * @param views The engine's views of the run's tasks, by task id, that the timeline is read off.
  */
-export function gateWaits(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, TaskClock>): WaitFact[] {
+export function gateWaits(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, TaskClock>) {
   const timed = run.gatesTimed;
-  if (!timed || !run.approvals?.length) return [];
+  if (!timed || !run.approvals?.length) return [] satisfies WaitFact[];
   const tl = timeline(run, views, steps);
-  return run.approvals.flatMap((a): WaitFact[] => {
+  return run.approvals.flatMap((a) => {
     const step = steps.find((s) => s.name === a.step);
-    if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [];
+    if (!step || !hasGate(step, run) || timed.some((g) => g.step === a.step && g.try === a.try)) return [] satisfies WaitFact[];
     const t = tl.steps[a.step]?.find((x) => x.try === a.try);
     const ms = t && !answeredLate(run, t) ? gateWaitOf(run, tl, step, t) : null;
-    if (ms === null) return [];
+    if (ms === null) return [] satisfies WaitFact[];
     const from = new Date(Date.parse(a.at) - ms).toISOString();
     return [
       { metric: 'wait', wait: 'gate', attributes: stepAttributes(run, step, 'approved'), run: run.id, try: a.try, from, to: a.at, ms },
-    ];
-  });
+    ] satisfies WaitFact[];
+  }) satisfies WaitFact[];
 }
 
 /**
@@ -390,7 +395,7 @@ export function onceFacts(
   steps: readonly StepSpec[],
   views: ReadonlyMap<string, FactView>,
   callOf: (denial: DeniedCall) => string,
-): { facts: StepFact[]; marks: Pick<Run, 'gatesTimed' | 'deniedCounted'> } {
+) {
   const gates = gateWaits(run, steps, views);
   const denied = deniedCalls(run, steps, views, callOf);
   const counted = new Map((run.deniedCounted ?? []).map((c) => [c.task, c.attempts]));
@@ -402,7 +407,7 @@ export function onceFacts(
       ...(run.gatesTimed ? { gatesTimed: [...run.gatesTimed, ...timed] } : {}),
       ...(run.deniedCounted ? { deniedCounted: [...counted].map(([task, attempts]) => ({ task, attempts })) } : {}),
     },
-  };
+  } satisfies { facts: StepFact[]; marks: Pick<Run, 'gatesTimed' | 'deniedCounted'> };
 }
 
 /**
@@ -438,9 +443,9 @@ export function deniedCalls(
   steps: readonly StepSpec[],
   views: ReadonlyMap<string, FactView>,
   callOf: (denial: DeniedCall) => string,
-): DeniedFact[] {
+) {
   const counted = run.deniedCounted;
-  if (!counted) return [];
+  if (!counted) return [] satisfies DeniedFact[];
   return steps.flatMap((step) => {
     const record = run.steps[step.name];
     const sessions = record ? triesOf(record).filter((t) => !t.check) : [];
@@ -448,8 +453,8 @@ export function deniedCalls(
     return sessions.flatMap(({ taskId }) => {
       const from = counted.find((c) => c.task === taskId)?.attempts ?? 0;
       const attempts: readonly FactAttempt[] = views.get(taskId)?.state.attempts ?? [];
-      return attempts.flatMap((a, i): DeniedFact[] => {
-        if (i < from || a.ended === null || a.ended === undefined) return [];
+      return attempts.flatMap((a, i) => {
+        if (i < from || a.ended === null || a.ended === undefined) return [] satisfies DeniedFact[];
         const at = a.endedAt ?? a.startedAt;
         return (a.denials ?? []).map((d) => ({
           metric: 'denied',
@@ -460,10 +465,10 @@ export function deniedCalls(
           call: callOf(d),
           at,
           attempt: i + 1,
-        }));
+        })) satisfies DeniedFact[];
       });
     });
-  });
+  }) satisfies DeniedFact[];
 }
 
 /**
@@ -492,15 +497,10 @@ export type TimelineFact = {
  * @param views The engine's views of every try's task and check, by task id.
  * @param outcome How the run ended.
  */
-export function timelineFacts(
-  run: Run,
-  steps: readonly StepSpec[],
-  views: ReadonlyMap<string, FactView>,
-  outcome: string,
-): TimelineFact[] | null {
+export function timelineFacts(run: Run, steps: readonly StepSpec[], views: ReadonlyMap<string, FactView>, outcome: string) {
   const tl = timeline(run, views, steps);
   if (tl.run.inFlight > 0) return null;
-  return timelineRows(run, tl, steps).map((r): TimelineFact => {
+  return timelineRows(run, tl, steps).map((r) => {
     const step = steps.find((s) => s.name === r.step);
     return {
       metric: 'timeline',
@@ -511,6 +511,6 @@ export function timelineFacts(
       part: r.part,
       value: r.value,
       ...(r.try === null ? {} : { try: r.try }),
-    };
-  });
+    } satisfies TimelineFact;
+  }) satisfies TimelineFact[] | null;
 }

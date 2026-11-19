@@ -24,7 +24,7 @@ export const EXPORT_INTERVALS = {
 } as const;
 
 /** The interval `env` gives under `name`: unset or blank none, a whole number of ms from 1 that number, anything else wrong. */
-const intervalOf = (env: Readonly<Record<string, string | undefined>>, name: string): number | undefined | { wrong: string } => {
+const intervalOf = (env: Readonly<Record<string, string | undefined>>, name: string) => {
   const value = env[name]?.trim();
   if (!value) return undefined;
   return /^[1-9]\d*$/.test(value) ? Number(value) : { wrong: value };
@@ -39,7 +39,7 @@ export const DEFAULT_SERVICE_NAME = 'nemia';
  * from 1 is left to the exporter, and said by `exportIntervalRefusalOf`. Answers undefined, no export, when the endpoint is unset or blank.
  * @param env The process's environment.
  */
-export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp | undefined {
+export function otlpOf(env: Readonly<Record<string, string | undefined>>) {
   const url = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim().replace(/\/+$/, '');
   if (!url) return undefined;
   const every: Otlp['every'] = {};
@@ -54,7 +54,7 @@ export function otlpOf(env: Readonly<Record<string, string | undefined>>): Otlp 
  * Why an `EXPORT_INTERVALS` variable of `env` is not read, in a sentence that names the fix, or `undefined` when each is read or unset.
  * @param env The process's environment.
  */
-export function exportIntervalRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
+export function exportIntervalRefusalOf(env: Readonly<Record<string, string | undefined>>) {
   for (const name of Object.values(EXPORT_INTERVALS)) {
     const ms = intervalOf(env, name);
     if (ms !== undefined && typeof ms !== 'number')
@@ -72,19 +72,19 @@ const TOOL_DETAILS = 'NEMIA_TOOL_DETAILS';
  * Answers undefined, no export, without a collector, whatever `NEMIA_TOOL_DETAILS` says; any value but `1` leaves the inputs off.
  * @param env The process's environment.
  */
-export function sessionTelemetryOf(
-  env: Readonly<Record<string, string | undefined>>,
-): { endpoint: string; toolDetails?: true } | undefined {
+export function sessionTelemetryOf(env: Readonly<Record<string, string | undefined>>) {
   const otlp = otlpOf(env);
   if (!otlp) return undefined;
-  return env[TOOL_DETAILS]?.trim() === '1' ? { endpoint: otlp.url, toolDetails: true } : { endpoint: otlp.url };
+  return (env[TOOL_DETAILS]?.trim() === '1' ? { endpoint: otlp.url, toolDetails: true } : { endpoint: otlp.url }) satisfies
+    | { endpoint: string; toolDetails?: true }
+    | undefined;
 }
 
 /**
  * Why `env`'s `NEMIA_TOOL_DETAILS` asks nothing, in a sentence that names the fix, or `undefined` when it is unset, blank, `0` or `1`.
  * @param env The process's environment.
  */
-export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
+export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undefined>>) {
   const value = env[TOOL_DETAILS];
   if (value === undefined || ['', '0', '1'].includes(value.trim())) return undefined;
   return `${TOOL_DETAILS} is ${JSON.stringify(value)}, which asks nothing: set it to 1 for each session to export its tools' inputs, or unset it. Their tools' details are left off.`;
@@ -96,7 +96,7 @@ export function toolDetailsRefusalOf(env: Readonly<Record<string, string | undef
  * @param run The run the step is of.
  * @param step The step.
  */
-export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec): StepLabels => ({
+export const stepLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>, step: StepSpec) => ({
   run: run.id,
   ...stepKeys(run, step),
 });
@@ -109,7 +109,7 @@ export type StepLabels = StepKeys & { run: string };
  * What a line of the feed about the run itself carries.
  * @param run The run.
  */
-export const runLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>): Pick<StepLabels, 'run' | 'factory' | 'workflow'> => ({
+export const runLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>) => ({
   run: run.id,
   ...runKeys(run),
 });
@@ -118,19 +118,19 @@ export const runLabels = (run: Pick<Run, 'id' | 'factory' | 'workflowDir'>): Pic
  * Where an OTLP collector at `otlp` takes traces.
  * @param otlp The OTLP export, whose collector's address is read.
  */
-export const tracesUrl = (otlp: Otlp): string => `${otlp.url}/v1/traces`;
+export const tracesUrl = (otlp: Otlp) => `${otlp.url}/v1/traces`;
 
 /**
  * Where an OTLP collector at `otlp` takes logs.
  * @param otlp The OTLP export, whose collector's address is read.
  */
-export const logsUrl = (otlp: Otlp): string => `${otlp.url}/v1/logs`;
+export const logsUrl = (otlp: Otlp) => `${otlp.url}/v1/logs`;
 
 /**
  * Where an OTLP collector at `otlp` takes metrics.
  * @param otlp The OTLP export, whose collector's address is read.
  */
-export const metricsUrl = (otlp: Otlp): string => `${otlp.url}/v1/metrics`;
+export const metricsUrl = (otlp: Otlp) => `${otlp.url}/v1/metrics`;
 
 /**
  * A log's `message` as `nemia up` prints it: the time of `date`, `HH:MM:SS` in UTC, two spaces, then the message — its parts joined by a
@@ -138,7 +138,7 @@ export const metricsUrl = (otlp: Otlp): string => `${otlp.url}/v1/metrics`;
  * @param message The log's message: a string, or an array of its parts.
  * @param date When the log was made.
  */
-export function lineOf(message: unknown, date: Date): string {
+export function lineOf(message: unknown, date: Date) {
   const parts = Array.isArray(message) ? message : [message];
   const text = parts.map((part) => (typeof part === 'string' ? part : JSON.stringify(part))).join(' ');
   return `${date.toISOString().slice(11, 19)}  ${text}`;

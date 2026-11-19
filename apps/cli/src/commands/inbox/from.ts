@@ -15,7 +15,7 @@ const { name: COMMAND } = INBOX_FROM_WORDS;
  * @param card The card as the api answers it after the write.
  * @param was The runs the card named under `from:` before the write.
  */
-export const fromLines = (card: Card, was: readonly string[]): string[] => {
+export const fromLines = (card: Card, was: readonly string[]) => {
   const name = card.metadata.name;
   const from = card.spec.from ?? [];
   return from.length
@@ -27,7 +27,7 @@ export const fromLines = (card: Card, was: readonly string[]): string[] => {
  * `nemia inbox from`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function inboxFrom(args: Args): Promise<number> {
+export async function inboxFrom(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const runs = switchArg(args, 'off') ? [] : runsNamed(args);
   const current = await asked(COMMAND, (c) => c.cards.getAll({ params: { name } }));

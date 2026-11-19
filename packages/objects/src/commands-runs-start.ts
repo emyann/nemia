@@ -14,7 +14,7 @@ const ONCE: Readonly<Record<string, string>> = {
 };
 
 /** One of `nemia start`'s value flags: taken once, unless `many`; `cli`, why the api does not take it as typed, where it does not. */
-function startFlag(flag: string, key: string, takes: string, how: { many?: true; cli?: string } = {}): Flag {
+function startFlag(flag: string, key: string, takes: string, how: { many?: true; cli?: string } = {}) {
   return {
     flag,
     kind: 'text',
@@ -22,7 +22,7 @@ function startFlag(flag: string, key: string, takes: string, how: { many?: true;
     takes: `${flag} takes ${takes}`,
     ...(how.many ? { many: true } : { twice: `nemia start takes ${flag} once: a run ${ONCE[flag]}.` }),
     ...(how.cli !== undefined ? { only: { side: 'cli', why: how.cli } } : {}),
-  };
+  } satisfies Flag;
 }
 
 /** `nemia start`'s spec: the brief, then its flags, each value flag also as `--flag=<value>`. */

@@ -23,7 +23,7 @@ import { textOf } from './lines.ts';
  * @param env The person's environment: the context in use, the cache folder, and the session's environment; this process's by default.
  * @param here The folder the command is typed in, the repository where none is typed; this process's working folder by default.
  */
-export async function factoryHome(args: Args, env: NodeJS.ProcessEnv = process.env, here: string = process.cwd()): Promise<number> {
+export async function factoryHome(args: Args, env: NodeJS.ProcessEnv = process.env, here: string = process.cwd()) {
   const factory = textOf(args, 'factory');
   const typed = path.resolve(here, textArg(args, 'repo') ?? '.');
   if (!fs.statSync(typed, { throwIfNoEntry: false })?.isDirectory())

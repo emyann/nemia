@@ -20,7 +20,7 @@ const COST = { preload: false, listed: 60, body: 1200, perTurn: 60 };
  * @param from Where it is found.
  * @param usedBy The agents of yours that give it.
  */
-const skillRow = (name: string, from: SkillRow['from'], usedBy: string[] = []): SkillRow => ({
+const skillRow = (name: string, from: SkillRow['from'], usedBy: string[] = []) => ({
   name,
   from,
   dir: from === 'builtin' ? `/nemia/skills/${name}` : `/store/skills/${name}`,
@@ -30,7 +30,7 @@ const skillRow = (name: string, from: SkillRow['from'], usedBy: string[] = []): 
   cost: COST,
   usedBy,
   found: from === 'builtin' ? null : 'user',
-});
+}) satisfies SkillRow;
 
 /** An agent of yours that writes a change's notes, giving one skill and leaving `Skill` out of its tools. */
 export const scribe: LibraryAgent = {
@@ -115,7 +115,7 @@ export const yourStore: YourStore = {
 };
 
 /** Nemia at `level`, her session up and two factories beside the default one, one raised for a stretch. */
-export const nemiaLevel = (level: NemiaLevel['level']): NemiaLevel => ({
+export const nemiaLevel = (level: NemiaLevel['level']) => ({
   level,
   since: '2026-11-15T12:00:00.000Z',
   task: 'nemia-1',
@@ -133,7 +133,7 @@ export const nemiaLevel = (level: NemiaLevel['level']): NemiaLevel => ({
     { factory: 'quay', level: 'manual', default: 'manual', own: 'manual', raise: null },
   ],
   untrusted: null,
-});
+}) satisfies NemiaLevel;
 
 /** The facts she keeps: two, none opened. */
 export const nemiaMemory: NemiaMemory = { dir: '/store/nemia/memory', facts: ['owner.md', 'style.md'], fact: null };

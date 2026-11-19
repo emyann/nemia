@@ -3,7 +3,7 @@
  * then one of Kubernetes' operators `=`, `==` or `!=`, then a proposal's phase; and which proposals it takes (`phaseTakes`). An empty
  * selector is every proposal, the list's to read before this is asked. Pure.
  */
-import { PROPOSAL_PHASES, type ProposalPhase } from 'objects';
+import { PROPOSAL_PHASES } from 'objects';
 import type { PhaseTakes, ProposalPhaseSelectorOf } from '../../contracts/proposal-phase-selector.contract.ts';
 
 export type { ProposalPhaseSelector } from '../../contracts/proposal-phase-selector.contract.ts';
@@ -12,7 +12,7 @@ export type { ProposalPhaseSelector } from '../../contracts/proposal-phase-selec
 const FIELD = 'status.phase';
 
 /** `word` as a proposal's phase, or null where it is none. */
-const phaseOf = (word: string): ProposalPhase | null => PROPOSAL_PHASES.find((phase) => phase === word) ?? null;
+const phaseOf = (word: string) => PROPOSAL_PHASES.find((phase) => phase === word) ?? null;
 
 /**
  * The selector `text` spells: `status.phase`, then `==`, `!=` or `=`, then a phase; null for anything else.

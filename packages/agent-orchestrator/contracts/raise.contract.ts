@@ -28,14 +28,13 @@ export type RaiseInput = {
 export type RaiseVerdict = { by: RaiseBy; above: number; modes: RetryMode[]; own: StepStatus | null };
 
 /** A try's raise is due: the try carries one, and there is a way to try it. */
-const tryDue = (i: RaiseInput): boolean => i.tryRaise !== null && i.modes.length > 0;
+const tryDue = (i: RaiseInput) => i.tryRaise !== null && i.modes.length > 0;
 
 /** A looping step whose round waits on its budget: over it, or out of rounds, with a step of its loop over its cap. */
-const roundDue = (i: RaiseInput): boolean =>
-  !tryDue(i) && i.loop && (i.status === 'over budget' || i.status === 'exhausted') && i.over.length > 0;
+const roundDue = (i: RaiseInput) => !tryDue(i) && i.loop && (i.status === 'over budget' || i.status === 'exhausted') && i.over.length > 0;
 
 /** Two lists of modes that say the same ways, in the same order. */
-const sameModes = (a: readonly RetryMode[], b: readonly RetryMode[]): boolean => a.length === b.length && a.every((m, k) => m === b.at(k));
+const sameModes = (a: readonly RetryMode[], b: readonly RetryMode[]) => a.length === b.length && a.every((m, k) => m === b.at(k));
 
 const raiseSpec = spec<(i: RaiseInput) => RaiseVerdict | null>({
   /**

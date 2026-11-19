@@ -31,17 +31,17 @@ export type Channel = {
 export type Sharing = { locks: Locks; channel: (name: string) => Channel };
 
 /** The browser's Web Locks and `BroadcastChannel`; none where the browser has no Web Locks or no channel. */
-export const browserSharing = (): Sharing | undefined =>
-  typeof navigator !== 'undefined' && navigator.locks && typeof BroadcastChannel !== 'undefined'
+export const browserSharing = () =>
+  (typeof navigator !== 'undefined' && navigator.locks && typeof BroadcastChannel !== 'undefined'
     ? { locks: navigator.locks, channel: (name) => new BroadcastChannel(name) }
-    : undefined;
+    : undefined) satisfies Sharing | undefined;
 
 /**
  * Whether the cursor `seen` already holds everything the cursor `id` does: each of its counts at least as high. Pure.
  * @param seen The cursor a tab holds, a dot-separated count of each source.
  * @param id The cursor a read ended on, in the same shape.
  */
-export const covers = (seen: string, id: string): boolean => {
+export const covers = (seen: string, id: string) => {
   const have = seen.split('.').map(Number);
   return id.split('.').every((n, i) => Number(n) <= (have[i] ?? 0));
 };

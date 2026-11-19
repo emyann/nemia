@@ -31,7 +31,7 @@ const roots: string[] = [];
 const marks: number[] = [];
 
 /** A new directory under the temp directory, named from `prefix`, taken away with what runs in it before the file ends. */
-export const scratch = (prefix: string): string => {
+export const scratch = (prefix: string) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   roots.push(root);
   return root;
@@ -41,7 +41,7 @@ export const scratch = (prefix: string): string => {
  * The machine's temp directory itself, for a test that asserts where the code under test runs a process. Never a place to
  * make a root in: `scratch` makes one, and `tools/guards/test/test-kit.test.ts` refuses a line that passes this to a `mkdtempSync`.
  */
-export const machineTempDir = (): string => os.tmpdir();
+export const machineTempDir = () => os.tmpdir();
 
 export type Proc = { pid: number; pgid: number; state: string; args: string; cwd?: string; env?: string };
 
@@ -51,14 +51,14 @@ export type Proc = { pid: number; pgid: number; state: string; args: string; cwd
  * which only its owner may read. The command's name in `/proc/<pid>/stat` is in parentheses and may hold spaces, so the fields are
  * counted from its last `)`.
  */
-const processes = (): Proc[] => {
+const processes = () => {
   if (!fs.existsSync('/proc/self/stat')) {
     return execFileSync('ps', ['-eo', 'pid=,pgid=,stat=,args='], { encoding: 'utf8' })
       .split('\n')
       .flatMap((line) => {
         const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
         return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3] ?? '', args: m[4] ?? '' }] : [];
-      });
+      }) satisfies Proc[] as Proc[];
   }
   const found: Proc[] = [];
   for (const entry of fs.readdirSync('/proc')) {
@@ -78,7 +78,7 @@ const processes = (): Proc[] => {
       found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0] ?? '', args, cwd, env });
     } catch {}
   }
-  return found;
+  return found satisfies Proc[];
 };
 
 const realOf = (p: string) => {
@@ -97,7 +97,7 @@ const pathIn = (text: string, dir: string) => {
 };
 
 /** The processes still alive in any of `dirs` — a zombie is not alive, and this process and its parent are never counted. */
-export const runningIn = (dirs: string[]): Proc[] => {
+export const runningIn = (dirs: string[]) => {
   const all = dirs.flatMap((d) => [d, realOf(d)]);
   return processes().filter(
     (p) =>
@@ -136,7 +136,7 @@ const isWorker = (p: Proc) => /\bae-worker\.ts\b/.test(p.args);
  * test froze it; then the rest killed, each with its process group where it leads one, for what it started, and never with
  * this process's own group. Answers what is still alive after both.
  */
-export const reap = async (dirs: string[]): Promise<Proc[]> => {
+export const reap = async (dirs: string[]) => {
   if (!dirs.length) return [];
   const workers = runningIn(dirs).filter(isWorker);
   for (const w of workers) {

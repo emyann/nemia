@@ -184,7 +184,7 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
       else process.env[key] = before[key];
     }
   }
-  const env = given.env!;
+  const env = given.env;
   assert.deepEqual(
     [env.CLAUDECODE, env.CLAUDE_PID, env.OTEL_EXPORTER_OTLP_ENDPOINT, env.CLAUDE_CODE_ENABLE_TELEMETRY],
     [undefined, undefined, undefined, undefined],

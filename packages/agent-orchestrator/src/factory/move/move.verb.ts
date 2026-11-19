@@ -22,7 +22,7 @@ import { CardDoor } from '../../cards/cards.store.ts';
 import { RunDoor } from '../../runs/runs.store.ts';
 import { CardName } from '../../inbox/inbox.model.ts';
 import { cardsListed, parseInboxCard } from '../../inbox/index.ts';
-import { ARCHIVE_LIMIT, packArchive, unpackArchive, type TreeFile } from '../../archive/archive.ts';
+import { ARCHIVE_LIMIT, packArchive, unpackArchive } from '../../archive/archive.ts';
 import { templateGiven } from '../../template/given.store.ts';
 import { treeDir } from '../applied/applied.store.ts';
 import { cloned } from '../clones/clones.verb.ts';
@@ -35,7 +35,7 @@ import { cardMoved, factoryOnTarget, fileTextOf, folderOnTarget, renamedFolders,
 const PACKED_AS = 'factory';
 
 /** Why a card that a run was started from stays with its store. */
-const leftWhy = (runs: readonly string[]): string =>
+const leftWhy = (runs: readonly string[]) =>
   `${runs.length > 1 ? 'the runs' : 'the run'} ${runs.join(', ')} ${runs.length > 1 ? 'were' : 'was'} started from it, and runs stay with their store: it stays beside ${runs.length > 1 ? 'them' : 'it'}.`;
 
 /**
@@ -97,7 +97,7 @@ const cardsOf = Effect.fn('cardsOf')(function* (name: string) {
  * The file `raw` an export carries, in one list of volumes: one an earlier release wrote, its repositories under `repos` and their URLs
  * under `origins`, read as the daemon's move reads it (`volumesFromRepos`), those keys taken out; one in one list as it is.
  */
-const oneList = (raw: object): object => {
+const oneList = (raw: object) => {
   if (!('repos' in raw) && !('origins' in raw)) return raw;
   const { repos, origins, volumes, ...kept } = raw as { repos?: unknown; origins?: unknown; volumes?: unknown };
   const keys = {
@@ -114,7 +114,7 @@ const oneList = (raw: object): object => {
  * none. A templated factory's workflows are its tree's, which travels in its folder, so its schedules and cost lines are judged once it is
  * filed, not here.
  */
-function factorySent(name: string, text: string): Factory {
+function factorySent(name: string, text: string) {
   const again = `Export it again from its store: nemia factory move ${name} --to <context>. Nothing was filed.`;
   const json = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))(text);
   if (Option.isNone(json)) throw new Invalid({ message: `the factory sent is not JSON. ${again}` });
@@ -140,7 +140,7 @@ type Decided = {
  * Each repository of `source`, its writable volumes, as the target in the store `home` takes it (`repoOnTarget`, then `volumesGiven`
  * as a writable volume), what was typed for each by its path on the source (`typedRepos`), into `out`.
  */
-function reposDecided(home: string, source: Factory, typedRepos: Readonly<Record<string, string>>, out: Decided): void {
+function reposDecided(home: string, source: Factory, typedRepos: Readonly<Record<string, string>>, out: Decided) {
   for (const repo of source.volumes.filter((v) => !v.readOnly)) {
     const given = repoOnTarget(repo.path, repo.origin, typedRepos[repo.path]);
     if (given.kind === 'refused') {
@@ -162,7 +162,7 @@ function reposDecided(home: string, source: Factory, typedRepos: Readonly<Record
  * Each repository and volume of `source` as the target in the store `home` takes it (`reposDecided`; `volumeOnTarget` over
  * `volumeRefusal`), what `write` typed for each by its key; a key typed that names none of them refused too.
  */
-function decided(home: string, source: Factory, write: FactoryImportWrite): Decided {
+function decided(home: string, source: Factory, write: FactoryImportWrite) {
   const out: Decided = { repos: {}, origins: {}, volumes: {}, refused: [] };
   const typedRepos = write.repos ?? {};
   reposDecided(home, source, typedRepos, out);
@@ -191,11 +191,11 @@ function decided(home: string, source: Factory, write: FactoryImportWrite): Deci
 }
 
 /** The folder sent, unpacked: none for none; refused `Invalid`, every entry at once, as `unpackArchive` refuses it. */
-const folderSent = (archive: string): TreeFile[] =>
+const folderSent = (archive: string) =>
   archive === '' ? [] : unpackArchive(Buffer.from(archive, 'base64'), ARCHIVE_LIMIT, 'the folder sent').files;
 
 /** A card the export carried, as the target files it: its text moved (`cardMoved`), refused `Invalid` where it does not read as a card. */
-function cardSent(card: { readonly name: string; readonly source: string }, factory: string, from: string): { name: string; text: string } {
+function cardSent(card: { readonly name: string; readonly source: string }, factory: string, from: string) {
   try {
     return { name: card.name, text: cardMoved(card.source, { name: card.name, factory, from }) };
   } catch (err) {
@@ -230,7 +230,7 @@ const cardFiled = Effect.fn('cardFiled')(function* (name: string, text: string) 
 });
 
 /** The refusal of an import under `name`, which this store files a factory under already. */
-const filedHere = (name: string): Conflict =>
+const filedHere = (name: string) =>
   new Conflict({
     message: `this store holds a factory ${name} already: remove it here with nemia factory rm ${name}, or keep it and move none over it. Nothing was filed.`,
   });

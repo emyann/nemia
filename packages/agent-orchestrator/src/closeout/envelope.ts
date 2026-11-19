@@ -69,7 +69,7 @@ export const ENVELOPE_SCHEMA = {
  * last space that leaves room for an ellipsis, or hard where it has none, and ends `…`.
  * @param text The summary as it was given.
  */
-export function summaryLine(text: string): string {
+export function summaryLine(text: string) {
   const line =
     text
       .split('\n')
@@ -89,7 +89,7 @@ export type ValueArtifact = { name: string; value: string };
  * so is `{path}`; `{name, value}` of two strings is a value; anything else is dropped.
  * @param list The envelope's `artifacts`, of any shape: anything but an array holds none.
  */
-export function artifactsOf(list: unknown): { files: string[]; values: ValueArtifact[] } {
+export function artifactsOf(list: unknown) {
   const files: string[] = [];
   const values: ValueArtifact[] = [];
   for (const a of Array.isArray(list) ? list : []) {
@@ -110,7 +110,7 @@ export function artifactsOf(list: unknown): { files: string[]; values: ValueArti
  * @param summary The summary cut to a line (`summaryLine`).
  * @param given The body given, or undefined where none was.
  */
-export function bodyOf(whole: string, summary: string, given: string | undefined): string | undefined {
+export function bodyOf(whole: string, summary: string, given: string | undefined) {
   const lead = whole.trim() !== summary ? whole.trim() : '';
   return [lead, given?.trim() ?? ''].filter(Boolean).join('\n\n') || undefined;
 }
@@ -120,7 +120,7 @@ export function bodyOf(whole: string, summary: string, given: string | undefined
  * closeout is never refused: it was given before the rule.
  * @param c The closeout's envelope: its version, its outcome and its `needs`.
  */
-export function envelopeRefusals(c: { apiVersion?: string; outcome: string; needs?: string }): string[] {
+export function envelopeRefusals(c: { apiVersion?: string; outcome: string; needs?: string }) {
   if (c.apiVersion !== CLOSEOUT_V1 || c.outcome !== 'done' || !c.needs) return [];
   return [
     '`needs` is set on a `done` closeout: it is only for a step that signs off `blocked`. Move what it says into `body`, or sign off `blocked`.',

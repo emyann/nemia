@@ -32,7 +32,7 @@ export const CLAUDE_PIN = '2.1.325';
  * folder's `bin/`; signed in by its own login, or by a long-lived token (`CLAUDE_SIGN_IN`), each typed by the person on the server, since
  * both ask for what a task cannot read.
  */
-function claudeNeeds(): HarnessNeeds {
+function claudeNeeds() {
   const home = `"$NEMIA_TOOLS/harnesses/claude/${CLAUDE_PIN}"`;
   const pkg = `@anthropic-ai/claude-agent-sdk-$p`;
   return {
@@ -55,7 +55,7 @@ function claudeNeeds(): HarnessNeeds {
       ],
     },
     turnModel: 'haiku',
-  };
+  } satisfies HarnessNeeds;
 }
 
 /**
@@ -234,7 +234,7 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
  * A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`.
  * @param key The flag's key in `config.claude`, in camelCase.
  */
-export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+export const claudeFlagName = (key: string) => `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 
 /**
  * What a Claude Code session is denied: the task's `disallowedTools`, and an edit anywhere under each read-only mount, `Edit(//<path>/**)`.
@@ -243,7 +243,7 @@ export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g
  * into it included (measured on Claude Code 2.1.288).
  * @param config The task's spawn config, read for its disallowed tools and its mounts; absent, none.
  */
-export const claudeDenies = (config: SpawnRequest['config']): string[] => [
+export const claudeDenies = (config: SpawnRequest['config']) => [
   ...(config?.disallowedTools ?? []),
   ...(config?.mounts ?? []).filter((m) => m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
@@ -255,7 +255,7 @@ export const claudeDenies = (config: SpawnRequest['config']): string[] => [
  * and a Bash redirection write there. `auto` writes there without it (measured on Claude Code 2.1.288).
  * @param config The task's spawn config, read for its allowed tools and its mounts; absent, none.
  */
-export const claudeAllows = (config: SpawnRequest['config']): string[] => [
+export const claudeAllows = (config: SpawnRequest['config']) => [
   ...(config?.allowedTools ?? []),
   ...(config?.mounts ?? []).filter((m) => !m.readOnly && m.ruled !== true).map((m) => `Edit(/${m.path}/**)`),
 ];
@@ -276,7 +276,7 @@ const CLAUDE_UNRULED = /[()*?[\]\\]|[^\S ]/;
  * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
  * edit there (`claudeDenies`), or allows one (`claudeAllows`), cannot carry (`CLAUDE_UNRULED`).
  */
-const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>) => {
   const mount = task.config?.mounts?.find((m) => CLAUDE_UNRULED.test(m.path));
   if (!mount) return undefined;
   const how = mount.readOnly
@@ -289,7 +289,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
  * Why a task's admission cannot be merged into its Claude Code settings — or `undefined`: settings given as a file, which the runtime
  * does not rewrite, or JSON that is no object.
  */
-const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>) => {
   const settings = task.config?.claude?.settings;
   if (task.config?.callAdmission === undefined || settings === undefined) return undefined;
   if (settingsObject(settings) !== undefined) return undefined;
@@ -300,7 +300,7 @@ const claudeAdmissionRefusal = (task: Omit<SpawnRequest, 'name'>): string | unde
  * Settings given as JSON, as an object; undefined for a file's path or JSON that is no object.
  * @param settings The task's `claude.settings`, as JSON or a file's path.
  */
-export const settingsObject = (settings: string): Record<string, unknown> | undefined => {
+export const settingsObject = (settings: string) => {
   try {
     const read: unknown = JSON.parse(settings);
     return isJsonObject(read) ? read : undefined;
@@ -321,14 +321,14 @@ export const isJsonObject = (value: unknown): value is Record<string, unknown> =
  * session's first message, a job's and a long-lived session's alike (`session-bridge.ts`), and never spelt as a flag.
  * @param task The task, read for its `config.claude.remoteControl`.
  */
-export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
+export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }) => task.config?.claude?.remoteControl !== undefined;
 
 /**
  * What Claude Code cannot be asked for, Codex's own arguments, a mount whose rule it cannot write and admission beside settings it
  * cannot merge among it, as a sentence that says what to write instead.
  * @param task The task as filed, its name left out.
  */
-export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>) => {
   const { permissionMode, effort } = task.config ?? {};
   const owned = Object.keys(task.config?.claude ?? {}).find((key) => CLAUDE_OWNED_FLAGS.includes(key));
   if (task.config?.codex !== undefined) {
@@ -351,7 +351,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
  * so it is stable, greppable, and — the point — never absent.
  * @param r The spawn request, read for its `config.worktree` and its session name.
  */
-export const worktreeName = (r: SpawnRequest): string =>
+export const worktreeName = (r: SpawnRequest) =>
   typeof r.config?.worktree === 'string' ? r.config.worktree : r.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /**
@@ -372,22 +372,23 @@ export const CLAUDE_ADDED_FOLDER_READS = {
 } as const;
 
 /** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
-const dropsAuto = (model: string | undefined): boolean =>
+const dropsAuto = (model: string | undefined) =>
   model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
 
 /** Claude Code's fence on `model`, run as a job or a background session alike. */
-const claudeReach = (model: string | undefined): FenceReach => ({
-  by: 'mode',
-  rank: CLAUDE_MODE_RANK,
-  given: CLAUDE_DEFAULT_MODE,
-  writes: CLAUDE_MODE_RANK.acceptEdits,
-  held: CLAUDE_HELD_MODE,
-  unasking: CLAUDE_UNASKING_MODES,
-  dropped: dropsAuto(model) ? ['auto'] : [],
-  refusing: CLAUDE_REFUSING_MODES,
-  unfenced: CLAUDE_UNFENCED,
-  granted: CLAUDE_GRANTED,
-});
+const claudeReach = (model: string | undefined) =>
+  ({
+    by: 'mode',
+    rank: CLAUDE_MODE_RANK,
+    given: CLAUDE_DEFAULT_MODE,
+    writes: CLAUDE_MODE_RANK.acceptEdits,
+    held: CLAUDE_HELD_MODE,
+    unasking: CLAUDE_UNASKING_MODES,
+    dropped: dropsAuto(model) ? ['auto'] : [],
+    refusing: CLAUDE_REFUSING_MODES,
+    unfenced: CLAUDE_UNFENCED,
+    granted: CLAUDE_GRANTED,
+  }) satisfies FenceReach;
 
 /**
  * What Claude Code declares, as the engine runs it (`'claude'`), a job and a long-lived session alike: every key of a task's config

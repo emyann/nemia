@@ -14,7 +14,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type WorkerSeen = 'running' | 'gone' | 'unknown';
 
 /** Whether a beat `beatAgeMs` old is within a lease of `leaseMs`: an age that cannot be read (`NaN`) is not. */
-const fresh = (beatAgeMs: number, leaseMs: number): boolean => beatAgeMs <= leaseMs;
+const fresh = (beatAgeMs: number, leaseMs: number) => beatAgeMs <= leaseMs;
 
 const leaseWordSpec = spec<(state: string, beatAgeMs: number, leaseMs: number, worker: WorkerSeen) => string>({
   requires: ({ input: [, , leaseMs] }) => leaseMs > 0,

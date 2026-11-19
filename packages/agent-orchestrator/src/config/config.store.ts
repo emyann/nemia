@@ -77,7 +77,7 @@ const minuteDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*([2
 
 /** `WF_METRICS_HOUR_DAYS`: days of hour lines kept, a whole number from 1; undefined, kept until pruned, when unset. */
 const hourDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*[1-9]\d*\s*$/)), 'WF_METRICS_HOUR_DAYS').pipe(
-  Config.map((value): number | undefined => Number(value.trim())),
+  Config.map((value) => Number(value.trim())),
   Config.withDefault(undefined),
 );
 
@@ -87,7 +87,7 @@ const quantity = (variable: string) =>
     Schema.String.check(Schema.makeFilter((value: string) => !value.trim() || memoryQuantityRefusal(value.trim()) === undefined)),
     variable,
   ).pipe(
-    Config.map((value): string | undefined => value.trim() || undefined),
+    Config.map((value) => value.trim() || undefined),
     Config.withDefault(undefined),
   );
 
@@ -105,7 +105,7 @@ const SLICE = /^[\w:@.-]*[\w:@-]\.slice$/;
 
 /** `WF_CGROUP_PARENT`: a slice's unit name (`SLICE`); undefined, the user manager's root slice, when unset or empty. */
 const slice = Config.schema(Schema.String.check(Schema.isPattern(SLICE)), 'WF_CGROUP_PARENT').pipe(
-  Config.map((value): string | undefined => value),
+  Config.map((value) => value),
   Config.withDefault(undefined),
 );
 
@@ -119,7 +119,7 @@ const releaseCheckOn = Config.schema(Schema.Literals(['on', 'off']), 'NEMIA_RELE
  * `config` read from `env`, or `Invalid` with the words `refusal` gives the value `name` has there. `keepEmpty` reads an empty value as a
  * value, where Effect's provider otherwise reads it as unset.
  */
-function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (value: string) => string, keepEmpty = false): T {
+function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (value: string) => string, keepEmpty = false) {
   const provider = ConfigProvider.fromEnvRecord({ ...env }, { preserveEmptyStrings: keepEmpty });
   const parsed = Effect.runSync(Effect.result(config.parse(provider)));
   if (Result.isSuccess(parsed)) return parsed.success;
@@ -131,7 +131,7 @@ function read<T>(config: Config.Config<T>, name: string, env: Env, refusal: (val
  * read a store of its own under its working directory, and when empty, which would read the working directory itself.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const wfRoot = (env: Env): string =>
+export const wfRoot = (env: Env) =>
   read(
     root(),
     'WF_ROOT',
@@ -145,7 +145,7 @@ export const wfRoot = (env: Env): string =>
  * `WF_MAX_CONCURRENT`, sessions at work per pool at once: a whole number from 1, or 2 when unset, empty or blank.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const maxConcurrent = (env: Env): number =>
+export const maxConcurrent = (env: Env) =>
   read(
     concurrent,
     'WF_MAX_CONCURRENT',
@@ -159,7 +159,7 @@ export const maxConcurrent = (env: Env): number =>
  * read as no cap, a mistyped value would lift the cap it was set to hold.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const maxRuns = (env: Env): number =>
+export const maxRuns = (env: Env) =>
   read(
     runs,
     'WF_MAX_RUNS',
@@ -174,7 +174,7 @@ export const maxRuns = (env: Env): number =>
  * set to keep.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const keepsWorktrees = (env: Env): boolean =>
+export const keepsWorktrees = (env: Env) =>
   read(
     keepWorktrees,
     'WF_KEEP_WORKTREES',
@@ -187,7 +187,7 @@ export const keepsWorktrees = (env: Env): boolean =>
  * `WF_VERIFY_REST`, whether a pass judges in full each run it answers from its memo of runs at rest: `1` on; `0`, unset or empty off.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const verifiesRest = (env: Env): boolean =>
+export const verifiesRest = (env: Env) =>
   read(
     verifyRest,
     'WF_VERIFY_REST',
@@ -200,7 +200,7 @@ export const verifiesRest = (env: Env): boolean =>
  * `WF_METRICS_MINUTE_DAYS`, the days of minute lines the series keep: a whole number from 2, or 30 when unset or empty.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const metricsMinuteDays = (env: Env): number =>
+export const metricsMinuteDays = (env: Env) =>
   read(
     minuteDays,
     'WF_METRICS_MINUTE_DAYS',
@@ -213,7 +213,7 @@ export const metricsMinuteDays = (env: Env): number =>
  * `WF_METRICS_HOUR_DAYS`, the days of hour lines the series keep: a whole number from 1, or undefined — kept until pruned — when unset.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const metricsHourDays = (env: Env): number | undefined =>
+export const metricsHourDays = (env: Env) =>
   read(
     hourDays,
     'WF_METRICS_HOUR_DAYS',
@@ -228,7 +228,7 @@ export const metricsHourDays = (env: Env): number | undefined =>
  * in the runtime's words when it is anything else: read as no limit, a mistyped value would lift the bound it was set to hold.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const memoryLimit = (env: Env): string | undefined =>
+export const memoryLimit = (env: Env) =>
   read(
     memory,
     'WF_MEMORY_LIMIT',
@@ -244,7 +244,7 @@ export const memoryLimit = (env: Env): string | undefined =>
  * above `WF_MEMORY_LIMIT`, since no session may ask more than it may hold.
  * @param env The environment the variable is read from, as `process.env` holds it; its `WF_MEMORY_LIMIT` is read too.
  */
-export const memoryRequest = (env: Env): string | undefined => {
+export const memoryRequest = (env: Env) => {
   const value = read(
     request,
     'WF_MEMORY_REQUEST',
@@ -269,7 +269,7 @@ export const memoryRequest = (env: Env): string | undefined => {
  * blank. Refused in the runtime's words when it is anything else: read as the default, a mistyped value would keep a floor nobody set.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const memoryReserved = (env: Env): string | undefined =>
+export const memoryReserved = (env: Env) =>
   read(
     reserved,
     'WF_MEMORY_RESERVED',
@@ -283,7 +283,7 @@ export const memoryReserved = (env: Env): string | undefined =>
  * `.slice`, which an operator caps to bound the sessions together, or undefined — the user manager's root slice — when unset or empty.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const cgroupParent = (env: Env): string | undefined =>
+export const cgroupParent = (env: Env) =>
   read(
     slice,
     'WF_CGROUP_PARENT',
@@ -298,7 +298,7 @@ export const cgroupParent = (env: Env): string | undefined =>
  * either, a mistyped value would do what it was not set to.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const releaseCheck = (env: Env): boolean =>
+export const releaseCheck = (env: Env) =>
   read(
     releaseCheckOn,
     'NEMIA_RELEASE_CHECK',
@@ -314,7 +314,7 @@ export const releaseCheck = (env: Env): boolean =>
  * process would read its own folders under its working directory.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const folderRoots = (env: Env): readonly string[] => {
+export const folderRoots = (env: Env) => {
   const value = env.WF_FOLDER_ROOTS ?? '';
   const roots = value
     .split(path.delimiter)
@@ -332,7 +332,7 @@ export const folderRoots = (env: Env): readonly string[] => {
  * that the person's folder listing names nothing inside it; Nemia's daemon keeps its engine under `WF_ROOT`.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const engineStore = (env: Env): string =>
+export const engineStore = (env: Env) =>
   env.AE_ROOT?.trim() ? path.resolve(env.AE_ROOT.trim()) : path.join(os.homedir(), '.agent-engine');
 
 /**
@@ -341,7 +341,7 @@ export const engineStore = (env: Env): string =>
  * folders. Unset, by default, every such start is refused.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
+export const defaultFactoryStarts = (env: Env) => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /**
  * `WF_EXPOSED`, whether the store is marked exposed — reached from beyond this machine, through a bind, a proxy or a tunnel — so that the
@@ -349,7 +349,7 @@ export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTOR
  * or not, refuses a request to the api that presents no token (`callerGate`).
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const exposedStore = (env: Env): boolean => env.WF_EXPOSED === '1';
+export const exposedStore = (env: Env) => env.WF_EXPOSED === '1';
 
 /** A name a store may be served at: a DNS name, as a URL's host writes one, its trailing dot allowed, or an IPv6 address in brackets. */
 const SERVED_NAME = /^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.?|\[[0-9a-f:.]+\])$/i;
@@ -362,7 +362,7 @@ const SERVED_NAME = /^(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?
  * every pairing asked at the name the person meant.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const servedNames = (env: Env): readonly string[] => {
+export const servedNames = (env: Env) => {
   const value = env.WF_SERVED_NAMES ?? '';
   const names = value.split(/[\s,]+/).filter((name) => name !== '');
   if (names.every((name) => SERVED_NAME.test(name))) return names.map((name) => name.toLowerCase().replace(/\.$/, ''));
@@ -380,7 +380,7 @@ export const servedNames = (env: Env): readonly string[] => {
  * @param bound The address the api listens on.
  * @param declared The names the person declares the store reached by.
  */
-export const servedNamesOf = (exposed: boolean, bound: string, declared: readonly string[]): readonly string[] => {
+export const servedNamesOf = (exposed: boolean, bound: string, declared: readonly string[]) => {
   if (!exposed) return [];
   if (bound === '' || bound === '0.0.0.0' || bound === '::') return declared;
   return [bound.includes(':') ? `[${bound.toLowerCase()}]` : bound, ...declared];
@@ -391,7 +391,7 @@ export const servedNamesOf = (exposed: boolean, bound: string, declared: readonl
  * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
  * @param env The environment the variable is read from, as `process.env` holds it.
  */
-export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOKEN || undefined;
+export const sessionToken = (env: Env) => env.WF_SESSION_TOKEN || undefined;
 
 /**
  * The daemon's per-session variables: what it sets on each session it starts, and so what no process but a session's starts with — the
@@ -440,59 +440,60 @@ export type Settings = {
  * reads it and by no other: a command that never reads `WF_MAX_RUNS` runs whatever it holds, as it did when each read its own.
  * @param env The environment the settings are read from, as `process.env` holds it, each variable when its setting is read.
  */
-export const settingsOf = (env: Env): Settings => ({
-  get maxConcurrent() {
-    return maxConcurrent(env);
-  },
-  get maxRuns() {
-    return maxRuns(env);
-  },
-  get verifyRest() {
-    return verifiesRest(env);
-  },
-  get keepWorktrees() {
-    return keepsWorktrees(env);
-  },
-  get metricsMinuteDays() {
-    return metricsMinuteDays(env);
-  },
-  get metricsHourDays() {
-    return metricsHourDays(env);
-  },
-  get memoryLimit() {
-    return memoryLimit(env);
-  },
-  get memoryRequest() {
-    return memoryRequest(env);
-  },
-  get memoryReserved() {
-    return memoryReserved(env);
-  },
-  get cgroupParent() {
-    return cgroupParent(env);
-  },
-  get defaultFactoryStarts() {
-    return defaultFactoryStarts(env);
-  },
-  get sessionToken() {
-    return sessionToken(env);
-  },
-  get exposed() {
-    return exposedStore(env);
-  },
-  get servedNames() {
-    return servedNames(env);
-  },
-  get releaseCheck() {
-    return releaseCheck(env);
-  },
-  get folderRoots() {
-    return folderRoots(env);
-  },
-  get engineStore() {
-    return engineStore(env);
-  },
-});
+export const settingsOf = (env: Env) =>
+  ({
+    get maxConcurrent() {
+      return maxConcurrent(env);
+    },
+    get maxRuns() {
+      return maxRuns(env);
+    },
+    get verifyRest() {
+      return verifiesRest(env);
+    },
+    get keepWorktrees() {
+      return keepsWorktrees(env);
+    },
+    get metricsMinuteDays() {
+      return metricsMinuteDays(env);
+    },
+    get metricsHourDays() {
+      return metricsHourDays(env);
+    },
+    get memoryLimit() {
+      return memoryLimit(env);
+    },
+    get memoryRequest() {
+      return memoryRequest(env);
+    },
+    get memoryReserved() {
+      return memoryReserved(env);
+    },
+    get cgroupParent() {
+      return cgroupParent(env);
+    },
+    get defaultFactoryStarts() {
+      return defaultFactoryStarts(env);
+    },
+    get sessionToken() {
+      return sessionToken(env);
+    },
+    get exposed() {
+      return exposedStore(env);
+    },
+    get servedNames() {
+      return servedNames(env);
+    },
+    get releaseCheck() {
+      return releaseCheck(env);
+    },
+    get folderRoots() {
+      return folderRoots(env);
+    },
+    get engineStore() {
+      return engineStore(env);
+    },
+  }) satisfies Settings as Settings;
 
 /**
  * The store's configuration a program asks for, given by whoever composes it, as `StoreRoot` is. It has no default: a program that asks
@@ -500,14 +501,14 @@ export const settingsOf = (env: Env): Settings => ({
  */
 export class StoreConfig extends Context.Service<StoreConfig, Settings>()('orchestrator/StoreConfig') {
   /** `settings` as the layer that gives them to a program. */
-  static readonly layer = (settings: Settings): Layer.Layer<StoreConfig> => Layer.succeed(StoreConfig)(StoreConfig.of(settings));
+  static readonly layer = (settings: Settings) => Layer.succeed(StoreConfig)(StoreConfig.of(settings));
 }
 
 /**
  * The setting `key` of the configuration the program was given, or the `Invalid` its reader refuses a value set wrong with.
  * @param key The name of the setting to read, a key of `Settings`.
  */
-export const setting = <K extends keyof Settings>(key: K): Effect.Effect<Settings[K], Invalid, StoreConfig> =>
+export const setting = <K extends keyof Settings>(key: K) =>
   Effect.flatMap(StoreConfig, (config) =>
     Effect.try({ try: () => config[key], catch: (error) => (error instanceof Invalid ? error : new Invalid({ message: String(error) })) }),
   );

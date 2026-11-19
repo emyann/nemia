@@ -101,13 +101,13 @@ export type ListedTask = Pick<TaskView, 'id' | 'calling'> & {
  */
 export const attachedCalls = <E, R>(list: (ids?: readonly string[]) => Effect.Effect<{ views: readonly ListedTask[] }, E, R>) => {
   let ids: readonly string[] | undefined;
-  return (): Effect.Effect<readonly Finishing[], E, R> =>
+  return () =>
     Effect.map(
       Effect.suspend(() => (ids === undefined ? list() : ids.length ? list(ids) : Effect.succeed({ views: [] }))),
       ({ views }) => {
         const live = views.filter((v) => v.state.restartPolicy === 'Always' && v.state.settled === null);
         ids ??= live.map((v) => v.id);
-        return live.flatMap((v): Finishing[] =>
+        return live.flatMap<Finishing>((v) =>
           v.calling
             ? [{ run: v.state.labels?.run ?? v.id, step: v.state.labels?.step ?? v.id, kind: 'session', calling: v.calling.tool }]
             : [],
@@ -126,7 +126,7 @@ const engineList = (ids?: readonly string[]) => Effect.flatMap(EngineService, (e
  * @param home The store's root, whose timeout file is read where no `--timeout` is given.
  * @param by The command asking, which a refusal opens on (`nemia upgrade`, `nemia service restart`).
  */
-export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effect<number, Refusal> =>
+export const timeoutGiven = (args: Args, home: string, by: string) =>
   tried(() => {
     if (typeof args.timeout !== 'string') return timeoutAt(home).ms;
     const ms = timeoutOf(args.timeout);
@@ -140,8 +140,8 @@ export const timeoutGiven = (args: Args, home: string, by: string): Effect.Effec
  * @param home The store's root.
  * @param verb The verb after `nemia`, which a refusal names.
  */
-export const timedHost = (args: Args, home: string, verb: string): Effect.Effect<ServiceHost, Refusal> =>
-  Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms));
+export const timedHost = (args: Args, home: string, verb: string) =>
+  Effect.map(timeoutGiven(args, home, `nemia ${verb}`), (ms) => liveHost(home, ms)) satisfies Effect.Effect<ServiceHost, Refusal>;
 
 /**
  * The machine as it is: the process's node, the store's lease and pause, `systemctl` and `launchctl` themselves. The daemon an install
@@ -151,36 +151,37 @@ export const timedHost = (args: Args, home: string, verb: string): Effect.Effect
  * @param root The store's root.
  * @param timeoutMs How long a take-over gives the daemon's calls in flight, in ms; ten minutes where not given.
  */
-export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): ServiceHost => ({
-  machine: machineOf,
-  dirs: serviceDirs,
-  roots: () => storeRoots(root),
-  daemon: () => pointedEntry({ ...daemonEntry(), node: process.execPath }, runningRelease()),
-  size: () => ({ memoryMiB: Math.floor(os.totalmem() / 1_048_576), cpus: os.availableParallelism() }),
-  node: process.execPath,
-  path: process.env.PATH ?? '',
-  user: userOf,
-  call: systemCall,
-  linger: lingerOf,
-  standing: () => readPause(root),
-  lease: () => daemonStanding(root),
-  signal: (pid) => process.kill(pid, 'SIGTERM'),
-  pause: (said) => putPause(root, said, new Date(), undefined, thisProcess()),
-  resume: () => resumePause(root),
-  calls: attachedCalls(engineList),
-  drain: drained,
-  say: (line) => console.error(line),
-  pollMs: 2_000,
-  waitMs: 60_000,
-  timeoutMs,
-  stopMs: 90_000,
-});
+export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS) =>
+  ({
+    machine: machineOf,
+    dirs: serviceDirs,
+    roots: () => storeRoots(root),
+    daemon: () => pointedEntry({ ...daemonEntry(), node: process.execPath }, runningRelease()),
+    size: () => ({ memoryMiB: Math.floor(os.totalmem() / 1_048_576), cpus: os.availableParallelism() }),
+    node: process.execPath,
+    path: process.env.PATH ?? '',
+    user: userOf,
+    call: systemCall,
+    linger: lingerOf,
+    standing: () => readPause(root),
+    lease: () => daemonStanding(root),
+    signal: (pid) => process.kill(pid, 'SIGTERM'),
+    pause: (said) => putPause(root, said, new Date(), undefined, thisProcess()),
+    resume: () => resumePause(root),
+    calls: attachedCalls(engineList),
+    drain: drained,
+    say: (line) => console.error(line),
+    pollMs: 2_000,
+    waitMs: 60_000,
+    timeoutMs,
+    stopMs: 90_000,
+  }) satisfies ServiceHost as ServiceHost;
 
 /** A service's whereabouts: its name, its system, its file, and the system's own name for it. */
 type Placed = { name: string; system: ServiceSystem; file: string; unit: string };
 
 /** The service named by `args` on this machine, or refused (`Invalid`): no system to install one with, or a name the store forbids. */
-function placed(args: Args, host: ServiceHost): Placed {
+function placed(args: Args, host: ServiceHost) {
   const system = systemOf(host.machine());
   if ('refusal' in system) throw new Invalid({ message: system.refusal });
   const name = typeof args.name === 'string' ? args.name : undefined;
@@ -188,7 +189,12 @@ function placed(args: Args, host: ServiceHost): Placed {
   const wrong = nameRefusal(name, root, defaultRoot);
   if (wrong !== null) throw new Invalid({ message: wrong });
   const named = name ?? DEFAULT_NAME;
-  return { name: named, system: system.system, file: unitPathOf(system.system, named, host.dirs()), unit: unitName(system.system, named) };
+  return {
+    name: named,
+    system: system.system,
+    file: unitPathOf(system.system, named, host.dirs()),
+    unit: unitName(system.system, named),
+  } satisfies Placed;
 }
 
 /** The system's programs for one service: reload its files, enable it at login, start, restart, stop and read it. */
@@ -209,7 +215,7 @@ function ops(at: Placed, host: ServiceHost) {
       restart: () => void ctl('restart', at.unit),
       remove: () => void ctl('disable', '--now', at.unit),
       removed: () => void ctl('daemon-reload'),
-      state: (): UnitState => systemdState(ctl('show', at.unit, '-p', 'ActiveState,UnitFileState,MainPID')),
+      state: () => systemdState(ctl('show', at.unit, '-p', 'ActiveState,UnitFileState,MainPID')),
     };
   const bootstrap = () => void (booted(), host.call(['launchctl', 'bootstrap', domain, at.file]));
   return {
@@ -218,7 +224,7 @@ function ops(at: Placed, host: ServiceHost) {
     restart: bootstrap,
     remove: booted,
     removed: () => undefined,
-    state: (): UnitState => {
+    state: () => {
       try {
         return launchdState(host.call(['launchctl', 'print', `${domain}/${at.name}`]));
       } catch {
@@ -229,24 +235,25 @@ function ops(at: Placed, host: ServiceHost) {
 }
 
 /** The system's word on the service, or null where it cannot say. */
-const stateOf = (at: Placed, host: ServiceHost): UnitState | null => {
+const stateOf = (at: Placed, host: ServiceHost) => {
   try {
-    return ops(at, host).state();
+    return ops(at, host).state() satisfies UnitState | null as UnitState | null;
   } catch {
     return null;
   }
 };
 
 /** The service as a take-over starts it: its start, how its log is read, the system's word on it now, and how a person starts it. */
-const startedOf = (at: Placed, host: ServiceHost): Started => ({
-  start: () => ops(at, host).start(),
-  logs: logsLine(at.system, at.name, host.dirs().home),
-  stateNow: () => stateOf(at, host),
-  startLine: startLine(at.system, at.name, at.file, host.user().uid),
-});
+const startedOf = (at: Placed, host: ServiceHost) =>
+  ({
+    start: () => ops(at, host).start(),
+    logs: logsLine(at.system, at.name, host.dirs().home),
+    stateNow: () => stateOf(at, host),
+    startLine: startLine(at.system, at.name, at.file, host.user().uid),
+  }) satisfies Started as Started;
 
 /** A pid as `--take-over` gives it: digits, above zero; else refused (`Invalid`). */
-function pidOf(text: unknown): number | undefined {
+function pidOf(text: unknown) {
   if (text === undefined) return undefined;
   const pid = typeof text === 'string' && /^\d+$/.test(text) ? Number(text) : 0;
   if (pid > 0) return pid;
@@ -265,7 +272,7 @@ const BIND_KEYS = ['NEMIA_BIND', 'WF_EXPOSED', BIND_PUBLIC_VARIABLE] as const;
  * Whether `--bind` names an address the daemon listens on as its api reads `NEMIA_BIND` (`bindOf`, apps/api/src/port.ts): an IPv4
  * address, or an IPv6 one written bare, never a host name, brackets or a zone (`%eth0`), which the api refuses at every start.
  */
-const bindable = (value: string): boolean => isIP(value) !== 0 && !value.includes('%');
+const bindable = (value: string) => isIP(value) !== 0 && !value.includes('%');
 
 /**
  * The variables `--size auto` writes, read off the machine's size (`sizedFor`), each but one `--env` gives (`given`): the sessions at once
@@ -277,12 +284,7 @@ const bindable = (value: string): boolean => isIP(value) !== 0 && !value.include
  * On systemd it also holds the sessions together to what the machine allocates (`sessionsCeiling`): the slice to write, and
  * `WF_CGROUP_PARENT` pointed at it.
  */
-function sizedEnv(
-  args: Args,
-  at: Placed,
-  host: ServiceHost,
-  given: ReadonlyMap<string, string>,
-): { env: [string, string][]; lines: string[]; slice: SliceFile | null } {
+function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlyMap<string, string>) {
   if (args.size === undefined) return { env: [], lines: [], slice: null };
   if (args.size !== 'auto')
     throw new Invalid({
@@ -334,14 +336,9 @@ type SliceFile = { readonly file: string; readonly text: string };
  * where it gives one, that slice is the person's: no file, and a line naming how to give it its ceiling. Refused (`Invalid`): a floor
  * at or above the machine's memory, which leaves the sessions nothing. None on launchd, which holds no cgroup.
  */
-function sessionsCeiling(
-  at: Placed,
-  host: ServiceHost,
-  machine: MachineSize,
-  reservedMiB: number,
-  given: ReadonlyMap<string, string>,
-): { env: [string, string][]; lines: string[]; slice: SliceFile | null } {
-  if (at.system !== 'systemd') return { env: [], lines: [], slice: null };
+function sessionsCeiling(at: Placed, host: ServiceHost, machine: MachineSize, reservedMiB: number, given: ReadonlyMap<string, string>) {
+  if (at.system !== 'systemd')
+    return { env: [], lines: [], slice: null } satisfies { env: [string, string][]; lines: string[]; slice: SliceFile | null };
   const totalBytes = machine.memoryMiB * 2 ** 20;
   const floor = memoryReserved({ WF_MEMORY_RESERVED: given.get('WF_MEMORY_RESERVED') });
   const floorBytes = (floor === undefined ? undefined : memoryBytesOf(floor)) ?? reservedMiB * 2 ** 20;
@@ -361,14 +358,14 @@ function sessionsCeiling(
           : `the sessions run under ${named}, as --env gives it, which install does not write: systemctl --user set-property ${named} MemoryMax=${ceilingBytes} holds them together under ${ceilingSaid}`,
       ],
       slice: null,
-    };
+    } satisfies { env: [string, string][]; lines: string[]; slice: SliceFile | null };
   }
   const slice = sessionsSliceOf(at.name);
   return {
     env: [['WF_CGROUP_PARENT', slice]],
     lines: [`wrote ${slicePathOf(at.name, host.dirs())}: the sessions run under ${slice}, held together under ${ceilingSaid}`],
     slice: { file: slicePathOf(at.name, host.dirs()), text: sliceText({ name: at.name, ceilingBytes }) },
-  };
+  } satisfies { env: [string, string][]; lines: string[]; slice: SliceFile | null };
 }
 
 /**
@@ -376,14 +373,14 @@ function sessionsCeiling(
  * that is none, a public or wildcard one without `--public` (`bindExposure`, as the api's start refuses it), `--public` without
  * `--bind`, or a variable `--env` gives too.
  */
-function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
+function boundEnv(args: Args, given: ReadonlySet<string>) {
   const acknowledged = args.public === true;
   if (args.bind === undefined) {
     if (acknowledged)
       throw new Invalid({
         message: `nemia service install: --public acknowledges a public or wildcard --bind, and none was given: --bind <addr> --public, or leave --public out.`,
       });
-    return [];
+    return [] satisfies [string, string][];
   }
   if (typeof args.bind !== 'string' || !bindable(args.bind))
     throw new Invalid({
@@ -397,14 +394,18 @@ function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
   const twice = BIND_KEYS.find((k) => given.has(k));
   if (twice !== undefined)
     throw new Invalid({ message: `nemia service install: --bind writes ${twice}, and --env gives it too: give one of them.` });
-  return [['NEMIA_BIND', args.bind], ['WF_EXPOSED', '1'], ...(acknowledged ? [[BIND_PUBLIC_VARIABLE, '1'] as [string, string]] : [])];
+  return [
+    ['NEMIA_BIND', args.bind],
+    ['WF_EXPOSED', '1'],
+    ...(acknowledged ? [[BIND_PUBLIC_VARIABLE, '1'] as [string, string]] : []),
+  ] satisfies [string, string][];
 }
 
 /**
  * The service's spec: the checkout's daemon under the installer's node (or the one the daemon carries), its store and `PATH`, what
  * `--size auto` and `--bind` write, then each `--env`, in the order given; and the lines the sizing says.
  */
-function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec; lines: string[]; slice: SliceFile | null } {
+function specOf(at: Placed, args: Args, host: ServiceHost) {
   const given = Array.isArray(args.env) ? (args.env as readonly string[]) : [];
   const wrong = envRefusal(given);
   if (wrong !== null) throw new Invalid({ message: wrong });
@@ -421,7 +422,7 @@ function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec;
   };
   const bad = specRefusal(spec);
   if (bad !== null) throw new Invalid({ message: bad });
-  return { spec, lines: sized.lines, slice: sized.slice };
+  return { spec, lines: sized.lines, slice: sized.slice } satisfies { spec: ServiceSpec; lines: string[]; slice: SliceFile | null };
 }
 
 /** What `nemia service install` did: the service and its file, the checkout it runs, how it stands now, and its lines. */
@@ -436,7 +437,7 @@ export type Installed = {
 };
 
 /** What install did once the unit is written, beside the daemon the lease names: start it, restart it, or name the holder. */
-function startedBeside(at: Placed, host: ServiceHost): Pick<Installed, 'did' | 'holder' | 'lines'> {
+function startedBeside(at: Placed, host: ServiceHost) {
   const lease = host.lease();
   const holder = holderOfLease(lease, stateOf(at, host));
   const run = ops(at, host);
@@ -446,7 +447,7 @@ function startedBeside(at: Placed, host: ServiceHost): Pick<Installed, 'did' | '
       did: 'restarted',
       holder: null,
       lines: [`restarted ${at.unit}, which held the store: it ticks it again from the unit just written`],
-    };
+    } satisfies Pick<Installed, 'did' | 'holder' | 'lines'> as Pick<Installed, 'did' | 'holder' | 'lines'>;
   }
   if (holder === 'other' && lease.kind === 'ticking') {
     const pid = lease.file.pid;
@@ -457,21 +458,26 @@ function startedBeside(at: Placed, host: ServiceHost): Pick<Installed, 'did' | '
         `pid ${pid} holds the store (${daemonLine(lease, Date.now())}), so ${at.unit} is enabled and not started: it starts at the next login.`,
         `To hand the store to the service now: ${takeOverLine(pid, at.name)} — it pauses the store, waits for the daemon's calls in flight, stops pid ${pid}, starts the service and resumes.`,
       ],
-    };
+    } satisfies Pick<Installed, 'did' | 'holder' | 'lines'> as Pick<Installed, 'did' | 'holder' | 'lines'>;
   }
   run.start();
-  return { did: 'started', holder: null, lines: [`started ${at.unit}: nemia service status says when it ticks the store`] };
+  return { did: 'started', holder: null, lines: [`started ${at.unit}: nemia service status says when it ticks the store`] } satisfies Pick<
+    Installed,
+    'did' | 'holder' | 'lines'
+  > as Pick<Installed, 'did' | 'holder' | 'lines'>;
 }
 
 /** The line said after an install where the user's services stop at the last logout. */
-const lingerLines = (at: Placed, host: ServiceHost): string[] => {
-  if (at.system !== 'systemd') return [];
+const lingerLines = (at: Placed, host: ServiceHost) => {
+  if (at.system !== 'systemd') return [] satisfies string[] as string[];
   const user = host.user().name;
-  return host.linger(user) === false
-    ? [
-        `lingering is off: the service stops at the last logout and starts at the next login; loginctl enable-linger ${user} keeps it running`,
-      ]
-    : [];
+  return (
+    host.linger(user) === false
+      ? [
+          `lingering is off: the service stops at the last logout and starts at the next login; loginctl enable-linger ${user} keeps it running`,
+        ]
+      : []
+  ) satisfies string[];
 };
 
 /**
@@ -542,12 +548,12 @@ export const uninstallService = Effect.fn('uninstallService')(function* (args: A
 export type ServiceStatus = { readonly service: ServiceRead; readonly lines: readonly string[] };
 
 /** The service as installed: what its file says it runs, and the checkout its entry is of. */
-const installedRead = (at: Placed): ServiceRead['unit'] => {
+const installedRead = (at: Placed) => {
   const text = readUnit(at.file);
   if (text === null) return null;
   const read = at.system === 'systemd' ? unitRead(text) : plistRead(text);
   const checkout = read.entry === undefined ? undefined : checkoutOf(read.entry);
-  return { ...read, ...(checkout !== undefined ? { checkout } : {}) };
+  return { ...read, ...(checkout !== undefined ? { checkout } : {}) } satisfies ServiceRead['unit'] as ServiceRead['unit'];
 };
 
 /** What an upgrade asks of the store's service: the system's word on it, the entry its file runs, its start and its log. */
@@ -558,7 +564,7 @@ export type ServiceForUpgrade = Started & { readonly state: UnitState | null; re
  * @param args The command's parsed arguments, whose `--name` names the service.
  * @param host The machine as the service sees it (`liveHost`).
  */
-export function serviceForUpgrade(args: Args, host: ServiceHost): ServiceForUpgrade | null {
+export function serviceForUpgrade(args: Args, host: ServiceHost) {
   let at: Placed;
   try {
     at = placed(args, host);
@@ -587,10 +593,17 @@ export type ServiceAt = Started & {
  * @param args The command's parsed arguments, whose `--name` names the service.
  * @param host The machine as the service sees it (`liveHost`).
  */
-export function serviceAt(args: Args, host: ServiceHost): ServiceAt {
+export function serviceAt(args: Args, host: ServiceHost) {
   const at = placed(args, host);
   const installed = readUnit(at.file) !== null;
-  return { name: at.name, unit: at.unit, file: at.file, installed, state: installed ? stateOf(at, host) : null, ...startedOf(at, host) };
+  return {
+    name: at.name,
+    unit: at.unit,
+    file: at.file,
+    installed,
+    state: installed ? stateOf(at, host) : null,
+    ...startedOf(at, host),
+  } satisfies ServiceAt as ServiceAt;
 }
 
 /** Reads the service and the lease, and names both: whether the service is installed and runs, what it runs, and who holds the store. */

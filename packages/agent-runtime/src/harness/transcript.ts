@@ -6,7 +6,7 @@
 import { Option, Schema } from 'effect';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import type { Transcript, TranscriptCursor, TranscriptEvent } from './seam.ts';
+import type { TranscriptCursor, TranscriptEvent } from './seam.ts';
 
 /** A line's text decoded as JSON, or none where it is not. */
 const jsonOf = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
@@ -24,24 +24,23 @@ const CURSOR_TAIL_BYTES = 4096;
  * @param offset How far into the transcript the cursor is, in bytes.
  * @param tail The transcript's bytes just before `offset`, its last `CURSOR_TAIL_BYTES` or all where there are fewer.
  */
-export const cursorOf = (offset: number, tail: Uint8Array): TranscriptCursor =>
-  `${offset}.${createHash('sha256').update(tail).digest('hex').slice(0, 16)}`;
+export const cursorOf = (offset: number, tail: Uint8Array) => `${offset}.${createHash('sha256').update(tail).digest('hex').slice(0, 16)}`;
 const START: TranscriptCursor = cursorOf(0, new Uint8Array());
 
 /**
  * Whether `after` is a cursor a transcript read could have given.
  * @param after The cursor a caller passed.
  */
-export const isTranscriptCursor = (after: string): boolean => /^(0|[1-9]\d*)\.[0-9a-f]{16}$/.test(after);
+export const isTranscriptCursor = (after: string) => /^(0|[1-9]\d*)\.[0-9a-f]{16}$/.test(after);
 
 /** No conversation to read yet: no events, and a cursor that reads from the start. */
-export const noTranscript = (): Transcript => ({ events: [], cursor: START });
+export const noTranscript = () => ({ events: [], cursor: START });
 
 /**
  * A record's own time as ISO 8601, or `undefined` when it has none that parses.
  * @param t The record's time as written, of any value: only a string that parses is a time.
  */
-export const isoTime = (t: unknown): string | undefined => {
+export const isoTime = (t: unknown) => {
   const ms = typeof t === 'string' ? Date.parse(t) : NaN;
   return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
 };
@@ -65,7 +64,7 @@ export const readTranscript = async (
   file: string | undefined,
   after: TranscriptCursor | undefined,
   eventsOf: (entry: unknown, offset: number, file: string) => TranscriptEvent[],
-): Promise<Transcript> => {
+) => {
   if (after !== undefined && !isTranscriptCursor(after)) {
     throw new Error(
       `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,

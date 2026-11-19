@@ -16,9 +16,9 @@ import { storeCredential } from './where.ts';
  * client carries it.
  * @param env The environment read: its `WF_SESSION_TOKEN`, and what `callerToken` reads besides.
  */
-export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
+export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env) => {
   const token = callerToken(env);
-  return token === undefined ? {} : { authorization: `Bearer ${token}` };
+  return (token === undefined ? {} : { authorization: `Bearer ${token}` }) satisfies Readonly<Record<string, string>>;
 };
 
 /**
@@ -27,7 +27,7 @@ export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<R
  * the store for the person (`storeCredential`, where.ts), so the person's `nemia` on the store's machine needs nothing typed.
  * @param env The environment read: its `WF_SESSION_TOKEN`, the context in use and the store it names.
  */
-export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
+export const callerToken = (env: NodeJS.ProcessEnv = process.env) => {
   const session = env.WF_SESSION_TOKEN;
   return session !== undefined && session !== '' ? session : (chosenToken(env) ?? storeCredential(env));
 };
@@ -41,7 +41,7 @@ export type Query = Readonly<Record<string, string | readonly string[] | undefin
  * @param path The route's path.
  * @param query The query's words, none where it is left out; a key whose value is undefined is not put on.
  */
-export const urlOf = (base: string, path: string, query: Query = {}): URL => {
+export const urlOf = (base: string, path: string, query: Query = {}) => {
   const url = new URL(path, base);
   for (const [key, value] of Object.entries(query))
     for (const one of value === undefined ? [] : typeof value === 'string' ? [value] : value) url.searchParams.append(key, one);
@@ -54,7 +54,7 @@ export const urlOf = (base: string, path: string, query: Query = {}): URL => {
  * @param base The daemon's url that did not answer.
  * @param err What the request failed with, its message named.
  */
-export const unanswered = (verb: string, base: string, err: unknown): Refused =>
+export const unanswered = (verb: string, base: string, err: unknown) =>
   new Refused(
     `the daemon at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). See whether it is up, \`nemia service status\`, or restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );
@@ -65,7 +65,7 @@ export const unanswered = (verb: string, base: string, err: unknown): Refused =>
  * @param base The daemon's url that answered.
  * @param path The route's path it does not serve.
  */
-export const olderThanThis = (verb: string, base: string, path: string): Refused =>
+export const olderThanThis = (verb: string, base: string, path: string) =>
   new Refused(
     `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );

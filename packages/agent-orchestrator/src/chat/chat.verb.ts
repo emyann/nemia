@@ -130,11 +130,12 @@ type Files = ReturnType<typeof filesNow>;
 const filesOf = (place: ChatPlace) => tried(() => filesNow(place));
 
 /** What a chat is projected from with the files numbered across its tasks (`spanned`). */
-const joined = (sources: ChatSources, spans: readonly TaskSpan[], files: Files): ChatSources => ({
-  ...sources,
-  ...files,
-  ...spanned(spans, files.delivered, files.stops),
-});
+const joined = (sources: ChatSources, spans: readonly TaskSpan[], files: Files) =>
+  ({
+    ...sources,
+    ...files,
+    ...spanned(spans, files.delivered, files.stops),
+  }) satisfies ChatSources;
 
 /**
  * What the chat at `place` is projected from, read now: each filed task's sessions, numbered across its tasks, and the words said to
@@ -217,7 +218,7 @@ export const FILES_CHECK_MS = 1000;
 export const RECORD_BEAT_MS = 2000;
 
 /** The chat folder's files at `place` as their names, sizes and times: what moves when one is written. */
-const filesStamp = (place: ChatPlace): string => {
+const filesStamp = (place: ChatPlace) => {
   const dir = chatDir(place.dir);
   const names = fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [];
   return names
@@ -229,7 +230,7 @@ const filesStamp = (place: ChatPlace): string => {
 };
 
 /** The words of a failure's cause. */
-const wordsOfCause = (cause: Cause.Cause<unknown>): string => {
+const wordsOfCause = (cause: Cause.Cause<unknown>) => {
   const err = Cause.squash(cause);
   return err instanceof Error ? err.message : String(err);
 };
@@ -262,24 +263,24 @@ type Held = {
 const followedOf = (h: Held) => h.sources.sessions.at(-1);
 
 /** The task the chat numbers `attempt` in, and that attempt as its task numbers it; undefined where no task holds it. */
-const ownerOf = (h: Held, attempt: number): { task: string; n: number } | undefined => {
+const ownerOf = (h: Held, attempt: number) => {
   const span = [...h.spans].reverse().find((s) => s.offset < attempt);
   return span === undefined ? undefined : { task: span.task, n: attempt - span.offset };
 };
 
 /** What the follower has not read of the session followed, read once it joins the follow: from its cursor, of its own attempt. */
-const caughtOf = (h: Held, task: string): Effect.Effect<ChatFollowed | undefined> => {
+const caughtOf = (h: Held, task: string) => {
   const at = followedOf(h);
   const owner = at === undefined ? undefined : ownerOf(h, at.attempt);
-  if (at?.cursor === undefined || owner?.task !== task) return Effect.succeed(undefined);
+  if (at?.cursor === undefined || owner?.task !== task) return Effect.succeed(undefined) satisfies Effect.Effect<ChatFollowed | undefined>;
   return asked('transcript', h.e.transcript(task, at.cursor, { attempt: owner.n })).pipe(
-    Effect.map((read): ChatFollowed => ({ kind: 'events', events: read.events, cursor: read.cursor })),
+    Effect.map((read) => ({ kind: 'events', events: read.events, cursor: read.cursor }) satisfies ChatFollowed),
     Effect.orElseSucceed(() => undefined),
-  );
+  ) satisfies Effect.Effect<ChatFollowed | undefined>;
 };
 
 /** The files `h` holds numbered again across its tasks, into its sources. */
-const respanned = (h: Held): void => {
+const respanned = (h: Held) => {
   h.sources = joined(h.sources, h.spans, h.files);
 };
 
@@ -364,40 +365,41 @@ const folded = (h: Held, placeOf: () => ChatPlace, moved: Moved) =>
   });
 
 /** What a fold changed in `h`, as the follower is sent it: the events new or changed and the presence where it moved, or nothing. */
-const changesOf = (h: Held): ChatSent[] => {
+const changesOf = (h: Held) => {
   const now = projectChat(h.sources);
   const changed = changedSince(h.events, now);
   h.events = now;
   const presence = presenceOf(h.sources.phase ?? undefined, h.waiting, now, h.mark, h.place.wakes);
   const shown = JSON.stringify(presence);
-  if (!changed.length && shown === h.shown) return [];
+  if (!changed.length && shown === h.shown) return [] satisfies ChatSent[];
   h.shown = shown;
-  return [{ kind: 'changes', changes: { events: changed, cursor: chatCursor(cursorOf(h.sources)), presence } }];
+  return [{ kind: 'changes', changes: { events: changed, cursor: chatCursor(cursorOf(h.sources)), presence } }] satisfies ChatSent[];
 };
 
 /**
  * What a fold of `moved` that ended `exit` sends: `unreadable` where it failed, once for each new reason; else `readable` first where a
  * read had failed before (a look, a beat or a run's line read it again), then what changed.
  */
-const sentAfter = (h: Held, moved: Moved, exit: Exit.Exit<void, unknown>): ChatSent[] => {
+const sentAfter = (h: Held, moved: Moved, exit: Exit.Exit<void, unknown>) => {
   if (Exit.isFailure(exit)) {
     const error = wordsOfCause(exit.cause);
-    if (error === h.unread) return [];
+    if (error === h.unread) return [] satisfies ChatSent[];
     h.unread = error;
-    return [{ kind: 'unreadable', error }];
+    return [{ kind: 'unreadable', error }] satisfies ChatSent[];
   }
   const back: ChatSent[] = h.unread !== null && moved.kind !== 'moment' ? [{ kind: 'readable' }] : [];
   if (back.length) h.unread = null;
-  return [...back, ...changesOf(h)];
+  return [...back, ...changesOf(h)] satisfies ChatSent[];
 };
 
 /** The follow of the task `h` holds, then a beat that reads the record and the follow asked for again, for as long as it is read. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const following = (h: Held, follow: ChatFollow, beatMs: number): Stream.Stream<Moved> =>
   Stream.suspend(() => {
     const task = h.spans.at(-1)?.task;
     const moments =
-      task === undefined ? Stream.empty : follow(task, caughtOf(h, task)).pipe(Stream.map((m): Moved => ({ kind: 'moment', m })));
-    const beat = Stream.fromEffect(Effect.sleep(Duration.millis(beatMs))).pipe(Stream.map((): Moved => ({ kind: 'beat' })));
+      task === undefined ? Stream.empty : follow(task, caughtOf(h, task)).pipe(Stream.map((m) => ({ kind: 'moment', m }) satisfies Moved));
+    const beat = Stream.fromEffect(Effect.sleep(Duration.millis(beatMs))).pipe(Stream.map(() => ({ kind: 'beat' }) satisfies Moved));
     return moments.pipe(Stream.concat(beat), Stream.concat(following(h, follow, beatMs)));
   });
 
@@ -435,11 +437,11 @@ export const followChat = Effect.fn('followChat')(function* (
   const h: Held = { e, reads, place, stamp, spans, files, sources, events, mark, waiting, shown: JSON.stringify(presence), unread: null };
   const looks = Stream.tick(Duration.millis(filesMs)).pipe(
     Stream.drop(1),
-    Stream.map((): Moved => ({ kind: 'files' })),
+    Stream.map(() => ({ kind: 'files' }) satisfies Moved),
   );
   const runs = followFeed(feedEnd).pipe(
     Stream.filter((f) => f.kind === 'line' && isRunLine(f.line)),
-    Stream.map((): Moved => ({ kind: 'runs' })),
+    Stream.map(() => ({ kind: 'runs' }) satisfies Moved),
     Stream.catchCause(() => Stream.empty),
   );
   const rest = Stream.mergeAll([following(h, follow, beatMs), looks, runs], { concurrency: 'unbounded' }).pipe(
@@ -455,7 +457,7 @@ export const followChat = Effect.fn('followChat')(function* (
 });
 
 /** A new outbox entry's id: the time it was written in base 36 and six random hex digits. */
-const entryId = (): string => `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
+const entryId = () => `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
 
 /**
  * The `text` the `caller` wrote put in the outbox of the chat at `place`, which the keeper says to the task once it is up (`sayOutbox`),

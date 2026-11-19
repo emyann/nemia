@@ -30,20 +30,22 @@ type Held = {
 };
 
 /** `one` of `kind` as a library item, the builtin's origin kept and every other said the user library's. */
-const itemOf =
-  (kind: LibraryKind) =>
-  (one: Held): LibraryItem => ({
+const itemOf = (kind: LibraryKind) => (one: Held) =>
+  ({
     kind,
     name: one.metadata.name,
     description: one.spec?.description ?? one.status.description ?? null,
     origin: one.status.origin === 'builtin' ? 'builtin' : 'user',
     factories: one.status.factories ?? [],
     builtinChanged: one.status.builtinChanged === true,
-  });
+  }) satisfies LibraryItem;
 
 /** A library server as a library item: its origin and factories read off its status, the user library's where none is said. */
-const serverItem = (one: McpServer): LibraryItem =>
-  itemOf('McpServer')({ metadata: one.metadata, status: { origin: one.status?.origin ?? 'user', factories: one.status?.factories } });
+const serverItem = (one: McpServer) =>
+  itemOf('McpServer')({
+    metadata: one.metadata,
+    status: { origin: one.status?.origin ?? 'user', factories: one.status?.factories },
+  }) satisfies LibraryItem;
 
 /**
  * Every item of the store's library, the four kinds read together, each kind in its order and each item by name (`LIBRARY_KINDS`).
@@ -58,28 +60,28 @@ export function libraryItemsOf(
   agents: readonly Agent[],
   servers: readonly McpServer[],
   workflows: readonly Workflow[],
-): LibraryItem[] {
+) {
   const byName = (a: LibraryItem, b: LibraryItem) => a.name.localeCompare(b.name);
   return [
     ...skills.map(itemOf('Skill')).sort(byName),
     ...agents.map(itemOf('Agent')).sort(byName),
     ...servers.map(serverItem).sort(byName),
     ...workflows.map((one) => itemOf('Workflow')({ metadata: one.metadata, status: one.status })).sort(byName),
-  ];
+  ] satisfies LibraryItem[];
 }
 
 /** The store's library, every kind, read once for the Library page. */
 export const libraryQuery = () =>
   queryOptions({
     queryKey: ['library'],
-    queryFn: async (): Promise<LibraryItem[]> => {
+    queryFn: async () => {
       const [skills, agents, servers, workflows] = await Promise.all([
         library.skills(),
         library.agents(),
         library.mcpServers(),
         library.workflows(),
       ]);
-      return libraryItemsOf(skills, agents, servers.items, workflows);
+      return libraryItemsOf(skills, agents, servers.items, workflows) satisfies LibraryItem[];
     },
   });
 
@@ -96,7 +98,7 @@ const COUNT_WORDS: Record<LibraryKind, readonly [string, string]> = {
  *
  * @param items the library's items
  */
-export function libraryCount(items: readonly LibraryItem[]): string {
+export function libraryCount(items: readonly LibraryItem[]) {
   const said = LIBRARY_KINDS.flatMap((kind) => {
     const n = items.filter((one) => one.kind === kind).length;
     return n === 0 ? [] : [`${n} ${COUNT_WORDS[kind][n === 1 ? 0 : 1]}`];
@@ -114,7 +116,7 @@ export type Importable = { name: string; file: string; description: string | nul
  * @param sources the agent files the store knows of
  * @param items the library's items
  */
-export function importablesOf(sources: readonly AgentSource[], items: readonly LibraryItem[]): Importable[] {
+export function importablesOf(sources: readonly AgentSource[], items: readonly LibraryItem[]) {
   const held = new Set(items.filter((one) => one.kind === 'Agent').map((one) => one.name));
   return sources
     .filter((one) => one.place === 'harness')
@@ -125,7 +127,7 @@ export function importablesOf(sources: readonly AgentSource[], items: readonly L
 export const agentSourcesQuery = () =>
   queryOptions({
     queryKey: ['library', 'agent-sources'],
-    queryFn: async (): Promise<AgentSource[]> => [...(await library.agentSources()).sources],
+    queryFn: async () => [...(await library.agentSources()).sources],
   });
 
 /**
@@ -133,7 +135,7 @@ export const agentSourcesQuery = () =>
  *
  * @param file the agent file, by its path as the sources list it
  */
-export const importAgent = async (file: string): Promise<string> => (await library.copyAgent(file)).name;
+export const importAgent = async (file: string) => (await library.copyAgent(file)).name;
 
 /**
  * What the factory `factory` has added from the library, each add with its state.
@@ -141,7 +143,7 @@ export const importAgent = async (file: string): Promise<string> => (await libra
  * @param factory the factory's name
  */
 export const libraryAddsQuery = (factory: string) =>
-  queryOptions({ queryKey: ['library-adds', factory], queryFn: (): Promise<LibraryAdd[]> => libraryAdds.list(factory) });
+  queryOptions({ queryKey: ['library-adds', factory], queryFn: () => libraryAdds.list(factory) });
 
 /** An item of the library a factory adds: an agent, a skill or an MCP server; a workflow is attached, never added. */
 export type AddableItem = LibraryItem & { kind: Exclude<LibraryKind, 'Workflow'> };
@@ -155,7 +157,7 @@ const isAddable = (item: LibraryItem): item is AddableItem => item.kind !== 'Wor
  * @param items the store's library
  * @param adds what the factory has added
  */
-export const addable = (items: readonly LibraryItem[], adds: readonly LibraryAdd[]): AddableItem[] => {
+export const addable = (items: readonly LibraryItem[], adds: readonly LibraryAdd[]) => {
   const added = new Set(adds.map((one) => one.metadata.name));
   return items.filter(isAddable).filter((item) => !added.has(`${item.kind}.${item.name}`));
 };
@@ -166,8 +168,7 @@ export const addable = (items: readonly LibraryItem[], adds: readonly LibraryAdd
  * @param factory the factory the item is added to
  * @param item the library item added
  */
-export const addToFactory = (factory: string, item: AddableItem): Promise<LibraryAdd> =>
-  libraryAdds.add(factory, `${item.kind}.${item.name}`);
+export const addToFactory = (factory: string, item: AddableItem) => libraryAdds.add(factory, `${item.kind}.${item.name}`);
 
 /**
  * The add `name` taken off the factory `factory`.
@@ -175,4 +176,4 @@ export const addToFactory = (factory: string, item: AddableItem): Promise<Librar
  * @param factory the factory the add is taken off
  * @param name the add's name, `<kind>.<name>`
  */
-export const removeFromFactory = (factory: string, name: string): Promise<LibraryAdd> => libraryAdds.remove(factory, name);
+export const removeFromFactory = (factory: string, name: string) => libraryAdds.remove(factory, name);

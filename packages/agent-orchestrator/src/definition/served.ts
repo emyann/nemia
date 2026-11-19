@@ -15,13 +15,7 @@
  * `/api/workflows`), and never removes what a factory uses; a factory's own definitions change the factory's way. Its laws are
  * `contracts/definition-write.contract.ts`'s.
  */
-import type {
-  DefinitionOrigin,
-  DefinitionServedOf,
-  DefinitionFound,
-  DefinitionListed,
-  HeldOriginsOf,
-} from '../../contracts/definition-served.contract.ts';
+import type { DefinitionOrigin, DefinitionServedOf, DefinitionFound, HeldOriginsOf } from '../../contracts/definition-served.contract.ts';
 import type { DefinitionWriteRefusal } from '../../contracts/definition-write.contract.ts';
 
 export type { DefinitionFound, DefinitionListed, DefinitionOrigin, DefinitionServed } from '../../contracts/definition-served.contract.ts';
@@ -58,7 +52,7 @@ export const heldOrigins: HeldOriginsOf = (found, name) => LOOKUP.filter((o) => 
  * @param found Every definition found, by name and origin.
  * @param asked The origin asked for, or undefined for the first that holds each name; a name that origin does not hold is left out.
  */
-export const definitionsServed = (found: readonly DefinitionFound[], asked: DefinitionOrigin | undefined): DefinitionListed[] =>
+export const definitionsServed = (found: readonly DefinitionFound[], asked: DefinitionOrigin | undefined) =>
   found
     .filter((f, i) => found.slice(0, i).every((g) => g.name !== f.name))
     .flatMap((f) => {
@@ -85,7 +79,7 @@ const BUILTIN_KEPT =
  * A library definition a factory uses is not removed.
  * @param users The factories that use it.
  */
-const inUse = (users: readonly string[]): string =>
+const inUse = (users: readonly string[]) =>
   `${users.join(', ')} use${users.length === 1 ? 's' : ''} it: take it off each first (\`nemia library rm <kind> <name> --factory <factory>\`), then remove it.`;
 
 /**

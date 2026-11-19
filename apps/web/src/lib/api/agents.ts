@@ -10,7 +10,6 @@ import {
   DEFAULT_NAMESPACE,
   type Agent,
   type AgentInstructions,
-  type AgentInstructionsCleared,
   type AgentSpec,
   type DefinitionOrigin,
 } from 'objects';
@@ -105,14 +104,14 @@ export type AgentListing = {
 export type LibraryAgent = AgentListing & { factories: string[] };
 
 /** The role keys an agent's `spec.keys` sets, each as its file writes it; one unset left out. */
-const roleKeysOf = (keys: AgentSpec['keys']): Partial<Record<AgentRoleKey, string>> =>
+const roleKeysOf = (keys: AgentSpec['keys']) =>
   Object.fromEntries(ROLE_KEYS.flatMap((key) => (typeof keys?.[key] === 'string' ? [[key, keys[key]]] : [])));
 
 /**
  * An Agent, as the board reads it (`LibraryAgent`, an `AgentListing` with the factories it fills a step in).
  * @param agent The Agent object the api serves.
  */
-export const agentViewOf = (agent: Agent): LibraryAgent => {
+export const agentViewOf = (agent: Agent) => {
   const { spec, status } = agent;
   return {
     name: agent.metadata.name,
@@ -149,8 +148,7 @@ const LISTED: readonly DefinitionOrigin[] = ['user'];
 /** Every agent of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: async (): Promise<LibraryAgent[]> =>
-    (await Promise.all(LISTED.map((origin) => served.list(DEFAULT_NAMESPACE, { origin })))).flat().map(agentViewOf),
+  queryFn: async () => (await Promise.all(LISTED.map((origin) => served.list(DEFAULT_NAMESPACE, { origin })))).flat().map(agentViewOf),
 });
 
 /**
@@ -160,7 +158,7 @@ export const agentsQuery = queryOptions({
  * @param name The agent's name.
  * @param place The factory and repository it is read in; empty for the default namespace on no repository.
  */
-export const readAgent = async (from: string, name: string, place: PagePlace = {}): Promise<AgentListing> =>
+export const readAgent = async (from: string, name: string, place: PagePlace = {}) =>
   agentViewOf(
     await served.get(namespaceOf(place.factory), name, { origin: originWord(from), ...(place.repo ? { repo: place.repo } : {}) }),
   );
@@ -195,7 +193,7 @@ export type AgentDraft = {
 };
 
 /** A draft as the Agent object's spec says it: its `output` the schema pasted, left out where none is, so the file keeps its own. */
-const specOfDraft = (draft: AgentDraft): AgentSpec => ({
+const specOfDraft = (draft: AgentDraft) => ({
   role: draft.role,
   description: draft.description,
   keys: Object.fromEntries(Object.entries(draft.keys).filter((entry): entry is [string, string | null] => entry[1] !== undefined)),
@@ -205,9 +203,6 @@ const specOfDraft = (draft: AgentDraft): AgentSpec => ({
   ...(draft.schema ? { output: draft.schema } : {}),
   instructions: draft.body,
 });
-
-/** An agent written: the agent as it now reads. */
-type AgentSaved = { agent: AgentListing };
 
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
@@ -238,7 +233,7 @@ const refused: Refuse = (words, status, answer) =>
  * Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses.
  * @param draft The agent to make: its name, keys, instructions and schema.
  */
-export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
+export const createAgent = async (draft: AgentDraft) => ({
   agent: agentViewOf(await served.create({ metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused)),
 });
 
@@ -248,7 +243,7 @@ export const createAgent = async (draft: AgentDraft): Promise<AgentSaved> => ({
  * @param version The version it was read at (`AgentListing.version`).
  * @param draft What it now holds, its name included.
  */
-export const saveAgent = async (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> => ({
+export const saveAgent = async (name: string, version: string, draft: AgentDraft) => ({
   agent: agentViewOf(
     await served.replace(name, { metadata: { name: draft.name, resourceVersion: version }, spec: specOfDraft(draft) }, refused),
   ),
@@ -259,11 +254,7 @@ export const saveAgent = async (name: string, version: string, draft: AgentDraft
  * @param name The agent's name.
  * @param version The version it was read at (`AgentListing.version`).
  */
-export const removeAgent = async (name: string, version: string): Promise<AgentListing> =>
-  agentViewOf(await served.delete(name, version, refused));
-
-/** The run a try started, which its page follows. */
-type AgentTried = { id: string };
+export const removeAgent = async (name: string, version: string) => agentViewOf(await served.delete(name, version, refused));
 
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
@@ -271,15 +262,12 @@ type AgentTried = { id: string };
  * @param name The agent's name.
  * @param brief What the try asks of it, in a person's words.
  */
-export const tryAgent = async (name: string, brief: string): Promise<AgentTried> => ({
+export const tryAgent = async (name: string, brief: string) => ({
   id: (await served.try(name, brief, refused)).id,
 });
 
 /** A person's custom instructions for an agent: the file they are kept in, their words (null for none), and why they do not read. */
 export type CustomInstructions = AgentInstructions;
-
-/** The file a clear looked at, and whether it removed words. */
-type CustomInstructionsCleared = AgentInstructionsCleared;
 
 /** Nemia's own name: her custom instructions are hers (`/api/nemia/instructions`), every other agent's its name's. */
 const NEMIA = 'nemia';
@@ -305,7 +293,7 @@ export const customInstructionsQuery = (name: string, repo?: string) =>
   });
 
 /** The repository an agent of a repository's name is looked for in, sent as `?repo=`; none for an agent of yours. */
-const repoQuery = (repo: string | undefined): { repo?: string } => (repo === undefined ? {} : { repo });
+const repoQuery = (repo: string | undefined) => (repo === undefined ? {} : { repo });
 
 /** What a write of custom instructions may have done, and what to look at before writing them again. */
 const CUSTOM_WRITTEN = "The words may be written: read the agent's page again before saving again.";
@@ -317,7 +305,7 @@ const CUSTOM_WRITTEN = "The words may be written: read the agent's page again be
  * @param words The custom instructions to write.
  * @param repo The repository its name is looked for in besides yours; undefined for yours alone.
  */
-export const writeCustomInstructions = (name: string, words: string, repo?: string): Promise<CustomInstructions> =>
+export const writeCustomInstructions = (name: string, words: string, repo?: string) =>
   call(
     (c) =>
       name === NEMIA
@@ -332,7 +320,7 @@ export const writeCustomInstructions = (name: string, words: string, repo?: stri
  * @param name The agent's name; `nemia` clears Nemia's own.
  * @param repo The repository its name is looked for in besides yours; undefined for yours alone.
  */
-export const clearCustomInstructions = (name: string, repo?: string): Promise<CustomInstructionsCleared> =>
+export const clearCustomInstructions = (name: string, repo?: string) =>
   call(
     (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { name }, query: repoQuery(repo) })),
     write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),

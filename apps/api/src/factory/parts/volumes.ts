@@ -4,7 +4,7 @@
  * (`nemia factory volume set`), answered as it reads after with the file written (`written`). `nemia factory volume add` and `rm`, which
  * take a folder by its whole path, are the factories group's.
  */
-import { FACTORY_VOLUME_SET, informerMemo, type SummaryHow, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
+import { FACTORY_VOLUME_SET, informerMemo, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { factoryNamed, queryOf } from './parts.ts';
@@ -12,7 +12,7 @@ import { answered } from '../../objects/refused.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** How a read of the volumes judges a run that mounts one: off the app's informer. */
-const howOf = (s: Served): SummaryHow => ({
+const howOf = (s: Served) => ({
   home: s.home,
   memo: s.informer ?? informerMemo(),
   verify: verifiesRest(s.env),

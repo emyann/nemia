@@ -27,7 +27,7 @@ type PickerFactory = { name: string; factory?: Factory };
  * @param held whether the default factory holds a run
  * @param picked the factory the page sits in, none at the store's level
  */
-export function pickerFactories(factories: readonly Factory[], held: boolean, picked: string | undefined): PickerFactory[] {
+export function pickerFactories(factories: readonly Factory[], held: boolean, picked: string | undefined) {
   const listed: PickerFactory[] = factoriesShown(factories, held).map((factory) => ({ name: factory.name, factory }));
   if (picked === undefined || listed.some((item) => item.name === picked)) return listed;
   return [...listed, { name: picked, factory: factories.find((f) => f.name === picked) }];
@@ -46,7 +46,7 @@ export function pickerOffer(
   factories: readonly Factory[] | undefined,
   held: Parameters<typeof holdsRuns>[0] | undefined,
   picked: string | undefined,
-): PickerFactory[] {
+) {
   if (factories === undefined) return [];
   const unnamed = factories.every((f) => f.default);
   if (unnamed && held === undefined) return [];
@@ -59,16 +59,16 @@ export function pickerOffer(
  * @param count how many runs are in flight
  * @param runs whether to name the word runs, as for every factory's count
  */
-export function inFlightWords(count: number, runs: boolean): string {
+export function inFlightWords(count: number, runs: boolean) {
   if (count === 0) return 'none in flight';
   return runs ? `${count} ${count === 1 ? 'run' : 'runs'} in flight` : `${count} in flight`;
 }
 
 /** How many runs of the light answer `open` are in flight in the factory `name`, a run of the default factory naming none. */
-const inFlightIn = (open: OpenRuns, name: string): number => open.inFlight.filter((row) => namespaceOf(row.factory) === name).length;
+const inFlightIn = (open: OpenRuns, name: string) => open.inFlight.filter((row) => namespaceOf(row.factory) === name).length;
 
 /** What the trigger's title says of the factory picked: its repositories whole, one a line, and why its file does not read. */
-const aboutOf = (factory: Factory | undefined): string | undefined =>
+const aboutOf = (factory: Factory | undefined) =>
   factory && [...factory.worksOn, ...(factory.error ? [`Its file does not read: ${factory.error}`] : [])].join('\n');
 
 /**
@@ -78,7 +78,7 @@ const aboutOf = (factory: Factory | undefined): string | undefined =>
  * @param item the factory item the picker offers
  * @param open the runs in flight, undefined while they are unread
  */
-export function supportOf(item: PickerFactory, open: OpenRuns | undefined): string | undefined {
+export function supportOf(item: PickerFactory, open: OpenRuns | undefined) {
   if (!item.factory) return 'no such factory';
   if (item.factory.error) return 'its file does not read';
   return open && inFlightWords(inFlightIn(open, item.name), false);
@@ -94,7 +94,7 @@ const NEW_FACTORY = 'new-factory';
  * @param factory the factory the switcher shows
  * @param tick whether the store's daemon ticks or its factories are paused, none while unread
  */
-export function switcherLine(factory: Factory | undefined, tick: 'ticking' | 'paused' | 'not ticking' | undefined): string {
+export function switcherLine(factory: Factory | undefined, tick: 'ticking' | 'paused' | 'not ticking' | undefined) {
   const repos = factory?.worksOn ?? [];
   const repo = repos[0] === undefined ? 'no volume to work on' : `${repoName(repos[0])}${repos.length > 1 ? ` +${repos.length - 1}` : ''}`;
   const template = factory?.template ? `${repoName(factory.template.source)}@${factory.template.version}` : undefined;

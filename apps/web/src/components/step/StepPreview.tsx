@@ -44,15 +44,15 @@ function OpenedCard({ run, step, asOf }: { run: RailRun; step: string; asOf: Dat
  * Ends a Tab on the bar that the preview has already moved into its card, so the grid the bar stands in (the table in flight), which
  * takes Tab as leaving the grid, does not move the focus back out of the card.
  */
-const intoTheCard = (event: KeyboardEvent): void => {
+const intoTheCard = (event: KeyboardEvent) => {
   if (event.key === 'Tab' && document.activeElement?.closest('[data-slot="preview-card"]')) event.stopPropagation();
 };
 
 /** The rail a bar stands in, or null outside one. */
-const railOf = (bar: Element | null | undefined): HTMLElement | null => bar?.closest<HTMLElement>('[data-run-steps]') ?? null;
+const railOf = (bar: Element | null | undefined) => bar?.closest<HTMLElement>('[data-run-steps]') ?? null;
 
 /** A ref that reads the rail of the bar `bar` holds, or the bar outside a rail, each time it is read. */
-const railRefOf = (bar: { current: Element | null } | undefined): { readonly current: Element | null } =>
+const railRefOf = (bar: { current: Element | null } | undefined) =>
   Object.defineProperty<{ readonly current: Element | null }>({ current: null }, 'current', {
     get: () => railOf(bar?.current) ?? bar?.current ?? null,
   });
@@ -82,7 +82,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
   const warm = useACardOpen();
   const said = barSaid(step.name, step.state, step.on, run.holding != null);
   useEffect(() => () => cardOpened(id, false), [id]);
-  const opened = (open: boolean): void => {
+  const opened = (open: boolean) => {
     cardOpened(id, open);
     const rail = railOf(document.querySelector(`[data-bar-of="${CSS.escape(id)}"]`));
     if (open && rail) setSide(previewSide(rail.getBoundingClientRect(), innerWidth));
@@ -140,10 +140,8 @@ function BarPreview(props: { run: RailRun; step: RailStep; asOf: Date; children:
  * @param run the run whose rail it is
  * @param asOf the instant its times are said at
  */
-export const previewBar =
-  (run: RailRun, asOf: Date) =>
-  (bar: ReactNode, step: RailStep): ReactNode => (
-    <BarPreview run={run} step={step} asOf={asOf}>
-      {bar}
-    </BarPreview>
-  );
+export const previewBar = (run: RailRun, asOf: Date) => (bar: ReactNode, step: RailStep) => (
+  <BarPreview run={run} step={step} asOf={asOf}>
+    {bar}
+  </BarPreview>
+);

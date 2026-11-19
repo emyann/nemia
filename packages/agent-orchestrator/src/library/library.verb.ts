@@ -20,7 +20,7 @@ import { Missing, type Refusal } from '../refusal/refusal.ts';
 import { objectsListed, type ObjectQuery } from '../object/listed.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import type { BuiltinServer, FactoryServer, FactoryServers } from '../factory/servers/index.ts';
+import type { BuiltinServer, FactoryServer } from '../factory/servers/index.ts';
 import { addName, libraryAddRefusal, libraryAddState, libraryAddsOf, sameAdd, type LibraryRef } from './library.ts';
 import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibraryAdds } from './library.store.ts';
 
@@ -29,30 +29,30 @@ import { libraryAddsFile, libraryDir, libraryServers, readLibraryAdds, writeLibr
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export const recordedAt = (home: string, name: string): string =>
+export const recordedAt = (home: string, name: string) =>
   (fs.statSync(libraryAddsFile(home, name), { throwIfNoEntry: false })?.mtime ?? new Date(0)).toISOString();
 
 /** A factory's adds, and whether they are its record's (`recorded`) or derived from what its workflows resolve today. */
 export type FactoryAdds = { readonly recorded: boolean; readonly adds: readonly LibraryRef[] };
 
 /** The factory `name` as its file reads, or undefined for `default`, which has no file, and for one whose file does not read. */
-const factoryNamed = (home: string, name: string): Factory | undefined => {
+const factoryNamed = (home: string, name: string) => {
   const listing = doorAtOnce(home, (door) => door.factories.listed()).find((f) => f.name === name);
   return listing === undefined || 'error' in listing ? undefined : listing;
 };
 
 /** Whether `file` is directly in the folder `dir`, by resolved path. */
-const inFolder = (file: string, dir: string): boolean => path.dirname(path.resolve(file)) === path.resolve(dir);
+const inFolder = (file: string, dir: string) => path.dirname(path.resolve(file)) === path.resolve(dir);
 
 /** Whether the library holds a skill of `name`: the person's, or a builtin. */
-const librarySkill = (home: string, name: string): DefinitionOrigin | undefined => {
+const librarySkill = (home: string, name: string) => {
   const holds = (dir: string) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true;
   if (holds(path.join(libraryDir(home), SKILLS_FOLDER))) return 'user';
   return holds(BUILTIN_SKILLS) ? 'builtin' : undefined;
 };
 
 /** The skills the agent file `file` gives, as its `skills:` line lists them; none for a file that cannot be read. */
-const givenSkills = (file: string): string[] => {
+const givenSkills = (file: string) => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -67,7 +67,7 @@ const givenSkills = (file: string): string[] => {
 };
 
 /** The repositories the factory `name` is read on, or one undefined for the store's workflows alone; none for a factory with no file. */
-function filledPlaces(home: string, name: string): { factory: Factory | undefined; repos: Array<string | undefined> } | undefined {
+function filledPlaces(home: string, name: string) {
   const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
   if (name !== DEFAULT_NAMESPACE && factory === undefined) return undefined;
   const repos = factory === undefined || workedOn(factory).length === 0 ? [undefined] : workedOn(factory);
@@ -75,7 +75,7 @@ function filledPlaces(home: string, name: string): { factory: Factory | undefine
 }
 
 /** Each of `read` over the places of the factory `name`, a place that cannot be listed skipped. */
-function overPlaces<T>(home: string, name: string, read: (repo: string | undefined, factory: Factory | undefined) => T[]): T[] {
+function overPlaces<T>(home: string, name: string, read: (repo: string | undefined, factory: Factory | undefined) => T[]) {
   const places = filledPlaces(home, name);
   if (places === undefined) return [];
   return places.repos.flatMap((repo) => {
@@ -88,7 +88,7 @@ function overPlaces<T>(home: string, name: string, read: (repo: string | undefin
 }
 
 /** The files of the agents the steps of the factory `name` are credited to (`stepsFilled`), on each of its repositories. */
-const filledFiles = (home: string, name: string): Set<string> =>
+const filledFiles = (home: string, name: string) =>
   new Set(overPlaces(home, name, (repo, factory) => stepsFilled(repo, home, factory).map((filled) => path.resolve(filled.file))));
 
 /**
@@ -98,7 +98,7 @@ const filledFiles = (home: string, name: string): Set<string> =>
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function derivedAdds(home: string, name: string): LibraryRef[] {
+export function derivedAdds(home: string, name: string) {
   const files = filledFiles(home, name);
   const agentsDir = path.join(libraryDir(home), AGENTS_FOLDER);
   const adds: LibraryRef[] = [];
@@ -119,7 +119,7 @@ export function derivedAdds(home: string, name: string): LibraryRef[] {
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function factoryAdds(home: string, name: string): FactoryAdds {
+export function factoryAdds(home: string, name: string) {
   const recorded = readLibraryAdds(home, name);
   return {
     recorded: recorded !== undefined,
@@ -132,14 +132,16 @@ export function factoryAdds(home: string, name: string): FactoryAdds {
  * @param home The store's root.
  * @param ref The item, by its kind and its name.
  */
-export function libraryOrigin(home: string, ref: LibraryRef): DefinitionOrigin | undefined {
-  if (ref.kind === 'Skill') return librarySkill(home, ref.name);
+export function libraryOrigin(home: string, ref: LibraryRef) {
+  if (ref.kind === 'Skill') return librarySkill(home, ref.name) satisfies DefinitionOrigin | undefined as DefinitionOrigin | undefined;
   if (ref.kind === 'Agent')
-    return fs.statSync(path.join(libraryDir(home), AGENTS_FOLDER, `${ref.name}.md`), { throwIfNoEntry: false })?.isFile()
+    return (fs.statSync(path.join(libraryDir(home), AGENTS_FOLDER, `${ref.name}.md`), { throwIfNoEntry: false })?.isFile()
       ? 'user'
-      : undefined;
-  if (libraryServers(home)[ref.name] !== undefined) return 'user';
-  return builtinServers(BUILTIN_SERVERS).some((s) => s.name === ref.name) ? 'builtin' : undefined;
+      : undefined) satisfies DefinitionOrigin | undefined as DefinitionOrigin | undefined;
+  if (libraryServers(home)[ref.name] !== undefined) return 'user' satisfies DefinitionOrigin | undefined as DefinitionOrigin | undefined;
+  return (builtinServers(BUILTIN_SERVERS).some((s) => s.name === ref.name) ? 'builtin' : undefined) satisfies
+    | DefinitionOrigin
+    | undefined as DefinitionOrigin | undefined;
 }
 
 /**
@@ -148,9 +150,9 @@ export function libraryOrigin(home: string, ref: LibraryRef): DefinitionOrigin |
  * @param name The factory's name.
  * @param ref The item.
  */
-function ownOrigins(home: string, name: string, ref: LibraryRef): DefinitionOrigin[] {
+function ownOrigins(home: string, name: string, ref: LibraryRef) {
   const factory = name === DEFAULT_NAMESPACE ? undefined : factoryNamed(home, name);
-  if (factory === undefined || ref.kind === 'McpServer') return [];
+  if (factory === undefined || ref.kind === 'McpServer') return [] satisfies DefinitionOrigin[] as DefinitionOrigin[];
   const at = (root: string) =>
     ref.kind === 'Agent'
       ? fs.existsSync(path.join(root, AGENTS_FOLDER, `${ref.name}.md`))
@@ -158,11 +160,11 @@ function ownOrigins(home: string, name: string, ref: LibraryRef): DefinitionOrig
   const out: DefinitionOrigin[] = [];
   if (factory.tree !== undefined && at(path.join(factory.tree, 'workflows'))) out.push('factory');
   if (workedOn(factory).some((repo) => at(path.join(path.resolve(repo), REPOSITORY_HOLDER)))) out.push('repo');
-  return out;
+  return out satisfies DefinitionOrigin[];
 }
 
 /** What to do about an add the library no longer holds. */
-const missingFix = (factory: string, ref: LibraryRef): string =>
+const missingFix = (factory: string, ref: LibraryRef) =>
   `${ref.kind} ${ref.name} is no longer in the library: make it again there, or take the add off with nemia library rm ${ref.kind} ${ref.name} --factory ${factory}.`;
 
 /**
@@ -172,7 +174,7 @@ const missingFix = (factory: string, ref: LibraryRef): string =>
  * @param ref The add.
  * @param recorded Whether the factory's adds are its record's.
  */
-export function libraryAddObject(home: string, name: string, ref: LibraryRef, recorded: boolean): LibraryAdd {
+export function libraryAddObject(home: string, name: string, ref: LibraryRef, recorded: boolean) {
   const held = libraryOrigin(home, ref);
   const own = ownOrigins(home, name, ref);
   const state = libraryAddState([...own, ...(held === undefined ? [] : [held])]);
@@ -196,19 +198,19 @@ export function libraryAddObject(home: string, name: string, ref: LibraryRef, re
       ...(held !== undefined && { origin: held }),
       ...(state === 'missing' && { message: missingFix(name, ref) }),
     },
-  };
+  } satisfies LibraryAdd as LibraryAdd;
 }
 
 /**
  * The add named `addname`, `<kind>.<name>`, read as a reference; undefined where it names no kind of the library.
  * @param addname The add's object name.
  */
-export function refOf(addname: string): LibraryRef | undefined {
+export function refOf(addname: string) {
   const dot = addname.indexOf('.');
   const kind = addname.slice(0, dot);
   const name = addname.slice(dot + 1);
   if (dot < 1 || !name || (kind !== 'Agent' && kind !== 'Skill' && kind !== 'McpServer')) return undefined;
-  return { kind, name };
+  return { kind, name } satisfies LibraryRef | undefined;
 }
 
 /**
@@ -220,14 +222,14 @@ export function refOf(addname: string): LibraryRef | undefined {
  * @param does Whether the item is added or its add taken off.
  * @param ref The item.
  */
-export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remove', ref: LibraryRef): LibraryAdd {
+export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remove', ref: LibraryRef) {
   const { adds } = factoryAdds(home, name);
   const added = adds.some((a) => sameAdd(a, ref));
   const refused = libraryAddRefusal(does, libraryOrigin(home, ref) !== undefined, added);
   if (refused !== null) throw new Missing({ message: refused.message });
   const now = does === 'add' ? (added ? adds : [...adds, ref]) : adds.filter((a) => !sameAdd(a, ref));
   writeLibraryAdds(home, name, now);
-  return libraryAddObject(home, name, ref, true);
+  return libraryAddObject(home, name, ref, true) satisfies LibraryAdd;
 }
 
 /**
@@ -236,7 +238,7 @@ export function writeLibraryAdd(home: string, name: string, does: 'add' | 'remov
  * @param home The store's root.
  * @param ref The item, or a workflow by its name.
  */
-export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }): string[] {
+export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'Workflow'; readonly name: string }) {
   const factories = doorAtOnce(home, (door) => door.factories.listed()).filter((f): f is Factory & { file: string } => !('error' in f));
   if (ref.kind === 'Workflow')
     return factories
@@ -261,7 +263,7 @@ export function libraryUsers(home: string, ref: LibraryRef | { readonly kind: 'W
  * words the fix, since it gates every name. A factory with no record is left out: its adds are what it runs.
  * @param home The store's root.
  */
-export function addsMissingNow(home: string): { factory: string; missing: boolean; message?: string }[] {
+export function addsMissingNow(home: string) {
   const listed = doorAtOnce(home, (door) => door.factories.listed()).flatMap((f) => ('error' in f ? [] : [f.name]));
   return [...new Set([DEFAULT_NAMESPACE, ...listed])].flatMap((factory) => {
     let adds: readonly LibraryRef[] | undefined;
@@ -282,7 +284,7 @@ export function addsMissingNow(home: string): { factory: string; missing: boolea
  * @param home The store's root.
  * @param name The factory's name, `default` among them.
  */
-export function addedServers(home: string, name: string): FactoryServers {
+export function addedServers(home: string, name: string) {
   const adds = readLibraryAdds(home, name) ?? [];
   const mine = libraryServers(home);
   const builtin = builtinServers(BUILTIN_SERVERS);
@@ -297,7 +299,7 @@ export function addedServers(home: string, name: string): FactoryServers {
 }
 
 /** A builtin server as a record holds it: its fields but its name. */
-const withoutName = ({ name: _name, ...server }: BuiltinServer): FactoryServer => server;
+const withoutName = ({ name: _name, ...server }: BuiltinServer) => server;
 
 /**
  * Adds to the factory `name`'s record each builtin skill an agent of its tree gives that neither its tree nor the record holds, so a
@@ -307,7 +309,7 @@ const withoutName = ({ name: _name, ...server }: BuiltinServer): FactoryServer =
  * @param name The factory's name.
  * @param tree The factory's tree, whose `workflows/agents/` and `workflows/skills/` are read.
  */
-export function addTemplateBuiltins(home: string, name: string, tree: string): void {
+export function addTemplateBuiltins(home: string, name: string, tree: string) {
   const recorded = readLibraryAdds(home, name);
   if (recorded === undefined) return;
   const agents = path.join(tree, 'workflows', AGENTS_FOLDER);
@@ -321,7 +323,7 @@ export function addTemplateBuiltins(home: string, name: string, tree: string): v
   const wanted = files
     .flatMap((file) => givenSkills(path.join(agents, file)))
     .filter((skill) => !skill.includes(':') && !own(skill) && librarySkill(home, skill) === 'builtin')
-    .map((skill): LibraryRef => ({ kind: 'Skill', name: skill }))
+    .map((skill) => ({ kind: 'Skill', name: skill }) satisfies LibraryRef)
     .filter((ref, i, all) => !recorded.some((a) => sameAdd(a, ref)) && all.findIndex((b) => sameAdd(b, ref)) === i);
   if (wanted.length) writeLibraryAdds(home, name, [...recorded, ...wanted]);
 }
@@ -333,11 +335,7 @@ export function addTemplateBuiltins(home: string, name: string, tree: string): v
  * @param does Whether the item is added or its add taken off.
  * @param addname The add's object name, `<kind>.<name>`.
  */
-export const libraryAddWritten = (
-  factory: string,
-  does: 'add' | 'remove',
-  addname: string,
-): Effect.Effect<LibraryAdd, Refusal, StoreRoot> =>
+export const libraryAddWritten = (factory: string, does: 'add' | 'remove', addname: string) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const ref = refOf(addname);
@@ -346,7 +344,7 @@ export const libraryAddWritten = (
         new Missing({ message: `${addname} is no add: name it <kind>.<name>, its kind Agent, Skill or McpServer.` }),
       );
     return yield* tried(() => writeLibraryAdd(home, factory, does, ref));
-  });
+  }) satisfies Effect.Effect<LibraryAdd, Refusal, StoreRoot>;
 
 /**
  * A page of the factory `name`'s adds (`LibraryAddList`), each with its state, cut by the list's query as every list is.
@@ -371,12 +369,12 @@ export const libraryAddList = Effect.fn('libraryAddList')(function* (home: strin
  * @param name The factory's name, `default` among them.
  * @param addname The add's object name, `<kind>.<name>`.
  */
-export function libraryAddNamed(home: string, name: string, addname: string): LibraryAdd {
+export function libraryAddNamed(home: string, name: string, addname: string) {
   const ref = refOf(addname);
   const { recorded, adds } = factoryAdds(home, name);
   if (ref === undefined || !adds.some((a) => sameAdd(a, ref)))
     throw new Missing({
       message: `${name} has no add ${addname}: list them with GET /api/namespaces/${name}/libraryadds, or add it with nemia library add.`,
     });
-  return libraryAddObject(home, name, ref, recorded);
+  return libraryAddObject(home, name, ref, recorded) satisfies LibraryAdd;
 }

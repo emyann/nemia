@@ -23,14 +23,14 @@ import type { RunStatusWord } from 'objects';
  * What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them.
  * @param pruned The run's pruned mark, whose `artifacts` says its files were removed too.
  */
-export const prunedKept = (pruned: Pruned): string =>
+export const prunedKept = (pruned: Pruned) =>
   pruned.artifacts ? 'its branches and record are kept' : 'its branches, record and files are kept';
 
 /**
  * A step at its gate on a pruned run, as `nemia ls` and `nemia decide` both say it: no approval is left to give (`prunedRefusal`).
  * @param pruned The run's pruned mark, worded by `prunedWords`.
  */
-export const neverApproved = (pruned: Pruned): string => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
+export const neverApproved = (pruned: Pruned) => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
 
 /**
  * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
@@ -40,7 +40,7 @@ export const neverApproved = (pruned: Pruned): string => `not approved, and neve
  * @param run The run the verb would file work into.
  * @param what The verb, as the refusal names it.
  */
-export function prunedRefusal(run: Run, what: string): string | null {
+export function prunedRefusal(run: Run, what: string) {
   if (!run.pruned) return null;
   const { at, worktrees, artifacts } = run.pruned;
   if (artifacts && !worktrees.length) {
@@ -58,7 +58,7 @@ export function prunedRefusal(run: Run, what: string): string | null {
  * @param run The run the verb would release work on.
  * @param what The verb, as the refusal names it.
  */
-export function heldRefusal(run: Run, what: string): string | null {
+export function heldRefusal(run: Run, what: string) {
   if (!run.hold) return null;
   return `${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))} (nemia hold, at ${run.hold.at || 'a time its file no longer says'}), and ${what} would release work the hold keeps back. What the step asks stays on its record, and is asked again once the hold lifts; to answer it now, lift the hold first: nemia hold ${run.id} --off.`;
 }
@@ -86,7 +86,7 @@ export type PruneFacts = {
  * left out — a files directory asked for is asked for again, and a run nobody has decided keeps its `--unmerged`. Pure.
  * @param id The run's id.
  */
-export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {}): string =>
+export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {}) =>
   `nemia prune ${id}${unmerged ? ' --unmerged' : ''}${artifacts ? ' --artifacts' : ''}`;
 
 /**
@@ -119,7 +119,7 @@ export function pruneRefusal(
   run: Run,
   facts: PruneFacts,
   { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {},
-): string | null {
+) {
   const id = run.id;
   const again = pruneAgain(id, { unmerged, artifacts });
   const agreed = unmerged || (Boolean(run.pruned) && !facts.files);
@@ -150,7 +150,7 @@ export function pruneRefusal(
 /**
  * Why `nemia prune` waits on a run that finished and nobody has decided: its branch, or the repository it worked in, is what is read. Pure.
  */
-function unmergedRefusal(run: RepositoryRun, artifacts: boolean): string {
+function unmergedRefusal(run: RepositoryRun, artifacts: boolean) {
   const again = pruneAgain(run.id, { unmerged: true, artifacts });
   return run.isolate
     ? `it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: ${again}`
@@ -160,7 +160,7 @@ function unmergedRefusal(run: RepositoryRun, artifacts: boolean): string {
 /**
  * Why `nemia prune` keeps one worktree — held, on no branch, or holding changes — with the place's command for it, or undefined. Pure.
  */
-function worktreeRefusal(w: PruneFacts['worktrees'][number], again: string): string | undefined {
+function worktreeRefusal(w: PruneFacts['worktrees'][number], again: string) {
   if (w.heldBy !== undefined) {
     return `${w.path} is held${w.heldBy ? ` (${w.heldBy})` : ''}, and the place will not remove it — let it go if nothing needs it${w.fix ? `: ${w.fix}` : ''}`;
   }
@@ -207,13 +207,13 @@ export type Pruning = {
  * The bytes a list of worktrees holds, together.
  * @param worktrees The worktrees, each with the bytes it holds.
  */
-export const prunedBytes = (worktrees: ReadonlyArray<{ bytes: number }>): number => worktrees.reduce((sum, w) => sum + w.bytes, 0);
+export const prunedBytes = (worktrees: ReadonlyArray<{ bytes: number }>) => worktrees.reduce((sum, w) => sum + w.bytes, 0);
 
 /**
  * The bytes one run's prune frees, or would: its worktrees and, under `--artifacts`, its files.
  * @param p The run's pruning: its worktrees and, under `--artifacts`, its files directory.
  */
-export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): number => prunedBytes(p.worktrees) + (p.artifacts?.bytes ?? 0);
+export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>) => prunedBytes(p.worktrees) + (p.artifacts?.bytes ?? 0);
 
 /**
  * What `nemia prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
@@ -221,13 +221,13 @@ export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): numbe
  * worktrees alone says that the files are kept.
  * @param p What `nemia prune` found, or did, with the run.
  */
-export function pruneLines(p: Pruning): string[] {
+export function pruneLines(p: Pruning) {
   const engine = p.engine && p.kind !== 'refused' ? engineWords(p.engine, { id: p.id, dry: true }) : '';
-  return engine ? [...storeLines(p), `   ${engine}`] : storeLines(p);
+  return (engine ? [...storeLines(p), `   ${engine}`] : storeLines(p)) satisfies string[];
 }
 
 /** What `nemia prune` says of one run's worktrees and files. */
-function storeLines(p: Pruning): string[] {
+function storeLines(p: Pruning) {
   const n = p.worktrees.length;
   const worktrees = `${n} worktree${n === 1 ? '' : 's'}`;
   const what = !p.artifacts ? worktrees : n ? `${worktrees} and its files` : 'its files';
@@ -259,7 +259,7 @@ export type Answered = { readonly run: Run; readonly status: RunStatusWord; read
  * a succeeded run is merged is not read here: the prune's own judgement refuses one that is not (`pruneRefusal`).
  * @param answers The runs a pass answered, each with its status and whether it was at rest.
  */
-export const freeable = (answers: readonly Answered[]): string[] =>
+export const freeable = (answers: readonly Answered[]) =>
   answers.filter((a) => a.feed.atRest === true && runOver(a.status) && isRepositoryRun(a.run)).map((a) => a.run.id);
 
 /**
@@ -271,7 +271,7 @@ export const freeable = (answers: readonly Answered[]): string[] =>
  * @param bound The most candidates one sweep judges.
  * @param turn How many sweeps have run, which picks the one taken once every candidate was judged.
  */
-export function freeTurn(candidates: readonly string[], judged: ReadonlySet<string>, bound: number, turn: number): string[] {
+export function freeTurn(candidates: readonly string[], judged: ReadonlySet<string>, bound: number, turn: number) {
   const fresh = candidates.filter((id) => !judged.has(id)).slice(0, Math.max(0, bound));
   if (fresh.length || !candidates.length || bound < 1) return fresh;
   const next = candidates[turn % candidates.length];
@@ -286,7 +286,7 @@ export function freeTurn(candidates: readonly string[], judged: ReadonlySet<stri
  * @param facts What the prune found of the run, or undefined where its place did not answer.
  * @param refusal Why the prune would not free it (`pruneRefusal`), or what the place said.
  */
-export function freeSaid(facts: PruneFacts | undefined, refusal: string): string | null {
+export function freeSaid(facts: PruneFacts | undefined, refusal: string) {
   if (!facts) return refusal;
   const finished = (facts.decided === 'landed' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
   return finished ? refusal : null;
@@ -296,7 +296,7 @@ export function freeSaid(facts: PruneFacts | undefined, refusal: string): string
  * What the daemon says of a run it freed: how many worktrees, and the bytes that freed. Pure.
  * @param p The run freed: its id and the worktrees removed, each with its bytes.
  */
-export const freedLine = (p: Pick<Pruning, 'id' | 'worktrees'>): string =>
+export const freedLine = (p: Pick<Pruning, 'id' | 'worktrees'>) =>
   `${p.id}  freed: removed ${p.worktrees.length} worktree${p.worktrees.length === 1 ? '' : 's'}, ${sizeOf(prunedBytes(p.worktrees))}; its record, branches and files are kept`;
 
 /**
@@ -313,7 +313,7 @@ export const untaken: Untaken = (r) => {
  * What `untaken` reads of a run a pass answered. Pure.
  * @param a The run as the pass answered it.
  */
-export const untakenOf = (a: Answered): UntakenWhy | null =>
+export const untakenOf = (a: Answered) =>
   untaken({
     status: a.status,
     atRest: a.feed.atRest === true,
@@ -328,7 +328,7 @@ export const untakenOf = (a: Answered): UntakenWhy | null =>
  * @param run The run left out.
  * @param why Why it is left out (`untaken`): its hold, or no frozen workflow.
  */
-export function untakenWords(run: Run, why: UntakenWhy): string {
+export function untakenWords(run: Run, why: UntakenWhy) {
   if (why === 'held' && run.hold) {
     return `it is ${holdWord(
       run.hold.until.map((id) => ({ run: id })),
@@ -354,7 +354,7 @@ export const ARTIFACTS_MARK = 'WF_ARTIFACTS';
 export const LEFT_MARKS = [STEP_FILES_MARK, ARTIFACTS_MARK] as const;
 
 /** The `<id>` of `folder` where it is under `<home>/runs/<id>/`, absolute and climbing out by no `..`; else `undefined`. */
-const runUnder = (folder: string | undefined, home: string): string | undefined => {
+const runUnder = (folder: string | undefined, home: string) => {
   if (folder === undefined || !path.isAbsolute(folder) || folder.split('/').includes('..')) return undefined;
   const runs = `${path.join(path.resolve(home), 'runs')}/`;
   if (!folder.startsWith(runs)) return undefined;
@@ -370,7 +370,7 @@ const runUnder = (folder: string | undefined, home: string): string | undefined 
  * @param env The process's environment, by variable.
  * @param home This store's home, under whose `runs/` the run's folder lies.
  */
-export function runOfEnvironment(env: Readonly<Record<string, string>>, home: string): string | undefined {
+export function runOfEnvironment(env: Readonly<Record<string, string>>, home: string) {
   return runUnder(env[STEP_FILES_MARK], home) ?? runUnder(env[ARTIFACTS_MARK], home);
 }
 
@@ -394,14 +394,14 @@ export const leftBehindOf: LeftBehindOf = (p, run) => {
  * a folder run's too, since a process a session left runs whatever place its run has. A failed run is not: it may be tried again. Pure.
  * @param answers The runs a pass answered, each with its status and whether it was at rest.
  */
-export const finishedAtRest = (answers: readonly Answered[]): string[] =>
+export const finishedAtRest = (answers: readonly Answered[]) =>
   answers.filter((a) => a.feed.atRest === true && (a.status === 'succeeded' || a.status === 'cancelled')).map((a) => a.run.id);
 
 /** A process as the sweep's words name it: its pid and its command's name. */
 export type NamedProcess = { readonly pid: number; readonly name: string };
 
 /** Each process by its pid and its command's name, in the order of their pids. */
-const named = (processes: readonly NamedProcess[]): string =>
+const named = (processes: readonly NamedProcess[]) =>
   [...processes]
     .sort((a, b) => a.pid - b.pid)
     .map((p) => `pid ${p.pid} (${p.name})`)
@@ -412,7 +412,7 @@ const named = (processes: readonly NamedProcess[]): string =>
  * @param run The run's id.
  * @param ended The processes the sweep ended of it.
  */
-export const leftLineNote = (run: string, ended: readonly NamedProcess[]): string =>
+export const leftLineNote = (run: string, ended: readonly NamedProcess[]) =>
   `${run} had finished, and ${ended.length === 1 ? 'a process' : `${ended.length} processes`} it started still ran: ${named(ended)}`;
 
 /**
@@ -421,5 +421,5 @@ export const leftLineNote = (run: string, ended: readonly NamedProcess[]): strin
  * @param processes The processes working in the folder.
  * @param folder The worktree the sweep leaves.
  */
-export const heldWords = (processes: readonly NamedProcess[], folder: string): string =>
+export const heldWords = (processes: readonly NamedProcess[], folder: string) =>
   `${named(processes)} ${processes.length === 1 ? 'works' : 'work'} in ${folder}: end ${processes.length === 1 ? 'it' : 'them'} or leave the folder, and a later sweep frees it`;

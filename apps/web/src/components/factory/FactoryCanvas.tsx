@@ -12,7 +12,6 @@ import {
   ReactFlowProvider,
   useReactFlow,
   useStoreApi,
-  type Edge,
   type Node,
   type NodeChange,
   type NodeDimensionChange,
@@ -24,7 +23,7 @@ import { Button, Card, CardContent, Switch, Title } from '@/components/ui/ds';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
-import { judged, runViewOf, type RunRow, type RunView } from '@/lib/api/judged';
+import { judged, runViewOf, type RunRow } from '@/lib/api/judged';
 import { namespaceOf } from '@/lib/api/namespace';
 import { FINISHED_SIZE, finishedRunsQuery, type OpenRuns, undecidedRunsQuery } from '@/lib/api/runs';
 import {
@@ -72,7 +71,7 @@ import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
 import { CanvasLegend } from '../step/CanvasLegend';
 import { QueueLane } from '../inbox/QueueLane';
-import { RunActions, type FoundRun } from '../run/RunActions';
+import { RunActions } from '../run/RunActions';
 import { RunNode, type RunFlowNode } from '../run/RunNode';
 import { StateEdge } from '../step/StateEdge';
 import { afterEdges, readEdges } from '../step/stepGraph';
@@ -81,7 +80,7 @@ import { afterEdges, readEdges } from '../step/stepGraph';
  * Where the cards were left in this browser: the arrangement saved at the cell width, or else the one saved at the narrower width, widened
  * (`widenLayout`).
  */
-const savedLayout = (): Map<string, Point> | null => readFactoryLayout() ?? widenLayout(readNarrowFactoryLayout());
+const savedLayout = () => readFactoryLayout() ?? widenLayout(readNarrowFactoryLayout());
 
 /** The floor's node types for React Flow, one object for the module's life. */
 const nodeTypes = { run: RunNode };
@@ -96,7 +95,7 @@ const FIT_GAP = 16;
  * the legend and the minimap. Takes the floor's frame, or null; measures the panels where they are drawn, at each call, since the legend's
  * height moves with the floor's width. A panel hidden on a narrow floor is drawn nowhere and takes no room.
  */
-function panelsOver(frame: HTMLElement | null): { top: number; bottom: number } {
+function panelsOver(frame: HTMLElement | null) {
   let top = 0;
   let bottom = 0;
   if (frame) {
@@ -121,7 +120,7 @@ function fitClear(frame: HTMLElement | null) {
 }
 
 /** The box an open card at `at` takes on the floor: the cells it spans, less the gap beside the last, which React Flow may not measure. */
-const boxOf = (at: Point, span: Span): Box => ({
+const boxOf = (at: Point, span: Span) => ({
   ...at,
   width: span.columns * CELL_WIDTH - (CELL_WIDTH - CARD_WIDTH),
   height: span.rows * CELL_HEIGHT - (CELL_WIDTH - CARD_WIDTH),
@@ -175,7 +174,7 @@ function FloorButtons({
  * @param nodes the floor's cards
  * @param target what the menu was asked for on
  */
-const cardRunOf = (nodes: readonly RunFlowNode[], target: Element): FoundRun | null => {
+const cardRunOf = (nodes: readonly RunFlowNode[], target: Element) => {
   const node = target.closest('.react-flow__node[data-id]');
   const run = node && nodes.find((n) => n.id === node.getAttribute('data-id'))?.data.run;
   return node && run && judged(run) ? { run, at: node.querySelector('article[data-run]') ?? node } : null;
@@ -233,12 +232,12 @@ export function FactoryCanvas({ open, factory }: { open: OpenRuns; factory: Fact
  * and the open runs' reads.
  */
 type PlacedCard = Node<Record<string, never>, 'run'>;
-const nodeOf = (id: string, position: Point): PlacedCard => ({ id, type: 'run', position, data: {} });
+const nodeOf = (id: string, position: Point) => ({ id, type: 'run', position, data: {} }) satisfies PlacedCard;
 
 /** What a card is told of an open run's read: its object's status once read, or why it could not be. */
 type Read = { detail: RunObject.RunStatus | null; trouble: string | null };
 const NOT_READ: Read = { detail: null, trouble: null };
-const readsOf = (results: UseQueryResult<RunObject.Run>[]): Read[] =>
+const readsOf = (results: UseQueryResult<RunObject.Run>[]) =>
   results.map(({ data, error }) => ({
     detail: data?.status ?? null,
     trouble: error ? `Could not read its steps: ${error.message}` : null,
@@ -276,7 +275,7 @@ const onTheFloor = (runs: readonly RunRow[], showFinished: boolean) => {
 };
 
 /** The parents read by id (`parentsWanted`): each run read, as the list would judge it, and whether any read is still under way. */
-const parentsOf = (results: UseQueryResult<RunObject.Run>[]): { parents: RunView[]; reading: boolean } => ({
+const parentsOf = (results: UseQueryResult<RunObject.Run>[]) => ({
   parents: results.flatMap(({ data }) => (data ? [runViewOf(data)] : [])),
   reading: results.some((result) => result.isPending),
 });
@@ -361,7 +360,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   const { judgedRuns, shownJudged, shown } = useMemo(() => onTheFloor(runs, showFinished), [runs, showFinished]);
   const known = useMemo(() => new Set(runs.map((run) => run.id)), [runs]);
   const ids = useContent(shown.map((run) => run.id));
-  const afterEntries = useContent(shownJudged.map((run): [string, string[]] => [run.id, run.after]));
+  const afterEntries = useContent(shownJudged.map((run) => [run.id, run.after] satisfies [string, string[]]));
   const after = useMemo(() => new Map(afterEntries), [afterEntries]);
 
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
@@ -373,9 +372,9 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   const details = useMemo(() => new Map(opened.map((id, i) => [id, reads[i] ?? NOT_READ])), [opened, reads]);
 
   const spanEntries = useContent(
-    [...opened].reverse().map((id): [string, Span] => {
+    [...opened].reverse().map((id) => {
       const run = shownJudged.find((one) => one.id === id)!;
-      return [id, openSpan(run.steps.length)];
+      return [id, openSpan(run.steps.length)] satisfies [string, Span];
     }),
   );
   const spans = useMemo(() => new Map(spanEntries), [spanEntries]);
@@ -442,7 +441,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
 
   const nodes = useMemo(() => {
     const byId = new Map(shown.map((run) => [run.id, run]));
-    return placed.flatMap((card): RunFlowNode[] => {
+    return placed.flatMap((card) => {
       const run = byId.get(card.id);
       if (!run) return [];
       const isOpen = openSet.has(run.id);
@@ -471,7 +470,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
 
   const [hovered, setHovered] = useState<string | null>(null);
   const focus = hovered ?? inspected;
-  const edges = useMemo((): Edge[] => [...afterEdges(shownJudged), ...readEdges(shownJudged, focus)], [shownJudged, focus]);
+  const edges = useMemo(() => [...afterEdges(shownJudged), ...readEdges(shownJudged, focus)], [shownJudged, focus]);
   const onNodeMouseEnter = useCallback((_: unknown, node: RunFlowNode) => setHovered(node.id), []);
   const onNodeMouseLeave = useCallback(() => setHovered(null), []);
 
@@ -630,7 +629,7 @@ function useFloorPress() {
 }
 
 /** The bar a run's card shows: the run's. */
-const runBar = (run: string): Bar => ({ kind: 'run', run });
+const runBar = (run: string) => ({ kind: 'run', run }) satisfies Bar;
 
 /**
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count

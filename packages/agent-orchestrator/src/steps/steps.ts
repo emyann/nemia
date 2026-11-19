@@ -3,7 +3,7 @@
  * refusal of a run that froze none whose folder does not load (`UnloadedFolder`), which stops that run alone, never the pass. The read
  * itself is a program over the Workflow door (`stepsOf`, `steps.verb.ts`).
  */
-import { orderSteps, type StepSpec } from '../workflow.ts';
+import { orderSteps } from '../workflow.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Run } from '../record/record.ts';
 
@@ -28,11 +28,11 @@ export class UnloadedFolder extends Invalid {
  * The words of `err` when it is an unfrozen run's folder that does not load (`UnloadedFolder`); undefined for any other failure.
  * @param err The failure of a read of the run's steps.
  */
-export const unloadedFolder = (err: unknown): string | undefined => (err instanceof UnloadedFolder ? err.message : undefined);
+export const unloadedFolder = (err: unknown) => (err instanceof UnloadedFolder ? err.message : undefined);
 
 /**
  * The workflow `run` froze at `nemia start`, in the order its steps run (`orderSteps`): ordered on the way out, so a record frozen in the
  * folder's order, alphabetical, reads in the order its steps run. Undefined for a record that froze none, whose folder is read instead.
  * @param run The run's record.
  */
-export const frozenStepsOf = (run: Run): StepSpec[] | undefined => (run.workflow === undefined ? undefined : orderSteps(run.workflow));
+export const frozenStepsOf = (run: Run) => (run.workflow === undefined ? undefined : orderSteps(run.workflow));

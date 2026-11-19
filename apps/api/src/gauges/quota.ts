@@ -116,7 +116,7 @@ const SEE = 'get_usage is experimental: see README.md, The quota on the board';
  * `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days.
  * @param ms How long, in milliseconds; a negative one is none.
  */
-export function ageWord(ms: number): string {
+export function ageWord(ms: number) {
   const sec = Math.ceil(Math.max(0, ms) / 1000);
   if (sec < 60) return `${sec} s`;
   const min = Math.floor(sec / 60);
@@ -130,7 +130,7 @@ export function ageWord(ms: number): string {
  * The windows the board shows, of the plan's `limits`, at `now`: in the board's order, each with its label, a key it does not know left
  * out.
  */
-function windowsOf(limits: readonly QuotaLimit[], now: number): QuotaWindow[] {
+function windowsOf(limits: readonly QuotaLimit[], now: number) {
   return Object.entries(LABELS).flatMap(([key, label]) => {
     const limit = limits.find((l) => l.key === key);
     if (!limit) return [];
@@ -155,12 +155,13 @@ function windowsOf(limits: readonly QuotaLimit[], now: number): QuotaWindow[] {
 export type Read = Pick<Quota, 'state' | 'subscription' | 'windows'> & { said: string | null; heard?: { at: string } | null };
 
 /** An answer in a shape the board does not read, `what` saying what it found. */
-const unknownRead = (what: string): Read => ({
-  state: 'unknown',
-  subscription: null,
-  windows: [],
-  said: `Claude Code answered the usage request in a shape this board does not read: ${what}. ${SEE}.`,
-});
+const unknownRead = (what: string) =>
+  ({
+    state: 'unknown',
+    subscription: null,
+    windows: [],
+    said: `Claude Code answered the usage request in a shape this board does not read: ${what}. ${SEE}.`,
+  }) satisfies Read;
 
 /** What the api holds of an ask: the engine's answer, or the words the engine rejected the ask with. */
 export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
@@ -169,16 +170,16 @@ export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
  * The command a person types to run the Claude Code that was asked: the path the engine named it by (`program`), which on an install
  * with no Claude Code on PATH is the one the release carries; `claude` where the engine found none to name.
  */
-const typed = (program: string | null): string => program ?? 'claude';
+const typed = (program: string | null) => program ?? 'claude';
 
 /**
  * The windows a token's sessions heard (`HeardQuota`), as the board shows them at `now`: `fresh`, with when a session's turn received
  * them. Null where none was heard, or none of its windows is one the board shows: an absent reading is never 0%.
  */
-const heardRead = (heard: HeardQuota | null, now: number): Read | null => {
+const heardRead = (heard: HeardQuota | null, now: number) => {
   const windows = heard ? windowsOf(heard.limits, now) : [];
-  if (heard === null || !windows.length) return null;
-  return { state: 'fresh', subscription: null, windows, said: null, heard: { at: heard.at } };
+  if (heard === null || !windows.length) return null satisfies Read | null;
+  return { state: 'fresh', subscription: null, windows, said: null, heard: { at: heard.at } } satisfies Read | null;
 };
 
 /**
@@ -187,7 +188,7 @@ const heardRead = (heard: HeardQuota | null, now: number): Read | null => {
  * @param asked The engine's answer, or why it gave none.
  * @param now The wall time, in milliseconds since the epoch, the windows' resets are judged at.
  */
-export function readOf(asked: Asked, now: number): Read {
+export function readOf(asked: Asked, now: number) {
   const none = { subscription: null, windows: [] };
   switch (asked.kind) {
     case 'missing':
@@ -195,55 +196,54 @@ export function readOf(asked: Asked, now: number): Read {
         ...none,
         state: 'no-claude',
         said: `The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the one in the store's tools folder. Put it there with nemia doctor fix ${DEFAULT_HARNESS}, or set AE_CLAUDE_EXECUTABLE in the api's environment to one that is there.`,
-      };
+      } satisfies Read as Read;
     case 'timeout':
       return {
         ...none,
         state: 'timeout',
         said: `Claude Code did not answer the usage request within ${ageWord(asked.ms)}: run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
-      };
+      } satisfies Read as Read;
     case 'failed': {
       const how = asked.code !== null ? `exit ${asked.code}` : asked.signal ? `killed by ${asked.signal}` : 'it did not start';
       return {
         ...none,
         state: 'failed',
         said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
-      };
+      } satisfies Read as Read;
     }
     case 'rejected':
       return {
         ...none,
         state: 'failed',
         said: `The api's engine would not ask Claude Code for the quota (${asked.said}): this is the engine refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine the api runs has no claude harness that answers a quota: see README.md, The quota on the board.`,
-      };
+      } satisfies Read as Read;
     case 'no-plan':
       return {
         ...none,
         state: 'no-plan',
         said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run ${typed(asked.program)}, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.`,
-      };
+      } satisfies Read as Read;
     case 'token':
-      return (
-        heardRead(asked.heard, now) ?? {
-          ...none,
-          state: 'no-plan',
-          heard: null,
-          said: `No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
-        }
-      );
+      return (heardRead(asked.heard, now) ?? {
+        ...none,
+        state: 'no-plan',
+        heard: null,
+        said: `No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
+      }) satisfies Read as Read;
     case 'unanswered':
       return {
         ...none,
         state: 'unanswered',
         subscription: asked.subscription,
         said: `Claude Code is signed in to a subscription${asked.subscription ? ` (${asked.subscription})` : ''}, but Anthropic's usage service gave it nothing this time. The service may be limiting how often it is asked, so the board waits longer before each ask until it answers.`,
-      };
+      } satisfies Read as Read;
     case 'unknown':
-      return unknownRead(asked.what);
+      return unknownRead(asked.what) satisfies Read as Read;
     case 'windows': {
       const windows = windowsOf(asked.limits, now);
-      if (!windows.length) return unknownRead(`none of its rate_limits (${ORDER.join(', ')}) has a numeric utilization`);
-      return { state: 'fresh', subscription: asked.subscription, windows, said: null };
+      if (!windows.length)
+        return unknownRead(`none of its rate_limits (${ORDER.join(', ')}) has a numeric utilization`) satisfies Read as Read;
+      return { state: 'fresh', subscription: asked.subscription, windows, said: null } satisfies Read as Read;
     }
   }
 }
@@ -260,7 +260,7 @@ export type Held = { asked: Asked; at: number; keptMs?: number };
  * @param streak How many unanswered outcomes in a row, this one counted.
  * @param firstMs How long the first is kept, in milliseconds; QUOTA_BACKOFF_MS by default.
  */
-export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): number {
+export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS) {
   return Math.min(firstMs * 2 ** Math.max(0, streak - 1), Math.max(firstMs, QUOTA_BACKOFF_CEILING_MS));
 }
 
@@ -272,7 +272,7 @@ export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): n
  * @param now The wall time, in milliseconds since the epoch, the quota is judged at.
  * @param keepMs How long an answer is kept, in milliseconds, where the ask held does not say; QUOTA_KEEP_MS by default.
  */
-export function quotaOf(held: Held | null, last: Held | null, now: number, keepMs: number = QUOTA_KEEP_MS): Quota {
+export function quotaOf(held: Held | null, last: Held | null, now: number, keepMs: number = QUOTA_KEEP_MS) {
   const lastRead = last && now - last.at <= QUOTA_LAST_MS ? readOf(last.asked, now) : null;
   const keptMs = held?.keptMs ?? keepMs;
   const base = {
@@ -283,21 +283,28 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
     keepMs,
     markAt: QUOTA_MARK_PERCENT,
   };
-  if (!held) return { ...base, state: 'asking', subscription: null, windows: [], said: 'Asking Claude Code for the quota…' };
+  if (!held)
+    return {
+      ...base,
+      state: 'asking',
+      subscription: null,
+      windows: [],
+      said: 'Asking Claude Code for the quota…',
+    } satisfies Quota as Quota;
   const { heard, ...read } = readOf(held.asked, now);
   const heardOn = heard === undefined ? {} : { heard: heard && { at: heard.at, ageMs: Math.max(0, now - Date.parse(heard.at)) } };
-  if (read.state === 'fresh') return { ...base, ...read, ...heardOn, last: null };
+  if (read.state === 'fresh') return { ...base, ...read, ...heardOn, last: null } satisfies Quota as Quota;
   const left = held.at + keptMs - now;
   return {
     ...base,
     ...read,
     ...heardOn,
     said: `${read.said} ${left >= 60_000 ? `Asked again in ${ageWord(left)}.` : 'Asked again on the next read.'}`,
-  };
+  } satisfies Quota as Quota;
 }
 
 /** A length of time from `env[name]`, in ms: a number 0 or more, or `fallback` for anything else. */
-const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number => {
+const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number) => {
   const value = env[name];
   const ms = Number(value);
   return value !== undefined && value !== '' && Number.isFinite(ms) && ms >= 0 ? ms : fallback;
@@ -320,7 +327,7 @@ export type ReadQuota = (opts: {
 }) => Promise<Quota>;
 
 /** An ask that rejected, as the board holds it: `rejected`, with what it rejected with. */
-const rejected = (e: unknown): Asked => ({ kind: 'rejected', said: e instanceof Error ? e.message : String(e) });
+const rejected = (e: unknown) => ({ kind: 'rejected', said: e instanceof Error ? e.message : String(e) }) satisfies Asked;
 
 /**
  * An ask of the quota, as an asker holds it: when it began on the monotonic clock — when the harness was started, and read the world it
@@ -332,7 +339,7 @@ type Flight = { began: number | null; done: boolean; settled: Promise<void> };
 type Clocks = { now: () => number; mono: () => number };
 
 /** Waits for `settled` at most `ms`. */
-const waitFor = async (settled: Promise<void>, ms: number): Promise<void> => {
+const waitFor = async (settled: Promise<void>, ms: number) => {
   let wait: NodeJS.Timeout | undefined;
   try {
     await Promise.race([
@@ -362,18 +369,18 @@ type Kept = Held & { began: number };
  * while it waits share it. A reading with windows begins the backoff again; each `unanswered` one in a row lengthens it (`backoffOf`);
  * another failure between two `unanswered` answers neither ends it nor adds to it.
  */
-export function makeQuota(): ReadQuota {
+export function makeQuota() {
   const each = new Map<string, ReadQuota>();
-  return (opts) => {
+  return ((opts) => {
     const key = opts.harness ?? '';
     const read = each.get(key) ?? oneQuota();
     each.set(key, read);
     return read(opts);
-  };
+  }) satisfies ReadQuota;
 }
 
 /** One harness's asker, as `makeQuota` describes it. */
-function oneQuota(): ReadQuota {
+function oneQuota() {
   let held: Kept | null = null;
   let good: Held | null = null;
   let unanswered = 0;
@@ -386,7 +393,7 @@ function oneQuota(): ReadQuota {
     held = read === 'unanswered' ? { asked, at, began, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at, began };
     if (read === 'fresh' && heard === undefined) good = held;
   };
-  const begin = (flight: Flight, ask: () => Promise<HarnessQuota>, clocks: Clocks, backoffMs: number): Promise<void> => {
+  const begin = (flight: Flight, ask: () => Promise<HarnessQuota>, clocks: Clocks, backoffMs: number) => {
     const at = clocks.now();
     const began = clocks.mono();
     flight.began = began;
@@ -399,7 +406,7 @@ function oneQuota(): ReadQuota {
         if (running === flight) running = null;
       });
   };
-  const flightFor = (started: number, keepMs: number, go: (flight: Flight) => Promise<void>): Flight => {
+  const flightFor = (started: number, keepMs: number, go: (flight: Flight) => Promise<void>) => {
     if (running !== null && running.began !== null && started - running.began < keepMs) return running;
     if (queued !== null) return queued;
     const flight: Flight = { began: null, done: false, settled: Promise.resolve() };
@@ -415,7 +422,7 @@ function oneQuota(): ReadQuota {
     }
     return flight;
   };
-  return async ({
+  return (async ({
     ask,
     env = process.env,
     waitMs = msOf(env, 'HKB_QUOTA_WAIT_MS', QUOTA_WAIT_MS),
@@ -430,7 +437,7 @@ function oneQuota(): ReadQuota {
       if (!flight.done) return quotaOf(null, good, now(), keepMs);
     }
     return quotaOf(held, good, now(), keepMs);
-  };
+  }) satisfies ReadQuota;
 }
 
 /**
@@ -445,11 +452,11 @@ export const QUOTA_DAEMON_WAIT_MS = 30_000;
  * (`heard`), a reading of a turn gone by and no ask's answer, which the daemon records nothing of either, as before. Pure.
  * @param q The board's quota, as quotaOf judges it.
  */
-export function harnessQuotaOf(q: Quota): HarnessQuota {
-  if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` };
-  if (q.heard) return { kind: 'unknown', what: "the board's quota is what a token's sessions heard" };
+export function harnessQuotaOf(q: Quota) {
+  if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` } satisfies HarnessQuota;
+  if (q.heard) return { kind: 'unknown', what: "the board's quota is what a token's sessions heard" } satisfies HarnessQuota;
   const limits = q.windows.map(({ key, usedPercentage, resetsAt }) => ({ key, usedPercentage, resetsAt }));
-  return { kind: 'windows', limits, subscription: q.subscription };
+  return { kind: 'windows', limits, subscription: q.subscription } satisfies HarnessQuota;
 }
 
 /**
@@ -462,11 +469,11 @@ export function harnessQuotaOf(q: Quota): HarnessQuota {
  */
 export const daemonQuota =
   (read: ReadQuota, harness: string, ask: () => Promise<HarnessQuota>) =>
-  (env: NodeJS.ProcessEnv = process.env): Promise<HarnessQuota> =>
-    read({ ask, harness, env, waitMs: QUOTA_DAEMON_WAIT_MS }).then(harnessQuotaOf);
+  (env: NodeJS.ProcessEnv = process.env) =>
+    read({ ask, harness, env, waitMs: QUOTA_DAEMON_WAIT_MS }).then(harnessQuotaOf) satisfies Promise<HarnessQuota>;
 
 /** The quota asker every board's read shares, one for an app (`live`, a fresh `makeQuota`): a test gives its own with `layer`. */
 export class QuotaAsker extends Context.Service<QuotaAsker, ReadQuota>()('api/QuotaAsker') {
   static readonly live: Layer.Layer<QuotaAsker> = Layer.sync(QuotaAsker)(makeQuota);
-  static readonly layer = (read: ReadQuota): Layer.Layer<QuotaAsker> => Layer.succeed(QuotaAsker)(read);
+  static readonly layer = (read: ReadQuota) => Layer.succeed(QuotaAsker)(read);
 }

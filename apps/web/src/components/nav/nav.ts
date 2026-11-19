@@ -30,16 +30,12 @@ const SETTINGS_TABS = [
   { to: '/tokens', label: 'Tokens' },
 ] as const;
 
-/** A tab of Settings (`SETTINGS_TABS`): its page and its name. */
-type SettingsTab = (typeof SETTINGS_TABS)[number];
-
 /**
  * The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page.
  *
  * @param path the address of the page
  */
-export const tabsOf = (path: string): readonly SettingsTab[] | undefined =>
-  SETTINGS_TABS.some((tab) => tab.to === path) ? SETTINGS_TABS : undefined;
+export const tabsOf = (path: string) => (SETTINGS_TABS.some((tab) => tab.to === path) ? SETTINGS_TABS : undefined);
 
 /** The store's pages, each with the rail destination it sits under, in the order they are read: the first that holds the path wins. */
 const STORE_SEATS: readonly { lights: (path: string) => boolean; rail: RailId | 'nemia'; name: string }[] = [
@@ -75,14 +71,14 @@ const PLACE_OF_SEGMENT: Readonly<Record<string, PanePlace>> = {
  *
  * @param path the address of the page
  */
-export function seatOf(path: string): Seat | undefined {
+export function seatOf(path: string) {
   const factory = /^\/factories\/([^/]+)(?:\/([^/]+))?/.exec(path);
   if (factory) {
     const place = factory[2] === undefined ? 'floor' : PLACE_OF_SEGMENT[factory[2]];
-    return place && { level: 'factory', factory: decodeURIComponent(factory[1] ?? ''), place };
+    return (place && { level: 'factory', factory: decodeURIComponent(factory[1] ?? ''), place }) satisfies Seat | undefined;
   }
   const store = STORE_SEATS.find((seat) => seat.lights(path));
-  return store && { level: 'store', rail: store.rail };
+  return (store && { level: 'store', rail: store.rail }) satisfies Seat | undefined;
 }
 
 /**
@@ -90,7 +86,7 @@ export function seatOf(path: string): Seat | undefined {
  *
  * @param seat where the page sits
  */
-export const seatFactory = (seat: Seat | undefined): string | undefined => (seat?.level === 'factory' ? seat.factory : undefined);
+export const seatFactory = (seat: Seat | undefined) => (seat?.level === 'factory' ? seat.factory : undefined);
 
 /** A destination of the rail: its key, its name and its icon. */
 type RailDestination = { readonly id: RailId; readonly label: string; readonly icon: LucideIcon };
@@ -147,7 +143,7 @@ const RAIL_HREF: Readonly<Record<RailId, string>> = {
  *
  * @param id the destination's key
  */
-export const railHref = (id: RailId): string => RAIL_HREF[id];
+export const railHref = (id: RailId) => RAIL_HREF[id];
 
 /**
  * The rail's destination lit at `seat`: its own on a store page, Factories on any factory's page, none on her chat's page (her face says
@@ -155,7 +151,7 @@ export const railHref = (id: RailId): string => RAIL_HREF[id];
  *
  * @param seat where the page sits
  */
-export function litOf(seat: Seat | undefined): RailId | undefined {
+export function litOf(seat: Seat | undefined) {
   if (seat === undefined) return undefined;
   if (seat.level === 'factory') return 'factories';
   return seat.rail === 'nemia' ? undefined : seat.rail;
@@ -185,7 +181,7 @@ export const PANE_PLACES: readonly PanePlaceItem[] = [
  * @param place the pane's place
  * @param factory the factory's name
  */
-export const placeHref = (place: PanePlace, factory: string): string =>
+export const placeHref = (place: PanePlace, factory: string) =>
   `/factories/${encodeURIComponent(factory)}${place === 'floor' ? '' : `/${place}`}`;
 
 /**
@@ -212,7 +208,7 @@ const OBJECT_PLACES: ReadonlySet<string> = new Set(['runs', 'inbox', 'proposals'
  * @param search the page's search
  * @param factory the factory picked
  */
-export function pickTo(path: string, search: Record<string, unknown>, factory: string): string {
+export function pickTo(path: string, search: Record<string, unknown>, factory: string) {
   const seat = seatOf(path);
   const floor = placeHref('floor', factory);
   if (seat?.level !== 'factory') return path === '/capabilities' ? placeHref('skills', factory) : floor;
@@ -232,7 +228,7 @@ export function pickTo(path: string, search: Record<string, unknown>, factory: s
  *
  * @param path the address of the page
  */
-export function pageNameOf(path: string): string | undefined {
+export function pageNameOf(path: string) {
   const seat = seatOf(path);
   if (seat?.level === 'factory') return PANE_PLACES.find((place) => place.id === seat.place)?.label;
   return seat && STORE_SEATS.find((one) => one.lights(path))?.name;

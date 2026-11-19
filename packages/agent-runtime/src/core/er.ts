@@ -23,6 +23,7 @@ type Drawn = { attribute?: { type: string; key?: 'PK' | 'FK' }; relations: Array
  * The members of a union, nested ones spread but for one that names itself, with `null` and `undefined` left out: what a nullable
  * or optional field holds.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const membersOf = (ast: SchemaAST.AST): SchemaAST.AST[] =>
   SchemaAST.isUnion(ast) && SchemaAST.resolveIdentifier(ast) === undefined
     ? ast.types.flatMap(membersOf)
@@ -31,10 +32,10 @@ const membersOf = (ast: SchemaAST.AST): SchemaAST.AST[] =>
       : [ast];
 
 /** The entity a schema is, by its identifier: a struct that names itself. */
-const entityOf = (ast: SchemaAST.AST): string | undefined => (SchemaAST.isObjects(ast) ? SchemaAST.resolveIdentifier(ast) : undefined);
+const entityOf = (ast: SchemaAST.AST) => (SchemaAST.isObjects(ast) ? SchemaAST.resolveIdentifier(ast) : undefined);
 
 /** What a container holds: an array's elements, a record's values; nothing for any other schema. */
-const heldIn = (ast: SchemaAST.AST): SchemaAST.AST[] =>
+const heldIn = (ast: SchemaAST.AST) =>
   (SchemaAST.isArrays(ast)
     ? [...ast.elements, ...ast.rest]
     : SchemaAST.isObjects(ast) && ast.propertySignatures.length === 0
@@ -43,16 +44,16 @@ const heldIn = (ast: SchemaAST.AST): SchemaAST.AST[] =>
   ).flatMap(membersOf);
 
 /** The entities a container holds. */
-const heldMany = (ast: SchemaAST.AST): string[] => heldIn(ast).flatMap((m) => entityOf(m) ?? []);
+const heldMany = (ast: SchemaAST.AST) => heldIn(ast).flatMap((m) => entityOf(m) ?? []);
 
 /** The id a schema is: an identifier the model names as an id, or one on a string, which is another layer's id. */
-const idOf = (model: ErModel, ast: SchemaAST.AST): string | undefined => {
+const idOf = (model: ErModel, ast: SchemaAST.AST) => {
   const named = SchemaAST.resolveIdentifier(ast);
   return named !== undefined && (own(model.ids, named) !== undefined || SchemaAST.isString(ast)) ? named : undefined;
 };
 
 /** The attribute type of a field that holds no entity and no id. */
-const typeOf = (ast: SchemaAST.AST): string => {
+const typeOf = (ast: SchemaAST.AST) => {
   const named = SchemaAST.resolveIdentifier(ast);
   if (named !== undefined) return named;
   if (SchemaAST.isString(ast)) return 'string';
@@ -66,34 +67,41 @@ const typeOf = (ast: SchemaAST.AST): string => {
 };
 
 /** What the field `ast` of the entity `holder` draws, `optional` when it may be left out. */
-const drawField = (model: ErModel, holder: string, ast: SchemaAST.AST, optional: boolean): Drawn => {
+const drawField = (model: ErModel, holder: string, ast: SchemaAST.AST, optional: boolean) => {
   const members = membersOf(ast);
   const only = members.length === 1 ? members[0] : undefined;
   const one = only ?? ast;
   const named = idOf(model, one);
   const entities = members.flatMap((m) => entityOf(m) ?? []);
-  if (entities.length > 0) return { relations: entities.map((to) => ({ card: optional ? '||--o|' : '||--||', to })) };
+  if (entities.length > 0)
+    return { relations: entities.map((to) => ({ card: optional ? '||--o|' : '||--||', to })) } satisfies Drawn as Drawn;
   if (named !== undefined) {
     const owner = own(model.ids, named);
-    if (owner === holder) return { attribute: { type: named, key: 'PK' }, relations: [] };
-    return { attribute: { type: named, key: 'FK' }, relations: [{ from: owner ?? named, card: '||--o{', to: holder }] };
+    if (owner === holder) return { attribute: { type: named, key: 'PK' }, relations: [] } satisfies Drawn as Drawn;
+    return {
+      attribute: { type: named, key: 'FK' },
+      relations: [{ from: owner ?? named, card: '||--o{', to: holder }],
+    } satisfies Drawn as Drawn;
   }
   const many = heldMany(one);
-  if (many.length > 0) return { relations: many.map((to) => ({ card: '||--o{', to })) };
+  if (many.length > 0) return { relations: many.map((to) => ({ card: '||--o{', to })) } satisfies Drawn as Drawn;
   const ids = heldIn(one).flatMap((m) => idOf(model, m) ?? []);
   if (ids.length > 0) {
     const relations = ids.map((id) => ({ from: own(model.ids, id) ?? id, card: '||--o{', to: holder }));
-    return { attribute: { type: typeOf(one), key: 'FK' }, relations };
+    return { attribute: { type: typeOf(one), key: 'FK' }, relations } satisfies Drawn as Drawn;
   }
-  return { attribute: { type: only === undefined && members.length === 0 ? 'unknown' : typeOf(one) }, relations: [] };
+  return {
+    attribute: { type: only === undefined && members.length === 0 ? 'unknown' : typeOf(one) },
+    relations: [],
+  } satisfies Drawn as Drawn;
 };
 
 /** The attribute line of a field: its type, its key when it is one, and whether it may be left out. */
-const attributeLine = (name: string, attribute: NonNullable<Drawn['attribute']>, optional: boolean): string =>
+const attributeLine = (name: string, attribute: NonNullable<Drawn['attribute']>, optional: boolean) =>
   `    ${attribute.type} ${name}${attribute.key ? ` ${attribute.key}` : ''}${optional ? ' "optional"' : ''}`;
 
 /** One entity's block and the relations its fields hold, in field order. */
-const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; relations: string[] } => {
+const drawEntity = (model: ErModel, entity: Schema.Top) => {
   const ast = entity.ast;
   const name = SchemaAST.resolveIdentifier(ast);
   if (name === undefined || !SchemaAST.isObjects(ast)) {
@@ -119,7 +127,7 @@ const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; rela
  * an array or a record of ids is an FK drawn the same way.
  * @param model The entities to draw, in order, with the schemas of their fields.
  */
-export const erDiagram = (model: ErModel): string => {
+export const erDiagram = (model: ErModel) => {
   const drawn = model.entities.map((entity) => drawEntity(model, entity));
   return ['erDiagram', ...drawn.flatMap((d) => d.block), ...drawn.flatMap((d) => d.relations)].join('\n');
 };

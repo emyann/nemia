@@ -10,8 +10,8 @@ import { objectHome } from '../lib/factoryAddress';
  * A run of a named factory belongs under its factory's path (`objectHome`), where the page is loaded again, its search kept.
  */
 export const Route = createFileRoute('/runs/$runId')({
-  validateSearch: (search: Record<string, unknown>): { step?: string } =>
-    typeof search.step === 'string' && search.step ? { step: search.step } : {},
+  validateSearch: (search: Record<string, unknown>) =>
+    (typeof search.step === 'string' && search.step ? { step: search.step } : {}) satisfies { step?: string } as { step?: string },
   beforeLoad: ({ search, params }) => {
     if (!search.step) return;
     const bar = barValue({ kind: 'step', run: params.runId, step: search.step });

@@ -28,21 +28,21 @@ export type FixRecord = typeof FixRecord.Type;
  * The folder of the fixes' records of the store at `home`.
  * @param home The store's root folder.
  */
-export const fixesDir = (home: string): string => path.join(home, 'fixes');
+export const fixesDir = (home: string) => path.join(home, 'fixes');
 
 /**
  * The record of the fix `id` of the store at `home`.
  * @param home The store's root folder.
  * @param id The fix's id.
  */
-export const fixFile = (home: string, id: string): string => path.join(fixesDir(home), `${id}.json`);
+export const fixFile = (home: string, id: string) => path.join(fixesDir(home), `${id}.json`);
 
 /**
  * Writes `record` whole, by a temporary file and a rename, so no reader meets half of one.
  * @param home The store's root folder.
  * @param record The fix's record, written to its id's file.
  */
-export function writeFixRecord(home: string, record: FixRecord): void {
+export function writeFixRecord(home: string, record: FixRecord) {
   fs.mkdirSync(fixesDir(home), { recursive: true });
   const file = fixFile(home, record.id);
   const hidden = path.join(fixesDir(home), `.${record.id}-${process.pid}`);
@@ -55,7 +55,7 @@ export function writeFixRecord(home: string, record: FixRecord): void {
  * @param home The store's root folder.
  * @param id The fix's id, as a caller gave it.
  */
-export function readFixRecord(home: string, id: string): FixRecord | undefined {
+export function readFixRecord(home: string, id: string) {
   if (id === '' || id.includes('/') || id.startsWith('.')) return undefined;
   try {
     return Schema.decodeUnknownSync(Schema.fromJsonString(FixRecord))(fs.readFileSync(fixFile(home, id), 'utf8'));

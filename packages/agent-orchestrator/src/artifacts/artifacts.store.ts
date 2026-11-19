@@ -15,7 +15,7 @@ import path from 'node:path';
 import { handedCloseout, type Closeout } from '../closeout/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { inside } from '../workspace/workspace.ts';
-import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type HandedFiles, type MissingArtifact } from './artifacts.ts';
+import { artifactPlace, HANDED_CLOSEOUT, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
 import { isRepositoryRun, type LackedFile, type Run } from '../record/record.ts';
 import { artifactsDir, lstatOf, statUnder } from '../record/record.store.ts';
 import { presentOn } from '../branches/changes.store.ts';
@@ -46,7 +46,7 @@ export function missingArtifacts(
   run: Run,
   stepName: string,
   closeout: Closeout | { error: string } | undefined,
-): MissingArtifact[] {
+) {
   if (!closeout || 'error' in closeout) return [];
   const dir = artifactsDir(home, run, stepName);
   const onBranch = branchOf(
@@ -69,10 +69,25 @@ export function missingArtifacts(
  * (`artifactPlace`), or `missing` from `dir`, which an absolute path in it names — undefined for one that is a file there, and
  * `workspace` for a path from the workspace root, which the workspace answers.
  */
-function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined {
+function placedWhy(file: string, dir: string) {
   const place = artifactPlace(file, dir);
-  if (place !== 'files') return place;
-  return isFileIn(file, dir) ? undefined : 'missing';
+  if (place !== 'files')
+    return place satisfies 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined as
+      | 'outside'
+      | 'escapes'
+      | 'configuration'
+      | 'reserved'
+      | 'missing'
+      | 'workspace'
+      | undefined;
+  return (isFileIn(file, dir) ? undefined : 'missing') satisfies
+    | 'outside'
+    | 'escapes'
+    | 'configuration'
+    | 'reserved'
+    | 'missing'
+    | 'workspace'
+    | undefined as 'outside' | 'escapes' | 'configuration' | 'reserved' | 'missing' | 'workspace' | undefined;
 }
 
 /**
@@ -87,7 +102,7 @@ function placedWhy(file: string, dir: string): 'outside' | 'escapes' | 'configur
  * @param stepName The step's name.
  * @param closeout The step's closeout; undefined where it has none, and nothing lacks.
  */
-export function filesLacked(home: string, run: Run, stepName: string, closeout: Closeout | undefined): LackedFile[] {
+export function filesLacked(home: string, run: Run, stepName: string, closeout: Closeout | undefined) {
   if (!closeout) return [];
   const dir = artifactsDir(home, run, stepName);
   const { workspace } = run.steps[stepName] ?? {};
@@ -101,7 +116,7 @@ export function filesLacked(home: string, run: Run, stepName: string, closeout: 
 }
 
 /** Why a path from the workspace root is not a file the run has, off the disk alone (`filesLacked`), or undefined where it has it. */
-function workspaceLacks(workspace: string | undefined, rel: string, dir: string): 'not there' | 'directory' | 'escapes' | undefined {
+function workspaceLacks(workspace: string | undefined, rel: string, dir: string) {
   if (isFileIn(path.join(dir, rel), dir) || !workspace || !fs.existsSync(workspace)) return undefined;
   const at = inWorkspace(workspace, rel);
   if (at.kind === 'file') return undefined;
@@ -118,7 +133,7 @@ function workspaceLacks(workspace: string | undefined, rel: string, dir: string)
  * @param step The step.
  * @param said Its closeout; undefined where it has none, and nothing is written.
  */
-export function handCloseout(home: string, run: Run, step: StepSpec, said: Closeout | undefined): string[] {
+export function handCloseout(home: string, run: Run, step: StepSpec, said: Closeout | undefined) {
   if (!said) return [];
   const dir = artifactsDir(home, run, step.name);
   const file = path.join(dir, HANDED_CLOSEOUT);
@@ -138,7 +153,7 @@ export function handCloseout(home: string, run: Run, step: StepSpec, said: Close
  * @param run The run, by its id.
  * @param stepName The step's name.
  */
-export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: string): boolean =>
+export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: string) =>
   lstatOf(path.join(artifactsDir(home, run, stepName), HANDED_CLOSEOUT))?.isFile() ?? false;
 
 /**
@@ -150,7 +165,7 @@ export const holdsCloseout = (home: string, run: Pick<Run, 'id'>, stepName: stri
  * @param stepName The step's name.
  * @param closeout The step's closeout; undefined where it has none, and it handed nothing.
  */
-export function filesHanded(home: string, run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined): HandedFiles {
+export function filesHanded(home: string, run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined) {
   const dir = artifactsDir(home, run, stepName);
   const there: string[] = [];
   let gone = 0;
@@ -168,14 +183,14 @@ export function filesHanded(home: string, run: Pick<Run, 'id'>, stepName: string
  * them, asked the first time one is needed, and then read from its answer. Absent everywhere for a step with no branch or a run with no
  * repository.
  */
-function branchOf(place: Place, run: Run, stepName: string, files: readonly string[]): OnBranch {
+function branchOf(place: Place, run: Run, stepName: string, files: readonly string[]) {
   const branch = run.steps[stepName]?.branch;
   let read: ReturnType<typeof presentOn> | undefined;
-  return (rel) => {
+  return ((rel) => {
     if (!branch || !isRepositoryRun(run)) return 'absent';
     read ??= presentOn(place, run, branch, [...new Set(files.map((file) => path.normalize(file)))]);
     return 'unknown' in read ? { unknown: read.unknown } : (read[rel] ?? 'absent');
-  };
+  }) satisfies OnBranch;
 }
 
 /**
@@ -187,46 +202,49 @@ function branchOf(place: Place, run: Run, stepName: string, files: readonly stri
  * handed off yet, is `not collected`. With nothing in the workspace, the branch answers too. Where the place did not say what the branch
  * holds, the file is `not known`, with what it said — never `not there`.
  */
-function workspaceArtifact(
-  run: Run,
-  stepName: string,
-  file: string,
-  dir: string,
-  onBranch: OnBranch,
-): Omit<MissingArtifact, 'path'> | undefined {
+function workspaceArtifact(run: Run, stepName: string, file: string, dir: string, onBranch: OnBranch) {
   const rel = path.normalize(file);
   if (isFileIn(path.join(dir, rel), dir)) return undefined;
   const { workspace } = run.steps[stepName] ?? {};
   const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
-  if (at.kind === 'outside') return { why: 'escapes' };
-  if (at.kind === 'directory') return { why: 'directory' };
-  if (at.kind === 'file' && copyBlocked(dir, rel)) return { why: 'not collected' };
+  if (at.kind === 'outside')
+    return { why: 'escapes' } satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
+  if (at.kind === 'directory')
+    return { why: 'directory' } satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
+  if (at.kind === 'file' && copyBlocked(dir, rel))
+    return { why: 'not collected' } satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
   const there = onBranch(rel);
-  if (typeof there !== 'string') return { why: 'not known', said: there.unknown };
+  if (typeof there !== 'string')
+    return { why: 'not known', said: there.unknown } satisfies Omit<MissingArtifact, 'path'> | undefined as
+      | Omit<MissingArtifact, 'path'>
+      | undefined;
   if (there === 'file') return undefined;
-  if (at.kind === 'file') return { why: 'not collected' };
-  return { why: there === 'directory' ? 'directory' : 'not there' };
+  if (at.kind === 'file')
+    return { why: 'not collected' } satisfies Omit<MissingArtifact, 'path'> | undefined as Omit<MissingArtifact, 'path'> | undefined;
+  return { why: there === 'directory' ? 'directory' : 'not there' } satisfies Omit<MissingArtifact, 'path'> | undefined as
+    | Omit<MissingArtifact, 'path'>
+    | undefined;
 }
 
 /**
  * What is at a path from a workspace's root, every link on the way followed: a file, and where it really is; a directory; something else;
  * nothing — or `outside`, when a link leads out of the workspace, which is not looked at further.
  */
-function inWorkspace(
-  workspace: string,
-  rel: string,
-): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
+function inWorkspace(workspace: string, rel: string) {
   let root: string;
   let real: string;
   try {
     root = fs.realpathSync(workspace);
     real = fs.realpathSync(path.join(workspace, rel));
   } catch {
-    return { kind: 'absent' };
+    return { kind: 'absent' } satisfies { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' };
   }
-  if (real !== root && !inside(root, real)) return { kind: 'outside' };
+  if (real !== root && !inside(root, real))
+    return { kind: 'outside' } satisfies { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' };
   const at = fs.statSync(real, { throwIfNoEntry: false });
-  return at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' };
+  return (at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' }) satisfies
+    | { kind: 'file'; real: string }
+    | { kind: 'directory' | 'other' | 'absent' | 'outside' };
 }
 
 /**
@@ -246,7 +264,7 @@ function inWorkspace(
  * @param stepName The step's name.
  * @param closeout The step's closeout; undefined where it has none, and nothing is copied.
  */
-export function collectArtifacts(home: string, run: Run, stepName: string, closeout: Closeout | undefined): string[] {
+export function collectArtifacts(home: string, run: Run, stepName: string, closeout: Closeout | undefined) {
   const workspace = run.steps[stepName]?.workspace;
   if (!closeout || !workspace) return [];
   const dir = artifactsDir(home, run, stepName);
@@ -277,7 +295,7 @@ export function collectArtifacts(home: string, run: Run, stepName: string, close
  * on the way that is not there yet blocks nothing, since it is made plain. Looks, and makes nothing: what `collectArtifacts` refuses to
  * write through, and what `missingArtifacts` names as the copy refused.
  */
-function copyBlocked(dir: string, rel: string): boolean {
+function copyBlocked(dir: string, rel: string) {
   let at = dir;
   for (const part of [
     '.',
@@ -296,7 +314,7 @@ function copyBlocked(dir: string, rel: string): boolean {
 }
 
 /** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */
-function isFileIn(file: string, dir: string): boolean {
+function isFileIn(file: string, dir: string) {
   try {
     const real = fs.realpathSync(file);
     return artifactPlace(real, fs.realpathSync(dir)) === 'files' && fs.statSync(real).isFile();
@@ -314,10 +332,10 @@ function isFileIn(file: string, dir: string): boolean {
  * @param run The run, by its id.
  * @param stepName The step's name.
  */
-export function artifactFiles(home: string, run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
+export function artifactFiles(home: string, run: Pick<Run, 'id'>, stepName: string) {
   const found: ArtifactFile[] = [];
   const top = artifactsDir(home, run, stepName);
-  const walk = (dir: string): void => {
+  const walk = (dir: string) => {
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -362,7 +380,7 @@ export function dropLandedPictures(
   stepName: string,
   closeout: Closeout | undefined,
   said: { commit: string; checkTaskId?: string },
-): { removed: string[]; bytes: number } {
+) {
   const dir = artifactsDir(home, run, stepName);
   const named = new Set(
     (closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))),
@@ -399,7 +417,7 @@ function landedPicturesNote(
   pictures: readonly { name: string; bytes: number }[],
   bytes: number,
   said: { commit: string; checkTaskId?: string },
-): string {
+) {
   return [
     `${stepName}'s check passed on the merge, and the run committed it as ${said.commit.slice(0, 12)}.`,
     `So the run removed the ${pictures.length} ${pictures.length === 1 ? 'picture' : 'pictures'} the check's e2e took of the merged tree (${sizeOf(bytes)}): after a pass nobody reads them.`,
@@ -421,7 +439,7 @@ function landedPicturesNote(
  * @param dir The folder.
  * @param rel The file's path under it.
  */
-export function fileUnder(dir: string, rel: string): Buffer | null {
+export function fileUnder(dir: string, rel: string) {
   const looked = statUnder(dir, rel);
   if (!looked) return null;
   let fd: number;
@@ -445,5 +463,5 @@ export function fileUnder(dir: string, rel: string): Buffer | null {
  * @param step The step's name.
  * @param rel The file's path under its files directory.
  */
-export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, rel: string): Buffer | null =>
+export const artifactFile = (home: string, run: Pick<Run, 'id'>, step: string, rel: string) =>
   fileUnder(artifactsDir(home, run, step), rel);

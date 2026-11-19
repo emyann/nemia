@@ -41,7 +41,7 @@ import { headsNow } from '../standing/standing.verb.ts';
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
 /** The ask `nemia retry` writes for the next try of `stepName`: its way, model, words and cap as asked, now, and who asked (`actor`). */
-const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefined): RetryAsk => ({
+const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefined) => ({
   step: stepName,
   try: tryOf(run, stepName) + 1,
   mode: how.mode,
@@ -83,7 +83,7 @@ export const retryRun = Effect.fn('retry')(function* (
   const spendOf = spendReader(views);
   const place = yield* PlaceService;
   let heads: { read: Readonly<Record<string, string>> | undefined } | undefined;
-  const tipOf = (branch: string): string | undefined => (heads ??= { read: headsNow(run, place) }).read?.[branch];
+  const tipOf = (branch: string) => (heads ??= { read: headsNow(run, place) }).read?.[branch];
   const refusal = (asks: readonly RetryAsk[]) =>
     retryRefusal(
       steps,
@@ -151,7 +151,7 @@ function tryRefused(
   denied: readonly string[],
   home: string,
   own: StepTold['own'],
-): string | undefined {
+) {
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
   const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, run), stepSpend(run, step.name, spendOf));

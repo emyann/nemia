@@ -51,7 +51,7 @@ type At = PartialAt & {
 };
 
 /** The whole lines of `file` past `from` bytes, and how many bytes they are: none when there is no file or no whole line yet. */
-const wholeLinesOf = (file: string, from: number): { text: string; bytes: number } => {
+const wholeLinesOf = (file: string, from: number) => {
   let fd: number;
   try {
     fd = fs.openSync(file, 'r');
@@ -76,7 +76,7 @@ const wholeLinesOf = (file: string, from: number): { text: string; bytes: number
  * @param at Where the follow is: the message open and the text block open in it, if any.
  * @param marks The marks read off the session's stdout since, in order.
  */
-export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]): [A, Followed[]] => {
+export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]) => {
   let { message, open } = at;
   const said: Followed[] = [];
   for (const mark of marks) {
@@ -91,7 +91,7 @@ export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]
       open = undefined;
     }
   }
-  return [{ ...at, message, open }, said];
+  return [{ ...at, message, open }, said] as const;
 };
 
 const refusal = (source: FollowSource, message: string, refused?: true) =>
@@ -143,7 +143,7 @@ const pass = (source: FollowSource, name: string, at: At) =>
  * @param source Where the session is found: its run, its stdout's file and folder, and how its stdout and its transcript read.
  * @param name The session's run name.
  */
-export const followOf = (source: FollowSource, name: string): Stream.Stream<Followed, RunnerError> =>
+export const followOf = (source: FollowSource, name: string) =>
   Stream.callback<Followed, RunnerError>((queue) =>
     Effect.gen(function* () {
       const wake = yield* Queue.sliding<void>(1);

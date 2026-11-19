@@ -24,7 +24,6 @@ import { Cause, Duration, Effect, Metric } from 'effect';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { factoryMounts } from '../factory/factory.ts';
-import type { Mount } from '../record/record.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { SubscriptionDoor } from '../subscription/subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
@@ -103,7 +102,7 @@ const NEMIA_PRIORITY = 1_000_000;
  * Where the store's quota is read, `<url>/api/quota` at the address its daemon's api serves (`daemon.json`); undefined with no daemon, one
  * stopped, one serving no board (`nemia up`), or a file that does not read.
  */
-const quotaUrl = (home: string): string | undefined => {
+const quotaUrl = (home: string) => {
   try {
     const held = parseDaemonFile(fs.readFileSync(daemonFile(home), 'utf8'));
     return held?.url !== undefined && held.stoppedAt === undefined ? `${held.url}/api/quota` : undefined;
@@ -116,13 +115,13 @@ const quotaUrl = (home: string): string | undefined => {
  * The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api.
  * @param quota The quota's URL, `<url>/api/quota` at the address the daemon's api serves.
  */
-export const quotaCall = (quota: string): string => `curl -s ${quota}`;
+export const quotaCall = (quota: string) => `curl -s ${quota}`;
 
 /**
  * What her session is told first, once filed: what she does while the person writes to her, and, while a factory is above `manual`
  * (`operating`), that the feed is said to her; and how she reads the quota at `quota`, where the daemon serves one.
  */
-const nemiaBrief = (quota: string | undefined, operating: boolean): string =>
+const nemiaBrief = (quota: string | undefined, operating: boolean) =>
   [
     'You are on. Read your memory, then answer what the person wrote in your chat, if anything; then wait for their next words.',
     ...(operating ? ['The feed is said to you when it needs the person.'] : []),
@@ -132,7 +131,7 @@ const nemiaBrief = (quota: string | undefined, operating: boolean): string =>
   ].join(' ');
 
 /** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
-const factoryFolders = (home: string): Mount[] => {
+const factoryFolders = (home: string) => {
   const volumes = listedAtOnce(home).flatMap((f) => ('volumes' in f ? f.volumes : []));
   return factoryMounts({ volumes }, undefined);
 };
@@ -152,14 +151,7 @@ const factoryFolders = (home: string): Mount[] => {
  * @param resumeFrom The session of her last task to continue, or undefined to start cold.
  * @param operating Whether a factory is above `manual`, so her brief says the feed is said to her.
  */
-export function nemiaSpec(
-  id: string,
-  custom: string | undefined,
-  token: string,
-  home: string,
-  resumeFrom?: string,
-  operating = true,
-): Parameters<Engine['file']>[0] {
+export function nemiaSpec(id: string, custom: string | undefined, token: string, home: string, resumeFrom?: string, operating = true) {
   const step = readNemia();
   const prompt = composePrompt(home, step.body, custom);
   const memory = `Edit(/${memoryDir(home)}/**)`;
@@ -193,7 +185,7 @@ export function nemiaSpec(
         () => undefined,
       ),
     },
-  };
+  } satisfies Parameters<Engine['file']>[0];
 }
 
 /** Her name, as the Agent door takes it. */
@@ -239,7 +231,7 @@ const fileHer = (e: Engine, beat: Beat) =>
     const home = beat.home;
     const tasks = herTasks(home);
     const last = tasks.at(-1);
-    const minted = (n: number): string => (n === 0 ? nemiaTaskId(beat.at) : `${nemiaTaskId(beat.at)}-${n}`);
+    const minted = (n: number) => (n === 0 ? nemiaTaskId(beat.at) : `${nemiaTaskId(beat.at)}-${n}`);
     let fresh = 0;
     while (tasks.includes(minted(fresh))) fresh++;
     const id = last !== undefined && !beat.filed ? last : minted(fresh);
@@ -312,7 +304,7 @@ const act = (e: Engine, beat: Beat, owed: Exclude<NemiaAct, 'trust'>) =>
   ACTS[owed](e, beat).pipe(Effect.andThen(Metric.update(NEMIA_ACTS, 1)));
 
 /** The words of what the write of her folder's trust threw. */
-const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const threwWords = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
  * Her folder made, where it is not yet, and her harness's trust given to it (`trustFolder`), which is safe since the folder is Nemia's
@@ -323,7 +315,7 @@ const threwWords = (err: unknown): string => (err instanceof Error ? err.message
 const trustHer = (home: string) =>
   Effect.gen(function* () {
     const dir = nemiaDir(home);
-    const refused = ((): string | undefined => {
+    const refused = (() => {
       try {
         fs.mkdirSync(dir, { recursive: true });
       } catch (err) {
@@ -369,7 +361,7 @@ const herTask = (e: Engine, id: string | undefined) =>
   });
 
 /** The latest of `times`, ISO times, in milliseconds, or null where none reads as one. */
-const latest = (times: readonly (string | undefined)[]): number | null =>
+const latest = (times: readonly (string | undefined)[]) =>
   times.reduce<number | null>((max, at) => {
     const ms = at === undefined ? Number.NaN : Date.parse(at);
     return Number.isNaN(ms) || (max !== null && max >= ms) ? max : ms;
@@ -418,7 +410,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* (
   const { task, up, idle, said, asking, closing } = yield* herTask(e, id);
   const dir = nemiaDir(home);
   const answers = readAnswers(dir);
-  const ms = (at: string | undefined): number | null => latest([at]);
+  const ms = (at: string | undefined) => latest([at]);
   const lastSaid = latest([...said, ...answers.map((a) => a.at)]);
   const quiet = quietOf({ idleSince: ms(record?.idleSince), lastSaid, now, restAfterMs });
   const spoke = latest([...readOutbox(dir).map((entry) => entry.at), ...answers.map((a) => a.at), levelFile?.asked]);
@@ -463,7 +455,7 @@ export const keepOnce = Effect.fn('keepOnce')(function* (
  * The keeper, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later.
  * @param options The keeper's pace, each one left out taken from `KEEP_DEFAULTS`.
  */
-export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService | StoreRoot> => {
+export const keep = (options: Partial<KeepOptions> = {}) => {
   const o = { ...KEEP_DEFAULTS, ...options };
   const restAfterMs = Duration.toMillis(Duration.fromInputUnsafe(o.restAfter));
   const beat = Effect.suspend(() => keepOnce(restAfterMs)).pipe(

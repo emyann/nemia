@@ -90,7 +90,7 @@ type GraphRunFixture = {
 };
 
 /** The build workflow's graph, among the steps a run has: a chain, and review looping back to implement for three rounds. */
-const chainOf = (steps: readonly RailStep[]): RunView['graph'] => {
+const chainOf = (steps: readonly RailStep[]) => {
   const names = steps.map((one) => one.name);
   const edges: Array<RunView['graph']['edges'][number]> = names.slice(1).map((to, i) => ({ from: names[i], to, kind: 'after' }));
   if (names.includes('review') && names.includes('implement')) edges.push({ from: 'review', to: 'implement', kind: 'loop', rounds: 3 });
@@ -117,7 +117,7 @@ const BUILD_GATES: RunView['gates'] = [
  * @param steps The run's steps.
  * @param held Whether a person holds it.
  */
-export const graphRun = (steps: RailStep[], held = false): GraphRunFixture => ({
+export const graphRun = (steps: RailStep[], held = false) => ({
   steps,
   graph: chainOf(steps),
   gates: BUILD_GATES.filter((gate) => steps.some((one) => one.name === gate.step)),

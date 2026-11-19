@@ -22,7 +22,7 @@ export class McpStateRefused extends Schema.TaggedError<McpStateRefused>()('McpS
  * Why `mcpState` is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has.
  * @param declared The engine's harnesses, each with what it declares.
  */
-export const noMcpHarness = (declared: readonly HarnessDeclared[]): string =>
+export const noMcpHarness = (declared: readonly HarnessDeclared[]) =>
   `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
 
 /**
@@ -48,7 +48,7 @@ export const mcpStateVerbOf = (
   executable: string | undefined,
   ask?: McpStatusAsk,
   harnessBin?: string,
-): ((servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>) =>
+) =>
   Effect.fnUntraced(function* (servers: Record<string, RemoteMcpServer>) {
     const refuse = (message: string) => Effect.fail(new McpStateRefused({ message }));
     const refused = mcpStateRefusal(servers);
@@ -59,4 +59,4 @@ export const mcpStateVerbOf = (
     return yield* Effect.promise(() =>
       mcpServersRead(servers, cwd, { ...(found === undefined ? {} : { executable: found }), ...(ask === undefined ? {} : { ask }) }),
     ).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));
-  });
+  }) satisfies (servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>;

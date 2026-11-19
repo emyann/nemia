@@ -11,7 +11,7 @@ import { PLACE_KINDS, type StepKeyForm } from 'objects';
  * `workflows/`.
  * @param name The name as sent, of any type.
  */
-export function workflowNameRefusal(name: unknown): string | undefined {
+export function workflowNameRefusal(name: unknown) {
   const fix = 'Name it as its folder is named — dev, say.';
   if (typeof name !== 'string' || !name.trim()) return `A workflow has no name, and a workflow is named by its folder. ${fix}`;
   const as = `\`${name}\` is not a workflow's name:`;
@@ -31,7 +31,7 @@ export function workflowNameRefusal(name: unknown): string | undefined {
  * Why `file` cannot be a schema beside the steps (400), or undefined: a `.json` file directly in the folder, not hidden.
  * @param file The schema's file name as sent.
  */
-export function schemaNameRefusal(file: string): string | undefined {
+export function schemaNameRefusal(file: string) {
   const fix = 'Name it beside its step — review.schema.json, say.';
   const as = `\`${file}\` is not a schema's file:`;
   if (/[\\/]/.test(file)) return `${as} a schema lives in the workflow's folder, and a slash names a file in another. ${fix}`;

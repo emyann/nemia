@@ -34,7 +34,7 @@ export type ApplyFacts = {
 export type ApplyAction = 'apply' | 'wait' | 'stale' | 'back-to-person' | 'drop';
 
 /** Whether the proposal is due to apply: at approval, or its run ended well, or it has no run (the person's). */
-const due = (f: ApplyFacts): boolean => f.at === 'approval' || f.run === 'succeeded' || f.run === 'none';
+const due = (f: ApplyFacts) => f.at === 'approval' || f.run === 'succeeded' || f.run === 'none';
 
 const proposalApplySpec = spec<(facts: ApplyFacts) => ApplyAction>({
   ensures: {

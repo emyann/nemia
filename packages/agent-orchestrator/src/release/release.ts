@@ -48,14 +48,14 @@ export type ReleaseFile = {
  * How a release came to the store, an absent `from` read as a build.
  * @param file A release's `release.json`, of which `from` is read.
  */
-export const releaseFrom = (file: Pick<ReleaseFile, 'from'>): ReleaseFrom => file.from ?? 'build';
+export const releaseFrom = (file: Pick<ReleaseFile, 'from'>) => file.from ?? 'build';
 
 /**
  * The release platform of a machine whose Node says `platform` and `arch`, or null where no archive is published for it.
  * @param platform The platform Node names, like linux.
  * @param arch The architecture Node names, like x64.
  */
-export function platformOf(platform: string, arch: string): ReleasePlatform | null {
+export function platformOf(platform: string, arch: string) {
   const named = `${platform}-${arch}`;
   return RELEASE_PLATFORMS.find((p) => p === named) ?? null;
 }
@@ -80,7 +80,7 @@ export type Current = ReleaseFile & { readonly dir: string };
  * pointer's own name, so no tag climbs out of `releases/` or hides as a dot folder.
  * @param tag The tag the upgrade names.
  */
-export function tagRefusal(tag: string): string | null {
+export function tagRefusal(tag: string) {
   if (tag === CURRENT)
     return `nemia upgrade: ${CURRENT} is the pointer's name, not a tag: name the tag to build, like nemia upgrade v1.2.0.`;
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(tag))
@@ -119,9 +119,11 @@ export type RestartPlan =
  * @param holder Who holds the lease: the service, another daemon, or none.
  * @param unitOnCurrent Whether the service's unit runs `releases/current`.
  */
-export function restartPlan(lease: DaemonStanding, holder: 'service' | 'other' | 'none', unitOnCurrent: boolean): RestartPlan {
-  if (lease.kind !== 'ticking') return { kind: 'none' };
-  return holder === 'service' && unitOnCurrent ? { kind: 'service', pid: lease.file.pid } : { kind: 'hand', pid: lease.file.pid };
+export function restartPlan(lease: DaemonStanding, holder: 'service' | 'other' | 'none', unitOnCurrent: boolean) {
+  if (lease.kind !== 'ticking') return { kind: 'none' } satisfies RestartPlan;
+  return (
+    holder === 'service' && unitOnCurrent ? { kind: 'service', pid: lease.file.pid } : { kind: 'hand', pid: lease.file.pid }
+  ) satisfies RestartPlan;
 }
 
 /**
@@ -131,7 +133,7 @@ export function restartPlan(lease: DaemonStanding, holder: 'service' | 'other' |
  * @param entry The entry, working folder, checkout and node a login service runs.
  * @param running The code this process runs.
  */
-export function pointedEntry<E extends { checkout: string; entry: string; cwd: string; node?: string }>(entry: E, running: Running): E {
+export function pointedEntry<E extends { checkout: string; entry: string; cwd: string; node?: string }>(entry: E, running: Running) {
   if (running.kind !== 'install' || entry.checkout !== running.root) return entry;
   const current = `${running.root.slice(0, running.root.length - running.tag.length)}${CURRENT}`;
   const under = (at: string) => `${current}${at.slice(running.root.length)}`;
@@ -140,7 +142,7 @@ export function pointedEntry<E extends { checkout: string; entry: string; cwd: s
 }
 
 /** A release in words: `v1.2.0 (install, abc1234) at <folder>`, or `checkout at <folder>`. */
-const releaseWords = (release: LeaseRelease | Running): string =>
+const releaseWords = (release: LeaseRelease | Running) =>
   release.kind === 'install'
     ? `${release.tag ?? 'an install'} (install${release.commit ? `, ${release.commit.slice(0, 7)}` : ''}) at ${release.root}`
     : `checkout at ${release.root}`;
@@ -164,11 +166,13 @@ export type SessionCount = { readonly release: SessionRelease | null; readonly h
  * @param image The real folder of the code the session's process runs.
  * @param releases The store's real releases folder.
  */
-export function sessionRelease(image: string, releases: string): SessionRelease {
+export function sessionRelease(image: string, releases: string) {
   const under = path.relative(releases, image);
   const tag = under.split(path.sep)[0] ?? '';
   const inside = under !== '' && !under.startsWith('..') && !path.isAbsolute(under);
-  return inside && tag !== '' && tagRefusal(tag) === null ? { kind: 'install', tag } : { kind: 'checkout', root: image };
+  return (
+    inside && tag !== '' && tagRefusal(tag) === null ? { kind: 'install', tag } : { kind: 'checkout', root: image }
+  ) satisfies SessionRelease;
 }
 
 /**
@@ -177,7 +181,7 @@ export function sessionRelease(image: string, releases: string): SessionRelease 
  * @param release The session's release, or null where none was recorded.
  * @param harness The session's harness and its version, or null where none was recorded.
  */
-export function ranOnWords(release: SessionRelease | null, harness: SessionHarness | null): string | null {
+export function ranOnWords(release: SessionRelease | null, harness: SessionHarness | null) {
   const said = [
     ...(release === null ? [] : [release.kind === 'install' ? release.tag : 'checkout']),
     ...(harness === null ? [] : [`${harness.name} ${harness.version}`]),
@@ -192,22 +196,18 @@ export function ranOnWords(release: SessionRelease | null, harness: SessionHarne
  * @param harness The name of the harness the attempt's task was filed with.
  * @param releases The store's real releases folder.
  */
-export function sessionRanOn(
-  attempt: { readonly image?: string; readonly harnessVersion?: string },
-  harness: string,
-  releases: string,
-): Pick<SessionCount, 'release' | 'harness'> {
+export function sessionRanOn(attempt: { readonly image?: string; readonly harnessVersion?: string }, harness: string, releases: string) {
   return {
     release: attempt.image === undefined ? null : sessionRelease(attempt.image, releases),
     harness: attempt.harnessVersion === undefined ? null : { name: harness, version: attempt.harnessVersion },
-  };
+  } satisfies Pick<SessionCount, 'release' | 'harness'>;
 }
 
 /**
  * The sessions at work, each its release and harness, counted by the two together: the most first, then in the order first met.
  * @param sessions The sessions at work, each its release and harness.
  */
-export function sessionCounts(sessions: ReadonlyArray<Pick<SessionCount, 'release' | 'harness'>>): SessionCount[] {
+export function sessionCounts(sessions: ReadonlyArray<Pick<SessionCount, 'release' | 'harness'>>) {
   const counts = new Map<string, SessionCount>();
   for (const s of sessions) {
     const key = JSON.stringify([s.release, s.harness]);
@@ -221,7 +221,7 @@ export function sessionCounts(sessions: ReadonlyArray<Pick<SessionCount, 'releas
  * it started on, and what does; null for an install.
  * @param release The release the daemon runs, as its lease or this process records it.
  */
-export function checkoutPromiseLine(release: LeaseRelease | Running): string | null {
+export function checkoutPromiseLine(release: LeaseRelease | Running) {
   if (release.kind !== 'checkout') return null;
   return (
     `this daemon runs the checkout ${release.root}, which makes no promise to keep a running session on its own files: an edit there, ` +
@@ -254,7 +254,7 @@ export function versionLines(
   lease: DaemonStanding,
   sessions: readonly SessionCount[],
   latest?: Latest,
-): string[] {
+) {
   const daemon =
     lease.kind !== 'ticking'
       ? 'no daemon ticks the store'
@@ -278,7 +278,7 @@ export function versionLines(
  * The lease's record of a release: its kind and folder, and an install's tag and commit.
  * @param running The code this process runs.
  */
-export const leaseRelease = (running: Running): LeaseRelease =>
-  running.kind === 'install'
+export const leaseRelease = (running: Running) =>
+  (running.kind === 'install'
     ? { kind: 'install', root: running.root, tag: running.tag, commit: running.commit }
-    : { kind: 'checkout', root: running.root };
+    : { kind: 'checkout', root: running.root }) satisfies LeaseRelease;

@@ -47,11 +47,10 @@ export type FloorRefusal = 'out-of-reach' | 'asks-the-person' | 'narrowed' | 'ot
 export type FloorAnswer = { readonly decision: 'allow' } | { readonly decision: 'deny'; readonly reason: FloorRefusal };
 
 /** Whether `answer` refuses for `reason`. */
-const deniedFor = (answer: FloorAnswer, reason: FloorRefusal): boolean => answer.decision === 'deny' && answer.reason === reason;
+const deniedFor = (answer: FloorAnswer, reason: FloorRefusal) => answer.decision === 'deny' && answer.reason === reason;
 
 /** Whether `c`, a class, is above the narrowing `n`: anything but a read above `read`, an answer or an ask above `act`. */
-const aboveNarrowing = (c: FloorCall['class'], n: FloorNarrowing | null): boolean =>
-  n !== null && c !== 'read' && (n === 'read' || c !== 'act');
+const aboveNarrowing = (c: FloorCall['class'], n: FloorNarrowing | null) => n !== null && c !== 'read' && (n === 'read' || c !== 'act');
 
 const floorOfSpec = spec<(call: FloorCall, holder: FloorHolder) => FloorAnswer>({
   ensures: {

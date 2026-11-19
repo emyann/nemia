@@ -34,7 +34,7 @@ import { wfRoot } from './src/config/config.store.ts';
  */
 const atRoot =
   <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
-  (...args: A): R =>
+  (...args: A) =>
     at(wfRoot(process.env), ...args);
 
 /** `factoriesDirAt` at the test's root. */

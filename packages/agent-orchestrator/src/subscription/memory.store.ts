@@ -15,10 +15,10 @@ import { noSubscription, SubscriptionDoor, subscriptionDoorOver, subscriptionTak
 export const MEMORY_ROOT = '/memory';
 
 /** The keys of `map`, sorted. */
-const sorted = (map: Map<string, unknown>): string[] => [...map.keys()].sort();
+const sorted = (map: Map<string, unknown>) => [...map.keys()].sort();
 
 /** A fresh Subscription door over maps: no subscription put, no delivery written. */
-export function subscriptionDoorMemory(): Layer.Layer<never> {
+export function subscriptionDoorMemory() {
   const subscriptions = new Map<string, Subscription>();
   const deliveries = new Map<string, KeptDelivery>();
   const layer: SubscriptionLayer = {

@@ -106,7 +106,7 @@ type EntryOnDisk = typeof EntrySchema.Type;
  * `authentication` is `AUTH_REQUIRED`, `WAITS`). The file keeps its words until it is next written. A word neither
  * vocabulary has is `failed`, as the other drivers read one: no session the runtime can wait on.
  */
-const upgraded = (e: EntryOnDisk): Entry => {
+const upgraded = (e: EntryOnDisk) => {
   const { seen, ...rest } = e;
   if (!seen) return rest;
   const state = isSessionState(seen.state)
@@ -118,7 +118,7 @@ const upgraded = (e: EntryOnDisk): Entry => {
 };
 
 /** The entry `text`, read from `file`, decoded; refused, naming the file, its first wrong field and the fix, where it does not read. */
-const entryIn = (file: string, text: string): EntryOnDisk => {
+const entryIn = (file: string, text: string) => {
   const json = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text);
   const read = Result.isSuccess(json) ? Schema.decodeUnknownResult(EntrySchema)(json.success) : json;
   if (Result.isSuccess(read)) return read.success;
@@ -129,13 +129,13 @@ const entryIn = (file: string, text: string): EntryOnDisk => {
 };
 
 /** The file of the session `name`'s entry in the registry folder `under`. */
-const entryFileOf = (under: string, name: string): string => path.join(under, `${encodeURIComponent(name)}.json`);
+const entryFileOf = (under: string, name: string) => path.join(under, `${encodeURIComponent(name)}.json`);
 
 /**
  * The entry in `file`, read as this code reads it (`upgraded`); `undefined` when there is none.
  * @param file The path of the entry's JSON file.
  */
-export const readEntry = (file: string): Entry | undefined => {
+export const readEntry = (file: string) => {
   try {
     return upgraded(entryIn(file, fs.readFileSync(file, 'utf8')));
   } catch (e) {
@@ -145,47 +145,44 @@ export const readEntry = (file: string): Entry | undefined => {
 };
 
 /** Where the registry in `dir` keeps the entry of the session `name`: open, and let go of. */
-const entryFilesOf = (dir: string, name: string): [open: string, done: string] => [
-  entryFileOf(dir, name),
-  entryFileOf(path.join(dir, 'done'), name),
-];
+const entryFilesOf = (dir: string, name: string) =>
+  [entryFileOf(dir, name), entryFileOf(path.join(dir, 'done'), name)] satisfies [open: string, done: string];
 
 /**
  * The remote harness `harness`'s `forget`, its registry in `dir`: the session's entry, open or let go of, removed or with `dry`
  * listed, and the Task the agent made of it named as left, since the remote party keeps it.
  */
-const forgetEntryOf =
-  (harness: string, dir: string): NonNullable<RunnerOps['forget']> =>
-  (session, options) => {
+const forgetEntryOf = (harness: string, dir: string) =>
+  ((session, options) => {
     const files = entryFilesOf(dir, session.name);
     const left = () => {
       const e = readEntry(files[0]) ?? readEntry(files[1]);
       return e?.taskId ? [`the Task ${e.taskId}, the \`${harness}\` agent's to keep`] : [];
     };
     return forgetFiles(harness, files, left, options.dry);
-  };
+  }) satisfies NonNullable<RunnerOps['forget']>;
 
 /**
  * The remote harness `harness`'s `kept`, its registry in `dir`: each session's entry, open or let go of. It names no record: the
  * Task the agent made of a session is the remote party's, and on no disk of ours.
  */
-const keptEntryOf =
-  (harness: string, dir: string): NonNullable<RunnerOps['kept']> =>
-  (sessions) =>
-    keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }));
+const keptEntryOf = (harness: string, dir: string) =>
+  ((sessions) => keptOf(harness, sessions, ({ name }) => ({ files: entryFilesOf(dir, name), records: [] }))) satisfies NonNullable<
+    RunnerOps['kept']
+  >;
 
 /**
  * The remote harness `harness`'s verbs over its registry in `dir` alone: `forget` (`forgetEntryOf`) and `kept` (`keptEntryOf`).
  * @param harness The name of the remote harness, said in what `forget` leaves and in what `kept` names.
  * @param dir The registry's folder, whose `done/` holds the entries let go of.
  */
-export const entryVerbsOf = (harness: string, dir: string): Required<Pick<RunnerOps, 'forget' | 'kept'>> => ({
+export const entryVerbsOf = (harness: string, dir: string) => ({
   forget: forgetEntryOf(harness, dir),
   kept: keptEntryOf(harness, dir),
 });
 
 /** The names of the entries in `under`; none for a folder not made yet. */
-const entryNames = (under: string): string[] => {
+const entryNames = (under: string) => {
   try {
     return fs.readdirSync(under).filter((f) => f.endsWith('.json'));
   } catch (e) {
@@ -210,13 +207,13 @@ export const registryOf = (harness: string, root: string) => {
     fs.mkdirSync(under, { recursive: true });
     replaceFile(fileOf(e.name, under), `${JSON.stringify(e)}\n`);
   };
-  const entriesIn = (under: string): Entry[] =>
+  const entriesIn = (under: string) =>
     entryNames(under).flatMap((f) => {
       const e = readEntry(path.join(under, f));
       return e?.agent === harness ? [e] : [];
-    });
-  const open = (): Entry[] => entriesIn(dir);
-  const bySession = (sessionId: string): Entry | undefined => {
+    }) satisfies Entry[] as Entry[];
+  const open = () => entriesIn(dir);
+  const bySession = (sessionId: string) => {
     const all = [...entriesIn(dir), ...entriesIn(done)];
     return (
       all.find((e) => e.taskId === sessionId || e.seen?.sessionId === sessionId || e.messageId === sessionId) ??

@@ -47,25 +47,22 @@ const BOUND = 120_000;
 /** The sign-in a refusal names: gh signed in to github.com in a browser, with the `workflow` scope a push of a CI file takes. */
 const SIGN_IN = 'gh auth login --hostname github.com --web --git-protocol https --scopes workflow';
 
-/** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
-type Ran = { status: number | null; out: string; err: string; missing: boolean };
-
 /** Run `cmd` with `args`, bounded, reading nothing from stdin. */
-function run(cmd: string, args: string[]): Ran {
+function run(cmd: string, args: string[]) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }
 
 /** Run gh with `args`; refuses where gh is not on the PATH, naming the install. */
-function gh(args: string[]): Ran {
+function gh(args: string[]) {
   const ran = run('gh', args);
   if (ran.missing) throw new Refusal('gh is not on the PATH: install it with `node "$WF_CARRIED_FILES/needs.ts" install-gh`');
   return ran;
 }
 
 /** The archive gh ships for this machine, by its name's tail after `gh_<version>_`; refuses a machine it ships none for. */
-function archiveTail(): string {
+function archiveTail() {
   const arch = { x64: 'amd64', arm64: 'arm64' }[process.arch as string];
   const system = { linux: { name: 'linux', ext: 'tar.gz' }, darwin: { name: 'macOS', ext: 'zip' } }[process.platform as string];
   if (arch === undefined || system === undefined)
@@ -74,7 +71,7 @@ function archiveTail(): string {
 }
 
 /** The body of `url`, refused with what was read where it cannot be. */
-async function fetched(url: string, what: string): Promise<Buffer> {
+async function fetched(url: string, what: string) {
   let res: Response;
   try {
     res = await fetch(url, { headers: { 'user-agent': 'nemia-needs', accept: 'application/octet-stream, application/json' } });
@@ -89,14 +86,14 @@ async function fetched(url: string, what: string): Promise<Buffer> {
 type Release = { tag_name?: unknown; assets?: Array<{ name?: unknown; browser_download_url?: unknown }> };
 
 /** The address of the asset `name` of `release`; refuses one it does not hold. */
-function assetUrl(release: Release, name: string): string {
+function assetUrl(release: Release, name: string) {
   const url = release.assets?.find((asset) => asset.name === name)?.browser_download_url;
   if (typeof url !== 'string') throw new Refusal(`the latest gh release holds no ${name}: install gh by hand (${MANUAL})`);
   return url;
 }
 
 /** The sum `checksums` (lines of `<sha256>  <name>`) gives the file `name`; refuses where it gives none. */
-function sumOf(checksums: string, name: string): string {
+function sumOf(checksums: string, name: string) {
   const line = checksums.split('\n').find((l) => l.trim().split(/\s+/)[1] === name);
   const sum = line?.trim().split(/\s+/)[0];
   if (!sum) throw new Refusal(`the release's checksums name no ${name}: install gh by hand (${MANUAL})`);
@@ -104,13 +101,13 @@ function sumOf(checksums: string, name: string): string {
 }
 
 /** The archive `file` unpacked into the folder `into`, by `tar` or `unzip`; refuses where the unpacker fails. */
-function unpacked(file: string, into: string): void {
+function unpacked(file: string, into: string) {
   const ran = file.endsWith('.zip') ? run('unzip', ['-q', file, '-d', into]) : run('tar', ['-xzf', file, '-C', into]);
   if (ran.status !== 0) throw new Refusal(`cannot unpack ${path.basename(file)}: ${ran.err || ran.out} — install gh by hand (${MANUAL})`);
 }
 
 /** The `bin/gh` of the release unpacked in `dir`: at its root, or under its one top folder; refuses where there is none. */
-function ghIn(dir: string): string {
+function ghIn(dir: string) {
   const tops = ['', ...fs.readdirSync(dir)];
   const found = tops.map((top) => path.join(dir, top, 'bin', 'gh')).find((file) => fs.existsSync(file));
   if (found === undefined) throw new Refusal(`the gh archive holds no bin/gh: install gh by hand (${MANUAL})`);
@@ -118,7 +115,7 @@ function ghIn(dir: string): string {
 }
 
 /** `link` made to point at `target`, through a fresh link renamed over it, so a reader never sees it missing. */
-function linked(target: string, link: string): void {
+function linked(target: string, link: string) {
   fs.mkdirSync(path.dirname(link), { recursive: true });
   const fresh = `${link}.${process.pid}`;
   fs.rmSync(fresh, { force: true });
@@ -127,7 +124,7 @@ function linked(target: string, link: string): void {
 }
 
 /** `install-gh`: the latest gh for this machine into `$NEMIA_TOOLS/gh/<version>`, its sum checked, and `$NEMIA_TOOLS/bin/gh` linked. */
-async function installGh(): Promise<string[]> {
+async function installGh() {
   const tools = process.env.NEMIA_TOOLS;
   if (!tools) throw new Refusal("NEMIA_TOOLS is not set: run this as a need's fix, `nemia doctor fix gh`, which names the tools folder");
   const tail = archiveTail();
@@ -172,7 +169,7 @@ async function installGh(): Promise<string[]> {
 }
 
 /** The scopes gh's `auth status` says its token holds, from its `Token scopes:` line, quoted or not; none where it says none. */
-function scopesSaid(said: string): string[] | undefined {
+function scopesSaid(said: string) {
   const line = /Token scopes:\s*(.*)$/m.exec(said)?.[1];
   if (line === undefined) return undefined;
   return line
@@ -182,7 +179,7 @@ function scopesSaid(said: string): string[] | undefined {
 }
 
 /** `scope <s>`: whether gh is signed in to github.com with a token holding `s`. */
-function scope([wanted]: string[]): string[] {
+function scope([wanted]: string[]) {
   if (!wanted) throw new Refusal('no scope named: give one, `node needs.ts scope workflow`');
   const ran = gh(['auth', 'status', '--hostname', 'github.com']);
   const said = `${ran.out}\n${ran.err}`;
@@ -197,7 +194,7 @@ function scope([wanted]: string[]): string[] {
 }
 
 /** `identity`: git's global name and email set from the account gh is signed in to. */
-function identity(): string[] {
+function identity() {
   const ran = gh(['api', 'user']);
   if (ran.status !== 0)
     throw new Refusal(
@@ -231,7 +228,7 @@ const INSTALL_BOUND = 840_000;
 type Core = { dir: string; version: string; via: string };
 
 /** The folder of the package `name` as Node resolves it from the folder `from`, by its `package.json`; none where it does not. */
-function resolvedFrom(from: string, name: string): string | undefined {
+function resolvedFrom(from: string, name: string) {
   try {
     return path.dirname(createRequire(path.join(from, 'noop.js')).resolve(`${name}/package.json`));
   } catch {
@@ -243,7 +240,7 @@ function resolvedFrom(from: string, name: string): string | undefined {
  * The `playwright-core` the browser tools run, resolved from the repository `repo`: the one `@playwright/mcp` resolves where the
  * repository has it, else the repository's own; none where it holds neither.
  */
-function coreOf(repo: string): Core | undefined {
+function coreOf(repo: string) {
   const mcp = resolvedFrom(repo, '@playwright/mcp');
   const fromMcp = mcp === undefined ? undefined : resolvedFrom(mcp, 'playwright-core');
   const dir = fromMcp ?? resolvedFrom(repo, 'playwright-core');
@@ -259,7 +256,7 @@ function coreOf(repo: string): Core | undefined {
 }
 
 /** The Chromium `core` launches, by its own `chromium.executablePath()`; refuses where it names none. */
-function executableOf(core: Core): string {
+function executableOf(core: Core) {
   let file: unknown;
   try {
     const loaded = createRequire(path.join(core.dir, 'package.json'))(core.dir) as { chromium?: { executablePath?: () => string } };
@@ -275,20 +272,20 @@ function executableOf(core: Core): string {
 }
 
 /** The build a Chromium's path names (`chromium-<build>`), or the path itself where it names none. */
-const buildOf = (file: string): string => /chromium(?:_headless_shell)?-(\d+)/.exec(file)?.[1] ?? file;
+const buildOf = (file: string) => /chromium(?:_headless_shell)?-(\d+)/.exec(file)?.[1] ?? file;
 
 /** The folders Playwright keeps its browsers in where nothing names its own: `PLAYWRIGHT_BROWSERS_PATH`, else its caches. */
-function browserFolders(): string[] {
+function browserFolders() {
   const named = process.env.PLAYWRIGHT_BROWSERS_PATH;
   const home = os.homedir();
   return [named || path.join(home, '.cache', 'ms-playwright'), path.join(home, 'Library', 'Caches', 'ms-playwright')];
 }
 
 /** The command that installs the browser with `core`'s installer. */
-const installerOf = (core: Core): string[] => [path.join(core.dir, 'cli.js'), 'install', 'chromium'];
+const installerOf = (core: Core) => [path.join(core.dir, 'cli.js'), 'install', 'chromium'];
 
 /** `browser`: whether the Chromium the browser tools launch is installed; `browser --install` installs it with their installer. */
-function browser(args: string[]): string[] {
+function browser(args: string[]) {
   const install = args.includes('--install');
   const unknown = args.filter((a) => a !== '--install');
   if (unknown.length)
@@ -329,7 +326,7 @@ function browser(args: string[]): string[] {
 const VERBS: Record<string, (args: string[]) => string[] | Promise<string[]>> = { 'install-gh': installGh, scope, identity, browser };
 
 /** The whole run: exit 0 with what was done on stdout, 1 with the refusal on stderr. */
-async function main(): Promise<number> {
+async function main() {
   const [verb = '', ...args] = process.argv.slice(2);
   try {
     const act = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined;

@@ -7,7 +7,7 @@ import { FirstHint } from './FirstHint';
  * A first card's run as the hints read it: labelled, in `status`, its first step filed where `filed`, and `land` its ending step
  * (`workspace: base`), so a run that succeeded landed.
  */
-const runOf = (status: RunView['status'], filed: boolean): Pick<RunView, 'labels' | 'status' | 'steps'> => ({
+const runOf = (status: RunView['status'], filed: boolean) => ({
   labels: { onboarding: 'first-card', workflow: 'quick' },
   status,
   steps: [

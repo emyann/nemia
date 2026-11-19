@@ -11,7 +11,7 @@ import { ReadRefusal } from './read.ts';
  * gone rather than draw it as it was.
  * @param error What a read failed with.
  */
-export const readGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
+export const readGone = (error: unknown) => error instanceof ReadRefusal && error.status === 404;
 
 /**
  * Every failure is tried again three times, as react-query does by default, but a read that found nothing (`readGone`): said at once, not
@@ -19,4 +19,4 @@ export const readGone = (error: unknown): boolean => error instanceof ReadRefusa
  * @param failures How many times the read has failed so far.
  * @param error What the last try failed with.
  */
-export const retryUnlessGone = (failures: number, error: unknown): boolean => !readGone(error) && failures < 3;
+export const retryUnlessGone = (failures: number, error: unknown) => !readGone(error) && failures < 3;

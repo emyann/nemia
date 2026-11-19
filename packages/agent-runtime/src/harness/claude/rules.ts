@@ -15,23 +15,22 @@
  * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash`
  * and `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
  */
-function ruleOf(rule: string): { tool: string; scope: string | null } | null {
+function ruleOf(rule: string) {
   const [, tool, scope] = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule) ?? [];
   if (tool === undefined) return null;
   return { tool, scope: scope === undefined || scope === '*' ? null : scope };
 }
 
 /** A Bash rule's scope in one spelling: `:*` at its end is a trailing ` *`. Anywhere else a colon is a colon. */
-const bashPattern = (scope: string): string => (scope.endsWith(':*') ? `${scope.slice(0, -2)} *` : scope);
+const bashPattern = (scope: string) => (scope.endsWith(':*') ? `${scope.slice(0, -2)} *` : scope);
 
 /** The bare command a pattern whose only wildcard is a trailing ` *` matches too — `git log` for `git log *` — or null. */
-const bareOf = (pattern: string): string | null =>
-  pattern.endsWith(' *') && pattern.indexOf('*') === pattern.length - 1 ? pattern.slice(0, -2) : null;
+const bareOf = (pattern: string) => (pattern.endsWith(' *') && pattern.indexOf('*') === pattern.length - 1 ? pattern.slice(0, -2) : null);
 
 /**
  * Whether a Bash pattern matches a command, as Claude Code matches one: `*` any text, spaces included; with no `*`, that command exactly.
  */
-function bashMatches(pattern: string, command: string): boolean {
+function bashMatches(pattern: string, command: string) {
   const glob = new RegExp(
     `^${pattern
       .split('*')
@@ -50,7 +49,7 @@ function bashMatches(pattern: string, command: string): boolean {
  * @param outer The scope of the rule that may cover, as its parentheses write it.
  * @param inner The scope of the rule that may be covered, as its parentheses write it.
  */
-export function bashCovers(outer: string, inner: string): boolean {
+export function bashCovers(outer: string, inner: string) {
   const [o, i] = [bashPattern(outer), bashPattern(inner)];
   const bare = bareOf(i);
   return bashMatches(o, i) && (bare === null || bashMatches(o, bare));
@@ -60,7 +59,7 @@ export function bashCovers(outer: string, inner: string): boolean {
  * A rule naming an MCP server's tools: the server, and one tool — null for every tool of it, as `mcp__<server>` and `mcp__<server>__*` both
  * are.
  */
-function mcpRuleOf(rule: string): { server: string; tool: string | null } | null {
+function mcpRuleOf(rule: string) {
   const [, server, tool] = /^mcp__(.+?)(?:__(.+))?$/.exec(rule) ?? [];
   return server === undefined ? null : { server, tool: tool === undefined || tool === '*' ? null : tool };
 }
@@ -73,7 +72,7 @@ function mcpRuleOf(rule: string): { server: string; tool: string | null } | null
  * @param server The MCP server's name.
  * @param tool The server's tool's name.
  */
-export function denyingRule(deny: readonly string[], server: string, tool: string): string | null {
+export function denyingRule(deny: readonly string[], server: string, tool: string) {
   const prefix = `mcp__${server}`;
   return deny.find((rule) => rule === `${prefix}__${tool}` || rule === prefix || rule === `${prefix}__*`) ?? null;
 }
@@ -88,7 +87,7 @@ export function denyingRule(deny: readonly string[], server: string, tool: strin
  * @param allow The allow rule, as the settings write it.
  * @param over The deny rules, or the ask rules, each carrying its rule as written.
  */
-export function takenBackBy<R extends { readonly rule: string }>(allow: string, over: readonly R[]): R | undefined {
+export function takenBackBy<R extends { readonly rule: string }>(allow: string, over: readonly R[]) {
   const server = mcpRuleOf(allow);
   const a = ruleOf(allow);
   return over.find((d) => {
@@ -112,7 +111,7 @@ export function takenBackBy<R extends { readonly rule: string }>(allow: string, 
  * @param allow The allow rule that stands, as the settings write it.
  * @param over The deny rules, or the ask rules, each carrying its rule as written.
  */
-export function narrowerRules(allow: string, over: readonly { readonly rule: string }[]): string[] {
+export function narrowerRules(allow: string, over: readonly { readonly rule: string }[]) {
   const server = mcpRuleOf(allow);
   const a = ruleOf(allow);
   return over
@@ -139,7 +138,7 @@ const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk
  * Exported only for the tests that import it.
  * @param permissionMode The job's permission mode; null where none is given.
  */
-export const jobDeniesAsksIn = (permissionMode: string | null): boolean => JOB_MEASURED.has(permissionMode);
+export const jobDeniesAsksIn = (permissionMode: string | null) => JOB_MEASURED.has(permissionMode);
 
 /**
  * What a measurement carries so that it is never read as current: the harness it was taken on, that harness's version, the day, and where
@@ -156,7 +155,7 @@ export type Dated = { harness: string; version: string; measuredAt: string; sour
  * @param name The measurement's name, as a refusal names it.
  * @param measurement The measurement, returned as it is when it says what it was taken on and when.
  */
-export function dated<T extends Dated>(name: string, measurement: T): T {
+export function dated<T extends Dated>(name: string, measurement: T) {
   const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
   const said = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
   const at = said(measuredAt) && /^\d{4}-\d{2}-\d{2}$/.test(measuredAt) ? new Date(`${measuredAt}T00:00:00Z`) : null;
@@ -188,7 +187,7 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
 export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
   name: string,
   commands: T,
-): T {
+) {
   dated(name, commands);
   const listed = (value: unknown): value is readonly string[] =>
     Array.isArray(value) && value.every((c) => typeof c === 'string' && /^[a-z][\w-]*$/.test(c));

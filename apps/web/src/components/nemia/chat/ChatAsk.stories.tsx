@@ -12,7 +12,7 @@ export default meta;
 const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)', display: 'flex', flexDirection: 'column' as const };
 
 /** Her question, each choice with why; `multiSelect` where it takes several. */
-const question = (multiSelect: boolean): AskQuestion => ({
+const question = (multiSelect: boolean) => ({
   question: 'What the board shows as an old closeout’s one line?',
   header: 'Summary',
   options: [
@@ -24,14 +24,15 @@ const question = (multiSelect: boolean): AskQuestion => ({
 });
 
 /** Her ask, carrying `q`. */
-const ask = (q: AskQuestion): Ask => ({
-  kind: 'question',
-  id: 'q:call-1',
-  call: 'call-1',
-  at: '2026-10-15T17:40:00.000Z',
-  text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
-  questions: [q],
-});
+const ask = (q: AskQuestion) =>
+  ({
+    kind: 'question',
+    id: 'q:call-1',
+    call: 'call-1',
+    at: '2026-10-15T17:40:00.000Z',
+    text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
+    questions: [q],
+  }) satisfies Ask;
 
 /** One choice of several: radios, the Recommended tag, the link her words carry, and Answer off until a choice is made. */
 export const OneChoice: StoryObj<typeof ChatAsk> = {

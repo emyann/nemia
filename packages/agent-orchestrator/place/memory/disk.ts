@@ -15,9 +15,10 @@ export const OWN = '.test-place';
 const SKIPPED = new Set([OWN, 'node_modules']);
 
 /** Whether `dir` is a directory. */
-export const isDirectory = (dir: string): boolean => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
+export const isDirectory = (dir: string) => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
 
 /** `p` with every link on the way followed, as far as it exists. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function real(p: string): string {
   try {
     return fs.realpathSync(p);
@@ -28,15 +29,15 @@ export function real(p: string): string {
 }
 
 /** Whether `p` lies inside `dir`, and is not `dir` itself. */
-export function inside(dir: string, p: string): boolean {
+export function inside(dir: string, p: string) {
   const rel = path.relative(dir, p);
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
 /** The files of `dir` as a tree, in folders too: none where it is no directory. */
-export function readTree(dir: string): Tree {
+export function readTree(dir: string) {
   const tree: Record<string, string> = {};
-  const read = (at: string, prefix: string): void => {
+  const read = (at: string, prefix: string) => {
     for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
       if (prefix === '' && SKIPPED.has(entry.name)) continue;
       const rel = `${prefix}${entry.name}`;
@@ -49,7 +50,7 @@ export function readTree(dir: string): Tree {
 }
 
 /** `dir` brought from the files `from` to the files `to`: each path that differs written or taken away, and every other left as it is. */
-export function writeChanges(dir: string, from: Tree, to: Tree): void {
+export function writeChanges(dir: string, from: Tree, to: Tree) {
   fs.mkdirSync(dir, { recursive: true });
   for (const rel of new Set([...Object.keys(from), ...Object.keys(to)])) {
     if (from[rel] === to[rel]) continue;
@@ -63,10 +64,10 @@ export function writeChanges(dir: string, from: Tree, to: Tree): void {
 }
 
 /** The file whose presence says a merge is staged in the checkout `dir`. */
-export const stagedFile = (dir: string): string => path.join(dir, OWN, 'staged');
+export const stagedFile = (dir: string) => path.join(dir, OWN, 'staged');
 
 /** The staged file of `dir` written, or taken away with the place's folder when it holds nothing else. */
-export function markStaged(dir: string, staged: boolean): void {
+export function markStaged(dir: string, staged: boolean) {
   const file = stagedFile(dir);
   if (staged) {
     fs.mkdirSync(path.dirname(file), { recursive: true });

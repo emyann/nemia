@@ -41,14 +41,14 @@ export type LibraryAddWrite = 'add' | 'remove';
 export type LibraryAddRefused = { readonly kind: 'Missing'; readonly message: string };
 
 /** Whether `a` and `b` are the same adds, in the same order. */
-const sameRefs = (a: readonly LibraryRef[], b: readonly LibraryRef[]): boolean =>
+const sameRefs = (a: readonly LibraryRef[], b: readonly LibraryRef[]) =>
   a.length === b.length && a.every((ref, i) => ref.kind === b.at(i)?.kind && ref.name === b.at(i)?.name);
 
 /** Whether `held` holds an origin of the library: the person's, or a builtin. */
-const inLibrary = (held: readonly Origin[]): boolean => held.includes('user') || held.includes('builtin');
+const inLibrary = (held: readonly Origin[]) => held.includes('user') || held.includes('builtin');
 
 /** Whether `held` holds an origin of the factory's own: its tree, or its repository. */
-const ownFirst = (held: readonly Origin[]): boolean => held.includes('factory') || held.includes('repo');
+const ownFirst = (held: readonly Origin[]) => held.includes('factory') || held.includes('repo');
 
 const libraryAddsOfSpec = spec<(recorded: readonly LibraryRef[] | undefined, derived: readonly LibraryRef[]) => readonly LibraryRef[]>({
   ensures: {

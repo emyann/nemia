@@ -34,13 +34,13 @@ export type PauseMove =
   | { readonly kind: 'refused'; readonly as: PauseRefusal };
 
 /** The events that put a pause, each naming what the pause gives a call in flight. */
-const puts = (event: PauseEvent): boolean => event === 'put' || event === 'put-timeout' || event === 'put-now';
+const puts = (event: PauseEvent) => event === 'put' || event === 'put-timeout' || event === 'put-now';
 
 /** Whether `move` is the move to `mode`. */
-const goesTo = (move: PauseMove, mode: PauseMode): boolean => move.kind === 'edge' && move.to === mode;
+const goesTo = (move: PauseMove, mode: PauseMode) => move.kind === 'edge' && move.to === mode;
 
 /** Whether `move` is the refusal `as`. */
-const refusedAs = (move: PauseMove, as: 'Conflict' | 'Missing'): boolean => move.kind === 'refused' && move.as === as;
+const refusedAs = (move: PauseMove, as: 'Conflict' | 'Missing') => move.kind === 'refused' && move.as === as;
 
 const pauseMoveSpec = spec<(from: PauseMode, event: PauseEvent) => PauseMove>({
   ensures: {

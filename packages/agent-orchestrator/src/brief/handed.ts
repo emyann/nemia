@@ -29,7 +29,7 @@ export type ParentCloseout = ({ run: string; asked: string; steps: readonly Pare
 const STAYS = 'Its work stays on the machine that runs this workflow and is not sent to you';
 
 /** What a run concluded, after a section's opening: the first line it was asked, and each terminal step's `summary` and declared output. */
-function concludedLines(parent: Extract<ParentCloseout, { steps: readonly ParentStep[] }>): string[] {
+function concludedLines(parent: Extract<ParentCloseout, { steps: readonly ParentStep[] }>) {
   const lines = ['', 'What it was asked, the first line:', '', ...fenced(parent.asked, 'text')];
   for (const s of parent.steps) {
     if ('unreadable' in s) {
@@ -67,7 +67,7 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
  * @param parent The run waited on: its record's terminal steps and how each signed off, or why that cannot be given.
  * @param remote Whether the step is on a remote A2A agent; false where absent.
  */
-export function fromRunSection(parent: ParentCloseout, remote = false): string {
+export function fromRunSection(parent: ParentCloseout, remote = false) {
   const head = ['', headingOf('From run <id>', parent.run), ''];
   if ('unreadable' in parent) {
     return [
@@ -93,7 +93,7 @@ export function fromRunSection(parent: ParentCloseout, remote = false): string {
 }
 
 /** Whether a run handed as context had landed when it was read, as its section labels it. */
-function landedLabel(parent: ParentCloseout, remote: boolean): string {
+function landedLabel(parent: ParentCloseout, remote: boolean) {
   if (parent.landed) return 'It landed: a person read this account beside its change before it went onto the base.';
   const when = `Not landed, not judged: ${parent.run} was still in flight (or did not land) when this run's steps were filed.`;
   return remote
@@ -109,7 +109,7 @@ function landedLabel(parent: ParentCloseout, remote: boolean): string {
  * @param parent The run handed as context, and whether it had landed.
  * @param remote Whether the step is on a remote A2A agent; false where absent.
  */
-export function contextSection(parent: ParentCloseout, remote = false): string {
+export function contextSection(parent: ParentCloseout, remote = false) {
   const head = ['', headingOf('From run <id>', parent.run), ''];
   const handed = `This run was handed ${parent.run} as context (\`--from\`); it did not wait on it.`;
   const label = landedLabel(parent, remote);
@@ -130,7 +130,7 @@ export function contextSection(parent: ParentCloseout, remote = false): string {
  * @param parent The run handed, with how: waited on, or read.
  * @param remote Whether the step is on a remote A2A agent; false where absent.
  */
-export const handedSection = (parent: ParentCloseout, remote = false): string =>
+export const handedSection = (parent: ParentCloseout, remote = false) =>
   parent.how === 'read' ? contextSection(parent, remote) : fromRunSection(parent, remote);
 
 /**
@@ -143,7 +143,7 @@ export type HandedPart =
   | { kind: 'from'; run: string; asked: string; body: string };
 
 /** The first line a section quotes as what its run was asked: the fenced text after its label, or empty where it has none. */
-function askedOf(lines: readonly string[]): string {
+function askedOf(lines: readonly string[]) {
   const at = lines.indexOf('What it was asked, the first line:');
   const open = lines.findIndex((line, i) => i > at && /^`{3,}/.test(line));
   const fence = /^`+/.exec(lines[open] ?? '')?.[0];
@@ -156,7 +156,7 @@ function askedOf(lines: readonly string[]): string {
 type Opened = { run: string } | { source: TaskSource; step?: string };
 
 /** `words` as a pattern that matches them alone. */
-const literal = (words: string): string => words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const literal = (words: string) => words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Each heading of `TASK_HEADINGS` as a whole line, its `<step>` caught; in the table's order, as a heading is tried. */
 const HEADING_LINES = (Object.keys(TASK_HEADINGS) as TaskHeading[]).map((heading) => {
@@ -173,7 +173,7 @@ const HEADING_LINES = (Object.keys(TASK_HEADINGS) as TaskHeading[]).map((heading
  * naming one of `steps` (a `## From <word>` naming no step is no heading of the run's); `What the check said` given by `self`, the step
  * whose own check it was.
  */
-function openedBy(line: string, steps: ReadonlySet<string>, self: string | undefined): Opened | null {
+function openedBy(line: string, steps: ReadonlySet<string>, self: string | undefined) {
   for (const { heading, line: shape } of HEADING_LINES) {
     const match = shape.exec(line);
     if (!match) continue;
@@ -188,13 +188,14 @@ function openedBy(line: string, steps: ReadonlySet<string>, self: string | undef
 }
 
 /** The part made of the lines gathered under one heading, what it opened saying whose they are. */
-function partOf(opened: Opened, lines: readonly string[]): HandedPart {
-  if ('run' in opened) return { kind: 'from', run: opened.run, asked: askedOf(lines), body: lines.slice(1).join('\n') };
-  return { kind: 'text', text: lines.join('\n'), ...opened };
+function partOf(opened: Opened, lines: readonly string[]) {
+  if ('run' in opened)
+    return { kind: 'from', run: opened.run, asked: askedOf(lines), body: lines.slice(1).join('\n') } satisfies HandedPart;
+  return { kind: 'text', text: lines.join('\n'), ...opened } satisfies HandedPart;
 }
 
 /** The fence open after `line`, `fence` being the one open before it: closed by its own run of backticks, opened by three or more. */
-const fenceAfter = (line: string, fence: string | null): string | null => {
+const fenceAfter = (line: string, fence: string | null) => {
   if (fence !== null) return line.trim() === fence ? null : fence;
   return /^`{3,}/.test(line) ? (/^`+/.exec(line)?.[0] ?? null) : null;
 };
@@ -203,14 +204,14 @@ const fenceAfter = (line: string, fence: string | null): string | null => {
  * What the heading `line` opens, after a part `opened`: what the run writes it as (`openedBy`); else, inside a person's section,
  * nothing, the line being the person's; else text of the run's.
  */
-const cutAt = (line: string, opened: Opened, steps: ReadonlySet<string>, self: string | undefined): Opened | null =>
+const cutAt = (line: string, opened: Opened, steps: ReadonlySet<string>, self: string | undefined) =>
   openedBy(line, steps, self) ?? ('source' in opened && opened.source === 'person' ? null : { source: 'run' });
 
 /**
  * Whether the lines gathered so far are a part before `next`: always after the first, and the first unless it is only blank lines,
  * which go with the part after them — but not into a `from` part, whose heading is its first line.
  */
-const endsPart = (parts: readonly HandedPart[], lines: readonly string[], next: Opened): boolean =>
+const endsPart = (parts: readonly HandedPart[], lines: readonly string[], next: Opened) =>
   parts.length > 0 || lines.some((l) => l.trim()) || ('run' in next && lines.length > 0);
 
 /**
@@ -228,7 +229,7 @@ const endsPart = (parts: readonly HandedPart[], lines: readonly string[], next: 
  * @param steps The names of the steps the run froze; none where absent.
  * @param self The step told; absent where none is.
  */
-export function handedParts(task: string, steps: readonly string[] = [], self?: string): HandedPart[] {
+export function handedParts(task: string, steps: readonly string[] = [], self?: string) {
   const named = new Set(steps);
   const parts: HandedPart[] = [];
   let opened: Opened = { source: 'run' };
@@ -246,5 +247,5 @@ export function handedParts(task: string, steps: readonly string[] = [], self?: 
     }
     lines.push(line);
   }
-  return parts.length || lines.some((l) => l.trim()) ? [...parts, partOf(opened, lines)] : [];
+  return (parts.length || lines.some((l) => l.trim()) ? [...parts, partOf(opened, lines)] : []) satisfies HandedPart[];
 }

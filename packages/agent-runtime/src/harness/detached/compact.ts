@@ -19,7 +19,7 @@ const CAPTURE_ENDS = ['.log', '.stdout'];
  * The run files in `dir` and the captures beside them, each by the run's file name less its end: a run's name is kept with no dot
  * (`safe`), so a `.json` file whose name less its end holds one is another file of a run's.
  */
-const listed = (dir: string): { runs: Map<string, RunFile>; captures: Map<string, string[]> } => {
+const listed = (dir: string) => {
   const runs = new Map<string, RunFile>();
   const captures = new Map<string, string[]>();
   for (const f of fs.existsSync(dir) ? fs.readdirSync(dir).sort() : []) {
@@ -35,7 +35,7 @@ const listed = (dir: string): { runs: Map<string, RunFile>; captures: Map<string
 };
 
 /** The size of `file`, or 0 when it is gone. */
-const sizeOf = (file: string): number => {
+const sizeOf = (file: string) => {
   try {
     return fs.statSync(file).size;
   } catch {
@@ -44,7 +44,7 @@ const sizeOf = (file: string): number => {
 };
 
 /** Why the captures of `run` are left as they are, or nothing when its worker has ended: one at work, or with no pid yet, is not. */
-const atWork = (run: RunFile | undefined, alive: (pid: number) => boolean): string | undefined => {
+const atWork = (run: RunFile | undefined, alive: (pid: number) => boolean) => {
   if (!run) return 'no run file names it';
   if (run.state !== 'working') return undefined;
   return run.pid <= 0 || alive(run.pid) ? 'its worker is at work' : undefined;
@@ -58,7 +58,7 @@ const compactOne = (
   dry: boolean,
   report: SessionsCompacted,
   saidFile?: string,
-): void => {
+) => {
   const file = path.join(dir, name);
   const capture = captureAt(file);
   if (!capture) return void report.left.push({ name, why: 'it could not be read' });
@@ -96,7 +96,7 @@ export const compactRuns = (
   spec: HarnessSpec,
   dir: string,
   { dry, alive = pidAlive }: { dry: boolean; alive?: (pid: number) => boolean },
-): SessionsCompacted => {
+) => {
   const report: SessionsCompacted = { captures: 0, compacted: 0, before: 0, after: 0, left: [] };
   const { readOutput, keepOutput } = spec;
   if (!readOutput || !keepOutput) return report;
@@ -123,8 +123,8 @@ export const compactRuns = (
  * @param spec The harness whose captures are compacted.
  * @param dir The folder of the harness's runs, its run files and their captures.
  */
-export const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'compact'> =>
-  spec.keepOutput
+export const compactOps = (spec: HarnessSpec, dir: string) =>
+  (spec.keepOutput
     ? {
         compact: ({ dry }) =>
           Effect.try({
@@ -132,4 +132,4 @@ export const compactOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'com
             catch: (cause) => new RunnerError({ verb: 'compact', message: `${spec.name}: ${String(cause)}` }),
           }),
       }
-    : {};
+    : {}) satisfies Pick<RunnerOps, 'compact'>;

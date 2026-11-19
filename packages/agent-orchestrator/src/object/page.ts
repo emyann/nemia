@@ -9,7 +9,7 @@ import type { ListPage } from '../../contracts/list-page.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** Whether `limit` is one a list takes: none, or a whole number from 1. */
-const limitTaken = (limit: number | null): boolean => limit === null || (Number.isInteger(limit) && limit >= 1);
+const limitTaken = (limit: number | null) => limit === null || (Number.isInteger(limit) && limit >= 1);
 
 /**
  * The page of `total` objects read from `start` with at most `limit` of them — `bounds.byDefault` where no `limit` is asked, and never
@@ -35,19 +35,19 @@ export const listPage: ListPage = (total, start, limit, bounds) => {
  * @param limit The most objects the page is asked to hold, or null where none is asked.
  * @param bounds The list's page sizes: the default and the most.
  */
-export const pageSizeOf = (limit: number | null, bounds: PageBounds): number | undefined => {
+export const pageSizeOf = (limit: number | null, bounds: PageBounds) => {
   const cut = listPage(Number.MAX_SAFE_INTEGER, 0, limit, bounds);
-  return 'refused' in cut ? undefined : cut.to;
+  return ('refused' in cut ? undefined : cut.to) satisfies number | undefined;
 };
 
 /**
  * The `continue` token that asks for the objects after `name`: its UTF-8 in base64url, with no padding.
  * @param name The name of the last object a page answered.
  */
-export const continueToken = (name: string): string => Buffer.from(name, 'utf8').toString('base64url');
+export const continueToken = (name: string) => Buffer.from(name, 'utf8').toString('base64url');
 
 /** The token's refusal: it names the fix. */
-const badToken = (token: string): Invalid =>
+const badToken = (token: string) =>
   new Invalid({
     message: `continue ${JSON.stringify(token)} is no token of this list: pass the continue a page's metadata answered, as it is, or leave continue out to read from the first object`,
   });
@@ -57,7 +57,7 @@ const badToken = (token: string): Invalid =>
  * UTF-8.
  * @param token The `continue` token a request passed.
  */
-export const continuedAfter = (token: string): string | Invalid => {
+export const continuedAfter = (token: string) => {
   if (!/^[A-Za-z0-9_-]+$/.test(token)) return badToken(token);
   const name = Buffer.from(token, 'base64url').toString('utf8');
   return name !== '' && continueToken(name) === token ? name : badToken(token);
@@ -75,7 +75,7 @@ export type Paged<T> = { readonly items: readonly T[]; readonly remainingItemCou
  * The `limit`'s refusal: it names the fix.
  * @param limit The limit asked, which a list does not take.
  */
-export const badLimit = (limit: number | null): Invalid =>
+export const badLimit = (limit: number | null) =>
   new Invalid({
     message: `limit ${String(limit)} is no whole number from 1: pass ?limit=<n>, n from 1, or leave limit out for the default page`,
   });
@@ -89,23 +89,18 @@ export const badLimit = (limit: number | null): Invalid =>
  * @param asked The page asked: its limit and its continue token.
  * @param bounds The page sizes, `LIST_PAGE` where none is given.
  */
-export const pageOf = <T>(
-  sorted: readonly T[],
-  nameOf: (item: T) => string,
-  asked: PageAsked,
-  bounds: PageBounds = LIST_PAGE,
-): Paged<T> | Invalid => {
+export const pageOf = <T>(sorted: readonly T[], nameOf: (item: T) => string, asked: PageAsked, bounds: PageBounds = LIST_PAGE) => {
   const after = asked.continue === undefined ? undefined : continuedAfter(asked.continue);
-  if (after instanceof Invalid) return after;
+  if (after instanceof Invalid) return after satisfies Paged<T> | Invalid as Paged<T> | Invalid;
   const found = after === undefined ? 0 : sorted.findIndex((item) => nameOf(item) > after);
   const start = found === -1 ? sorted.length : found;
   const cut = listPage(sorted.length, start, asked.limit, bounds);
-  if ('refused' in cut) return badLimit(asked.limit);
+  if ('refused' in cut) return badLimit(asked.limit) satisfies Paged<T> | Invalid as Paged<T> | Invalid;
   const items = sorted.slice(cut.from, cut.to);
   const last = items.at(-1);
   return {
     items,
     remainingItemCount: cut.remainingItemCount,
     ...(cut.more && last !== undefined ? { continue: continueToken(nameOf(last)) } : {}),
-  };
+  } satisfies Paged<T> | Invalid as Paged<T> | Invalid;
 };

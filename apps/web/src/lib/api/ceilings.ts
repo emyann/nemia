@@ -57,7 +57,7 @@ export type PassCost = Omit<PassCostAnswer, 'phases' | 'harnesses'> & typeof Pas
 export type Ceilings = Omit<CeilingsAnswer, 'pass'> & { pass: PassCost | null };
 
 /** `answer` with its pass's parts read by their keys. */
-const ceilingsOf = (answer: CeilingsAnswer): Ceilings =>
+const ceilingsOf = (answer: CeilingsAnswer) =>
   answer.pass === null
     ? { ...answer, pass: null }
     : { ...answer, pass: { ...answer.pass, ...decoded('GET /api/ceilings', PassParts, answer.pass) } };

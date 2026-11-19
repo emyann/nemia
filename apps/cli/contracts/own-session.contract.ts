@@ -43,20 +43,19 @@ const DENIED = '--disallowedTools';
 const SOURCES = '--setting-sources';
 
 /** The deny that holds a folder read-only, spelled as the runtime spells a read-only mount's: `Edit(//<path>/**)`. */
-const editDenied = (folder: string): string => 'Edit(/' + folder + '/**)';
+const editDenied = (folder: string) => 'Edit(/' + folder + '/**)';
 
 /** Whether `inner` is `outer` or a folder under it. */
-const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer + '/');
+const within = (inner: string, outer: string) => inner === outer || inner.startsWith(outer + '/');
 
 /** Whether a path is absolute, not the root, and has no trailing `/`. */
-const plain = (p: string): boolean => p.startsWith('/') && p.length > 1 && !p.endsWith('/');
+const plain = (p: string) => p.startsWith('/') && p.length > 1 && !p.endsWith('/');
 
 /** Whether the copy and the repository are nested, either in the other or the same folder. */
-const nested = (i: OwnSessionPlace): boolean => within(i.copy, i.repo) || within(i.repo, i.copy);
+const nested = (i: OwnSessionPlace) => within(i.copy, i.repo) || within(i.repo, i.copy);
 
 /** Whether `flags` holds the flag `name` with the value `value`. */
-const has = (flags: readonly SessionFlag[], name: string, value: string): boolean =>
-  flags.some((f) => f.name === name && f.value === value);
+const has = (flags: readonly SessionFlag[], name: string, value: string) => flags.some((f) => f.name === name && f.value === value);
 
 const ownSessionSpec = spec<(i: OwnSessionPlace) => OwnSession>({
   /** Both folders are absolute, neither the root, neither with a trailing `/`. */
@@ -108,7 +107,7 @@ const ownSessionSpec = spec<(i: OwnSessionPlace) => OwnSession>({
 export type OwnSessionOf = Implementation<typeof ownSessionSpec>;
 
 /** Whether a folder's name is a render still being written: the sibling a copy is written into before it is renamed in place. */
-const inFlight = (name: string): boolean => name.startsWith('.');
+const inFlight = (name: string) => name.startsWith('.');
 
 const staleCopiesSpec = spec<(present: readonly string[], current: string) => readonly string[]>({
   /** The current copy's name is a digest, never a render in flight. */

@@ -23,7 +23,7 @@ export type DeniedClock = {
 type Attempt = DeniedClock['state']['attempts'][number];
 
 /** An attempt that ended: its `ended` is an outcome, not null. */
-const endedOf = (a: Attempt): boolean => a.ended !== null;
+const endedOf = (a: Attempt) => a.ended !== null;
 
 const deniedCallsSpec = spec<(view: DeniedClock | undefined) => DeniedCall[] | null>({
   ensures: {

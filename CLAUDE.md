@@ -44,7 +44,8 @@ holds what every change needs.
   follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
   tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
-  `noUncheckedIndexedAccess` off);
+  `noUncheckedIndexedAccess` off), every tsconfig extending the root `tsconfig.base.json` (`noImplicitReturns`, which asks a value on
+  every path of a function whose type is inferred);
   `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads. tsrs, the Rust port of TypeScript 7.1's compiler, pinned
   exactly at the root, checks the same files as tsc 6 in about a third of its memory (the seven packages' peaks ~2.3 GB against ~8.3
   GB, measured 2026-11-02), so runs reaching their checks together no longer run the machine out of it. `typescript@6` stays, for
@@ -53,7 +54,9 @@ holds what every change needs.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. It extends
   `@interfere/landmines`' recommended config, pinned exactly, which holds how a test is written (no double but a watching spy, MSW for
-  the network, no fixed sleep, no retry or raised timeout); its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
+  the network, no fixed sleep, no retry or raised timeout) and refuses a declared return type in source and tests alike: pin a value
+  with a typed variable or `satisfies` at its return, and keep a recursive function's type under a disable that says why; no
+  `@returns` is asked, since the checker gives the type. Its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
   with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. A commit
   formats and lints its staged files (husky and lint-staged, `.husky/pre-commit`), and `npm run lint:fast` checks the whole tree.

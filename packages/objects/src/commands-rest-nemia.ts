@@ -12,17 +12,17 @@ import { LEVELS } from './words.ts';
 export const LEVEL_FORM = `nemia level [${LEVELS.join('|')}] [--factory <name> [--for <duration> | --end]]`;
 
 /** The text under `key`, or undefined where none was given. */
-const textIn = (args: Args, key: string): string | undefined => {
+const textIn = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
 
 /** Why `word` is no level `nemia level` sets, or null where it is one. */
-const levelWordRefusal = (word: string): string | null =>
+const levelWordRefusal = (word: string) =>
   (LEVELS as readonly string[]).includes(word) ? null : `${JSON.stringify(word)} is no level: ${LEVEL_FORM}.`;
 
 /** Whether `text` is a stretch a raise is given for: digits and `m`, `h` or `d`, above zero and at most a week. */
-const isStretch = (text: string): boolean => {
+const isStretch = (text: string) => {
   const [, digits, unit] = /^(\d+)([mhd])$/.exec(text.trim()) ?? [];
   const minutes = unit === 'm' ? 1 : unit === 'h' ? 60 : unit === 'd' ? 1440 : 0;
   const total = Number(digits ?? 0) * minutes;
@@ -33,7 +33,7 @@ const isStretch = (text: string): boolean => {
  * The refusal of a factory write's arguments, or null: `--for` or `--end` with no factory, a raise with no level, an end with one, both,
  * the default factory named (the store's level is its own), and a stretch that is none.
  */
-function factoryArgsRefusal(args: Args): string | null {
+function factoryArgsRefusal(args: Args) {
   const level = textIn(args, 'level');
   const stretch = textIn(args, 'for');
   const factory = textIn(args, 'factory');
@@ -56,7 +56,7 @@ function factoryArgsRefusal(args: Args): string | null {
  * Whether `args` ask a write of a level: a level, a factory's, a raise or its end. Bare (or `--factory` alone) reads.
  * @param args The command line's arguments, by key.
  */
-export const levelWritten = (args: Args): boolean =>
+export const levelWritten = (args: Args) =>
   textIn(args, 'level') !== undefined || args['end'] === true || textIn(args, 'for') !== undefined;
 
 /** `nemia level`: bare, where Nemia is; a level, the store's or with `--factory` a factory's, raised for a stretch or its raise ended. */
@@ -103,7 +103,7 @@ export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [-l <key>=<value>].
 const RETIRED_WAKE = ['--wake', '--wake-word'];
 
 /** Why `arg` is a flag `nemia subscribe` no longer takes, naming what to type now; undefined where it is none of them. */
-const retiredWake = (arg: string): string | undefined => {
+const retiredWake = (arg: string) => {
   const flag = arg.split('=')[0] ?? arg;
   if (!RETIRED_WAKE.includes(flag)) return undefined;
   return (

@@ -17,7 +17,7 @@ import type { InvolvedKind } from 'objects';
 export type EventInvolvedKind = InvolvedKind;
 
 /** Whether a line of this kind is a run's: the run's own, or one of its steps'. */
-const ofARun = (kind: EventInvolvedKind): boolean => kind === 'Run' || kind === 'Step';
+const ofARun = (kind: EventInvolvedKind) => kind === 'Run' || kind === 'Step';
 
 /** Whether the line names a factory: a label given, and not empty. */
 const namesAFactory = (factory: string | undefined): factory is string => factory !== undefined && factory.length > 0;

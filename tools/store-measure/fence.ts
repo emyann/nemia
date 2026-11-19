@@ -40,10 +40,10 @@ export type Copied = { files: number; bytes: number; leftOut: string[] };
  * a link. A store being written while it is copied is copied as it is read: a file gone before it is copied is passed over, and a line
  * torn in the middle is the copy's. Anything but a folder, a file or a link (a socket, a fifo) is passed over.
  */
-export function copyStore(from: string, to: string, leftOut: readonly { path: string }[] = LEFT_OUT): Copied {
+export function copyStore(from: string, to: string, leftOut: readonly { path: string }[] = LEFT_OUT) {
   const out = new Set(leftOut.map((l) => l.path));
   const copied: Copied = { files: 0, bytes: 0, leftOut: [] };
-  const walk = (at: string): void => {
+  const walk = (at: string) => {
     fs.mkdirSync(path.join(to, at), { recursive: true });
     for (const entry of entriesOf(path.join(from, at))) {
       const here = at === '' ? entry.name : `${at}/${entry.name}`;
@@ -57,10 +57,10 @@ export function copyStore(from: string, to: string, leftOut: readonly { path: st
 }
 
 /** The entries of the folder `dir`, none where it went before it was read. */
-const entriesOf = (dir: string): fs.Dirent[] => passingGone(() => fs.readdirSync(dir, { withFileTypes: true })) ?? [];
+const entriesOf = (dir: string) => passingGone(() => fs.readdirSync(dir, { withFileTypes: true })) ?? [];
 
 /** What `act` answers, or undefined where what it reads went before it was read (`ENOENT`); any other failure thrown. */
-function passingGone<T>(act: () => T): T | undefined {
+function passingGone<T>(act: () => T) {
   try {
     return act();
   } catch (err) {
@@ -70,7 +70,7 @@ function passingGone<T>(act: () => T): T | undefined {
 }
 
 /** One entry copied from `source` to `dest`: a link as a link, a file counted into `copied`, anything else passed over. */
-function copyOne(source: string, dest: string, entry: fs.Dirent, copied: Copied): void {
+function copyOne(source: string, dest: string, entry: fs.Dirent, copied: Copied) {
   if (entry.isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(source), dest);
   else if (entry.isFile()) {
     fs.copyFileSync(source, dest);
@@ -80,13 +80,13 @@ function copyOne(source: string, dest: string, entry: fs.Dirent, copied: Copied)
 }
 
 /** Whether `inner` is `outer` or under it, each resolved. */
-const within = (inner: string, outer: string): boolean => {
+const within = (inner: string, outer: string) => {
   const rel = path.relative(path.resolve(outer), path.resolve(inner));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
 
 /** The real path of `p`, or `p` resolved where it is not there. */
-const real = (p: string): string => {
+const real = (p: string) => {
   try {
     return fs.realpathSync(p);
   } catch {
@@ -98,7 +98,7 @@ const real = (p: string): string => {
  * Why a copy made under `dest` would be inside one of the stores it copies, which a walk of that store would then copy into itself and
  * whose files the measure would read as the store's; or undefined.
  */
-export function destinationRefusal(dest: string, sources: readonly string[]): string | undefined {
+export function destinationRefusal(dest: string, sources: readonly string[]) {
   const inside = sources.find((source) => within(real(dest), real(source)));
   return inside === undefined
     ? undefined
@@ -109,7 +109,7 @@ export function destinationRefusal(dest: string, sources: readonly string[]): st
 /** The place's verbs that change a repository or a checkout: each refused by `readOnlyPlace`. */
 export const PLACE_WRITES = ['open', 'follow', 'make', 'handoff', 'land', 'remove', 'export', 'seal'] as const;
 
-const isWrite = (verb: string): boolean => (PLACE_WRITES as readonly string[]).includes(verb);
+const isWrite = (verb: string) => (PLACE_WRITES as readonly string[]).includes(verb);
 
 /** The words of a refused write, as the place's own refusal. */
 const refusedWrite = (verb: string) => ({
@@ -120,7 +120,7 @@ const refusedWrite = (verb: string) => ({
 export const placeRefused: Record<string, number> = {};
 
 /** `place`, answering its reads as it does and refusing every write (`PLACE_WRITES`) in its own words, never asking `place` of it. */
-export function readOnlyPlace(place: Place): Place {
+export function readOnlyPlace(place: Place) {
   const refuse = (verb: string) => {
     placeRefused[verb] = (placeRefused[verb] ?? 0) + 1;
     return refusedWrite(verb) as never;
@@ -129,7 +129,7 @@ export function readOnlyPlace(place: Place): Place {
     declared: place.declared,
     ask: (verb, request, options) => (isWrite(verb) ? Effect.sync(() => refuse(verb)) : place.ask(verb, request, options)),
     askNow: (verb, request, options) => (isWrite(verb) ? refuse(verb) : place.askNow(verb, request, options)),
-  };
+  } satisfies Place as Place;
 }
 
 /** git's options before its verb that take the word after them. */
@@ -173,7 +173,7 @@ const BRANCH_WRITES = /^(-[dDmMcCfut]|--delete|--move|--copy|--force|--track|--s
 const BRANCH_VALUED = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--format', '--sort']);
 
 /** Whether `git branch` with `args` lists, and makes, moves or deletes nothing. */
-const branchReads = (args: readonly string[]): boolean => {
+const branchReads = (args: readonly string[]) => {
   if (args.some((a) => BRANCH_WRITES.test(a))) return false;
   if (args.some((a) => a === '--list' || a === '-l' || a === '--show-current')) return true;
   const named = args.filter((a, i) => !a.startsWith('-') && !BRANCH_VALUED.has(args[i - 1] ?? ''));
@@ -185,7 +185,7 @@ const branchReads = (args: readonly string[]): boolean => {
  * `remote`, `tag`, `stash`, `symbolic-ref` and `notes` in a form that lists, is a read; any other verb, any `--output`, and git with no
  * verb is a write.
  */
-export function gitVerdict(args: readonly string[]): 'read' | 'write' {
+export function gitVerdict(args: readonly string[]) {
   let i = 0;
   while (i < args.length && args[i].startsWith('-') && args[i] !== '--version') i += GIT_VALUED.has(args[i]) ? 2 : 1;
   const verb = args[i];
@@ -234,7 +234,7 @@ const second: WrittenBy = (args) => [args[1]];
 const both: WrittenBy = (args) => [args[0], args[1]];
 
 /** Whether an `open` with `flags` may write. */
-const opensToWrite = (flags: unknown): boolean =>
+const opensToWrite = (flags: unknown) =>
   typeof flags === 'string'
     ? /[wa+]/.test(flags)
     : typeof flags === 'number'
@@ -267,11 +267,11 @@ const FS_WRITES: Record<string, WrittenBy> = {
 };
 
 /** A path an `fs` call was handed, as a string, or undefined for a descriptor. */
-const pathOf = (p: unknown): string | undefined =>
+const pathOf = (p: unknown) =>
   typeof p === 'string' ? p : p instanceof URL ? fileURLToPath(p) : Buffer.isBuffer(p) ? p.toString() : undefined;
 
 /** What a call of one of `child_process`'s functions runs: the program and its words. */
-const commandOf = (name: string, args: unknown[]): { file: string; words: string[] } => {
+const commandOf = (name: string, args: unknown[]) => {
   if (name === 'exec' || name === 'execSync') {
     const [file = '', ...words] = String(args[0]).trim().split(/\s+/);
     return { file, words };
@@ -312,7 +312,7 @@ function replace(
 }
 
 /** A refusal kept in `state`, as the error a refused call of the system throws. */
-function refused(state: FenceState, kind: Refusal['kind'], what: string): Error {
+function refused(state: FenceState, kind: Refusal['kind'], what: string) {
   state.refusals.push({ kind, what, on: state.mode ?? 'read' });
   return Object.assign(new Error(`EACCES: the store's measure refused ${kind === 'write' ? 'a write to' : kind} ${what}`), {
     code: 'EACCES',
@@ -320,7 +320,7 @@ function refused(state: FenceState, kind: Refusal['kind'], what: string): Error 
 }
 
 /** Every function of `child_process` judged as it is called: a git that writes refused, and on a pass anything but git. */
-function fenceSpawns(state: FenceState): void {
+function fenceSpawns(state: FenceState) {
   for (const name of ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec', 'execSync', 'fork'])
     replace(
       state,
@@ -344,7 +344,7 @@ function fenceSpawns(state: FenceState): void {
 }
 
 /** Every write of `fs`, in its sync, callback and promise forms, refused outside `allowed`. */
-function fenceWrites(state: FenceState, allowed: readonly string[]): void {
+function fenceWrites(state: FenceState, allowed: readonly string[]) {
   const written = (name: string, args: unknown[]) => {
     if (state.mode === undefined) return;
     for (const p of FS_WRITES[name](args)) {
@@ -373,7 +373,7 @@ function fenceWrites(state: FenceState, allowed: readonly string[]): void {
 }
 
 /** `process.kill` refused for any signal but 0 to a process the fence did not see started. */
-function fenceSignals(state: FenceState): void {
+function fenceSignals(state: FenceState) {
   replace(state, process, 'kill', (original) => (pid: unknown, signal?: unknown) => {
     if (state.mode !== undefined && signal !== 0 && !state.started.has(Math.abs(Number(pid))))
       throw refused(state, 'signal', `${typeof signal === 'string' || typeof signal === 'number' ? signal : 'SIGTERM'} to ${Number(pid)}`);
@@ -387,7 +387,7 @@ function fenceSignals(state: FenceState): void {
  * outside `roots` (and `/dev/null`); and refuses a signal but 0 to a process it did not see started. A refusal throws where the call was
  * made, as a refused call of the system would, and is kept in `refusals`.
  */
-export function installFence(roots: readonly string[]): Fence {
+export function installFence(roots: readonly string[]) {
   const state: FenceState = { mode: undefined, refusals: [], spawned: [], started: new Set(), undo: [] };
   fenceSpawns(state);
   fenceWrites(state, [...roots.flatMap((r) => [path.resolve(r), real(r)]), '/dev/null']);
@@ -408,5 +408,5 @@ export function installFence(roots: readonly string[]): Fence {
       for (const put of state.undo.reverse()) put();
       syncBuiltinESMExports();
     },
-  };
+  } satisfies Fence;
 }

@@ -58,7 +58,7 @@ export type RestFacts = {
  * waited on, no slot. Pure.
  * @param f What the pass read of the run.
  */
-export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
+export const atRest = (f: RestFacts) => restBlockers(f).length === 0;
 
 /**
  * Whether a person's hold keeps a run out of rest (`rest-hold.contract.ts`): the pass of a held run reads the runs the hold names to lift
@@ -74,7 +74,7 @@ export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
  * runs by clause is made of. Pure.
  * @param f What the pass read of the run.
  */
-export function restBlockers(f: RestFacts): string[] {
+export function restBlockers(f: RestFacts) {
   const out: string[] = [];
   if (f.status === 'running' && !f.run.pruned) out.push('status');
   if (!f.run.workflow) out.push('workflow');
@@ -100,7 +100,7 @@ export function restBlockers(f: RestFacts): string[] {
  * @param taskIds The task ids the feed names.
  * @param ids The ids of the runs held.
  */
-export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): Set<string> {
+export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>) {
   const out = new Set<string>();
   for (const taskId of taskIds) {
     for (let at = taskId.indexOf('-'); at > 0; at = taskId.indexOf('-', at + 1)) {

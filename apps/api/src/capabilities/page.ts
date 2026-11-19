@@ -21,12 +21,12 @@ export const FILE_FACTORY: readonly string[] = [
 /** A factory the page may read with none named: its name and its repositories, each as `path.resolve` spells it. */
 type Candidate = { name: string; repos: string[] };
 
-const unread = (reason: CapabilitiesUnread['reason'], message: string, more: Partial<CapabilitiesUnread> = {}): PageRead => ({
+const unread = (reason: CapabilitiesUnread['reason'], message: string, more: Partial<CapabilitiesUnread> = {}) => ({
   unread: { reason, message, factory: null, repos: [], commands: [], ...more },
 });
 
 /** `several-repositories` of the factory `name`, which works on `repos`. */
-const pickRepository = (name: string, repos: readonly string[]): PageRead =>
+const pickRepository = (name: string, repos: readonly string[]) =>
   unread('several-repositories', `The factory ${name} works on ${repos.length} repositories: pick the one to read.`, {
     factory: name,
     repos: [...repos].sort(),
@@ -42,7 +42,7 @@ const pickRepository = (name: string, repos: readonly string[]): PageRead =>
  * @param place The factory and repository the request is answered in (placeFor).
  * @param listings The store's factories, each as its file read.
  */
-export function pageRead(place: Place, listings: readonly FactoryListing[]): PageRead {
+export function pageRead(place: Place, listings: readonly FactoryListing[]) {
   if (place.factory !== undefined) {
     if (place.repo !== undefined) return { repo: place.repo };
     return pickRepository(place.factory.name, workedOn(place.factory));
@@ -68,16 +68,17 @@ export function pageRead(place: Place, listings: readonly FactoryListing[]): Pag
  * The page's answer where it reads no repository: `unread`, no `repo`, every list empty.
  * @param why Why no repository is read.
  */
-export const unreadAnswer = (why: CapabilitiesUnread): CapabilitiesWithSteps => ({
-  unread: why,
-  skills: [],
-  agents: [],
-  mcp: [],
-  denied: [],
-  asked: [],
-  allowed: [],
-  warnings: [],
-  measured: CLAUDE_RULES.measuredTools,
-  readOnly: CLAUDE_RULES.readOnlyCommands,
-  steps: [],
-});
+export const unreadAnswer = (why: CapabilitiesUnread) =>
+  ({
+    unread: why,
+    skills: [],
+    agents: [],
+    mcp: [],
+    denied: [],
+    asked: [],
+    allowed: [],
+    warnings: [],
+    measured: CLAUDE_RULES.measuredTools,
+    readOnly: CLAUDE_RULES.readOnlyCommands,
+    steps: [],
+  }) satisfies CapabilitiesWithSteps as CapabilitiesWithSteps;

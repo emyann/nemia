@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import type { RaiseBy } from 'objects';
 import type { Question } from '../../lib/api/tries.ts';
-import type { QuestionAnswer, RetryMode } from '../../lib/api/asks.ts';
+import type { RetryMode } from '../../lib/api/asks.ts';
 import { askedSaid, raiseTo, type Answer } from '../../lib/asks';
 import { OFFERS } from '../../lib/words';
 import { MODES, Refusal, useAsk, useRound } from './Ask';
@@ -202,7 +202,7 @@ function RaiseAsked({ step, said }: { step: string; said: string }) {
 }
 
 /** What a raise's button asks for: a round, its check again, an answer, or a try. */
-const raiseWord = (by: RaiseBy, rechecking: boolean, asks: boolean): string => {
+const raiseWord = (by: RaiseBy, rechecking: boolean, asks: boolean) => {
   const { button, buttons } = OFFERS.raise;
   return by === 'round' ? buttons.round : rechecking ? buttons.recheck : asks ? buttons.answer : button;
 };
@@ -277,7 +277,7 @@ export const raiseBody = ({
   asks: boolean;
   questions: readonly Frozen<Question>[];
   draft: Draft;
-}): { mode: RetryMode; budget?: number; message?: string; answers?: QuestionAnswer[] } => {
+}) => {
   const budget = amount.trim() === '' ? {} : { budget: Number(amount) };
   if (asks && questions.length) {
     return { mode, ...budget, answers: answersFrom(questions, draft), ...(message.trim() ? { message } : {}) };

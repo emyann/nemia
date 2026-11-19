@@ -12,12 +12,7 @@ import { labelsText } from '../labels/labels.ts';
 import { cardLabels, phaseSaid, triedClause, type InboxListing } from './inbox.ts';
 
 /** A column of the inbox's table: a string, shown by default (`priority` 0) unless it is only asked wide. */
-const column = (
-  name: string,
-  description: string,
-  priority = 0,
-  type: TableColumnDefinition['type'] = 'string',
-): TableColumnDefinition => ({
+const column = (name: string, description: string, priority = 0, type: TableColumnDefinition['type'] = 'string') => ({
   name,
   type,
   format: name === 'Name' ? 'name' : '',
@@ -47,7 +42,7 @@ export const INBOX_COLUMNS: readonly TableColumnDefinition[] = [
  * @param l The inbox's entry: a card, or a file that does not read as one.
  * @param unfactoredStarts Whether a card that names no factory starts on a repository (`WF_DEFAULT_FACTORY_STARTS=1`).
  */
-export const inboxCells = (l: InboxListing, unfactoredStarts: boolean): readonly unknown[] => [
+export const inboxCells = (l: InboxListing, unfactoredStarts: boolean) => [
   l.name,
   l.error ?? l.title ?? '',
   l.workflow ?? '',

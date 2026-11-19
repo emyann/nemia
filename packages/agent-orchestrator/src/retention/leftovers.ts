@@ -28,7 +28,7 @@ export const leftovers: UpgradeLeftovers = (entries, logs, nowMs) => ({
  * What a sweep says of the leftovers it removed: each entry, its process gone, and each log, older than `LOGS_KEPT_DAYS`.
  * @param swept The entries and logs the sweep removed.
  */
-export const leftoverLines = (swept: Leftovers): string[] => [
+export const leftoverLines = (swept: Leftovers) => [
   ...swept.entries.map((name) => `removed releases/${name}: the upgrade that made it is gone`),
   ...swept.logs.map((name) => `removed the build log releases/.logs/${name}: older than ${LOGS_KEPT_DAYS} days`),
 ];

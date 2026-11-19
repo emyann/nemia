@@ -122,7 +122,7 @@ const EMPTY: Draft = { name: '', url: '', transport: 'http', header: '', clientI
  * `builtin` as a draft: the facts Nemia holds of it, so a person types neither its address nor its client id; or a recorded server's,
  * each header's value the mask it was read with, which sent back keeps the value stored.
  */
-const draftOf = (builtin: BuiltinServer): Draft => ({
+const draftOf = (builtin: BuiltinServer) => ({
   name: builtin.name,
   url: builtin.url,
   transport: builtin.type,
@@ -175,22 +175,22 @@ function SignInFields({ draft, set }: Fills) {
 }
 
 /** The transport `draft` names, `http` where none is typed; null for a word the api takes no server from. */
-const transportOf = (draft: Draft): McpServerWrite['type'] | null => {
+const transportOf = (draft: Draft) => {
   const typed = draft.transport.trim() || 'http';
   return MCP_TRANSPORTS.find((one) => one === typed) ?? null;
 };
 
 /** `name=value`, as a header field holds one, split at its first `=`; null for one with none. */
-const headerOf = (one: string): [string, string] | null => {
+const headerOf = (one: string) => {
   const at = one.indexOf('=');
-  return at <= 0 ? null : [one.slice(0, at).trim(), one.slice(at + 1).trim()];
+  return (at <= 0 ? null : [one.slice(0, at).trim(), one.slice(at + 1).trim()]) satisfies [string, string] | null;
 };
 
 /**
  * What `draft` records: its address, its transport (`transportOf`), each header as typed — a value the mask keeping the one stored — and
  * its OAuth client.
  */
-const writeOf = (draft: Draft, type: McpServerWrite['type']): McpServerWrite => {
+const writeOf = (draft: Draft, type: McpServerWrite['type']) => {
   const headers = Object.fromEntries(
     draft.header
       .split(',')

@@ -53,27 +53,26 @@ export const RUN_COLUMNS: readonly TableColumnDefinition[] = [
 ];
 
 /** A run's labels, `key=value` by key, comma-separated: empty for none. */
-const labelsCell = (labels: Readonly<Record<string, string>>): string =>
+const labelsCell = (labels: Readonly<Record<string, string>>) =>
   Object.keys(labels)
     .sort()
     .map((key) => `${key}=${labels[key] ?? ''}`)
     .join(',');
 
 /** Whether a run was cancelled or pruned, as `nemia ls` marks its head line; empty for neither. */
-const calledOff = (run: Run): string =>
-  [...(run.status.cancelledAt ? ['cancelled'] : []), ...(run.status.pruned ? ['pruned'] : [])].join(', ');
+const calledOff = (run: Run) => [...(run.status.cancelledAt ? ['cancelled'] : []), ...(run.status.pruned ? ['pruned'] : [])].join(', ');
 
 /** The engine's bare word for a session that waits on its harness, which a step's `waitingFor` words. */
 const NEEDS_HUMAN = 'needs-human';
 
 /** A step's word as `nemia ls` shows it: a session at `needs-human` says what it waits for. */
-const stepWordOf = (step: RunStepStatus): string =>
+const stepWordOf = (step: RunStepStatus) =>
   step.waitingFor && step.message.startsWith(NEEDS_HUMAN)
     ? `${NEEDS_HUMAN}: ${step.waitingFor.words}${step.message.slice(NEEDS_HUMAN.length)}`
     : step.message;
 
 /** Where the run stands: its word, `held` under a person's hold, then each step waiting on you in its word. */
-const statusCell = ({ status }: Run): string => {
+const statusCell = ({ status }: Run) => {
   const word = [status.status, ...(status.holding ? ['held'] : [])].join(', ');
   const asking = status.waitingOnYou.map((name) => {
     const step = status.steps.find((s) => s.name === name);
@@ -83,7 +82,7 @@ const statusCell = ({ status }: Run): string => {
 };
 
 /** A hold in `nemia ls`'s words, with what lifts it: its advice where a run it names never lands, nothing while the tick lifts it. */
-const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>): string => {
+const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>) => {
   const lifting = holding.runs.length > 0 && holding.runs.every((r) => r.landed);
   if (holding.waitingOnYou) return `${holding.word}: ${holding.advice}`;
   return lifting ? holding.word : `${holding.word} — nemia hold ${name} --off lifts it`;
@@ -93,7 +92,7 @@ const holdWords = (name: string, holding: NonNullable<Run['status']['holding']>)
  * Whether no result branch is left to name: none at all, or what to decide names every one already — it names only those ahead of the
  * base, so a result branch that is not is still named.
  */
-const resultNamed = ({ result = [], toDecide }: Run['status']): boolean =>
+const resultNamed = ({ result = [], toDecide }: Run['status']) =>
   result.every((branch) => toDecide?.kind === 'result' && toDecide.branches.includes(branch));
 
 /**
@@ -101,7 +100,7 @@ const resultNamed = ({ result = [], toDecide }: Run['status']): boolean =>
  * approval named once) with `nemia decide`, a run waited on that never lands with what to do, a hold with what lifts it, and where its
  * work ended up (`result`), landed or not, unless what to decide names those branches already.
  */
-const waitsCell = ({ metadata: { name }, status }: Run): string => {
+const waitsCell = ({ metadata: { name }, status }: Run) => {
   const { toDecide, waiting, holding } = status;
   const asked = status.waitingOnYouWords.filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
   return [
@@ -117,17 +116,17 @@ const waitsCell = ({ metadata: { name }, status }: Run): string => {
  * What the session of a step at work runs on (`ranOnWords`): `on v1.2.0, <harness> <version>`, off its current try's latest attempt while
  * that has not ended; nothing for one that ended, or recorded neither.
  */
-const ranOnOf = ({ attempts: { latest } }: RunStepStatus): string | undefined =>
+const ranOnOf = ({ attempts: { latest } }: RunStepStatus) =>
   latest && latest.ended === null ? (ranOnWords(latest.release, latest.harness) ?? undefined) : undefined;
 
 /** How many questions a step's closeout asks of you, as `nemia ls` notes it; nothing where it asks none. */
-const asksWords = ({ asks }: RunStepStatus): string | undefined => (asks ? `asks ${asks} question${asks === 1 ? '' : 's'}` : undefined);
+const asksWords = ({ asks }: RunStepStatus) => (asks ? `asks ${asks} question${asks === 1 ? '' : 's'}` : undefined);
 
 /**
  * Each step in its word, its cost, its branch and its note — its own, the questions it asks, what it runs on and what it was denied — as
  * `nemia ls` printed a line per step.
  */
-const stepsCell = ({ status }: Run): string =>
+const stepsCell = ({ status }: Run) =>
   status.steps
     .map((step) => {
       const note = [step.note, asksWords(step), ranOnOf(step), step.denied?.words].filter(Boolean).join(' · ');
@@ -143,7 +142,7 @@ const partialOf = (metadata: Run['metadata']) => ({ kind: 'PartialObjectMetadata
  * The cells of `run`'s row, in `RUN_COLUMNS`' order.
  * @param run The run of the row, as its list serves it.
  */
-export const runCells = (run: Run): readonly unknown[] => [
+export const runCells = (run: Run) => [
   run.metadata.name,
   statusCell(run),
   headline(run.spec.brief).slice(0, BRIEF_WIDTH),
@@ -155,32 +154,24 @@ export const runCells = (run: Run): readonly unknown[] => [
 ];
 
 /** The steps of a run that could not be judged, each in its word off the run's record and its branch, as `nemia ls` printed them. */
-const unjudgedStepsCell = ({ steps = [] }: RunUnjudged): string =>
+const unjudgedStepsCell = ({ steps = [] }: RunUnjudged) =>
   steps.map((step) => [step.name, step.message, step.branch].filter(Boolean).join(' ')).join('; ');
 
 /** The cells of a run that could not be judged: its name, why as its note, and its steps as its record says them. */
-const unjudgedCells = (run: RunUnjudged): readonly unknown[] => [
-  run.name,
-  '',
-  '',
-  '',
-  `unreadable: ${run.error}`,
-  '',
-  '',
-  unjudgedStepsCell(run),
-];
+const unjudgedCells = (run: RunUnjudged) => [run.name, '', '', '', `unreadable: ${run.error}`, '', '', unjudgedStepsCell(run)];
 
 /**
  * `list` as a table: its page's place (`continue`), `RUN_COLUMNS`, and a row per run of the page, the judged first.
  * @param list The page of runs, judged and unjudged, with its place.
  */
-export const runTable = (list: RunList): Table => ({
-  kind: 'Table',
-  apiVersion: 'meta.k8s.io/v1',
-  metadata: list.metadata.continue === undefined ? {} : { continue: list.metadata.continue },
-  columnDefinitions: RUN_COLUMNS,
-  rows: [
-    ...list.items.map((run) => ({ cells: runCells(run), object: partialOf(run.metadata) })),
-    ...(list.unjudged ?? []).map((run) => ({ cells: unjudgedCells(run) })),
-  ],
-});
+export const runTable = (list: RunList) =>
+  ({
+    kind: 'Table',
+    apiVersion: 'meta.k8s.io/v1',
+    metadata: list.metadata.continue === undefined ? {} : { continue: list.metadata.continue },
+    columnDefinitions: RUN_COLUMNS,
+    rows: [
+      ...list.items.map((run) => ({ cells: runCells(run), object: partialOf(run.metadata) })),
+      ...(list.unjudged ?? []).map((run) => ({ cells: unjudgedCells(run) })),
+    ],
+  }) satisfies Table as Table;

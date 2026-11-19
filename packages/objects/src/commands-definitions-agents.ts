@@ -8,7 +8,7 @@ import { leftOut } from './commands-flags.ts';
 import { versionFlag, writerSpec } from './commands-writers.ts';
 
 /** The text `args` holds under `key`, or undefined where none was given. */
-const textIn = (args: Args, key: string): string | undefined => {
+const textIn = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -20,27 +20,31 @@ const AGENTS_TAKES = {
 } as const;
 
 /** `--repo <r>` once, and `--from repo|user` once, which the listing takes and leaves unread. */
-const AGENTS_FLAGS = (['--repo', '--from'] as const).map((flag): Flag => ({
-  flag,
-  kind: 'text',
-  key: flag.slice(2),
-  takes: AGENTS_TAKES[flag],
-  twice: `${CLI} agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
-}));
+const AGENTS_FLAGS = (['--repo', '--from'] as const).map(
+  (flag) =>
+    ({
+      flag,
+      kind: 'text',
+      key: flag.slice(2),
+      takes: AGENTS_TAKES[flag],
+      twice: `${CLI} agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
+    }) satisfies Flag,
+);
 
 /** `nemia agents`' spec, after the name of the card it is asked for: its flags, and an argument it does not take in its own words. */
-const agentsSpec = (positionals: readonly Positional[]): Spec => ({
-  positionals,
-  flags: AGENTS_FLAGS,
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `${CLI} agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|user.`
-      : `${CLI} agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library's (user): nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
-  apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
-});
+const agentsSpec = (positionals: readonly Positional[]) =>
+  ({
+    positionals,
+    flags: AGENTS_FLAGS,
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `${CLI} agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|user.`
+        : `${CLI} agents takes no argument but card <name>, custom <name>, sources, copy <file>, or write, remove and try on the library's (user): nemia agents, nemia agents card ${arg}, or nemia agents custom ${arg}.`,
+    apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
+  }) satisfies Spec;
 
 /** Refused of `nemia agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or user. */
-function agentsRefusal(args: Args): string | null {
+function agentsRefusal(args: Args) {
   for (const flag of ['--repo', '--from'] as const) {
     const value = textIn(args, flag.slice(2));
     if (value !== undefined && (!value || value.startsWith('--'))) return AGENTS_TAKES[flag];
@@ -122,7 +126,7 @@ export const AGENTS_SOURCES_WORDS = {
 } as const satisfies CommandWords;
 
 /** The refusal of a value flag of `nemia agents custom` given twice. */
-const customTwice = (flag: string): string => `${CLI} agents custom takes ${flag} once: one agent's words are one file.`;
+const customTwice = (flag: string) => `${CLI} agents custom takes ${flag} once: one agent's words are one file.`;
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
 const CUSTOM_FILE = {

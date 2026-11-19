@@ -31,7 +31,7 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
 export type Slots = { cap: number; inFlight: string[] | null; held: Map<string, RunSlot> };
 
 /** `e`, its `view` of a task answered from `listed`, the one look a read took, and of a task filed since by the engine itself. */
-const seenIn = (e: Engine, listed: ReadonlyMap<string, TaskView>): Engine => ({
+const seenIn = (e: Engine, listed: ReadonlyMap<string, TaskView>) => ({
   ...e,
   view: (taskId: string) => {
     const seen = listed.get(taskId);
@@ -61,7 +61,7 @@ const needOf = Effect.fnUntraced(function* (
  * Refuses a run a caller left out of the cap's count as ended at rest (`slotSettled`) where, judged afresh on a verified read, it is in
  * flight or wants a slot: leaving it out would have changed the answer.
  */
-const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean }): void => {
+const leftOutRightly = (id: string, need: { inFlight: boolean; wants: boolean }) => {
   if (need.inFlight || need.wants)
     throw new Error(
       `The ceilings left ${id} out as ended and at rest, and judged afresh it ${need.inFlight ? 'is in flight' : 'wants a run slot'} (WF_VERIFY_REST): the informer's judgement of it is stale, or \`slotSettled\` trusts a word it should not.`,
@@ -123,8 +123,7 @@ export const slotsOf = Effect.fn('slotsOf')(function* (
  * @param given The record a run's id is answered by, undefined for a run read from the store; left out,
  * every run is read.
  */
-export const storeRunsGiven = (home: string, given?: (id: string) => Run | undefined): Run[] =>
-  runsAtOnce(home).runs.list(undefined, given);
+export const storeRunsGiven = (home: string, given?: (id: string) => Run | undefined) => runsAtOnce(home).runs.list(undefined, given);
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no cap
@@ -172,7 +171,7 @@ export const passRead = (
   config: Settings,
   standing: PassStanding,
   revisions: PassRevisions,
-): PassRead => {
+) => {
   const parents = passParents(standingReader(standing));
   type Held = Deferred.Deferred<Map<string, RunSlot>, Refusal>;
   let held: Held | undefined;
@@ -188,5 +187,5 @@ export const passRead = (
       }),
     );
   });
-  return { runs, slots, parents, standing, revisions };
+  return { runs, slots, parents, standing, revisions } satisfies PassRead;
 };

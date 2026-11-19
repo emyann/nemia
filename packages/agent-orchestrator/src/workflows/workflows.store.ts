@@ -121,7 +121,7 @@ export type WorkflowDoorShape = {
  */
 const inWritersWords =
   <S extends Schema.Top>(schema: S) =>
-  <A>(value: A): Effect.Effect<A, Invalid> => {
+  <A>(value: A) => {
     const broken = brokenBy(schema, value);
     return broken === null ? Effect.succeed(value) : Effect.fail(new WorkflowError(broken));
   };
@@ -140,7 +140,7 @@ const stepChecked = inWritersWords(StepName.OnCreate);
  * the folder reads as a step or its README. Pure, and asked by the door before either layer, so both refuse the same names.
  * @param name The name of the file the draft carries.
  */
-export function carriedNameRefusal(name: string): string | undefined {
+export function carriedNameRefusal(name: string) {
   if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
     return `${JSON.stringify(name)} is not a file's name in the workflow's folder: a draft carries the files directly in it. Move the file up into the draft folder, or leave it out.`;
   if (name.toLowerCase().endsWith('.md'))
@@ -149,7 +149,7 @@ export function carriedNameRefusal(name: string): string | undefined {
 }
 
 /** A draft's carried files, each name as `carriedNameRefusal` judges it, refused `Invalid` in its words; no name twice. */
-const carriedChecked = (files: readonly CarriedFile[] = []): Effect.Effect<void, Invalid> => {
+const carriedChecked = (files: readonly CarriedFile[] = []) => {
   for (const [i, file] of files.entries()) {
     const why =
       carriedNameRefusal(file.path) ??
@@ -184,7 +184,7 @@ export const draftedWorkflow = (dir: string, draft: WorkflowDraft) => ({
 });
 
 /** The refusal `workflowVersionRefusal` chose, as the refusal of its kind. */
-const refusalOf = (refused: { kind: 'Invalid' | 'Conflict' | 'Missing'; message: string }): Refusal =>
+const refusalOf = (refused: { kind: 'Invalid' | 'Conflict' | 'Missing'; message: string }) =>
   refused.kind === 'Missing'
     ? new Missing({ message: refused.message })
     : refused.kind === 'Conflict'
@@ -201,15 +201,15 @@ export type WorkflowDefs = { readonly agents: AgentDoorShape; readonly skills: S
  * @param layer The layer the door acts through.
  * @param defs The Agent and Skill doors to find agents and skills through; left out, those the program is given.
  */
-export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): WorkflowDoorShape {
+export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs) {
   const door = doorOf<WorkflowLayer, WorkflowDir>(layer).workflows;
-  const foundIn = (dir: WorkflowDir, places: Places): Effect.Effect<Found, Refusal> =>
+  const foundIn = (dir: WorkflowDir, places: Places) =>
     Effect.gen(function* () {
       const agents = defs?.agents ?? (yield* AgentDoor);
       const skills = defs?.skills ?? (yield* SkillDoor);
       return { agents: yield* agents.agents.found({ dir, places }), skills: yield* skills.skills.found({ dir, places }) };
     });
-  const thereOf = (dir: WorkflowDir, places?: Places): Effect.Effect<WorkflowThere, Refusal> =>
+  const thereOf = (dir: WorkflowDir, places?: Places) =>
     Effect.gen(function* () {
       const named = yield* door.named(dir);
       const gathered = yield* versionGathered(dir, yield* door.around(dir, places), named, defs);
@@ -257,7 +257,7 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
           return yield* door.remove(dir, users);
         }),
     },
-  };
+  } satisfies WorkflowDoorShape;
 }
 
 /**
@@ -266,8 +266,8 @@ export function workflowDoorOver(layer: WorkflowLayer, defs?: WorkflowDefs): Wor
  * read given none looks beside the folder alone.
  * @param home The store's root folder.
  */
-export function workflowFiles(home: string): WorkflowLayer {
-  const around = (dir: string, places?: Places): Places => places ?? placesAroundAt(home, dir);
+export function workflowFiles(home: string) {
+  const around = (dir: string, places?: Places) => places ?? placesAroundAt(home, dir);
   return {
     workflows: {
       list: (holder) => workflowsIn(holder),
@@ -290,7 +290,7 @@ export function workflowFiles(home: string): WorkflowLayer {
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),
     },
-  };
+  } satisfies WorkflowLayer;
 }
 
 /**
@@ -308,7 +308,7 @@ export const WorkflowDoor = Context.Reference<WorkflowDoorShape>('agent-orchestr
  * workflow's agents and skills through the Agent and Skill doors over the same files.
  * @param root The store's root folder.
  */
-export const workflowDoorFiles = (root: string): Layer.Layer<never> =>
+export const workflowDoorFiles = (root: string) =>
   Layer.succeed(WorkflowDoor)(
     workflowDoorOver(workflowFiles(root), { agents: agentDoorOver(agentFiles(root)), skills: skillDoorOver(skillFiles(root)) }),
   );
@@ -317,7 +317,7 @@ export const workflowDoorFiles = (root: string): Layer.Layer<never> =>
  * The agents and skills a workflow at `dir` finds beside it or in `places`, read off the files of the Agent and Skill doors (`agentFiles`,
  * `skillFiles`): what a synchronous reader parses a folder against. Their `found` reads `places`, never the root the layer is given.
  */
-const foundOnDisk = (home: string, dir: string, places: Places): Found => {
+const foundOnDisk = (home: string, dir: string, places: Places) => {
   const where = { dir, places };
   return { agents: agentFiles(home).agents.found(where), skills: skillFiles(home).skills.found(where) };
 };
@@ -331,9 +331,9 @@ const foundOnDisk = (home: string, dir: string, places: Places): Found => {
  * @param places The places its agents and skills are looked for in, and the store as `places.home`; none given, beside the folder alone.
  * @param fills The hires each step is filled with; undefined for none.
  */
-export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Step[] {
+export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills) {
   const home = places.home ?? '';
-  return workflowFiles(home).workflows.read(dir, foundOnDisk(home, dir, places), fills);
+  return workflowFiles(home).workflows.read(dir, foundOnDisk(home, dir, places), fills) satisfies Step[];
 }
 
 /**
@@ -346,12 +346,12 @@ const writeWorkflowOnDisk = (
   steps: readonly StepDraft[],
   readme?: string,
   { anywhere, places }: { anywhere?: boolean; places?: Places } = {},
-): WorkflowWritten =>
+) =>
   writeWorkflowAt(home, dir, steps, readme, {
     ...(anywhere !== undefined && { anywhere }),
     ...(places !== undefined && { places }),
     found: foundOnDisk(home, path.resolve(dir), places ?? placesAroundAt(home, dir)),
-  });
+  }) satisfies WorkflowWritten;
 
 /** `writeWorkflowOnDisk`, under the name the package exports: the store's root first. */
 export const writeWorkflow = writeWorkflowOnDisk;
@@ -382,7 +382,7 @@ export type WorkflowFilesRead = {
  * Why a folder given as files may not hold the file named `name`, or undefined where it may: a name directly in the folder, never a path
  * nor one climbing out of it, and given once (`seen`, the names before it). Pure.
  */
-const givenNameRefusal = (name: string, seen: readonly string[]): string | undefined => {
+const givenNameRefusal = (name: string, seen: readonly string[]) => {
   if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\') || name.includes('\0'))
     return `${JSON.stringify(name)} is not a file's name in the workflow's folder: send the files directly in it, each by its name.`;
   if (seen.includes(name)) return `${name} is sent twice: send each file of the folder once.`;

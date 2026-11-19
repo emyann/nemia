@@ -1,4 +1,4 @@
-import { memo, useId, type ComponentProps, type ReactNode } from 'react';
+import { memo, useId, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fencedCode, labelFootnotes, languageOf, placeHeadings } from '../../lib/markdown';
@@ -27,7 +27,7 @@ const TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 type Level = 2 | 3 | 4 | 5 | 6;
 
 /** A heading's size, by the depth the text wrote it at (`placeHeadings` gives it as the heading's class). */
-const sizeOf = (depth: number): string => HEADING[TAGS[depth - 1] ?? 'h6'];
+const sizeOf = (depth: number) => HEADING[TAGS[depth - 1] ?? 'h6'];
 
 const heading = (Tag: (typeof TAGS)[number]) =>
   function Heading({ node: _node, className, ...props }: ComponentProps<'h1'> & ExtraProps) {
@@ -149,7 +149,7 @@ type MarkdownProps = {
  * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so
  * two closeouts with a `[^1]` on one page each link to their own.
  */
-function MarkdownText({ children, className, level = 3, top = false, 'data-body': body }: MarkdownProps): ReactNode {
+function MarkdownText({ children, className, level = 3, top = false, 'data-body': body }: MarkdownProps) {
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
   return (
     <div

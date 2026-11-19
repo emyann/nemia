@@ -31,7 +31,7 @@ import {
   PLACE_SKILLS,
   type Places,
 } from './read.store.ts';
-import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
+import { SkillDoor, skillDoorOver, type SkillLayer, type SkillWhere } from './skill-door.store.ts';
 
 /** Where the stand-in says a skill's folder is: the root its paths are named under, as the files' are under the store's root. */
 export const MEMORY_ROOT = '/memory';
@@ -43,14 +43,14 @@ const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
  * The version of a skill held: a digest of its SKILL.md's text, and of its other files where it has any, as `skillVersion` digests a
  * skill's folder.
  */
-const versionOf = (text: string, others: readonly SkillOther[] = []): string =>
+const versionOf = (text: string, others: readonly SkillOther[] = []) =>
   others.length === 0 ? versionDigest(text) : versionDigest(JSON.stringify([text, others]));
 
 /** `files` by their path, sorted, as the files layer reads them back. */
-const sorted = (files: readonly SkillOther[]): SkillOther[] => [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+const sorted = (files: readonly SkillOther[]) => [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
 /** Why a write or a copy may not go to the folder of skills `at`, as the files refuse it, or nothing. */
-function placeRefusal(at: string, where: SkillWhere | undefined): Invalid | undefined {
+function placeRefusal(at: string, where: SkillWhere | undefined) {
   if (path.posix.basename(at) !== SKILLS_FOLDER)
     return new Invalid({ message: `${at} is not a folder of skills: name <workflows>/${SKILLS_FOLDER}.` });
   if (where?.anywhere !== true && path.posix.dirname(at) !== MEMORY_WORKFLOWS)
@@ -61,7 +61,7 @@ function placeRefusal(at: string, where: SkillWhere | undefined): Invalid | unde
 }
 
 /** `act`'s answer, or what it threw as a `WorkflowError`, an `Invalid`, in its words: the card reader's refusal, as the files word it. */
-function asRefusal<A>(act: () => A): A {
+function asRefusal<A>(act: () => A) {
   try {
     return act();
   } catch (err) {
@@ -73,7 +73,7 @@ function asRefusal<A>(act: () => A): A {
  * The skills of the workflow folder `dir` and its places, as a start finds them, each root's names read by `namesIn`: the roots'
  * precedence decided by `lookedUp`, a name one repository holds in both places refused, and the package's own skills last.
  */
-function foundIn(namesIn: (holder: string) => string[], dir: string, places: Places | undefined): SkillsFound {
+function foundIn(namesIn: (holder: string) => string[], dir: string, places: Places | undefined) {
   const roots = lookupRoots(dir, places);
   const names = roots.map((root) => namesIn(path.posix.join(root, SKILLS_FOLDER)));
   const all = new Map<string, string | WorkflowError>();
@@ -98,14 +98,14 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
     at: { get: (name) => (name.includes(':') ? undefined : all.get(name)) },
     all,
     looked: [...roots.map((root) => path.posix.join(root, SKILLS_FOLDER)), PLACE_SKILLS, BUILTIN_SKILLS],
-  };
+  } satisfies SkillsFound;
 }
 
 /**
  * The skill `name` of the folder of skills `at` read for its page from the text held, `undefined` where none is, and its other files
  * held.
  */
-function pageOf(name: string, at: string, text: string | undefined, others: readonly SkillOther[]): SkillPage {
+function pageOf(name: string, at: string, text: string | undefined, others: readonly SkillOther[]) {
   const file = path.posix.join(at, name, 'SKILL.md');
   if (text === undefined)
     return {
@@ -126,11 +126,11 @@ function pageOf(name: string, at: string, text: string | undefined, others: read
 }
 
 /** A fresh Skill door over a map: no skill held. */
-export function skillDoorMemory(): Layer.Layer<never> {
+export function skillDoorMemory() {
   const held = new Map<string, string>();
   const othersHeld = new Map<string, readonly SkillOther[]>();
-  const othersAt = (dir: string): readonly SkillOther[] => othersHeld.get(dir) ?? [];
-  const namesIn = (holder: string): string[] =>
+  const othersAt = (dir: string) => othersHeld.get(dir) ?? [];
+  const namesIn = (holder: string) =>
     [...held.keys()]
       .filter((dir) => path.posix.dirname(dir) === holder)
       .map((dir) => path.posix.basename(dir))

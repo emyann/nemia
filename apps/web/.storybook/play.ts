@@ -12,7 +12,7 @@ import { waitFor } from 'storybook/test';
 type User = { tab: (options?: { shift?: boolean }) => Promise<void> };
 
 /** Takes the focus off what has it, so the story a play function leaves behind is pictured at rest, as it was drawn. */
-export const atRest = (): void => (document.activeElement as HTMLElement | null)?.blur();
+export const atRest = () => (document.activeElement as HTMLElement | null)?.blur();
 
 /**
  * Puts the focus down once a press has settled, as `atRest` does, and waits until nothing in `root` draws the focus ring: whether the
@@ -20,7 +20,7 @@ export const atRest = (): void => (document.activeElement as HTMLElement | null)
  * mouse sees none, nor one with the keyboard once its write took the button off and gave it back.
  * @param root The story's canvas, read for what still draws the ring.
  */
-export async function settled(root: HTMLElement): Promise<void> {
+export async function settled(root: HTMLElement) {
   atRest();
   await waitFor(() => {
     if (document.activeElement !== document.body || root.querySelector(':focus-visible'))
@@ -29,7 +29,7 @@ export async function settled(root: HTMLElement): Promise<void> {
 }
 
 /** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
-export const focused = (): { marks: string[]; text: string } => {
+export const focused = () => {
   const at = document.activeElement as HTMLElement | null;
   return { marks: at && at !== document.body ? Object.keys(at.dataset) : [], text: at?.textContent ?? '' };
 };
@@ -39,7 +39,7 @@ export const focused = (): { marks: string[]; text: string } => {
  * @param user The user the play function is handed.
  * @param mark The mark, camel-cased as `dataset` names it.
  */
-export async function tabTo(user: User, mark: string): Promise<void> {
+export async function tabTo(user: User, mark: string) {
   for (let i = 0; i < 40; i += 1) {
     await user.tab();
     if (focused().marks.includes(mark)) return;
@@ -52,7 +52,7 @@ export async function tabTo(user: User, mark: string): Promise<void> {
  * marks and text; none where forty presses reach no stop that carries one.
  * @param user The user the play function is handed.
  */
-export async function tabStops(user: User): Promise<Array<{ marks: string[]; text: string }>> {
+export async function tabStops(user: User) {
   const stops: Array<{ marks: string[]; text: string }> = [];
   for (let i = 0; i < 40; i += 1) {
     await user.tab();
@@ -70,7 +70,7 @@ export async function tabStops(user: User): Promise<Array<{ marks: string[]; tex
  * @param user The user the play function is handed.
  * @param trigger The mark, link or button the tooltip hangs off.
  */
-export async function tipOf(user: User, trigger: Element): Promise<HTMLElement> {
+export async function tipOf(user: User, trigger: Element) {
   await user.tab();
   (trigger as HTMLElement).focus();
   return describing(trigger);
@@ -84,7 +84,7 @@ export async function tipOf(user: User, trigger: Element): Promise<HTMLElement> 
  * @param row The row of the table that holds `trigger`.
  * @param trigger The mark or link the tooltip hangs off.
  */
-export async function tipInRow(user: User & Keys, row: HTMLElement, trigger: Element): Promise<HTMLElement> {
+export async function tipInRow(user: User & Keys, row: HTMLElement, trigger: Element) {
   await user.tab();
   row.focus();
   for (let i = 0; i < 20 && document.activeElement !== trigger; i += 1) await user.keyboard('{ArrowRight}');
@@ -96,7 +96,7 @@ export async function tipInRow(user: User & Keys, row: HTMLElement, trigger: Ele
 type Keys = { keyboard: (keys: string) => Promise<void> };
 
 /** The tooltip that describes `trigger` (`role="tooltip"`, named by its `aria-describedby`), once it opens. */
-const describing = (trigger: Element): Promise<HTMLElement> =>
+const describing = (trigger: Element) =>
   waitFor(() => {
     const tip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '');
     if (tip?.getAttribute('role') !== 'tooltip') throw new Error(`no tooltip describes ${trigger.outerHTML.slice(0, 80)}`);
@@ -110,7 +110,7 @@ const describing = (trigger: Element): Promise<HTMLElement> =>
  * @param user The user the play function is handed.
  * @param element What has the focus when the key is pressed.
  */
-export async function menuKey(user: { keyboard: (keys: string) => Promise<unknown> }, element: HTMLElement): Promise<void> {
+export async function menuKey(user: { keyboard: (keys: string) => Promise<unknown> }, element: HTMLElement) {
   element.focus();
   await user.keyboard('{Shift>}{F10}{/Shift}');
   element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 }));
@@ -120,7 +120,7 @@ export async function menuKey(user: { keyboard: (keys: string) => Promise<unknow
  * The snackbar the kit's region shows once it comes: what a story's write said as its thing left the page.
  * @param body The document's body, where the region stands.
  */
-export const snackbarShown = (body: HTMLElement): Promise<HTMLElement> =>
+export const snackbarShown = (body: HTMLElement) =>
   waitFor(() => {
     const shown = body.querySelector<HTMLElement>('[data-slot="snackbar"]');
     if (!shown) throw new Error('no snackbar is shown');
@@ -128,7 +128,7 @@ export const snackbarShown = (body: HTMLElement): Promise<HTMLElement> =>
   });
 
 /** Where `root`'s headings go more than one level deeper than the one before them, each said `h<from> to h<to>`: none, in order. */
-export const skippedHeadings = (root: Element): string[] => {
+export const skippedHeadings = (root: Element) => {
   const levels = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((heading) => Number(heading.tagName.slice(1)));
   return levels.flatMap((level, i) => (i > 0 && level > levels[i - 1] + 1 ? [`h${levels[i - 1]} to h${level}`] : []));
 };

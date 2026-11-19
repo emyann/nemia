@@ -39,7 +39,7 @@ const isWord = (v: unknown): v is string => typeof v === 'string' && v !== '' &&
  * is not a list of tools' names, at least one: admission that sees no call decides nothing.
  * @param admission The task's `config.admission` as filed, of any shape; undefined where it is left out, which is no refusal.
  */
-export const admissionRefusalOf = (admission: unknown): string | undefined => {
+export const admissionRefusalOf = (admission: unknown) => {
   if (admission === undefined) return undefined;
   if (typeof admission !== 'object' || admission === null || Array.isArray(admission)) {
     return `\`callAdmission: ${JSON.stringify(admission)}\` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.`;

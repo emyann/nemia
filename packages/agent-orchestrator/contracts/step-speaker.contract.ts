@@ -68,7 +68,7 @@ export type SaidFrom = { readonly from: Speaker; readonly words: string };
  * `slice`: that the name, cut at the first `AGENT_WRITES`, holds none; and that the frame written again around the name and the words
  * after it is the text. The set of texts is the same.
  */
-const inAnAgentsFrame = (text: string): boolean => {
+const inAnAgentsFrame = (text: string) => {
   if (!text.startsWith(AGENT_OPENS)) return false;
   const rest = text.slice(AGENT_OPENS.length);
   const end = rest.indexOf(AGENT_WRITES);

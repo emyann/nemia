@@ -82,14 +82,14 @@ const AT_A_GATE: ReadonlySet<StepState> = new Set(
  * @param state The step's state.
  * @param runCancelled Whether the run was called off.
  */
-export const waitsOnPerson = (state: StepState, runCancelled: boolean): boolean => WAITS_ON_A_PERSON.has(state) && !runCancelled;
+export const waitsOnPerson = (state: StepState, runCancelled: boolean) => WAITS_ON_A_PERSON.has(state) && !runCancelled;
 
 /**
  * Whether a step in `state` waits at a human gate (`AT_A_GATE`), drawn with the gate's badge. Not on a run somebody called off.
  * @param state The step's state.
  * @param runCancelled Whether the run was called off.
  */
-export const waitsAtGate = (state: StepState, runCancelled: boolean): boolean => AT_A_GATE.has(state) && !runCancelled;
+export const waitsAtGate = (state: StepState, runCancelled: boolean) => AT_A_GATE.has(state) && !runCancelled;
 
 /**
  * A step's state from its codes, whether the run was called off, and whether a person holds the run: `held` for a state a hold stops
@@ -99,7 +99,7 @@ export const waitsAtGate = (state: StepState, runCancelled: boolean): boolean =>
  * @param runCancelled Whether the run was called off.
  * @param runHeld Whether a person holds the run.
  */
-export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: boolean): StepState {
+export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: boolean) {
   const state = codeState(codes, runCancelled);
   return runHeld && !runCancelled && HELD_BY_A_HOLD.has(state) ? 'held' : state;
 }
@@ -146,7 +146,7 @@ const STATE_OF: Record<StepReason, StepState> = {
  * could not judge (`Unknown` in phase `failed`), `cancelled` for a step to come on a run called off, `asks-in-session` for a question its
  * session asks (`AwaitingAnswer` via `session`), and `waiting-for-slot` for a wait on the limit on runs in flight (`Waiting` on `limit`).
  */
-function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean): StepState {
+function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean) {
   if (phase === 'failed' && reason === 'Unknown') return 'unreadable';
   if (phase === 'pending' && runCancelled) return 'cancelled';
   if (reason === 'AwaitingAnswer' && via === 'session') return 'asks-in-session';
@@ -159,13 +159,13 @@ function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean)
  * that filed its card.
  * @param state The step's state.
  */
-export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified' || state === 'sent';
+export const satisfiesAfter = (state: StepState) => state === 'verified' || state === 'unverified' || state === 'sent';
 
 /**
  * Settled with nothing more to come of it: done (`satisfiesAfter`), or a node its route passed by.
  * @param state The step's state.
  */
-export const settledState = (state: StepState): boolean => satisfiesAfter(state) || state === 'skipped';
+export const settledState = (state: StepState) => satisfiesAfter(state) || state === 'skipped';
 
 /** How a state is drawn: the hue that says its meaning, the form the hue takes, and what marks it beside its colour. */
 export interface Drawn {
@@ -214,8 +214,7 @@ export const stateDrawn: Record<StepState, Drawn> = {
 const FORMS = { filled, container, ringed, dashed } as const;
 
 /** The classes of one drawing: its form in its hue, then its mark. */
-export const classOf = ({ hue, form, mark }: Drawn): string =>
-  [form === 'hairline' ? hairline : FORMS[form][hue], mark].filter(Boolean).join(' ');
+export const classOf = ({ hue, form, mark }: Drawn) => [form === 'hairline' ? hairline : FORMS[form][hue], mark].filter(Boolean).join(' ');
 
 /**
  * The states of `table` that break the look's rule, each with why; none for a table that keeps it. A state that waits on a person
@@ -223,7 +222,7 @@ export const classOf = ({ hue, form, mark }: Drawn): string =>
  * `money`.
  * @param table How each state is drawn.
  */
-export function brokenMeanings(table: Record<StepState, Drawn>): string[] {
+export function brokenMeanings(table: Record<StepState, Drawn>) {
   const states = Object.keys(table) as StepState[];
   return states.flatMap((state) => {
     const meaning = meaningOf(table[state].hue);
@@ -237,7 +236,7 @@ export function brokenMeanings(table: Record<StepState, Drawn>): string[] {
 
 const FAILURES: ReadonlySet<StepState> = new Set(['failed', 'failed-check', 'unreadable']);
 
-const each = (table: Record<StepState, Drawn>, of: (drawn: Drawn) => string): Record<StepState, string> => {
+const each = (table: Record<StepState, Drawn>, of: (drawn: Drawn) => string) => {
   const entries = (Object.keys(table) as StepState[]).map((state) => [state, of(table[state])] as const);
   return Object.fromEntries(entries) as Record<StepState, string>;
 };

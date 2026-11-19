@@ -41,7 +41,7 @@ export const RULES: readonly Group[] = [
 ];
 
 /** What `group`'s tests said, and whether they passed. */
-function run(group: Group): Promise<{ group: Group; passed: boolean; said: string }> {
+function run(group: Group) {
   const child = spawn(process.execPath, [VITEST, 'run', '--maxWorkers=3', ...group.loads, ...group.files], {
     cwd: path.join(REPO, group.dir),
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -49,7 +49,11 @@ function run(group: Group): Promise<{ group: Group; passed: boolean; said: strin
   let said = '';
   child.stdout.on('data', (chunk) => (said += chunk));
   child.stderr.on('data', (chunk) => (said += chunk));
-  return new Promise((resolve) => child.on('close', (code) => resolve({ group, passed: code === 0, said })));
+  return new Promise((resolve) => child.on('close', (code) => resolve({ group, passed: code === 0, said }))) satisfies Promise<{
+    group: Group;
+    passed: boolean;
+    said: string;
+  }>;
 }
 
 if (import.meta.main) {

@@ -12,7 +12,7 @@ import { pausedWords } from '../watch/lines.ts';
 const RESUME_LINE = 'nemia resume';
 
 /** A duration for a person: `58s`, `19m42s`, `1h05m`, `2d03h`. */
-function durationWord(ms: number): string {
+function durationWord(ms: number) {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const two = (n: number) => String(n).padStart(2, '0');
   if (s < 60) return `${s}s`;
@@ -25,12 +25,12 @@ function durationWord(ms: number): string {
 
 type Finishing = Paused['finishing'][number];
 
-const atWorkWords = (kind: Finishing['kind'], calling: string | undefined): string => {
+const atWorkWords = (kind: Finishing['kind'], calling: string | undefined) => {
   if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
   return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
 };
 
-const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing): string =>
+const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishing) =>
   stopping
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
     : `${run}'s ${step} is finishing: ${atWorkWords(kind, calling)}`;
@@ -40,9 +40,9 @@ const finishingWords = ({ run, step, kind, stopping, resumed, calling }: Finishi
  * @param paused What the api says of the store's pause: whether it is paused, and each task it finishes and holds.
  * @param now The moment the time left of the pause's timeout is counted from: now where it is left out.
  */
-export const pausedLines = (paused: Paused, now: Date = new Date()): string[] => {
+export const pausedLines = (paused: Paused, now: Date = new Date()) => {
   const line = pausedWords(paused, now);
-  if (line === null) return [];
+  if (line === null) return [] satisfies string[] as string[];
   return [
     line,
     ...paused.finishing.map((f) => `   ${finishingWords(f)}`),
@@ -54,11 +54,11 @@ export const pausedLines = (paused: Paused, now: Date = new Date()): string[] =>
       ({ run, step, repo }) => `   ${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`,
     ),
     ...paused.held.map(({ run, step }) => `   ${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`),
-  ];
+  ] satisfies string[];
 };
 
 /** When a schedule fires or fired, and how far that is from `now`. */
-const fireWord = (iso: string, now: number): string => {
+const fireWord = (iso: string, now: number) => {
   const ms = Date.parse(iso) - now;
   return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;
 };
@@ -71,7 +71,7 @@ export type FactorySchedules = { readonly factory: string; readonly schedules: r
  * @param factories Each factory's schedules, by its name.
  * @param now The moment each fire's distance is counted from, in ms since the epoch.
  */
-export const scheduleLines = (factories: readonly FactorySchedules[], now: number): string[] =>
+export const scheduleLines = (factories: readonly FactorySchedules[], now: number) =>
   [...factories]
     .sort((a, b) => a.factory.localeCompare(b.factory))
     .flatMap(({ factory, schedules }) =>
@@ -81,4 +81,4 @@ export const scheduleLines = (factories: readonly FactorySchedules[], now: numbe
           `scheduled  ${factory}/${metadata.name}  ${spec.cron}${spec.tz ? ` (${spec.tz})` : ''}  next ${status.next ? fireWord(status.next, now) : 'never'}  last ${status.last ? `${status.last.run} (${fireWord(status.last.at, now)})` : 'none'}`,
           ...(status.refused ? [`  refused: ${status.refused}`] : []),
         ]),
-    );
+    ) satisfies string[];

@@ -13,7 +13,7 @@ import { passesRead, type PassesRead } from './meter.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A text argument's value, or undefined where it was not given. */
-const textOf = (args: Args, key: string): string | undefined => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
@@ -23,7 +23,7 @@ const textOf = (args: Args, key: string): string | undefined => {
  * number from 1.
  * @param args The command's arguments, `last` among them as the text given.
  */
-export const lastOf = (args: Args): number => {
+export const lastOf = (args: Args) => {
   const last = textOf(args, 'last');
   if (last === undefined) return Infinity;
   const n = /^\d+$/.test(last) ? Number(last) : 0;
@@ -36,7 +36,7 @@ export const lastOf = (args: Args): number => {
  * @param home The store's root folder, where `tick-recent.json` is.
  * @param args The command's arguments, `last` among them as the text given.
  */
-export const passesOf = (home: string, args: Args): PassesRead => {
+export const passesOf = (home: string, args: Args) => {
   const n = lastOf(args);
   const recent = recentPasses(home);
   return passesRead(Number.isFinite(n) ? recent.slice(-n) : recent);

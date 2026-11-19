@@ -34,7 +34,7 @@ const HOME_SPEC: Spec = {
 };
 
 /** What `nemia factory home` refuses of what was typed, before the api is asked; null where it takes it. */
-function homeRefused(args: Args): string | null {
+function homeRefused(args: Args) {
   const left = leftOut(HOME_SPEC, args);
   if (left !== null) return left;
   const claudeMd = args['claudeMd'];

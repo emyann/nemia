@@ -32,7 +32,7 @@ export const fencedBySandbox = assume(sandboxed, { pure: false });
 const CARDS = 'cards';
 
 /** Whether a name is given more than once in `names`: one of them was given before. */
-const twice = (names: readonly string[]): boolean => names.some((name, at) => names.slice(0, at).includes(name));
+const twice = (names: readonly string[]) => names.some((name, at) => names.slice(0, at).includes(name));
 
 const namedTwiceSpec = spec<(names: readonly string[]) => string | undefined>({
   ensures: {
@@ -91,7 +91,7 @@ const cardsRefusalSpec = spec<
 export type CardsRefusal = Implementation<typeof cardsRefusalSpec>;
 
 /** Each folder the pass found of `found`, by its absolute path: the code's own list, whose laws are above. */
-const foundPaths = (found: readonly HandedRunFolders[]): string[] => handedFolders(found);
+const foundPaths = (found: readonly HandedRunFolders[]) => handedFolders(found);
 
 const handedRunMountsSpec = spec<(step: Pick<StepSpec, 'harness'>, found: readonly HandedRunFolders[]) => Mount[]>({
   ensures: {

@@ -10,7 +10,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type LeftSignal = 'none' | 'SIGTERM' | 'SIGKILL';
 
 /** Whether a stop asked `askedAgoMs` ago is still within a grace of `graceMs`: an age that cannot be read (`NaN`) is not. */
-const withinGrace = (askedAgoMs: number, graceMs: number): boolean => askedAgoMs <= graceMs;
+const withinGrace = (askedAgoMs: number, graceMs: number) => askedAgoMs <= graceMs;
 
 const leftSignalSpec = spec<(left: boolean, askedAgoMs: number | undefined, graceMs: number) => LeftSignal>({
   requires: ({ input: [, , graceMs] }) => graceMs >= 0,

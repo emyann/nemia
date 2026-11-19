@@ -30,7 +30,6 @@ import {
   workflowReadme,
   type Factory,
   type FolderLoaded,
-  type Places,
 } from 'agent-orchestrator';
 import {
   checkFailurePolicyLine,
@@ -39,7 +38,6 @@ import {
   STEP_KEY_MEANINGS,
   STEP_KEYS,
   type Agents,
-  type AgentSkill,
   type SkillsFound,
   type StepKey,
   type StepSpec,
@@ -150,7 +148,7 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  * `renderStep` writes it), `output:` as the file it names, `route:` as its line (`routeLine`), `checkFailurePolicy:` as its line
  * (`checkFailurePolicyLine`), and null for none.
  */
-function keyValue(step: StepSpec, key: StepKey): string | null {
+function keyValue(step: StepSpec, key: StepKey) {
   const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
@@ -164,15 +162,14 @@ function keyValue(step: StepSpec, key: StepKey): string | null {
  * does.
  * @param step The step, as the loader read it.
  */
-export const keyRows = (step: StepSpec): KeyRow[] =>
-  STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
+export const keyRows = (step: StepSpec) => STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
 /**
  * The file of the step `name` in the workflow folder `dir`, as written: frontmatter and all.
  * @param dir The workflow's folder.
  * @param name The step's name.
  */
-export const stepSourceOf = (dir: string, name: string): string => fs.readFileSync(path.join(dir, `${name}.md`), 'utf8');
+export const stepSourceOf = (dir: string, name: string) => fs.readFileSync(path.join(dir, `${name}.md`), 'utf8');
 
 /**
  * Where workflows are read from, in the order they are listed: the repository's, then yours — and, in a factory made from a template, its
@@ -181,14 +178,15 @@ export const stepSourceOf = (dir: string, name: string): string => fs.readFileSy
  * @param home The store's root folder, whose workflows/ is yours.
  * @param tree The factory's tree folder, or undefined where it was made from no template.
  */
-export const sourcesOf = (repo: string, home: string, tree?: string): Array<{ from: WorkflowSource; dir: string }> => [
-  ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
-  { from: 'repo', dir: path.join(repo, 'workflows') },
-  { from: 'user', dir: path.join(home, 'workflows') },
-];
+export const sourcesOf = (repo: string, home: string, tree?: string) =>
+  [
+    ...(tree !== undefined ? [{ from: 'repo' as const, dir: path.join(tree, 'workflows') }] : []),
+    { from: 'repo', dir: path.join(repo, 'workflows') },
+    { from: 'user', dir: path.join(home, 'workflows') },
+  ] satisfies Array<{ from: WorkflowSource; dir: string }>;
 
 /** The first of `found` from each source: the folder a tree shadows is no second one. */
-const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], name: (t: T) => string = () => ''): T[] =>
+const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], name: (t: T) => string = () => '') =>
   found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
 /**
@@ -216,7 +214,7 @@ export const loadedOf = async (
  * @param loaded The loadings loadedOf gave, by folder.
  * @param dir The folder whose loading is asked.
  */
-export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
+export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string) {
   const folder = loaded[dir];
   if (folder === undefined) throw new Error(`The table's \`workflows\` gave no loading of '${dir}', which it was asked to load.`);
   return folder;
@@ -234,14 +232,7 @@ export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: st
  * @param inRequest What runs a program over the request's services, which read each folder's version.
  * @param factory The factory whose attached workflows alone are listed; undefined for every one.
  */
-export async function listWorkflows(
-  e: Engine['Service'],
-  on: RunsOn,
-  repo: string,
-  home: string,
-  inRequest: InRequest,
-  factory?: Factory,
-): Promise<WorkflowListing[]> {
+export async function listWorkflows(e: Engine['Service'], on: RunsOn, repo: string, home: string, inRequest: InRequest, factory?: Factory) {
   const folders = unshadowed(
     sourcesOf(repo, home, factory?.tree).flatMap(({ from, dir }) =>
       foldersIn(dir)
@@ -276,7 +267,7 @@ export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promi
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's root folder.
  */
-export const placesOf = (repo: string | undefined, home: string): Places => (repo === undefined ? { home } : { repo, home });
+export const placesOf = (repo: string | undefined, home: string) => (repo === undefined ? { home } : { repo, home });
 
 /**
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
@@ -289,14 +280,7 @@ export const placesOf = (repo: string | undefined, home: string): Places => (rep
  * @param version The folder's version now.
  * @param factory The factory whose hires fill its steps; undefined for none.
  */
-export function listed(
-  name: string,
-  from: WorkflowSource,
-  dir: string,
-  loaded: FolderLoaded,
-  version: string,
-  factory?: Factory,
-): WorkflowListing {
+export function listed(name: string, from: WorkflowSource, dir: string, loaded: FolderLoaded, version: string, factory?: Factory) {
   const description = workflowDescription(dir);
   const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
@@ -341,22 +325,20 @@ export function listed(
  * an agent gives it the rest, and the agent hired into it.
  * @param hires The agent hired into each step, by step.
  */
-export const listedStep =
-  (hires: ReadonlyMap<string, string>) =>
-  (step: StepSpec): ListedStep => ({
-    name: step.name,
-    spec: specOf(step),
-    body: step.body,
-    own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
-    hired: hires.get(step.name) ?? null,
-    layers: step.agent ? toldLayers(step, null) : null,
-    mcp: step.agent?.mcp ?? [],
-  });
+export const listedStep = (hires: ReadonlyMap<string, string>) => (step: StepSpec) => ({
+  name: step.name,
+  spec: specOf(step),
+  body: step.body,
+  own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
+  hired: hires.get(step.name) ?? null,
+  layers: step.agent ? toldLayers(step, null) : null,
+  mcp: step.agent?.mcp ?? [],
+});
 
 /**
  * The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed.
  */
-function schemasIn(dir: string): string[] {
+function schemasIn(dir: string) {
   try {
     return fs
       .readdirSync(dir, { withFileTypes: true })
@@ -372,7 +354,7 @@ function schemasIn(dir: string): string[] {
  * The other text files of a workflow's folder, sorted by name: each regular file directly in it that is no markdown and is text by the
  * package's one test (`textIn`), with its text, as a proposal reads the folder. None for a folder that cannot be listed.
  */
-function filesIn(dir: string): WorkflowFile[] {
+function filesIn(dir: string) {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -425,7 +407,7 @@ const boundsOf = (step: StepSpec) => ({
  * A step's spec as the listing has it: each key it sets, null where it sets none.
  * @param step The step, as the loader read it.
  */
-export const specOf = (step: StepSpec): WorkflowStepSpec => ({
+export const specOf = (step: StepSpec) => ({
   ...listsOf(step),
   ...wiringOf(step),
   harness: step.harness ?? null,
@@ -465,14 +447,14 @@ const routingOf = (step: StepSpec) => ({
 });
 
 /** A key whose value is an object, as its line writes it in YAML flow: `route:` and `checkFailurePolicy:`; null for any other. */
-const objectLine = (step: StepSpec, key: StepKey): string | null => {
+const objectLine = (step: StepSpec, key: StepKey) => {
   if (key === 'route' && step.route) return routeLine(step.route);
   if (key === 'checkFailurePolicy' && step.checkFailurePolicy) return checkFailurePolicyLine(step.checkFailurePolicy);
   return null;
 };
 
 /** A condition's `route:` as its line writes it, in YAML flow. */
-const routeLine = (route: NonNullable<StepSpec['route']>): string => {
+const routeLine = (route: NonNullable<StepSpec['route']>) => {
   if (route.kind === 'judge') return 'judge';
   if (route.kind === 'script') return `{ script: ${route.script} }`;
   const rows = Object.entries(route.table).map(([value, to]) => `${value}: ${to}`);
@@ -489,22 +471,17 @@ const routeLine = (route: NonNullable<StepSpec['route']>): string => {
  * @param home The store's root folder.
  * @param tree The factory's tree folder, looked in first, or undefined where it was made from no template.
  */
-export function folderOf(
-  name: string,
-  from: WorkflowSource | undefined,
-  repo: string,
-  home: string,
-  tree?: string,
-): { dir: string } | Refusal {
+export function folderOf(name: string, from: WorkflowSource | undefined, repo: string, home: string, tree?: string) {
   const sources = sourcesOf(repo, home, tree);
   const found = unshadowed(sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name)));
   const [only] = found;
-  if (found.length === 1 && only !== undefined) return { dir: path.join(only.dir, name) };
+  if (found.length === 1 && only !== undefined)
+    return { dir: path.join(only.dir, name) } satisfies { dir: string } | Refusal as { dir: string } | Refusal;
   if (found.length > 1) {
     return {
       status: 409,
       error: `Both the repository and yours have a workflow named '${name}' (${found.map((s) => path.join(s.dir, name)).join(' and ')}). Say which with \`"from": "repo"\` or \`"from": "yours"\`.`,
-    };
+    } satisfies { dir: string } | Refusal as { dir: string } | Refusal;
   }
   const there = sources.flatMap((s) => foldersIn(s.dir).map((folder) => `${folder} (${s.from})`));
   const where = from
@@ -518,7 +495,7 @@ export function folderOf(
     error: there.length
       ? `No workflow '${name}' in ${where}. The workflows there are: ${there.join(', ')}. GET /api/namespaces/<namespace>/workflows lists them, each Workflow's steps in its \`spec.steps\`: the namespace \`default\`, or the factory's name.`
       : `No workflow '${name}': there is no workflow at all, in ${sources.map((s) => s.dir).join(' or ')}. A workflow is a folder of steps: add one there, such as workflows/dev/implement.md.`,
-  };
+  } satisfies { dir: string } | Refusal as { dir: string } | Refusal;
 }
 
 /**
@@ -528,7 +505,7 @@ export function folderOf(
  * @param step The step, as the loader read it.
  * @param found What the folder's places hold: their agents and skills.
  */
-export function agentSkillsOf(step: StepSpec, found: { readonly agents: Agents; readonly skills: SkillsFound }): AgentSkill[] | null {
+export function agentSkillsOf(step: StepSpec, found: { readonly agents: Agents; readonly skills: SkillsFound }) {
   const attached = step.agent ? found.agents.get(step.agent.name) : undefined;
   if (attached === undefined || attached instanceof Error) return null;
   try {

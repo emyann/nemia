@@ -30,7 +30,7 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: those of each factory in the
  * store at `home` whose file reads, in the order the Factory door lists them (`listedAtOnce`).
  */
-function knownRepos(home: string): string[] {
+function knownRepos(home: string) {
   return [...new Set(listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : workedOn(listing))))];
 }
 
@@ -38,13 +38,13 @@ function knownRepos(home: string): string[] {
  * The repository of `known` that holds the folder `named`: itself where it is one, else the deepest one it is under, as a command typed
  * in a subfolder of a repository is about that repository; none where no known repository holds it.
  */
-const holdingOf = (named: string, known: readonly string[]): string | undefined =>
+const holdingOf = (named: string, known: readonly string[]) =>
   known
     .filter((repo) => named === repo || named.startsWith(repo.endsWith(path.sep) ? repo : `${repo}${path.sep}`))
     .sort((a, b) => b.length - a.length)[0];
 
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
-const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
+const unknownRepo = (repo: string, known: readonly string[]) =>
   new Invalid({
     message: `${repo}: the default factory reads only a repository a factory in the store works on — ${known.length ? known.join(', ') : 'there is none'} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --volume ${repo}:rw.`,
   });
@@ -53,7 +53,7 @@ const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
  * Why the factory `factory` does not serve `repo`, not one of its repositories: an `Invalid`, naming them, the `?repo=` that asks for
  * one, and the `nemia factory add` that files a factory on `repo`.
  */
-const outsideRepo = (factory: Factory, repo: string): Invalid => {
+const outsideRepo = (factory: Factory, repo: string) => {
   const repos = [...workedOn(factory)].sort();
   const named = repos.length
     ? `works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or`
@@ -78,12 +78,12 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  * @param query The request's query, read for its factory and repository.
  * @param home The store's root folder, whose factories are read.
  */
-export function placeFor(query: PlaceQuery, home: string): Place {
+export function placeFor(query: PlaceQuery, home: string) {
   return { ...placeOf(query, home), repoNamed: query.repo !== undefined };
 }
 
 /** `placeFor`'s place, but whether it named `?repo=`. */
-function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
+function placeOf(query: PlaceQuery, home: string) {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
   const factory = query.factory === undefined || query.factory === DEFAULT_NAMESPACE ? undefined : filedAtOnce(home, query.factory);
   if (factory === undefined) {
@@ -107,7 +107,7 @@ function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
  * no repository, naming the `?factory=` that picks a factory and the `nemia factory add` that files one.
  * @param place The repository and factory the request is answered in.
  */
-export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
+export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>) {
   if (place.repo !== undefined) return place.repo;
   if (place.factory !== undefined) {
     const repos = [...workedOn(place.factory)].sort();
@@ -132,7 +132,7 @@ export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
  * rather than read without a word.
  * @param place The repository and factory the request is answered in.
  */
-export function repoLayer(place: Pick<Place, 'repo' | 'factory'>): string | undefined {
+export function repoLayer(place: Pick<Place, 'repo' | 'factory'>) {
   if (place.repo !== undefined || place.factory === undefined || !workedOn(place.factory).length) return place.repo;
   return repoNeeded(place);
 }

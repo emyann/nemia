@@ -14,7 +14,7 @@ export type ScheduleTry = { due: string; at: string; run?: string; why?: string;
  * The fire a kept try settled, a start or a lasting refusal, in milliseconds; none for a failure, which the next pass tries again.
  * @param kept The tick's kept try of the schedule, or undefined where it keeps none.
  */
-export const settledFire = (kept: ScheduleTry | undefined): number | undefined =>
+export const settledFire = (kept: ScheduleTry | undefined) =>
   kept && (kept.run !== undefined || kept.refused === true) ? Date.parse(kept.due) : undefined;
 
 /**
@@ -24,7 +24,7 @@ export const settledFire = (kept: ScheduleTry | undefined): number | undefined =
  * @param at The instants compared, in milliseconds since the epoch: `latest`, `since`, and `last` and `settled`, each absent
  *   where there is none.
  */
-export function scheduleDue(at: { latest: number; since: number; last?: number; settled?: number }): boolean {
+export function scheduleDue(at: { latest: number; since: number; last?: number; settled?: number }) {
   return at.latest > at.since && at.latest > (at.last ?? -Infinity) && at.latest > (at.settled ?? -Infinity);
 }
 
@@ -41,7 +41,7 @@ export type ScheduleStarted =
  * The line `nemia up` says of a pass's scheduled start.
  * @param s What the pass did with the schedule: started a run, kept a lasting refusal, or failed.
  */
-export function scheduleLine(s: ScheduleStarted): string {
+export function scheduleLine(s: ScheduleStarted) {
   const named = `${s.factory}/${s.workflow}`;
   if ('refused' in s) {
     return `${named} not started for its fire at ${s.due}: ${s.refused} — not tried again until its next fire: fix what it says, or nemia factory unschedule ${s.factory} ${s.workflow}`;
@@ -71,7 +71,7 @@ export type ScheduleListed = {
  * @param iso The instant, an ISO timestamp.
  * @param now The time it is said at, in milliseconds since the epoch.
  */
-export function fireWord(iso: string, now: number): string {
+export function fireWord(iso: string, now: number) {
   const ms = Date.parse(iso) - now;
   return `${iso}, ${ms >= 0 ? `in ${durationWord(ms)}` : `${durationWord(-ms)} ago`}`;
 }
@@ -82,7 +82,7 @@ export function fireWord(iso: string, now: number): string {
  * @param schedules Every factory's schedules as they are listed (`ScheduleListed`).
  * @param clock How an ISO instant is worded in the listing.
  */
-export function scheduleLines(schedules: readonly ScheduleListed[], clock: (iso: string) => string): string[] {
+export function scheduleLines(schedules: readonly ScheduleListed[], clock: (iso: string) => string) {
   return schedules.flatMap((s) => [
     `scheduled  ${s.factory}/${s.workflow}  ${s.cron}${s.tz ? ` (${s.tz})` : ''}  next ${s.next ? clock(s.next) : 'never'}  last ${s.last ? `${s.last.run} (${clock(s.last.at)})` : 'none'}`,
     ...(s.refused ? [`  refused: ${s.refused}`] : []),

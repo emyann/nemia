@@ -49,7 +49,7 @@ export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; s
 }
 
 /** The try whose path is read: none for the current one, which is read again as the step moves. */
-const pathTry = (step: Step, shown: number | null): number | null =>
+const pathTry = (step: Step, shown: number | null) =>
   shown === null || shown === (step.tries.find((t) => t.current)?.try ?? null) ? null : shown;
 
 /**

@@ -87,7 +87,7 @@ const KeptSchema = Schema.Struct({
 const keptIn = Schema.decodeUnknownOption(Schema.fromJsonString(KeptSchema));
 
 /** Whether a kept output of `version` is taken: the shipped readers' own, or one of `SAID_EXTENDED`. */
-const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_EXTENDED.includes(version);
+const isTaken = (version: number) => version === SAID_VERSION || SAID_EXTENDED.includes(version);
 
 /**
  * What `file` keeps of a capture known by `key` — or nothing, when it is not there, not whole, not decoded, or of another key.
@@ -95,7 +95,7 @@ const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_E
  * @param file The file a capture's reading is kept in (`.said`).
  * @param key The capture's size and modification time now, which the kept reading must have been read at.
  */
-export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
+export const keptSaid = (file: string, key: SaidKey) => {
   let text: string;
   try {
     text = readText(file);
@@ -114,18 +114,18 @@ export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined 
  * @param key The capture's size and modification time the reading was read at.
  * @param read What the spec's reader read of the capture.
  */
-export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void => {
+export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput) => {
   try {
     replaceFile(file, JSON.stringify({ version: SAID_VERSION, ...key, read }));
   } catch {}
 };
 
 /** What `reader` says of `text`: what it read, or why it refused it, in its words. */
-const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
+const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string) => {
   try {
-    return { read: reader(text) };
+    return { read: reader(text) } satisfies Said as Said;
   } catch (e) {
-    return { wrong: e instanceof Error ? e.message : String(e) };
+    return { wrong: e instanceof Error ? e.message : String(e) } satisfies Said as Said;
   }
 };
 
@@ -143,17 +143,27 @@ export const keptText = (
   keep: (output: string) => string,
   text: string,
   read?: HarnessOutput,
-): { kept: string; read: HarnessOutput } | { why: string } => {
+) => {
   const whole = read ? { read } : saidOf(reader, text);
-  if ('wrong' in whole) return { why: `its reader refuses it: ${whole.wrong}` };
+  if ('wrong' in whole)
+    return { why: `its reader refuses it: ${whole.wrong}` } satisfies { kept: string; read: HarnessOutput } | { why: string } as
+      | { kept: string; read: HarnessOutput }
+      | { why: string };
   let kept: string;
   try {
     kept = keep(text);
   } catch (e) {
-    return { why: `what it keeps could not be told: ${e instanceof Error ? e.message : String(e)}` };
+    return { why: `what it keeps could not be told: ${e instanceof Error ? e.message : String(e)}` } satisfies
+      | { kept: string; read: HarnessOutput }
+      | { why: string } as { kept: string; read: HarnessOutput } | { why: string };
   }
-  if (kept !== text && !isDeepStrictEqual(saidOf(reader, kept), whole)) return { why: 'its reader reads it otherwise once kept' };
-  return { kept, read: whole.read };
+  if (kept !== text && !isDeepStrictEqual(saidOf(reader, kept), whole))
+    return { why: 'its reader reads it otherwise once kept' } satisfies { kept: string; read: HarnessOutput } | { why: string } as
+      | { kept: string; read: HarnessOutput }
+      | { why: string };
+  return { kept, read: whole.read } satisfies { kept: string; read: HarnessOutput } | { why: string } as
+    | { kept: string; read: HarnessOutput }
+    | { why: string };
 };
 
 /**
@@ -164,15 +174,15 @@ export const keptText = (
  * @param key The capture's size and modification time when `kept` was worked out from it.
  * @param kept The text to write over it.
  */
-export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
+export const replaceCapture = (file: string, key: SaidKey, kept: string) => {
   try {
     const { size, mtimeMs, atimeMs } = fs.statSync(file);
-    if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined;
+    if (size !== key.size || mtimeMs !== key.mtimeMs) return undefined satisfies SaidKey | undefined as SaidKey | undefined;
     replaceFile(file, kept, { times: { atimeMs, mtimeMs } });
     const now = fs.statSync(file);
-    return { size: now.size, mtimeMs: now.mtimeMs };
+    return { size: now.size, mtimeMs: now.mtimeMs } satisfies SaidKey | undefined as SaidKey | undefined;
   } catch {
-    return undefined;
+    return undefined satisfies SaidKey | undefined as SaidKey | undefined;
   }
 };
 
@@ -186,7 +196,7 @@ const keepCapture = (
   file: string,
   capture: { key: SaidKey; text: string },
   read?: HarnessOutput,
-): SaidKey | undefined => {
+) => {
   const told = keptText(reader, keep, capture.text, read);
   return 'kept' in told && told.kept !== capture.text ? replaceCapture(file, capture.key, told.kept) : undefined;
 };
@@ -195,7 +205,7 @@ const keepCapture = (
  * A capture `file`'s key and text, or nothing when it cannot be read.
  * @param file The capture: the run's `.log`, or the stdout file it keeps.
  */
-export const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
+export const captureAt = (file: string) => {
   try {
     const { size, mtimeMs } = fs.statSync(file);
     return { key: { size, mtimeMs }, text: readText(file) };
@@ -212,7 +222,7 @@ type SaidFiles = { log: string; kept: string; stdout?: string };
  * @param base The path of the run's files less their end.
  * @param streams Whether the spec keeps its streams whole, which adds `.stdout`; undefined for none.
  */
-export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
+export const saidFilesAt = (base: string, streams?: true) => ({
   log: `${base}.log`,
   kept: `${base}.said`,
   ...(streams ? { stdout: `${base}.stdout` } : {}),
@@ -231,7 +241,7 @@ type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => str
  * @param over Whether the runner's look reads the run as over now.
  * @param keep What the spec keeps of an ended capture (`keepOutput`), or undefined for a spec that keeps every capture whole.
  */
-export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) => string): SaidWhen => ({
+export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) => string) => ({
   over,
   ended: run.state !== 'working',
   ...(keep ? { keep } : {}),
@@ -241,12 +251,7 @@ export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) =>
  * What the capture `log`, known by `key`, says, and the key it is known by now: kept in `kept`, else read; once the run is `over`,
  * what was read is kept there, after the capture and its stdout are rewritten to what `keep` keeps, once `ended` (`keepCapture`).
  */
-const saidAt = (
-  reader: NonNullable<HarnessSpec['readOutput']>,
-  files: SaidFiles,
-  key: SaidKey,
-  when: SaidWhen,
-): { said: Said; key: SaidKey } | undefined => {
+const saidAt = (reader: NonNullable<HarnessSpec['readOutput']>, files: SaidFiles, key: SaidKey, when: SaidWhen) => {
   const kept = keptSaid(files.kept, key);
   if (kept) return { said: { read: kept }, key };
   let text: string;
@@ -286,7 +291,7 @@ export const outputIn = (
   name: string,
   files: SaidFiles,
   when: SaidWhen,
-): { read: HarnessOutput } | { wrong: string } | undefined => {
+) => {
   let key: SaidKey;
   try {
     const { size, mtimeMs } = fs.statSync(files.log);

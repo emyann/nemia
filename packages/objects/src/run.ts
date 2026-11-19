@@ -62,7 +62,7 @@ const NullBoolean = Schema.NullOr(Schema.Boolean);
  * The checks that hold a served object to codes the package makes (`codes.ts`): its phase is its reason's, a wait says what it waits
  * on, an answer awaited where it is asked. An object with any other set is refused as it is encoded, and as a client decodes it.
  */
-const codesRefused = (what: string, codes: { phase: string; reason: string; on?: unknown; via?: unknown }): string =>
+const codesRefused = (what: string, codes: { phase: string; reason: string; on?: unknown; via?: unknown }) =>
   `${what} is served with codes nothing makes together — phase ${codes.phase}, reason ${codes.reason}` +
   `${'on' in codes ? `, on ${String(codes.on)}, via ${String(codes.via)}` : ''}: a reason has one phase (STEP_PHASE_OF, RUN_PHASE_OF in ` +
   'objects), Waiting alone says what it waits on, and AwaitingAnswer alone where it is asked. Build the codes from the reason.';

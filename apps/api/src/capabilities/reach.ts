@@ -31,7 +31,7 @@ import type { PlaceService } from 'agent-orchestrator';
  * @param harness The step's harness, by its name.
  * @param spec The step's spec, read for its permission mode.
  */
-export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode'>): 'dontAsk' | 'a job' | null => {
+export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode'>) => {
   if (spec.permissionMode === 'dontAsk') return 'dontAsk';
   return rulesOf(harness)?.jobDeniesAsksIn(spec.permissionMode) === true ? 'a job' : null;
 };
@@ -45,9 +45,6 @@ type StepReachAllowed = StepReach['allowed'];
 /** A tool taken from a step by a deny rule (objects' `StepReach`, its `tools.removed`). */
 type RemovedTool = NonNullable<StepReach['tools']>['removed'][number];
 
-/** A server's tool as it reaches a step (objects' `StepReach`, its `mcp`'s `tools`). */
-type ReachedMcpTool = NonNullable<NonNullable<StepReach['mcp']>[number]['tools']>[number];
-
 /** One of Claude Code's read-only commands as it reaches a step with Bash (objects' `StepReach`, its `readOnly`). */
 type ReadOnlyCommand = NonNullable<StepReach['readOnly']>[number];
 
@@ -59,14 +56,14 @@ type ReadOnlyCommand = NonNullable<StepReach['readOnly']>[number];
 export function reachOf(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflows: readonly WorkflowListing[],
-): StepReach[] {
+) {
   return workflows
     .filter((w) => w.error === null)
-    .flatMap((w) => w.steps.map(({ name, spec, mcp }) => stepReach(capabilities, w, name, spec, mcp)));
+    .flatMap((w) => w.steps.map(({ name, spec, mcp }) => stepReach(capabilities, w, name, spec, mcp))) satisfies StepReach[];
 }
 
 /** A row for each server `named` that the checkout's `.mcp.json` does not declare (`declared`): no tools, and why. */
-const undeclared = (named: readonly string[], declared: Capabilities['mcp']): NonNullable<StepReach['mcp']> =>
+const undeclared = (named: readonly string[], declared: Capabilities['mcp']) =>
   named
     .filter((name) => !declared.some((server) => server.name === name))
     .map((server) => ({
@@ -95,13 +92,13 @@ function serversReached(
     asked: readonly CapabilityRule[];
     allow: readonly string[];
   },
-): NonNullable<StepReach['mcp']> {
+) {
   const loaded = servers
     .filter((server) => named.includes(server.name))
     .map((server) => ({
       server: server.name,
       tools:
-        server.tools?.map((tool): ReachedMcpTool => {
+        server.tools?.map((tool) => {
           const rule = denyingRule(rules.deny, server.name, tool.name);
           const asking = rule === null ? denyingRule(rules.ask, server.name, tool.name) : null;
           return {
@@ -117,7 +114,7 @@ function serversReached(
 }
 
 /** The fence a step's file declares (`StepReach['fence']`), with the servers its sessions load, `named`. */
-const fenceOf = (spec: WorkflowStepSpec, named: readonly string[]): StepReach['fence'] => ({
+const fenceOf = (spec: WorkflowStepSpec, named: readonly string[]) => ({
   tools: spec.tools,
   disallowedTools: spec.disallowedTools,
   allowedTools: spec.allowedTools,
@@ -147,7 +144,7 @@ function stepReach(
   step: string,
   spec: WorkflowStepSpec,
   named: readonly string[],
-): StepReach {
+) {
   const harness = spec.harness ?? DEFAULT_HARNESS;
   const dontAsk = spec.permissionMode === 'dontAsk';
   const rules = rulesOf(harness);
@@ -180,7 +177,7 @@ function stepReach(
         askDenier,
         why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.`,
       },
-    };
+    } satisfies StepReach;
   }
 
   const { ruleOf, bashCovers, takenBackBy, narrowerRules, measuredTools } = rules;
@@ -256,7 +253,7 @@ function stepReach(
     asked,
     allowed,
     readOnly,
-  };
+  } satisfies StepReach;
 }
 
 /**
@@ -279,7 +276,7 @@ function allowedOf(
   },
   hasBash: boolean,
   mode: { dontAsk: boolean; askDenier: StepReachAllowed['askDenier']; bashTaken?: RemovedTool },
-): StepReachAllowed {
+) {
   const { denied, asked, has, narrowerAsks } = over;
   const standing: string[] = [];
   const takenBack: Array<StepReachAllowed['takenBack'][number]> = [];
@@ -329,12 +326,7 @@ function allowedOf(
  * so does one whose state could not be read, which is not an absence. The read is one short-lived harness session for the whole
  * record, and none at all for a default factory that records no server, which is the common case.
  */
-const statedByFactory = async (
-  servers: readonly CapabilityServer[],
-  e: Engine['Service'],
-  on: RunsOn,
-  home: string,
-): Promise<CapabilityServer[]> => {
+const statedByFactory = async (servers: readonly CapabilityServer[], e: Engine['Service'], on: RunsOn, home: string) => {
   if (!servers.length) return [...servers];
   const listing = await runPlaced({ ...on, home }, e, FACTORY_SERVERS.handler({ factory: DEFAULT_NAMESPACE })).catch(() => undefined);
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
@@ -368,7 +360,7 @@ export async function capabilitiesWithSteps(
     asker: AskServer;
     inRequest: InRequest;
   },
-): Promise<CapabilitiesWithSteps> {
+) {
   const read = await capabilitiesOf(repo, { env, asker });
   const mcp = await statedByFactory(read.mcp, e, { placeService, config, trace }, home);
   let workflows: WorkflowListing[] = [];
@@ -384,5 +376,5 @@ export async function capabilitiesWithSteps(
     measured: CLAUDE_RULES.measuredTools,
     readOnly: CLAUDE_RULES.readOnlyCommands,
     steps: reachOf(capabilities, workflows),
-  };
+  } satisfies CapabilitiesWithSteps;
 }

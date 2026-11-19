@@ -26,10 +26,10 @@ const PAUSE_RUNS_ON = 'nothing new starts, and each working session runs on to i
  * What `pause` does, as the package says it: `PAUSE_CUTS` under a timeout of 0, `PAUSE_PARKS` under another,
  * `PAUSE_RUNS_ON` under none.
  */
-const pauseDoes = ({ timeoutMs }: Pause): string => (timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
+const pauseDoes = ({ timeoutMs }: Pause) => (timeoutMs === 0 ? PAUSE_CUTS : timeoutMs !== undefined ? PAUSE_PARKS : PAUSE_RUNS_ON);
 
 /** The same words opening a sentence. */
-const opening = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+const opening = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
 /** What the button shows: all factories run, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
 export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
@@ -51,7 +51,7 @@ export type PauseWords = {
 };
 
 /** Since when, by whom and why: `since 4:40 PM by ann: merging by hand`, and what the file no longer says, said so. */
-function pauseSince(pause: Pause, now: Date): string {
+function pauseSince(pause: Pause, now: Date) {
   const at = Number.isNaN(Date.parse(pause.at)) ? 'a time its file no longer says' : clockWord(new Date(pause.at), now);
   return `since ${at} by ${pause.by || 'someone its file no longer names'}${pause.why ? `: ${pause.why}` : ''}`;
 }
@@ -60,19 +60,19 @@ function pauseSince(pause: Pause, now: Date): string {
  * A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work; or, once asked to stop, that it is
  * stopping, and tried again on the resume only where a pause at once's ask names it (`resumed`); a session in a tool call names the tool.
  */
-export const finishingSentence = ({ run, step, kind, stopping, resumed, calling }: Finishing): string =>
+export const finishingSentence = ({ run, step, kind, stopping, resumed, calling }: Finishing) =>
   stopping
     ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? ', and is tried again on the resume' : ''}`
     : `${run}'s ${step} is finishing: ${atWork(kind, calling)}`;
 
 /** What of a step is at work, in words: its session, in its call to `calling` where it is in one, its check, or its landing's. */
-const atWork = (kind: Finishing['kind'], calling: string | undefined): string => {
+const atWork = (kind: Finishing['kind'], calling: string | undefined) => {
   if (kind === 'session') return calling ? `its call to ${calling} runs` : 'its session is at work';
   return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
 };
 
 /** A session the pause has parked, in a sentence: its run and step, and the call it stopped after or the call cut (`parkedWords`). */
-export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
+export const parkedSentence = ({ run, step, after, cut }: Parked) =>
   `${run}'s ${step} is paused${after ? ` after its call to ${after}` : cut ? `, its call to ${cut} cut` : ''}`;
 
 /**
@@ -80,14 +80,14 @@ export const parkedSentence = ({ run, step, after, cut }: Parked): string =>
  * finishing a tool call, cut in 1h 30m", `leftMs` to the minute as every duration is said (`durationWords`); "…, cut now" once none is
  * left.
  */
-const pausingLine = (sessions: number, leftMs: number): string =>
+const pausingLine = (sessions: number, leftMs: number) =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${durationWords(leftMs, 'minute')}` : 'now'}`;
 
 /**
  * The head of the Pausing line: under a pause with a timeout while sessions finish, how many and when they are cut (`pausingLine`);
  * otherwise how many tasks finish.
  */
-const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date): string => {
+const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date) => {
   const sessions = finishing.filter((f) => f.kind === 'session').length;
   return pause.timeoutMs !== undefined && sessions
     ? pausingLine(sessions, Math.min(pause.timeoutMs, Date.parse(pause.at) + pause.timeoutMs - now.getTime()))
@@ -95,17 +95,17 @@ const pausingHead = ({ pause, finishing }: Paused & { pause: Pause }, now: Date)
 };
 
 /** A task a pause at once would stop, in a few words: its run, then its step's session or check. */
-export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;
+export const interruptSentence = ({ run, step, kind }: Interrupt) => `${run}: ${step}'s ${kind}`;
 
 /** A landing the pause holds with its merge staged, in a sentence: whose, where, and that its check waits on the resume. */
-const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
+const stagedSentence = ({ run, step, repo }: PauseStaged) =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on the resume`;
 
 /** A check the pause holds whose merge is not staged, in a sentence: whose, and that its check waits on the resume. */
-const heldSentence = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on the resume`;
+const heldSentence = ({ run, step }: PauseHeld) => `${run}'s ${step} has signed off, and its check waits on the resume`;
 
 /** How many checks the pause holds back, staged landings among them: `, 2 checks held`, or nothing for none. */
-const heldCount = ({ staged, held }: Paused): string => {
+const heldCount = ({ staged, held }: Paused) => {
   const n = staged.length + held.length;
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
@@ -118,7 +118,7 @@ const heldCount = ({ staged, held }: Paused): string => {
  * @param error Why the last read failed, or null where it did not.
  * @param now The instant it is now, against which the pause's start and its cut are said.
  */
-export function pauseWords(paused: Paused | undefined, error: Error | null, now: Date): PauseWords {
+export function pauseWords(paused: Paused | undefined, error: Error | null, now: Date) {
   const lists = {
     finishing: (paused?.finishing ?? []).map(finishingSentence),
     parked: (paused?.parked ?? []).map(parkedSentence),
@@ -129,19 +129,19 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
     const line = error
       ? `Whether all factories are paused could not be read: ${error.message}`
       : 'Reading whether all factories are paused.';
-    return { state: 'reading', text: null, label: 'The pause of all factories, not read', line, ...lists };
+    return { state: 'reading', text: null, label: 'The pause of all factories, not read', line, ...lists } satisfies PauseWords;
   }
   if (!paused.pause) {
     const line = `Pause all factories: ${PAUSE_PARKS}.`;
-    return { state: 'running', text: null, label: 'Pause all factories', line, ...lists };
+    return { state: 'running', text: null, label: 'Pause all factories', line, ...lists } satisfies PauseWords;
   }
   const since = pauseSince(paused.pause, now);
   const count = paused.finishing.length;
   if (count > 0) {
     const head = pausingHead({ ...paused, pause: paused.pause }, now);
     const line = `${head}${heldCount(paused)} — paused ${since}. ${opening(pauseDoes(paused.pause))}.`;
-    return { state: 'pausing', text: `Pausing · ${count}`, label: `Pausing, ${count} finishing`, line, ...lists };
+    return { state: 'pausing', text: `Pausing · ${count}`, label: `Pausing, ${count} finishing`, line, ...lists } satisfies PauseWords;
   }
   const line = `Paused ${since}. Nothing runs and nothing new starts${heldCount(paused)}.`;
-  return { state: 'paused', text: 'Paused', label: 'Paused: resume all factories', line, ...lists };
+  return { state: 'paused', text: 'Paused', label: 'Paused: resume all factories', line, ...lists } satisfies PauseWords;
 }

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect } from 'storybook/test';
-import type { AskQuestion } from '@/lib/api/chat';
 import type { ChatAsk } from '@/lib/chatFollowing';
 import { ChatAskMany } from './ChatAskMany';
 
@@ -12,7 +11,7 @@ export default meta;
 const SHEET = { width: 400, padding: 16, background: 'var(--md-sys-color-surface)', display: 'flex', flexDirection: 'column' as const };
 
 /** One of her questions, by its header and words. */
-const question = (header: string, words: string): AskQuestion => ({
+const question = (header: string, words: string) => ({
   question: words,
   header,
   options: [

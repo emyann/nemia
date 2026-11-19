@@ -37,13 +37,13 @@ export type Merged = { at: string; from: 'template' | 'factory' | 'both' };
 export type TreeMerge = { base: 'common' | 'none'; files: FileMerge[]; merged: Merged[]; conflicts: Conflict[] };
 
 /** The file merged as `bytes`, with no conflict. */
-const fixed = (path: string, bytes: Buffer | null, mode?: number): FileMerge => ({ path, mode, conflicts: [], build: () => bytes });
+const fixed = (path: string, bytes: Buffer | null, mode?: number) => ({ path, mode, conflicts: [], build: () => bytes });
 
 /** Whether two sides of a file hold the same bytes, null for none. */
-const sameBytes = (a: Buffer | null, b: Buffer | null): boolean => (a === null || b === null ? a === b : a.equals(b));
+const sameBytes = (a: Buffer | null, b: Buffer | null) => (a === null || b === null ? a === b : a.equals(b));
 
 /** The bytes as text, or null where they are not text a person can read (a NUL, or not UTF-8). */
-function textOf(bytes: Buffer | null): string | null {
+function textOf(bytes: Buffer | null) {
   if (bytes === null || bytes.includes(0)) return null;
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -53,13 +53,13 @@ function textOf(bytes: Buffer | null): string | null {
 }
 
 /** A side as a conflict quotes it: its text, or a line saying what it is when it is not text. */
-const quoted = (bytes: Buffer | null): string | null => (bytes === null ? null : (textOf(bytes) ?? `(${bytes.length} bytes, not text)`));
+const quoted = (bytes: Buffer | null) => (bytes === null ? null : (textOf(bytes) ?? `(${bytes.length} bytes, not text)`));
 
 /** Whether a mode makes its file executable. */
-const runs = (mode: number | undefined): number => (mode ?? 0) & 0o111;
+const runs = (mode: number | undefined) => (mode ?? 0) & 0o111;
 
 /** The mode of a merged file: theirs where ours kept base's, else ours; theirs where ours has none. */
-function modeOf(base: TreeFile | undefined, ours: TreeFile | undefined, theirs: TreeFile | undefined): number | undefined {
+function modeOf(base: TreeFile | undefined, ours: TreeFile | undefined, theirs: TreeFile | undefined) {
   if (ours === undefined) return theirs?.mode;
   if (theirs !== undefined && base !== undefined && runs(ours.mode) === runs(base.mode)) return theirs.mode;
   return ours.mode;
@@ -69,12 +69,12 @@ function modeOf(base: TreeFile | undefined, ours: TreeFile | undefined, theirs: 
 type Part = string | Conflict;
 
 /** The text `parts` build, each conflict given the text its choice gives it. */
-function built(parts: readonly Part[], choices: ReadonlyMap<string, Choice>): string {
+function built(parts: readonly Part[], choices: ReadonlyMap<string, Choice>) {
   return parts.map((part) => (typeof part === 'string' ? part : (chosenText(part, choices.get(part.at)) ?? ''))).join('');
 }
 
 /** The three sides' lines merged by `diff3Lines`, each conflict addressed `<path>:<a>-<b>` with `offset` base lines before them. */
-function lineParts(path: string, base: string, ours: string, theirs: string, offset: number): Part[] {
+function lineParts(path: string, base: string, ours: string, theirs: string, offset: number) {
   return diff3Lines(linesOf(base), linesOf(ours), linesOf(theirs)).map((segment) => {
     if ('clean' in segment) return segment.clean.join('');
     const { a, b } = segment.conflict;
@@ -88,7 +88,7 @@ function lineParts(path: string, base: string, ours: string, theirs: string, off
 }
 
 /** A frontmatter's entries by key, in order: a line `key:` at the start opens one, and the lines under it belong to it; `''` before any. */
-function entriesOf(head: string): Map<string, string> {
+function entriesOf(head: string) {
   const entries = new Map<string, string>();
   let key = '';
   for (const line of linesOf(head)) {
@@ -100,7 +100,7 @@ function entriesOf(head: string): Map<string, string> {
 }
 
 /** A markdown text cut into its frontmatter (between its `---` lines) and its body, or none where it opens with none. */
-function frontmatterOf(text: string): { head: string; body: string; lines: number } | undefined {
+function frontmatterOf(text: string) {
   const lines = linesOf(text);
   if (lines[0] !== '---\n') return undefined;
   const end = lines.indexOf('---\n', 1);
@@ -116,7 +116,7 @@ function keyed<T>(at: string, base: T | undefined, ours: T | undefined, theirs: 
 }
 
 /** The keys of `ours`, then each key `theirs` adds, placed after the key it follows in theirs. */
-function keyOrder(ours: readonly string[], theirs: readonly string[]): string[] {
+function keyOrder(ours: readonly string[], theirs: readonly string[]) {
   const order = [...ours];
   theirs.forEach((key, i) => {
     if (order.includes(key)) return;
@@ -130,7 +130,7 @@ function keyOrder(ours: readonly string[], theirs: readonly string[]): string[] 
 }
 
 /** A frontmatter merged by key into `parts`, each conflict addressed `<path>#<key>`. */
-function headParts(path: string, base: string, ours: string, theirs: string): Part[] {
+function headParts(path: string, base: string, ours: string, theirs: string) {
   const [b, o, t] = [entriesOf(base), entriesOf(ours), entriesOf(theirs)];
   const parts: Part[] = [];
   for (const key of keyOrder([...o.keys()], [...t.keys()])) {
@@ -142,7 +142,7 @@ function headParts(path: string, base: string, ours: string, theirs: string): Pa
 }
 
 /** A text both sides changed merged into parts: by frontmatter key and body line where all three open with frontmatter, else by line. */
-function textParts(path: string, base: string, ours: string, theirs: string): Part[] {
+function textParts(path: string, base: string, ours: string, theirs: string) {
   const [b, o, t] = [frontmatterOf(base), frontmatterOf(ours), frontmatterOf(theirs)];
   if (b === undefined || o === undefined || t === undefined) return lineParts(path, base, ours, theirs, 0);
   return ['---\n', ...headParts(path, b.head, o.head, t.head), '---\n', ...lineParts(path, b.body, o.body, t.body, b.lines)];
@@ -156,7 +156,7 @@ export const isJsonObject = (value: unknown): value is Record<string, unknown> =
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** A JSON object, or none where the text is not one. */
-function objectOf(text: string): Record<string, unknown> | undefined {
+function objectOf(text: string) {
   try {
     const value: unknown = JSON.parse(text);
     return isJsonObject(value) ? value : undefined;
@@ -166,36 +166,36 @@ function objectOf(text: string): Record<string, unknown> | undefined {
 }
 
 /** The names of a list, or none where it is not one. */
-const namesIn = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
+const namesIn = (value: unknown) => (Array.isArray(value) ? value.map(String) : []);
 
 /** A set merged three ways: each name both keep, or one adds; none a side removed. Sorted. */
-function setMerged(base: unknown, ours: unknown, theirs: unknown): string[] {
+function setMerged(base: unknown, ours: unknown, theirs: unknown) {
   const [b, o, t] = [new Set(namesIn(base)), new Set(namesIn(ours)), new Set(namesIn(theirs))];
   return [...new Set([...o, ...t])].filter((name) => (o.has(name) && t.has(name)) || !b.has(name)).sort();
 }
 
 /** A map of strings, or an empty one. */
-const mapOf = (value: unknown): Record<string, string> =>
+const mapOf = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, string>) : {};
 
 /** A value of `factory.json` as a conflict quotes it: a hire's agent by name, any other value as JSON. */
-const jsonQuoted = (value: unknown, hire: boolean): string | null =>
+const jsonQuoted = (value: unknown, hire: boolean) =>
   value === undefined ? null : hire && typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
 /**
  * The value a choice gives a key of `factory.json`: a side's, or the person's, a hire's agent by name, else JSON (as words where it is
  * none).
  */
-function jsonChosen(slot: Slot, choice: Choice | undefined): unknown {
-  if (choice === undefined) return undefined;
+function jsonChosen(slot: Slot, choice: Choice | undefined) {
+  if (choice === undefined) return undefined as unknown;
   if (choice === 'ours') return slot.sides?.[1];
   if (choice === 'theirs') return slot.sides?.[2];
   const text = choice.text;
-  if (slot.hire) return text.trim();
+  if (slot.hire) return text.trim() as unknown;
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
-    return text.trim();
+    return text.trim() as unknown;
   }
 }
 
@@ -203,7 +203,7 @@ function jsonChosen(slot: Slot, choice: Choice | undefined): unknown {
 type Slot = { key: string; hire: boolean; value?: unknown; conflict?: Conflict; sides?: [unknown, unknown, unknown] };
 
 /** `factory.json` merged by key, its workflows as a set, its hires by step, any other key whole; none where a side is no object. */
-function wiringMerge(base: string, ours: string, theirs: string): FileMerge | undefined {
+function wiringMerge(base: string, ours: string, theirs: string) {
   const [b, o, t] = [objectOf(base), objectOf(ours), objectOf(theirs)];
   if (b === undefined || o === undefined || t === undefined) return undefined;
   const slots: Slot[] = [];
@@ -222,18 +222,18 @@ function wiringMerge(base: string, ours: string, theirs: string): FileMerge | un
         add(step, true, [mapOf(b.hires)[step], mapOf(o.hires)[step], mapOf(t.hires)[step]]);
   }
   const conflicts = slots.flatMap((slot) => (slot.conflict ? [slot.conflict] : []));
-  return { path: 'factory.json', conflicts, build: (choices) => Buffer.from(wiringText(slots, choices)) };
+  return { path: 'factory.json', conflicts, build: (choices) => Buffer.from(wiringText(slots, choices)) } satisfies FileMerge | undefined;
 }
 
 /** The three sides of a key of `factory.json` as a conflict quotes them. */
-const sidesQuoted = (sides: [unknown, unknown, unknown], hire: boolean): Omit<Conflict, 'at'> => ({
+const sidesQuoted = (sides: [unknown, unknown, unknown], hire: boolean) => ({
   base: jsonQuoted(sides[0], hire),
   ours: jsonQuoted(sides[1], hire),
   theirs: jsonQuoted(sides[2], hire),
 });
 
 /** The text of the merged `factory.json`, each conflict's slot given the chosen value; a key with none left out. */
-function wiringText(slots: readonly Slot[], choices: ReadonlyMap<string, Choice>): string {
+function wiringText(slots: readonly Slot[], choices: ReadonlyMap<string, Choice>) {
   const out: Record<string, unknown> = {};
   const hires: Record<string, unknown> = {};
   for (const slot of slots) {
@@ -247,16 +247,16 @@ function wiringText(slots: readonly Slot[], choices: ReadonlyMap<string, Choice>
 }
 
 /** A text file both sides changed, merged by its parts. */
-function partsMerge(path: string, parts: readonly Part[], mode: number | undefined): FileMerge {
+function partsMerge(path: string, parts: readonly Part[], mode: number | undefined) {
   const conflicts = parts.filter((part): part is Conflict => typeof part !== 'string');
-  return { path, mode, conflicts, build: (choices) => Buffer.from(built(parts, choices)) };
+  return { path, mode, conflicts, build: (choices) => Buffer.from(built(parts, choices)) } satisfies FileMerge;
 }
 
 /**
  * A text file both sides changed and neither deleted, merged by its kind: `factory.json` by key where all three read, markdown by
  * frontmatter.
  */
-function bothChanged(path: string, sides: [string, string, string], mode: number | undefined): FileMerge {
+function bothChanged(path: string, sides: [string, string, string], mode: number | undefined) {
   const [base, ours, theirs] = sides;
   if (path === 'factory.json') {
     const merged = wiringMerge(base, ours, theirs);
@@ -267,9 +267,9 @@ function bothChanged(path: string, sides: [string, string, string], mode: number
 }
 
 /** The whole file conflicting: its address the path, each side's bytes kept for a choice of one, or the person's text. */
-function wholeConflict(path: string, sides: [Buffer | null, Buffer | null, Buffer | null], mode: number | undefined): FileMerge {
+function wholeConflict(path: string, sides: [Buffer | null, Buffer | null, Buffer | null], mode: number | undefined) {
   const conflict: Conflict = { at: path, base: quoted(sides[0]), ours: quoted(sides[1]), theirs: quoted(sides[2]) };
-  const build = (choices: ReadonlyMap<string, Choice>): Buffer | null => {
+  const build = (choices: ReadonlyMap<string, Choice>) => {
     const choice = choices.get(path);
     if (choice === 'ours') return sides[1];
     if (choice === 'theirs') return sides[2];
@@ -279,17 +279,23 @@ function wholeConflict(path: string, sides: [Buffer | null, Buffer | null, Buffe
 }
 
 /** One path merged: taken whole where one side kept base's or both agree, else merged by kind, or conflicting whole. */
-function mergeFile(path: string, base?: TreeFile, ours?: TreeFile, theirs?: TreeFile): { file: FileMerge; merged?: Merged } {
+function mergeFile(path: string, base?: TreeFile, ours?: TreeFile, theirs?: TreeFile) {
   const [b, o, t] = [base?.bytes ?? null, ours?.bytes ?? null, theirs?.bytes ?? null];
   const mode = modeOf(base, ours, theirs);
-  if (sameBytes(o, t)) return { file: fixed(path, o, mode), merged: sameBytes(o, b) ? undefined : { at: path, from: 'both' } };
-  if (sameBytes(o, b)) return { file: fixed(path, t, theirs?.mode), merged: { at: path, from: 'template' } };
-  if (sameBytes(t, b)) return { file: fixed(path, o, mode), merged: { at: path, from: 'factory' } };
+  if (sameBytes(o, t))
+    return { file: fixed(path, o, mode), merged: sameBytes(o, b) ? undefined : { at: path, from: 'both' } } satisfies {
+      file: FileMerge;
+      merged?: Merged;
+    };
+  if (sameBytes(o, b))
+    return { file: fixed(path, t, theirs?.mode), merged: { at: path, from: 'template' } } satisfies { file: FileMerge; merged?: Merged };
+  if (sameBytes(t, b))
+    return { file: fixed(path, o, mode), merged: { at: path, from: 'factory' } } satisfies { file: FileMerge; merged?: Merged };
   const texts = [textOf(b), textOf(o), textOf(t)];
   const file = texts.every((text) => text !== null)
     ? bothChanged(path, texts as [string, string, string], mode)
     : wholeConflict(path, [b, o, t], mode);
-  return { file, merged: file.conflicts.length ? undefined : { at: path, from: 'both' } };
+  return { file, merged: file.conflicts.length ? undefined : { at: path, from: 'both' } } satisfies { file: FileMerge; merged?: Merged };
 }
 
 /**
@@ -299,7 +305,7 @@ function mergeFile(path: string, base?: TreeFile, ours?: TreeFile, theirs?: Tree
  * @param ours The files of the factory's tree now.
  * @param theirs The files of the template rendered at the new version.
  */
-export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[], theirs: readonly TreeFile[]): TreeMerge {
+export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[], theirs: readonly TreeFile[]) {
   const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
   const [b, o, t] = [index(base), index(ours), index(theirs)];
   const paths = [...new Set([...b.keys(), ...o.keys(), ...t.keys()])].sort();
@@ -314,7 +320,7 @@ export function mergeTrees(base: readonly TreeFile[], ours: readonly TreeFile[],
 }
 
 /** Two sides' lines merged two ways by `diff2Lines`, each conflict addressed `<path>:<a>-<b>` by the tree's lines after `offset`. */
-function unrelatedLines(path: string, ours: string, theirs: string, offset: number): Part[] {
+function unrelatedLines(path: string, ours: string, theirs: string, offset: number) {
   return diff2Lines(linesOf(ours), linesOf(theirs)).map((segment) => {
     if ('clean' in segment) return segment.clean.join('');
     const { a, b } = segment.conflict;
@@ -328,16 +334,16 @@ function unrelatedLines(path: string, ours: string, theirs: string, offset: numb
 }
 
 /** A frontmatter merged by key with no base (`unrelatedKey`), each conflict addressed `<path>#<key>`. */
-function unrelatedHead(path: string, ours: string, theirs: string): Part[] {
+function unrelatedHead(path: string, ours: string, theirs: string) {
   const [o, t] = [entriesOf(ours), entriesOf(theirs)];
-  return keyOrder([...o.keys()], [...t.keys()]).map((key): Part => {
+  return keyOrder([...o.keys()], [...t.keys()]).map((key) => {
     const merged = unrelatedKey(o.get(key), t.get(key));
     return 'taken' in merged ? merged.taken : { at: `${path}#${key}`, base: null, ours: o.get(key) ?? null, theirs: t.get(key) ?? null };
   });
 }
 
 /** A text both sides hold differently, merged with no base: by frontmatter key and body line where both open with one, else by line. */
-function unrelatedText(path: string, ours: string, theirs: string): Part[] {
+function unrelatedText(path: string, ours: string, theirs: string) {
   const [o, t] = [frontmatterOf(ours), frontmatterOf(theirs)];
   if (!path.endsWith('.md') || o === undefined || t === undefined) return unrelatedLines(path, ours, theirs, 0);
   return ['---\n', ...unrelatedHead(path, o.head, t.head), '---\n', ...unrelatedLines(path, o.body, t.body, o.lines)];
@@ -347,11 +353,11 @@ function unrelatedText(path: string, ours: string, theirs: string): Part[] {
  * `factory.json` merged by key with no base: its workflows as a set (`unrelatedSet`), its hires by step, any other key whole
  * (`unrelatedKey`).
  */
-function unrelatedWiring(ours: string, theirs: string): FileMerge | undefined {
+function unrelatedWiring(ours: string, theirs: string) {
   const [o, t] = [objectOf(ours), objectOf(theirs)];
   if (o === undefined || t === undefined) return undefined;
   const slots: Slot[] = [];
-  const json = (value: unknown): string | undefined => (value === undefined ? undefined : JSON.stringify(value));
+  const json = (value: unknown) => (value === undefined ? undefined : JSON.stringify(value));
   const add = (key: string, hire: boolean, sides: [unknown, unknown, unknown], asked: boolean) => {
     const at = hire ? `factory.json#hires.${key}` : `factory.json#${key}`;
     if (!asked) slots.push({ key, hire, value: sides[2] });
@@ -370,23 +376,24 @@ function unrelatedWiring(ours: string, theirs: string): FileMerge | undefined {
       }
   }
   const conflicts = slots.flatMap((slot) => (slot.conflict ? [slot.conflict] : []));
-  return { path: 'factory.json', conflicts, build: (choices) => Buffer.from(wiringText(slots, choices)) };
+  return { path: 'factory.json', conflicts, build: (choices) => Buffer.from(wiringText(slots, choices)) } satisfies FileMerge | undefined;
 }
 
 /**
  * One path merged with no base: the same on both sides taken, one only the template holds added, one only the tree holds a conflict
  * whose template side is none, and two texts merged by kind, two ways; a binary that differs conflicts whole.
  */
-function switchFile(path: string, ours?: TreeFile, theirs?: TreeFile): { file: FileMerge; merged?: Merged } {
+function switchFile(path: string, ours?: TreeFile, theirs?: TreeFile) {
   const [o, t] = [ours?.bytes ?? null, theirs?.bytes ?? null];
   const mode = ours === undefined ? theirs?.mode : ours.mode;
-  if (sameBytes(o, t)) return { file: fixed(path, o, mode) };
-  if (o === null) return { file: fixed(path, t, mode), merged: { at: path, from: 'template' } };
+  if (sameBytes(o, t)) return { file: fixed(path, o, mode) } satisfies { file: FileMerge; merged?: Merged };
+  if (o === null)
+    return { file: fixed(path, t, mode), merged: { at: path, from: 'template' } } satisfies { file: FileMerge; merged?: Merged };
   const [ot, tt] = [textOf(o), textOf(t)];
-  if (ot === null || tt === null) return { file: wholeConflict(path, [null, o, t], mode) };
+  if (ot === null || tt === null) return { file: wholeConflict(path, [null, o, t], mode) } satisfies { file: FileMerge; merged?: Merged };
   const wiring = path === 'factory.json' ? unrelatedWiring(ot, tt) : undefined;
   const file = wiring ?? partsMerge(path, unrelatedText(path, ot, tt), mode);
-  return { file, merged: file.conflicts.length ? undefined : { at: path, from: 'both' } };
+  return { file, merged: file.conflicts.length ? undefined : { at: path, from: 'both' } } satisfies { file: FileMerge; merged?: Merged };
 }
 
 /**
@@ -395,7 +402,7 @@ function switchFile(path: string, ours?: TreeFile, theirs?: TreeFile): { file: F
  * @param ours The files of the factory's tree now.
  * @param theirs The files of the other template, rendered.
  */
-export function switchTrees(ours: readonly TreeFile[], theirs: readonly TreeFile[]): TreeMerge {
+export function switchTrees(ours: readonly TreeFile[], theirs: readonly TreeFile[]) {
   const index = (files: readonly TreeFile[]) => new Map(files.map((file) => [file.path, file]));
   const [o, t] = [index(ours), index(theirs)];
   const out: TreeMerge = { base: 'none', files: [], merged: [], conflicts: [] };
@@ -412,10 +419,10 @@ export function switchTrees(ours: readonly TreeFile[], theirs: readonly TreeFile
  * Whether a conflict is of lines or of a frontmatter key, whose text the person writes ends in a newline: neither a whole file nor
  * JSON.
  */
-const ofLines = (at: string): boolean => /:\d+-\d+$/.test(at) || (at.includes('#') && !at.startsWith('factory.json#'));
+const ofLines = (at: string) => /:\d+-\d+$/.test(at) || (at.includes('#') && !at.startsWith('factory.json#'));
 
 /** The text a choice gives a conflict: one side's, or the person's, given its newline where the conflict is of lines. */
-function chosenText(conflict: Conflict, choice: Choice | undefined): string | null {
+function chosenText(conflict: Conflict, choice: Choice | undefined) {
   if (choice === undefined) return null;
   if (choice === 'ours') return conflict.ours;
   if (choice === 'theirs') return conflict.theirs;
@@ -428,9 +435,10 @@ function chosenText(conflict: Conflict, choice: Choice | undefined): string | nu
  * @param merge The merge of the trees: its files and its conflicts.
  * @param choices The person's choice for each conflict, by its address.
  */
-export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): { entries: TreeFile[] } | { pending: Conflict[] } {
+export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choice>>) {
   const pending = merge.conflicts.filter((conflict) => !Object.hasOwn(choices, conflict.at));
-  if (pending.length) return { pending };
+  if (pending.length)
+    return { pending } satisfies { entries: TreeFile[] } | { pending: Conflict[] } as { entries: TreeFile[] } | { pending: Conflict[] };
   const chosen = new Map<string, Choice>();
   for (const conflict of merge.conflicts) {
     const choice = choices[conflict.at];
@@ -441,7 +449,7 @@ export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choic
     const bytes = file.build(chosen);
     if (bytes !== null) entries.push({ path: file.path, bytes, ...(file.mode === undefined ? {} : { mode: file.mode }) });
   }
-  return { entries };
+  return { entries } satisfies { entries: TreeFile[] } | { pending: Conflict[] } as { entries: TreeFile[] } | { pending: Conflict[] };
 }
 
 /**
@@ -449,7 +457,7 @@ export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choic
  * @param a The first version, x.y.z.
  * @param b The version it is compared with, x.y.z.
  */
-export function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string) {
   const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
   for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
   return 0;
@@ -460,27 +468,27 @@ export function compareVersions(a: string, b: string): number {
  * @param name The factory's name.
  * @param at The conflict's address.
  */
-export const resolveLine = (name: string, at: string): string => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
+export const resolveLine = (name: string, at: string) => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
 
 /**
  * The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it.
  * @param name The factory's name.
  * @param proposal The proposal's id.
  */
-export const approveLine = (name: string, proposal: string): string => `nemia proposals approve ${proposal} -n ${name}`;
+export const approveLine = (name: string, proposal: string) => `nemia proposals approve ${proposal} -n ${name}`;
 
 /**
  * The line that declines the proposal `proposal` of the factory `name`, so its workflow's conflicts are resolved again.
  * @param name The factory's name.
  * @param proposal The proposal's id.
  */
-export const declineLine = (name: string, proposal: string): string => `nemia proposals decline ${proposal} -n ${name}`;
+export const declineLine = (name: string, proposal: string) => `nemia proposals decline ${proposal} -n ${name}`;
 
 /** The most lines of a side a status keeps of a conflict. */
 export const KEPT_LINES = 200;
 
 /** A side cut to its first `max` lines, saying how many more it holds and where it is read whole. */
-function cutSide(text: string | null, max: number, where: string): string | null {
+function cutSide(text: string | null, max: number, where: string) {
   if (text === null) return null;
   const lines = linesOf(text);
   if (lines.length <= max) return text;
@@ -492,7 +500,7 @@ function cutSide(text: string | null, max: number, where: string): string | null
  * @param conflict The conflict, its address and its three sides whole.
  * @param max The most lines of a side kept; absent, `KEPT_LINES`.
  */
-export const conflictCut = (conflict: Conflict, max = KEPT_LINES): Conflict => {
+export const conflictCut = (conflict: Conflict, max = KEPT_LINES) => {
   const file = conflict.at.replace(/(#.*|:\d+-\d+)$/, '');
   return {
     at: conflict.at,
@@ -506,7 +514,7 @@ export const conflictCut = (conflict: Conflict, max = KEPT_LINES): Conflict => {
 const FROM: Record<Merged['from'], string> = { template: 'the template', factory: 'your tree', both: 'both, merged' };
 
 /** A side as the plan quotes it: each line indented under its name, or that it has none. */
-function sideLines(name: string, text: string | null): string[] {
+function sideLines(name: string, text: string | null) {
   if (text === null) return [`    ${name}: none`];
   return [`    ${name}:`, ...linesOf(text).map((line) => `      | ${line.replace(/\n$/, '')}`)];
 }
@@ -529,7 +537,7 @@ export type Switched = { from: string; to: string };
  * @param next What files the upgrade: its line, the plan's digest, and the parameters it drops.
  * @param switched The templates of a switch, the base's and the one switched onto; absent where the upgrade keeps its template.
  */
-export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched): string[] {
+export function planLines(name: string, from: string, to: string, merge: TreeMerge, next: PlanNext, switched?: Switched) {
   const lines =
     switched === undefined
       ? [from === to ? `${name}: its parameters at ${to}` : `${name}: ${from} → ${to}`]

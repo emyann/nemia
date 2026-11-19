@@ -10,19 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  failedWords,
-  git,
-  gitSays,
-  isDirectory,
-  readInclude,
-  refusalLines,
-  refused,
-  runBranch,
-  type Asking,
-  type Refusal,
-  type Reply,
-} from '../git.ts';
+import { failedWords, git, gitSays, isDirectory, readInclude, refusalLines, refused, runBranch } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The identity a merge commit of the run's is made under. */
@@ -32,7 +20,7 @@ const AS_RUN = ['-c', 'user.email=wf@local', '-c', 'user.name=wf'];
  * Whether a worktree is at `at` to take up: false when none is, true when one is on `name`, and a refusal naming both when one is on
  * another branch.
  */
-function* takenUp(at: string, name: string): Asking<boolean | Refusal> {
+function* takenUp(at: string, name: string) {
   if (!fs.lstatSync(path.join(at, '.git'), { throwIfNoEntry: false })) return false;
   const head = yield* gitSays(at, ['rev-parse', '--abbrev-ref', 'HEAD']);
   if (head === name) return true;
@@ -45,7 +33,7 @@ function* takenUp(at: string, name: string): Asking<boolean | Refusal> {
  * Merge each branch of `also` into `at`: the paths left unmerged, and a note for each merge that failed with nothing unmerged to show for
  * it — a branch git does not have, say.
  */
-function* mergeAll(at: string, also: readonly string[]): Asking<{ conflicts: string[]; notes: string[] }> {
+function* mergeAll(at: string, also: readonly string[]) {
   const failed: string[] = [];
   for (const branch of also) {
     try {
@@ -59,13 +47,13 @@ function* mergeAll(at: string, also: readonly string[]): Asking<{ conflicts: str
 }
 
 /** Whether `real` is `root` or inside it, both real paths. */
-const inside = (root: string, real: string): boolean => {
+const inside = (root: string, real: string) => {
   const rel = path.relative(root, real);
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
 
 /** `rel` of `repo` copied to `at`, never over a file already there: a note when it could not be. */
-function copied(repo: string, at: string, rel: string): string[] {
+function copied(repo: string, at: string, rel: string) {
   const to = path.join(at, rel);
   try {
     fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -82,7 +70,7 @@ function copied(repo: string, at: string, rel: string): string[] {
  * an untracked file the hand-off would commit onto the run's branch. A path the checkout does not have is skipped; one that leads outside
  * the repository, as written or through a link, or that git does not ignore, is refused.
  */
-function* includeFiles(repo: string, at: string): Asking<string[]> {
+function* includeFiles(repo: string, at: string) {
   const include = readInclude(repo);
   if (include === null) return [];
   if (typeof include === 'string') return [`.worktreeinclude: not read — ${include}`];
@@ -107,7 +95,7 @@ function* includeFiles(repo: string, at: string): Asking<string[]> {
 }
 
 /** The verb's body. */
-export function* make({ repo, at, run, leaf, from, also }: PlaceRequests['make']): Asking<Reply<'make'>> {
+export function* make({ repo, at, run, leaf, from, also }: PlaceRequests['make']) {
   const name = runBranch(run, leaf);
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so no workspace can be cut from it`);
   const there = yield* takenUp(at, name);

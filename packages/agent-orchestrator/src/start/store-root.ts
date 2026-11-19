@@ -9,7 +9,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 type StoreFolders = { runArtifacts: string; inbox: string; inputs?: string };
 
 /** What a step's first filing would name under the store in a permission rule, or undefined where it names nothing there. */
-const ruledUnderStore = (step: StepSpec, steps: readonly StepSpec[], t: StoreFolders): string | undefined => {
+const ruledUnderStore = (step: StepSpec, steps: readonly StepSpec[], t: StoreFolders) => {
   if (readsRunArtifacts(step)) return "a read of its run's artifacts folder";
   const { handed, store, inputs } = filedFolders(step, steps, t);
   if (handed.length) return 'the artifacts folders of the steps before it';
@@ -28,7 +28,7 @@ const ruledUnderStore = (step: StepSpec, steps: readonly StepSpec[], t: StoreFol
  * @param t The folders a step's first filing would name: the run's artifacts folder, the inbox, and the run's inputs folder where it is
  *   given.
  */
-export const storeRootRefusal = (root: string, steps: readonly StepSpec[], t: StoreFolders): string | undefined => {
+export const storeRootRefusal = (root: string, steps: readonly StepSpec[], t: StoreFolders) => {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const what = ruledUnderStore(step, steps, t);
     const char = what && unruledIn(step.harness ?? DEFAULT_HARNESS, root);

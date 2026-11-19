@@ -43,7 +43,7 @@ export const RUN_MARK_EVENTS: Readonly<Record<RunMarkEvent, string>> = {
  * The marks a run carries, by which of its three files are there: called off, pruned, held. Every set of them is some mark.
  * @param run Which of the three marks the run carries, each a boolean.
  */
-export const runMarkOf = (run: Parts): RunMark => {
+export const runMarkOf = (run: Parts) => {
   if (run.cancelled) {
     if (run.pruned) return run.held ? 'called-off-pruned-held' : 'called-off-pruned';
     return run.held ? 'called-off-held' : 'called-off';
@@ -53,16 +53,16 @@ export const runMarkOf = (run: Parts): RunMark => {
 };
 
 /** The move to the marks `to`. */
-const to = (parts: Parts): RunMarkMove => ({ kind: 'edge', to: runMarkOf(parts) });
+const to = (parts: Parts) => ({ kind: 'edge', to: runMarkOf(parts) }) satisfies RunMarkMove;
 
 /** The refusal `as`. */
-const refused = (as: RunMarkRefusal): RunMarkMove => ({ kind: 'refused', as });
+const refused = (as: RunMarkRefusal) => ({ kind: 'refused', as }) satisfies RunMarkMove;
 
 /** A hold put on a run whose marks are `at`: refused by the first mark that stands in its way, called off before pruned before held. */
-const holdOn = (at: Parts): RunMarkMove => {
-  if (at.cancelled) return refused('cancelled');
-  if (at.pruned) return refused('pruned');
-  return at.held ? refused('held') : to({ ...at, held: true });
+const holdOn = (at: Parts) => {
+  if (at.cancelled) return refused('cancelled') satisfies RunMarkMove;
+  if (at.pruned) return refused('pruned') satisfies RunMarkMove;
+  return (at.held ? refused('held') : to({ ...at, held: true })) satisfies RunMarkMove;
 };
 
 /**
@@ -70,13 +70,13 @@ const holdOn = (at: Parts): RunMarkMove => {
  * @param from The marks the run carries, read from its files now.
  * @param event What is asked of the run: a hold, a lift, a call-off, a prune, or a prune taken back.
  */
-export const runMarkMove: RunMarkMoved = (from: RunMark, event: RunMarkEvent): RunMarkMove => {
+export const runMarkMove: RunMarkMoved = (from: RunMark, event: RunMarkEvent) => {
   const at = PARTS[from];
-  if (event === 'hold') return holdOn(at);
-  if (event === 'lift') return at.held ? to({ ...at, held: false }) : refused('not-held');
-  if (event === 'cancel') return at.cancelled ? { kind: 'stays' } : to({ ...at, cancelled: true });
-  if (event === 'prune') return at.pruned ? { kind: 'stays' } : to({ ...at, pruned: true });
-  return at.pruned ? to({ ...at, pruned: false }) : refused('not-pruned');
+  if (event === 'hold') return holdOn(at) satisfies RunMarkMove;
+  if (event === 'lift') return (at.held ? to({ ...at, held: false }) : refused('not-held')) satisfies RunMarkMove;
+  if (event === 'cancel') return (at.cancelled ? { kind: 'stays' } : to({ ...at, cancelled: true })) satisfies RunMarkMove;
+  if (event === 'prune') return (at.pruned ? { kind: 'stays' } : to({ ...at, pruned: true })) satisfies RunMarkMove;
+  return (at.pruned ? to({ ...at, pruned: false }) : refused('not-pruned')) satisfies RunMarkMove;
 };
 
 /**
@@ -98,7 +98,7 @@ export const MARK_MEANS: Readonly<Record<RunMark, { readonly endedForGood: boole
 export type RunMarkEdge = { readonly from: RunMark; readonly to: RunMark; readonly event: RunMarkEvent };
 
 /** Every move `runMarkMove` makes between two marks, read off it: each mark asked each event. */
-export const runMarkEdges = (): RunMarkEdge[] =>
+export const runMarkEdges = () =>
   RUN_MARKS.flatMap((from) =>
     (Object.keys(RUN_MARK_EVENTS) as RunMarkEvent[]).flatMap((event) => {
       const move = runMarkMove(from, event);
@@ -107,5 +107,5 @@ export const runMarkEdges = (): RunMarkEdge[] =>
   );
 
 /** A person's marks on a run as a Mermaid state diagram: every move `runMarkMove` makes, by the fact that makes it. */
-export const runMarksDiagram = (): string =>
+export const runMarksDiagram = () =>
   ['stateDiagram-v2', '  [*] --> open', ...runMarkEdges().map((e) => `  ${e.from} --> ${e.to}: ${RUN_MARK_EVENTS[e.event]}`)].join('\n');

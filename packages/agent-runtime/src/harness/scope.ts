@@ -22,7 +22,7 @@ export type ScopeAt = { cgroupParent?: string | undefined; scopeProgram?: string
  * @param r The spawn asked for, whose `resources.limits.memory` is the limit, where it has one.
  * @param at The slice to put the scope in and the program that makes it, each the default where unset.
  */
-export const scopeFor = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number; argv: string[] } | { refused: string } | undefined => {
+export const scopeFor = (r: SpawnRequest, at: ScopeAt) => {
   const memory = r.resources?.limits?.memory;
   const refused = () => scopeRefusal(at.cgroupParent, at.scopeProgram);
   if (memory === undefined) return refused() === undefined ? { argv: scopeArgv(undefined, at.cgroupParent, at.scopeProgram) } : undefined;

@@ -12,7 +12,7 @@ export type Watched = { json?: boolean };
  * What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's.
  * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedSaidWords = (l: FeedStreamLine): string => {
+export const feedSaidWords = (l: FeedStreamLine) => {
   const store = l.store !== undefined ? l : undefined;
   const who = store?.by ? ` by ${store.by}` : '';
   const notes = [store?.why, l.note].filter((n) => n);
@@ -31,7 +31,7 @@ export const feedSaidWords = (l: FeedStreamLine): string => {
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`.
  * @param l The feed's line, decoded by `FeedStreamLine`.
  */
-export const feedLineWords = (l: FeedStreamLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
+export const feedLineWords = (l: FeedStreamLine) => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
 /**
  * A line as the watch prints it, `line` as the stream's event decoded it and `cursor` the byte just after it: in words, or the line whole
@@ -40,7 +40,7 @@ export const feedLineWords = (l: FeedStreamLine): string => `${l.at.slice(11, 19
  * @param cursor The feed's offset just after the line, in bytes.
  * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
-export const watchedLine = (line: FeedStreamLine, cursor: number, how: Watched): string =>
+export const watchedLine = (line: FeedStreamLine, cursor: number, how: Watched) =>
   how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 
 /**
@@ -48,31 +48,30 @@ export const watchedLine = (line: FeedStreamLine, cursor: number, how: Watched):
  * @param cursor The feed's offset read to, in bytes.
  * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
-export const bookmarkLine = (cursor: number, how: Watched): string | undefined =>
-  how.json === true ? JSON.stringify({ cursor }) : undefined;
+export const bookmarkLine = (cursor: number, how: Watched) => (how.json === true ? JSON.stringify({ cursor }) : undefined);
 
 /** The verb that resumes a paused store. */
 const RESUME_LINE = 'nemia resume';
 
 /** Since when, by whom and why. */
-const sinceWords = ({ at, by, why }: NonNullable<Paused['pause']>): string =>
+const sinceWords = ({ at, by, why }: NonNullable<Paused['pause']>) =>
   `since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''}`;
 
 /** How many checks the pause holds back: `, 2 checks held`, or nothing. */
-const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string => {
+const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>) => {
   const n = staged.length + held.length;
   return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
 };
 
 /** The sessions still in a tool call under a timed pause and when they are cut, as the orchestrator's `pausingWords` says it. */
-const pausingWords = (sessions: number, leftMs: number): string =>
+const pausingWords = (sessions: number, leftMs: number) =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
 
 /**
  * What the pause does, as the orchestrator's `pauseDoes` says it: a pause at once cuts each session and parks it; a timed one parks it at
  * its call's end; none runs on.
  */
-const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>): string =>
+const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>) =>
   timeoutMs === 0
     ? 'nothing new starts, and each working session is cut at once and parks'
     : timeoutMs !== undefined
@@ -84,7 +83,7 @@ const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>): string =>
  * @param paused What the api says of the store's pause: the pause, if one stands, and each task it finishes and holds.
  * @param now The moment the time left of a timed pause is counted from: now where it is left out.
  */
-export const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
+export const pausedWords = (paused: Paused, now: Date = new Date()) => {
   const { pause, finishing } = paused;
   if (!pause) return null;
   const sessions = finishing.filter((f) => f.kind === 'session').length;
@@ -108,19 +107,20 @@ export type Liveness = { state: 'up' | 'down'; at: string; text: string };
  * @param now The moment it was read, in ms since the epoch.
  * @param why Why the stream dropped, said beside a `down`; empty where it is left out.
  */
-export const livenessOf = (state: Liveness['state'], base: string, cursor: number, now: number, why = ''): Liveness => ({
-  state,
-  at: new Date(now).toISOString(),
-  text:
-    state === 'down'
-      ? `daemon: none answers at ${base}${why ? ` (${why})` : ''} — the watch reads on from ${cursor} once one does; start it with nemia service restart, or npm start in apps/api`
-      : `daemon: answering at ${base} — reading on from ${cursor}`,
-});
+export const livenessOf = (state: Liveness['state'], base: string, cursor: number, now: number, why = '') =>
+  ({
+    state,
+    at: new Date(now).toISOString(),
+    text:
+      state === 'down'
+        ? `daemon: none answers at ${base}${why ? ` (${why})` : ''} — the watch reads on from ${cursor} once one does; start it with nemia service restart, or npm start in apps/api`
+        : `daemon: answering at ${base} — reading on from ${cursor}`,
+  }) satisfies Liveness;
 
 /**
  * A liveness line as the watch prints it: `12:00:00  daemon down  · <text>`, or one JSON object, which no cursor has.
  * @param l The liveness to print.
  * @param json Whether the watch prints as JSON (`--json`): false where it is left out.
  */
-export const livenessWords = (l: Liveness, json = false): string =>
+export const livenessWords = (l: Liveness, json = false) =>
   json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

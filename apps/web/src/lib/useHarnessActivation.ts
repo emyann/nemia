@@ -44,7 +44,7 @@ export function useHarnessActivation(pieces: readonly ReadinessPiece[]) {
   const choices = harnessChoices(pieces);
   const chosen = choices.find((choice) => choice.name === activating);
   const installRun = chosen === undefined ? undefined : fixes.find((fix) => fix.need === chosen.install.name);
-  const checkedInstall = (install: ReadinessPiece): ReadinessPiece => {
+  const checkedInstall = (install: ReadinessPiece) => {
     const live = turn.data;
     if (live === undefined || install.harness?.name !== live.harness || install.checks === undefined) return install;
     return { ...install, checks: install.checks.map((check) => (check.name === 'turn' ? live.check : check)) };

@@ -14,7 +14,7 @@ const { name: COMMAND } = INBOX_QUEUE_WORDS;
  * What `nemia inbox queue` prints of the card queued: when and where in the queue, on what, and how the tick starts it.
  * @param card The card as the api answers it after it is queued.
  */
-export const queuedLines = (card: Card): string[] => {
+export const queuedLines = (card: Card) => {
   const name = card.metadata.name;
   const { place, queueLength, factoryRepo } = card.status;
   const at = queueLength === undefined ? `${place ?? '?'} in the queue` : `${place ?? '?'} of ${queueLength}`;
@@ -30,7 +30,7 @@ export const queuedLines = (card: Card): string[] => {
 };
 
 /** What `nemia inbox queue --off` prints, given whether the card was queued before. */
-const takenBackLines = (name: string, was: boolean): string[] =>
+const takenBackLines = (name: string, was: boolean) =>
   was
     ? [`${name}  taken back: it no longer starts on its own — start it with nemia start ${name}`]
     : [`${name}  not queued — nothing to take back`];
@@ -39,7 +39,7 @@ const takenBackLines = (name: string, was: boolean): string[] =>
  * `nemia inbox queue`'s runner, on the words parsed against its words.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function inboxQueue(args: Args): Promise<number> {
+export async function inboxQueue(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, `nemia inbox queue ${name}`);
   const before = await asked(COMMAND, (c) => c.cards.getAll({ params: { name } }));

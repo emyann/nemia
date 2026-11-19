@@ -4,7 +4,7 @@
  * proved by `contracts/subscription-status.contract.ts`), and that file read down to what the status says of it (`deliveryKept`). The
  * object itself is put together in `subscription.verb.ts`, beside its resourceVersion's digest.
  */
-import type { DeliveryKept, SubscriptionDelivered } from '../../contracts/subscription-status.contract.ts';
+import type { SubscriptionDelivered } from '../../contracts/subscription-status.contract.ts';
 import type { KeptDelivery } from '../subscription/index.ts';
 
 /**
@@ -25,7 +25,7 @@ export const subscriptionDelivered: SubscriptionDelivered = (sub, kept) => {
  * The deliverer's file read down to what the status says of it: whose it is, its cursor, its digest's length, and its first fold's ms.
  * @param kept The deliverer's file as the store keeps it.
  */
-export const deliveryKept = (kept: KeptDelivery): DeliveryKept => ({
+export const deliveryKept = (kept: KeptDelivery) => ({
   of: { task: kept.of.task, from: kept.of.from },
   cursor: kept.cursor,
   pending: kept.digest.length,

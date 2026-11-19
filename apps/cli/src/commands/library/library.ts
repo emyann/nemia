@@ -17,7 +17,7 @@ type Held = {
 const KINDS = ['skills', 'agents', 'mcpservers', 'workflows'] as const;
 
 /** The items of a list, as a line reads them. */
-const items = (list: { readonly items: readonly Held[] }): readonly Held[] => list.items;
+const items = (list: { readonly items: readonly Held[] }) => list.items satisfies readonly Held[];
 
 /** Every item of the library's `kind`, page after page. */
 const heldOf = (c: ObjectsClient, kind: (typeof KINDS)[number]) => {
@@ -35,7 +35,7 @@ const heldOf = (c: ObjectsClient, kind: (typeof KINDS)[number]) => {
 };
 
 /** A line of the library: the kind and name, the origin, and who adds it. */
-const heldLine = (kind: string, item: Held): string => {
+const heldLine = (kind: string, item: Held) => {
   const factories = item.status?.factories ?? [];
   return `${kind}/${item.metadata.name}  ${item.status?.origin ?? ''}  ${factories.length === 0 ? 'added by none' : `added by ${factories.join(', ')}`}`;
 };
@@ -44,7 +44,7 @@ const heldLine = (kind: string, item: Held): string => {
  * `nemia library [<kind>] [--factory <factory>]`'s runner: each kind's items, or the one kind's; with a factory, its adds.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function libraryListed(args: Args): Promise<number> {
+export async function libraryListed(args: Args) {
   const factory = textArg(args, 'factory');
   if (factory !== undefined) return factoryAddsListed(factory);
   const asked1 = textArg(args, 'kind');
@@ -59,7 +59,7 @@ export async function libraryListed(args: Args): Promise<number> {
 }
 
 /** `nemia library --factory <factory>`: each add of the factory, with its state. */
-async function factoryAddsListed(namespace: string): Promise<number> {
+async function factoryAddsListed(namespace: string) {
   const adds = await asked(LIBRARY_WORDS.name, (c) =>
     Effect.map(
       everyPage((page) => c.libraryadds.list({ params: { namespace }, query: page })),
@@ -71,7 +71,7 @@ async function factoryAddsListed(namespace: string): Promise<number> {
 }
 
 /** The line of an add: its name in the factory, and its state. */
-const addLine = (add: LibraryAdd, done: string): string =>
+const addLine = (add: LibraryAdd, done: string) =>
   `${add.metadata.name} ${done} in ${add.metadata.namespace ?? ''}: ${add.status.state}${add.status.message ? `, ${add.status.message}` : ''}`;
 
 /** The factory and the add's object name `args` name. */
@@ -84,7 +84,7 @@ const addOf = (args: Args) => ({
  * `nemia library add <kind> <name> --factory <factory>`'s runner: the item added, and its state.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function libraryAdd(args: Args): Promise<number> {
+export async function libraryAdd(args: Args) {
   const params = addOf(args);
   said([addLine(await asked(LIBRARY_ADD_WORDS.name, (c) => c.libraryadds.put({ params })), 'added')]);
   return 0;
@@ -94,7 +94,7 @@ export async function libraryAdd(args: Args): Promise<number> {
  * `nemia library rm <kind> <name> --factory <factory>`'s runner: the add taken off, the item left in the library.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function libraryRm(args: Args): Promise<number> {
+export async function libraryRm(args: Args) {
   const params = addOf(args);
   said([addLine(await asked(LIBRARY_RM_WORDS.name, (c) => c.libraryadds.delete({ params })), 'taken off')]);
   return 0;

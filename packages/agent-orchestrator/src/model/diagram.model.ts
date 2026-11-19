@@ -25,7 +25,7 @@ const MODELS: readonly ErModel[] = [
 ];
 
 /** The orchestrator's `erDiagram`, printed between the `diagram:orchestrator-model` markers of `docs/model.md`. */
-export const orchestratorModelDiagram = (): string =>
+export const orchestratorModelDiagram = () =>
   erDiagram({
     entities: MODELS.flatMap((m) => m.entities),
     ids: Object.assign({}, ...MODELS.map((m) => m.ids)),

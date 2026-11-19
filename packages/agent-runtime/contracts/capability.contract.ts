@@ -52,11 +52,10 @@ export type VerbHarness =
   | { readonly kind: 'refused'; readonly reason: 'unknown' | 'undeclared' | 'none' };
 
 /** Whether `harness` declares `capability`: a runner of the consumer's declares nothing. */
-const declares = (harness: HarnessDeclared, capability: Capability): boolean =>
-  harness.can !== undefined && harness.can.includes(capability);
+const declares = (harness: HarnessDeclared, capability: Capability) => harness.can !== undefined && harness.can.includes(capability);
 
 /** Whether a declaration lists `capability`. */
-const lists = (can: readonly Capability[], capability: Capability): boolean => can.includes(capability);
+const lists = (can: readonly Capability[], capability: Capability) => can.includes(capability);
 
 const misplacedSpec = spec<(asked: readonly Capability[], can: readonly Capability[] | undefined) => Capability | undefined>({
   ensures: {
@@ -106,11 +105,10 @@ const takersSpec = spec<(capability: Capability, harnesses: readonly HarnessDecl
 export type TakersOf = Implementation<typeof takersSpec>;
 
 /** The harness configured under `name`, the first where two are: what the engine's own lookup finds. */
-const named = (harnesses: readonly HarnessDeclared[], name: string): HarnessDeclared | undefined => harnesses.find((h) => h.name === name);
+const named = (harnesses: readonly HarnessDeclared[], name: string) => harnesses.find((h) => h.name === name);
 
 /** The first harness that declares `verb`, in the engine's order. */
-const firstDeclaring = (harnesses: readonly HarnessDeclared[], verb: Capability): HarnessDeclared | undefined =>
-  harnesses.find((h) => declares(h, verb));
+const firstDeclaring = (harnesses: readonly HarnessDeclared[], verb: Capability) => harnesses.find((h) => declares(h, verb));
 
 const verbHarnessSpec = spec<(verb: Capability, name: string | undefined, harnesses: readonly HarnessDeclared[]) => VerbHarness>({
   ensures: {

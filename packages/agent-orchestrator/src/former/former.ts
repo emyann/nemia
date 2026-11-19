@@ -32,7 +32,7 @@ export const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
  * Whether `key` names a harness, whose block a file's frontmatter may hold.
  * @param key A frontmatter key.
  */
-export const isHarnessBlock = (key: string): boolean => fenceKeysOf(key) !== undefined;
+export const isHarnessBlock = (key: string) => fenceKeysOf(key) !== undefined;
 
 /** The harness block a frontmatter holds, `<harness>: { fence: … }`: the harness, the line it opens on and the fence keys it sets. */
 export type FenceBlock = { harness: string; line: number; keys: string[] };
@@ -63,7 +63,7 @@ export const FORMER_HARNESS_PROMPTS: Readonly<Record<string, HarnessPrompt>> = {
  * not, as the api's picture of an agent that does not load. Pure.
  * @param word The word the former `systemPrompt:` line says.
  */
-export const harnessPromptNamed = (word: string): string =>
+export const harnessPromptNamed = (word: string) =>
   (Object.hasOwn(FORMER_HARNESS_PROMPTS, word) ? FORMER_HARNESS_PROMPTS[word] : undefined) ?? word;
 
 /**
@@ -79,7 +79,7 @@ export function codexSandboxNamed<K extends string>(
   file: string,
   meta: Partial<Record<K | 'permissionMode' | 'sandbox', string>>,
   harness: string | undefined,
-): Partial<Record<K | 'permissionMode' | 'sandbox', string>> {
+) {
   const word = meta.permissionMode;
   if (fenceKeyOf(harness) !== 'sandbox' || word === undefined) return meta;
   if (meta.sandbox !== undefined) {
@@ -99,10 +99,7 @@ export function codexSandboxNamed<K extends string>(
  * @param file The step file the lines are read from, as a refusal names it.
  * @param meta The step's lines, by key.
  */
-export function placeSpelled<K extends string>(
-  file: string,
-  meta: Partial<Record<K | 'workspace' | 'place', string>>,
-): Partial<Record<K | 'workspace' | 'place', string>> {
+export function placeSpelled<K extends string>(file: string, meta: Partial<Record<K | 'workspace' | 'place', string>>) {
   if (meta.workspace !== 'folder') return meta;
   if (meta.place !== undefined) {
     refuse(
@@ -117,14 +114,14 @@ export function placeSpelled<K extends string>(
  * What `nemia start` says of a step file that still says `workspace: folder` (`placeSpelled`). The one writer of it.
  * @param file The step file, as the line names it.
  */
-export const placeLine = (file: string): string =>
+export const placeLine = (file: string) =>
   `${file}: \`workspace: folder\` is read as \`place: folder\`, where the step works. The former line is still read; rename it, or save the file from the board, which writes \`place:\`.`;
 
 /**
  * Why `workspace: folder` is not written, as `formerKeyWritten` says of a former name: what sends one is a stale form.
  * @param file The step file the save was sent for.
  */
-export const placeWritten = (file: string): string =>
+export const placeWritten = (file: string) =>
   `${file}: \`workspace: folder\` is the former spelling of \`place: folder\`, which a file may still say but nothing writes. Send \`place: folder\` — a page that sends the former spelling is stale: reload it, and save again.`;
 
 /**
@@ -133,7 +130,7 @@ export const placeWritten = (file: string): string =>
  * (`baseLine`). One key holds both spellings, so the file cannot say the two at once. Pure.
  * @param meta The step's lines, by key.
  */
-export function baseSpelled<K extends string>(meta: Partial<Record<K | 'workspace', string>>): Partial<Record<K | 'workspace', string>> {
+export function baseSpelled<K extends string>(meta: Partial<Record<K | 'workspace', string>>) {
   if (meta.workspace !== 'main') return meta;
   return { ...meta, workspace: 'base' };
 }
@@ -142,38 +139,38 @@ export function baseSpelled<K extends string>(meta: Partial<Record<K | 'workspac
  * What `nemia start` says of a step file that still says `workspace: main` (`baseSpelled`). The one writer of it.
  * @param file The step file, as the line names it.
  */
-export const baseLine = (file: string): string =>
+export const baseLine = (file: string) =>
   `${file}: \`workspace: main\` is read as \`workspace: base\`, a step that works on the base branch in the repository's own checkout. The former line is still read; rename it, or save the file from the board, which writes \`workspace: base\`.`;
 
 /**
  * Why `workspace: main` is not written, as `formerKeyWritten` says of a former name: what sends one is a stale form.
  * @param file The step file the save was sent for.
  */
-export const baseWritten = (file: string): string =>
+export const baseWritten = (file: string) =>
   `${file}: \`workspace: main\` is the former spelling of \`workspace: base\`, which a file may still say but nothing writes. Send \`workspace: base\` — a page that sends the former spelling is stale: reload it, and save again.`;
 
 /** The sandbox a codex permission mode named: itself, or `danger-full-access` for `bypassPermissions`, the engine's alias for it. */
-const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
+const sandboxNamed = (word: string) => (word === 'bypassPermissions' ? 'danger-full-access' : word);
 
 /**
  * The sandbox a codex file's former `permissionMode: <word>` is read as. For code outside the package that reads a file's lines the
  * parser did not read — the api's picture of an agent that does not load — so it reads the former line as the parser would. Pure.
  * @param word The word the former mode line says.
  */
-export const formerSandbox = (word: string): string => sandboxNamed(word);
+export const formerSandbox = (word: string) => sandboxNamed(word);
 
 /**
  * The fence a step asks its harness for: the engine's task calls both `permissionMode`, Claude Code's permission mode and Codex's sandbox,
  * and a step has at most one of the two (`wordOf`). What the tick files as `config.permissionMode`. Pure.
  * @param step The step, with its permission mode and its sandbox where it sets them.
  */
-export const modeOf = (step: Pick<StepSpec, 'permissionMode' | 'sandbox'>): string | undefined => step.sandbox ?? step.permissionMode;
+export const modeOf = (step: Pick<StepSpec, 'permissionMode' | 'sandbox'>) => step.sandbox ?? step.permissionMode;
 
 /** The name a key was written under, for a key read under a former one (`FORMER_KEYS`), by the key it is now. */
 export type Spelled = Partial<Record<string, string>>;
 
 /** The key a frontmatter line names: its own, or the one its former name is now (`FORMER_KEYS`). */
-const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : undefined) ?? written;
+const keyNamed = (written: string) => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : undefined) ?? written;
 
 /**
  * The frontmatter as key → value: every key a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. The
@@ -199,7 +196,7 @@ export function readKeys<K extends string>(
   block: string,
   refusal: (key: string) => string | undefined,
   maps: readonly string[] = [],
-): { meta: Partial<Record<K, string>>; spelled: Spelled; block?: FenceBlock } {
+) {
   const meta: Partial<Record<K, string>> = {};
   const spelled: Spelled = {};
   let fenced: FenceBlock | undefined;
@@ -239,24 +236,24 @@ export function readKeys<K extends string>(
 }
 
 /** A key's value as a line holds it (`flatValue`), or the JSON text of a map on a key in `maps`, left to its own reader. */
-const keyValue = (step: string, entry: FrontmatterEntry, maps: readonly string[]): string =>
+const keyValue = (step: string, entry: FrontmatterEntry, maps: readonly string[]) =>
   maps.includes(entry.key) && typeof entry.value === 'object' && !Array.isArray(entry.value)
     ? JSON.stringify(entry.value)
     : flatValue(step, entry, LIST_KEYS.includes(entry.key));
 
 /** Refused: a fence key written both at the top level, its former spelling, and under its harness's block. */
-const bothSpellings = (step: string, key: string, harness: string): string =>
+const bothSpellings = (step: string, key: string, harness: string) =>
   `${step}: \`${key}\` is set twice, at the top level and under \`${harness}: { fence: … }\` — the top-level line is its former spelling, and reads as the block's. Keep the block's and delete the other line: nemia frontmatter rewrite <folder> moves a top-level fence key into its block.`;
 
 /** Whether a frontmatter entry is a harness's block: a key naming a harness, holding a map. */
-const isBlockEntry = (entry: FrontmatterEntry): boolean =>
+const isBlockEntry = (entry: FrontmatterEntry) =>
   isHarnessBlock(entry.key) && typeof entry.value === 'object' && !Array.isArray(entry.value);
 
 /**
  * The fence keys and values a harness's block `entry` holds, or refused: a key of the block other than `fence`, a `fence` that is not a
  * map, and a key the harness's fence does not take (`fenceKeysOf`).
  */
-function blockFence(step: string, entry: FrontmatterEntry): Array<[string, FrontmatterValue]> {
+function blockFence(step: string, entry: FrontmatterEntry) {
   const harness = entry.key;
   const map = entry.value as Readonly<Record<string, FrontmatterValue>>;
   const other = Object.keys(map).find((key) => key !== 'fence');
@@ -274,19 +271,19 @@ function blockFence(step: string, entry: FrontmatterEntry): Array<[string, Front
 }
 
 /** Refused: two harness blocks in one file, which runs on one harness. */
-const twoBlocks = (file: string, first: string, second: string): string =>
+const twoBlocks = (file: string, first: string, second: string) =>
   `${file}: \`${first}:\` and \`${second}:\` are both set, and a file runs on one harness, whose block holds its fence. Keep the block of the harness it runs on — its \`harness:\` line, \`${DEFAULT_HARNESS}\` without one — and delete the other.`;
 
 /** Refused: a key under a harness's block other than `fence`. */
-const blockKeyRefused = (file: string, harness: string, key: string): string =>
+const blockKeyRefused = (file: string, harness: string, key: string) =>
   `${file}: \`${harness}: { ${key}: … }\` — a harness's block in a step or agent file holds its \`fence\` alone. Write \`${key}:\` at the top level, or delete it.`;
 
 /** Refused: a harness's `fence` that is not a map of its keys. */
-const fenceNotMap = (file: string, harness: string, takes: readonly string[]): string =>
+const fenceNotMap = (file: string, harness: string, takes: readonly string[]) =>
   `${file}: \`${harness}: { fence: … }\` is a map of the harness's fence keys — ${takes.join(', ')} — each on a line of its own, indented under \`fence:\`.`;
 
 /** Refused: a key in a harness's fence that the harness does not take. */
-const fenceKeyRefused = (file: string, harness: string, key: string, takes: readonly string[]): string =>
+const fenceKeyRefused = (file: string, harness: string, key: string, takes: readonly string[]) =>
   `${file}: \`${harness}: { fence: { ${key}: … } }\` — ${harness}'s fence takes ${takes.map((k) => `\`${k}\``).join(', ')}, and not \`${key}\`. Correct the key, or move it into the block of the harness that takes it.`;
 
 /**
@@ -296,7 +293,7 @@ const fenceKeyRefused = (file: string, harness: string, key: string, takes: read
  * @param block The harness block its frontmatter holds, or undefined for none.
  * @param harness The harness the file runs on.
  */
-export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string): string | undefined {
+export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string) {
   if (block === undefined || block.harness === harness) return undefined;
   const takes = fenceKeysOf(harness);
   return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${takes ? ` (${takes.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;
@@ -309,7 +306,7 @@ export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, h
  * @param block The harness block its frontmatter holds, or undefined for none.
  * @param harnesses The harnesses the file may name, first its own `harness:` line, then its agent's; each undefined where none is said.
  */
-export function refuseFenceBlock(file: string, block: FenceBlock | undefined, ...harnesses: Array<string | undefined>): void {
+export function refuseFenceBlock(file: string, block: FenceBlock | undefined, ...harnesses: Array<string | undefined>) {
   const runsOn = harnesses.map((harness) => harness?.trim()).find(Boolean) ?? DEFAULT_HARNESS;
   const why = fenceBlockRefusal(file, block, runsOn);
   if (why !== undefined) refuse(why);
@@ -324,10 +321,7 @@ export function refuseFenceBlock(file: string, block: FenceBlock | undefined, ..
  * @param pairs The key and value pairs a writer would write, in order.
  * @param runsOn The harness the file says it runs on, or undefined where it says none.
  */
-export function fencedPairs(
-  pairs: ReadonlyArray<readonly [string, FrontmatterValue]>,
-  runsOn?: string,
-): Array<readonly [string, FrontmatterValue]> {
+export function fencedPairs(pairs: ReadonlyArray<readonly [string, FrontmatterValue]>, runsOn?: string) {
   const blocks = new Map<string, Record<string, FrontmatterValue>>();
   const out: Array<readonly [string, FrontmatterValue]> = [];
   for (const [key, value] of pairs) {
@@ -344,15 +338,14 @@ export function fencedPairs(
     }
     fence[key] = value;
   }
-  return out;
+  return out satisfies Array<readonly [string, FrontmatterValue]>;
 }
 
 /** The harness whose fence takes key `key` (`fenceKeysOf`): each fence key is one harness's. */
-const harnessTaking = (key: string): string | undefined =>
-  Object.keys(HARNESS_KNOBS).find((harness) => fenceKeysOf(harness)?.includes(key));
+const harnessTaking = (key: string) => Object.keys(HARNESS_KNOBS).find((harness) => fenceKeysOf(harness)?.includes(key));
 
 /** Why a key written with no value is refused, and what to write: the command, the tools or the dollars it takes, or the line deleted. */
-const noValue = (step: string, key: string, written: string): string =>
+const noValue = (step: string, key: string, written: string) =>
   key === 'check'
     ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
     : key === 'tools'
@@ -366,7 +359,7 @@ const noValue = (step: string, key: string, written: string): string =>
             : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`;
 
 /** A file's frontmatter as it reads (`readFrontmatter`), or null for a file with none, one that never closes, or one it refuses. */
-function frontmatterOf(text: string): { entries: FrontmatterEntry[] } | null {
+function frontmatterOf(text: string) {
   try {
     const { block } = splitFrontmatter('', text);
     return block === null ? null : frontmatterOrNull(block);
@@ -385,7 +378,7 @@ function frontmatterOf(text: string): { entries: FrontmatterEntry[] } | null {
  * @param key The key whose value is read.
  * @param top Whether to read the top-level line alone, never a harness's block; false when not given.
  */
-export function frontmatterKey(text: string, key: string, top = false): string | undefined {
+export function frontmatterKey(text: string, key: string, top = false) {
   const entries = frontmatterOf(text)?.entries ?? [];
   const found = entries.find((entry) => entry.key === key)?.value;
   const value =
@@ -398,7 +391,7 @@ export function frontmatterKey(text: string, key: string, top = false): string |
 }
 
 /** The fence map a harness block's value holds, or `undefined` for one that holds none. */
-const fenceOfBlock = (value: FrontmatterValue): Readonly<Record<string, FrontmatterValue>> | undefined => {
+const fenceOfBlock = (value: FrontmatterValue) => {
   if (typeof value !== 'object' || Array.isArray(value)) return undefined;
   const fence = (value as Readonly<Record<string, FrontmatterValue>>).fence;
   return typeof fence === 'object' && !Array.isArray(fence) ? (fence as Readonly<Record<string, FrontmatterValue>>) : undefined;
@@ -408,7 +401,7 @@ const fenceOfBlock = (value: FrontmatterValue): Readonly<Record<string, Frontmat
  * The fence keys a file's frontmatter still writes at the top level (`FORMER_FENCE_KEYS`), in the order it writes them.
  * @param text The file's whole text.
  */
-export function formerFenceIn(text: string): string[] {
+export function formerFenceIn(text: string) {
   return (frontmatterOf(text)?.entries ?? []).flatMap(({ key }) => (FORMER_FENCE_KEYS.includes(key) ? [key] : []));
 }
 
@@ -417,7 +410,7 @@ export function formerFenceIn(text: string): string[] {
  * @param file The file, as the line names it.
  * @param key The fence key it writes at the top level.
  */
-export const formerFenceLine = (file: string, key: string): string =>
+export const formerFenceLine = (file: string, key: string) =>
   `${file}: \`${key}:\` at the top level is read as the fence of the file's harness, \`<harness>: { fence: { ${key}: … } }\`. The former line is still read; move it into the block: nemia frontmatter rewrite <folder>, or save the file from the board.`;
 
 /**
@@ -425,7 +418,7 @@ export const formerFenceLine = (file: string, key: string): string =>
  * (`offerRefusal`). The one writer of it.
  * @param file The agent file, as the line names it.
  */
-export const overridableLine = (file: string): string =>
+export const overridableLine = (file: string) =>
   `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added. Say what a step may override — \`overridable: [model, fence, skills]\` — and a step that writes anything else is refused at load.`;
 
 /**
@@ -433,11 +426,7 @@ export const overridableLine = (file: string): string =>
  * and another reads as its former spelling (`codexSandboxNamed`), the harness the file runs on, whose own mode key it becomes. Undefined
  * for that key where the file's harness is not known: it stays where it is.
  */
-function movedTo(
-  key: string,
-  value: FrontmatterValue,
-  harness: string | undefined,
-): { block: string; key: string; value: FrontmatterValue } | undefined {
+function movedTo(key: string, value: FrontmatterValue, harness: string | undefined) {
   if (key !== 'permissionMode') {
     const block = harnessTaking(key);
     return block === undefined ? undefined : { block, key, value };
@@ -457,7 +446,7 @@ function movedTo(
  * @param text The file's whole text.
  * @param harness The harness the file runs on, or undefined where it is not known.
  */
-export function fenceMoved(name: string, text: string, harness: string | undefined): { text: string; changed: boolean; kept: string[] } {
+export function fenceMoved(name: string, text: string, harness: string | undefined) {
   const { block } = splitFrontmatter(name, text);
   if (block === null) return { text, changed: false, kept: [] };
   const read = readFrontmatter(name, block);
@@ -492,7 +481,7 @@ export function fenceMoved(name: string, text: string, harness: string | undefin
  * closes, or reads in neither form.
  * @param text The file's whole text.
  */
-export function formerKeysIn(text: string): string[] {
+export function formerKeysIn(text: string) {
   return (frontmatterOf(text)?.entries ?? []).flatMap(({ key }) => (Object.hasOwn(FORMER_KEYS, key) ? [key] : []));
 }
 
@@ -503,11 +492,11 @@ export function formerKeysIn(text: string): string[] {
  * @param file The file the save was sent for.
  * @param former The key's former name, as the save sent it.
  */
-export const formerKeyWritten = (file: string, former: string): string =>
+export const formerKeyWritten = (file: string, former: string) =>
   `${file}: \`${former}\` is \`${renamed(former)}\`'s former name, which a file may still say but nothing writes. Send \`${renamed(former)}\` — a page that sends the former name is stale: reload it, and save again.`;
 
 /** The key a former name is now, a step's (`FORMER_KEYS`) or an agent's own (`FORMER_OWN_KEYS`). */
-const renamed = (former: string): string | undefined => FORMER_KEYS[former] ?? FORMER_OWN_KEYS[former];
+const renamed = (former: string) => FORMER_KEYS[former] ?? FORMER_OWN_KEYS[former];
 
 /**
  * Why a codex `permissionMode` (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read
@@ -518,7 +507,7 @@ const renamed = (former: string): string | undefined => FORMER_KEYS[former] ?? F
  * @param file The file the save was sent for.
  * @param word The mode the save sent in the fence's mode key.
  */
-export const codexModeWritten = (file: string, word: string): string =>
+export const codexModeWritten = (file: string, word: string) =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send the sandbox as \`sandbox:\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
 
 /**
@@ -526,7 +515,7 @@ export const codexModeWritten = (file: string, word: string): string =>
  * @param file The file, as the line names it.
  * @param word The mode its mode line says.
  */
-export const codexModeLine = (file: string, word: string): string =>
+export const codexModeLine = (file: string, word: string) =>
   `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
 /**
@@ -535,7 +524,7 @@ export const codexModeLine = (file: string, word: string): string =>
  * @param file The file, as the line names it.
  * @param former The key's former name, as the file writes it.
  */
-export const formerKeyLine = (file: string, former: string): string =>
+export const formerKeyLine = (file: string, former: string) =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
 /**
@@ -544,7 +533,7 @@ export const formerKeyLine = (file: string, former: string): string =>
  * @param file The agent file, as the line names it.
  * @param word The word its `systemPrompt:` line says.
  */
-export const harnessPromptLine = (file: string, word: string): string =>
+export const harnessPromptLine = (file: string, word: string) =>
   `${file}: \`systemPrompt: ${word}\` is read as \`harnessPrompt: ${harnessPromptNamed(word)}\`, what becomes of Claude Code's own prompt. The former line is still read; rename it, or save the file from the board, which writes \`harnessPrompt:\`.`;
 
 /**
@@ -572,14 +561,14 @@ function isNamed(step: FrozenStep): step is StepSpec {
  * A frozen agent's harness prompt under its name now: its former `systemPrompt`, in the word it is now (`harnessPromptNamed`), unless it
  * holds `harnessPrompt` too, which is kept.
  */
-function harnessPromptAsNamed(agent: NonNullable<FrozenStep['agent']>): Omit<StepAgent, 'keys'> & { keys: string[] } {
+function harnessPromptAsNamed(agent: NonNullable<FrozenStep['agent']>) {
   const { systemPrompt: former, ...rest } = agent;
   if (former === undefined || rest.harnessPrompt !== undefined) return rest;
   return { ...rest, harnessPrompt: harnessPromptNamed(former) as HarnessPrompt };
 }
 
 /** Whether a frozen `workspace` is a former spelling: `folder`, now `place: 'folder'`, or `main`, now `base`. */
-const isFormerWorkspace = (workspace: unknown): boolean => workspace === 'folder' || workspace === 'main';
+const isFormerWorkspace = (workspace: unknown) => workspace === 'folder' || workspace === 'main';
 
 /**
  * A step's fields, or its agent's `given`, under the names their keys have now (`FORMER_KEYS`), a `workspace: 'folder'` as `place:
@@ -608,15 +597,15 @@ function renamedFields(fields: object) {
  * value. A step with no former name is returned as it is. Pure.
  * @param step The step as the record holds it.
  */
-export function asNamed(step: FrozenStep): StepSpec {
-  if (isNamed(step)) return step;
+export function asNamed(step: FrozenStep) {
+  if (isNamed(step)) return step satisfies StepSpec;
   const fields = renamedFields(step) as StepSpec;
-  if (!step.agent) return fields;
+  if (!step.agent) return fields satisfies StepSpec;
   const { keys, given } = step.agent;
   const agent = {
     ...harnessPromptAsNamed(step.agent),
     keys: [...new Set(keys.map((key) => (key === 'workspace' && step.workspace === 'folder' ? 'place' : (keyNamed(key) as StepKey))))],
     given: renamedFields(given),
   };
-  return { ...fields, agent };
+  return { ...fields, agent } satisfies StepSpec as StepSpec;
 }

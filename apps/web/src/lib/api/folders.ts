@@ -23,7 +23,7 @@ export const folderNamesQuery = (path: string) =>
  * The folder at `path` made a git repository, with one empty first commit and none of its files added.
  * @param path The folder, absolute.
  */
-export const makeRepository = (path: string): Promise<RepositoryMade> =>
+export const makeRepository = (path: string) =>
   call(
     (c) => c.folders.repository({ payload: { path } }),
     write(RepositoryMade, 'The folder may be a repository now: read the folder again before making it again.'),
@@ -33,7 +33,7 @@ export const makeRepository = (path: string): Promise<RepositoryMade> =>
  * A new, empty repository made in the store, named `name`: where it was made.
  * @param name The repository's name.
  */
-export const newRepository = (name: string): Promise<RepositoryMade> =>
+export const newRepository = (name: string) =>
   call(
     (c) => c.folders.make({ payload: { name } }),
     write(RepositoryMade, 'The repository may be made: make it again under the same name, which finds it.'),

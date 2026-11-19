@@ -144,15 +144,19 @@ export type DocumentFile = { kind: 'FactoryTemplate' | 'Workflow' | 'Agent' | 'S
  * @param file The file's path in the template's folder.
  * @param template The template's name, the name its `nemia.yaml` must carry.
  */
-export function documentFile(file: string, template: string): DocumentFile | undefined {
+export function documentFile(file: string, template: string) {
   const parts = file.split('/');
-  if (file === 'nemia.yaml') return { kind: 'FactoryTemplate', name: template };
-  if (file === 'nemia.lock.yaml') return { kind: 'Lock', name: undefined };
+  if (file === 'nemia.yaml')
+    return { kind: 'FactoryTemplate', name: template } satisfies DocumentFile | undefined as DocumentFile | undefined;
+  if (file === 'nemia.lock.yaml') return { kind: 'Lock', name: undefined } satisfies DocumentFile | undefined as DocumentFile | undefined;
   if (parts.length !== 3) return undefined;
   const [holder, name, leaf] = parts;
-  if (holder === 'workflows' && leaf === 'workflow.yaml') return { kind: 'Workflow', name };
-  if (holder === 'agents' && leaf === 'agent.yaml') return { kind: 'Agent', name };
-  if (holder === 'skills' && leaf === 'skill.yaml') return { kind: 'Skill', name };
+  if (holder === 'workflows' && leaf === 'workflow.yaml')
+    return { kind: 'Workflow', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
+  if (holder === 'agents' && leaf === 'agent.yaml')
+    return { kind: 'Agent', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
+  if (holder === 'skills' && leaf === 'skill.yaml')
+    return { kind: 'Skill', name } satisfies DocumentFile | undefined as DocumentFile | undefined;
   return undefined;
 }
 
@@ -172,7 +176,7 @@ const LAYOUT =
  * Whether `rest`, a file's path in a workflow's folder after the folder's name, is one the layout gives it: the workflow's document and a
  * step's note directly in it, and any file that is no `.md` or `.yaml`, at any depth.
  */
-const inWorkflow = (rest: string): boolean => {
+const inWorkflow = (rest: string) => {
   const direct = !rest.includes('/');
   return (direct && (rest === 'workflow.yaml' || rest.endsWith('.md'))) || !(rest.endsWith('.md') || rest.endsWith('.yaml'));
 };
@@ -181,7 +185,7 @@ const inWorkflow = (rest: string): boolean => {
  * What follows the folder's name in `inHolder`, a file's path under a holder (`workflows/`, `agents/`, `skills/`) after the holder's own
  * `/`: none where the path holds no file of a folder.
  */
-const pastFolder = (inHolder: string): string | undefined => {
+const pastFolder = (inHolder: string) => {
   const slash = inHolder.indexOf('/');
   if (slash < 0) return undefined;
   const rest = inHolder.slice(slash).slice(1);
@@ -215,7 +219,7 @@ export const inLayout: InLayout = (file, named) => {
 const HOLDS = { workflows: ['workflow.yaml', 'a workflow'], agents: ['agent.yaml', 'an agent'], skills: ['SKILL.md', 'a skill'] } as const;
 
 /** What the folders of `files` lack or are misnamed: a folder of workflows/, agents/ or skills/ without its file, or not named a Name. */
-function folderRefusals(files: readonly string[]): Refusal[] {
+function folderRefusals(files: readonly string[]) {
   const folders = new Set(
     files.flatMap((file) => {
       const [holder, name, ...rest] = file.split('/');
@@ -244,7 +248,7 @@ function folderRefusals(files: readonly string[]): Refusal[] {
  * @param folder The template's folder, read down to its files.
  * @param named The files a `{ path }` of a document names.
  */
-export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: ReadonlySet<string>): Refusal[] {
+export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: ReadonlySet<string>) {
   const outside = folder.files
     .filter((file) => !inLayout(file, named))
     .map((file) => ({ file, at: [], message: `${file} is outside the template's layout. ${LAYOUT}. Move it there, or remove it.` }));
@@ -294,7 +298,7 @@ const PROFILE: Shape = {
 };
 
 /** Whether the fence key `key` is a tool list of the harness that takes it. */
-function isList(key: string): boolean {
+function isList(key: string) {
   return Object.values(HARNESS_KNOBS).some((knobs) => knobs.fence.lists.includes(key));
 }
 
@@ -406,13 +410,13 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
 };
 
 /** The shape of a whole document of `kind`. */
-const documentShape = (kind: DocumentFile['kind']): Shape =>
-  kind === 'Lock'
+const documentShape = (kind: DocumentFile['kind']) =>
+  (kind === 'Lock'
     ? { fields: { apiVersion: 'string', kind: 'string', resolved: { list: 'not-yet' } }, required: ['apiVersion', 'kind'] }
     : {
         fields: { apiVersion: 'string', kind: 'string', metadata: METADATA, spec: SPECS[kind] },
         required: ['apiVersion', 'kind', 'metadata', 'spec'],
-      };
+      }) satisfies Shape as Shape;
 
 /**
  * Whether `value` is a map, as YAML's data model has one: an object that is no list.
@@ -438,7 +442,7 @@ const PARAMETER_EXPRESSION = /\$\{\{\s*parameters\.([A-Za-z_][A-Za-z0-9_]*)\s*\}
  * The name of each `${{ parameters.<name> }}` in `text`, with the offset it stands at, in order.
  * @param text The text looked in.
  */
-export const expressionsIn = (text: string): Array<{ name: string; index: number }> =>
+export const expressionsIn = (text: string) =>
   [...text.matchAll(PARAMETER_EXPRESSION)].flatMap((match) => (match[1] === undefined ? [] : [{ name: match[1], index: match.index }]));
 
 /**
@@ -446,22 +450,22 @@ export const expressionsIn = (text: string): Array<{ name: string; index: number
  * @param text The text whose expressions are replaced.
  * @param write What an expression is replaced by, given its parameter's name.
  */
-export const writeExpressions = (text: string, write: (name: string) => string): string =>
+export const writeExpressions = (text: string, write: (name: string) => string) =>
   text.replace(PARAMETER_EXPRESSION, (_, name: string) => write(name));
 
 /**
  * A key path as a person reads it: `spec.steps[1].budget`.
  * @param at The key path, each part a key or a list's index.
  */
-export const spelled = (at: ReadonlyArray<string | number>): string =>
+export const spelled = (at: ReadonlyArray<string | number>) =>
   at.map((part, i) => (typeof part === 'number' ? `[${part}]` : i === 0 ? part : `.${part}`)).join('') || 'the document';
 
 /** Why a source at `at` is not read: v1 carries every file in the folder. */
-const notYet = (at: ReadonlyArray<string | number>): string =>
+const notYet = (at: ReadonlyArray<string | number>) =>
   `${spelled(at)} is a git or url source, and a template reads none yet: not yet. Carry the file in the template's folder, and name it {path: <file>}.`;
 
 /** What a text is: words, `{ path: <file> }` or `{ param: <name> }`; a git or url source is not yet. */
-function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string | undefined {
+function textRefusal(value: unknown, at: ReadonlyArray<string | number>) {
   if (typeof value === 'string' || isParam(value)) return undefined;
   if (isMap(value) && ('git' in value || 'url' in value)) return notYet(at);
   if (isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string') return undefined;
@@ -469,7 +473,7 @@ function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string
 }
 
 /** Whether `value` is a list of strings. */
-const isStrings = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isStrings = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 /**
  * Whether `value` is a `{ path }` and nothing more: a file of the template named in a list.
@@ -479,10 +483,10 @@ export const isPathItem = (value: unknown): value is { path: string } =>
   isMap(value) && Object.keys(value).length === 1 && typeof value.path === 'string';
 
 /** Whether `value` is a harness's tool list: lines, each a string or a `{ path }` naming a file of the template that holds more. */
-const isLines = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string' || isPathItem(item));
+const isLines = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === 'string' || isPathItem(item));
 
 /** Whether `value` is a `route:` (`TemplateRoute`). */
-const isRoute = (value: unknown): boolean => {
+const isRoute = (value: unknown) => {
   if (value === 'judge') return true;
   if (!isMap(value)) return false;
   const keys = Object.keys(value).sort().join(',');
@@ -496,7 +500,7 @@ const isRoute = (value: unknown): boolean => {
 };
 
 /** Whether `value` is a `checkFailurePolicy:` the step's parser reads (`checkFailurePolicyOf`). */
-const isPolicy = (value: unknown): boolean => {
+const isPolicy = (value: unknown) => {
   if (!isMap(value)) return false;
   try {
     checkFailurePolicyOf('checkFailurePolicy', JSON.stringify(value));
@@ -523,7 +527,7 @@ const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknow
 };
 
 /** Why the leaf at `at` is not what `leaf` says, or undefined. */
-function leafRefusal(leaf: Leaf, value: unknown, at: ReadonlyArray<string | number>): string | undefined {
+function leafRefusal(leaf: Leaf, value: unknown, at: ReadonlyArray<string | number>) {
   if (leaf === 'not-yet') return notYet(at);
   if (leaf === 'text') return textRefusal(value, at);
   const [holds, what] = LEAVES[leaf];
@@ -531,18 +535,13 @@ function leafRefusal(leaf: Leaf, value: unknown, at: ReadonlyArray<string | numb
 }
 
 /** What a map at `at` breaks of its `fields` shape: a required key missing, a key it has no place for, and each value's own breaks. */
-function fieldsRefusals(
-  file: string,
-  shape: Extract<Shape, { fields: unknown }>,
-  value: unknown,
-  at: ReadonlyArray<string | number>,
-): Refusal[] {
+function fieldsRefusals(file: string, shape: Extract<Shape, { fields: unknown }>, value: unknown, at: ReadonlyArray<string | number>) {
   if (!isMap(value)) return [{ file, at, message: `${spelled(at)} is a map of keys, and here it is ${JSON.stringify(value)}.` }];
   const known = Object.keys(shape.fields);
   const missing = (shape.required ?? [])
     .filter((key) => !(key in value))
     .map((key) => ({ file, at, message: `${spelled(at)} has no \`${key}\`, which it requires: write it.` }));
-  const each = Object.entries(value).flatMap(([key, held]): Refusal[] => {
+  const each = Object.entries(value).flatMap(([key, held]) => {
     const inner = shape.fields[key] ?? shape.rest;
     if (inner !== undefined) return shapeRefusals(file, inner, held, [...at, key]);
     const message = `${spelled([...at, key])} is no key of ${spelled(at)}, which holds ${known.join(', ')}: rename it, or remove it.`;
@@ -552,6 +551,7 @@ function fieldsRefusals(
 }
 
 /** What `value`, at `at` in `file`, breaks of `shape`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function shapeRefusals(file: string, shape: Shape, value: unknown, at: ReadonlyArray<string | number>): Refusal[] {
   if (typeof shape === 'string') {
     const message = leafRefusal(shape, value, at);
@@ -563,7 +563,7 @@ function shapeRefusals(file: string, shape: Shape, value: unknown, at: ReadonlyA
 }
 
 /** What the envelope of `doc`, a document of `kind` in `file`, breaks: its apiVersion, its kind, and its name, its folder's. */
-function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<string, unknown>): Refusal[] {
+function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<string, unknown>) {
   const refusals: Refusal[] = [];
   if (doc.apiVersion !== TEMPLATE_LAYOUT_VERSION)
     refusals.push({
@@ -578,7 +578,7 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
       message: `kind is ${JSON.stringify(doc.kind)}, and ${file} holds a ${expected.kind}: write kind: ${expected.kind}.`,
     });
   const name = isMap(doc.metadata) ? doc.metadata.name : undefined;
-  if (expected.name === undefined || typeof name !== 'string') return refusals;
+  if (expected.name === undefined || typeof name !== 'string') return refusals satisfies Refusal[];
   if (!SKILL_NAME.test(name))
     refusals.push({ file, at: ['metadata', 'name'], message: `metadata.name ${name} is not a name: lowercase words joined by dashes.` });
   else if (name !== expected.name)
@@ -587,7 +587,7 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
       at: ['metadata', 'name'],
       message: `metadata.name is ${name}, and a document's name is its folder's: write ${expected.name}, or rename the folder.`,
     });
-  return refusals;
+  return refusals satisfies Refusal[];
 }
 
 /**
@@ -597,7 +597,7 @@ function envelopeRefusals(file: string, expected: DocumentFile, doc: Record<stri
  * @param doc The document as YAML parsed it.
  * @param template The template's name.
  */
-export function documentRefusals(file: string, doc: unknown, template: string): Refusal[] {
+export function documentRefusals(file: string, doc: unknown, template: string) {
   const expected = documentFile(file, template);
   if (expected === undefined) return [];
   if (!isMap(doc)) return [{ file, at: [], message: `${file} is not a map of keys: write the document, ${expected.kind}.` }];

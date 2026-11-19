@@ -24,7 +24,7 @@ const [OWN, LABEL] = ['own', 'o:'];
 type Picks = Record<number, AskPick>;
 
 /** The value the group holds for the question `i`: the label chosen, the own-words row, or none. */
-const valueOf = (pick: AskPick | undefined): string | null => {
+const valueOf = (pick: AskPick | undefined) => {
   if (pick === undefined) return null;
   if (pick.words !== undefined) return OWN;
   const label = pick.labels?.[0];

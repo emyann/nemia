@@ -22,10 +22,10 @@ export type ToolMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type ToolHints = { readonly readOnlyHint: boolean; readonly destructiveHint: boolean };
 
 /** Whether an endpoint of `method` writes nothing: the api's guard stands in front of every other. */
-const reads = (method: ToolMethod): boolean => method === 'GET';
+const reads = (method: ToolMethod) => method === 'GET';
 
 /** Whether the inside seat would not run a write of `cls` unasked: asked each time, out of reach, or a read's setting form. */
-const asksInside = (cls: ToolClass): boolean => cls === 'ask' || cls === 'none' || cls === 'setting';
+const asksInside = (cls: ToolClass) => cls === 'ask' || cls === 'none' || cls === 'setting';
 
 const toolHintsSpec = spec<(cls: ToolClass, method: ToolMethod) => ToolHints>({
   ensures: {

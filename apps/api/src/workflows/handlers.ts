@@ -60,7 +60,7 @@ import { repoLayer } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
-import { draftOf, keyForm, schemasOf, write, yourAgentsRead, type StepBody } from './builder.ts';
+import { draftOf, keyForm, schemasOf, write, yourAgentsRead } from './builder.ts';
 import { workflowNameRefusal } from './words.ts';
 import {
   listed as listingOf,
@@ -80,7 +80,6 @@ import {
   namespacedWriteRefused,
   writeGoes,
   writtenAt,
-  type Held,
   type Origin,
 } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
@@ -107,7 +106,7 @@ const filesOf = (files: readonly WorkflowFile[] | undefined, schemas: readonly {
 };
 
 /** The folders of `dir`, each held at `origin`, read as `from`: in a factory only those attached to it. Nothing is loaded. */
-const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: string): Held<Folder>[] =>
+const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: string) =>
   foldersIn(dir)
     .filter((name) => !s.factory || s.factory.workflows.includes(name))
     .map((name) => ({ name, origin, item: { from, dir: path.join(dir, name) } }));
@@ -118,7 +117,7 @@ const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: strin
  * @param s The request's services, its caller and the place it is answered in.
  * @param origin The origin each workflow is held at.
  */
-export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
+export const treeWorkflowsHeld = (s: Served, origin: Origin) =>
   s.factory?.tree === undefined ? [] : foldersHeld(s, origin, 'repo', path.join(s.factory.tree, 'workflows'));
 
 /**
@@ -126,7 +125,7 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
  * an install with no factory named, refused for a factory named whose repository the request leaves open), yours.
  * @param s The request's services, its caller and the place it is answered in.
  */
-export const heldIn = (s: Served): Held<Folder>[] => {
+export const heldIn = (s: Served) => {
   const repo = repoLayer(s);
   return [
     ...treeWorkflowsHeld(s, 'factory'),
@@ -136,7 +135,7 @@ export const heldIn = (s: Served): Held<Folder>[] => {
 };
 
 /** The spec of a step in the object's words: `workspace: main`, the former spelling, said `base`. */
-const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
+const keysOf = (spec: ListedStep['spec']) => {
   const { shape: _shape, ...keys } = spec as ListedStep['spec'] & { shape?: unknown };
   return { ...keys, ...((keys.workspace as string | null) === 'main' && { workspace: 'base' as const }) };
 };
@@ -146,7 +145,7 @@ const keysOf = (spec: ListedStep['spec']): WorkflowStep['keys'] => {
  * too), so a spec read and proposed back changes nothing. No steps where a step's frontmatter does not read (`WorkflowError`, or its YAML
  * refused), nor where a key holds a value no step's key takes (`WorkflowSpec`), which the loader refuses too: `status.error` says why.
  */
-const specAt = (dir: string): WorkflowSpec => {
+const specAt = (dir: string) => {
   let read: unknown;
   try {
     read = workflowSpecAt(dir);
@@ -166,7 +165,7 @@ const specAt = (dir: string): WorkflowSpec => {
  * factory hires an agent into read as if its file named that agent, and a templated factory's agents looked for in its tree. Refused
  * `Invalid` without a name, and as the reader refuses.
  */
-async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
+async function folderRead(s: Served, { name, files }: DefinitionFiles) {
   if (name === undefined)
     throw new Invalid({
       error:
@@ -181,7 +180,7 @@ async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<
 }
 
 /** A step the object sends, as the builder takes it: `agent` among its keys makes every key its own, and its body its own note. */
-const stepBodyOf = (step: WorkflowStep): StepBody => ({
+const stepBodyOf = (step: WorkflowStep) => ({
   name: step.name,
   spec: step.keys,
   body: step.body,
@@ -199,32 +198,33 @@ const workflowObject = (
   listing: WorkflowListing,
   loaded: FolderLoaded,
   revision: number | undefined,
-): Workflow => ({
-  apiVersion: API_VERSION,
-  kind: 'Workflow',
-  metadata: {
-    name: listing.name,
-    ...(namespace !== undefined && { namespace }),
-    creationTimestamp: writtenAt(listing.dir),
-    resourceVersion: listing.version,
-  },
-  spec: specAt(listing.dir),
-  status: {
-    origin,
-    ...(shadowedBy !== null && { shadowedBy }),
-    ...(revision !== undefined && { revision }),
-    dir: listing.dir,
-    description: listing.description,
-    needs: workflowNeeds(listing.dir),
-    readmeBody: listing.readme,
-    graph: typedGraphOf('error' in loaded ? [] : loaded.steps),
-    steps: listing.steps.map((step) => ({ ...step, spec: keysOf(step.spec) })),
-    schemas: listing.schemas,
-    folderTeam: listing.folderTeam,
-    error: listing.error,
-    unfilled: listing.unfilled,
-  },
-});
+) =>
+  ({
+    apiVersion: API_VERSION,
+    kind: 'Workflow',
+    metadata: {
+      name: listing.name,
+      ...(namespace !== undefined && { namespace }),
+      creationTimestamp: writtenAt(listing.dir),
+      resourceVersion: listing.version,
+    },
+    spec: specAt(listing.dir),
+    status: {
+      origin,
+      ...(shadowedBy !== null && { shadowedBy }),
+      ...(revision !== undefined && { revision }),
+      dir: listing.dir,
+      description: listing.description,
+      needs: workflowNeeds(listing.dir),
+      readmeBody: listing.readme,
+      graph: typedGraphOf('error' in loaded ? [] : loaded.steps),
+      steps: listing.steps.map((step) => ({ ...step, spec: keysOf(step.spec) })),
+      schemas: listing.schemas,
+      folderTeam: listing.folderTeam,
+      error: listing.error,
+      unfilled: listing.unfilled,
+    },
+  }) satisfies Workflow;
 
 /**
  * The objects of the folders `served`, each loaded now as a start in the request's factory would load it, its hires filling their steps:
@@ -236,7 +236,7 @@ const workflowObject = (
  * @param served The folders to answer, each with its origin and what shadows it.
  * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
-export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
+export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string) {
   const repo = repoLayer(s);
   const loaded = await loadedOf(
     s.e,
@@ -267,10 +267,10 @@ const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/workfl
  * @param name The workflow's name.
  * @param asked The origin asked for, or undefined for the one the name resolves to.
  */
-export async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Workflow> {
+export async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin) {
   const [one] = await workflowObjectsOf(s, [servedNamed(heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Workflow;
 }
 
 /** The namespace the library is read in: the default factory with no repository, whose workflows are the person's and the builtins. */
@@ -283,17 +283,17 @@ const LIBRARY_PATH = 'GET /api/workflows';
 const libraryHeld = (s: Served) => heldIn(s).filter((h) => h.origin === 'user' || h.origin === 'builtin');
 
 /** The library's objects of the workflows `served`, in no namespace, each with the factories that attach it. */
-const libraryObjectsOf = async (s: Served, served: Parameters<typeof workflowObjectsOf>[1]): Promise<Workflow[]> =>
+const libraryObjectsOf = async (s: Served, served: Parameters<typeof workflowObjectsOf>[1]) =>
   (await workflowObjectsOf(s, served)).map((one) => ({
     ...one,
     status: { ...one.status, factories: libraryUsers(s.home, { kind: 'Workflow', name: one.metadata.name }) },
-  }));
+  })) satisfies Workflow[];
 
 /** The library's workflow `name` (from `asked`, where one is), read now. */
-async function libraryAt(s: Served, name: string, asked?: Origin): Promise<Workflow> {
+async function libraryAt(s: Served, name: string, asked?: Origin) {
   const [one] = await libraryObjectsOf(s, [servedNamed(libraryHeld(s), name, asked, LIBRARY_PATH)]);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);
-  return one;
+  return one satisfies Workflow as Workflow;
 }
 
 /** The steps a write sends, as the builder drafts them, or the first refusal of one, thrown as the `Api`'s error. */
@@ -319,12 +319,12 @@ const writing = (s: Served, name: string, changes: boolean) => ({
 });
 
 /** The builder's answer: the steps a refusal names kept beside its words. */
-const builderRefused = (saved: Awaited<ReturnType<typeof write>>): void => {
+const builderRefused = (saved: Awaited<ReturnType<typeof write>>) => {
   if ('error' in saved) throw new Invalid({ error: saved.error, steps: saved.steps });
 };
 
 /** The workflow `payload` names made in the user library with its first step, read back. */
-async function libraryCreated(s: Served, payload: WorkflowCreate): Promise<Workflow> {
+async function libraryCreated(s: Served, payload: WorkflowCreate) {
   const { name } = payload.metadata;
   const route = 'POST /api/workflows';
   writeGoes('library', 'create', thereOf(libraryHeld(s), name));
@@ -339,7 +339,7 @@ async function libraryCreated(s: Served, payload: WorkflowCreate): Promise<Workf
 }
 
 /** The library's workflow `name` written over from `payload`, at the version it was read at, read back. */
-async function libraryReplaced(s: Served, name: string, payload: WorkflowWrite): Promise<Workflow> {
+async function libraryReplaced(s: Served, name: string, payload: WorkflowWrite) {
   const route = `PUT /api/workflows/${name}`;
   writeGoes('library', 'replace', thereOf(libraryHeld(s), name));
   const steps = draftsOf(payload.spec.steps, route);

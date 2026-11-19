@@ -14,7 +14,7 @@ const CLAIM_EVERY_MS = 2_000;
 const reload = () => window.location.reload();
 
 /** The status a refusal carries, where it carries one. */
-const statusOf = (error: unknown): number | undefined => {
+const statusOf = (error: unknown) => {
   const status = typeof error === 'object' && error !== null ? Reflect.get(error, 'status') : undefined;
   return typeof status === 'number' ? status : undefined;
 };

@@ -32,7 +32,7 @@ const UNIT_MS: Readonly<Record<string, number>> = { ms: 1, s: 1_000, m: 60_000 }
  * undefined where it does not read as one. Pure.
  * @param text The duration as typed.
  */
-export function waitForOf(text: string): number | undefined {
+export function waitForOf(text: string) {
   const [, digits, unit] = /^(\d+)(ms|s|m)$/.exec(text.trim()) ?? [];
   const per = unit === undefined ? undefined : UNIT_MS[unit];
   return digits === undefined || per === undefined ? undefined : Number(digits) * per;
@@ -43,7 +43,7 @@ export function waitForOf(text: string): number | undefined {
  * in its form, none to wait, or longer than a call lives. Pure.
  * @param text The duration `--for` was given; undefined where it was given none.
  */
-export function waitForBound(text: string | undefined): { readonly ms: number } | { readonly refusal: string } {
+export function waitForBound(text: string | undefined) {
   const asked = text === undefined ? undefined : waitForOf(text);
   if (text !== undefined && asked === undefined)
     return {

@@ -16,10 +16,10 @@ export type RouteTable = { readonly from: string; readonly table: Readonly<Recor
 export type TablePick = { readonly kind: 'route'; readonly route: string } | { readonly kind: 'unsigned' };
 
 /** Whether `route` is one of the condition's declared routes. */
-const declared = (routes: readonly string[], route: string): boolean => routes.includes(route);
+const declared = (routes: readonly string[], route: string) => routes.includes(route);
 
 /** The row the table holds for a value, when the value is a string, the table's own key, and its row a string. */
-const rowOf = (table: RouteTable, value: unknown): string | undefined => {
+const rowOf = (table: RouteTable, value: unknown) => {
   if (typeof value !== 'string' || !Object.hasOwn(table.table, value)) return undefined;
   const row: unknown = table.table[value];
   return typeof row === 'string' ? row : undefined;

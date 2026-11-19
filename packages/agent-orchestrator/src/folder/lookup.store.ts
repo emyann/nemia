@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import type { LibraryAdded, Places } from '../skills/read.store.ts';
+import type { LibraryAdded } from '../skills/read.store.ts';
 
 /**
  * Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store at
@@ -14,7 +14,7 @@ import type { LibraryAdded, Places } from '../skills/read.store.ts';
  * @param repo The repository the run is on, or undefined for a run on none.
  * @param added The names the run's factory has added from the library (`addedOf`); undefined reads the library whole.
  */
-export const placesOf = (home: string, repo: string | undefined, added?: LibraryAdded): Places => ({
+export const placesOf = (home: string, repo: string | undefined, added?: LibraryAdded) => ({
   ...(repo ? { repo } : {}),
   home,
   ...(added !== undefined && { added }),
@@ -26,7 +26,7 @@ export const placesOf = (home: string, repo: string | undefined, added?: Library
  * can name it; nor is `agents/`, whose files are the agents the workflows beside it name, nor `skills/`, the skills those agents give.
  * @param dir The folder to list.
  */
-export function foldersIn(dir: string): string[] {
+export function foldersIn(dir: string) {
   let names: string[];
   try {
     names = fs.readdirSync(dir);

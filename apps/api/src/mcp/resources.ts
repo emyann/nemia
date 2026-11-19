@@ -33,10 +33,10 @@ export type FeedView = { readonly uri: string; readonly path: string; readonly s
 export type ViewOrNot = { readonly kind: 'view'; readonly view: FeedView } | { readonly kind: 'none'; readonly message: string };
 
 /** An endpoint's path as a URI template: each `:name` as `{name}`, under the scheme, the selector its query. */
-const uriTemplateOf = (path: string): string => `${SCHEME}://${path.replace(/:([A-Za-z]+)/g, '{$1}')}{?${SELECTOR_KEY}*}`;
+const uriTemplateOf = (path: string) => `${SCHEME}://${path.replace(/:([A-Za-z]+)/g, '{$1}')}{?${SELECTOR_KEY}*}`;
 
 /** A template's name: its path's words, the `api` and each `:name` left out (`events`, `namespaces-events`). */
-const nameOf = (path: string): string =>
+const nameOf = (path: string) =>
   path
     .split('/')
     .filter((part) => part !== '' && part !== 'api' && !part.startsWith(':'))
@@ -46,7 +46,7 @@ const nameOf = (path: string): string =>
  * Whether `endpoint` lists the feed's events: a GET whose success is an `EventList`.
  * @param endpoint The endpoint, its method and the kinds it answers.
  */
-export const listsEvents = (endpoint: Endpoint): boolean => endpoint.method === 'GET' && endpoint.kinds.includes('EventList');
+export const listsEvents = (endpoint: Endpoint) => endpoint.method === 'GET' && endpoint.kinds.includes('EventList');
 
 /** The templates of the feed's resources, one per Event list of the `Api`, in `ENDPOINTS`' order (the fewest names first). */
 export const FEED_TEMPLATES: readonly FeedTemplate[] = ENDPOINTS.filter(listsEvents).map((endpoint) => ({
@@ -62,26 +62,26 @@ export const FEED_TEMPLATES: readonly FeedTemplate[] = ENDPOINTS.filter(listsEve
 }));
 
 /** The templates as a refusal names them. */
-const named = (): string => FEED_TEMPLATES.map((t) => t.uriTemplate).join(' or ');
+const named = () => FEED_TEMPLATES.map((t) => t.uriTemplate).join(' or ');
 
 /**
  * The view `uri` names: a URI of the `nemia` scheme with no host, whose path is one an Event list serves and whose query holds the
  * selector alone (each `labelSelector` kept, in order); else why it names none, naming the templates that do.
  * @param uri The URI a subscription or a read names.
  */
-export const viewOf = (uri: string): ViewOrNot => {
-  const none = (why: string): ViewOrNot => ({ kind: 'none', message: `${uri} ${why}: give a URI of ${named()}` });
+export const viewOf = (uri: string) => {
+  const none = (why: string) => ({ kind: 'none', message: `${uri} ${why}: give a URI of ${named()}` }) satisfies ViewOrNot;
   let url: URL;
   try {
     url = new URL(uri);
   } catch {
-    return none('is no URI');
+    return none('is no URI') satisfies ViewOrNot;
   }
-  if (url.protocol !== `${SCHEME}:` || url.host !== '') return none(`is not of the ${SCHEME}:/// scheme`);
-  if (!FEED_TEMPLATES.some((t) => t.endpoint.pattern.test(url.pathname))) return none('is no feed of the api');
+  if (url.protocol !== `${SCHEME}:` || url.host !== '') return none(`is not of the ${SCHEME}:/// scheme`) satisfies ViewOrNot;
+  if (!FEED_TEMPLATES.some((t) => t.endpoint.pattern.test(url.pathname))) return none('is no feed of the api') satisfies ViewOrNot;
   const other = [...url.searchParams.keys()].filter((key) => key !== SELECTOR_KEY);
-  if (other.length > 0) return none(`takes ${SELECTOR_KEY} alone, not ${[...new Set(other)].join(', ')}`);
-  return { kind: 'view', view: { uri, path: url.pathname, selectors: url.searchParams.getAll(SELECTOR_KEY) } };
+  if (other.length > 0) return none(`takes ${SELECTOR_KEY} alone, not ${[...new Set(other)].join(', ')}`) satisfies ViewOrNot;
+  return { kind: 'view', view: { uri, path: url.pathname, selectors: url.searchParams.getAll(SELECTOR_KEY) } } satisfies ViewOrNot;
 };
 
 /**
@@ -89,7 +89,7 @@ export const viewOf = (uri: string): ViewOrNot => {
  * @param view The view: its path and its selectors.
  * @param extra The keys read with it, each with its value.
  */
-export const pathOf = (view: FeedView, extra: Readonly<Record<string, string>>): string => {
+export const pathOf = (view: FeedView, extra: Readonly<Record<string, string>>) => {
   const query = new URLSearchParams(extra);
   for (const selector of view.selectors) query.append(SELECTOR_KEY, selector);
   return `${view.path}?${query.toString()}`;
@@ -102,7 +102,7 @@ export const pathOf = (view: FeedView, extra: Readonly<Record<string, string>>):
  * @param resourceVersion The version they are at, or undefined where none is known.
  * @param bound The most the text is, in characters; ANSWER_BOUND by default.
  */
-export const readAnswer = (events: readonly Event[], resourceVersion: string | undefined, bound = ANSWER_BOUND): string => {
+export const readAnswer = (events: readonly Event[], resourceVersion: string | undefined, bound = ANSWER_BOUND) => {
   const metadata = resourceVersion === undefined ? {} : { resourceVersion };
   const textOf = (items: readonly Event[]) =>
     JSON.stringify({ apiVersion: 'nemia/v1', kind: 'EventList', metadata, items } satisfies EventList);

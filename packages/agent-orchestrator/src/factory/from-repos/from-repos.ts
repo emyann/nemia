@@ -9,7 +9,7 @@ import type { FileVolume, VolumesFromRepos } from '../../../contracts/volumes-fr
 export type { FileVolume, FormerKeys } from '../../../contracts/volumes-from-repos.contract.ts';
 
 /** The URL `origins` holds for `at`, where it holds one of its own: a prototype's name (`constructor`) is none. */
-const originOf = (origins: Readonly<Record<string, string>> | undefined, at: string): string | undefined =>
+const originOf = (origins: Readonly<Record<string, string>> | undefined, at: string) =>
   origins !== undefined && Object.hasOwn(origins, at) ? origins[at] : undefined;
 
 /**

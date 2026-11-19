@@ -19,7 +19,7 @@ export type { Unmet } from '../../contracts/reach.contract.ts';
 export type { GateSite, NeverWhy } from '../../contracts/never-holds.contract.ts';
 
 /** A step's name as a rule's id may hold it: lowercase letters and digits, every other run of characters a dash. */
-function slugOf(step: string): string {
+function slugOf(step: string) {
   let slug = '';
   for (const ch of step.toLowerCase()) slug += /[a-z0-9]/.test(ch) ? ch : slug.endsWith('-') || slug === '' ? '' : '-';
   return slug.endsWith('-') ? slug.slice(0, -1) : slug;
@@ -87,17 +87,16 @@ const UNMET_WORDS: Record<Condition, string> = {
 };
 
 /** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
-const listed = (words: readonly string[]): string =>
-  words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`);
 
 /** Dollars as a person reads them: whole where they are, else to the cent. */
-const dollars = (n: number): string => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+const dollars = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 /**
  * Why a rule misses a gate, in a person's words, naming the rule by its id.
  * @param miss The rule's first reason it can never approve at the gate.
  */
-export function missWords(miss: RuleMiss): string {
+export function missWords(miss: RuleMiss) {
   if (miss.why === 'answers-retry') return `${miss.rule}: it only tries a step again, and never approves one`;
   if (miss.why === 'other-steps') return `${miss.rule}: it covers other steps, not this one`;
   return `${miss.rule}: it needs "${CONDITION_WORDS[miss.condition]}", and ${NEVER_WORDS[miss.because]}`;
@@ -109,24 +108,25 @@ export function missWords(miss: RuleMiss): string {
  * @param rule The rule, whose dollar line is named.
  * @param spend What the run has cost, in dollars.
  */
-export function unmetWords(unmet: Unmet, rule: PolicyRule, spend: number): string {
+export function unmetWords(unmet: Unmet, rule: PolicyRule, spend: number) {
   const line = unmet.overLine && rule.under !== undefined ? [`it has cost ${dollars(spend)}, past its ${dollars(rule.under)} line`] : [];
   return listed([...unmet.conditions.map((c) => UNMET_WORDS[c]), ...line]);
 }
 
 /** The first reason `rule` can never approve at `site`, or undefined where it can. */
-function missOf(rule: PolicyRule, site: GateSite): RuleMiss | undefined {
-  if (rule.answer === 'retry') return { rule: rule.id, why: 'answers-retry' };
-  if (rule.steps !== undefined && !rule.steps.includes(site.step)) return { rule: rule.id, why: 'other-steps' };
+function missOf(rule: PolicyRule, site: GateSite) {
+  if (rule.answer === 'retry') return { rule: rule.id, why: 'answers-retry' } satisfies RuleMiss | undefined;
+  if (rule.steps !== undefined && !rule.steps.includes(site.step))
+    return { rule: rule.id, why: 'other-steps' } satisfies RuleMiss | undefined;
   for (const condition of CONDITIONS) {
     const because = rule.when.includes(condition) ? neverHolds(site, condition) : null;
-    if (because !== null) return { rule: rule.id, why: 'never-holds', condition, because };
+    if (because !== null) return { rule: rule.id, why: 'never-holds', condition, because } satisfies RuleMiss | undefined;
   }
   return undefined;
 }
 
 /** A gate's row: the rules that reach it, those proposed that would, the misses, and, given facts, what keeps each rule now. */
-function rowOf(inForce: readonly PolicyRule[], proposed: readonly PolicyRule[], site: GateSite, facts: Facts | undefined): GateReach {
+function rowOf(inForce: readonly PolicyRule[], proposed: readonly PolicyRule[], site: GateSite, facts: Facts | undefined) {
   const reaching = inForce.filter((rule) => ruleReaches(rule, site));
   const misses = inForce.flatMap((rule) => {
     const miss = missOf(rule, site);
@@ -160,7 +160,7 @@ export function gateRows(
   proposed: readonly PolicyRule[],
   sites: readonly GateSite[],
   factsAt?: (site: GateSite) => Facts | undefined,
-): { reach: Reach; rows: GateReach[]; suggested: PolicyRule[] } {
+) {
   const rows = sites.map((site) => rowOf(inForce, proposed, site, factsAt?.(site)));
   const reached = rows.filter((row) => row.reachedBy.length > 0).length;
   const reach: Reach = reached === rows.length ? 'all' : reached === 0 ? 'none' : 'some';

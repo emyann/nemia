@@ -49,7 +49,7 @@ export const SELECTOR_FORM =
  * undefined where none is. Pure, and asked of `LABEL_KEYS` itself, so a label added under a reserved name is refused by name.
  * @param keys The label keys asked of.
  */
-export const labelKeysRefusal = (keys: readonly string[]): string | undefined => {
+export const labelKeysRefusal = (keys: readonly string[]) => {
   const taken = keys.find((key) => RESERVED_KEYS.includes(key));
   return taken === undefined
     ? undefined
@@ -86,7 +86,7 @@ const MEANS_LIST = /(^|\s)(in|notin)(\s|\()/;
  * `text` split into its clauses on the commas outside parentheses, so a list's commas stay in their clause — or undefined where a
  * parenthesis is left open, which no split could read.
  */
-function clausesOf(text: string): string[] | undefined {
+function clausesOf(text: string) {
   const out: string[] = [];
   let depth = 0;
   let start = 0;
@@ -106,7 +106,7 @@ function clausesOf(text: string): string[] | undefined {
 }
 
 /** The refusal of `key`, where a selector may not name it, or undefined. */
-const keyRefusal = (key: string): string | undefined => {
+const keyRefusal = (key: string) => {
   if (PROSE_KEYS.includes(key))
     return `${key} is prose a person reads, and nothing selects on it: a selector names a key such as ${SELECTABLE_KEYS.join(', ')} — ${SELECTOR_FORM}`;
   if (key.includes('/'))
@@ -117,14 +117,14 @@ const keyRefusal = (key: string): string | undefined => {
 };
 
 /** The refusal of a value a selector cannot hold: empty, or spelling a comma or a parenthesis, which the grammar reads itself. */
-const valueRefusal = (key: string, op: string, value: string): string | undefined => {
+const valueRefusal = (key: string, op: string, value: string) => {
   if (!value) return `${key}${op} takes a value: ${SELECTOR_FORM}`;
   if (/[(),]/.test(value)) return `${JSON.stringify(value)} is no value of a selector, which reads ( ) and , itself: ${SELECTOR_FORM}`;
   return undefined;
 };
 
 /** The refusal of the values between a list's parentheses: none at all, or one of them empty. */
-const listRefusal = (key: string, list: string): string | undefined => {
+const listRefusal = (key: string, list: string) => {
   const values = list.split(',').map((v) => v.trim());
   if (!list.trim()) return `${key} in () takes a value at least: ${SELECTOR_FORM}`;
   if (values.some((v) => !v)) return `${key} in (${list}) holds an empty value: ${SELECTOR_FORM}`;
@@ -136,7 +136,7 @@ const listRefusal = (key: string, list: string): string | undefined => {
  * meant, a list with no parentheses or none between them, a value the grammar reads itself, and anything else, which has no operator at
  * all. Pure.
  */
-function clauseRefusal(text: string): string | undefined {
+function clauseRefusal(text: string) {
   const t = text.trim();
   if (!t) return `a selector holds an empty clause: ${SELECTOR_FORM}`;
   const [, listedKey, , list] = LISTED.exec(t) ?? [];
@@ -156,7 +156,7 @@ function clauseRefusal(text: string): string | undefined {
  * Pure: what the api's feed refuses a label query in (422), and what a loader of a stored selector throws.
  * @param values The selectors as typed, one per `-l` given.
  */
-export function selectorsRefusal(values: readonly string[]): string | undefined {
+export function selectorsRefusal(values: readonly string[]) {
   for (const value of values) {
     const clauses = clausesOf(value);
     if (clauses === undefined) return `${JSON.stringify(value)} leaves a ( open: ${SELECTOR_FORM}`;
@@ -170,19 +170,19 @@ export function selectorsRefusal(values: readonly string[]): string | undefined 
 }
 
 /** One clause of checked text, parsed (`selectorsRefusal` first): its key, its operator, and its value or values. */
-function clauseOf(text: string): Clause {
+function clauseOf(text: string) {
   const t = text.trim();
   const [, listedKey, listOp, list] = LISTED.exec(t) ?? [];
   if (listedKey !== undefined && list !== undefined) {
     const values = list.split(',').map((v) => v.trim());
-    return listOp === 'notin' ? { key: listedKey, op: 'notin', values } : { key: listedKey, op: 'in', values };
+    return (listOp === 'notin' ? { key: listedKey, op: 'notin', values } : { key: listedKey, op: 'in', values }) satisfies Clause;
   }
   const [, key, op, compared] = COMPARED.exec(t) ?? [];
   if (key !== undefined && compared !== undefined) {
     const value = compared.trim();
-    return op === '!=' ? { key, op: '!=', value } : { key, op: '=', value };
+    return (op === '!=' ? { key, op: '!=', value } : { key, op: '=', value }) satisfies Clause;
   }
-  return { key: t, op: 'exists' };
+  return { key: t, op: 'exists' } satisfies Clause;
 }
 
 /**
@@ -190,8 +190,8 @@ function clauseOf(text: string): Clause {
  * selects every line. Text already held to the grammar (`selectorsRefusal`): what it refuses, this does not read. Pure.
  * @param values The selectors as typed, one per `-l` given.
  */
-export const parseSelectors = (values: readonly string[]): Selectors =>
-  values.map((value) => (clausesOf(value) ?? []).filter((c) => c.trim()).map(clauseOf));
+export const parseSelectors = (values: readonly string[]) =>
+  values.map((value) => (clausesOf(value) ?? []).filter((c) => c.trim()).map(clauseOf)) satisfies Selectors;
 
 /**
  * What `line` offers a selector: a flat map of its keys to their values, read off the signed line (`upgraded`) — `kind` from what it is
@@ -199,7 +199,7 @@ export const parseSelectors = (values: readonly string[]): Selectors =>
  * and `!=` and `notin` always do. The message is no key of it. Pure.
  * @param line The feed line.
  */
-export function selectableOf(line: FeedLine): Readonly<Record<string, string>> {
+export function selectableOf(line: FeedLine) {
   const signed = upgraded(line);
   const labels: Readonly<Record<string, string | undefined>> = signed.labels ?? {};
   const on: Record<string, string> = {};
@@ -218,7 +218,7 @@ export function selectableOf(line: FeedLine): Readonly<Record<string, string>> {
 }
 
 /** Whether `clause` holds of `value`, the line's under its key, or undefined where the line carries none. Pure. */
-function holds(clause: Clause, value: string | undefined): boolean {
+function holds(clause: Clause, value: string | undefined) {
   if (clause.op === 'exists') return value !== undefined;
   if (clause.op === '=') return value === clause.value;
   if (clause.op === '!=') return value !== clause.value;
@@ -227,8 +227,7 @@ function holds(clause: Clause, value: string | undefined): boolean {
 }
 
 /** The values a clause names: its one, or its list. */
-const named = (clause: Clause): readonly string[] =>
-  clause.op === 'exists' ? [] : clause.op === '=' || clause.op === '!=' ? [clause.value] : clause.values;
+const named = (clause: Clause) => (clause.op === 'exists' ? [] : clause.op === '=' || clause.op === '!=' ? [clause.value] : clause.values);
 
 /**
  * Whether `clause` holds of `line`, whose keys are `on`: a clause on `reason` naming a former code is held of the line's current reason and
@@ -236,7 +235,7 @@ const named = (clause: Clause): readonly string[] =>
  * The line's codes are read as its writer wrote them, which a newer `nemia` may have written outside the table: `formerOf` matches only
  * the codes it knows.
  */
-function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, string>>): boolean {
+function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, string>>) {
   const value = on[clause.key];
   if (clause.key !== 'reason' || !named(clause).some(isFormerReason)) return holds(clause, value);
   const former = value === undefined ? undefined : formerOf({ reason: value, on: on.on, via: on.via } as Codes, involvedOf(line).kind);
@@ -250,7 +249,7 @@ function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, str
  * @param selectors The parsed selectors (`parseSelectors`).
  * @param line The feed line.
  */
-export function selects(selectors: Selectors, line: FeedLine): boolean {
+export function selects(selectors: Selectors, line: FeedLine) {
   if (selectors.length === 0) return true;
   const on = selectableOf(line);
   return selectors.some((clauses) => clauses.every((clause) => holdsOf(clause, line, on)));
@@ -262,7 +261,7 @@ export function selects(selectors: Selectors, line: FeedLine): boolean {
  * @param selectors The parsed selectors (`parseSelectors`).
  * @param labels The flat map of label keys to their values.
  */
-export function selectsLabels(selectors: Selectors, labels: Readonly<Record<string, string>>): boolean {
+export function selectsLabels(selectors: Selectors, labels: Readonly<Record<string, string>>) {
   if (selectors.length === 0) return true;
   return selectors.some((clauses) => clauses.every((clause) => holds(clause, labels[clause.key])));
 }

@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Args, TemplateGiven } from 'objects';
+import type { Args } from 'objects';
 import { chosenOf } from '../../context.ts';
 import { captured } from '../../local.ts';
 import { asked } from '../../objects.ts';
@@ -24,7 +24,7 @@ import { adoptLines, approveLine, planLines, resolveLine, UNKNOWN } from './plan
 const TEMPLATE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** The archive `nemia template pack` writes of `folder` on this machine, read and removed; refused where it does not pack. */
-async function packed(folder: string, command: string, env: NodeJS.ProcessEnv): Promise<Buffer> {
+async function packed(folder: string, command: string, env: NodeJS.ProcessEnv) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-template-'));
   try {
     const out = path.join(dir, 'template.tgz');
@@ -47,7 +47,7 @@ async function packed(folder: string, command: string, env: NodeJS.ProcessEnv): 
  * @param command The command's name, said in a refusal.
  * @param env The environment whose chosen context says whether the daemon is this machine's; this process's by default.
  */
-export async function templateSent(given: string, command: string, env: NodeJS.ProcessEnv = process.env): Promise<TemplateGiven> {
+export async function templateSent(given: string, command: string, env: NodeJS.ProcessEnv = process.env) {
   if (TEMPLATE_NAME.test(given)) return { name: given };
   if (chosenOf(env).kind !== 'remote') return { path: path.resolve(given) };
   const at = fs.statSync(given, { throwIfNoEntry: false });
@@ -59,22 +59,22 @@ export async function templateSent(given: string, command: string, env: NodeJS.P
 }
 
 /** The template `--template` names, sent; none where it is not given, for the api to refuse in its words. */
-const templateOf = async (args: Args, command: string): Promise<{ template?: TemplateGiven }> => {
+const templateOf = async (args: Args, command: string) => {
   const given = textArg(args, 'template');
   return given === undefined ? {} : { template: await templateSent(given, command) };
 };
 
 /** The `--set` words, where any were given. */
-const setsOf = (args: Args): { sets?: readonly string[] } => {
+const setsOf = (args: Args) => {
   const sets = listArg(args, 'sets');
-  return sets.length ? { sets } : {};
+  return (sets.length ? { sets } : {}) satisfies { sets?: readonly string[] } as { sets?: readonly string[] };
 };
 
 /**
  * `nemia factory apply`: a factory made from a template, with its volumes, its writable ones trusted unless `--no-trust`.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryApply(args: Args): Promise<number> {
+export async function factoryApply(args: Args) {
   const name = textOf(args, 'name');
   const volumes = listArg(args, 'volumes').map((v) => volumeSent(v));
   const payload = {
@@ -98,7 +98,7 @@ export async function factoryApply(args: Args): Promise<number> {
  * `nemia factory diff`: the preview of a templated factory's upgrade, or of a hand-made one's takeover; nothing written.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryDiff(args: Args): Promise<number> {
+export async function factoryDiff(args: Args) {
   const factory = textOf(args, 'factory');
   const to = textArg(args, 'to');
   const payload = { ...(to === undefined ? {} : { to }), ...(await templateOf(args, 'factory diff')), ...setsOf(args) };
@@ -111,7 +111,7 @@ export async function factoryDiff(args: Args): Promise<number> {
  * `nemia factory adopt`: a hand-made factory taken over by a template, by the plan's digest its preview printed.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryAdopt(args: Args): Promise<number> {
+export async function factoryAdopt(args: Args) {
   const factory = textOf(args, 'factory');
   const plan = textArg(args, 'plan');
   const payload = { ...(await templateOf(args, 'factory adopt')), ...setsOf(args), ...(plan === undefined ? {} : { plan }) };
@@ -128,7 +128,7 @@ export async function factoryAdopt(args: Args): Promise<number> {
  * `nemia factory upgrade`: an upgrade filed, by the plan's digest where its preview printed one.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryUpgrade(args: Args): Promise<number> {
+export async function factoryUpgrade(args: Args) {
   const factory = textOf(args, 'factory');
   const [to, plan] = [textArg(args, 'to'), textArg(args, 'plan')];
   const payload = {
@@ -152,18 +152,18 @@ export async function factoryUpgrade(args: Args): Promise<number> {
 }
 
 /** The choice the resolve's arguments give: ours, theirs, or the text of `--file`, read here. */
-const choiceOf = (args: Args): { ours: true } | { theirs: true } | { text: string } =>
-  switchArg(args, 'ours')
+const choiceOf = (args: Args) =>
+  (switchArg(args, 'ours')
     ? { ours: true }
     : switchArg(args, 'theirs')
       ? { theirs: true }
-      : { text: fileText(textOf(args, 'file'), 'factory resolve') };
+      : { text: fileText(textOf(args, 'file'), 'factory resolve') }) satisfies { ours: true } | { theirs: true } | { text: string };
 
 /**
  * `nemia factory resolve`: one conflict of the upgrade under way given its choice, and what still waits.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function factoryResolve(args: Args): Promise<number> {
+export async function factoryResolve(args: Args) {
   const factory = textOf(args, 'factory');
   const conflict = textOf(args, 'conflict');
   const payload = { conflict, ...choiceOf(args) };

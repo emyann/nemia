@@ -24,15 +24,16 @@ const UNRUN: HarnessCheck = {
 };
 
 /** A harness's install piece in place, carrying `checks`. */
-const install = (checks: HarnessCheck[]): ReadinessPiece => ({
-  name: 'agent-one',
-  area: 'harness',
-  state: 'met',
-  message: 'Agent One (agent) is installed',
-  fixes: [],
-  harness: { name: 'agent-one', part: 'install' },
-  checks,
-});
+const install = (checks: HarnessCheck[]) =>
+  ({
+    name: 'agent-one',
+    area: 'harness',
+    state: 'met',
+    message: 'Agent One (agent) is installed',
+    fixes: [],
+    harness: { name: 'agent-one', part: 'install' },
+    checks,
+  }) satisfies ReadinessPiece;
 
 /** The sign-in's typed fix, offered under a turn that failed. */
 const SIGN_IN_FIX = { message: 'sign in through the browser', command: 'agent-one auth login', startable: false, kind: 'typed' } as const;

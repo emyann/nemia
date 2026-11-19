@@ -5,11 +5,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { gitSays, isDirectory, refused } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The verb's body. */
-export function* seal({ tree }: PlaceRequests['seal']): Asking<Reply<'seal'>> {
+export function* seal({ tree }: PlaceRequests['seal']) {
   if (!isDirectory(tree)) return refused(`${tree} is not a directory, so there is no exported tree to seal`);
   const own = path.join(tree, '.git');
   if (!fs.existsSync(own)) return { removed: false };

@@ -45,7 +45,7 @@ const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<
 };
 
 /** `verb`'s body for `request`, which it reads first: one it cannot read is `Malformed` before any command is run. */
-function* body<V extends PlaceVerb>(verb: V, request: PlaceRequests[V]): Asking<Reply<V>> {
+function* body<V extends PlaceVerb>(verb: V, request: PlaceRequests[V]) {
   readable(verb, request);
   return yield* VERBS[verb](request);
 }
@@ -54,7 +54,7 @@ function* body<V extends PlaceVerb>(verb: V, request: PlaceRequests[V]): Asking<
 export type GitPlaceOptions = { readonly env?: NodeJS.ProcessEnv; readonly started?: () => void };
 
 /** A git place: one object that answers every repository it is asked of, and keeps nothing of any. */
-export function gitPlace(options: GitPlaceOptions = {}): Place {
+export function gitPlace(options: GitPlaceOptions = {}) {
   const asked = (verb: PlaceVerb, given: AskOptions | undefined) => ({
     deadlineMs: given?.deadlineMs ?? PLACE_DEADLINE_MS[verb],
     graceMs: given?.graceMs ?? STOP_GRACE_MS,
@@ -65,5 +65,5 @@ export function gitPlace(options: GitPlaceOptions = {}): Place {
     declared,
     ask: (verb, request, given) => answered(verb, () => body(verb, request), asked(verb, given)),
     askNow: (verb, request, given) => answeredNow(verb, body(verb, request), asked(verb, given)),
-  };
+  } satisfies Place as Place;
 }

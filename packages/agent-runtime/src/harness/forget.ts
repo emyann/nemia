@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { RunnerError } from './error.ts';
-import type { SessionForgotten, SessionKept } from './seam.ts';
+import type { SessionKept } from './seam.ts';
 
 /**
  * The answer of the harness `harness`'s `forget`: each of `files` that is there, removed unless `dry`, and what `left` names,
@@ -15,12 +15,7 @@ import type { SessionForgotten, SessionKept } from './seam.ts';
  * @param left Names what is left of the session that is not removed, asked once the files are.
  * @param dry Whether only to say what would be removed, removing nothing.
  */
-export const forgetFiles = (
-  harness: string,
-  files: readonly string[],
-  left: () => readonly string[],
-  dry: boolean,
-): Effect.Effect<SessionForgotten, RunnerError> =>
+export const forgetFiles = (harness: string, files: readonly string[], left: () => readonly string[], dry: boolean) =>
   Effect.try({
     try: () => {
       const there = files.filter((file) => fs.existsSync(file));
@@ -37,11 +32,7 @@ export const forgetFiles = (
  * @param sessions The sessions asked about.
  * @param of Names a session's files, its records and its output, asked once a session.
  */
-export const keptOf = <S extends { name: string }>(
-  harness: string,
-  sessions: readonly S[],
-  of: (session: S) => SessionKept,
-): Effect.Effect<Record<string, SessionKept>, RunnerError> =>
+export const keptOf = <S extends { name: string }>(harness: string, sessions: readonly S[], of: (session: S) => SessionKept) =>
   Effect.try({
     try: () => {
       const kept: Record<string, SessionKept> = {};

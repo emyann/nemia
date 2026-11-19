@@ -28,10 +28,10 @@ export type VolumeSwitch =
   | { readonly kind: 'missing' };
 
 /** The volume of `volumes` named `name`, the first where two were. */
-const namedIn = (volumes: readonly NamedSwitchable[], name: string): NamedSwitchable | undefined => volumes.find((v) => v.name === name);
+const namedIn = (volumes: readonly NamedSwitchable[], name: string) => volumes.find((v) => v.name === name);
 
 /** Whether `switches` gives either switch. */
-const asked = (switches: VolumeSwitches): boolean => switches.claudeMd !== undefined || switches.skills !== undefined;
+const asked = (switches: VolumeSwitches) => switches.claudeMd !== undefined || switches.skills !== undefined;
 
 const volumeSwitchedSpec = spec<(volumes: readonly NamedSwitchable[], name: string, switches: VolumeSwitches) => VolumeSwitch>({
   ensures: {

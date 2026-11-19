@@ -11,7 +11,7 @@ import { TABLE_ACCEPT } from 'objects';
  * Whether `accept`, an `Accept` header's value, names `TABLE_ACCEPT` among its comma-separated values.
  * @param accept The Accept header's value, or undefined where the request sends none.
  */
-export const acceptsTable = (accept: string | undefined): boolean =>
+export const acceptsTable = (accept: string | undefined) =>
   accept !== undefined && accept.split(',').some((value) => value.replace(/\s+/g, '').toLowerCase() === TABLE_ACCEPT.toLowerCase());
 
 /** Whether the request being answered asks for a `Table` (`acceptsTable` of its `Accept` header). */

@@ -18,7 +18,7 @@ import { FactoryName, isDefaultFactory } from '../factory.model.ts';
 import { doorAt, FactoryDoor } from '../door/factories.store.ts';
 import { tableEntry, type Served } from '../../command/entry.verb.ts';
 import { noFactoryLine } from '../factory.ts';
-import { Invalid, Missing, type Refusal } from '../../refusal/refusal.ts';
+import { Invalid, Missing } from '../../refusal/refusal.ts';
 import { factoryServersFile } from './servers.store.ts';
 import {
   FACTORY_SERVER_ADD_WORDS,
@@ -31,7 +31,7 @@ import {
 import { factoryServerRefusal, headerWritten, maskedHeaders, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+const textOf = (args: Args, key: string) => (typeof args[key] === 'string' ? args[key] : '');
 
 /** One server of a factory's record as a listing gives it: its facts, and the harness's word for its state, or `null` where unread. */
 export type ServerListed = {
@@ -76,7 +76,7 @@ export const statesOf = Effect.fn('statesOf')(function* (record: FactoryServers)
  * @param server The server as the record holds it.
  * @param state The state the harness reported of it, or undefined where none was read.
  */
-export const listedOf = (name: string, server: FactoryServers[string], state: McpServerState | undefined): ServerListed => ({
+export const listedOf = (name: string, server: FactoryServers[string], state: McpServerState | undefined) => ({
   name,
   type: server.type,
   url: server.url,
@@ -111,10 +111,10 @@ export const FACTORY_SERVERS: Served<ServersListing> = {
 };
 
 /** Whether `n` is a port an OAuth app's callback can be registered on: a whole number from 1 to 65535. */
-const isPort = (n: number): boolean => Number.isSafeInteger(n) && n >= 1 && n <= 65535;
+const isPort = (n: number) => Number.isSafeInteger(n) && n >= 1 && n <= 65535;
 
 /** Why `port` is no callback port, naming the flag and the key that give it. */
-const portRefusal = (port: string): string =>
+const portRefusal = (port: string) =>
   `--callback-port (\`oauth.callbackPort\`) takes the port the OAuth app's callback is registered on, a whole number from 1 to 65535, and \`${port}\` is not one: --callback-port 8791. Nothing was recorded.`;
 
 /** What `nemia factory server add` takes: the factory, the server's name, and the McpServer's write (`objects`' `McpServerWrite`). */
@@ -129,7 +129,7 @@ export type ServerRmInput = typeof ServerRmInput.Type;
  * Why a server's write is refused before anything is read, beside `factoryServerRefusal`: a header with no name, a port that is none.
  * @param write The server's write as it was sent.
  */
-export const writeRefusal = (write: McpServerWrite): string | undefined => {
+export const writeRefusal = (write: McpServerWrite) => {
   if (write.headers !== undefined && Object.hasOwn(write.headers, ''))
     return 'A header is sent by its name, and one has none: give each header its name, as { "X-MCP-Toolsets": "actions,repos" }. Nothing was recorded.';
   const port = write.oauth?.callbackPort;
@@ -143,7 +143,7 @@ export const writeRefusal = (write: McpServerWrite): string | undefined => {
  * @param name The factory's name.
  * @param verb What the refused verb would have done, as a past participle (`listed`, `recorded`, `removed`), said in the refusal.
  */
-export const factoryThere = (name: string, verb: string): Effect.Effect<void, Refusal> =>
+export const factoryThere = (name: string, verb: string) =>
   Effect.gen(function* () {
     const door = yield* FactoryDoor;
     const all = yield* door.factories.listed();
@@ -175,7 +175,7 @@ export const factoryThere = (name: string, verb: string): Effect.Effect<void, Re
  * @param server The server as the write sends it.
  * @param stored The server of its name the record holds, or undefined for none.
  */
-export function headersKept(server: FactoryServers[string], stored: FactoryServers[string] | undefined): FactoryServers[string] {
+export function headersKept(server: FactoryServers[string], stored: FactoryServers[string] | undefined) {
   if (server.headers === undefined) return server;
   const headers: Record<string, string> = {};
   for (const [header, sent] of Object.entries(server.headers)) {
@@ -190,12 +190,11 @@ export function headersKept(server: FactoryServers[string], stored: FactoryServe
 }
 
 /** `server` as an answer gives it: its headers masked, as a read serves them. */
-const masked = (server: FactoryServers[string]): FactoryServers[string] =>
+const masked = (server: FactoryServers[string]) =>
   server.headers === undefined ? server : { ...server, headers: maskedHeaders(server.headers) };
 
 /** `server` masked (`masked`), or null for none. */
-const maskedOrNull = (server: FactoryServers[string] | undefined): FactoryServers[string] | null =>
-  server === undefined ? null : masked(server);
+const maskedOrNull = (server: FactoryServers[string] | undefined) => (server === undefined ? null : masked(server));
 
 /** What an add answers: the file written, the server as it was recorded, and the one it replaced, or null, each with its headers masked. */
 type Added = { file: string; name: string; server: FactoryServers[string]; replaced: FactoryServers[string] | null };
@@ -335,7 +334,7 @@ export const unsignedStep = (
   servers: ServersBefore | undefined,
   step: { readonly name: string; readonly harness?: string; readonly agent?: { readonly mcp?: readonly string[] } },
   notes: string[],
-): boolean => {
+) => {
   const why = servers?.refuses(step.harness, step.agent?.mcp) ?? null;
   if (why !== null) notes.push(`${step.name}: not filed — ${why}`);
   return why !== null;

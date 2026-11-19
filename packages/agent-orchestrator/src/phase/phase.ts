@@ -221,7 +221,7 @@ export const PHASE_OF: typeof STEP_PHASE_OF = {
  * A step's codes from its qualified reason: the phase is the reason's (`PHASE_OF`). Pure.
  * @param q The step's reason, with what it waits on or who asks where the reason carries one.
  */
-export const codedStep = (q: QualifiedStep): CodedStep => ({ ...q, phase: PHASE_OF[q.reason] });
+export const codedStep = (q: QualifiedStep) => ({ ...q, phase: PHASE_OF[q.reason] });
 
 /** Where a run stands, as `assess` decides it. */
 type RunStatus = Assessment['status'];
@@ -290,16 +290,16 @@ export const PERSON_WAITS: ReadonlySet<Reason> = new Set<Reason>([
  * A try or a round the run has due moves such a step on, and its readers read that first. Pure.
  * @param status The step's status, as the run's judgement says it.
  */
-export const holdsTheRun = (status: StepStatus): boolean => {
+export const holdsTheRun = (status: StepStatus) => {
   const { reason } = REASON_OF[status];
   return reason !== 'Failed' && PERSON_WAITS.has(reason);
 };
 
 /** What a run stopped on `step` says: the step's reason, and its `via` where it is an answer's. */
-const stoppedOn = (step: CodedStep): QualifiedRun =>
-  step.reason === 'AwaitingAnswer'
+const stoppedOn = (step: CodedStep) =>
+  (step.reason === 'AwaitingAnswer'
     ? { reason: 'AwaitingAnswer', via: step.via }
-    : { reason: step.reason as Exclude<RunReason, 'Waiting' | 'AwaitingAnswer'> };
+    : { reason: step.reason as Exclude<RunReason, 'Waiting' | 'AwaitingAnswer'> }) satisfies QualifiedRun;
 
 /**
  * A run's codes. A running run a person holds (`holding`, the runs the hold waits for, null when nobody holds it) is `Waiting` on `run`
@@ -317,7 +317,7 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * @param holding The runs a person's hold on the run waits for, empty for a hold that names none, or null when nobody holds it.
  * @param steps The run's steps' codes, in the workflow's order; none where none is given.
  */
-export function runCodes(status: RunStatus, holding: readonly unknown[] | null, steps: readonly CodedStep[] = []): CodedRun {
+export function runCodes(status: RunStatus, holding: readonly unknown[] | null, steps: readonly CodedStep[] = []) {
   const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
   const q: QualifiedRun =
     status === 'running' && holding !== null
@@ -341,5 +341,5 @@ export type WaitFacts = {
  * lands without one, or a hold on it only a person lifts. What the list's state reads (`kindOf` in run-state.ts). Pure.
  * @param run What the run says of who it waits on: whether it was called off, its steps waiting on a person, its wait and its hold.
  */
-export const waitsOnYou = (run: WaitFacts): boolean =>
+export const waitsOnYou = (run: WaitFacts) =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));

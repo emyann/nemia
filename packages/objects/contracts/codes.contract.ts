@@ -32,13 +32,13 @@ export type RunCodes = {
 };
 
 /** Whether a step in `reason` is still to come: not filed, waiting on a step or a thing, or of a task the engine has no record of. */
-const toCome = (reason: StepReason): boolean => reason === 'Pending' || reason === 'Waiting' || reason === 'Unknown';
+const toCome = (reason: StepReason) => reason === 'Pending' || reason === 'Waiting' || reason === 'Unknown';
 
 /** Whether a step in `reason` is at work: its session, its check, or parked by the store's pause. */
-const atWork = (reason: StepReason): boolean => reason === 'Running' || reason === 'Checking' || reason === 'Paused';
+const atWork = (reason: StepReason) => reason === 'Running' || reason === 'Checking' || reason === 'Paused';
 
 /** Whether `reason` is a wait on a person, of a step or of a run. */
-const onAPerson = (reason: StepReason | RunReason): boolean =>
+const onAPerson = (reason: StepReason | RunReason) =>
   reason === 'AwaitingApproval' ||
   reason === 'AwaitingAnswer' ||
   reason === 'AwaitingRound' ||
@@ -48,20 +48,20 @@ const onAPerson = (reason: StepReason | RunReason): boolean =>
   reason === 'Denied';
 
 /** Whether a step in `reason` is done: on its own word, on its check's, or its card sent. */
-const done = (reason: StepReason): boolean => reason === 'Succeeded' || reason === 'CheckPassed' || reason === 'Sent';
+const done = (reason: StepReason) => reason === 'Succeeded' || reason === 'CheckPassed' || reason === 'Sent';
 
 /** Whether a step in `reason` broke: its task, its check, or a closeout that does not read. */
-const broke = (reason: StepReason): boolean => reason === 'Failed' || reason === 'CheckFailed' || reason === 'UnreadableCloseout';
+const broke = (reason: StepReason) => reason === 'Failed' || reason === 'CheckFailed' || reason === 'UnreadableCloseout';
 
 /** The phase a step that is neither to come nor at work stands in: waiting on a person, done, broken, or stopped. */
-const restingPhase = (reason: StepReason): StepPhase => {
+const restingPhase = (reason: StepReason) => {
   if (onAPerson(reason)) return 'waiting';
   if (done(reason)) return 'succeeded';
   return broke(reason) ? 'failed' : 'stopped';
 };
 
 /** The phase a step in `reason` stands in. */
-const stepPhase = (reason: StepReason): StepPhase => {
+const stepPhase = (reason: StepReason) => {
   if (toCome(reason)) return 'pending';
   return atWork(reason) ? 'running' : restingPhase(reason);
 };
@@ -70,11 +70,10 @@ const stepPhase = (reason: StepReason): StepPhase => {
  * Whether `phase` is one a step in `reason` is served in. One reason has two: `Unknown` is to come, as the engine folds a task it has no
  * record of, and `failed` for a step whose record does not read at all, which nothing judges.
  */
-const stepPhaseFits = (phase: StepPhase, reason: StepReason): boolean =>
-  phase === stepPhase(reason) || (reason === 'Unknown' && phase === 'failed');
+const stepPhaseFits = (phase: StepPhase, reason: StepReason) => phase === stepPhase(reason) || (reason === 'Unknown' && phase === 'failed');
 
 /** Whether `phase` is the phase a run in `reason` stands in: a run a person holds is to come, and one stopped on a person waits. */
-const runPhaseFits = (phase: RunPhase, reason: RunReason): boolean =>
+const runPhaseFits = (phase: RunPhase, reason: RunReason) =>
   reason === 'Running'
     ? phase === 'running'
     : reason === 'Waiting'

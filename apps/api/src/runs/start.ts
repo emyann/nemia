@@ -21,10 +21,9 @@ import {
   startFactoryAtOnce,
   wiredRepoFor,
   type Factory,
-  type SentInput,
   type StartInput,
 } from 'agent-orchestrator';
-import { type CardStart, type CardStarted, Conflict, Invalid, Missing, type RunStart, type RunStarted } from 'objects';
+import { type CardStart, Conflict, Invalid, Missing, type RunStart } from 'objects';
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
@@ -41,7 +40,7 @@ const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` ta
  * Why the card `card` is not started in the default factory, naming no factory and asked with none: the two places a factory is named,
  * and that nothing was started.
  */
-const noFactoryRefusal = (card: string): string =>
+const noFactoryRefusal = (card: string) =>
   `${card}: this card names no factory, and the default factory reads no repository to start it on. Name its factory at start, ?factory=<name>, or write \`factory: <name>\` on the card. Nothing was started.`;
 
 /** What a start of a run from a brief starts: a workflow's folder, with a brief. */
@@ -67,8 +66,8 @@ const extrasOf = (body: Pick<RunStart, 'models' | 'gates' | 'noWorktree'>) => ({
  * gives none. Refused (422), before anything is written, for an id no file of `namespace` is kept under, naming the upload that makes
  * one.
  */
-function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['inputs']>): SentInput[] {
-  return inputs.map(({ name, file, text, base64 }): SentInput => {
+function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['inputs']>) {
+  return inputs.map(({ name, file, text, base64 }) => {
     const kept = file === undefined ? undefined : fileAt(home, namespace, file);
     if (file !== undefined && kept === undefined)
       throw declaredAs(START_REFUSALS, {
@@ -88,12 +87,7 @@ function sentOf(home: string, namespace: string, inputs: NonNullable<RunStart['i
  * `start` handed the files `inputs` names (`sentOf`), written where it reads them (`sentInputsWritten`) and removed once it has: refused
  * (422) naming `--input` where one cannot be handed (`sentInputRefusal`), before anything is written.
  */
-async function withInputs<A>(
-  s: Served,
-  namespace: string,
-  inputs: RunStart['inputs'],
-  start: (files: string[] | undefined) => Promise<A>,
-): Promise<A> {
+async function withInputs<A>(s: Served, namespace: string, inputs: RunStart['inputs'], start: (files: string[] | undefined) => Promise<A>) {
   if (inputs === undefined || !inputs.length) return start(undefined);
   const sent = sentOf(s.home, namespace, inputs);
   const refused = sentInputRefusal(sent);
@@ -107,7 +101,7 @@ async function withInputs<A>(
 }
 
 /** What a start answers beside the run's id, off what `START` answered: what `nemia start` prints of it, as data (`startedFacts`). */
-const startedOf = (started: Awaited<ReturnType<typeof runStarted>>): RunStarted => ({
+const startedOf = (started: Awaited<ReturnType<typeof runStarted>>) => ({
   id: started.id,
   ...(started.card !== undefined ? { card: started.card } : {}),
   ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
@@ -144,11 +138,11 @@ const handedOf = (body: {
  * `after`, `context`, `cards` and `label` are only shaped by the body: whether this run may wait on each run, be handed each run or card,
  * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words.
  */
-function startOf(body: RunStart, repo: string, home: string, tree?: string): Asked | Refusal {
+function startOf(body: RunStart, repo: string, home: string, tree?: string) {
   const folder = folderOf(body.workflow, body.from, repo, home, tree);
-  if ('status' in folder) return folder;
-  if (body.brief === undefined || !body.brief.trim()) return { status: 422, error: NO_BRIEF };
-  return { dir: folder.dir, brief: body.brief.trim(), ...handedOf(body) };
+  if ('status' in folder) return folder satisfies Asked | Refusal as Asked | Refusal;
+  if (body.brief === undefined || !body.brief.trim()) return { status: 422, error: NO_BRIEF } satisfies Asked | Refusal as Asked | Refusal;
+  return { dir: folder.dir, brief: body.brief.trim(), ...handedOf(body) } satisfies Asked | Refusal as Asked | Refusal;
 }
 
 /**
@@ -168,13 +162,7 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
  * @param factory The factory to start it in, the card's namespace's or the request's; undefined where neither names one.
  * @param namespace The namespace the request names, whose files an input names by id.
  */
-export async function cardStart(
-  s: Served,
-  card: string,
-  body: CardStart,
-  factory: string | undefined,
-  namespace: string,
-): Promise<CardStarted> {
+export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined, namespace: string) {
   if (s.repoNamed) throw new Refused({ message: cardRepoRefusal(card) });
   if (factory === undefined) throw new Refused({ message: noFactoryRefusal(card) });
   const handed = handedOf(body);
@@ -198,9 +186,12 @@ export async function cardStart(
  * The factory a start in `default` runs in, found from `repo` (`startFactoryAtOnce`): the one whose repository holds it. Where none or two
  * do, the start's own refusal (`first`) where it has one, said before the factory's, else the factory's.
  */
-function foundFactory(s: Served, repo: string, first: Asked | Refusal): { factory?: Factory; repo?: string } {
+function foundFactory(s: Served, repo: string, first: Asked | Refusal) {
   try {
-    return startFactoryAtOnce(s.home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts);
+    return startFactoryAtOnce(s.home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts) satisfies {
+      factory?: Factory;
+      repo?: string;
+    };
   } catch (err) {
     if ('status' in first) throw declaredAs(START_REFUSALS, first);
     throw err;
@@ -208,7 +199,7 @@ function foundFactory(s: Served, repo: string, first: Asked | Refusal): { factor
 }
 
 /** The `?repo=` that only found the factory, where its wiring placed the run on another (`wired`): what the start says of it. */
-const foundFactoryBy = (s: Served, wired: string | undefined): { repoFoundFactory?: string } =>
+const foundFactoryBy = (s: Served, wired: string | undefined) =>
   wired !== undefined && s.repoNamed && s.repo !== undefined && s.repo !== wired ? { repoFoundFactory: s.repo } : {};
 
 /**
@@ -234,7 +225,7 @@ const foundFactoryBy = (s: Served, wired: string | undefined): { repoFoundFactor
  * @param body The start's body, as the endpoint decodes it.
  * @param namespace The namespace the request names, whose files an input names by id.
  */
-export async function runStart(s: Served, body: RunStart, namespace: string): Promise<RunStarted> {
+export async function runStart(s: Served, body: RunStart, namespace: string) {
   const { home, factory } = s;
   const wiredIn = (name: string) => wiredRepoFor(home, name, path.basename(body.workflow));
   const named = factory === undefined ? undefined : wiredIn(factory.name);

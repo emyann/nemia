@@ -9,21 +9,21 @@ import { usePagePlace } from '@/components/nav/useSeat';
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { XIcon } from 'lucide-react';
 import { Button, IconButton } from '@/components/ui/ds';
-import { barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
+import { barOpens, barValue, escapeDoes, focusGoesBack } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
 import { routeLink } from '../nav/routeLink';
 
 const RouterLinkButton = routeLink(Button);
 
 /** The text of `target` when it is a field a person types in, else null. */
-function fieldTextOf(target: EventTarget | null): string | null {
+function fieldTextOf(target: EventTarget | null) {
   if (target instanceof HTMLTextAreaElement) return target.value;
   if (target instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'submit', 'reset'].includes(target.type)) return target.value;
   return null;
 }
 
 /** Leaves `field`: for the bar `bar` when the field is in it, else for nothing, so the focus stays out of the bar. */
-function leave(field: EventTarget | null, bar: HTMLElement | null): void {
+function leave(field: EventTarget | null, bar: HTMLElement | null) {
   if (bar && field instanceof Node && bar.contains(field)) bar.focus();
   else if (field instanceof HTMLElement) field.blur();
 }
@@ -50,7 +50,7 @@ function useEscape(bar: RefObject<HTMLElement | null>, close: () => void) {
 }
 
 /** Where the focus stands beside the bar `self`, as `focusGoesBack` reads it. */
-const placeOf = (now: Element | null, self: HTMLElement | null): FocusPlace =>
+const placeOf = (now: Element | null, self: HTMLElement | null) =>
   self?.contains(now) ? 'in' : now === null || now === document.body ? 'nothing' : 'out';
 
 /**

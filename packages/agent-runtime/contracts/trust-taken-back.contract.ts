@@ -11,7 +11,7 @@
 import { type Implementation, spec } from '@emyann/tsverify';
 
 /** `key` names the folder `folder` itself, or a folder inside it: the folder followed by a separator and more. */
-const within = (key: string, folder: string): boolean => key === folder || key.startsWith(folder + '/');
+const within = (key: string, folder: string) => key === folder || key.startsWith(folder + '/');
 
 const claudeKeyUnderSpec = spec<(key: string, folder: string) => boolean>({
   requires: ({ input: [, folder] }) => folder.length > 1 && folder.startsWith('/') && !folder.endsWith('/'),

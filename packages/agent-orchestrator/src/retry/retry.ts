@@ -66,7 +66,7 @@ import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-rechec
 export type CheckKillOf = (step: string) => OutOfMemoryKill | undefined;
 
 /** Whether the machine, not the check's own limit, ran out of memory and killed a process of a step's current check. */
-const machineKilled = (checkKillOf: CheckKillOf, step: string): boolean => checkKillOf(step)?.by === 'machine';
+const machineKilled = (checkKillOf: CheckKillOf, step: string) => checkKillOf(step)?.by === 'machine';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.
@@ -122,7 +122,7 @@ const machineKilled = (checkKillOf: CheckKillOf, step: string): boolean => check
  * @param args The step, the run, each task's phase, each step's closeout, whether a task was asked for one, the run's steps,
  *   `harnessBlocked`, `spendOf`, `verdictOf` and where each branch of the run is now, in `triedOn`'s order.
  */
-export function retryable(...args: Parameters<typeof triedOn>): ReturnType<typeof triedOn> {
+export function retryable(...args: Parameters<typeof triedOn>) {
   const [step, run, , , , steps = []] = args;
   const tried = triedOn(...args);
   if (!routeSettled(step, run, steps)) return tried;
@@ -131,7 +131,7 @@ export function retryable(...args: Parameters<typeof triedOn>): ReturnType<typeo
 }
 
 /** Whether a condition's route is settled for the run: one of the nodes after it has been filed, or sent its card. */
-const routeSettled = (step: StepSpec, run: Run, steps: readonly StepSpec[]): boolean =>
+const routeSettled = (step: StepSpec, run: Run, steps: readonly StepSpec[]) =>
   step.routes !== undefined &&
   steps.some((s) => s.after.includes(step.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
 
@@ -147,7 +147,7 @@ function triedOn(
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   tipOf?: TipOf,
-): { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep {
+) {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
@@ -184,7 +184,7 @@ function triedOn(
     ...(sendsBack ? { sendsBack: true as const } : {}),
     ...(sendsBack && back ? { back } : {}),
     ...(raise ? { raise } : {}),
-  };
+  } satisfies { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep;
 }
 
 /**
@@ -193,13 +193,16 @@ function triedOn(
  * check may run again (`rechecks`, `blockedRecheck`); a session alone from any other end, or where its harness asks or its gate sends it
  * back (`other`).
  */
-const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean, rechecks: boolean): RetryMode[] => {
-  if (rechecks) return ['continue', 'fresh', 'recheck'];
+const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean, rechecks: boolean) => {
+  if (rechecks) return ['continue', 'fresh', 'recheck'] satisfies RetryMode[];
   if (tried === 'budget exhausted')
-    return settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh'];
-  if (tried === 'failed (check)') return landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck'];
+    return (
+      settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh']
+    ) satisfies RetryMode[];
+  if (tried === 'failed (check)')
+    return (landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck']) satisfies RetryMode[];
   const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
-  return ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : [];
+  return (ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : []) satisfies RetryMode[];
 };
 
 /** Whether a step standing `tried` is blocked and its failed check may run again (`blockedRecheck`). */
@@ -211,7 +214,7 @@ const blockedRechecks = (
 ) => tried === 'blocked' && blockedRecheck(blockedRecheckRead(record, true, phaseOf, tipOf)).recheck;
 
 /** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
-const landingAborted = (step: StepSpec, run: Run): boolean => {
+const landingAborted = (step: StepSpec, run: Run) => {
   const landed = run.steps[step.name]?.landed;
   return landsOnCheck(step, run) && landed !== undefined && 'aborted' in landed;
 };
@@ -280,7 +283,7 @@ export type RaiseGrounds = { raise: StepRaise | null; retry: Raise | undefined; 
  * @param run The run's record.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf): ReturnType<typeof loopOver> =>
+export const roundOver = (steps: readonly StepSpec[], step: StepSpec, run: Run, spendOf: SpendOf) =>
   step.loop ? loopOver(steps, step, run, spendOf) : [];
 
 /**
@@ -311,7 +314,7 @@ export function raiseGrounds(
     spendOf,
     reads.verdictOf,
   ),
-): RaiseGrounds {
+) {
   const round = roundOver(steps, step, run, spendOf);
   const own = tried.raise ? ownStatus(step, run, reads.phaseOf, reads.closeoutOf, reads.askedCloseout, steps, spendOf) : null;
   const verdict = raiseVerdict({
@@ -341,12 +344,12 @@ export function raiseGrounds(
  * @param reads Each task's phase, each step's closeout and check verdict, and whether a task was asked for a closeout.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export const stepRaise = (step: StepSpec, run: Run, steps: readonly StepSpec[], reads: RaiseReads, spendOf: SpendOf): StepRaise | null =>
+export const stepRaise = (step: StepSpec, run: Run, steps: readonly StepSpec[], reads: RaiseReads, spendOf: SpendOf) =>
   raiseGrounds(step, run, steps, reads, spendOf).raise;
 
 /** A standing's codes: a session its harness asks the person through is `AwaitingAnswer` via `session`, else its status's reason. */
-const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
-  harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
+const codesOf = (status: StepStatus, harnessAsks: boolean) =>
+  (harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status]) satisfies QualifiedStep;
 
 /**
  * Whether a person's ask carries what a try of its step needs, and nothing it cannot take. A recheck files no session, and carries. An ask
@@ -357,11 +360,11 @@ const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
  * @param raise The raise a session of the step must carry: set on a step over its budget, or ended at it (`retryable`).
  * @param floor What any `--budget` on the step must pass (`raiseOf`): undefined for a step with no `budget:`.
  */
-export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined, floor: Raise | undefined): boolean =>
+export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined, floor: Raise | undefined) =>
   a.mode === 'recheck' || (a.budget === undefined ? !raise : floor !== undefined && a.budget > floor.above);
 
 /** What a due try takes from its ask's `--budget`: the cap it raises to, on a session, and `pastCap` where the step was past its budget. */
-const raisedBy = (ask: RetryAsk, raise: Raise | undefined): Pick<Retry, 'budget' | 'pastCap'> =>
+const raisedBy = (ask: RetryAsk, raise: Raise | undefined) =>
   ask.budget === undefined || ask.mode === 'recheck' ? {} : { budget: ask.budget, ...(raise ? { pastCap: true as const } : {}) };
 
 /**
@@ -371,18 +374,17 @@ const raisedBy = (ask: RetryAsk, raise: Raise | undefined): Pick<Retry, 'budget'
  * @param a The ask, its message read.
  * @param sendsBack Set where a try of the step sends the work back from a gate.
  */
-export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boolean => !sendsBack || a.message !== undefined;
+export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined) => !sendsBack || a.message !== undefined;
 
 /** The task a pause's ask is written for, as the step's record names it now: its check's for a recheck, else its session's. */
-const currentOf = (run: Run, a: RetryAsk): string | null | undefined =>
-  a.mode === 'recheck' ? run.steps[a.step]?.check?.taskId : run.steps[a.step]?.taskId;
+const currentOf = (run: Run, a: RetryAsk) => (a.mode === 'recheck' ? run.steps[a.step]?.check?.taskId : run.steps[a.step]?.taskId);
 
 /**
  * Whether an ask may be due on its task's standing: any ask of a person's own, and the ask `nemia pause --now` wrote (`interrupted`) only
  * while the task it stopped is still the step's current one and the engine reads it settled `stopped`. So such an ask never stops a session
  * first, and never tries a step that ended on its own before its stop was taken.
  */
-const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPhase): boolean =>
+const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPhase) =>
   a.interrupted === undefined || (currentOf(run, a) === a.interrupted && phaseOf(a.interrupted) === 'stopped');
 
 /**
@@ -404,7 +406,7 @@ export function pauseAskVoid(
   a: RetryAsk,
   phaseOf: (taskId: string) => TaskPhase,
   spendOf: SpendOf = () => undefined,
-): boolean {
+) {
   if (a.interrupted === undefined) return false;
   if (currentOf(run, a) !== a.interrupted) return true;
   const phase = phaseOf(a.interrupted);
@@ -427,7 +429,7 @@ export const pauseAsksVoid = (
   asks: readonly RetryAsk[],
   phaseOf: (taskId: string) => TaskPhase,
   spendOf: SpendOf = () => undefined,
-): RetryAsk[] =>
+) =>
   asks.filter((a) => {
     const step = steps.find((s) => s.name === a.step);
     return step !== undefined && pauseAskVoid(step, run, a, phaseOf, spendOf);
@@ -506,7 +508,7 @@ export function retriesDue(
   spendOf: SpendOf = () => undefined,
   checkKillOf: CheckKillOf = () => undefined,
   tipOf: TipOf = () => undefined,
-): Retry[] {
+) {
   const due: Retry[] = [];
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
@@ -573,11 +575,11 @@ export function retriesDue(
 }
 
 /** Whether the run refuses a closeout's envelope or its questions (`closeoutRefusals`): a closeout not given is not. */
-const refusedOf = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
+const refusedOf = (step: StepSpec, said: Closeout | undefined, steps: readonly StepSpec[]) =>
   Boolean(said && closeoutRefusals(step, said, steps).length);
 
 /** Who asked for a try by its ask: `nemia pause --now`, where the ask names the task it stopped, else a person. */
-const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');
+const askedBy = (ask: RetryAsk) => (ask.interrupted === undefined ? 'ask' : 'pause');
 
 /**
  * The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked.
@@ -595,7 +597,7 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
  * @param steps The run's steps, its loop read from them: none where absent.
  * @param answered Whether a person's ask with a message answered the try, false where absent.
  */
-export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: readonly StepSpec[] = [], answered = false): string {
+export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: readonly StepSpec[] = [], answered = false) {
   const tries = record?.tries ?? [];
   const last = tries.at(-1);
   if (!last) return '';
@@ -612,7 +614,7 @@ export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: r
  * How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off ask, the pause, or a person's word — its mode, or a
  * merge of the base.
  */
-function howOf(step: StepSpec, last: EarlierTry): string {
+function howOf(step: StepSpec, last: EarlierTry) {
   if (last.cause === 'retries') return `by retries: ${step.retries ?? 0}`;
   if (last.retried) return `rechecked by retries: ${step.retries ?? 0}, the machine having run out of memory`;
   if (last.cause === 'signoff') return 'asked to sign off by the run';
@@ -624,7 +626,7 @@ function howOf(step: StepSpec, last: EarlierTry): string {
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */
-const sessionNeeds = (raise: Raise | undefined): string =>
+const sessionNeeds = (raise: Raise | undefined) =>
   raise
     ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})`
     : '';
@@ -633,14 +635,15 @@ const sessionNeeds = (raise: Raise | undefined): string =>
  * The words of the offer to raise a step's cap past what it spent (`retryOffers`): its bare command, from `command`, what comes before it
  * in the sentence, from the step's state (`word`) and whether an ending may land again (`landAgain`), and what after, ending on `more`.
  */
-const raiseWords = (command: string, word: string, raise: Raise, landAgain: string, more: string): [string, string, string] => [
-  `${command} --budget <amount>`,
-  `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${landAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
-  `  (--fresh, or --model <m>, for a new session${more})`,
-];
+const raiseWords = (command: string, word: string, raise: Raise, landAgain: string, more: string) =>
+  [
+    `${command} --budget <amount>`,
+    `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${landAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
+    `  (--fresh, or --model <m>, for a new session${more})`,
+  ] satisfies [string, string, string];
 
 /** What `--recheck` does, said beside a raise where it is offered (`retryOffers`): runs a check never run, or one that did not finish. */
-const recheckWords = (status: StepStatus, modes: readonly RetryMode[]): string =>
+const recheckWords = (status: StepStatus, modes: readonly RetryMode[]) =>
   !modes.includes('recheck')
     ? ''
     : status === 'budget exhausted'
@@ -651,24 +654,19 @@ const recheckWords = (status: StepStatus, modes: readonly RetryMode[]): string =
  * The words of the offer to send a step's work back when the endings after it (`back`) stopped on the base branch (`retryOffers`): its
  * bare command, from `command`, and what comes before it in the sentence.
  */
-const backWords = (command: string, step: string, back: string): [string, string] => [
-  `${command} --message "<objection>"`,
-  `${back} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step} is filed again with your objection and what ${back} said, may ask for a round, and ${back} waits at its gate for a new approval`,
-];
+const backWords = (command: string, step: string, back: string) =>
+  [
+    `${command} --message "<objection>"`,
+    `${back} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step} is filed again with your objection and what ${back} said, may ask for a round, and ${back} waits at its gate for a new approval`,
+  ] satisfies [string, string];
 
 /**
  * The words of the offer to an ending that lands on its check, whose merge the run aborted (`retryOffers`): its bare `command`, what comes
  * before it in the sentence and what after. Merge and check again when its check did not finish (`unfinished`), with nothing staged for
  * `--recheck` to judge; otherwise continue its session, told what happened (`happened`). Each with what a new session needs past a budget.
  */
-const abortedWords = (
-  run: Run,
-  command: string,
-  unfinished: boolean,
-  raise: Raise | undefined,
-  happened: string,
-): [string, string, string] =>
-  unfinished
+const abortedWords = (run: Run, command: string, unfinished: boolean, raise: Raise | undefined, happened: string) =>
+  (unfinished
     ? [
         command,
         `its check did not finish, so the run aborted the merge and nothing landed on ${run.branch}. Merge and check again`,
@@ -678,7 +676,7 @@ const abortedWords = (
         command,
         `${happened} Continue its session, told what happened`,
         `  (--fresh, or --model <m>, for a new session${sessionNeeds(raise)})`,
-      ];
+      ]) satisfies [string, string, string];
 
 /**
  * What `nemia decide` offers for each step a person may try again: the command, and what it does. Pure.
@@ -727,7 +725,7 @@ export function retryOffers(
   landingDenied: () => readonly string[] = () => [],
   checkKillOf: CheckKillOf = () => undefined,
   tipOf: TipOf = () => undefined,
-): Offer[] {
+) {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   const lines: Offer[] = [];
   for (const step of steps) {
@@ -794,17 +792,17 @@ export function retryOffers(
  * The exit code of a step's refused check where its `checkFailurePolicy:` says the refusal is a person's to answer (`FailStep`,
  * `checkFailureAction`), or undefined: no policy, a code the policy counts, a check that did not finish or has no verdict. Pure.
  */
-function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Verdict | undefined): number | undefined {
+function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Verdict | undefined) {
   if (verdict === undefined || verdict === 'unfinished') return undefined;
   return checkFailureAction(step.checkFailurePolicy, verdict) === 'FailStep' ? verdict : undefined;
 }
 
 /** Whether a `failed (check)` step's check the machine killed is offered `--recheck` first, where `--recheck` is a way to try it. Pure. */
-const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf): boolean =>
+const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf) =>
   status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step);
 
 /** Whether a blocked step is offered `--recheck` first: its failed check may run again (`retryable`, `blockedRecheck`). */
-const blockedOffered = (status: StepStatus, modes: readonly RetryMode[]): boolean => status === 'blocked' && modes.includes('recheck');
+const blockedOffered = (status: StepStatus, modes: readonly RetryMode[]) => status === 'blocked' && modes.includes('recheck');
 
 /** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
 const personsOffered = (
@@ -812,8 +810,7 @@ const personsOffered = (
   status: StepStatus,
   modes: readonly RetryMode[],
   verdictOf: (step: string) => Verdict | undefined,
-): number | undefined =>
-  status === 'failed (check)' && modes.includes('recheck') ? personsRefusal(step, verdictOf(step.name)) : undefined;
+) => (status === 'failed (check)' && modes.includes('recheck') ? personsRefusal(step, verdictOf(step.name)) : undefined);
 
 /**
  * What `nemia decide` says of a blocked step whose failed check may run again (`blockedRecheck`): the branch is where that check judged it,
@@ -836,38 +833,40 @@ function recheckFirst(
   machine: boolean,
   blocked: boolean,
   persons: () => number | undefined,
-): [string, string, string] | undefined {
-  if (blocked) return [`${command} --recheck`, BLOCKED_RECHECK, `  (or answer its session: ${command} --message "<answer>"${spent})`];
+) {
+  if (blocked)
+    return [`${command} --recheck`, BLOCKED_RECHECK, `  (or answer its session: ${command} --message "<answer>"${spent})`] satisfies
+      | [string, string, string]
+      | undefined;
   if (machine)
     return [
       `${command} --recheck`,
       'the machine ran out of memory and killed a process of its check, under its own limit: no verdict on the work. Run the check again, and nothing else, once the machine has room',
       `  (or continue its session, told what happened: ${command}${spent})`,
-    ];
+    ] satisfies [string, string, string] | undefined;
   if (unfinished)
     return [
       `${command} --recheck`,
       'its check did not finish, so no retry was spent on it. Run the check again, and nothing else',
       sessionNeeds(raise),
-    ];
+    ] satisfies [string, string, string] | undefined;
   const exit = raise ? undefined : persons();
   if (exit === undefined) return undefined;
   return [
     `${command} --recheck`,
     `its check exited ${exit}, which its \`checkFailurePolicy:\` names a person's to answer, so no retry was spent on it. Answer what its check said, then run the check again, and nothing else`,
     `  (or continue its session, told what happened: ${command}${spent})`,
-  ];
+  ] satisfies [string, string, string] | undefined;
 }
 
 /**
  * What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure.
  * @param args The arguments `retryOffers` takes, in its order.
  */
-export const retryLines = (...args: Parameters<typeof retryOffers>): string[] => retryOffers(...args).map((o) => o.said);
+export const retryLines = (...args: Parameters<typeof retryOffers>) => retryOffers(...args).map((o) => o.said);
 
 /** What the current task of a step's record was denied (`TaskSpend.denied`): none for a record with no task, or a task with no denial. */
-const deniedOn = (record: StepRecord | undefined, spendOf: SpendOf): readonly string[] =>
-  (record?.taskId ? spendOf(record.taskId) : undefined)?.denied ?? [];
+const deniedOn = (record: StepRecord | undefined, spendOf: SpendOf) => (record?.taskId ? spendOf(record.taskId) : undefined)?.denied ?? [];
 
 /**
  * The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allowedTools:`, so a path goes
@@ -886,7 +885,7 @@ const RULE_CAP = 240;
  * @param step The step's deny rules, none where absent.
  * @param at The step's working folder and the run's id, which a path written from it is read against: none where absent.
  */
-export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
+export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'disallowedTools'> = {}, at: DeniedAt = {}) {
   const calls = [...new Set(denied)];
   const fenced = calls.flatMap((call) => {
     const rule = disallowedBy(call, step.disallowedTools ?? [], at);
@@ -903,7 +902,7 @@ export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'dis
 }
 
 /** Rules or calls as `deniedOffer` names them: each one line, the first `DENIED_SHOWN`, then how many more. Pure. */
-function shownList(words: readonly string[]): string {
+function shownList(words: readonly string[]) {
   const named = words.slice(0, DENIED_SHOWN).map((word) => oneLine(word, RULE_CAP));
   const more = words.length - named.length;
   return `${named.join(', ')}${more ? ` and ${more} more (nemia logs)` : ''}`;
@@ -922,7 +921,7 @@ function shownList(words: readonly string[]): string {
  * @param d The run's decision.
  * @param spendOf What each task's sessions cost (`taskSpend`).
  */
-export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
+export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision, spendOf: SpendOf) {
   if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
   const why = d.overBudget.map((name) => {
     const step = steps.find((s) => s.name === name);
@@ -966,7 +965,7 @@ export function answerLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
   needsRefused: (step: string) => string | undefined = () => undefined,
-): Record<string, string> {
+) {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {

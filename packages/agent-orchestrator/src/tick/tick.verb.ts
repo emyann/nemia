@@ -25,7 +25,7 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { passRevisions } from '../revisions/pin.verb.ts';
 import { DRAIN_OF, pauseModeOf } from '../pause-machine/pause-machine.ts';
 import { liftLapsedPause, readPause, readResumed } from '../pause/pause.store.ts';
-import { finishingAmong, parkedAmong, type Finishing, type Parked, type Pause, type PauseStanding } from '../pause/pause.ts';
+import { finishingAmong, parkedAmong, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong } from '../steps/steps.verb.ts';
@@ -34,7 +34,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedConflicts, FeedMissing, FeedReadiness, FeedResumed } from '../feed/index.ts';
+import type { FeedConflicts, FeedMissing, FeedReadiness } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { conflictsNow } from '../factory/applied/applied.verb.ts';
@@ -128,7 +128,7 @@ export type Pass = {
  * @param refused The moves the pass refused.
  * @param said The refusals the last pass said, by task, state and event.
  */
-export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
+export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>) {
   const now = new Set<string>();
   const lines: string[] = [];
   for (const m of refused) {
@@ -151,7 +151,7 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean; readiness?: 
  * The series kept from the ring after a pass (`keepSeries`), and the time it took, which is measuring's. A failure costs the series, never
  * the pass: it is said on stderr.
  */
-const seriesKept = (home: string, ring: readonly RecentPass[], config: Settings): number => {
+const seriesKept = (home: string, ring: readonly RecentPass[], config: Settings) => {
   const t0 = performance.now();
   try {
     keepSeries(home, ring, config);
@@ -162,7 +162,7 @@ const seriesKept = (home: string, ring: readonly RecentPass[], config: Settings)
 };
 
 /** The machine's load over the last minute, per core it has. */
-const loadNow = (): number => {
+const loadNow = () => {
   const [lastMinute = 0] = os.loadavg();
   return lastMinute / os.availableParallelism();
 };
@@ -229,7 +229,10 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     }),
   );
   yield* recordStepMetrics(value.runs.flatMap((advanced) => advanced.facts ?? []));
-  if (!tallies) return value;
+  if (!tallies) {
+    const untallied: Pass = value;
+    return untallied;
+  }
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, io1);
   const cost: PassCost = {
@@ -242,7 +245,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     return recordPassCost(home, cost) + recent.ms + seriesKept(home, recent.kept, config);
   });
   yield* recordPassMetrics(cost);
-  return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
+  const tallied: Pass = { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
+  return tallied;
 });
 
 /**
@@ -364,17 +368,13 @@ const drainFromPause = Effect.fnUntraced(function* (engine: Engine) {
 });
 
 /** Each session of `runs` the pause has parked (`parkedAmong`), read off the views the runtime reported on the pass. */
-const parkedReported = (runs: readonly Run[], views: readonly TaskView[]): Parked[] => {
+const parkedReported = (runs: readonly Run[], views: readonly TaskView[]) => {
   const reported = new Map(views.map((v) => [v.id, v]));
   return parkedAmong(runs, (taskId) => reported.get(taskId));
 };
 
 /** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
-const finishingReported = (
-  runs: readonly Run[],
-  views: readonly TaskView[],
-  among: ReadonlyMap<string, readonly StepSpec[]>,
-): Finishing[] => {
+const finishingReported = (runs: readonly Run[], views: readonly TaskView[], among: ReadonlyMap<string, readonly StepSpec[]>) => {
   const reported = new Map(views.map((v) => [v.id, v]));
   return finishingAmong(
     runs,
@@ -420,7 +420,7 @@ type Judging = { done: Map<string, Advanced>; unjudged: Map<string, Pick<Unjudge
 class Unjudged extends Data.TaggedError('Unjudged')<{ why: string; by: 'journal' | 'folder' }> {}
 
 /** Every run the memo holds that the store no longer lists taken out of it: a run `nemia rm` forgot. */
-const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
+const forgotten = (memo: RestMemo, runs: readonly Run[]) => {
   const listed = new Set(runs.map((r) => r.id));
   for (const id of memo.runs.keys()) if (!listed.has(id)) memo.runs.delete(id);
 };
@@ -431,7 +431,7 @@ const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
  */
 const judged = (e: Engine, judging: Judging, pass: PassRead, run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
   advanceResting(e, run, pass, resting, slot).pipe(
-    Effect.map((advanced): Advanced | undefined => {
+    Effect.map((advanced) => {
       judging.done.set(run.id, advanced);
       return advanced;
     }),
@@ -464,7 +464,7 @@ const waitingJudged = Effect.fn('waitingJudged')(function* (
 });
 
 /** A run's feed as the pass judged it, keyed by its id, for `emitFeed`: none for a run the pass did not judge. */
-const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [string, F])[] => (judged ? [[id, judged.feed] as const] : []);
+const feedOf = <F>(id: string, judged: { feed: F } | undefined) => (judged ? [[id, judged.feed] as const] : []);
 
 /**
  * Why the feed could not be written with what the pass judged (`emitFeed`), the store's pause it read at its start (`pause`, whose
@@ -490,7 +490,7 @@ const feedErrorOf = (
     missing: FeedMissing | undefined;
     readiness: (() => FeedReadiness | undefined) | undefined;
   },
-): Effect.Effect<string | undefined> =>
+) =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
       unjudged: new Set(unjudged.keys()),
@@ -510,13 +510,13 @@ const feedErrorOf = (
   );
 
 /** Who last lifted the store's pause by hand, as `emitFeed` takes it (`readResumed`): none where nobody the api resolved has. */
-const resumedOf = (home: string): { resumed?: FeedResumed } => {
+const resumedOf = (home: string) => {
   const resumed = readResumed(home);
   return resumed === undefined ? {} : { resumed };
 };
 
 /** The store's readiness as `emitFeed` takes it: none where the daemon has read none. */
-const readOf = (readiness: FeedReadiness | undefined): { readiness?: FeedReadiness } => (readiness === undefined ? {} : { readiness });
+const readOf = (readiness: FeedReadiness | undefined) => (readiness === undefined ? {} : { readiness });
 
 /**
  * The pass as reported, with why the feed was not written (`feedErrorOf`): each run judged in the store's order, the queue's card, and
@@ -529,7 +529,7 @@ const passOf = (
   judging: Judging,
   queue: QueueStarted | undefined,
   feedError: string | undefined,
-): Pass => {
+) => {
   const refused = report.refused ?? [];
   const unobserved = report.unobserved ?? [];
   const causes = new Set([...judging.unjudged.values()].filter((u) => u.by === 'journal').map((u) => u.why));
@@ -571,11 +571,11 @@ export type RestMemo = {
 };
 
 /** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
-export const freshRestMemo = (): RestMemo => ({ runs: new Map(), standing: freshStandingMemo() });
+export const freshRestMemo = () => ({ runs: new Map(), standing: freshStandingMemo() }) satisfies RestMemo as RestMemo;
 
 /** Each engine's memo: one engine is one daemon's (`nemia up` makes one for all its passes), and one a test builds starts with none. */
 const memos = new WeakMap<Engine, RestMemo>();
-const restMemo = (e: Engine): RestMemo => {
+const restMemo = (e: Engine) => {
   let memo = memos.get(e);
   if (!memo) memos.set(e, (memo = freshRestMemo()));
   return memo;
@@ -595,7 +595,7 @@ type RestingPass = {
 /** The memo's run for an id whose stamp is the one it was kept at, for the store to list in place of reading its record; else nothing. */
 const keptOf =
   ({ memo, stamps }: RestingPass) =>
-  (id: string): Run | undefined => {
+  (id: string) => {
     const kept = memo.runs.get(id);
     return kept !== undefined && kept.stamp === stamps.get(id) ? kept.run : undefined;
   };
@@ -681,7 +681,7 @@ const advanceResting = Effect.fnUntraced(function* (e: Engine, run: Run, pass: P
  * Whether every result branch the run rests on is where its record says (`tipsSeen`), off the heads the pass read (`headsFor`): never where
  * the pass did not read them, and the run is then judged in full.
  */
-const tipsHold = (run: Run, tipped: readonly string[], pass: PassRead): boolean => {
+const tipsHold = (run: Run, tipped: readonly string[], pass: PassRead) => {
   if (!tipped.length || !isRepositoryRun(run)) return true;
   const heads = pass.standing && headsFor(pass.standing, run);
   return heads !== undefined && tipsSeen(run, tipped, heads) === undefined;

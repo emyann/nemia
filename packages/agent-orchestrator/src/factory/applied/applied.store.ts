@@ -18,28 +18,28 @@ import { choicesApply, ownerKey, ownerOfKey, type MergeAt } from '../upgrade/ind
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
-const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);
+const folderAt = (home: string, name: string) => path.join(home, 'factories', name);
 
 /**
  * The folder a templated factory runs from: today's format, seeded once from its base, then the person's.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const treeDir = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
+export const treeDir = (home: string, name: string) => path.join(folderAt(home, name), 'tree');
 
 /**
  * The template as the controller last rendered it into the factory: read-only, the base of an upgrade's merge.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const appliedDir = (home: string, name: string): string => path.join(folderAt(home, name), 'applied');
+export const appliedDir = (home: string, name: string) => path.join(folderAt(home, name), 'applied');
 
 /**
  * What the controller last observed of a templated factory, written by it alone.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const statusFile = (home: string, name: string): string => path.join(folderAt(home, name), 'status.json');
+export const statusFile = (home: string, name: string) => path.join(folderAt(home, name), 'status.json');
 
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
@@ -64,7 +64,7 @@ const TreeWiringSchema = Schema.StructWithRest(
 export type TreeWiring = typeof TreeWiringSchema.Type;
 
 /** The file of a tree's wiring. */
-const wiringFile = (home: string, name: string): string => path.join(treeDir(home, name), 'factory.json');
+const wiringFile = (home: string, name: string) => path.join(treeDir(home, name), 'factory.json');
 
 /**
  * The wiring of the factory `name`'s tree: what its `factory.json` holds, none (`absent`) while the tree is not rendered, or why it does
@@ -72,19 +72,25 @@ const wiringFile = (home: string, name: string): string => path.join(treeDir(hom
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const readTreeWiring = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
-  wiringIn(wiringFile(home, name));
+export const readTreeWiring = (home: string, name: string) => {
+  const read: { wiring: TreeWiring } | { absent: true } | { error: string } = wiringIn(wiringFile(home, name));
+  return read;
+};
 
 /** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
-function wiringIn(file: string): { wiring: TreeWiring } | { absent: true } | { error: string } {
+function wiringIn(file: string) {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { absent: true };
-    return { error: `${file} is not JSON (${(err as Error).message}): fix it by hand, as {"workflows": [...], "hires": {...}}.` };
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT')
+      return { absent: true } satisfies { wiring: TreeWiring } | { absent: true } | { error: string };
+    return { error: `${file} is not JSON (${(err as Error).message}): fix it by hand, as {"workflows": [...], "hires": {...}}.` } satisfies
+      | { wiring: TreeWiring }
+      | { absent: true }
+      | { error: string };
   }
-  return wiringOfText(file, text);
+  return wiringOfText(file, text) satisfies { wiring: TreeWiring } | { absent: true } | { error: string };
 }
 
 /**
@@ -92,13 +98,15 @@ function wiringIn(file: string): { wiring: TreeWiring } | { absent: true } | { e
  * why it does not read.
  * @param entries The files of a render, by their paths in it.
  */
-export function treeWiringOf(entries: readonly Entry[]): { wiring: TreeWiring } | { absent: true } | { error: string } {
+export function treeWiringOf(entries: readonly Entry[]) {
   const entry = entries.find((e) => e.path === 'factory.json');
-  return entry === undefined ? { absent: true } : wiringOfText("the render's factory.json", entry.bytes.toString('utf8'));
+  const read: { wiring: TreeWiring } | { absent: true } | { error: string } =
+    entry === undefined ? { absent: true } : wiringOfText("the render's factory.json", entry.bytes.toString('utf8'));
+  return read;
 }
 
 /** The wiring `text`, read at `file`, holds, or why it does not read. */
-function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { error: string } {
+function wiringOfText(file: string, text: string) {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -118,10 +126,10 @@ function wiringOfText(file: string, text: string): { wiring: TreeWiring } | { er
  * @param name The factory's name.
  * @param wiring The wiring to write, its `workflows` in any order.
  */
-export const writeTreeWiring = (home: string, name: string, wiring: TreeWiring): void => wiringWritten(wiringFile(home, name), wiring);
+export const writeTreeWiring = (home: string, name: string, wiring: TreeWiring) => wiringWritten(wiringFile(home, name), wiring);
 
 /** `wiring` written whole onto a tree's `file`, `workflows` kept sorted. */
-const wiringWritten = (file: string, wiring: TreeWiring): void =>
+const wiringWritten = (file: string, wiring: TreeWiring) =>
   writeWhole(file, `${JSON.stringify({ ...wiring, workflows: [...wiring.workflows].sort() }, null, 2)}\n`);
 
 /**
@@ -191,10 +199,10 @@ export type Condition = typeof ConditionSchema.Type;
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const readStatus = (home: string, name: string): Status | undefined => statusIn(statusFile(home, name));
+export const readStatus = (home: string, name: string) => statusIn(statusFile(home, name)) satisfies Status | undefined;
 
 /** The status a factory's `file` holds, or none where it is not there or does not read. */
-function statusIn(file: string): Status | undefined {
+function statusIn(file: string) {
   try {
     return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(StatusSchema))(fs.readFileSync(file, 'utf8')));
   } catch {
@@ -208,7 +216,7 @@ function statusIn(file: string): Status | undefined {
  * @param name The factory's name.
  * @param status The status the pass observed.
  */
-export function writeStatus(home: string, name: string, status: Status): boolean {
+export function writeStatus(home: string, name: string, status: Status) {
   const text = `${JSON.stringify(status, null, 2)}\n`;
   const file = statusFile(home, name);
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === text) return false;
@@ -221,7 +229,7 @@ export function writeStatus(home: string, name: string, status: Status): boolean
  * The sha256 of `entries`: each path and its bytes, in the order of their paths, so one folder digests the same wherever it is.
  * @param entries The files of a folder, in any order.
  */
-export function digestOf(entries: readonly Entry[]): string {
+export function digestOf(entries: readonly Entry[]) {
   const hash = createHash('sha256');
   for (const entry of [...entries].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) {
     hash.update(`${entry.path}\0${entry.bytes.length}\0`);
@@ -235,6 +243,7 @@ export function digestOf(entries: readonly Entry[]): string {
  * @param dir The folder to read.
  * @param under The path inside `dir` to read from, with `/`; empty, the default, for the whole folder.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function entriesIn(dir: string, under = ''): Entry[] {
   let names: string[];
   try {
@@ -252,7 +261,7 @@ export function entriesIn(dir: string, under = ''): Entry[] {
 }
 
 /** `entries` written into a hidden folder beside `dir`, each file with its mode, made read-only where `readOnly`; the hidden folder. */
-function hiddenFolder(dir: string, entries: readonly Entry[], readOnly: boolean): string {
+function hiddenFolder(dir: string, entries: readonly Entry[], readOnly: boolean) {
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   const hidden = path.join(path.dirname(dir), `.${path.basename(dir)}.${process.pid}.${randomBytes(4).toString('hex')}`);
   for (const entry of entries) {
@@ -273,7 +282,7 @@ function hiddenFolder(dir: string, entries: readonly Entry[], readOnly: boolean)
  * @param entries The files to write into it.
  * @param readOnly Whether each file is made read-only.
  */
-export function stageFolder(dir: string, entries: readonly Entry[], readOnly: boolean): boolean {
+export function stageFolder(dir: string, entries: readonly Entry[], readOnly: boolean) {
   if (fs.existsSync(dir)) return false;
   let hidden: string | undefined;
   try {
@@ -294,7 +303,7 @@ export function stageFolder(dir: string, entries: readonly Entry[], readOnly: bo
  * digests to it by then: a write made since it was read is never lost. Where the new one cannot be renamed in, the old one is renamed
  * back; where it cannot be either, it is kept aside, and the error names where.
  */
-function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, unless?: string): boolean {
+function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, unless?: string) {
   const hidden = hiddenFolder(dir, entries, readOnly);
   const aside = `${hidden}.old`;
   try {
@@ -314,7 +323,7 @@ function swapFolder(dir: string, entries: readonly Entry[], readOnly: boolean, u
 }
 
 /** The folder set `aside` renamed back onto `dir` after `failed`, or, where it cannot be, an error naming where it is kept. */
-function putBack(aside: string, dir: string, failed: Error): void {
+function putBack(aside: string, dir: string, failed: Error) {
   try {
     fs.renameSync(aside, dir);
   } catch (err) {
@@ -332,7 +341,7 @@ function putBack(aside: string, dir: string, failed: Error): void {
  * @param entries The files of the new tree.
  * @param read The digest of the tree the merge read (`digestOf`).
  */
-export const swapTree = (home: string, name: string, entries: readonly Entry[], read: string): boolean =>
+export const swapTree = (home: string, name: string, entries: readonly Entry[], read: string) =>
   swapFolder(treeDir(home, name), entries, false, read);
 
 /**
@@ -341,7 +350,7 @@ export const swapTree = (home: string, name: string, entries: readonly Entry[], 
  * @param name The factory's name.
  * @param entries The files of the template as rendered now.
  */
-export const replaceBase = (home: string, name: string, entries: readonly Entry[]): void =>
+export const replaceBase = (home: string, name: string, entries: readonly Entry[]) =>
   void swapFolder(appliedDir(home, name), entries, true);
 
 /**
@@ -369,14 +378,14 @@ export type Resolutions = typeof ResolutionsSchema.Type;
  * @param home The store's root.
  * @param name The factory's name.
  */
-export const resolutionsFile = (home: string, name: string): string => path.join(folderAt(home, name), 'resolutions.json');
+export const resolutionsFile = (home: string, name: string) => path.join(folderAt(home, name), 'resolutions.json');
 
 /**
  * The person's choices for the factory `name`'s upgrade, or none where there are none or they do not read.
  * @param home The store's root.
  * @param name The factory's name.
  */
-export function readResolutions(home: string, name: string): Resolutions | undefined {
+export function readResolutions(home: string, name: string) {
   try {
     const text = fs.readFileSync(resolutionsFile(home, name), 'utf8');
     return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(ResolutionsSchema))(text));
@@ -392,8 +401,8 @@ export function readResolutions(home: string, name: string): Resolutions | undef
  * @param resolutions The person's choices as read, or undefined where there are none.
  * @param merge The merge the choices are asked for: its version, template and base.
  */
-export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt): Resolutions['choices'] =>
-  resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {};
+export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt) =>
+  (resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {}) satisfies Resolutions['choices'];
 
 /**
  * The proposals of `resolutions`, by the key of the owner each resolves (`ownerKey`), that resolve the merge `merge`: those recorded
@@ -402,10 +411,10 @@ export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt)
  * @param resolutions The person's choices as read, or undefined where there are none.
  * @param merge The merge the proposals are asked for: its version, template and base.
  */
-export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeAt): Readonly<Record<string, string>> =>
-  resolutions !== undefined && choicesApply(resolutions, merge)
+export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeAt) =>
+  (resolutions !== undefined && choicesApply(resolutions, merge)
     ? Object.fromEntries(Object.entries(resolutions.proposals ?? {}).map(([key, name]) => [ownerKey(ownerOfKey(key)), name]))
-    : {};
+    : {}) satisfies Readonly<Record<string, string>> as Readonly<Record<string, string>>;
 
 /**
  * The person's choices for the factory `name`'s upgrade written whole.
@@ -413,5 +422,5 @@ export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeA
  * @param name The factory's name.
  * @param resolutions The choices to write.
  */
-export const writeResolutions = (home: string, name: string, resolutions: Resolutions): void =>
+export const writeResolutions = (home: string, name: string, resolutions: Resolutions) =>
   writeWhole(resolutionsFile(home, name), `${JSON.stringify(resolutions, null, 2)}\n`);

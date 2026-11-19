@@ -4,12 +4,10 @@
  * chat). Pure and level-triggered: the pane covered by the docked sheet under 1600 is read from what holds now, never written as the
  * person's fold, so it comes back as it was the moment the sheet closes.
  */
-import type { FrameAt, FrameFold, FrameFoldOf, PaneForm } from '../../contracts/frame-fold.contract.ts';
-
-export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
+import type { FrameAt, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
 
 /** The factory pane wider than a narrow screen: none off a factory, folded as the person keeps it, covered by the sheet under 1600. */
-const paneWide = (at: FrameAt, wanted: boolean): PaneForm => {
+const paneWide = (at: FrameAt, wanted: boolean) => {
   if (!at.hasPane) return 'none';
   if (!at.paneOpen) return 'folded';
   return at.width === 'medium' && wanted ? 'covered' : 'docked';
@@ -23,7 +21,7 @@ const paneWide = (at: FrameAt, wanted: boolean): PaneForm => {
  * @param at What holds now: the screen's width, whether the page has a factory pane and the person keeps it open, what the address's
  * `?bar=` names and her sheet.
  */
-export const frameFold: FrameFoldOf = (at: FrameAt): FrameFold => {
+export const frameFold: FrameFoldOf = (at: FrameAt) => {
   const shows = at.barOpen ? 'bar' : at.sheetOpen && !at.ownsChat ? 'her' : 'none';
   const wanted = shows !== 'none';
   if (at.width === 'narrow') {
@@ -43,7 +41,7 @@ const PANE_COOKIE_AGE = 60 * 60 * 24 * 7;
  * kept, open for none.
  * @param cookie The page's `document.cookie`.
  */
-export function paneOpenOf(cookie: string): boolean {
+export function paneOpenOf(cookie: string) {
   return !cookie.split(';').some((pair) => pair.trim() === `${PANE_COOKIE}=false`);
 }
 
@@ -52,6 +50,6 @@ export function paneOpenOf(cookie: string): boolean {
  * for the pane the sheet covers.
  * @param open Whether they keep the pane open.
  */
-export function paneCookie(open: boolean): string {
+export function paneCookie(open: boolean) {
   return `${PANE_COOKIE}=${open}; path=/; max-age=${PANE_COOKIE_AGE}`;
 }

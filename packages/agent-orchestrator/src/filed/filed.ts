@@ -17,7 +17,6 @@ import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 import { handedFolders } from './handed-folders/handed-folders.ts';
 import { inWorkspace, memoryFilesOf, sessionStart } from './session-start/session-start.ts';
-import type { SessionStart } from '../../contracts/session-home.contract.ts';
 import { expandedIn } from './session-start/spelled.ts';
 
 export { handedFolders } from './handed-folders/handed-folders.ts';
@@ -121,14 +120,7 @@ const placedOf = (
   run: Pick<Run, 'harnessSettings'> & Partial<Pick<Run, 'worked'>>,
   t: { workspace?: string; start?: StartFound },
   others: Mount[],
-): {
-  rule: (r: string) => string;
-  denies: readonly string[];
-  mounts: Mount[];
-  servedFrom: { projectMcpFrom?: string };
-  env: Record<string, string>;
-  own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
-} => {
+) => {
   const ws = t.workspace;
   const start = ws === undefined ? undefined : startOf(step, ws, t.start);
   const worked = start?.worked ?? null;
@@ -140,6 +132,20 @@ const placedOf = (
       servedFrom: {},
       env: {},
       own: (own) => ({ own, env: {} }),
+    } satisfies {
+      rule: (r: string) => string;
+      denies: readonly string[];
+      mounts: Mount[];
+      servedFrom: { projectMcpFrom?: string };
+      env: Record<string, string>;
+      own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
+    } as {
+      rule: (r: string) => string;
+      denies: readonly string[];
+      mounts: Mount[];
+      servedFrom: { projectMcpFrom?: string };
+      env: Record<string, string>;
+      own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
     };
   const mounts = [worked, ...others.filter((m) => m.path !== worked.path && m.path !== start.cwd)];
   const reads = addedFolderReadsOf(step.harness ?? DEFAULT_HARNESS);
@@ -156,6 +162,20 @@ const placedOf = (
       const loads = memory?.load === true && reads !== undefined && given.skipped;
       return { own: given.own, env: loads ? { [reads.memoryEnv]: '1' } : {} };
     },
+  } satisfies {
+    rule: (r: string) => string;
+    denies: readonly string[];
+    mounts: Mount[];
+    servedFrom: { projectMcpFrom?: string };
+    env: Record<string, string>;
+    own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
+  } as {
+    rule: (r: string) => string;
+    denies: readonly string[];
+    mounts: Mount[];
+    servedFrom: { projectMcpFrom?: string };
+    env: Record<string, string>;
+    own: <Own extends object>(own: Own) => { own: Own; env: Record<string, string> };
   };
 };
 
@@ -173,7 +193,7 @@ export type StartFound = { home: string; mcp: boolean; skills: Readonly<Record<s
  * @param workspace The step's workspace, absolute.
  * @param found What the filing found of the run's home, or undefined where it froze none.
  */
-export const startOf = (step: StepSpec, workspace: string, found: StartFound | undefined): SessionStart =>
+export const startOf = (step: StepSpec, workspace: string, found: StartFound | undefined) =>
   sessionStart({
     workspace,
     home: found?.home,
@@ -183,24 +203,25 @@ export const startOf = (step: StepSpec, workspace: string, found: StartFound | u
   });
 
 /** A list of rules each read by `rule`, with `more` after them; undefined where there was no list and nothing more, as before. */
-const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]): string[] | undefined =>
-  rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more];
+const withRules = (rules: readonly string[] | undefined, rule: (r: string) => string, more: readonly string[]) =>
+  (rules === undefined && !more.length ? undefined : [...(rules ?? []).map(rule), ...more]) satisfies string[] | undefined;
 
 /** A mount as the runtime takes it: its path, its mode, and whether its rules are the task's own; no switch of a volume's. */
-const mountOf = (m: Mount): Mount => ({ path: m.path, readOnly: m.readOnly, ...(m.ruled === true ? { ruled: true as const } : {}) });
+const mountOf = (m: Mount) =>
+  ({ path: m.path, readOnly: m.readOnly, ...(m.ruled === true ? { ruled: true as const } : {}) }) satisfies Mount as Mount;
 
 /**
  * Each folder added to a session in the home, and whether its memory files are switched on: the workspace by the volume the run works
  * on (`run.worked`), each other by its own frozen switch.
  */
-const memoryFolders = (mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>): { path: string; claudeMd: boolean }[] =>
+const memoryFolders = (mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>) =>
   mounts.map((m) => ({ path: m.path, claudeMd: m.path === workspace ? run.worked?.claudeMd === true : m.claudeMd === true }));
 
 /**
  * The skills a session in the home is offered beside its step's own: the home's, then each added folder's (`found.skills`) whose volume
  * does not switch its skills off, the workspace's by the volume the run works on.
  */
-const homeSkills = (found: StartFound | undefined, mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>): string[] => {
+const homeSkills = (found: StartFound | undefined, mounts: readonly Mount[], workspace: string, run: Pick<Run, 'worked'>) => {
   if (found === undefined) return [];
   const offered = mounts.filter((m) => (m.path === workspace ? run.worked?.skills !== false : m.skills !== false));
   return [...(found.skills[found.home] ?? []), ...offered.flatMap((m) => found.skills[m.path] ?? [])];
@@ -218,7 +239,7 @@ function inHomeOwn<Own extends object>(
   step: Pick<StepSpec, 'harness'>,
   skills: readonly string[],
   skipped: { key: string | undefined; excludes: readonly string[] },
-): { own: Own; skipped: boolean } {
+) {
   const { key, excludes } = skipped;
   const listed: unknown = Reflect.get(own, 'enabledSkills');
   const withSkills = Array.isArray(listed) && skills.length ? { ...own, enabledSkills: [...new Set([...listed, ...skills])] } : own;
@@ -236,7 +257,7 @@ function inHomeOwn<Own extends object>(
 }
 
 /** A harness's settings given inline as a JSON object, read; none given reads as an empty one, and a file or no object as undefined. */
-const settingsObject = (given: unknown): Record<string, unknown> | undefined => {
+const settingsObject = (given: unknown) => {
   if (given === undefined) return {};
   if (typeof given !== 'string') return undefined;
   let read: unknown;
@@ -259,14 +280,14 @@ export const WORKSPACE = 'WF_WORKSPACE';
  * (`SETTINGS_HARNESS`): its rendered `settings` laid over the allowed ones (`filedSettings`), a step with no agent given the harness's key
  * for them. As they were for a run that froze none, on another harness, and on a remote agent.
  */
-function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own): Own {
+function ownWith<Own extends object>(step: Pick<StepSpec, 'harness'>, frozen: Run['harnessSettings'], own: Own) {
   const harness = step.harness ?? DEFAULT_HARNESS;
   const given = frozen?.[SETTINGS_HARNESS];
-  if (harness !== SETTINGS_HARNESS || given === undefined) return own;
+  if (harness !== SETTINGS_HARNESS || given === undefined) return own satisfies Own;
   const rendered: unknown = Reflect.get(own, harness);
   const flags = typeof rendered === 'object' && rendered !== null ? rendered : {};
   const settings = filedSettings(given, 'settings' in flags && typeof flags.settings === 'string' ? flags.settings : undefined);
-  return settings === undefined ? own : { ...own, [harness]: { ...flags, settings } };
+  return (settings === undefined ? own : { ...own, [harness]: { ...flags, settings } }) satisfies Own;
 }
 
 /**
@@ -316,19 +337,20 @@ const stepFilesEnv = (
   labels: Run['labels'],
   sessionToken: string | undefined,
   more: Record<string, string> = {},
-): { env: Record<string, string> } => ({
-  env: {
-    ...more,
-    [STEP_FILES]: stepFilesOf(step, runArtifacts),
-    ...(copies.workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: copies.workflowFiles }),
-    ...(copies.carriedFiles === undefined ? {} : { [CARRIED_FILES]: copies.carriedFiles }),
-    [RUN_LABELS]: JSON.stringify(labels ?? {}),
-    ...(sessionToken === undefined ? {} : { [SESSION_TOKEN]: sessionToken }),
-  },
-});
+) =>
+  ({
+    env: {
+      ...more,
+      [STEP_FILES]: stepFilesOf(step, runArtifacts),
+      ...(copies.workflowFiles === undefined ? {} : { [WORKFLOW_FILES]: copies.workflowFiles }),
+      ...(copies.carriedFiles === undefined ? {} : { [CARRIED_FILES]: copies.carriedFiles }),
+      [RUN_LABELS]: JSON.stringify(labels ?? {}),
+      ...(sessionToken === undefined ? {} : { [SESSION_TOKEN]: sessionToken }),
+    },
+  }) satisfies { env: Record<string, string> } as { env: Record<string, string> };
 
 /** A step's files directory, the run's artifacts folder of that step under `runArtifacts`: what `STEP_FILES` names to its session. */
-const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string => path.join(runArtifacts, step.name);
+const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string) => path.join(runArtifacts, step.name);
 
 /**
  * The step's own files directory (`stepFilesOf`), read-only, for a step whose permission mode writes outside its directory only where a
@@ -343,7 +365,7 @@ const stepFilesOf = (step: Pick<StepSpec, 'name'>, runArtifacts: string): string
  * @param step The step to file.
  * @param runArtifacts The run's artifacts folder, absolute, under which the step's files directory is.
  */
-export const ownMounts = (step: StepSpec, runArtifacts: string): Mount[] => {
+export const ownMounts = (step: StepSpec, runArtifacts: string) => {
   const own = stepFilesOf(step, runArtifacts);
   return local(step.harness) && writesOutsideByRule(modeOf(step)) && unruledIn(step.harness ?? DEFAULT_HARNESS, own) === undefined
     ? [{ path: own, readOnly: true }]
@@ -397,7 +419,7 @@ export const filedFolders = (
     carriedFiles?: string;
     runs?: readonly HandedRunFolders[];
   },
-): FiledFolders => ({
+) => ({
   own: ownMounts(step, t.runArtifacts),
   handed: handedMounts(step, steps, t.runArtifacts),
   store: readsMounts(step, t.inbox),
@@ -412,7 +434,7 @@ export const filedFolders = (
  * A step's folders beyond its factory's, in the order they are filed: its own, the handed ones, the handed runs', the store's, the run's
  * inputs, then the run's copies of its workflow folder and of its carried files.
  */
-const folders = (f: FiledFolders): Mount[] => [
+const folders = (f: FiledFolders) => [
   ...(f.own ?? []),
   ...f.handed,
   ...(f.runs ?? []),
@@ -423,7 +445,7 @@ const folders = (f: FiledFolders): Mount[] => [
 ];
 
 /** Whether a step's harness reads the disk only through what it is filed: neither a remote agent nor one fenced by a sandbox. */
-const local = (harness: string | undefined): boolean => !isRemoteHarness(harness) && !sandboxed(harness ?? DEFAULT_HARNESS);
+const local = (harness: string | undefined) => !isRemoteHarness(harness) && !sandboxed(harness ?? DEFAULT_HARNESS);
 
 /**
  * The store's folders a step's `reads:` names, each read-only: the inbox (`inbox`, its absolute path) when it names it. It reads the
@@ -432,7 +454,7 @@ const local = (harness: string | undefined): boolean => !isRemoteHarness(harness
  * @param step The step to file: its harness and its `reads:`.
  * @param inbox The store's inbox folder, absolute.
  */
-export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string): Mount[] =>
+export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: string) =>
   local(step.harness) && step.reads?.includes('inbox') ? [{ path: inbox, readOnly: true }] : [];
 
 /**
@@ -444,11 +466,8 @@ export const readsMounts = (step: Pick<StepSpec, 'harness' | 'reads'>, inbox: st
  * @param steps Every step of the run's workflow, which says whether it is a folder team.
  * @param dir The run's inputs folder, absolute, or undefined for a run given no input.
  */
-export const inputsMounts = (
-  step: Pick<StepSpec, 'harness'>,
-  steps: readonly Pick<StepSpec, 'place'>[],
-  dir: string | undefined,
-): Mount[] => (dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : []);
+export const inputsMounts = (step: Pick<StepSpec, 'harness'>, steps: readonly Pick<StepSpec, 'place'>[], dir: string | undefined) =>
+  dir !== undefined && local(step.harness) && !isFolderTeam(steps) ? [{ path: dir, readOnly: true }] : [];
 
 /**
  * The folders of each run this one is handed (`found`), each read-only, for a step whatever steps it comes after: it reads another run's
@@ -473,7 +492,7 @@ export const handedRunMounts: HandedRunMounts = (step, found) =>
  * @param step The step to file: its harness.
  * @param dir The run's copy of the folder to mount, absolute, or undefined where the record names none.
  */
-export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined): Mount[] => {
+export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | undefined) => {
   const harness = step.harness ?? DEFAULT_HARNESS;
   return dir !== undefined && fenceReach(harness)?.by === 'mode' && unruledIn(harness, dir) === undefined
     ? [{ path: dir, readOnly: true }]
@@ -491,18 +510,26 @@ export const workflowMounts = (step: Pick<StepSpec, 'harness'>, dir: string | un
  * None for a step with no agent, and no key at all for an agent frozen before it named any, whose sessions load the whole file as they
  * did.
  */
-const serversOf = (
-  step: Pick<StepSpec, 'agent'>,
-  record: FactoryServers | undefined,
-): { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
-  if (step.agent === undefined) return { projectMcp: [] };
-  if (step.agent.mcp === undefined) return {};
+const serversOf = (step: Pick<StepSpec, 'agent'>, record: FactoryServers | undefined) => {
+  if (step.agent === undefined)
+    return { projectMcp: [] } satisfies { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } as {
+      projectMcp?: string[];
+      mcp?: Record<string, FactoryServer>;
+    };
+  if (step.agent.mcp === undefined)
+    return {} satisfies { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } as {
+      projectMcp?: string[];
+      mcp?: Record<string, FactoryServer>;
+    };
   const { mcp, checkout } = splitServers(step.agent.mcp, record);
-  return { projectMcp: checkout, ...(mcp === undefined ? {} : { mcp }) };
+  return { projectMcp: checkout, ...(mcp === undefined ? {} : { mcp }) } satisfies {
+    projectMcp?: string[];
+    mcp?: Record<string, FactoryServer>;
+  } as { projectMcp?: string[]; mcp?: Record<string, FactoryServer> };
 };
 
 /** `mounts` as a config holds them: the key, or none for no folder. */
-const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { mounts } : {});
+const mountsOf = (mounts: Mount[]) => (mounts.length ? { mounts } : {}) satisfies { mounts?: Mount[] } as { mounts?: Mount[] };
 
 /**
  * The model a try runs on: a fresh one on the model it asked for, or the step's; any other on the one its session was started on.
@@ -510,5 +537,5 @@ const mountsOf = (mounts: Mount[]): { mounts?: Mount[] } => (mounts.length ? { m
  * @param record The step's record, whose tries say the model its session was started on; undefined for a step with none.
  * @param how How the try runs: fresh or continued, and the model it asked for.
  */
-export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>): string | undefined =>
+export const tryModel = (step: StepSpec, record: StepRecord | undefined, how: Pick<RetryHow, 'mode' | 'model'>) =>
   how.mode === 'fresh' ? (how.model ?? step.model) : sessionModel(step, record);

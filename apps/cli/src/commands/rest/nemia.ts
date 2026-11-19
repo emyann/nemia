@@ -2,7 +2,7 @@
  * Nemia's switch: `nemia level` (`nemia.level` bare, `nemia.setLevel` given a level, a raise or its end), where she is and each factory's
  * level. Who may speak in her chat is no list of names any more: an agent speaks with a token of its own (`RETIRED_COMMANDS`).
  */
-import { type Args, DEFAULT_NAMESPACE, LEVEL_WORDS, LEVELS, levelWritten, NemiaLevel, NemiaLevelSet } from 'objects';
+import { type Args, DEFAULT_NAMESPACE, LEVEL_WORDS, LEVELS, levelWritten, NemiaLevel } from 'objects';
 import { asked } from '../../objects.ts';
 import { said, switchArg, textArg } from '../requests.ts';
 
@@ -13,10 +13,10 @@ type Level = typeof NemiaLevel.Type;
 type FactoryRow = Level['factories'][number];
 
 /** Dollars as a person reads them: `$0.42`, and three figures under a cent. */
-const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+const dollars = (usd: number) => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A factory's level in words: its level, its raise and when it ends, and whose level it follows. */
-const factoryWords = (row: FactoryRow): string => {
+const factoryWords = (row: FactoryRow) => {
   const whose =
     row.factory === DEFAULT_NAMESPACE ? "the store's level, for runs in no factory" : row.own === null ? "the store's" : 'its own';
   if (row.raise !== null) return `${row.factory}: ${row.level} until ${row.raise.until}, then ${row.default} (${whose})`;
@@ -24,14 +24,14 @@ const factoryWords = (row: FactoryRow): string => {
 };
 
 /** What her sessions cost, as `nemia level` says it: each counted as it ends, her open one not yet. */
-const spendLine = ({ usd, measured, unmeasured }: NonNullable<Level['spend']>): string =>
+const spendLine = ({ usd, measured, unmeasured }: NonNullable<Level['spend']>) =>
   `spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends`;
 
 /** What `nemia level` prints of the keeper's trust of her folder refused: its words, which name the fix. */
-const untrustedLine = (untrusted: string): string => `her folder could not be trusted, so her session is not filed: ${untrusted}`;
+const untrustedLine = (untrusted: string) => `her folder could not be trusted, so her session is not filed: ${untrusted}`;
 
 /** Her session's line: none for no task, else its phase, or why it is not filed yet. */
-const sessionLines = (data: Level): string[] => {
+const sessionLines = (data: Level) => {
   if (data.task === null) return [];
   if (data.phase !== null) return [`her session ${data.task}: ${data.phase}`];
   const why =
@@ -46,7 +46,7 @@ const sessionLines = (data: Level): string[] => {
  * @param data Where she is, as the api answers it: the level, the factories, her session, why her folder could not be trusted, spend,
  * whether she was stopped or rests, reach and allows.
  */
-export function levelLines(data: Level): string[] {
+export function levelLines(data: Level) {
   const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
   const factories = ['factories (a raise ends by itself, read as it passes):', ...data.factories.map((row) => `  ${factoryWords(row)}`)];
   const spent = data.spend === null ? [] : [spendLine(data.spend)];
@@ -69,7 +69,7 @@ type LevelWord = (typeof LEVELS)[number];
 const isLevel = (word: string): word is LevelWord => (LEVELS as readonly string[]).includes(word);
 
 /** The write `args` ask of a level, as the api's body takes it: the store's level, or a factory's, raised for a stretch or ended. */
-const levelSet = (args: Args): typeof NemiaLevelSet.Type => {
+const levelSet = (args: Args) => {
   const level = textArg(args, 'level');
   const factory = textArg(args, 'factory');
   const stretch = textArg(args, 'for');
@@ -85,7 +85,7 @@ const levelSet = (args: Args): typeof NemiaLevelSet.Type => {
  * `nemia level`'s runner: bare, where she is; given a level, a raise or its end, that written, and where she is after.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function level(args: Args): Promise<number> {
+export async function level(args: Args) {
   const data = await asked(LEVEL_WORDS.name, (c) => (levelWritten(args) ? c.nemia.setLevel({ payload: levelSet(args) }) : c.nemia.level()));
   said(levelLines(data));
   return 0;

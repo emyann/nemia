@@ -47,21 +47,21 @@ export type CardQuery = {
 };
 
 /** The namespace of a listed card: its factory, or `default`. */
-const namespaceOf = (l: InboxListing): string => l.factory ?? DEFAULT_NAMESPACE;
+const namespaceOf = (l: InboxListing) => l.factory ?? DEFAULT_NAMESPACE;
 
 /**
  * What a list orders an entry by and a token carries: its name, then its file, so a stray `notes` and the card `notes.md`, both named
  * `notes`, are two places of the list, sorted by its UTF-16 code units, as `<` compares. A line break sorts below every letter a name
  * holds, so the order is the names' first.
  */
-const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
+const keyOf = (l: InboxListing) => `${l.name}\n${l.file}`;
 
 /**
  * The body a card's text holds, or why it holds none: the listing's own `error` for an entry it found no card, and for a card the listing
  * read and whose text no longer parses (edited between the two reads), the parse's own reason, so a card is never listed with no body and
  * no word of why.
  */
-const bodyOf = (l: InboxListing, text: string): { readonly body?: string; readonly error?: string } => {
+const bodyOf = (l: InboxListing, text: string) => {
   if (l.error !== null) return { error: l.error };
   try {
     return { body: parseInboxCard(l.file, text).body };
@@ -71,7 +71,7 @@ const bodyOf = (l: InboxListing, text: string): { readonly body?: string; readon
 };
 
 /** The object of the listed card `l`, of its text and filing time; its text as `status.source` where `source` (a read of one card). */
-const cardOf = (l: InboxListing, text: string, filedAt: string, source = false): Card => {
+const cardOf = (l: InboxListing, text: string, filedAt: string, source = false) => {
   const { body, error } = bodyOf(l, text);
   return {
     apiVersion: API_VERSION,
@@ -103,7 +103,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false):
       file: l.file,
       ...(source ? { source: text } : {}),
     },
-  };
+  } satisfies Card as Card;
 };
 
 /**
@@ -130,7 +130,7 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
  * The entries of `listing` that `fieldSelector` keeps: every one where it is empty or none, else those whose `cardInPlay` is what it
  * asks (`cardPlaySelector`); `Invalid` naming the forms it takes where it spells none.
  */
-const inPlayKept = (listing: readonly InboxListing[], fieldSelector: string | undefined): readonly InboxListing[] | Invalid => {
+const inPlayKept = (listing: readonly InboxListing[], fieldSelector: string | undefined) => {
   if (fieldSelector === undefined || fieldSelector === '') return listing;
   const selector = cardPlaySelector(fieldSelector);
   if (selector === null)

@@ -370,8 +370,7 @@ export type StepOutput = {
  * `shapes` as a step's output keeps them (`StepOutput.shapes`): none where no field was marked.
  * @param shapes Each marked field's shape, by the field's name.
  */
-export const shapesKept = (shapes: Record<string, FieldShape>): Pick<StepOutput, 'shapes'> =>
-  Object.keys(shapes).length ? { shapes } : {};
+export const shapesKept = (shapes: Record<string, FieldShape>) => (Object.keys(shapes).length ? { shapes } : {});
 
 /** Who declares a field of a merged output: the agent or the step, by its name and the schema file its `output:` line names. */
 export type OutputOwner = { by: 'agent' | 'step'; name: string; file: string };
@@ -553,7 +552,7 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
  * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
  * @param step The step, its `place:` among it.
  */
-export const stepPlace = (step: Pick<StepSpec, 'place'>): PlaceKind => step.place ?? 'git';
+export const stepPlace = (step: Pick<StepSpec, 'place'>) => step.place ?? 'git';
 
 /**
  * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: base`). Pure, and read of the
@@ -563,13 +562,13 @@ export const stepPlace = (step: Pick<StepSpec, 'place'>): PlaceKind => step.plac
  * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
  * @param step The step, its `workspace:` among it.
  */
-export const endsOnBase = (step: Pick<StepSpec, 'workspace'>): boolean => step.workspace === 'base';
+export const endsOnBase = (step: Pick<StepSpec, 'workspace'>) => step.workspace === 'base';
 
 /**
  * The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none.
  * @param step The step.
  */
-export const outputFields = (step: StepSpec): string[] => Object.keys(step.output?.schema.properties ?? {});
+export const outputFields = (step: StepSpec) => Object.keys(step.output?.schema.properties ?? {});
 
 /**
  * Keys refused with a reason of their own, because each is one somebody will write expecting it to
@@ -621,7 +620,7 @@ export const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
  * @param name What a refusal calls the file.
  * @param text The file's text.
  */
-export function splitFrontmatter(name: string, text: string): { block: string | null; body: string } {
+export function splitFrontmatter(name: string, text: string) {
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const m = FRONTMATTER.exec(text);
   if (!m && /^---[ \t]*\n/.test(text)) {
@@ -637,7 +636,7 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * is for, and is never a step: read as one, it would be an agent told the folder's documentation.
  * @param file A file's name.
  */
-export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
+export const isReadme = (file: string) => /^readme\.md$/i.test(file);
 
 /**
  * The folder of agents, beside the workflows that name them: `agents/`. A workflow may not have its name — `workflowsIn` never lists it,

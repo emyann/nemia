@@ -48,8 +48,7 @@ export const filedDenies = (
   step: Pick<StepSpec, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
   run: Pick<Run, 'gates'>,
   landingDenied: () => readonly string[],
-): string[] | undefined =>
-  landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...landingDenied()])] : step.disallowedTools;
+) => (landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...landingDenied()])] : step.disallowedTools);
 
 /**
  * The allow list a step is filed with, each try and each round: its own, and for a step in the repository's own checkout
@@ -60,7 +59,7 @@ export const filedDenies = (
  * @param step The step filed: its workspace, its harness and its own allow list.
  * @param runArtifacts The absolute path of the run's artifacts folder.
  */
-export const filedAllows = (step: Pick<StepSpec, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
+export const filedAllows = (step: Pick<StepSpec, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string) =>
   readsRunArtifacts(step) ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])] : step.allowedTools;
 
 /**
@@ -68,7 +67,7 @@ export const filedAllows = (step: Pick<StepSpec, 'workspace' | 'harness' | 'allo
  * (`workspace: base`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
  * @param step The step: its workspace and its harness.
  */
-export const readsRunArtifacts = (step: Pick<StepSpec, 'workspace' | 'harness'>): boolean =>
+export const readsRunArtifacts = (step: Pick<StepSpec, 'workspace' | 'harness'>) =>
   endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
 
 /**
@@ -128,7 +127,7 @@ export function landingDue(
   verdict: Verdict | undefined,
   staged: boolean,
   merge: () => MergeState | { readonly unread: string },
-): Landing | undefined {
+) {
   const settled = landingSettled(step, run, phaseOf);
   if (!settled) return undefined;
   const { check } = settled;
@@ -136,44 +135,44 @@ export function landingDue(
   const nothing = ended
     ? { act: 'record' as const, landed: { untouched: `${step.name} ended ${own}, and nothing of it was staged` } }
     : undefined;
-  if (own !== 'checking' && !staged) return nothing;
+  if (own !== 'checking' && !staged) return nothing satisfies Landing | undefined;
   const read = merge();
-  if ('unread' in read) return { act: 'wait', why: read.unread };
+  if ('unread' in read) return { act: 'wait', why: read.unread } satisfies Landing | undefined;
   const { merging, conflicted, missing, tip } = read;
   if (merging === 'other') return undefined;
   const ours = merging === 'ours';
   const onHead = !ours && merging === 'none' && missing.length === 0;
-  const end = (why: string, refused: { refusedOn?: string } = {}): Landing =>
-    ours ? { act: 'abort', why, ...refused } : { act: 'record', landed: { aborted: why } };
-  if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing;
-  if (run.cancelledAt) return end('the run was called off before its merge was committed');
-  if (ours && conflicted) return end('the merge it staged has conflicts');
-  if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`);
-  if (!check) return run.hold ? end('the run was held before its check was filed') : undefined;
+  const end = (why: string, refused: { refusedOn?: string } = {}) =>
+    (ours ? { act: 'abort', why, ...refused } : { act: 'record', landed: { aborted: why } }) satisfies Landing;
+  if (own !== 'checking')
+    return (ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing) satisfies Landing | undefined;
+  if (run.cancelledAt) return end('the run was called off before its merge was committed') satisfies Landing | undefined;
+  if (ours && conflicted) return end('the merge it staged has conflicts') satisfies Landing | undefined;
+  if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`) satisfies Landing | undefined;
+  if (!check) return (run.hold ? end('the run was held before its check was filed') : undefined) satisfies Landing | undefined;
   if (check === 'succeeded') {
-    if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
-    if (onHead && read.landedBy) return { act: 'record', landed: { commit: read.landedBy } };
+    if (ours)
+      return (message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`)) satisfies
+        | Landing
+        | undefined;
+    if (onHead && read.landedBy) return { act: 'record', landed: { commit: read.landedBy } } satisfies Landing | undefined;
     return {
       act: 'record',
       landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' },
-    };
+    } satisfies Landing | undefined;
   }
   const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';
   return end(
     onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why,
     refusedBase(tip, check, verdict),
-  );
+  ) satisfies Landing | undefined;
 }
 
 /**
  * The phases of the session and the check (none before it is filed) of `step`, an ending of `run` that lands on its check, once both
  * have stopped running; undefined while either runs, and for a step that lands nothing or has landed. Pure.
  */
-const landingSettled = (
-  step: StepSpec,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-): { session: TaskPhase; check: TaskPhase | undefined } | undefined => {
+const landingSettled = (step: StepSpec, run: Run, phaseOf: (taskId: string) => TaskPhase) => {
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return undefined;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
@@ -187,7 +186,7 @@ const landingSettled = (
  * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia refresh --base` file a merge
  * of work that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
  */
-const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict | undefined): { refusedOn?: string } =>
+const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict | undefined) =>
   tip && refusedCheck(check, verdict) ? { refusedOn: tip } : {};
 
 /**
@@ -206,7 +205,7 @@ export const landingOpen = (
   own: StepStatus,
   phaseOf: (taskId: string) => TaskPhase,
   merging: () => MergeState['merging'],
-): boolean => {
+) => {
   const record = run.steps[step.name];
   if (!landsOnCheck(step, run) || !record?.taskId || record.landed) return false;
   const busy = (phase: TaskPhase | undefined) => phase === 'pending' || phase === 'running';
@@ -220,7 +219,7 @@ export const landingOpen = (
  * @param run The run's base branch.
  * @param landed What the run did with the merge, as the step's record holds it.
  */
-export const landedWords = (run: Pick<Run, 'branch'>, landed: LandingRecord): string =>
+export const landedWords = (run: Pick<Run, 'branch'>, landed: LandingRecord) =>
   'commit' in landed
     ? `the run landed on ${run.branch} as ${landed.commit.slice(0, 7)}`
     : 'aborted' in landed
@@ -241,7 +240,7 @@ export const LANDED_CAP = 160;
  * @param step The ending's spec.
  * @param asks The asks for a try written for the run.
  */
-export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[]): string | undefined =>
+export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[]) =>
   run.steps[step.name]?.taskId
     ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
     : approvalOf(run, step.name)?.at;
@@ -257,7 +256,7 @@ export const endingAsked = (run: Run, step: StepSpec, asks: readonly RetryAsk[])
 export const claimedAt: ClaimedAt = (w) => w.asked ?? (w.filed ? (w.landed ? undefined : w.createdAt) : w.gated ? undefined : w.createdAt);
 
 /** Whether a try of an ending landed a commit on the base branch, read off its record's `landed`. Pure. */
-const landedCommit = (landed: LandingRecord | undefined): boolean => landed !== undefined && 'commit' in landed;
+const landedCommit = (landed: LandingRecord | undefined) => landed !== undefined && 'commit' in landed;
 
 /**
  * `claimedAt` of a run's ending, read off its record and its asks (`checkoutHold`, `mainClaim`): `landed` is whether its try landed a
@@ -266,7 +265,7 @@ const landedCommit = (landed: LandingRecord | undefined): boolean => landed !== 
  * @param step The ending's spec.
  * @param asks The asks for a try written for the run.
  */
-export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAsk[]): string | undefined =>
+export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAsk[]) =>
   claimedAt({
     asked: endingAsked(run, step, asks),
     gated: hasGate(step, run),
@@ -284,7 +283,7 @@ export const endingClaimedAt = (run: Run, step: StepSpec, asks: readonly RetryAs
  * still working, so a step with no session of its own would be drawn as one whose session is running.
  * @param hold The run and step that hold the checkout.
  */
-export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
+export const checkoutWord = (hold: CheckoutHold) => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 
 /**
  * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees
@@ -292,7 +291,7 @@ export const checkoutWord = (hold: CheckoutHold): string => `waiting on the chec
  * @param step The waiting step's name.
  * @param hold The run and step that hold the checkout.
  */
-export const checkoutLine = (step: string, hold: CheckoutHold): string =>
+export const checkoutLine = (step: string, hold: CheckoutHold) =>
   `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
@@ -303,7 +302,7 @@ export const checkoutLine = (step: string, hold: CheckoutHold): string =>
  * @param step The ending's name.
  * @param standings Where each result branch stands against the base branch.
  */
-export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
+export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]) =>
   `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;
 
 /**
@@ -339,17 +338,19 @@ export function toDecide(
   status: Assessment['status'],
   statusOf: (step: string) => StepStatus,
   standings: readonly BranchStanding[] = [],
-): ToDecide | undefined {
+) {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
   if (waiting && !run.pruned) {
     if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
     const filed = Boolean(run.steps[waiting.name]?.taskId);
-    return { kind: 'approve', step: waiting.name, says: filed ? null : firstLine(ownNote(waiting)) || null, filed };
+    return { kind: 'approve', step: waiting.name, says: filed ? null : firstLine(ownNote(waiting)) || null, filed } satisfies
+      | ToDecide
+      | undefined;
   }
   if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
-  return ahead.length ? { kind: 'result', branches: ahead } : undefined;
+  return (ahead.length ? { kind: 'result', branches: ahead } : undefined) satisfies ToDecide | undefined;
 }
 
 /**
@@ -357,7 +358,7 @@ export function toDecide(
  * done, so nobody is handed its branch and told to type `git merge`. Pure.
  * @param steps The workflow's steps.
  */
-export const merges = (steps: readonly StepSpec[]): boolean => steps.some(endsOnBase);
+export const merges = (steps: readonly StepSpec[]) => steps.some(endsOnBase);
 
 /**
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
@@ -373,15 +374,15 @@ export const merges = (steps: readonly StepSpec[]): boolean => steps.some(endsOn
  * @param steps The workflow's steps.
  * @param run The run's gates.
  */
-export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): StepSpec[] =>
-  terminalSteps(steps).filter((s) => hasGate(s, run));
+export const endingSteps = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>) =>
+  terminalSteps(steps).filter((s) => hasGate(s, run)) satisfies StepSpec[];
 
 /**
  * The words a step's own file says, below its frontmatter: its note alone where it names an agent, since `body` then opens with the
  * heading of that agent's instructions (`LAYER_HEADINGS` in `workflow/layers.ts`), and its whole body otherwise. Pure.
  * @param step The step: its body and its agent.
  */
-export const ownNote = (step: Pick<StepSpec, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
+export const ownNote = (step: Pick<StepSpec, 'body' | 'agent'>) => (step.agent ? step.agent.body : step.body);
 
 /**
  * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which a
@@ -395,7 +396,7 @@ export type ToDecide = { kind: 'approve'; step: string; says: string | null; fil
  * @param run The run's id and base branch.
  * @param t What the run waits on a person to decide.
  */
-export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>
+export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide) =>
   t.kind === 'approve'
     ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — nemia approve ${run.id} ${t.step}`
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — nemia decide ${run.id}`;
@@ -412,7 +413,7 @@ export function gateRefusal(
   gates: readonly string[],
   steps: readonly Pick<StepSpec, 'name'>[],
   said: (step: string) => string = (step) => `--gate ${step}`,
-): string | null {
+) {
   const seen = new Set<string>();
   for (const step of gates) {
     if (seen.has(step)) return `${said(step)} is given twice, and a run is gated at a step once. Give each step one --gate.`;
@@ -431,5 +432,5 @@ export function gateRefusal(
  * @param run The run's record.
  * @param name The step's name.
  */
-export const unrunEnding = (steps: readonly StepSpec[], run: Run, name: string): boolean =>
+export const unrunEnding = (steps: readonly StepSpec[], run: Run, name: string) =>
   !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));

@@ -190,7 +190,7 @@ function startable(
     allows,
     harnessSettings,
   }: { refused: ConfigRefused; given: boolean; allows: Allows; harnessSettings?: HarnessSettings },
-): StepSpec[] {
+) {
   const set = stepSetRefusal(steps, isolate);
   if (set) throw new Invalid({ message: set });
   const unallowed = unallowedRefusal(steps, allows.rules, allows.untrusted);
@@ -215,7 +215,7 @@ function startable(
  * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is. The skills
  * are those the Skill door `found` in the folder's places, read only for a folder team.
  */
-function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | undefined): string | undefined {
+function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | undefined) {
   if (!isFolderTeam(steps) || found === undefined) return undefined;
   for (const step of steps) {
     const skill = step.agent?.skills?.find((name) => {
@@ -255,10 +255,10 @@ export const configRefused = (
   denied: readonly string[],
   written: Readonly<Record<string, string>> = {},
   harnessSettings?: HarnessSettings,
-): string | undefined => refusedStep(home, steps, places, gates, written, [], denied, [], harnessSettings)?.why;
+) => refusedStep(home, steps, places, gates, written, [], denied, [], harnessSettings)?.why;
 
 /** A run's artifacts folder as a start asks of its steps' first filing, before the run has an id. */
-const startArtifacts = (home: string): string => path.dirname(artifactsDir(home, { id: 'run' }, 'step'));
+const startArtifacts = (home: string) => path.dirname(artifactsDir(home, { id: 'run' }, 'step'));
 
 /**
  * `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`) and the volumes `volumes`
@@ -275,7 +275,7 @@ function refusedStep(
   denied: readonly string[],
   volumes: readonly Mount[] = [],
   harnessSettings?: HarnessSettings,
-): { step: StepSpec; why: string } | undefined {
+) {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = startArtifacts(home);
@@ -320,7 +320,7 @@ export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/Start
  * refused by the runtime, in the file's words (`readRemote`) — and only when a step names a remote agent, and only the entry it names:
  * `engine()` leaves out what is refused, and every other command and run works on.
  */
-function undeclaredRefusal(steps: readonly StepSpec[], home: string): string | undefined {
+function undeclaredRefusal(steps: readonly StepSpec[], home: string) {
   const remote = steps
     .map((s) => ({ s, name: remoteNameOf(s.harness) }))
     .filter((r): r is { s: StepSpec; name: string } => r.name !== undefined);
@@ -402,36 +402,40 @@ type Told = Pick<
 >;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
-const repoNamedRefusal = (home: string, repo: string): string =>
+const repoNamedRefusal = (home: string, repo: string) =>
   `--repo ${repo}: this workflow's steps say \`place: folder\`, so the run works in folders it makes under ${workRoot(runsDir(home), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
   `Start it without --repo, or start a workflow whose steps work on a repository.`;
 
 /**
  * The files `nemia start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing.
  */
-function inputsOf(given: readonly string[]): InputFile[] {
-  return given.map((g): InputFile => {
+function inputsOf(given: readonly string[]) {
+  return given.map((g) => {
     const resolved = path.resolve(g);
     const at = fs.statSync(resolved, { throwIfNoEntry: false });
-    return { given: g, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
-  });
+    return {
+      given: g,
+      resolved,
+      kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other',
+    } satisfies InputFile;
+  }) satisfies InputFile[];
 }
 
 /** Whether `at` is a directory now. */
-const isDirectory = (at: string): boolean => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() === true;
+const isDirectory = (at: string) => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() === true;
 
 /**
  * The folders a run in `factory` on `repo` mounts (`factoryMounts`), each a directory now; none in the default factory. A folder run gives
  * no `repo`.
  */
-const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount[] =>
+const mountsAt = (factory: Factory | undefined, repo: string | undefined) =>
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
 /**
  * The read-only volumes of `factory` a run in it mounts (`factoryVolumes` of `readOnlyVolumes`), each a directory now; none in the default
  * factory. Its writable ones are the repositories it works on, mounted as `mounts` (`mountsAt`).
  */
-const volumesAt = (factory: Factory | undefined): Mount[] =>
+const volumesAt = (factory: Factory | undefined) =>
   factory ? factoryVolumes({ volumes: readOnlyVolumes(factory) }).filter((v) => isDirectory(v.path)) : [];
 
 /**
@@ -450,7 +454,7 @@ function mountRefusal(
   mounts: readonly Mount[],
   denied: readonly string[],
   { volumes, harnessSettings }: { volumes: readonly Mount[]; harnessSettings: HarnessSettings | undefined },
-): string | undefined {
+) {
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || (!mounts.length && !volumes.length)) return unwritable;
@@ -470,7 +474,7 @@ function mountRefusal(
  * @param home The store's root.
  * @param run The run started.
  */
-export function leftOutMounts(home: string, run: Run): string[] {
+export function leftOutMounts(home: string, run: Run) {
   return leftOut(home, run).mounts;
 }
 
@@ -479,12 +483,12 @@ export function leftOutMounts(home: string, run: Run): string[] {
  * @param home The store's root.
  * @param run The run started.
  */
-export function leftOutVolumes(home: string, run: Run): string[] {
+export function leftOutVolumes(home: string, run: Run) {
   return leftOut(home, run).volumes;
 }
 
 /** The factory's folders and volumes `startRun` left out of `run`, each no directory now; none where the factory does not read. */
-function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] } {
+function leftOut(home: string, run: Run) {
   if (!run.factory) return { mounts: [], volumes: [] };
   let factory: Factory | undefined;
   try {
@@ -506,7 +510,7 @@ function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] 
 }
 
 /** The models a run is started with, as its record freezes them: none where it names none. */
-const frozenModels = (models: RunModels | undefined): Pick<Told, 'models'> =>
+const frozenModels = (models: RunModels | undefined) =>
   models !== undefined && Object.keys(models).length ? { models: { ...models } } : {};
 
 /**
@@ -526,7 +530,7 @@ function toldOf(
   mounts: Mount[],
   volumes: Mount[],
   harnessSettings: HarnessSettings | undefined,
-): Told {
+) {
   const after = opts.after ?? [];
   const context = opts.context ?? [];
   const gates = opts.gates ?? [];
@@ -616,7 +620,7 @@ const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: To
  * Copies `inputs` into the run's own `inputs/` (`inputsDir`), and the text of each card handed (`cards`, by name) into its `cards/`
  * (`cardsDir`) as `<name>.md`, each exclusively; throws with exit 1 when one cannot be, the run's directory removed.
  */
-function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards: ReadonlyMap<string, string>): void {
+function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards: ReadonlyMap<string, string>) {
   if (!inputs.length && !cards.size) return;
   const dir = inputsDir(home, run);
   try {
@@ -643,13 +647,7 @@ function copyInputs(home: string, run: Run, inputs: readonly InputFile[], cards:
  * the run's directory removed. A link or a file of another kind in either folder is refused before the run has an id
  * (`workflowFilesOf`), so what fails here is a write.
  */
-function renderAgents(
-  home: string,
-  run: Run,
-  steps: readonly StepSpec[],
-  found: SkillsFound,
-  factory: Factory | undefined,
-): Pick<Run, 'workflowFiles' | 'carriedFiles' | 'homeFiles'> {
+function renderAgents(home: string, run: Run, steps: readonly StepSpec[], found: SkillsFound, factory: Factory | undefined) {
   const tree = factory?.tree;
   let what = `the steps' agents could not be rendered into ${path.join(runsDir(home), run.id, 'agents')}`;
   try {
@@ -678,7 +676,7 @@ function renderAgents(
  * The switches of the volume `run` in `factory` works on, its repository, as the run freezes them (`switchesOf`), as the record's
  * `worked`; none where they are the defaults, the run works on no volume of the factory or on no repository, or it is in no factory.
  */
-const workedSwitches = (factory: Factory | undefined, run: Run): Pick<Run, 'worked'> => {
+const workedSwitches = (factory: Factory | undefined, run: Run) => {
   if (factory === undefined || !isRepositoryRun(run)) return {};
   const at = path.resolve(run.repo);
   const volume = factory.volumes.find((v) => !v.readOnly && path.resolve(v.path) === at);
@@ -692,7 +690,7 @@ const workedSwitches = (factory: Factory | undefined, run: Run): Pick<Run, 'work
  * @param workflowDir The workflow's folder.
  * @param factory The run's factory, whose tree holds its home; none for the default factory.
  */
-const frozenRead = (workflowDir: string, factory: Factory | undefined): void => {
+const frozenRead = (workflowDir: string, factory: Factory | undefined) => {
   workflowFilesOf(workflowDir);
   carriedFilesOf(workflowDir);
   homeFilesOf(factory?.tree);
@@ -701,8 +699,7 @@ const frozenRead = (workflowDir: string, factory: Factory | undefined): void => 
 /**
  * The factory a run is started in, read through the door (`filedAtOnce`); none for no name and for the default factory, which is no file.
  */
-const factoryNamed = (home: string, name: string | undefined): Factory | undefined =>
-  name === undefined ? undefined : filedAtOnce(home, name);
+const factoryNamed = (home: string, name: string | undefined) => (name === undefined ? undefined : filedAtOnce(home, name));
 
 /**
  * The repository a run started by `nemia start` in the factory `name` works on where no wiring places it (`factoryRepo`): `named`, else
@@ -714,7 +711,7 @@ const factoryNamed = (home: string, name: string | undefined): Factory | undefin
  * @param named The repository `--repo` names, or undefined where none is named.
  * @param fallback The repository taken where neither names one.
  */
-export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string): string =>
+export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string) =>
   factoryRepo(factoryNamed(home, name), named, fallback);
 
 /**
@@ -726,7 +723,7 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  * @param name The factory's name.
  * @param workflow The workflow's name.
  */
-export const wiredRepoFor = (home: string, name: string, workflow: string): string | undefined => {
+export const wiredRepoFor = (home: string, name: string, workflow: string) => {
   const factory = filedAtOnce(home, name);
   if (factory === undefined) return undefined;
   const of = wiredRepo(factory, workflow);
@@ -890,7 +887,7 @@ const homeTrusted = Effect.fnUntraced(function* (home: string, run: Run, steps: 
 });
 
 /** Whether a start hands its run anything to copy into its inputs: a file (`--input`) or a card (`--card`). */
-const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards'>): boolean => Boolean(opts.inputs?.length || opts.cards?.length);
+const givenAny = (opts: Pick<StartOptions, 'inputs' | 'cards'>) => Boolean(opts.inputs?.length || opts.cards?.length);
 
 /**
  * The text of each inbox card `cards` names, by name, read through the Card door: refused before anything is written where they cannot

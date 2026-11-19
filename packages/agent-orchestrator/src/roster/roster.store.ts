@@ -39,7 +39,7 @@ export type Readings = { repo: string | undefined; home: string };
 type Read = Agent | Refusal;
 
 /** The agent `name` of the folder `dir`, as the Agent door reads it, its refusal kept as the value. */
-const doorRead = (name: string, dir: string): Effect.Effect<Read> =>
+const doorRead = (name: string, dir: string) =>
   Effect.flatMap(AgentDoor, (door) =>
     Effect.map(Effect.result(door.agents.read(AgentName.read(name), { dir })), (read) =>
       Result.isSuccess(read) ? read.success : read.failure,
@@ -47,10 +47,10 @@ const doorRead = (name: string, dir: string): Effect.Effect<Read> =>
   );
 
 /** The names the folder `dir` holds, as the Agent door lists them. */
-const namesIn = (dir: string): Effect.Effect<readonly string[], Refusal> => Effect.flatMap(AgentDoor, (door) => door.agents.list(dir));
+const namesIn = (dir: string) => Effect.flatMap(AgentDoor, (door) => door.agents.list(dir));
 
 /** The version of the agent `name` of `dir`, its skills counted where `skills` found them; null where the folder has no such agent. */
-const versionOf = (name: string, dir: string, skills: SkillsFound): Effect.Effect<string | null, Refusal> =>
+const versionOf = (name: string, dir: string, skills: SkillsFound) =>
   Effect.flatMap(AgentDoor, (door) =>
     Effect.map(door.agents.there(AgentName.read(name), { dir, skills }), (there) => (there.kind === 'held' ? there.version : null)),
   );
@@ -73,10 +73,11 @@ export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: st
  * @param repo The repository's folder, or undefined where there is none.
  * @param home The store's folder.
  */
-export const agentPlaces = (repo: string | undefined, home: string): Array<{ from: AgentPlace; dir: string }> => [
-  ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
-  { from: 'user', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
-];
+export const agentPlaces = (repo: string | undefined, home: string) =>
+  [
+    ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
+    { from: 'user', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
+  ] satisfies Array<{ from: AgentPlace; dir: string }>;
 
 /**
  * Every agent of both places, in the order the places come, each read now through the Agent door. An agent that does not read carries
@@ -124,24 +125,28 @@ export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: s
   return { from: one.from, dir: one.dir, agent: one.agent };
 });
 
-const linked = (at: string): boolean => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
+const linked = (at: string) => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
 
 /**
  * The file of the person's custom instructions for `name` in the store `home`, or null when they wrote none.
  * @param home The store's folder.
  * @param name The agent's name.
  */
-export function customOf(home: string, name: string): string | null {
+export function customOf(home: string, name: string) {
   const file = customInstructionsFile(home, name);
   return fs.lstatSync(file, { throwIfNoEntry: false }) ? file : null;
 }
 
 /** Where the agent `name` of yours in the store `home` was copied from, and how that file stands now; null for one never copied. */
-function copiedOf(home: string, name: string): AgentCopiedFrom | null {
+function copiedOf(home: string, name: string) {
   const record = readCopyRecord(home, name);
   if (record === null) return null;
   const now = sourceVersion(record.source, home);
-  return { source: record.source, version: record.version, now: now === null ? 'gone' : now === record.version ? 'same' : 'changed' };
+  return {
+    source: record.source,
+    version: record.version,
+    now: now === null ? 'gone' : now === record.version ? 'same' : 'changed',
+  } satisfies AgentCopiedFrom | null;
 }
 
 /**
@@ -172,7 +177,7 @@ export const agentRead = Effect.fn('agentRead')(function* (from: AgentPlace, dir
   } catch (err) {
     if (agent instanceof Error) return { ...empty, error: (err as Error).message };
   }
-  const sidecarOf = (named: string | undefined): AgentReading['schema'] => {
+  const sidecarOf = (named: string | undefined) => {
     if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
     try {
       return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') };

@@ -10,7 +10,7 @@
  * @param parse Reads the kept text, or gives undefined where it reads nothing in it.
  * @param none What is given where nothing is read.
  */
-export function readStored<T>(key: string, parse: (raw: string) => T | undefined, none: T): T {
+export function readStored<T>(key: string, parse: (raw: string) => T | undefined, none: T) {
   try {
     const raw = localStorage.getItem(key);
     return raw === null ? none : (parse(raw) ?? none);
@@ -24,7 +24,7 @@ export function readStored<T>(key: string, parse: (raw: string) => T | undefined
  * @param key The `localStorage` key to keep it under.
  * @param value The text to keep.
  */
-export function store(key: string, value: string): void {
+export function store(key: string, value: string) {
   try {
     localStorage.setItem(key, value);
   } catch {}
@@ -34,7 +34,7 @@ export function store(key: string, value: string): void {
  * Forgets what is kept under `key`: where storage is refused, nothing was kept to forget.
  * @param key The `localStorage` key to forget.
  */
-export function forgetStored(key: string): void {
+export function forgetStored(key: string) {
   try {
     localStorage.removeItem(key);
   } catch {}

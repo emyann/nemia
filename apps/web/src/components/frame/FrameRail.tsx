@@ -9,13 +9,13 @@ import { FactoryPane } from './FactoryPane';
 import { litOf, RAIL_GROUPS, type RailGroup, railHref, seatOf } from '../nav/nav';
 
 /** What Waiting's badge says to a screen reader: how many runs wait on you, in every factory. */
-const waitingTitle = (count: number): string => `${count} ${count === 1 ? 'waits' : 'wait'} on you in every factory`;
+const waitingTitle = (count: number) => `${count} ${count === 1 ? 'waits' : 'wait'} on you in every factory`;
 
 /**
  * The rail's groups (`RAIL_GROUPS`) as the kit's items, each a link where `railHref` says, Waiting counting the runs that wait on you in
  * every factory, the api's, none before they are read.
  */
-function useRailGroups(): { group: RailGroup; items: NavigationItem[] }[] {
+function useRailGroups() {
   const runs = useQuery(openRunsQuery());
   const waiting = runs.data?.counts.waiting ?? 0;
   return RAIL_GROUPS.map((group) => ({

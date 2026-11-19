@@ -4,24 +4,13 @@
  */
 import { useState } from 'react';
 
-/** A form's name and write, as `useFactoryWrite` holds them. */
-type FactoryWrite = {
-  name: string;
-  setName: (name: string) => void;
-  pending: boolean;
-  refused: string | undefined;
-  /** Whether the press may be made: a name not blank, and no write out. */
-  ready: boolean;
-  make: () => void;
-};
-
 /**
  * A form's name and its write: `make` sends `write` of the trimmed name once, and tells `onMade` the name once the api answered, or keeps
  * the refusal's words, the press offered again.
  * @param write Files the factory by its name, rejecting with the api's refusal.
  * @param onMade Told the factory's name once the api answered the write.
  */
-export function useFactoryWrite(write: (name: string) => Promise<unknown>, onMade: (name: string) => void): FactoryWrite {
+export function useFactoryWrite(write: (name: string) => Promise<unknown>, onMade: (name: string) => void) {
   const [name, setName] = useState('');
   const [pending, setPending] = useState(false);
   const [refused, setRefused] = useState<string | undefined>(undefined);

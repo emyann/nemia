@@ -25,13 +25,13 @@ export type RunMarks = {
  * The run was called off: a moment is written in `cancelledAt`. Read by truthiness, as every other guard of a cancellation reads it
  * (`holdsOpen`'s laws, `gate.contract.ts`), so the two predicates stand in for those guards on every record, an empty one included.
  */
-const calledOff = (r: RunMarks): boolean => !!r.cancelledAt;
+const calledOff = (r: RunMarks) => !!r.cancelledAt;
 
 /** The run was pruned: its worktrees are gone. */
-const pruned = (r: RunMarks): boolean => r.pruned !== undefined;
+const pruned = (r: RunMarks) => r.pruned !== undefined;
 
 /** A hold stands on the run. */
-const held = (r: RunMarks): boolean => r.hold !== undefined;
+const held = (r: RunMarks) => r.hold !== undefined;
 
 const endedForGoodSpec = spec<(run: RunMarks) => boolean>({
   ensures: {

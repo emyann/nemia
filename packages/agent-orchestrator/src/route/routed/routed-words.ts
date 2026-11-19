@@ -17,7 +17,7 @@ import { conditionOf, nodeFate, nodeKind, tableRoute } from '../route.ts';
  * @param run The run whose records say which nodes were filed or sent their card.
  * @param steps The workflow's steps: the nodes after the condition.
  */
-export const routeSettled = (condition: StepSpec, run: Run, steps: readonly StepSpec[]): boolean =>
+export const routeSettled = (condition: StepSpec, run: Run, steps: readonly StepSpec[]) =>
   steps.some((s) => s.after.includes(condition.name) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent));
 
 /** What a table answers off its producer's signed closeout, read afresh; undefined until the producer has signed off on its work. */
@@ -26,7 +26,7 @@ function tableRead(
   routes: readonly string[],
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
-): { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined {
+) {
   const [producer = '', ...field] = by.from.split('.');
   const said = satisfiesAfter(wordOf(producer)) ? closeoutOf(producer) : undefined;
   return said ? tableRoute(by, routes, said.output?.[field.join('.')]) : undefined;
@@ -51,17 +51,24 @@ export function answeredRoute(
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
   steps: readonly StepSpec[],
-): { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined {
+) {
   const routes = condition.routes ?? [];
   const kept = run.steps[condition.name]?.route;
   const keeps = kept !== undefined && kept.try === tryOf(run, condition.name) && routes.includes(kept.route);
   const by = condition.route;
   if (keeps && (kept.by !== 'table' || by?.kind !== 'table' || routeSettled(condition, run, steps)))
-    return { kind: 'route', route: kept.route };
-  if (by?.kind === 'table') return tableRead(by, routes, closeoutOf, wordOf) ?? (keeps ? { kind: 'route', route: kept.route } : undefined);
+    return { kind: 'route', route: kept.route } satisfies { kind: 'route'; route: string } | { kind: 'unsigned' } | undefined;
+  if (by?.kind === 'table')
+    return (tableRead(by, routes, closeoutOf, wordOf) ?? (keeps ? { kind: 'route', route: kept.route } : undefined)) satisfies
+      | { kind: 'route'; route: string }
+      | { kind: 'unsigned' }
+      | undefined;
   if (by !== undefined && satisfiesAfter(wordOf(condition.name))) {
     const route = closeoutOf(condition.name)?.output?.route;
-    return typeof route === 'string' && routes.includes(route) ? { kind: 'route', route } : undefined;
+    return (typeof route === 'string' && routes.includes(route) ? { kind: 'route', route } : undefined) satisfies
+      | { kind: 'route'; route: string }
+      | { kind: 'unsigned' }
+      | undefined;
   }
   return undefined;
 }
@@ -89,9 +96,9 @@ export function routedWords(
   run: Run,
   stood: ReadonlyMap<string, StepStatus>,
   closeoutOf: (step: string) => Closeout | undefined,
-): Map<string, StepStatus> {
+) {
   const words = new Map(stood);
-  const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
+  const wordOf = (name: string) => words.get(name) ?? 'pending';
   for (const step of steps) {
     const routed = routedWord(step, steps, run, closeoutOf, wordOf);
     if (routed !== undefined) words.set(step.name, routed);
@@ -106,7 +113,7 @@ function routedWord(
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
-): StepStatus | undefined {
+) {
   const record = run.steps[step.name];
   if (record?.sent) return nodeKind(step) === 'workflow' ? 'sent' : undefined;
   if (record?.taskId) return filedWord(step, run, closeoutOf, wordOf);
@@ -123,7 +130,7 @@ function routedWord(
  * @param step The condition read: the routes it declares.
  * @param run The run whose record holds the person's route and the try the condition is on.
  */
-export const personRouted = (step: StepSpec, run: Run): boolean => {
+export const personRouted = (step: StepSpec, run: Run) => {
   const kept = run.steps[step.name]?.route;
   return kept?.by === 'person' && kept.try === tryOf(run, step.name) && (step.routes ?? []).includes(kept.route);
 };
@@ -134,12 +141,7 @@ export const personRouted = (step: StepSpec, run: Run): boolean => {
  * file, an undeclared route), which its standing reads as signed; else its standing's (a route, `blocked`, `failed`, `stopped`, running).
  * A filed step that is no condition reads its standing's.
  */
-function filedWord(
-  step: StepSpec,
-  run: Run,
-  closeoutOf: (step: string) => Closeout | undefined,
-  wordOf: (step: string) => StepStatus,
-): StepStatus | undefined {
+function filedWord(step: StepSpec, run: Run, closeoutOf: (step: string) => Closeout | undefined, wordOf: (step: string) => StepStatus) {
   if (step.routes !== undefined && personRouted(step, run)) return 'unverified';
   const signed = wordOf(step.name) === 'unverified' || (step.route?.kind === 'judge' && wordOf(step.name) === 'awaiting approval');
   if ((step.route?.kind !== 'script' && step.route?.kind !== 'judge') || !signed) return undefined;
@@ -164,11 +166,10 @@ export function runWords(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): Map<string, StepStatus> {
-  const stood = steps.map((s): [string, StepStatus] => [
-    s.name,
-    standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status,
-  ]);
+) {
+  const stood = steps.map(
+    (s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status] satisfies [string, StepStatus],
+  );
   return routedWords(steps, run, new Map(stood), closeoutOf);
 }
 
@@ -179,7 +180,7 @@ function offRoute(
   run: Run,
   closeoutOf: (step: string) => Closeout | undefined,
   wordOf: (step: string) => StepStatus,
-): boolean {
+) {
   const parents = step.after.map(wordOf);
   const condition = conditionOf(step, steps);
   const answered = condition ? answeredRoute(condition, run, closeoutOf, wordOf, steps) : undefined;

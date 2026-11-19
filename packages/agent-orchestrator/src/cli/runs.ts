@@ -11,7 +11,7 @@ import { placedIn, type Engine } from './flags.ts';
  * @param e The engine the decision runs over.
  * @param place The place the decision is given.
  */
-export async function admitRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+export async function admitRun(env: Env, args: Args, e: Engine, place: Place) {
   const home = wfRoot(env);
   const floor = typeof args.atLeast === 'string' ? (args.atLeast as Parameters<typeof admitted>[3]) : undefined;
   const auto = typeof args.auto === 'string' ? args.auto : undefined;

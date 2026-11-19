@@ -19,13 +19,13 @@ export type NodeWord = StepStatus;
 export type Fate = 'ready' | 'waits' | 'skipped' | 'unreachable';
 
 /** A parent a follower may be filed on: work it did, or a card it filed (`sent`). */
-const satisfies = (w: NodeWord): boolean => w === 'verified' || w === 'unverified' || w === 'sent';
+const satisfies = (w: NodeWord) => w === 'verified' || w === 'unverified' || w === 'sent';
 
 /** A route not taken: neither satisfies nor stops. */
-const skipped = (w: NodeWord): boolean => w === 'skipped';
+const skipped = (w: NodeWord) => w === 'skipped';
 
 /** The machinery's stops (`stopsFollowers`, record.ts): each a person's, or a break. */
-const stops = (w: NodeWord): boolean =>
+const stops = (w: NodeWord) =>
   w === 'blocked' ||
   w === 'unsigned' ||
   w === 'awaiting approval' ||
@@ -38,11 +38,11 @@ const stops = (w: NodeWord): boolean =>
   w === 'stopped';
 
 /** Its condition answered a route it does not take. */
-const offRoute = (when: readonly string[] | undefined, answered: string | undefined): boolean =>
+const offRoute = (when: readonly string[] | undefined, answered: string | undefined) =>
   when !== undefined && answered !== undefined && !when.includes(answered);
 
 /** Its route is taken: it names none, or its condition answered one it names. */
-const onRoute = (when: readonly string[] | undefined, answered: string | undefined): boolean =>
+const onRoute = (when: readonly string[] | undefined, answered: string | undefined) =>
   when === undefined || (answered !== undefined && when.includes(answered));
 
 const nodeFateSpec = spec<(when: readonly string[] | undefined, answered: string | undefined, parents: readonly NodeWord[]) => Fate>({

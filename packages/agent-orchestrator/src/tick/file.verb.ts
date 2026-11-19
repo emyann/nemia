@@ -96,14 +96,13 @@ type Spec = Parameters<Engine['file']>[0];
  * default stands (`WF_MEMORY_LIMIT`). On a session alone, inside `localFields`, since the runtime refuses a limit on a remote agent; a
  * check is filed without it, asking its step's `checkMemory:` instead (`checkRequestOf`).
  */
-const limitsOf = (step: StepSpec): Pick<Spec, 'resources'> =>
-  step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } };
+const limitsOf = (step: StepSpec) => (step.memory === undefined ? {} : { resources: { limits: { memory: step.memory } } });
 
 /**
  * What a step's check asks of the machine, a container's `resources`: its `checkMemory:` as `requests.memory` alone, or nothing, where
  * the engine's default request stands (`WF_MEMORY_REQUEST`). The runtime gives a request alone the engine's default limit beside it.
  */
-const checkRequestOf = (step: StepSpec): Pick<Spec, 'resources'> =>
+const checkRequestOf = (step: StepSpec) =>
   step.checkMemory === undefined ? {} : { resources: { requests: { memory: step.checkMemory } } };
 
 /**
@@ -138,17 +137,17 @@ export type Filing = {
 export type Heads = () => Readonly<Record<string, string>> | undefined;
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
-const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
+const asRead = (f: Filing) => reportedEngine(f.e, [...f.reads.views.values()]) satisfies Engine;
 
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
-const closeFirst = (f: Filing, name: string, taskId: string | null | undefined): Effect.Effect<string | undefined> =>
+const closeFirst = (f: Filing, name: string, taskId: string | null | undefined) =>
   taskId && f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId) : Effect.succeed(undefined);
 
 /**
  * Whether `step`'s session would start in a run's home its harness does not trust, and cannot be made to (`trustRunHome`): the step is
  * left unfiled on this pass, with a note that names the fix, and the next pass asks again.
  */
-const homeUntrusted = (f: Filing, step: StepSpec): boolean => {
+const homeUntrusted = (f: Filing, step: StepSpec) => {
   const why = trustRunHome(f.home, f.run, [step]);
   if (why !== undefined) f.notes.push(`${step.name}: not filed — ${why}; the next pass asks again`);
   return why !== undefined;
@@ -202,7 +201,7 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
  * The step's task held open a try answers, where the try is a person's continue answering it in the session that signed, rather than a
  * task of its own; undefined where it is not.
  */
-const heldAnswered = (f: Filing, r: Retry, step: StepSpec, record: StepRecord): string | undefined => {
+const heldAnswered = (f: Filing, r: Retry, step: StepSpec, record: StepRecord) => {
   const { run, reads } = f;
   const taskId = record.taskId;
   if (!taskId || !f.closer.awaitsWord(taskId)) return undefined;
@@ -232,7 +231,7 @@ export const tryFiled = (
   record: StepRecord,
   retry: Retry,
   taskId: string,
-): StepRecord => ({
+) => ({
   ...nextTry(record, retry, taskId),
   ...filedOn(f, step),
 });
@@ -287,14 +286,15 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: StepSpec, resumed
 });
 
 /** What a try of a step on a remote agent is told of itself (`remoteBrief`): a new task, never a session continued. */
-const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
-  try: r.try,
-  by: r.by,
-  mode: r.mode,
-  resumed: false,
-  status,
-  ...(r.message !== undefined ? { message: r.message } : {}),
-});
+const remoteTry = (r: Retry, status: StepStatus) =>
+  ({
+    try: r.try,
+    by: r.by,
+    mode: r.mode,
+    resumed: false,
+    status,
+    ...(r.message !== undefined ? { message: r.message } : {}),
+  }) satisfies RetryBriefing as RetryBriefing;
 
 /**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
@@ -352,8 +352,10 @@ const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom
   const asking = resumeFrom ? undefined : askingTry(reads.steps, run, r.step);
   const askedWith = asking ? (yield* asked('view', e.view(asking.taskId))).state.attempts.at(-1)?.closeout : undefined;
   const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
-  return (name: string): Closeout | undefined =>
-    asking && name === asking.looping.name && findings && !('error' in findings) ? findings : reads.signedOff(name);
+  return (name: string) =>
+    (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : reads.signedOff(name)) satisfies
+      | Closeout
+      | undefined;
 });
 
 /** A try filed as a task of its own, in the workspace the step had, with its brief, its session to continue and its cap. */
@@ -363,7 +365,7 @@ const trySpec = (
   step: StepSpec,
   record: StepRecord,
   t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: Told },
-): Spec => ({
+) => ({
   id: t.taskId,
   brief: t.brief,
   cwd: sessionCwd(step, f.run, f.home, record.workspace ?? f.run.workspace),
@@ -459,7 +461,7 @@ function roundSpec(
   taskId: string,
   told: StepTold,
   said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts; deps?: Provisioned },
-): Spec {
+) {
   const { run, reads } = f;
   const record = recordNamed(run, r.target);
   const files = artifactsDir(home, run, r.target);
@@ -512,7 +514,7 @@ function roundSpec(
       ...limitsOf(target),
     })),
     deadlineSeconds: target.deadlineSeconds,
-  };
+  } satisfies Spec as Spec;
 }
 
 /** File the checks of these steps, in order, until the pass may file no more: answers with the steps whose checks are on the record. */
@@ -646,7 +648,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, due: Due, 
 });
 
 /** The session of the step a step resumes, off its current task: undefined for a step with none. */
-const sessionOf = (f: Filing, stepName: string): string | undefined => {
+const sessionOf = (f: Filing, stepName: string) => {
   const taskId = f.run.steps[stepName]?.taskId;
   return taskId ? sessionIn(f.reads.views, taskId) : undefined;
 };
@@ -668,7 +670,7 @@ function readySpec(
     closeoutOf: (step: string) => Closeout | undefined;
     costs: WorkflowCosts | undefined;
   },
-): Spec {
+) {
   const { parents, closeoutOf } = said;
   const { run, reads } = f;
   return {

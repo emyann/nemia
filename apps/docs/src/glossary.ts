@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import type { Heading, List, ListItem, Paragraph, PhrasingContent, Root, RootContent } from 'mdast';
+import type { Heading, List, ListItem, Paragraph, PhrasingContent, Root } from 'mdast';
 
 /**
  * A spelling a term no longer has, and the card that retires it. `kept` names each path, from the repository's root, where the old
@@ -35,9 +35,9 @@ const SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
  * The files under each of `dirs`, folders from `root`, by path from `root`: a walk of the folders, leaving out installed packages,
  * build output and every folder whose name opens with a dot. Read without git, whose calls belong to the place's code alone.
  */
-const filesOf = (root: string, dirs: string[]): string[] => {
+const filesOf = (root: string, dirs: string[]) => {
   const out: string[] = [];
-  const walk = (dir: string): void => {
+  const walk = (dir: string) => {
     const at = path.join(root, dir);
     if (!fs.existsSync(at)) return;
     for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
@@ -55,7 +55,7 @@ const filesOf = (root: string, dirs: string[]): string[] => {
  * Every glossary table of the repository at `root`: each `glossary.json` under `packages/` and `apps/`, parsed, by its path.
  * @param root The repository's root folder, under whose packages/ and apps/ the tables are found and from which their paths are said.
  */
-export const tablesIn = (root: string): Table[] =>
+export const tablesIn = (root: string) =>
   filesOf(root, ['packages', 'apps'])
     .filter((f) => path.posix.basename(f) === 'glossary.json')
     .sort()
@@ -72,7 +72,7 @@ export const tablesIn = (root: string): Table[] =>
  * The ids a ```glossary fence lists, one a line, in its order.
  * @param fence The text inside the glossary fence of the page, one context's id a line.
  */
-export const idsOf = (fence: string): string[] =>
+export const idsOf = (fence: string) =>
   fence
     .split('\n')
     .map((line) => line.trim())
@@ -84,36 +84,46 @@ export const idsOf = (fence: string): string[] =>
  * @param tables Every glossary table of the repository, as tablesIn reads them.
  * @param order The ids the fence lists, in its order (idsOf).
  */
-export const fenceFaults = (tables: Table[], order: string[]): Fault[] => [
-  ...tables
-    .filter((t) => !order.includes(t.context))
-    .map((t): Fault => ({
-      kind: 'omitted',
-      context: t.context,
-      says: `${t.file} is the table of ${t.context}, which the glossary fence omits: add ${t.context} to the fence of apps/docs/src/content/docs/glossary.mdx, in the map's order`,
-    })),
-  ...order
-    .filter((id) => !tables.some((t) => t.context === id))
-    .map((id): Fault => ({
-      kind: 'no-table',
-      context: id,
-      says: `the glossary fence lists ${id}, which no glossary.json names as its context: take it off the fence, or give that context its table`,
-    })),
-  ...[...new Set(tables.map((t) => t.context))]
-    .map((id) => tables.filter((t) => t.context === id))
-    .filter((same) => same.length > 1)
-    .map((same): Fault => ({
-      kind: 'twice',
-      context: same[0].context,
-      says: `${same.map((t) => t.file).join(' and ')} each give the context ${same[0].context}: give each table the id of its own context`,
-    })),
-];
+export const fenceFaults = (tables: Table[], order: string[]) =>
+  [
+    ...tables
+      .filter((t) => !order.includes(t.context))
+      .map(
+        (t) =>
+          ({
+            kind: 'omitted',
+            context: t.context,
+            says: `${t.file} is the table of ${t.context}, which the glossary fence omits: add ${t.context} to the fence of apps/docs/src/content/docs/glossary.mdx, in the map's order`,
+          }) satisfies Fault,
+      ),
+    ...order
+      .filter((id) => !tables.some((t) => t.context === id))
+      .map(
+        (id) =>
+          ({
+            kind: 'no-table',
+            context: id,
+            says: `the glossary fence lists ${id}, which no glossary.json names as its context: take it off the fence, or give that context its table`,
+          }) satisfies Fault,
+      ),
+    ...[...new Set(tables.map((t) => t.context))]
+      .map((id) => tables.filter((t) => t.context === id))
+      .filter((same) => same.length > 1)
+      .map(
+        (same) =>
+          ({
+            kind: 'twice',
+            context: same[0].context,
+            says: `${same.map((t) => t.file).join(' and ')} each give the context ${same[0].context}: give each table the id of its own context`,
+          }) satisfies Fault,
+      ),
+  ] satisfies Fault[];
 
 /** Text that may hold backticked names, as phrasing: each backticked span inline code, the rest text. */
-const phrasing = (text: string): PhrasingContent[] =>
+const phrasing = (text: string) =>
   text
     .split(/`([^`\n]+)`/)
-    .flatMap((part, i): PhrasingContent[] =>
+    .flatMap<PhrasingContent>((part, i) =>
       i % 2 === 1 ? [{ type: 'inlineCode', value: part }] : part ? [{ type: 'text', value: part }] : [],
     );
 
@@ -121,7 +131,7 @@ const phrasing = (text: string): PhrasingContent[] =>
  * One term's line: **term**: its meaning, its type in code where it has one, the spellings it retired, which the code says no more,
  * and the link to the page that explains it.
  */
-const itemOf = (term: Term): ListItem => {
+const itemOf = (term: Term) => {
   const children: PhrasingContent[] = [
     { type: 'strong', children: [{ type: 'text', value: term.term }] },
     { type: 'text', value: ': ' },
@@ -132,15 +142,18 @@ const itemOf = (term: Term): ListItem => {
   if (term.retired?.length)
     children.push(
       { type: 'text', value: ' Retired: ' },
-      ...term.retired.flatMap((r, i): PhrasingContent[] => [
-        ...(i > 0 ? [{ type: 'text', value: ', ' } as const] : []),
-        { type: 'inlineCode', value: r.spelling },
-      ]),
+      ...term.retired.flatMap(
+        (r, i) =>
+          [
+            ...(i > 0 ? [{ type: 'text', value: ', ' } as const] : []),
+            { type: 'inlineCode', value: r.spelling },
+          ] satisfies PhrasingContent[],
+      ),
       { type: 'text', value: '.' },
     );
   if (term.see)
     children.push({ type: 'text', value: ' ' }, { type: 'link', url: term.see.href, children: [{ type: 'text', value: term.see.label }] });
-  return { type: 'listItem', spread: false, children: [{ type: 'paragraph', children }] };
+  return { type: 'listItem', spread: false, children: [{ type: 'paragraph', children }] } satisfies ListItem;
 };
 
 /**
@@ -148,7 +161,7 @@ const itemOf = (term: Term): ListItem => {
  * @param tables Every glossary table of the repository, as tablesIn reads them.
  * @param order The ids the fence lists, in its order: a context no table has draws no section.
  */
-export const glossarySections = (tables: Table[], order: string[]): RootContent[] =>
+export const glossarySections = (tables: Table[], order: string[]) =>
   order.flatMap((id) => {
     const table = tables.find((t) => t.context === id);
     if (!table) return [];
@@ -159,18 +172,18 @@ export const glossarySections = (tables: Table[], order: string[]): RootContent[
   });
 
 /** The workspace a table sits in, by path from the root: `packages/<x>` or `apps/<x>`. */
-const workspaceOf = (file: string): string => file.split('/').slice(0, 2).join('/');
+const workspaceOf = (file: string) => file.split('/').slice(0, 2).join('/');
 
 /** A source file of a workspace that is no test: a `.ts` or `.tsx`, outside any `test/` folder and not named `*.test.*`. */
-const isSource = (file: string): boolean =>
+const isSource = (file: string) =>
   /\.tsx?$/.test(file) && !file.endsWith('.d.ts') && !/\.test\.tsx?$/.test(file) && !file.split('/').includes('test');
 
 /** The names a source file exports: a type, an interface, a class, a const or let, a function, an enum, and a named re-export. */
-const exportsOf = (file: string, text: string): string[] => {
+const exportsOf = (file: string, text: string) => {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const exported = (node: ts.Node) =>
     ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-  return source.statements.flatMap((node): string[] => {
+  return source.statements.flatMap((node) => {
     if (ts.isExportDeclaration(node))
       return node.exportClause && ts.isNamedExports(node.exportClause) ? node.exportClause.elements.map((e) => e.name.text) : [];
     if (!exported(node)) return [];
@@ -193,9 +206,9 @@ const exportsOf = (file: string, text: string): string[] => {
  * @param root The repository's root folder, from which each table's workspace is read.
  * @param tables Every glossary table of the repository, whose terms' types are looked for.
  */
-export const typeFaults = (root: string, tables: Table[]): Fault[] => {
+export const typeFaults = (root: string, tables: Table[]) => {
   const exports = new Map<string, Set<string>>();
-  const exportedBy = (workspace: string): Set<string> => {
+  const exportedBy = (workspace: string) => {
     let names = exports.get(workspace);
     if (!names) {
       names = new Set(
@@ -208,19 +221,20 @@ export const typeFaults = (root: string, tables: Table[]): Fault[] => {
     return names;
   };
   return tables.flatMap((table) =>
-    table.terms.flatMap((term): Fault[] =>
-      term.type && !exportedBy(workspaceOf(table.file)).has(term.type)
-        ? [
-            {
-              kind: 'no-export',
-              context: table.context,
-              type: term.type,
-              says: `${table.file}: the term ${term.term} names the type ${term.type}, which no source of ${workspaceOf(table.file)} exports: name a type it exports, or take the type off`,
-            },
-          ]
-        : [],
+    table.terms.flatMap(
+      (term) =>
+        (term.type && !exportedBy(workspaceOf(table.file)).has(term.type)
+          ? [
+              {
+                kind: 'no-export',
+                context: table.context,
+                type: term.type,
+                says: `${table.file}: the term ${term.term} names the type ${term.type}, which no source of ${workspaceOf(table.file)} exports: name a type it exports, or take the type off`,
+              },
+            ]
+          : []) satisfies Fault[],
     ),
-  );
+  ) satisfies Fault[];
 };
 
 /**
@@ -230,7 +244,7 @@ export const typeFaults = (root: string, tables: Table[]): Fault[] => {
  */
 export const remarkGlossary =
   ({ root }: { root: string }) =>
-  (tree: Root, file: { path?: string }): void => {
+  (tree: Root, file: { path?: string }) => {
     const at = tree.children.findIndex((node) => node.type === 'code' && node.lang === 'glossary');
     if (at < 0) return;
     const fence = tree.children[at];

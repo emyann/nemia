@@ -28,10 +28,10 @@ export type Redirect = { readonly origin: string; readonly pathname: string };
 export type CallbackRefusal = 'unreadable' | 'elsewhere' | 'denied' | 'no-code' | 'no-state';
 
 /** Whether an OAuth parameter was given, and given something. */
-const given = (value: string | null): boolean => value !== null && value !== '';
+const given = (value: string | null) => value !== null && value !== '';
 
 /** Whether `pasted` is the redirect `redirect` names: the same origin and the same path. */
-const atTheRedirect = (pasted: PastedCallback, redirect: Redirect): boolean =>
+const atTheRedirect = (pasted: PastedCallback, redirect: Redirect) =>
   pasted.origin === redirect.origin && pasted.pathname === redirect.pathname;
 
 const callbackSpec = spec<(pasted: PastedCallback | undefined, redirect: Redirect) => CallbackRefusal | undefined>({

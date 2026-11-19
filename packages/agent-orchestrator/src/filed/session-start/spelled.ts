@@ -13,16 +13,16 @@ export const WORKSPACE_EXPRESSION = '${{ workspace }}';
  * @param text A rule as the step's fence writes it.
  * @param workspace The step's workspace, absolute.
  */
-export const expandedIn = (text: string, workspace: string): string => text.split(WORKSPACE_EXPRESSION).join(workspace);
+export const expandedIn = (text: string, workspace: string) => text.split(WORKSPACE_EXPRESSION).join(workspace);
 
 /**
  * The deny that holds a folder read-only, spelled as the runtime spells a read-only mount's: `Edit(//<path>/**)`.
  * @param folder The folder denied, absolute.
  */
-export const editDenied = (folder: string): string => 'Edit(/' + folder + '/**)';
+export const editDenied = (folder: string) => 'Edit(/' + folder + '/**)';
 
 /**
  * The exclude that skips every memory file under a folder.
  * @param folder The folder skipped, absolute.
  */
-export const everyFileUnder = (folder: string): string => folder + '/**';
+export const everyFileUnder = (folder: string) => folder + '/**';

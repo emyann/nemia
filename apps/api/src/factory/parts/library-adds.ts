@@ -11,7 +11,7 @@ import { answered } from '../../objects/refused.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The route of the add `name` of `namespace`, as a refusal says it. */
-const routeOf = (method: string, namespace: string, name: string): string => `${method} /api/namespaces/${namespace}/libraryadds/${name}`;
+const routeOf = (method: string, namespace: string, name: string) => `${method} /api/namespaces/${namespace}/libraryadds/${name}`;
 
 export const libraryAddsHandlers = readsBounded(Api, 'libraryadds', (handlers) =>
   handlers

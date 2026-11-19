@@ -91,10 +91,10 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
 
 type Pattern = { input: string; negated: boolean; matches: (file: string) => boolean };
 
-const escape = (text: string): string => text.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+const escape = (text: string) => text.replace(/[.+^${}()|[\]\\]/g, '\\$&');
 
 /** A segment's regular expression, `/` included where another segment follows, or `undefined` for a shape this file does not read. */
-const segmentOf = (segment: string, last: boolean): string | undefined => {
+const segmentOf = (segment: string, last: boolean) => {
   if (segment === '**') return last ? '.+' : '(?:[^/]+/)*';
   if (segment === '' || segment === '.' || segment === '..' || /[?[\]{}!]/.test(segment) || segment.includes('**')) return undefined;
   return segment.split('*').map(escape).join('[^/]*') + (last ? '' : '/');
@@ -107,10 +107,10 @@ const segmentOf = (segment: string, last: boolean): string | undefined => {
  * @param folder the workspace's folder from the root, what `$TURBO_DEFAULT$` and a bare input stand under.
  * @param owner what lists the input, named in the refusal: a turbo task or a key of this file's.
  */
-export const patternOf = (input: string, folder = GUARDS, owner = TASK): Pattern => {
+export const patternOf = (input: string, folder = GUARDS, owner = TASK) => {
   const negated = input.startsWith('!');
   const body = negated ? input.slice(1) : input;
-  const refused = (): Error =>
+  const refused = () =>
     new Error(
       `${owner}'s input ${JSON.stringify(input)} has a shape tools/guards/due.ts does not read. Rewrite it, in turbo.json or in ` +
         "due.ts's own table, as a folder ending in /** (dir/**), a plain file, with * inside one segment (apps/*/src/**) or ** as a " +
@@ -122,23 +122,23 @@ export const patternOf = (input: string, folder = GUARDS, owner = TASK): Pattern
   const parts = segments.map((segment, i) => segmentOf(segment, i === segments.length - 1));
   if (parts.some((part) => part === undefined)) throw refused();
   const regex = new RegExp(`^${parts.join('')}$`);
-  return { input, negated, matches: (file) => regex.test(file) };
+  return { input, negated, matches: (file) => regex.test(file) } satisfies Pattern;
 };
 
 /** A claim compiled: why a path is due by it, or `undefined` where it names the path not. */
 type Matcher = (file: string) => string | undefined;
 
-const matcherOf = (claim: Claim, owner: string): Matcher => {
+const matcherOf = (claim: Claim, owner: string) => {
   const patterns = claim.inputs.map((input) => patternOf(input, claim.folder, owner));
   const positives = patterns.filter((p) => !p.negated);
   const negatives = patterns.filter((p) => p.negated);
-  return (file) => {
+  return ((file) => {
     const under = claim.folders.find((dir) => file.startsWith(`${dir.replace(/\/$/, '')}/`));
     if (under !== undefined) return `${file} is under ${under}, a workspace ${owner} depends on`;
     const named = positives.find((p) => p.matches(file));
     if (named !== undefined && !negatives.some((p) => p.matches(file))) return `${file} is named by ${owner}'s input ${named.input}`;
     return undefined;
-  };
+  }) satisfies Matcher;
 };
 
 /**
@@ -150,7 +150,7 @@ const matcherOf = (claim: Claim, owner: string): Matcher => {
  * @param folders the folders of the workspaces the claim's workspace depends on, from the root.
  * @param folder the claim's own workspace folder, what `$TURBO_DEFAULT$` stands for.
  */
-export const dueOf = (changed: readonly string[], inputs: readonly string[], folders: readonly string[], folder = GUARDS): Due => {
+export const dueOf = (changed: readonly string[], inputs: readonly string[], folders: readonly string[], folder = GUARDS) => {
   const matches = matcherOf({ inputs, folder, folders }, TASK);
   for (const file of changed) {
     const why = matches(file);
@@ -163,7 +163,7 @@ export const dueOf = (changed: readonly string[], inputs: readonly string[], fol
 };
 
 /** Every claim compiled, by key; throws on an input of a shape this file does not read. */
-const compiled = (claims: Claims): Map<string, Matcher[]> =>
+const compiled = (claims: Claims) =>
   new Map(Object.entries(claims).map(([key, list]) => [key, list.map((claim) => matcherOf(claim, key))]));
 
 /**
@@ -176,7 +176,7 @@ const compiled = (claims: Claims): Map<string, Matcher[]> =>
  * @param claims every key's claims, as `claimsOf` reads them.
  * @param everywhere the paths every job runs on.
  */
-export const jobDueOf = (job: string, changed: readonly string[], claims: Claims, everywhere: readonly string[] = EVERYWHERE): Due => {
+export const jobDueOf = (job: string, changed: readonly string[], claims: Claims, everywhere: readonly string[] = EVERYWHERE) => {
   const matchers = compiled(claims);
   const own = matchers.get(job);
   if (own === undefined)
@@ -203,10 +203,10 @@ type Manifest = {
   devDependencies?: Record<string, string>;
 };
 
-const readJson = <T>(file: string): T => JSON.parse(fs.readFileSync(file, 'utf8')) as T;
+const readJson = <T>(file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as T;
 
 /** The folders a root `package.json` workspace names: each folder of `dir` for `dir/*`, else the folder itself. */
-const foldersOf = (root: string, glob: string): string[] => {
+const foldersOf = (root: string, glob: string) => {
   const dir = glob.endsWith('/*') ? glob.slice(0, -2) : glob;
   if (/[*?[{]/.test(dir))
     throw new Error(`The root package.json's workspace ${JSON.stringify(glob)} is not a dir/* or a folder: write it as one.`);
@@ -215,7 +215,7 @@ const foldersOf = (root: string, glob: string): string[] => {
 };
 
 /** Each workspace package's folder by its name, from the root `package.json`'s `workspaces`. */
-const workspacesOf = (root: string): Map<string, string> => {
+const workspacesOf = (root: string) => {
   const folders = new Map<string, string>();
   for (const glob of readJson<Manifest>(path.join(root, 'package.json')).workspaces ?? []) {
     for (const candidate of foldersOf(root, glob)) {
@@ -233,9 +233,9 @@ const workspacesOf = (root: string): Map<string, string> => {
  * @param root the repository's root.
  * @param folder the workspace's folder, from the root.
  */
-export const dependencyFolders = (root: string, folder = GUARDS): string[] => {
+export const dependencyFolders = (root: string, folder = GUARDS) => {
   const workspaces = workspacesOf(root);
-  const namesOf = (manifest: Manifest): string[] =>
+  const namesOf = (manifest: Manifest) =>
     [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})].filter((n) => workspaces.has(n));
   const seen = new Set<string>();
   const queue = namesOf(readJson<Manifest>(path.join(root, folder, 'package.json')));
@@ -258,7 +258,7 @@ export const dependencyFolders = (root: string, folder = GUARDS): string[] => {
  *
  * @param root the repository's root.
  */
-export const claimsOf = (root: string): Claims => {
+export const claimsOf = (root: string) => {
   const workspaces = workspacesOf(root);
   const claims: Record<string, Claim[]> = {};
   for (const [key, claim] of [...turboClaims(root, workspaces), ...writtenClaims(root, workspaces)])
@@ -279,9 +279,9 @@ const TURBO_JOBS: readonly { job: 'test' | 'typecheck' | 'build'; task: string; 
 ];
 
 /** The claims of the jobs that run a turbo task, each beside its key, read off `turbo.json` and each workspace's scripts. */
-const turboClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => {
+const turboClaims = (root: string, workspaces: Map<string, string>) => {
   const tasks = readJson<{ tasks?: Record<string, { inputs?: string[] }> }>(path.join(root, 'turbo.json')).tasks ?? {};
-  const keyOf = (job: string, name: string, folder: string): string => {
+  const keyOf = (job: string, name: string, folder: string) => {
     if (job !== 'test') return job;
     return folder === GUARDS ? 'guards' : `test ${name}`;
   };
@@ -290,34 +290,36 @@ const turboClaims = (root: string, workspaces: Map<string, string>): [string, Cl
     .flatMap(([name, folder]) => {
       const scripts = readJson<Manifest>(path.join(root, folder, 'package.json')).scripts ?? {};
       return TURBO_JOBS.filter((each) => each.scripts.every((script) => scripts[script] !== undefined)).map(
-        ({ job, task }): [string, Claim] => [
-          keyOf(job, name, folder),
-          {
-            inputs: tasks[`${name}#${task}`]?.inputs ?? tasks[task]?.inputs ?? ['$TURBO_DEFAULT$'],
-            folder,
-            folders: dependencyFolders(root, folder),
-          },
-        ],
+        ({ job, task }) =>
+          [
+            keyOf(job, name, folder),
+            {
+              inputs: tasks[`${name}#${task}`]?.inputs ?? tasks[task]?.inputs ?? ['$TURBO_DEFAULT$'],
+              folder,
+              folders: dependencyFolders(root, folder),
+            },
+          ] satisfies [string, Claim],
       );
-    });
+    }) satisfies [string, Claim][];
 };
 
 /** The claims of the jobs that run no turbo task, each beside its key, from this file's table. */
-const writtenClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => [
-  ['lint', { inputs: ['$TURBO_ROOT$/**', ...LINT_SKIPS.map((ext) => `!$TURBO_ROOT$/**/*.${ext}`)], folder: '.', folders: [] }],
-  ['lint', { inputs: [...LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), ...LINT_READS], folder: '.', folders: [] }],
-  ...Object.entries(WRITTEN).flatMap(([key, names]) => [
-    ...names.map((name): [string, Claim] => {
-      const folder = workspaces.get(name);
-      if (folder === undefined)
-        throw new Error(
-          `tools/guards/due.ts's WRITTEN gives ${key} the workspace ${name}, which the root package.json's workspaces do not hold: name the workspace by its package name, or take it off`,
-        );
-      return [key, { inputs: ['$TURBO_DEFAULT$'], folder, folders: dependencyFolders(root, folder) }];
-    }),
-    ...(key.startsWith('contracts ') ? [[key, { inputs: [CONTRACTS_TOOL], folder: '.', folders: [] }] as [string, Claim]] : []),
-  ]),
-];
+const writtenClaims = (root: string, workspaces: Map<string, string>) =>
+  [
+    ['lint', { inputs: ['$TURBO_ROOT$/**', ...LINT_SKIPS.map((ext) => `!$TURBO_ROOT$/**/*.${ext}`)], folder: '.', folders: [] }],
+    ['lint', { inputs: [...LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), ...LINT_READS], folder: '.', folders: [] }],
+    ...Object.entries(WRITTEN).flatMap(([key, names]) => [
+      ...names.map((name) => {
+        const folder = workspaces.get(name);
+        if (folder === undefined)
+          throw new Error(
+            `tools/guards/due.ts's WRITTEN gives ${key} the workspace ${name}, which the root package.json's workspaces do not hold: name the workspace by its package name, or take it off`,
+          );
+        return [key, { inputs: ['$TURBO_DEFAULT$'], folder, folders: dependencyFolders(root, folder) }] satisfies [string, Claim];
+      }),
+      ...(key.startsWith('contracts ') ? [[key, { inputs: [CONTRACTS_TOOL], folder: '.', folders: [] }] as [string, Claim]] : []),
+    ]),
+  ] satisfies [string, Claim][];
 
 const SHA = /^[0-9a-f]{7,64}$/;
 
@@ -326,7 +328,7 @@ const SHA = /^[0-9a-f]{7,64}$/;
  *
  * @param env the environment GitHub gives the step.
  */
-export const rangeOf = (env: NodeJS.ProcessEnv): { range: string } | { none: string } => {
+export const rangeOf = (env: NodeJS.ProcessEnv) => {
   const event = env.GITHUB_EVENT_NAME ?? '';
   if (event === 'pull_request') {
     const base = env.BASE ?? '';
@@ -345,7 +347,7 @@ export const rangeOf = (env: NodeJS.ProcessEnv): { range: string } | { none: str
 };
 
 /** The answer for `key` in the repository at `root` under `env`: what git says changed, read against every key's claims. */
-const decide = (root: string, env: NodeJS.ProcessEnv, key: string): Due => {
+const decide = (root: string, env: NodeJS.ProcessEnv, key: string) => {
   const claims = claimsOf(root);
   jobDueOf(key, [], claims);
   const range = rangeOf(env);

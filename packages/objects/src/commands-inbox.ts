@@ -10,13 +10,14 @@ import { leftOut } from './commands-flags.ts';
 const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--factory': 'factory' };
 
 /** One of `nemia inbox add`'s value flags, keyed by its name, taking what `takes` says, once. */
-const addFlag = (flag: string, takes: string): Flag => ({
-  flag,
-  kind: 'text',
-  key: flag.slice(2),
-  takes: `${flag} takes ${takes}`,
-  twice: `${CLI} inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag] ?? 'value'}.`,
-});
+const addFlag = (flag: string, takes: string) =>
+  ({
+    flag,
+    kind: 'text',
+    key: flag.slice(2),
+    takes: `${flag} takes ${takes}`,
+    twice: `${CLI} inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag] ?? 'value'}.`,
+  }) satisfies Flag;
 
 /** `nemia inbox add`'s flags: `--workflow` and `--factory`, once each, and `--label`, once per label. */
 const ADD_FLAGS: readonly Flag[] = [
@@ -112,7 +113,7 @@ export const INBOX_QUEUE_WORDS = {
  * The runs `args` names, as `nemia inbox from` takes them: none for `--off`.
  * @param args The command line's arguments, by key: its runs under runs.
  */
-export const runsNamed = (args: Args): readonly string[] => (Array.isArray(args.runs) ? args.runs.map(String) : []);
+export const runsNamed = (args: Args) => (Array.isArray(args.runs) ? args.runs.map(String) : []);
 
 /** `nemia inbox from`'s spec: the card's name, then the runs it is handed as context, or `--off`. */
 const FROM_SPEC: Spec = {
@@ -201,29 +202,28 @@ export const INBOX_RM_WORDS = {
  * The edits under `labels`, in the order given.
  * @param args The command line's arguments, by key: its edits under labels.
  */
-export const labelEdits = (args: Args): readonly string[] => (Array.isArray(args.labels) ? args.labels.map(String) : []);
+export const labelEdits = (args: Args) => (Array.isArray(args.labels) ? args.labels.map(String) : []);
 
 /** A label command's spec: the run or card, then its edits, and `--overwrite`. */
-const labelSpec = (command: string, what: string, key: string, lists: string): Spec => ({
-  positionals: [
-    { key, takes: 'required', kind: 'name' },
-    { key: 'labels', takes: 'many', kind: 'text' },
-  ],
-  flags: [{ flag: '--overwrite', kind: 'switch', key: 'overwrite' }],
-  unknown: (arg) =>
-    `${command} does not take ${arg}. It takes the ${what}, then its edits — key=value to set a key, key- to remove one — and --overwrite to change a value: ${command} <${key}> team=core.`,
-  missing: `${command} takes the ${what} first, as ${lists} lists it, then its edits: ${command} <${key}> team=core [--overwrite].`,
-});
+const labelSpec = (command: string, what: string, key: string, lists: string) =>
+  ({
+    positionals: [
+      { key, takes: 'required', kind: 'name' },
+      { key: 'labels', takes: 'many', kind: 'text' },
+    ],
+    flags: [{ flag: '--overwrite', kind: 'switch', key: 'overwrite' }],
+    unknown: (arg) =>
+      `${command} does not take ${arg}. It takes the ${what}, then its edits — key=value to set a key, key- to remove one — and --overwrite to change a value: ${command} <${key}> team=core.`,
+    missing: `${command} takes the ${what} first, as ${lists} lists it, then its edits: ${command} <${key}> team=core [--overwrite].`,
+  }) satisfies Spec;
 
 /**
  * The refusal of a label command given no edit, or null where it was given one.
  * @param command The label command's line, as its refusal names it (nemia label run).
  * @param key What the edits come after on the command line, as its refusal says it (run, card).
  */
-export const noEdits =
-  (command: string, key: string) =>
-  (args: Args): string | null =>
-    labelEdits(args).length ? null : `${command} takes the edits to make after the ${key}: key=value to set a key, key- to remove one.`;
+export const noEdits = (command: string, key: string) => (args: Args) =>
+  labelEdits(args).length ? null : `${command} takes the edits to make after the ${key}: key=value to set a key, key- to remove one.`;
 
 /** `nemia label run`: a run's person labels edited, as `kubectl label` spells it. */
 export const LABEL_RUN_WORDS = {

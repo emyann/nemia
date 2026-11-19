@@ -39,7 +39,7 @@ export type KeptDelivery = Delivery & { of: { task: string; from: number } };
  * @param kept The deliverer's file, or undefined where it has none.
  * @param sub The subscription, whose task and `from` the file must match.
  */
-export const resumedAt = (kept: KeptDelivery | undefined, sub: Subscription): Delivery =>
+export const resumedAt = (kept: KeptDelivery | undefined, sub: Subscription) =>
   kept && kept.of.task === sub.task && kept.of.from === sub.from
     ? { cursor: kept.cursor, digest: kept.digest, ...(kept.since ? { since: kept.since } : {}) }
     : { cursor: sub.from, digest: [] };
@@ -64,7 +64,7 @@ export type Watched = { json?: boolean };
  * @param cursor The feed's byte just after the line.
  * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
-export const watchedLine = (line: FeedLine, cursor: number, how: Watched): string =>
+export const watchedLine = (line: FeedLine, cursor: number, how: Watched) =>
   how.json === true ? JSON.stringify({ ...line, cursor }) : feedLineWords(line);
 
 /**
@@ -81,11 +81,10 @@ export const BOOKMARK_EVERY = '30 seconds';
  * @param cursor The feed's byte the watch has read to.
  * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
-export const bookmarkLine = (cursor: number, how: Watched): string | undefined =>
-  how.json === true ? JSON.stringify({ cursor }) : undefined;
+export const bookmarkLine = (cursor: number, how: Watched) => (how.json === true ? JSON.stringify({ cursor }) : undefined);
 
 /** The routine lines said under a heading, one a line with its time, and how many there are. */
-const digestLines = (lines: readonly FeedLine[]): string[] => [
+const digestLines = (lines: readonly FeedLine[]) => [
   `${lines.length} routine line${lines.length === 1 ? '' : 's'} of the feed:`,
   ...lines.map((l) => `  ${feedLineWords(l)}`),
 ];
@@ -96,7 +95,7 @@ const digestLines = (lines: readonly FeedLine[]): string[] => [
  * @param lines The wake lines of the read, in feed order.
  * @param digest The routine lines folded so far, said under the wake lines; empty where none is.
  */
-export const messageOf = (lines: readonly FeedLine[], digest: readonly FeedLine[]): string =>
+export const messageOf = (lines: readonly FeedLine[], digest: readonly FeedLine[]) =>
   [
     'The feed needs your judgement:',
     ...lines.map((l) => `  ${feedLineWords(l)}`),
@@ -117,13 +116,7 @@ export type ReadDelivered = { message?: string; wakes: number; next: Delivery };
  * @param cursor The feed's byte the read ended at.
  * @param now The read's time, the digest's start where it was empty.
  */
-export function readDelivered(
-  at: Delivery,
-  carried: readonly FeedLine[],
-  selectors: Selectors,
-  cursor: number,
-  now: Instant,
-): ReadDelivered {
+export function readDelivered(at: Delivery, carried: readonly FeedLine[], selectors: Selectors, cursor: number, now: Instant) {
   const wakes = carried.filter((l) => selects(selectors, l));
   const routine = carried.filter((l) => !selects(selectors, l));
   const digest = [...at.digest, ...routine];
@@ -136,8 +129,7 @@ export function readDelivered(
  * What a subscriber is told of routine news with no wake to ride: the digest, one line each, and its count. Pure.
  * @param lines The digest's routine lines, in feed order.
  */
-export const digestOf = (lines: readonly FeedLine[]): string =>
-  ['News from the feed, nothing waiting on you:', ...digestLines(lines)].join('\n');
+export const digestOf = (lines: readonly FeedLine[]) => ['News from the feed, nothing waiting on you:', ...digestLines(lines)].join('\n');
 
 /**
  * Whether a digest begun at `since` is due at `now`, `everyMinutes` minutes after it (`elapsedMs`): never while it is empty (no `since`).
@@ -146,7 +138,7 @@ export const digestOf = (lines: readonly FeedLine[]): string =>
  * @param everyMinutes How many minutes after `since` the digest is due.
  * @param now The time asked of.
  */
-export const digestDue = (since: Instant | undefined, everyMinutes: number, now: Instant): boolean =>
+export const digestDue = (since: Instant | undefined, everyMinutes: number, now: Instant) =>
   since !== undefined && elapsedMs(since, now) >= everyMinutes * 60_000;
 
 /** A subscription's name: what its files are named after, a letter or digit first, then letters, digits, `-` and `_`. */
@@ -159,7 +151,7 @@ export const SUBSCRIBE_FORM = 'nemia subscribe <name> <task> [-l <selector>]... 
  * Why `name` is no subscription's name, or undefined where it is one. Pure.
  * @param name The name typed.
  */
-export const subscriptionNameRefusal = (name: string): string | undefined =>
+export const subscriptionNameRefusal = (name: string) =>
   NAME.test(name)
     ? undefined
     : `${JSON.stringify(name)} is no subscription's name, which names its files: a letter or a digit, then letters, digits, - and _: ` +
@@ -179,7 +171,7 @@ export function subscribeRefusalOf({
   selectors: readonly string[];
   digestEvery?: number;
   atLeast?: string;
-}): string | undefined {
+}) {
   const named = subscriptionNameRefusal(name);
   if (named) return named;
   const selected = selectorsRefusal(selectors);

@@ -14,7 +14,7 @@ import { verbHarnessIn } from './verb-harness.ts';
 export const TEST_HARNESS = 'test';
 
 /** The harnesses a stand-in has unless a test names its own: `test`, which declares everything, then each the runtime declares. */
-export const testHarnesses = (): HarnessDeclared[] => [
+export const testHarnesses = () => [
   { name: TEST_HARNESS, can: CAPABILITIES },
   ...Object.entries(HARNESS_DECLARATIONS).map(([name, d]) => ({ name, can: d.can })),
 ];
@@ -32,13 +32,13 @@ export type TestHarnesses = {
  * `declared` as a stand-in's verbs ask it (`TestHarnesses`).
  * @param declared The stand-in's harnesses, each with what it declares, the first its fallback.
  */
-export const testHarnessesOf = (declared: readonly HarnessDeclared[]): TestHarnesses => {
+export const testHarnessesOf = (declared: readonly HarnessDeclared[]) => {
   const fallback = declared[0]?.name ?? TEST_HARNESS;
   return {
     declared,
     runsOn: (harness) => (harness !== undefined && declared.some((h) => h.name === harness) ? harness : fallback),
     takes: (verb, name) => verbHarnessIn(verb, name, declared, fallback).kind === 'taken',
-  };
+  } satisfies TestHarnesses;
 };
 
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
@@ -48,10 +48,7 @@ const unkept = (verb: string) => () =>
   );
 
 /** The verbs the stand-in does not keep, each dying naming itself (`unkept`). */
-export const unkeptVerbs = (): Pick<
-  EngineShape,
-  'tick' | 'admit' | 'follow' | 'path' | 'close' | 'watch' | 'tallied' | 'up' | 'sweep' | 'removeBody' | 'compact'
-> => ({
+export const unkeptVerbs = () => ({
   tick: unkept('tick'),
   admit: unkept('admit'),
   follow: unkept('follow'),
@@ -75,7 +72,7 @@ export const unkeptVerbs = (): Pick<
 export const declaredVerbsOf = (
   harnesses: TestHarnesses,
   kept: Pick<EngineShape, 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'>,
-): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'> => {
+) => {
   const { declared } = harnesses;
   const fallback = harnesses.runsOn(undefined);
   const mcp = verbHarnessIn('mcp', undefined, declared, fallback).kind === 'taken';
@@ -96,5 +93,5 @@ export const declaredVerbsOf = (
     mcpSignInState: kept.mcpSignInState,
     mcpSignInCallback: kept.mcpSignInCallback,
     mcpSignOut: (name, server) => signIn(() => kept.mcpSignOut(name, server), mcpStateRefusal({ [name]: server })),
-  };
+  } satisfies Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'>;
 };

@@ -29,14 +29,14 @@ export type CheckFailureRule = { readonly action: CheckFailureAction; readonly o
 export type CheckFailurePolicy = { readonly rules: readonly CheckFailureRule[] };
 
 /** Whether `rule` holds of a check's verdict: an exit code, `In` or `NotIn` its values. A check that did not finish matches no rule. */
-const holds = (rule: CheckFailureRule, verdict: Verdict): boolean =>
+const holds = (rule: CheckFailureRule, verdict: Verdict) =>
   verdict !== 'unfinished' &&
   (rule.onExitCodes.operator === 'In'
     ? rule.onExitCodes.values.some((code) => code === verdict)
     : !rule.onExitCodes.values.some((code) => code === verdict));
 
 /** Whether a rule before the `i`th of `rules` holds of the verdict. */
-const heldBefore = (rules: readonly CheckFailureRule[], i: number, verdict: Verdict): boolean =>
+const heldBefore = (rules: readonly CheckFailureRule[], i: number, verdict: Verdict) =>
   rules.some((rule, j) => j < i && holds(rule, verdict));
 
 const checkFailureActionSpec = spec<(policy: CheckFailurePolicy | undefined, verdict: Verdict) => CheckFailureAction>({

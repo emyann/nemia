@@ -22,14 +22,9 @@ import type {
   GetTaskPushNotificationConfigRequest,
   GetTaskRequest,
   ListTaskPushNotificationConfigsRequest,
-  ListTaskPushNotificationConfigsResponse,
   ListTasksRequest,
-  ListTasksResponse,
-  Message,
   SendMessageRequest,
-  StreamResponse,
   SubscribeToTaskRequest,
-  Task,
   TaskPushNotificationConfig,
 } from '@a2a-js/sdk';
 import type { A2ARequestHandler, ServerCallContext } from '@a2a-js/sdk/server';
@@ -76,7 +71,7 @@ const refuse = (method: Exclude<keyof A2ARequestHandler, Served>) =>
  * @param ops The harness's driver, whose verbs the in-process card reads.
  * @param url The address the port serves the harness at.
  */
-export const servedCardOf = (harness: string, ops: RunnerOps, url: string): AgentCard => {
+export const servedCardOf = (harness: string, ops: RunnerOps, url: string) => {
   const card = cardOf(harness, ops);
   return {
     ...card,
@@ -92,14 +87,14 @@ export const servedCardOf = (harness: string, ops: RunnerOps, url: string): Agen
         params: { methods: [], say: false } satisfies RuntimeExtensionParams,
       })),
     },
-  };
+  } satisfies AgentCard as AgentCard;
 };
 
 /**
  * A card as the JSON it is served and configured as (`cardOfJson` reads it back).
  * @param card The card in the SDK's objects.
  */
-export const cardJsonOf = (card: AgentCard): Record<string, unknown> => AgentCard.toJSON(card) as Record<string, unknown>;
+export const cardJsonOf = (card: AgentCard) => AgentCard.toJSON(card) as Record<string, unknown>;
 
 /**
  * The reading surface over `inner`, serving `card`: `getAgentCard`, `getTask` and `resubscribe` are `inner`'s, and every
@@ -115,61 +110,52 @@ export class ServedHandler implements A2ARequestHandler {
     this.card = card;
   }
 
-  async getAgentCard(): Promise<AgentCard> {
+  async getAgentCard() {
     return this.card;
   }
 
-  async getTask(params: GetTaskRequest, context: ServerCallContext): Promise<Task> {
+  async getTask(params: GetTaskRequest, context: ServerCallContext) {
     return this.inner.getTask(params, context);
   }
 
-  async *resubscribe(params: SubscribeToTaskRequest, context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+  async *resubscribe(params: SubscribeToTaskRequest, context: ServerCallContext) {
     yield* this.inner.resubscribe(params, context);
   }
 
-  async sendMessage(_params: SendMessageRequest, _context: ServerCallContext): Promise<Message | Task> {
-    throw refuse('sendMessage');
+  async sendMessage(_params: SendMessageRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('sendMessage'));
   }
 
   // oxlint-disable-next-line require-yield -- the SDK's handler types this as a stream, and this port serves none
-  async *sendMessageStream(_params: SendMessageRequest, _context: ServerCallContext): AsyncGenerator<StreamResponse, void, undefined> {
+  async *sendMessageStream(_params: SendMessageRequest, _context: ServerCallContext) {
     throw refuse('sendMessageStream');
   }
 
-  async cancelTask(_params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
-    throw refuse('cancelTask');
+  async cancelTask(_params: CancelTaskRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('cancelTask'));
   }
 
-  async listTasks(_params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
-    throw refuse('listTasks');
+  async listTasks(_params: ListTasksRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('listTasks'));
   }
 
-  async createTaskPushNotificationConfig(
-    _params: TaskPushNotificationConfig,
-    _context: ServerCallContext,
-  ): Promise<TaskPushNotificationConfig> {
-    throw refuse('createTaskPushNotificationConfig');
+  async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext) {
+    return Promise.reject(refuse('createTaskPushNotificationConfig'));
   }
 
-  async getTaskPushNotificationConfig(
-    _params: GetTaskPushNotificationConfigRequest,
-    _context: ServerCallContext,
-  ): Promise<TaskPushNotificationConfig> {
-    throw refuse('getTaskPushNotificationConfig');
+  async getTaskPushNotificationConfig(_params: GetTaskPushNotificationConfigRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('getTaskPushNotificationConfig'));
   }
 
-  async listTaskPushNotificationConfigs(
-    _params: ListTaskPushNotificationConfigsRequest,
-    _context: ServerCallContext,
-  ): Promise<ListTaskPushNotificationConfigsResponse> {
-    throw refuse('listTaskPushNotificationConfigs');
+  async listTaskPushNotificationConfigs(_params: ListTaskPushNotificationConfigsRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('listTaskPushNotificationConfigs'));
   }
 
-  async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext): Promise<void> {
-    throw refuse('deleteTaskPushNotificationConfig');
+  async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('deleteTaskPushNotificationConfig'));
   }
 
-  async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext): Promise<AgentCard> {
-    throw refuse('getAuthenticatedExtendedAgentCard');
+  async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext) {
+    return Promise.reject(refuse('getAuthenticatedExtendedAgentCard'));
   }
 }

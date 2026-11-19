@@ -41,7 +41,7 @@ export const jobHoldOf = (io: HoldIO, ended: () => void) => {
   let after: { tool: string } | undefined;
   let parked: JobHold['parked'];
   let written: string | undefined;
-  const write = (): void => {
+  const write = () => {
     const first = firstCall(calls);
     const hold: JobHold = {
       ...(first && !parked ? { calling: first } : {}),
@@ -59,12 +59,12 @@ export const jobHoldOf = (io: HoldIO, ended: () => void) => {
     draining = read === null ? undefined : (draining ?? new Date().toISOString());
     return read;
   };
-  const park = (calling: Call | undefined): void => {
+  const park = (calling: Call | undefined) => {
     parked = { at: new Date().toISOString(), ...(calling ? { calling } : {}) };
     write();
     ended();
   };
-  const look = (): void => {
+  const look = () => {
     if (parked) return;
     const read = drain();
     if (read !== null) {
@@ -74,7 +74,7 @@ export const jobHoldOf = (io: HoldIO, ended: () => void) => {
     }
     write();
   };
-  const held = (): boolean => !parked && drain() !== null && calls.size === 0;
+  const held = () => !parked && drain() !== null && calls.size === 0;
   const over = async (input: unknown, id: string | undefined) => {
     const ended = id === undefined ? undefined : calls.get(id);
     if (ended && !inside(input)) after = { tool: ended.tool };

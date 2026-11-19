@@ -31,7 +31,7 @@ export type TryAsked = { who: string; from: string; name: string; brief: string;
  * The skills the agent `reading` gives that only the repository `repo` has, each its name and folder, found where `found` says a start
  * finds them. None when no repository is named.
  */
-function repoOnlySkills(reading: AgentReading, repo: string, found: SkillsFound): Array<{ name: string; dir: string }> {
+function repoOnlySkills(reading: AgentReading, repo: string, found: SkillsFound) {
   if (!repo) return [];
   const theirs = [path.join(path.resolve(repo), '.claude', 'skills'), path.join(path.resolve(repo), 'workflows', 'skills')];
   return skillNamesIn(reading.source).flatMap((name) => {

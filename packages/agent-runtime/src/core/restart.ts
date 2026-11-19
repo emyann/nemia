@@ -2,7 +2,7 @@
  * How a task restarts inside itself: a long-lived task's back-off, a kubelet's, and the words a restarted or continued session is
  * told instead of the brief. Pure, and read by `observe` (`domain.ts`, which re-exports what a caller takes).
  */
-import { elapsedMs, type Instant } from './clock.ts';
+import { elapsedMs } from './clock.ts';
 import type { Attempt, Parked } from './domain.ts';
 import { quote } from './quote.ts';
 
@@ -23,7 +23,7 @@ export const PARKED_WORDS = 'Your session was paused between two tool calls and 
  * result never reached the session. The tool's name is its harness's word, quoted.
  * @param tool The name of the tool whose call was cut, in its harness's word.
  */
-export const cutWords = (tool: string): string =>
+export const cutWords = (tool: string) =>
   `Your session was paused while a ${quote(tool)} call was running, and that call did not finish: its result never reached you. ` +
   'Check what it did before it was cut, run it again if it is still needed, and carry on where you left off.';
 
@@ -31,27 +31,27 @@ export const cutWords = (tool: string): string =>
  * What a restart is told: the call its attempt's park cut, that it was parked between calls, or, not parked, that its process ended.
  * @param parked How the attempt it continues was parked, or undefined where it was not.
  */
-export const restartWords = (parked: Parked | undefined): string =>
+export const restartWords = (parked: Parked | undefined) =>
   parked === undefined ? RESTART_WORDS : parked.calling ? cutWords(parked.calling.tool) : PARKED_WORDS;
 
 /**
  * When an attempt started, on both clocks it was stamped on.
  * @param a The attempt's fold.
  */
-export const startedWhen = (a: Attempt): Instant => ({ at: Date.parse(a.startedAt), mono: a.startedMono });
+export const startedWhen = (a: Attempt) => ({ at: Date.parse(a.startedAt), mono: a.startedMono });
 
 /**
  * When an attempt ended, on both clocks; one not ended yet reads as its start. The one reading of an end's time `decide` makes.
  * @param a The attempt's fold.
  */
-export const endedWhen = (a: Attempt): Instant => (a.endedAt === null ? startedWhen(a) : { at: Date.parse(a.endedAt), mono: a.endedMono });
+export const endedWhen = (a: Attempt) => (a.endedAt === null ? startedWhen(a) : { at: Date.parse(a.endedAt), mono: a.endedMono });
 
 /**
  * How long a long-lived task waits after its last end before restarting (`RESTART_BACKOFF`): the initial wait, doubled for each
  * attempt before it that ended in a row too soon to reset it, up to the cap. Pure arithmetic over the attempts' times.
  * @param attempts The task's attempts, in order.
  */
-export function backoffOf(attempts: readonly Attempt[]): number {
+export function backoffOf(attempts: readonly Attempt[]) {
   const { initialMs, factor, maxMs, resetAfterMs } = RESTART_BACKOFF;
   let ends = 0;
   for (const a of [...attempts].reverse()) {

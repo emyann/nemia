@@ -29,16 +29,17 @@ export const VOLUMES = {
  * @param verb The verb that was given it, `add` or `apply`.
  * @param arg The argument as typed.
  */
-export const retiredRepo = (verb: 'add' | 'apply', arg: string): string | undefined =>
+export const retiredRepo = (verb: 'add' | 'apply', arg: string) =>
   arg === '--repo' || arg.startsWith('--repo=')
     ? `nemia factory ${verb} does not take --repo: a repository a factory works on is a writable volume. Give it with --volume <path|url>:rw, or after with nemia factory volume add <factory> <path|url>:rw. Nothing was filed.`
     : undefined;
 
 /** Why the command line takes a verb of a template by its arguments: the api serves it, a template traveling by its name or packed. */
-const servedAs = (endpoints: string): { readonly side: 'cli'; readonly why: string } => ({
-  side: 'cli',
-  why: `the api serves it as the Factory's ${endpoints} of \`objects\`' Api, calling this handler: a template travels there packed, or by a builtin template's name`,
-});
+const servedAs = (endpoints: string) =>
+  ({
+    side: 'cli',
+    why: `the api serves it as the Factory's ${endpoints} of \`objects\`' Api, calling this handler: a template travels there packed, or by a builtin template's name`,
+  }) satisfies { readonly side: 'cli'; readonly why: string };
 
 /** `--set <key>=<value>`, once per parameter of the template. */
 const SET: Flag = {

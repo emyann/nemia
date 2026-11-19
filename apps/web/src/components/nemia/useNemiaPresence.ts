@@ -7,7 +7,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { frameRunsQuery } from '@/components/nav/nav';
 import { presenceOf } from '@/lib/chatFollowing';
-import type { Presence } from '@/lib/presence';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 
 /**
@@ -15,7 +14,7 @@ import { useNemiaChat } from '@/lib/useNemiaChat';
  *
  * @param path the address of the page
  */
-export function useNemiaPresence(path: string): Presence {
+export function useNemiaPresence(path: string) {
   const chat = useNemiaChat();
   const counted = useQuery(frameRunsQuery(path)).data;
   return presenceOf(chat.state.presence, chat.kept !== null, counted?.counts.waiting ?? 0, chat.state.events);

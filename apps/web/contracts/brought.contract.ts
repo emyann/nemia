@@ -31,7 +31,7 @@ export type BroughtFacts = {
 export type BroughtPart = 'missing' | 'gate' | 'answer' | 'continue' | 'asked' | 'settled';
 
 /** Whether `part` is a form that answers the step. */
-const answers = (part: BroughtPart): boolean => part === 'gate' || part === 'answer' || part === 'continue';
+const answers = (part: BroughtPart) => part === 'gate' || part === 'answer' || part === 'continue';
 
 const broughtPartSpec = spec<(facts: BroughtFacts) => BroughtPart>({
   ensures: {

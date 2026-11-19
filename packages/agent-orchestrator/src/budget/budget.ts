@@ -53,7 +53,7 @@ const BUDGETS_SCHEMAS = knownSchemas([BUDGETS_SCHEMA]);
  * The fields a step's `output:` declares whose schema is `BUDGETS_SCHEMA`, in the schema's order: none for a step without `output:`.
  * @param step The step whose `output:` is read, or undefined where there is none, which declares no field.
  */
-export const budgetFields = (step: StepSpec | undefined): string[] =>
+export const budgetFields = (step: StepSpec | undefined) =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => sameSchema(schema, BUDGETS_SCHEMAS))
     .map(([name]) => name);
@@ -62,7 +62,7 @@ export const budgetFields = (step: StepSpec | undefined): string[] =>
 const BUDGET_KEYS = ['step', 'usd', 'why'];
 
 /** One budget read, or why it is not one. */
-function oneBudget(value: unknown, at: string): ProposedBudget | string {
+function oneBudget(value: unknown, at: string) {
   const b = fieldsOf(value);
   if (!b) return `${at} is not an object`;
   // oxlint-disable-next-line unicorn/no-useless-spread -- the verifier sees only a spread as allocated here (`fieldsOf`)
@@ -81,7 +81,7 @@ function oneBudget(value: unknown, at: string): ProposedBudget | string {
  * step's name, a number and a text. Which steps they name and the amounts are `proposalRefusal`'s. Read afresh from `value`.
  * @param value The field's value as the closeout gave it, of any shape.
  */
-export function budgetsOf(value: unknown): ProposedBudget[] | { error: string } {
+export function budgetsOf(value: unknown) {
   const items = itemsOf(value);
   if (!items) return { error: 'the budgets are not a list' };
   const budgets: ProposedBudget[] = [];
@@ -100,7 +100,7 @@ export function budgetsOf(value: unknown): ProposedBudget[] | { error: string } 
  * @param step The step that closed out, whose budget fields are read, or undefined where it is not in the workflow.
  * @param said The step's closeout, an error where it did not read, or undefined where none is there.
  */
-export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): ProposedBudget[] {
+export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { error: string } | undefined) {
   if (!said || 'error' in said) return [];
   return budgetFields(step).flatMap((field) => {
     const read = budgetsOf(said.output?.[field]);
@@ -113,7 +113,7 @@ export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { e
  * @param steps The workflow's steps, in its order.
  * @param step The name of the gated step.
  */
-export const laterSteps = (steps: readonly StepSpec[], step: string): string[] => {
+export const laterSteps = (steps: readonly StepSpec[], step: string) => {
   const later = downstreamOf(steps, step);
   return steps.filter((s) => later.has(s.name)).map((s) => s.name);
 };
@@ -126,11 +126,7 @@ export const laterSteps = (steps: readonly StepSpec[], step: string): string[] =
  * @param steps The workflow's steps, in its order, which say the steps after it.
  * @param said The step's closeout, an error where it did not read, or undefined where none is there.
  */
-export function budgetRefusals(
-  step: StepSpec | undefined,
-  steps: readonly StepSpec[],
-  said: Closeout | { error: string } | undefined,
-): string[] {
+export function budgetRefusals(step: StepSpec | undefined, steps: readonly StepSpec[], said: Closeout | { error: string } | undefined) {
   if (!step || !said || 'error' in said) return [];
   const read: ProposedBudget[] = [];
   const refused: string[] = [];
@@ -147,7 +143,7 @@ export function budgetRefusals(
 }
 
 /** Whether `usd` is an amount a cap can be: dollars above zero, and finite. */
-const anAmount = (usd: number): boolean => usd > 0 && Number.isFinite(usd);
+const anAmount = (usd: number) => usd > 0 && Number.isFinite(usd);
 
 /**
  * Why `budgets` cannot be the caps a gate sets for the steps `later` names, or null: a budget for a step not among them, one that is no
@@ -223,7 +219,7 @@ export const pastTheLine: PastTheLine = (most, line) => line !== undefined && mo
  * The steps' own budgets, as the ceilings `aboveTheWorkflow` reads: none of a step with no `budget:`.
  * @param steps The workflow's steps.
  */
-export const ceilingsOf = (steps: readonly StepSpec[]): StepBudget[] =>
+export const ceilingsOf = (steps: readonly StepSpec[]) =>
   steps.flatMap((s) => (s.budget === undefined ? [] : [{ step: s.name, usd: s.budget }]));
 
 /**
@@ -231,7 +227,7 @@ export const ceilingsOf = (steps: readonly StepSpec[]): StepBudget[] =>
  * the api's fold of a body's `budgets` hands the command, so both sides are read by one parser.
  * @param budgets The budgets, each a step and dollars.
  */
-export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.map((b) => `${b.step}=${String(b.usd)}`);
+export const budgetArgs = (budgets: readonly StepBudget[]) => budgets.map((b) => `${b.step}=${String(b.usd)}`);
 
 /**
  * The cap the approvals in force set for a step, as a list of none or one: of each approval of a try its step is still on (`approvalOf`'s
@@ -240,7 +236,7 @@ export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.
  * @param run The run's record, its approvals and its steps' tries.
  * @param step The name of the step.
  */
-export const approvedCapsOf = (run: Run, step: string): number[] => {
+export const approvedCapsOf = (run: Run, step: string) => {
   let last: { at: string; usd: number } | undefined;
   for (const a of run.approvals ?? []) {
     const usd = a.budgets?.[step];
@@ -257,7 +253,7 @@ export const approvedCapsOf = (run: Run, step: string): number[] => {
  * @param step The step, whose own `budget:` is the last resort.
  * @param run The run's record, its tries and its approvals.
  */
-export const budgetOf = (step: StepSpec, run: Run): number | undefined =>
+export const budgetOf = (step: StepSpec, run: Run) =>
   capInForce({
     raised: [...(run.steps[step.name]?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget,
     approved: approvedCapsOf(run, step.name),

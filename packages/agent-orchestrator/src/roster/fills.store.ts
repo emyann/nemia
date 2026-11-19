@@ -14,7 +14,7 @@ import { stepFiles } from '../folder/folder.ts';
 import { fillsOf, type Factory, type FactoryListing, workedOn } from '../factory/factory.ts';
 import { lookupRoots, type Places } from '../skills/read.store.ts';
 import { foldersIn } from '../folder/lookup.store.ts';
-import type { FillPlace, FilledStep } from './roster.ts';
+import type { FillPlace } from './roster.ts';
 
 /**
  * The file a start of the workflow in `workflowDir` runs for the agent `name`: `agents/<name>.md` in the first of its `lookupRoots` that
@@ -24,7 +24,7 @@ import type { FillPlace, FilledStep } from './roster.ts';
  * @param name the agent's name, as a step's `agent:` line or a hire writes it
  * @param places the repository and the store whose folders are looked in after it
  */
-export function agentFileOf(workflowDir: string, name: string, places: Places): string | undefined {
+export function agentFileOf(workflowDir: string, name: string, places: Places) {
   if (/[\\/]/.test(name)) return undefined;
   return lookupRoots(workflowDir, places)
     .map((root) => path.resolve(root, AGENTS_FOLDER, `${name}.md`))
@@ -32,7 +32,7 @@ export function agentFileOf(workflowDir: string, name: string, places: Places): 
 }
 
 /** The agent a step file names (`agent:`), or none for a file that names none or cannot be read. */
-function writtenAgent(file: string): string | undefined {
+function writtenAgent(file: string) {
   try {
     return frontmatterKey(fs.readFileSync(file, 'utf8'), 'agent');
   } catch {
@@ -44,7 +44,7 @@ function writtenAgent(file: string): string | undefined {
  * Each step of the workflow `workflow`, in `dir`, filled: by the agent its file names, and by the one `hires` puts in it, each credited to
  * its file. A step both name counts under both. None for a folder that cannot be read.
  */
-function filledIn(from: FillPlace, dir: string, workflow: string, hires: ReadonlyMap<string, string>, places: Places): FilledStep[] {
+function filledIn(from: FillPlace, dir: string, workflow: string, hires: ReadonlyMap<string, string>, places: Places) {
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);
@@ -75,7 +75,7 @@ function filledIn(from: FillPlace, dir: string, workflow: string, hires: Readonl
  * @param home the store, whose `workflows/` is read and whose agents a start finds
  * @param factory the factory read in, whose attached workflows, hires and tree are read; none for the default factory, every workflow
  */
-export function stepsFilled(repo: string | undefined, home: string, factory?: Factory): FilledStep[] {
+export function stepsFilled(repo: string | undefined, home: string, factory?: Factory) {
   const places: Places = repo === undefined ? { home } : { repo, home };
   return workflowsFilled(repo, home, factory).flatMap(({ from, dir, workflow }) => {
     const hires = new Map(factory ? Object.entries(fillsOf(factory.hires, workflow)) : []);
@@ -84,11 +84,7 @@ export function stepsFilled(repo: string | undefined, home: string, factory?: Fa
 }
 
 /** The folders of the workflows `factory` fills on `repo`, each with its place and name, as `stepsFilled` reads them. */
-function workflowsFilled(
-  repo: string | undefined,
-  home: string,
-  factory: Factory | undefined,
-): Array<{ from: FillPlace; dir: string; workflow: string }> {
+function workflowsFilled(repo: string | undefined, home: string, factory: Factory | undefined) {
   const tree = factory?.tree;
   const sources: Array<{ from: FillPlace; dir: string }> = [
     ...(tree === undefined ? [] : [{ from: 'factory' as const, dir: path.join(tree, 'workflows') }]),
@@ -114,7 +110,7 @@ function workflowsFilled(
  * @param home The store's root.
  * @param factory The factory whose workflows are read, or undefined for every workflow.
  */
-export function stepSkillsNamed(repo: string | undefined, home: string, factory?: Factory): string[] {
+export function stepSkillsNamed(repo: string | undefined, home: string, factory?: Factory) {
   return workflowsFilled(repo, home, factory).flatMap(({ dir }) => {
     let entries: string[];
     try {
@@ -142,7 +138,7 @@ export function stepSkillsNamed(repo: string | undefined, home: string, factory?
  * The agent files `factory` fills a step with, on each of its repositories, or on its tree alone where it was made from a template and
  * names none; none on one whose folders cannot be listed.
  */
-const filesFilledBy = (factory: Factory, home: string): string[] =>
+const filesFilledBy = (factory: Factory, home: string) =>
   (workedOn(factory).length === 0 && factory.tree !== undefined ? [undefined] : workedOn(factory)).flatMap((repo) => {
     try {
       return stepsFilled(repo === undefined ? undefined : path.resolve(repo), home, factory).map(({ file }) => file);
@@ -158,7 +154,7 @@ const filesFilledBy = (factory: Factory, home: string): string[] =>
  * @param factories the factories as their files list them, each read on each of its repositories
  * @param home the store each factory's steps are read with
  */
-export function factoriesFilling(factories: readonly FactoryListing[], home: string): Map<string, string[]> {
+export function factoriesFilling(factories: readonly FactoryListing[], home: string) {
   const byFile = new Map<string, Set<string>>();
   for (const listing of factories) {
     if ('error' in listing) continue;

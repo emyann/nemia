@@ -20,7 +20,7 @@ export const TRY_STEP = 'try';
  * @param text The step file's text.
  * @param home The store's root folder.
  */
-export function writeTryFolder(name: string, text: string, home: string): string {
+export function writeTryFolder(name: string, text: string, home: string) {
   const dir = tryDir(name, home);
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
@@ -48,7 +48,7 @@ export function writeTryFolder(name: string, text: string, home: string): string
  * @param keys The agent's keys that say its fence: its mode and its allow rules.
  * @param home The store's root folder.
  */
-export function tryFolder(name: string, version: string, keys: FencedKeys, home: string): string {
+export function tryFolder(name: string, version: string, keys: FencedKeys, home: string) {
   const fence = tryFence(name, keys);
   if (typeof fence === 'string') throw new Invalid({ message: fence });
   return writeTryFolder(name, tryText(name, version, fence), home);

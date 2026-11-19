@@ -15,7 +15,7 @@ import { hireRefusalOf, type Factory, workedOn } from '../factory.ts';
  * The folders whose `workflows/<workflow>/` a start in `factory` reads a step's own file from, in the store `home`: its repositories and
  * `home`; made from a template, the first of its tree, its repositories and `home` that holds the workflow, as a start reads it by name.
  */
-function rootsOf(home: string, factory: Factory, workflow: string): readonly string[] {
+function rootsOf(home: string, factory: Factory, workflow: string) {
   if (factory.tree === undefined) return [...workedOn(factory), home];
   const holder = [factory.tree, ...workedOn(factory), home].find((root) =>
     fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)),
@@ -30,7 +30,7 @@ function rootsOf(home: string, factory: Factory, workflow: string): readonly str
  * @param workflow The workflow's name.
  * @param step The step's name in the workflow.
  */
-export function ownAgentOf(roots: readonly string[], workflow: string, step: string): { named: string; file: string } | undefined {
+export function ownAgentOf(roots: readonly string[], workflow: string, step: string) {
   for (const root of roots) {
     const file = path.join(path.resolve(root), 'workflows', workflow, `${step}.md`);
     let named: string | undefined;
@@ -51,7 +51,7 @@ export function ownAgentOf(roots: readonly string[], workflow: string, step: str
  * @param factory The factory hired into: its repositories and its tree.
  * @param step The step hired into, `<workflow>/<step>`.
  */
-export function ownAgentRefusal(home: string, factory: Factory, step: string): Conflict | undefined {
+export function ownAgentRefusal(home: string, factory: Factory, step: string) {
   const workflow = step.slice(0, step.indexOf('/'));
   const own = ownAgentOf(rootsOf(home, factory, workflow), workflow, step.slice(workflow.length + 1));
   if (own === undefined) return undefined;

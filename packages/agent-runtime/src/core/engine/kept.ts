@@ -23,7 +23,7 @@ export type JournalKept = { taskId: string; journal: number; bodies: number; har
  * @param file The path to measure.
  * @param seen The paths counted so far, added to as each is counted, or undefined to count every path.
  */
-export const diskBytesOf = (file: string, seen?: Set<string>): number | undefined => {
+export const diskBytesOf = (file: string, seen?: Set<string>) => {
   const stat = fs.lstatSync(file, { throwIfNoEntry: false });
   if (!stat) return undefined;
   if (seen?.has(file)) return 0;
@@ -37,7 +37,7 @@ export const diskBytesOf = (file: string, seen?: Set<string>): number | undefine
  * The harness and the attempts the stored entries `entries` name: an attempt by its `starting`, its id by its `ended` or the task's
  * `settled`.
  */
-const sessionsIn = (entries: readonly unknown[]): Pick<JournalKept, 'harness' | 'attempts'> => {
+const sessionsIn = (entries: readonly unknown[]) => {
   const attempts: KeptAttempt[] = [];
   let harness: string | undefined;
   for (const entry of entries) {
@@ -54,7 +54,7 @@ const sessionsIn = (entries: readonly unknown[]): Pick<JournalKept, 'harness' | 
 type Stored = { kind?: unknown; attempt?: unknown; nativeId?: unknown; harness?: unknown };
 
 /** The session id `e` says, put on the attempt it ends, or, for a `settled`, on the last attempt where no end gave one. */
-const idInto = (attempts: KeptAttempt[], e: Stored): void => {
+const idInto = (attempts: KeptAttempt[], e: Stored) => {
   if (typeof e.nativeId !== 'string' || e.nativeId === '') return;
   if (e.kind === 'ended') {
     const ended = attempts.find((a) => a.n === e.attempt);
@@ -75,7 +75,7 @@ export const journalsKept = Effect.fn('journalsKept')(function* (ops: StoreOps) 
   const sizes = new Map(listed.map((body) => [body.ref, body.bytes]));
   const at = ops.bodies?.located;
   const taken = new Set<BodyRef>();
-  const bodyBytes = (ref: BodyRef): number => {
+  const bodyBytes = (ref: BodyRef) => {
     if (taken.has(ref)) return 0;
     taken.add(ref);
     return (at ? diskBytesOf(at(ref)) : undefined) ?? sizes.get(ref) ?? 0;

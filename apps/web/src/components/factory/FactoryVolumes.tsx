@@ -45,7 +45,7 @@ const SWITCHES: ReadonlyArray<{ key: SwitchKey; label: string; means: string }> 
 const NOT_DONE: Record<Change['kind'], string> = { add: 'Not added', remove: 'Not removed', switch: 'Not changed' };
 
 /** The api's words for a write it refused, or none. */
-const refusalOf = (error: unknown): string | null =>
+const refusalOf = (error: unknown) =>
   error === null || error === undefined ? null : error instanceof Error ? error.message : 'the api answered nothing the board reads.';
 
 /**
@@ -150,8 +150,8 @@ function VolumeForm({ adding, held, onAdd }: { adding: boolean; held: boolean; o
 /** The volumes of `factory`, marked `data-factory-volumes` with its name, in the api's order (`VolumeRow`), and the form that adds one. */
 export function FactoryVolumes({ factory }: { factory: Pick<Factory, 'name' | 'volumes' | 'commands'> }) {
   const queryClient = useQueryClient();
-  const change = useMutation({
-    mutationFn: (asked: Change): Promise<unknown> =>
+  const change = useMutation<unknown, Error, Change>({
+    mutationFn: (asked: Change) =>
       asked.kind === 'add'
         ? factories.addVolume(factory.name, { volume: asked.volume })
         : asked.kind === 'remove'

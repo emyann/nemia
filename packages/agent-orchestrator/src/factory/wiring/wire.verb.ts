@@ -6,7 +6,6 @@
  */
 import { Effect } from 'effect';
 import { tried } from '../../runtime-client.ts';
-import type { Refusal } from '../../refusal/refusal.ts';
 import type { Factory } from '../factory.ts';
 import { FactoryDoor, filedFactory, wiringChecked, wiringNamesRefused } from '../door/factories.store.ts';
 import type { WiringChange } from './wiring.ts';
@@ -20,11 +19,7 @@ import type { WiringChange } from './wiring.ts';
  * @param onDisk What a fact of the disk or the clock refuses of the changed factory, its error, or undefined where it allows it;
  *   absent, nothing is refused so.
  */
-export const wire = (
-  name: string,
-  change: WiringChange,
-  onDisk?: (factory: Factory) => Error | undefined,
-): Effect.Effect<{ was: Factory; now: Factory; file: string }, Refusal> =>
+export const wire = (name: string, change: WiringChange, onDisk?: (factory: Factory) => Error | undefined) =>
   Effect.gen(function* () {
     yield* tried(() => wiringNamesRefused(name, change));
     const door = yield* FactoryDoor;

@@ -11,7 +11,6 @@ import {
   StepStreamEvent,
   StepTranscript as StepTranscriptAnswer,
   TRANSCRIPT_PAGE,
-  type StepTranscript,
   type LifecycleEdge,
   type LifecycleTransition as LifecycleTransitionAnswer,
   type LifecycleVerb,
@@ -98,7 +97,7 @@ const transcriptPage = (runId: string, step: string, after: string | undefined) 
  * @param runId The run's id.
  * @param step The step's name.
  */
-export async function readTranscript(runId: string, step: string): Promise<StepTranscript> {
+export async function readTranscript(runId: string, step: string) {
   let page = await transcriptPage(runId, step, undefined);
   const events = [...page.events];
   while (page.more === true && page.cursor !== null) {
@@ -171,7 +170,7 @@ const SERVED = /^\/api\/runs\/([^/]+)\/steps\/([^/]+)\/(artifacts|files)\/([^/]+
 export const stepFileQuery = (url: string) =>
   queryOptions({
     queryKey: ['step-file', url],
-    queryFn: async (): Promise<string> => {
+    queryFn: async () => {
       const [, runId, step, route, file] = SERVED.exec(url) ?? [];
       if (runId === undefined || step === undefined || file === undefined)
         throw new Error(`${url} is not the address of a step's file: open it from its step's part.`);

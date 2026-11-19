@@ -28,11 +28,11 @@ export type WorkflowRepoRefusal = 'none' | 'unwired' | 'unknown' | 'shared';
 export type WorkflowRepoOf = { readonly repo: string } | { readonly refused: WorkflowRepoRefusal };
 
 /** The folder name the factory's wiring gives `workflow`, where it gives one: a prototype's name (`constructor`) is none. */
-const wiredName = (wired: Readonly<Record<string, string>> | undefined, workflow: string): string | undefined =>
+const wiredName = (wired: Readonly<Record<string, string>> | undefined, workflow: string) =>
   wired !== undefined && Object.hasOwn(wired, workflow) ? wired[workflow] : undefined;
 
 /** How many of `repos` have the folder name `name`. */
-const named = (repos: readonly NamedRepo[], name: string): number => repos.filter((r) => r.name === name).length;
+const named = (repos: readonly NamedRepo[], name: string) => repos.filter((r) => r.name === name).length;
 
 const workflowRepoSpec = spec<
   (repos: readonly NamedRepo[], wired: Readonly<Record<string, string>> | undefined, workflow: string) => WorkflowRepoOf

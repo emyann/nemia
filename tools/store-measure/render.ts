@@ -103,7 +103,7 @@ const mb = (n: number) => (n / 1e6).toFixed(1);
 const kb = (m: Measured | null | undefined) => (m?.bytes !== undefined ? (m.bytes / 1e3).toFixed(1) : '—');
 
 /** The report as markdown. */
-export function rendered(report: StoreMeasure): string {
+export function rendered(report: StoreMeasure) {
   const { counts } = report;
   const row = (key: MeasureKey) => {
     const m = report.measures[key];
@@ -134,7 +134,7 @@ export function rendered(report: StoreMeasure): string {
 }
 
 /** Each number of `now` beside `baseline`'s, and their ratio, as markdown: `—` for a read or a count the baseline lacks. */
-export function comparedWith(now: StoreMeasure, baseline: StoreMeasure): string {
+export function comparedWith(now: StoreMeasure, baseline: StoreMeasure) {
   const records = (m: Measured | null | undefined) => (m?.records ? `${m.records.cold} / ${m.records.warm}` : '—');
   const ratio = (a: number, b: number | undefined) => (b !== undefined && b > 0 ? `×${(a / b).toFixed(2)}` : '—');
   const cell = (n: Measured | null, b: Measured | null | undefined, side: 'cold' | 'warm') =>

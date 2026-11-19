@@ -43,7 +43,7 @@ type Go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E
 type Held = { taskId: string; state: State; events: readonly Event[]; harness: string; runner: SeamOps };
 
 /** Why `forget` will not take `args`, or `undefined` for a list of one or more task ids and nothing or `{ yes }`, a boolean. */
-const argumentRefusal = (args: readonly unknown[]): string | undefined => {
+const argumentRefusal = (args: readonly unknown[]) => {
   const [taskIds, options] = args;
   const ids = Array.isArray(taskIds) && taskIds.length > 0 && taskIds.every((id) => typeof id === 'string' && id !== '');
   const yes = (options as { yes?: unknown } | null | undefined)?.yes;
@@ -58,7 +58,7 @@ const argumentRefusal = (args: readonly unknown[]): string | undefined => {
 };
 
 /** Where `state` stands, in words, for a task that has not settled. */
-const unsettledWords = (state: State): string => {
+const unsettledWords = (state: State) => {
   const last = state.attempts.at(-1);
   if (waitsForInput(state)) return 'held open, waiting for an answer';
   if (!last) return 'not started';
@@ -69,16 +69,14 @@ const unsettledWords = (state: State): string => {
  * The size of a task's journal: the file's, where the store says where it keeps it (`located`), else its entries' as JSON lines.
  * @param ops the engine's store.
  */
-export const journalBytesOf =
-  (ops: StoreOps) =>
-  (taskId: string, events: readonly Event[]): number => {
-    const file = 'located' in ops ? ops.located?.journal(taskId) : undefined;
-    if (file && fs.existsSync(file)) return fs.statSync(file).size;
-    return events.reduce((n, e) => n + Buffer.byteLength(JSON.stringify(e)) + 1, 0);
-  };
+export const journalBytesOf = (ops: StoreOps) => (taskId: string, events: readonly Event[]) => {
+  const file = 'located' in ops ? ops.located?.journal(taskId) : undefined;
+  if (file && fs.existsSync(file)) return fs.statSync(file).size;
+  return events.reduce((n, e) => n + Buffer.byteLength(JSON.stringify(e)) + 1, 0);
+};
 
 /** A task's count in `counts`, 0 where it has none. */
-const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: string): number => (counts && own(counts, taskId)) ?? 0;
+const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: string) => (counts && own(counts, taskId)) ?? 0;
 
 /**
  * Each task of `ids`' lines in the feed, read once, for a `forget` that removes nothing (`dry`) or one that removes them: off the
@@ -94,7 +92,7 @@ const feedCountsOf = (go: Go, ids: readonly string[], dry: boolean) =>
   });
 
 /** Whether a session its harness lists is still held: at work, or its process kept (`held`). One listed ended is let go. */
-const stillHeld = (seen: Sighting | undefined): boolean => seen !== undefined && (atWorkState(seen.state) || seen.held === true);
+const stillHeld = (seen: Sighting | undefined) => seen !== undefined && (atWorkState(seen.state) || seen.held === true);
 
 /**
  * A refusal of `held` when its harness still holds a session of it (`stillHeld`), or could not be read for one: a look told the

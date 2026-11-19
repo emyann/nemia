@@ -4,7 +4,7 @@
  * controller: an Effect program over the Card and Run doors.
  */
 import { Effect, Exit } from 'effect';
-import { type CardEdit, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
+import { type CardEdit, DEFAULT_NAMESPACE } from 'objects';
 import type { CardEditRefusal } from '../../contracts/card-edit.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -33,7 +33,7 @@ const refusalOf = (refusal: CardEditRefusal, card: InboxCard, read: InboxCard | 
 };
 
 /** The Card's spec a card's text says (`read`): its keys and body, and its `queued:` as the card has it (`queued`) where it says none. */
-const specOf = (read: InboxCard, queued: string | undefined): CardWrite['spec'] => {
+const specOf = (read: InboxCard, queued: string | undefined) => {
   const at = read.queued ?? queued;
   return {
     ...(read.workflow !== undefined ? { workflow: read.workflow } : {}),

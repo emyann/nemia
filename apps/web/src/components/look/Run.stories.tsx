@@ -13,7 +13,7 @@ import { Run } from './Run';
 const AS_OF = new Date('2026-11-15T18:00:00.000Z');
 
 /** `run` as the list carries one: no clock to break down, its present wait on a person dated where it has one. */
-const listed = (run: RunObject): WaitingRun => ({
+const listed = (run: RunObject) => ({
   ...runViewOf(run),
   wallMs: 0,
   finishedAt: run.status.finishedAt ?? null,
@@ -26,7 +26,7 @@ const listed = (run: RunObject): WaitingRun => ({
 const AMONG = Object.values(TARGET_RUNS).map(listed);
 
 /** A target run by its id's last four characters. */
-const RUN = (four: keyof typeof TARGET_RUNS): WaitingRun => listed(TARGET_RUNS[four]);
+const RUN = (four: keyof typeof TARGET_RUNS) => listed(TARGET_RUNS[four]);
 
 /** The six states the targets draw, each by its heading and its run. */
 const STATES: Array<[string, keyof typeof TARGET_RUNS]> = [

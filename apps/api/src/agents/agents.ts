@@ -85,8 +85,8 @@ export type AgentDraftBody = Omit<typeof POST_BODY.Type, 'name'>;
  * @param body The decoded body of the write.
  * @param name The agent's name, from the route.
  */
-export function agentDraftOf(body: AgentDraftBody, name: string): { draft: AgentDraft; schema: AgentSchema | null } {
-  const line = (value: string | null | undefined): string | null => (value?.trim() ? value.trim() : null);
+export function agentDraftOf(body: AgentDraftBody, name: string) {
+  const line = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
   return {
     draft: {
       name,
@@ -111,7 +111,7 @@ export function agentDraftOf(body: AgentDraftBody, name: string): { draft: Agent
 export async function saved(
   s: Served,
   { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
-): Promise<void> {
+) {
   const input = {
     from: 'user',
     repo: s.repo,

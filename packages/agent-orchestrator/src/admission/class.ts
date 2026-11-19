@@ -34,16 +34,16 @@ export const PROPOSED_INSTEAD: readonly string[] = [
  * The class of `entry` for an agent: out of reach where it writes a factory's definitions (`PROPOSED_INSTEAD`), else its own.
  * @param entry The table's entry: its name and its own class.
  */
-export function agentClassOf(entry: { readonly name: string; readonly class: CommandClass }): CommandClass {
-  if (!PROPOSED_INSTEAD.includes(entry.name)) return entry.class;
-  return typeof entry.class === 'object' ? { ...entry.class, sets: 'none' } : 'none';
+export function agentClassOf(entry: { readonly name: string; readonly class: CommandClass }) {
+  if (!PROPOSED_INSTEAD.includes(entry.name)) return entry.class satisfies CommandClass;
+  return (typeof entry.class === 'object' ? { ...entry.class, sets: 'none' } : 'none') satisfies CommandClass;
 }
 
 /**
  * The forms of `PROPOSED_INSTEAD` that are no entry's whole name but a command of `names` with its first word: each denied by itself.
  * @param names The names of the table's entries.
  */
-export const proposedForms = (names: readonly string[]): string[] =>
+export const proposedForms = (names: readonly string[]) =>
   PROPOSED_INSTEAD.filter((form) => !names.includes(form) && names.some((name) => form.startsWith(`${name} `)));
 
 /**
@@ -66,7 +66,7 @@ type Classed = {
 };
 
 /** The class a rule on a command's name gives every command it extends: an ask or an allow on `<name>:*`. */
-const covers = (c: CommandClass): boolean => c === 'answer' || c === 'ask';
+const covers = (c: CommandClass) => c === 'answer' || c === 'ask';
 
 /** The command whose writes are the person's confirmed list for `auto`, which a prompt's allow must never reach. */
 const ALWAYS_ASKED_UNDER = 'policy';
@@ -75,7 +75,7 @@ const ALWAYS_ASKED_UNDER = 'policy';
  * Where an entry's `asksAlways` breaks the rules: given a class other than `ask`, where it asks nothing a prompt's allow could reach;
  * left out of an `ask` write under `nemia policy`, which writes the person's confirmed list.
  */
-function askedBreaks(c: Classed): string[] {
+function askedBreaks(c: Classed) {
   if (c.asksAlways && c.class !== 'ask')
     return [`${c.name} asks always and is classed ${JSON.stringify(c.class)}: asksAlways is a prompt's, so class it 'ask' or drop it`];
   if (!c.asksAlways && c.class === 'ask' && c.name.startsWith(`${ALWAYS_ASKED_UNDER} `))
@@ -87,7 +87,7 @@ function askedBreaks(c: Classed): string[] {
  * Where one entry's class breaks the rules: a read classed as a write, a write classed as a read, a flag a bare read leaves
  * out, and its `asksAlways` (`askedBreaks`).
  */
-function ownBreaks(c: Classed): string[] {
+function ownBreaks(c: Classed) {
   const asked = askedBreaks(c);
   if (asked.length) return asked;
   if (!c.writes && c.class !== 'read') return [`${c.name} writes nothing and is classed ${JSON.stringify(c.class)}: class it 'read'`];
@@ -107,7 +107,7 @@ function ownBreaks(c: Classed): string[] {
  * the shorter name would override.
  * @param table The table's entries, each with whether it writes, its class, its `asksAlways` and its spec's flags.
  */
-export function classBreaks(table: readonly Classed[]): string[] {
+export function classBreaks(table: readonly Classed[]) {
   const breaks = table.flatMap(ownBreaks);
   for (const c of table) {
     const under = table.find((o) => covers(o.class) && c.name.startsWith(`${o.name} `) && o.class !== c.class);

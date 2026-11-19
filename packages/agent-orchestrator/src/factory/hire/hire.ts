@@ -33,7 +33,7 @@ export const settingOrigin: SettingOriginOf = (stepSets, agentGives) => {
  * @param workflow The workflow's name.
  * @param step The step's name.
  */
-export const hireNamed = (workflow: string, step: string): string => `${workflow}.${step}`;
+export const hireNamed = (workflow: string, step: string) => `${workflow}.${step}`;
 
 /** A step of a workflow, as a Hire names it. */
 export type HiredStep = { readonly workflow: string; readonly step: string };
@@ -43,7 +43,7 @@ export type HiredStep = { readonly workflow: string; readonly step: string };
  * that holds it. A name only one step joins to is not there.
  * @param steps The steps of a factory's workflows, each by its workflow and its name.
  */
-export function hiresCollided(steps: readonly HiredStep[]): ReadonlyMap<string, readonly HiredStep[]> {
+export function hiresCollided(steps: readonly HiredStep[]) {
   const by = new Map<string, HiredStep[]>();
   for (const s of steps) by.set(hireNamed(s.workflow, s.step), [...(by.get(hireNamed(s.workflow, s.step)) ?? []), s]);
   return new Map([...by].filter(([, held]) => held.length > 1));
@@ -74,7 +74,7 @@ export type HireRead = {
  * @param read What the read of the factory's step says of its hire.
  * @param keys The names of the settings the Hire says.
  */
-export function hireStatusOf(read: HireRead, keys: readonly string[]): HireStatus {
+export function hireStatusOf(read: HireRead, keys: readonly string[]) {
   const agent = read.written ?? read.hired;
   const settingOf = (key: string) => {
     const value = read.values[key];

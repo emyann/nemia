@@ -30,10 +30,10 @@ export const PAIR_EVERY_VARIABLE = 'NEMIA_PAIR_EVERY_MS';
 const USAGE = 'nemia pair <url> [--context <name>] [--name <client>]   pair this machine with the server at <url>, as the context <name>';
 
 /** A `nemia pair` typed otherwise than its usage: refused, exit 2, naming it. */
-const misused = (said: string): Refused => new Refused(`nemia pair: ${said}. Type:\n${USAGE}`);
+const misused = (said: string) => new Refused(`nemia pair: ${said}. Type:\n${USAGE}`);
 
 /** The value after `flag` among `args`, if typed; refused where the flag is typed with none. */
-const flagOf = (args: readonly string[], flag: string): string | undefined => {
+const flagOf = (args: readonly string[], flag: string) => {
   const at = args.indexOf(flag);
   if (at < 0) return undefined;
   const value = args[at + 1];
@@ -42,7 +42,7 @@ const flagOf = (args: readonly string[], flag: string): string | undefined => {
 };
 
 /** The server's address, read as http(s): its origin. Refused where it is not one. */
-const serverOf = (typed: string | undefined): URL => {
+const serverOf = (typed: string | undefined) => {
   if (typed === undefined || typed.startsWith('-')) throw misused('it takes the server’s address first, as http://vps:7777');
   let url: URL;
   try {
@@ -55,7 +55,7 @@ const serverOf = (typed: string | undefined): URL => {
 };
 
 /** A pairing that ended without a token: lapsed, or unknown to the server. Refused, exit 1, naming the command to begin again. */
-const ended = (server: string, why: 'lapsed' | 'unknown'): Refused =>
+const ended = (server: string, why: 'lapsed' | 'unknown') =>
   new Refused(
     why === 'lapsed'
       ? `the pairing lapsed before it was approved and claimed: ask again with \`nemia pair ${server}\`, and approve the new code within its ten minutes`
@@ -70,13 +70,13 @@ type Claimed =
   | { readonly kind: 'ended'; readonly why: 'lapsed' | 'unknown' };
 
 /** The pairing `id` claimed once with `secret` at `server`. */
-async function claimOnce(server: string, id: string, secret: string): Promise<Claimed> {
+async function claimOnce(server: string, id: string, secret: string) {
   return askedBare('pair', server, (client) =>
     client.pairings.claim({ params: { id }, payload: { secret } }).pipe(
-      Effect.map((answer): Claimed => {
-        if (answer.phase === 'claimed' && answer.token !== undefined) return { kind: 'token', token: answer.token };
-        if (answer.phase === 'expired') return { kind: 'ended', why: 'lapsed' };
-        return { kind: 'waiting' };
+      Effect.map((answer) => {
+        if (answer.phase === 'claimed' && answer.token !== undefined) return { kind: 'token', token: answer.token } satisfies Claimed;
+        if (answer.phase === 'expired') return { kind: 'ended', why: 'lapsed' } satisfies Claimed;
+        return { kind: 'waiting' } satisfies Claimed;
       }),
       Effect.catch((err) =>
         err instanceof Conflict
@@ -90,7 +90,7 @@ async function claimOnce(server: string, id: string, secret: string): Promise<Cl
 }
 
 /** The interval between claims `env` asks for, else `PAIR_EVERY_MS`. */
-const everyOf = (env: NodeJS.ProcessEnv): number => {
+const everyOf = (env: NodeJS.ProcessEnv) => {
   const asked = Number(env[PAIR_EVERY_VARIABLE]);
   return Number.isInteger(asked) && asked > 0 ? asked : PAIR_EVERY_MS;
 };
@@ -100,7 +100,7 @@ const everyOf = (env: NodeJS.ProcessEnv): number => {
  * @param args The words typed after `pair`: the server's url, then `--context` and `--name`.
  * @param env The environment read for the config file and the interval between claims.
  */
-export async function pair(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function pair(args: readonly string[], env: NodeJS.ProcessEnv = process.env) {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(`${USAGE}\n`);
     return 0;

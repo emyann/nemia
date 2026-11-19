@@ -60,7 +60,7 @@ export const RUN_PHASE_OF = {
  * Whether `phase` is one a step or a try in `reason` is served in:
  * its reason's, or `failed` for an `Unknown` whose record does not read.
  */
-const stepPhaseFits = (phase: StepPhase, reason: StepReason): boolean =>
+const stepPhaseFits = (phase: StepPhase, reason: StepReason) =>
   phase === STEP_PHASE_OF[reason] || (reason === 'Unknown' && phase === 'failed');
 
 /**

@@ -28,7 +28,7 @@ export const FORMER_MODES = { nudge: 'continue' } as const satisfies Readonly<Re
  * A mode or a try's cause under the word it has now: a former spelling (`FORMER_MODES`) as its mode, anything else as it is. Pure.
  * @param value The mode or cause as it was read.
  */
-export const upgradeMode = (value: unknown): unknown =>
+export const upgradeMode = (value: unknown) =>
   typeof value === 'string' && Object.hasOwn(FORMER_MODES, value) ? FORMER_MODES[value as keyof typeof FORMER_MODES] : value;
 
 /**
@@ -40,9 +40,7 @@ export const upgradeMode = (value: unknown): unknown =>
  * left no id. Pure; typed by what it reads, so this file imports no runtime.
  * @param attempts The attempts of the task before the try, or undefined where there is no task.
  */
-export const continuesFrom = (
-  attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined,
-): string | undefined => {
+export const continuesFrom = (attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined) => {
   const last = attempts?.at(-1);
   if (!last) return undefined;
   return last.nativeId ?? last.resumeFrom;
@@ -58,7 +56,7 @@ export type { TryCause };
  * An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it. Pure.
  * @param read An ask file's JSON, as parsed.
  */
-export const upgradeAsk = (read: unknown): unknown =>
+export const upgradeAsk = (read: unknown) =>
   isObjectOrArray(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode')
     ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }
     : read;
@@ -90,7 +88,7 @@ export const TRY_CAUSES = [
  * a try is left as it is, for the schema to refuse.
  * @param raw A run record's JSON, as parsed.
  */
-export const upgradeTries = (raw: unknown): unknown => {
+export const upgradeTries = (raw: unknown) => {
   const steps: unknown = isObjectOrArray(raw) ? Reflect.get(raw, 'steps') : undefined;
   if (!isObjectOrArray(steps) || Array.isArray(steps)) return raw;
   const upgraded = Object.entries(steps).map(([name, step]) => {
@@ -104,7 +102,7 @@ export const upgradeTries = (raw: unknown): unknown => {
  * One try under `cause`, in the word it has now: its former `then` moved there, where it holds no `cause` of its own, and dropped; a
  * former mode (`upgradeMode`) said as the mode it is.
  */
-const upgradeTry = (t: unknown): unknown => {
+const upgradeTry = (t: unknown) => {
   if (!isObjectOrArray(t)) return t;
   const { then, ...rest } = t as { then?: unknown; cause?: unknown };
   const cause = Object.hasOwn(rest, 'cause') ? rest.cause : then;
@@ -201,7 +199,7 @@ export type Retry = {
  * @param how How the try is asked for, its message among it.
  * @param command The command a refusal names, `nemia retry <runId> <step>` where absent.
  */
-export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <step>'): string | null {
+export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <step>') {
   if (how.message === undefined) return null;
   if (how.mode === 'recheck') {
     return `--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. Recheck without a message (${command} --recheck), or give the answer to a session: ${command} --message "<answer>".`;
@@ -212,7 +210,7 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
 }
 
 /** Whether a try moved behind starts the step's count of tries afresh: a round, a merge, an ending sent back. */
-const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
+const anew = (t: EarlierTry) => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
 
 /**
  * The tries `retries:` has filed for a step in the round it is on, a recheck it filed (`retried`) among them. A person's do not
@@ -220,7 +218,7 @@ const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'mer
  * check may refuse it afresh — and so is a merge.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const retriesSpent = (record: StepRecord | undefined): number => {
+export const retriesSpent = (record: StepRecord | undefined) => {
   let spent = 0;
   for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'retries' || t.retried ? 1 : 0);
   return spent;
@@ -231,7 +229,7 @@ export const retriesSpent = (record: StepRecord | undefined): number => {
  * from the step's record — so a restart, a person's try in between, or a second tick never files another — and new at each round.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const signoffsSpent = (record: StepRecord | undefined): number => {
+export const signoffsSpent = (record: StepRecord | undefined) => {
   let spent = 0;
   for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'signoff' ? 1 : 0);
   return spent;
@@ -245,7 +243,7 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
  * @param asked What the engine says of the closeout the session was asked for.
  * @param refused Whether the closeout's envelope was refused, false where absent.
  */
-export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = false): boolean =>
+export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = false) =>
   (asked === 'unsigned' || lackedOf(record).length > 0 || refused) && signoffsSpent(record) < 1;
 
 /**
@@ -253,20 +251,20 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
  * `--recheck`.
  * @param how The try's mode, and the model a `--model` named.
  */
-export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
+export const modeWord = (how: { mode: RetryMode; model?: string }) => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
 /**
  * The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with.
  * @param r The try to file.
  * @param step The step's spec, whose `retries:` is said.
  */
-export const tryWord = (r: Retry, step: StepSpec): string =>
+export const tryWord = (r: Retry, step: StepSpec) =>
   `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}${r.mode === 'recheck' ? ', its check run again: the machine ran out of memory' : ''}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
 
 /**
  * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
  */
-const askedWord = (r: Retry): string =>
+const askedWord = (r: Retry) =>
   r.by === 'pause'
     ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`
     : `nemia retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
@@ -279,7 +277,7 @@ const askedWord = (r: Retry): string =>
  * @param retry The try filed.
  * @param taskId The new task's id; absent for a recheck, which keeps the same task.
  */
-export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
+export function nextTry(record: StepRecord, retry: Retry, taskId?: string) {
   const { check, tries = [], handedOff: _, landed: __, filesRead, ...rest } = record;
   if (record.taskId === null)
     throw new Error(`try ${retry.try} of ${retry.step} is filed over a record with no task: file a try of a step that has one`);
@@ -296,7 +294,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
-  return { ...rest, ...(same && filesRead ? { filesRead } : {}), taskId: next, tries: [...tries, over] };
+  return { ...rest, ...(same && filesRead ? { filesRead } : {}), taskId: next, tries: [...tries, over] } satisfies StepRecord as StepRecord;
 }
 
 /**
@@ -307,7 +305,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
  * @param step The step's spec, whose own model is read.
  * @param record The step's record, or undefined where the run has none of it.
  */
-export function sessionModel(step: StepSpec, record: StepRecord | undefined): string | undefined {
+export function sessionModel(step: StepSpec, record: StepRecord | undefined) {
   for (const t of [...(record?.tries ?? [])].reverse()) {
     if (t.cause === 'recheck') continue;
     if (t.cause === 'fresh') return t.model ?? step.model;
@@ -322,7 +320,7 @@ export function sessionModel(step: StepSpec, record: StepRecord | undefined): st
  * writing down is found (`adoptTries`).
  * @param record The step's record, or undefined where the run has none of it.
  */
-export const turnsOf = (record: StepRecord | undefined): number =>
+export const turnsOf = (record: StepRecord | undefined) =>
   (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.cause !== 'recheck').length;
 
 /**
@@ -330,7 +328,7 @@ export const turnsOf = (record: StepRecord | undefined): number =>
  * @param run The run's record.
  * @param asks The asks of the run, waiting.
  */
-export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
+export const spentAsks = (run: Run, asks: readonly RetryAsk[]) => asks.filter((a) => a.try <= tryOf(run, a.step));
 
 /**
  * A try due now, as `nemia ls` and `nemia decide` say it — and, for a step whose session the tick stops first, that it does:
@@ -339,7 +337,7 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * @param run The run's record.
  * @param r The try due.
  */
-export const dueNote = (step: StepSpec, run: Run, r: Retry): string => {
+export const dueNote = (step: StepSpec, run: Run, r: Retry) => {
   if (r.by === 'ask') return askedNote(r);
   if (r.by === 'signoff')
     return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
@@ -350,7 +348,7 @@ export const dueNote = (step: StepSpec, run: Run, r: Retry): string => {
 };
 
 /** A try a person asked for, as `dueNote` says it: its mode, budget and answer, and whether its session is stopped first. */
-const askedNote = (r: Retry): string => {
+const askedNote = (r: Retry) => {
   const budget = r.budget !== undefined ? `, --budget ${r.budget}` : '';
   const answer = r.message !== undefined ? ', with your answer' : '';
   const next = r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it';
@@ -358,7 +356,7 @@ const askedNote = (r: Retry): string => {
 };
 
 /** A try `nemia pause --now` asked for, as `dueNote` says it once its task is stopped: the session continued, or the check run again. */
-const pausedNote = (r: Retry): string =>
+const pausedNote = (r: Retry) =>
   r.mode === 'recheck'
     ? `try ${r.try} due — its check was stopped by nemia pause --now, and the next tick runs it again`
     : `try ${r.try} due — its session was stopped by nemia pause --now, and the next tick continues it`;
@@ -371,9 +369,11 @@ const pausedNote = (r: Retry): string =>
  * @param step The step's name.
  * @param answers The run's ask files, waiting and consumed.
  */
-export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): RetryAsk | undefined {
+export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]) {
   const last = run.steps[step]?.tries?.at(-1);
   if (!last) return undefined;
   const n = tryOf(run, step);
-  return answers.find((a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model);
+  return answers.find(
+    (a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model,
+  ) satisfies RetryAsk | undefined;
 }

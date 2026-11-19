@@ -53,7 +53,7 @@ export type Started = {
 export const INSTALL_BY = 'nemia service install';
 
 /** How a take-over's lines open: the install with the pid it was given, or the command that runs it. */
-const opening = (pid: number, by: string): string => (by === INSTALL_BY ? `${by} --take-over ${pid}` : by);
+const opening = (pid: number, by: string) => (by === INSTALL_BY ? `${by} --take-over ${pid}` : by);
 
 /**
  * Why `pid` is not the daemon to stop, or null: the lease must name it ticking, and the process table must say it is the process that
@@ -62,7 +62,7 @@ const opening = (pid: number, by: string): string => (by === INSTALL_BY ? `${by}
  * @param lease The store's lease as it reads now.
  * @param by The command asking, which the words open on; install's where not given.
  */
-export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY): string | null {
+export function takeOverRefusal(pid: number, lease: DaemonStanding, by: string = INSTALL_BY) {
   const said = opening(pid, by);
   if (lease.kind !== 'ticking')
     return `${said}: no daemon ticks the store (${lease.kind}): install without --take-over starts the service.`;
@@ -99,7 +99,7 @@ const pauseFor = (pid: number, host: TakeoverHost, by: string) =>
   });
 
 /** A timeout in words: `10m`, `90s`, or its milliseconds where it is under a second, as only a test gives one. */
-const timeoutSaid = (ms: number): string => (ms < 1_000 ? `${ms} ms` : timeoutWords(ms));
+const timeoutSaid = (ms: number) => (ms < 1_000 ? `${ms} ms` : timeoutWords(ms));
 
 /**
  * Waits until no session living in the daemon is in a tool call (`calls`), saying how many are and in how long they are cut
@@ -165,7 +165,7 @@ const unitLetGo = (host: TakeoverHost, service: Started, by: string, old: number
   );
 
 /** The first line a program said on its error output as it failed, else of its error, else nothing. */
-const failedLine = (err: unknown): string => {
+const failedLine = (err: unknown) => {
   const stderr = typeof err === 'object' && err !== null && 'stderr' in err ? String(err.stderr) : '';
   const message = err instanceof Error ? err.message : String(err);
   return [...stderr.split('\n'), ...message.split('\n')].map((l) => l.trim()).find((l) => l !== '') ?? '';
@@ -188,7 +188,7 @@ const startOf = (service: Started, by: string, left: string) =>
  * Why no daemon ticks the store after the start, by what the unit runs now (`unitRunning`): a process that has not taken the store, no
  * process at all, the stopped daemon still, or the system could not say. Only a unit that runs a process is said to have been started.
  */
-const notTickingWords = (service: Started, by: string, old: number | null, left: string): string => {
+const notTickingWords = (service: Started, by: string, old: number | null, left: string) => {
   const state = service.stateNow();
   switch (unitRunning(state, old)) {
     case 'other':
@@ -203,7 +203,7 @@ const notTickingWords = (service: Started, by: string, old: number | null, left:
 };
 
 /** Whether `lease` names the daemon of `pid` ticking with no pass completed yet: what the first-pass wait waits through. */
-const firstPassDue = (lease: DaemonStanding, pid: number): boolean =>
+const firstPassDue = (lease: DaemonStanding, pid: number) =>
   lease.kind === 'ticking' && lease.file.pid === pid && lease.file.passedAt === null;
 
 /**

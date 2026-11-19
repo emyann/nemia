@@ -26,7 +26,7 @@ export type DaemonAnswer = {
 const standingNow = Effect.flatMap(StoreRoot, (home) => tried(() => daemonStanding(home)));
 
 /** Whether `s` is an api that ticks and has not yet written where it listens: its url comes once it listens. */
-const listening = (s: DaemonStanding): boolean => s.kind === 'ticking' && s.file.by === 'api' && s.file.url === undefined;
+const listening = (s: DaemonStanding) => s.kind === 'ticking' && s.file.by === 'api' && s.file.url === undefined;
 
 /**
  * The lease once it says all it will: an api that took the store but does not listen yet is read again every `DEMAND_POLL_MS`, at most

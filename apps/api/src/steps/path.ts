@@ -15,31 +15,43 @@ export type LifecycleTransition = Effect.Success<ReturnType<Engine['Service']['p
  * @param step The step's name.
  * @param asked The try's number, as the request gives it; undefined or empty for the current one.
  */
-export function tryOfStep(
-  run: Run,
-  step: string,
-  asked: string | undefined,
-): { try: number; taskId: string | null; turn?: number } | { status: 400 | 404; error: string } {
+export function tryOfStep(run: Run, step: string, asked: string | undefined) {
   const record = run.steps[step];
   const earlier = record?.tries ?? [];
   const current = earlier.length + 1;
-  if (asked === undefined || asked === '') return { try: current, taskId: record?.taskId ?? null };
+  if (asked === undefined || asked === '')
+    return { try: current, taskId: record?.taskId ?? null } satisfies
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string } as
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string };
   if (!/^[1-9]\d*$/.test(asked)) {
     return {
       status: 400,
       error: `\`${asked}\` is not a try: give a whole number from 1, as GET /api/runs/${run.id} numbers the step's \`tries\`, or none for the current one.`,
-    };
+    } satisfies { try: number; taskId: string | null; turn?: number } | { status: 400 | 404; error: string } as
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string };
   }
   const n = Number(asked);
   if (n > current) {
     return {
       status: 404,
       error: `Step '${step}' of run '${run.id}' has had ${current} ${current === 1 ? 'try' : 'tries'}, so it has no try ${n}. GET /api/runs/${run.id} lists them under \`tries\`.`,
-    };
+    } satisfies { try: number; taskId: string | null; turn?: number } | { status: 400 | 404; error: string } as
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string };
   }
   const at = earlier[n - 1];
-  if (at === undefined) return { try: current, taskId: record?.taskId ?? null };
-  return { try: n, taskId: at.taskId, turn: turnOfTry(earlier.slice(0, n - 1), at) };
+  if (at === undefined)
+    return { try: current, taskId: record?.taskId ?? null } satisfies
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string } as
+      | { try: number; taskId: string | null; turn?: number }
+      | { status: 400 | 404; error: string };
+  return { try: n, taskId: at.taskId, turn: turnOfTry(earlier.slice(0, n - 1), at) } satisfies
+    | { try: number; taskId: string | null; turn?: number }
+    | { status: 400 | 404; error: string } as { try: number; taskId: string | null; turn?: number } | { status: 400 | 404; error: string };
 }
 
 /**
@@ -48,7 +60,7 @@ export function tryOfStep(
  * @param path The task's path.
  * @param turn The turn to cut at, counted from 0, or undefined for the whole path.
  */
-export function pathToTurn(path: readonly LifecycleTransition[], turn: number | undefined): LifecycleTransition[] {
+export function pathToTurn(path: readonly LifecycleTransition[], turn: number | undefined) {
   if (turn === undefined) return [...path];
   let inputs = 0;
   const end = path.findIndex((s) => s.event === 'input' && ++inputs > turn);

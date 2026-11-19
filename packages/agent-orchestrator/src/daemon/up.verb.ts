@@ -42,7 +42,7 @@ import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { credentialKept } from '../token/token.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
 import { upgradeCarries, type Running } from '../release/index.ts';
-import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
+import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees } from '../release/carry.store.ts';
 import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
 import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
 import { eventLoopWatched, EVENT_LOOP_DELAY } from '../telemetry/event-loop.store.ts';
@@ -94,7 +94,7 @@ export const QUOTA_METRICS = {
 } as const;
 
 /** Each window of `q` into the quota's gauges (`QUOTA_METRICS`) for `harness`; nothing when it reports no windows. */
-const quotaRecorded = (harness: string, q: HarnessQuota): Effect.Effect<void> =>
+const quotaRecorded = (harness: string, q: HarnessQuota) =>
   q.kind !== 'windows'
     ? Effect.void
     : Effect.forEach(
@@ -112,8 +112,7 @@ const quotaRecorded = (harness: string, q: HarnessQuota): Effect.Effect<void> =>
       );
 
 /** The percent of each window `q` reports used, or none when it reports no windows. */
-const usedOf = (q: HarnessQuota): Reading[string] | undefined =>
-  q.kind === 'windows' ? Object.fromEntries(q.limits.map((l) => [l.key, l.usedPercentage])) : undefined;
+const usedOf = (q: HarnessQuota) => (q.kind === 'windows' ? Object.fromEntries(q.limits.map((l) => [l.key, l.usedPercentage])) : undefined);
 
 /**
  * Each harness's quota (`quotaHarnesses`) asked through `ask` — the engine's `quota` of `e` unless given — over `last`: one that answers
@@ -173,7 +172,7 @@ export const NOTHING_SAID: UpSaid = {
 };
 
 /** The queued card's line, unless it is the failure said last; answers with the failure it says now, if any. */
-function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined): { lines: PassLine[]; said: string | undefined } {
+function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined) {
   const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
   const named = 'run' in queue ? { run: queue.run } : {};
   const lines = failure === undefined || failure !== said ? [{ text: queueLine(queue), ...named }] : [];
@@ -184,7 +183,7 @@ function queueSaid(queue: NonNullable<Pass['queue']>, said: string | undefined):
  * The scheduled start's line, about its run when it started one; none for a failure the schedule's try already held (`again`), which
  * was said when it was first kept.
  */
-const scheduleSaid = (scheduled: Pass['scheduled']): PassLine[] =>
+const scheduleSaid = (scheduled: Pass['scheduled']) =>
   !scheduled || ('failed' in scheduled && scheduled.again)
     ? []
     : [{ text: scheduleLine(scheduled), ...('run' in scheduled ? { run: scheduled.run } : { warn: true as const }) }];
@@ -193,11 +192,10 @@ const scheduleSaid = (scheduled: Pass['scheduled']): PassLine[] =>
  * What a pass did to each run, about that run: its notes, then the steps it filed, tried again, rounded again and is checking, a line for
  * each step, annotated with it.
  */
-function advancedLines(advanced: Pass['runs']): PassLine[] {
+function advancedLines(advanced: Pass['runs']) {
   return advanced.flatMap((r) => {
     const run = r.run.id;
-    const steps = (verb: string, names: readonly string[]): PassLine[] =>
-      names.map((name) => ({ text: `${run}  ${verb} ${name}`, run, step: name }));
+    const steps = (verb: string, names: readonly string[]) => names.map((name) => ({ text: `${run}  ${verb} ${name}`, run, step: name }));
     return [
       ...r.notes.map((note) => ({ text: `${run}  ${note}`, run })),
       ...steps('filed', r.filed),
@@ -215,15 +213,15 @@ function advancedLines(advanced: Pass['runs']): PassLine[] {
  * @param pause The store's pause as the pass read it, or undefined where the store is not paused.
  * @param said The pause's words said last, or undefined where none were (the store not paused).
  */
-export function pauseSaid(pause: Pass['pause'], said: string | undefined): { lines: string[]; said: string | undefined } {
+export function pauseSaid(pause: Pass['pause'], said: string | undefined) {
   const lines = pause ? [pausedWords(pause) ?? '', ...heldLines(pause)] : [RESUMED];
   const now = pause ? lines.join('\n') : undefined;
   return { lines: now !== said ? lines : [], said: now };
 }
 
 /** A warning for each of `whys` not in `said`, in `words`: what a pass says once while it lasts. */
-const warnedOnce = (whys: readonly string[] | undefined, said: ReadonlySet<string>, words: (why: string) => string): PassLine[] =>
-  (whys ?? []).filter((why) => !said.has(why)).map((why) => ({ text: words(why), warn: true }));
+const warnedOnce = (whys: readonly string[] | undefined, said: ReadonlySet<string>, words: (why: string) => string) =>
+  (whys ?? []).filter((why) => !said.has(why)).map((why) => ({ text: words(why), warn: true })) satisfies PassLine[];
 
 /**
  * One pass's lines, going by what the daemon has said (`was`), not by the store, at `now`: the pause, the summary when one is due, the
@@ -233,7 +231,7 @@ const warnedOnce = (whys: readonly string[] | undefined, said: ReadonlySet<strin
  * @param was What the daemon has said before this pass.
  * @param now The time of the pass, in epoch milliseconds.
  */
-export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLine[]; said: UpSaid } {
+export function passSaid(pass: Pass, was: UpSaid, now: number) {
   const { runs: advanced, queue, feedError, cost, refused, unreadable, unobserved, forgetting } = pass;
   const paused = pauseSaid(pass.pause, was.pauseSaid);
   const lines: PassLine[] = paused.lines.map((text) => ({ text }));
@@ -257,7 +255,7 @@ export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLin
 }
 
 /** Logs `line`, Info or Warn, annotated with the run and the steps it is about. */
-const sayLine = (line: PassLine): Effect.Effect<void> =>
+const sayLine = (line: PassLine) =>
   (line.warn ? Effect.logWarning(line.text) : Effect.logInfo(line.text)).pipe(
     Effect.annotateLogs({ ...(line.run ? { run: line.run } : {}), ...(line.step ? { step: line.step } : {}) }),
   );
@@ -273,7 +271,7 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
  * The feed's line that this daemon has taken the store, saying how the one before it ended (`startedLine`); a line it could not write is
  * a warning, never a failed start.
  */
-const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
+const saidStarted = ({ held, replaced }: TakenStore) =>
   emitDaemonStarted(startedLine(held.pid, replaced, new Date().toISOString(), Date.now())).pipe(
     Effect.catchCause((cause) => Effect.logWarning(`the feed's ${DAEMON_STARTED} line was not written: ${Cause.pretty(cause)}`)),
   );
@@ -287,7 +285,7 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * @param scope Probes a scope in the slice it is given and answers why the host cannot hold one, or undefined where it can; `scopeRefusal`
  * by default.
  */
-export const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal): Invalid | undefined => {
+export const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal) => {
   const { memory, cgroupParent: parent } = ceilings(config);
   if (memory === undefined) return undefined;
   const why = scope(parent);
@@ -333,8 +331,8 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * @param e The engine every pass runs on, whose sessions the daemon holds.
  * @param options Its interval, its repository, its kind and the rest of what it runs with (`UpOptions`).
  */
-export const up = (e: Engine, options: UpOptions): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
-  eventLoopWatched(daemon(e, options));
+export const up = (e: Engine, options: UpOptions) =>
+  eventLoopWatched(daemon(e, options)) satisfies Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig>;
 
 /**
  * Each factory file an earlier release wrote, moved into one list of volumes through the Factory door (`moveVolumes`), at every start,
@@ -348,10 +346,7 @@ const volumesMoved = Effect.gen(function* () {
 });
 
 /** The daemon `up` runs with its event loop watched: its doc says what it does. */
-const daemon = (
-  e: Engine,
-  { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions,
-): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig> =>
+const daemon = (e: Engine, { every, repo, holder, series = [], onTaken, quota, scope }: UpOptions) =>
   Effect.gen(function* () {
     const config = yield* StoreConfig;
     const home = yield* StoreRoot;
@@ -426,7 +421,7 @@ const daemon = (
       said = yield* logPass(pass, said);
       yield* Effect.sleep(every);
     }
-  });
+  }) satisfies Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot | StoreConfig>;
 
 /**
  * The tools folder's `bin/` of the store at `home` made (`toolsBinDir`) and put first on `env`'s PATH (`pathLedByTools`, which ends it
@@ -442,7 +437,7 @@ export const toolsOnPath = (
   home: string,
   env: Record<string, string | undefined>,
   declared: Pick<PlaceDeclared, 'toolsEnv' | 'toolsPath'> = {},
-): string => {
+) => {
   const bin = toolsBinDir(home);
   fs.mkdirSync(bin, { recursive: true });
   const placed = (declared.toolsPath ?? []).map((folder) => path.join(toolsDir(home), folder));
@@ -458,7 +453,7 @@ export const toolsOnPath = (
  * @param home The store's directory (`WF_ROOT`).
  * @param running The release this process runs.
  */
-export const carryTrees = (home: string, running: Running): string[] => [
+export const carryTrees = (home: string, running: Running) => [
   ...(running.kind === 'install' ? [running.root] : []),
   ...releaseTrees(home),
 ];
@@ -469,7 +464,7 @@ export const carryTrees = (home: string, running: Running): string[] => [
  * @param home The store's directory (`WF_ROOT`).
  * @param running The release this process runs.
  */
-export const adoptedAtStart = (home: string, running: Running): Effect.Effect<readonly Adopted[]> =>
+export const adoptedAtStart = (home: string, running: Running) =>
   Effect.try({ try: () => adoptBundled(home, carryTrees(home, running)), catch: (err) => err }).pipe(
     Effect.tap((adopted) =>
       Effect.forEach(adopted, (a) =>
@@ -482,7 +477,7 @@ export const adoptedAtStart = (home: string, running: Running): Effect.Effect<re
   );
 
 /** Whether a fix of `need` was started in the store at `home` within a fix's deadline: one an earlier start filed may still run. */
-const fixUnderWay = (home: string, need: string, now: number): boolean => {
+const fixUnderWay = (home: string, need: string, now: number) => {
   let ids: string[];
   try {
     ids = fs.readdirSync(fixesDir(home)).flatMap((file) => (file.endsWith('.json') ? [file.slice(0, -'.json'.length)] : []));
@@ -528,7 +523,7 @@ export const carriedFiled = Effect.fn('carriedFiled')(function* (home: string, r
  * @param home The store's directory (`WF_ROOT`).
  * @param url Where the api serves the board.
  */
-export const holdUrl = (home: string, url: string): boolean => heldUrl(home, url);
+export const holdUrl = (home: string, url: string) => heldUrl(home, url);
 
 /**
  * The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number.
@@ -550,7 +545,7 @@ const SIGNALS = [
  * handles no SIGHUP, and it hands no failure back to the caller.
  * @param program The command to run.
  */
-export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
+export function runMain<A, E>(program: Effect.Effect<A, E>) {
   return new Promise<A>((resolve, reject) => {
     let stoppedWith: number | undefined;
     const stops = SIGNALS.map(([signal, code]) => {

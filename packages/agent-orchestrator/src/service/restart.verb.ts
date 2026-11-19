@@ -42,7 +42,7 @@ export type Restarted = {
  * service's holds the store, or one is stalled). A start carries `old`, the daemon that let the store go and is still the unit's main
  * process, which the start waits for the unit to end (`startedPassed`).
  */
-function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: number } | { kind: 'start'; old: number | null } {
+function planOf(service: ServiceAt, host: ServiceHost) {
   const lease = host.lease();
   if (!service.installed)
     throw new Missing({
@@ -57,12 +57,17 @@ function planOf(service: ServiceAt, host: ServiceHost): { kind: 'restart'; pid: 
       message: `${BY}: ${daemonLine(lease, Date.now())}. Stop it, then ${SHAPE} starts the service.`,
     });
   const holder = holderOfLease(lease, service.state);
-  if (lease.kind === 'ticking' && holder === 'service') return { kind: 'restart', pid: lease.file.pid };
+  if (lease.kind === 'ticking' && holder === 'service')
+    return { kind: 'restart', pid: lease.file.pid } satisfies { kind: 'restart'; pid: number } | { kind: 'start'; old: number | null } as
+      | { kind: 'restart'; pid: number }
+      | { kind: 'start'; old: number | null };
   if (lease.kind === 'ticking')
     throw new Conflict({
       message: `${BY}: pid ${lease.file.pid} holds the store and is not ${service.unit}'s process, so it cannot be started again: ${takeOverLine(lease.file.pid, service.name)} hands the store to the service, which ${BY} restarts from then on.`,
     });
-  return { kind: 'start', old: lease.kind === 'stopped' && service.state?.pid === lease.file.pid ? lease.file.pid : null };
+  return { kind: 'start', old: lease.kind === 'stopped' && service.state?.pid === lease.file.pid ? lease.file.pid : null } satisfies
+    | { kind: 'restart'; pid: number }
+    | { kind: 'start'; old: number | null } as { kind: 'restart'; pid: number } | { kind: 'start'; old: number | null };
 }
 
 /** The line said after a restart where a person's pause stood through it. */

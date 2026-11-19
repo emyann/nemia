@@ -40,13 +40,13 @@ export class WriteRefusal extends Error {
 }
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
-const shown = (value: unknown): string => {
+const shown = (value: unknown) => {
   const json = JSON.stringify(value) ?? 'undefined';
   return json.length > 60 ? `${json.slice(0, 59)}…` : json;
 };
 
 /** `path` as a reader writes it into a value: `[0].steps[1].status`, or `the answer` for the value itself. */
-const pathWords = (path: readonly PropertyKey[]): string =>
+const pathWords = (path: readonly PropertyKey[]) =>
   path.length ? path.map((key, i) => (typeof key === 'number' ? `[${key}]` : `${i ? '.' : ''}${String(key)}`)).join('') : 'the answer';
 
 /**
@@ -54,7 +54,7 @@ const pathWords = (path: readonly PropertyKey[]): string =>
  * are as deep: a union answers an issue for each member, and the one that read furthest is the member the answer meant. Sentences ending
  * on the fix, with `may` before it: what a write may have done, and what to look at before sending it again.
  */
-function unreadWords(route: string, issue: SchemaIssue.Issue, may?: string): string {
+function unreadWords(route: string, issue: SchemaIssue.Issue, may?: string) {
   const deepest = refusedIn(issue).reduce<RefusedPlace | undefined>(
     (found, next) => (found && next.path.length <= found.path.length ? found : next),
     undefined,
@@ -77,7 +77,7 @@ function unreadWords(route: string, issue: SchemaIssue.Issue, may?: string): str
  * @param value The answer as the api sent it.
  * @param may What a write may have done, said before the fix; none for a read.
  */
-export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string): T {
+export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unknown, may?: string) {
   const result = Schema.decodeUnknownResult(schema)(value, { reportInput: true });
   if (Result.isSuccess(result)) return result.success;
   throw new UnreadAnswer(route, unreadWords(route, result.failure.issue, may));
@@ -97,7 +97,7 @@ export type TokenAsked = { readonly reason: TokenAsk; readonly message: string; 
 const TOKEN_ASKS: ReadonlySet<string> = new Set<TokenAsk>(['token-required', 'unknown-token']);
 
 /** The string `answer` carries at `key`, where it is an object that carries one. */
-const stringAt = (answer: unknown, key: string): string | undefined => {
+const stringAt = (answer: unknown, key: string) => {
   const value = typeof answer === 'object' && answer !== null ? Reflect.get(answer, key) : undefined;
   return typeof value === 'string' ? value : undefined;
 };
@@ -109,7 +109,7 @@ const stringAt = (answer: unknown, key: string): string | undefined => {
  * @param status The status the api answered.
  * @param answer The answer's JSON, undefined for one that is not JSON.
  */
-export function tokenAskOf(status: number, answer: unknown): TokenAsked | null {
+export function tokenAskOf(status: number, answer: unknown) {
   const reason = stringAt(answer, 'reason');
   if (status !== 401 || reason === undefined || !TOKEN_ASKS.has(reason)) return null;
   const exposed = typeof answer === 'object' && answer !== null ? Reflect.get(answer, 'exposed') !== false : true;
@@ -127,7 +127,7 @@ const askedListeners = new Set<() => void>();
  * each answer that asks, and the first words of a reason are kept.
  * @param ask The api's ask for a token: its reason and its words.
  */
-export function askToken(ask: TokenAsked): void {
+export function askToken(ask: TokenAsked) {
   if (asked?.reason === ask.reason) return;
   asked = ask;
   for (const listener of askedListeners) listener();
@@ -137,10 +137,10 @@ export function askToken(ask: TokenAsked): void {
  * `listener` told each time the api asks for a token; the answer stops telling it. Shaped for React's `useSyncExternalStore`.
  * @param listener Called each time the api asks for a token anew.
  */
-export function onTokenAsked(listener: () => void): () => void {
+export function onTokenAsked(listener: () => void) {
   askedListeners.add(listener);
   return () => void askedListeners.delete(listener);
 }
 
 /** The token the api last asked for, or null while it has asked for none. */
-export const tokenAsked = (): TokenAsked | null => asked;
+export const tokenAsked = () => asked;

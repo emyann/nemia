@@ -21,7 +21,7 @@ import { putScheduleTry } from './schedule.store.ts';
 import type { ScheduleStarted, ScheduleTry } from './schedule.ts';
 
 /** A failure in one line, its lines joined by ` / `. */
-const oneLine = (err: unknown): string =>
+const oneLine = (err: unknown) =>
   (err instanceof Error ? err.message : String(err))
     .split('\n')
     .map((line) => line.trim())
@@ -66,7 +66,7 @@ export const startDue = Effect.fn('startDue')(function* (runs: readonly Run[], n
   if (!due) return undefined;
   const at = { factory: due.factory.name, workflow: due.workflow, due: new Date(due.fires.latest).toISOString() };
   const exit = yield* Effect.exit(started(home, due, at.due));
-  const keep = (tried: ScheduleTry): void => {
+  const keep = (tried: ScheduleTry) => {
     try {
       putScheduleTry(home, at.factory, at.workflow, tried);
     } catch {}

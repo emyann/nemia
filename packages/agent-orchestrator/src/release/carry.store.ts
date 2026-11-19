@@ -13,14 +13,14 @@ import { spawnSync } from 'node:child_process';
 import { HARNESS_DECLARATIONS, type HarnessNeeds } from 'agent-runtime/vocabulary';
 import { pathLedByTools, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import { installedReleases, releaseDir } from './release.store.ts';
-import { upgradeCarries, type HarnessesHeld } from './carry.ts';
+import { upgradeCarries } from './carry.ts';
 import { DEACTIVATED, harnessInstallCommand } from '../needs/index.ts';
 
 /** A harness whose adapter declares needs (`HarnessNeeds`), by its name. */
 export type PinnedHarness = { readonly name: string; readonly needs: HarnessNeeds };
 
 /** The harnesses whose adapters declare needs, in `HARNESS_DECLARATIONS`' order: the ones a release pins. */
-export const pinnedHarnesses = (): PinnedHarness[] =>
+export const pinnedHarnesses = () =>
   Object.entries(HARNESS_DECLARATIONS).flatMap(([name, declaration]) =>
     declaration.needs === undefined ? [] : [{ name, needs: declaration.needs }],
   );
@@ -29,16 +29,16 @@ export const pinnedHarnesses = (): PinnedHarness[] =>
  * The folder of the tools folder each harness is installed under, `<tools>/harnesses/<name>/<version>/`.
  * @param home The store's folder.
  */
-export const harnessesDir = (home: string): string => path.join(toolsDir(home), 'harnesses');
+export const harnessesDir = (home: string) => path.join(toolsDir(home), 'harnesses');
 
 /** Whether `file` is a folder (`directory`) or a file (`file`), followed through a link; false where nothing is there. */
-const isA = (file: string, kind: 'directory' | 'file'): boolean => {
+const isA = (file: string, kind: 'directory' | 'file') => {
   const stat = fs.statSync(file, { throwIfNoEntry: false });
   return kind === 'directory' ? stat?.isDirectory() === true : stat?.isFile() === true;
 };
 
 /** The names in `dir`, sorted; none where it cannot be read. */
-const namesIn = (dir: string): string[] => {
+const namesIn = (dir: string) => {
   try {
     return fs.readdirSync(dir).sort();
   } catch {
@@ -47,7 +47,7 @@ const namesIn = (dir: string): string[] => {
 };
 
 /** Whether a person deactivated the harness `name` in the store at `home`: its removal's mark in its folder (`DEACTIVATED`). */
-const deactivated = (home: string, name: string): boolean => isA(path.join(harnessesDir(home), name, DEACTIVATED), 'file');
+const deactivated = (home: string, name: string) => isA(path.join(harnessesDir(home), name, DEACTIVATED), 'file');
 
 /**
  * The harnesses of `pinned` the tools folder of the store at `home` holds activated: a `<tools>/harnesses/<name>/` folder of each, with
@@ -55,7 +55,7 @@ const deactivated = (home: string, name: string): boolean => isA(path.join(harne
  * @param home The store's folder.
  * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
-export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()): string[] =>
+export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
   pinned.filter((h) => isA(path.join(harnessesDir(home), h.name), 'directory') && !deactivated(home, h.name)).map((h) => h.name);
 
 /**
@@ -66,12 +66,7 @@ export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[
  * @param platform The platform of the package, this machine's where absent.
  * @param arch The architecture of the package, this machine's where absent.
  */
-export function bundledProgramIn(
-  tree: string,
-  program: string,
-  platform: string = process.platform,
-  arch: string = process.arch,
-): string | undefined {
+export function bundledProgramIn(tree: string, program: string, platform: string = process.platform, arch: string = process.arch) {
   const modules = path.join(tree, 'node_modules');
   const suffix = `-${platform}-${arch}`;
   const packages = namesIn(modules).flatMap((entry) =>
@@ -88,14 +83,14 @@ export function bundledProgramIn(
  * @param trees The release trees searched.
  * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
-export const bundledHarnesses = (trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()): string[] =>
+export const bundledHarnesses = (trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()) =>
   pinned.filter((h) => trees.some((tree) => bundledProgramIn(tree, h.needs.program) !== undefined)).map((h) => h.name);
 
 /**
  * The trees of the releases installed in the store at `home` (`installedReleases`): each `releases/<tag>/`, never the pointer.
  * @param home The store's folder.
  */
-export const releaseTrees = (home: string): string[] => installedReleases(home).map((r) => releaseDir(r.tag, home));
+export const releaseTrees = (home: string) => installedReleases(home).map((r) => releaseDir(r.tag, home));
 
 /**
  * What the store at `home` holds of the harnesses: activated in its tools folder, and carried by any of `trees` — but one a person
@@ -104,11 +99,7 @@ export const releaseTrees = (home: string): string[] => installedReleases(home).
  * @param trees The release trees searched for bundled programs.
  * @param pinned The harnesses whose adapters declare needs, every one where absent.
  */
-export const harnessesHeld = (
-  home: string,
-  trees: readonly string[],
-  pinned: readonly PinnedHarness[] = pinnedHarnesses(),
-): HarnessesHeld => ({
+export const harnessesHeld = (home: string, trees: readonly string[], pinned: readonly PinnedHarness[] = pinnedHarnesses()) => ({
   activated: activatedHarnesses(home, pinned),
   bundled: bundledHarnesses(trees, pinned).filter((name) => !deactivated(home, name)),
 });
@@ -119,7 +110,7 @@ export const harnessesHeld = (
  * @param home The store's folder.
  * @param harness The harness and its needs, whose pin and program are read.
  */
-export function atPin(home: string, harness: PinnedHarness): boolean {
+export function atPin(home: string, harness: PinnedHarness) {
   try {
     const real = fs.realpathSync(path.join(toolsBinDir(home), harness.needs.program));
     const pinDir = fs.realpathSync(path.join(harnessesDir(home), harness.name, harness.needs.pin));
@@ -151,7 +142,7 @@ export function carryHarnesses(
   env: NodeJS.ProcessEnv,
   tree: string,
   say: (line: string) => void = (line) => console.log(line),
-): CarryRan {
+) {
   const pinned = pinnedHarnesses();
   const carried = upgradeCarries(
     harnessesHeld(home, [tree, ...releaseTrees(home)], pinned),
@@ -159,10 +150,10 @@ export function carryHarnesses(
   );
   const harnesses = pinned
     .filter((h) => carried.includes(h.name))
-    .map((h): HarnessCarried => {
+    .map((h) => {
       if (atPin(home, h)) {
         say(`${h.needs.title} is at ${h.needs.pin} already`);
-        return { name: h.name, pin: h.needs.pin, kind: 'at-pin' };
+        return { name: h.name, pin: h.needs.pin, kind: 'at-pin' } satisfies HarnessCarried;
       }
       say(`installing ${h.needs.title} ${h.needs.pin} into ${harnessesDir(home)}`);
       fs.mkdirSync(toolsBinDir(home), { recursive: true });
@@ -171,14 +162,14 @@ export function carryHarnesses(
         env: { ...env, PATH: pathLedByTools(home, env.PATH), NEMIA_TOOLS: toolsDir(home) },
         stdio: ['ignore', 'inherit', 'inherit'],
       });
-      if (ran.status === 0) return { name: h.name, pin: h.needs.pin, kind: 'installed' };
+      if (ran.status === 0) return { name: h.name, pin: h.needs.pin, kind: 'installed' } satisfies HarnessCarried;
       say(
         `${h.needs.title} ${h.needs.pin} did not install (${ran.error?.message ?? `exit ${ran.status ?? ran.signal}`}): nemia doctor fix ${h.name} runs its install again.`,
       );
-      return { name: h.name, pin: h.needs.pin, kind: 'failed' };
+      return { name: h.name, pin: h.needs.pin, kind: 'failed' } satisfies HarnessCarried;
     });
   if (harnesses.length === 0) say('no harness to carry: none is activated in the tools folder, and no release carries one');
-  return { harnesses, code: harnesses.some((h) => h.kind === 'failed') ? 1 : 0 };
+  return { harnesses, code: harnesses.some((h) => h.kind === 'failed') ? 1 : 0 } satisfies CarryRan;
 }
 
 /** The key of a bundling package's `package.json` that names the version of the program its platform package carries. */
@@ -188,7 +179,7 @@ const BUNDLED_VERSION_KEY = 'claudeCodeVersion';
 const packageIn = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)));
 
 /** The `package.json` at `dir` read as a record, or undefined where it does not read as one. */
-const packageOf = (dir: string): Record<string, unknown> | undefined => {
+const packageOf = (dir: string) => {
   try {
     return Option.getOrUndefined(packageIn(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')));
   } catch {
@@ -200,7 +191,7 @@ const packageOf = (dir: string): Record<string, unknown> | undefined => {
  * The version of the program at `program`, read as it was bundled: its package's bundling package (the platform package's name without
  * `-<platform>-<arch>`, beside it) names it under `BUNDLED_VERSION_KEY`; else the platform package's own version; else `bundled`.
  */
-function bundledVersionOf(program: string, platform: string, arch: string): string {
+function bundledVersionOf(program: string, platform: string, arch: string) {
   const own = path.dirname(program);
   const bundling = path.join(path.dirname(own), path.basename(own).slice(0, -`-${platform}-${arch}`.length));
   const named = packageOf(bundling)?.[BUNDLED_VERSION_KEY];
@@ -223,12 +214,7 @@ export type Adopted = { readonly name: string; readonly version: string; readonl
  * @param platform The platform of the package, this machine's where absent.
  * @param arch The architecture of the package, this machine's where absent.
  */
-export function adoptBundled(
-  home: string,
-  trees: readonly string[],
-  platform: string = process.platform,
-  arch: string = process.arch,
-): Adopted[] {
+export function adoptBundled(home: string, trees: readonly string[], platform: string = process.platform, arch: string = process.arch) {
   return pinnedHarnesses().flatMap((h) => {
     const link = path.join(toolsBinDir(home), h.needs.program);
     if (fs.existsSync(link) || deactivated(home, h.name)) return [];

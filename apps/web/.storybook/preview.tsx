@@ -45,11 +45,11 @@ const GROUND: CSSProperties = { padding: 24, containerType: 'inline-size', conta
 class Held extends Component<{ children: ReactNode }, { broken: string | null }> {
   override state = { broken: null as string | null };
 
-  static getDerivedStateFromError(err: unknown): { broken: string } {
+  static getDerivedStateFromError(err: unknown) {
     return { broken: err instanceof Error ? err.message : String(err) };
   }
 
-  override render(): ReactNode {
+  override render() {
     return this.state.broken === null ? this.props.children : <p data-broken>{this.state.broken}</p>;
   }
 }
@@ -111,7 +111,7 @@ let marking = false;
  * Has the body name each story Storybook finishes, once: its channel is listened to from the first story drawn, since it is set only
  * after this file is read.
  */
-function markFinished(): void {
+function markFinished() {
   if (marking) return;
   marking = true;
   addons.getChannel().on(STORY_FINISHED, ({ storyId }: StoryFinishedPayload) => document.body.setAttribute(FINISHED, storyId));

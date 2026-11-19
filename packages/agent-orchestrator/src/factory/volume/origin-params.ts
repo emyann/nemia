@@ -27,7 +27,7 @@ const SCP_LIKE = /^[^/@:]+@([^/:]+):/;
  * a file URL, a path or no origin at all.
  * @param origin The URL a volume was cloned from, where it was.
  */
-export function originHostOf(origin: string | undefined): string | undefined {
+export function originHostOf(origin: string | undefined) {
   if (origin === undefined) return undefined;
   const scp = SCP_LIKE.exec(origin);
   if (scp?.[1] !== undefined) return scp[1].toLowerCase();

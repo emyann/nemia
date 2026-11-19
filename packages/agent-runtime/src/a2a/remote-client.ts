@@ -3,7 +3,7 @@
  * requirements ask of each request, and the SDK's client over a `fetch` that bounds every request and follows no redirect.
  * `remote.ts` speaks the session verbs over it.
  */
-import type { AgentCard, AgentInterface, SecurityScheme } from '@a2a-js/sdk';
+import type { AgentCard, SecurityScheme } from '@a2a-js/sdk';
 import {
   type Client,
   ClientFactory,
@@ -39,7 +39,7 @@ export type Credentials = (scheme: string, agentUrl: string, harness: string) =>
 export type MissingCredential = (scheme: string, agentUrl: string, harness: string) => string;
 
 /** Where the card of an agent given by `address` is read: the address itself when it names a `.json` file, else beneath its path. */
-const cardUrlOf = (address: string): URL => {
+const cardUrlOf = (address: string) => {
   const url = new URL(address);
   if (url.pathname.endsWith('.json')) return url;
   if (!url.pathname.endsWith('/')) url.pathname = `${url.pathname}/`;
@@ -52,7 +52,7 @@ const cardUrlOf = (address: string): URL => {
  * Exported only for the tests that import it.
  * @param u The address: a string, a URL, or a request whose `url` is read.
  */
-export const shownUrl = (u: string | URL | Request): string => {
+export const shownUrl = (u: string | URL | Request) => {
   const url = new URL(u instanceof Request ? u.url : u);
   return `${url.origin}${quote(url.pathname, WORDS_QUOTE)}`;
 };
@@ -68,10 +68,10 @@ const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
 const SPOKEN_WORDS = 'JSON-RPC (`JSONRPC`) and REST (`HTTP+JSON`), at A2A 1.0';
 
 /** The card's interfaces that this runtime speaks, in the card's order. */
-const spokenOf = (card: AgentCard): AgentInterface[] =>
+const spokenOf = (card: AgentCard) =>
   card.supportedInterfaces.filter((i) => SPOKEN.includes(i.protocolBinding.toUpperCase()) && !i.protocolVersion.startsWith('0.'));
 
-const originOf = (url: string): string | undefined => (URL.canParse(url) ? new URL(url).origin : undefined);
+const originOf = (url: string) => (URL.canParse(url) ? new URL(url).origin : undefined);
 
 /** The headers a card's requirements ask for, as the caller's secrets meet them — or why none can be met. */
 type Auth = { headers: Record<string, string> } | { refusal: string };
@@ -85,33 +85,41 @@ const headerOf = (
   scheme: SecurityScheme | undefined,
   secret: () => string | undefined,
   missing: () => string | undefined,
-): [string, string] | string => {
+) => {
   name = quote(name);
-  if (!scheme) return `\`${name}\` is not a scheme the card declares`;
+  if (!scheme) return `\`${name}\` is not a scheme the card declares` satisfies [string, string] | string;
   const s = scheme.scheme;
-  if (!s || !SCHEME_KINDS.includes(s.$case)) return `\`${name}\` is a kind of scheme this runtime does not know, and cannot send`;
-  const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
+  if (!s || !SCHEME_KINDS.includes(s.$case))
+    return `\`${name}\` is a kind of scheme this runtime does not know, and cannot send` satisfies [string, string] | string;
+  const needed = (header: string, value: (secret: string) => string) => {
     const given = secret();
-    return given === undefined || given === ''
-      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${quote(missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``, MISSING_QUOTE)}`
-      : [header, value(given)];
+    return (
+      given === undefined || given === ''
+        ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${quote(missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``, MISSING_QUOTE)}`
+        : [header, value(given)]
+    ) satisfies [string, string] | string;
   };
   switch (s.$case) {
     case 'httpAuthSecurityScheme': {
       const kind = s.value.scheme.toLowerCase();
-      if (kind === 'bearer') return needed('authorization', (t) => `Bearer ${t}`);
-      if (kind === 'basic') return needed('authorization', (t) => `Basic ${Buffer.from(t).toString('base64')}`);
-      return `\`${name}\` is HTTP \`${quote(s.value.scheme)}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\``;
+      if (kind === 'bearer') return needed('authorization', (t) => `Bearer ${t}`) satisfies [string, string] | string;
+      if (kind === 'basic')
+        return needed('authorization', (t) => `Basic ${Buffer.from(t).toString('base64')}`) satisfies [string, string] | string;
+      return `\`${name}\` is HTTP \`${quote(s.value.scheme)}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\`` satisfies
+        | [string, string]
+        | string;
     }
     case 'oauth2SecurityScheme':
     case 'openIdConnectSecurityScheme':
-      return needed('authorization', (t) => `Bearer ${t}`);
+      return needed('authorization', (t) => `Bearer ${t}`) satisfies [string, string] | string;
     case 'apiKeySecurityScheme':
-      return s.value.location.toLowerCase() === 'header'
-        ? needed(s.value.name.toLowerCase(), (t) => t)
-        : `\`${name}\` is an API key in a ${quote(s.value.location) || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`;
+      return (
+        s.value.location.toLowerCase() === 'header'
+          ? needed(s.value.name.toLowerCase(), (t) => t)
+          : `\`${name}\` is an API key in a ${quote(s.value.location) || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`
+      ) satisfies [string, string] | string;
     case 'mtlsSecurityScheme':
-      return `\`${name}\` is mutual TLS, and this runtime holds no client certificate`;
+      return `\`${name}\` is mutual TLS, and this runtime holds no client certificate` satisfies [string, string] | string;
   }
 };
 
@@ -130,8 +138,8 @@ export const authOf = (
   harness: string,
   credentials: Credentials | undefined,
   missing?: MissingCredential,
-): Auth => {
-  if (!card.securityRequirements.length) return { headers: {} };
+) => {
+  if (!card.securityRequirements.length) return { headers: {} } satisfies Auth as Auth;
   const why: string[] = [];
   for (const requirement of card.securityRequirements) {
     const headers: Record<string, string> = {};
@@ -146,25 +154,25 @@ export const authOf = (
       if (typeof h === 'string') unmet.push(h);
       else headers[h[0]] = h[1];
     }
-    if (!unmet.length) return { headers };
+    if (!unmet.length) return { headers } satisfies Auth as Auth;
     why.push(firstOf(unmet, ', and '));
   }
   return {
     refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${firstOf(why, '; or ')}. Nothing was sent.`,
-  };
+  } satisfies Auth as Auth;
 };
 
 /**
  * The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, then `then`, and that nothing
  * was sent.
  */
-const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then = ''): AgentCard => {
+const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then = '') => {
   if ('wrong' in read) throw new Refusal(`${what}: ${read.wrong}. ${then ? `${then} nothing` : 'Nothing'} was sent.`);
   return read.card;
 };
 
 /** The card an agent answered for at `at`, or a refusal that names it by its origin and path: nothing is sent past one. */
-const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
+const servedCard = async (at: URL, response: Response) => {
   if (!response.ok)
     throw new Refusal(
       `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${quote(response.statusText, WORDS_QUOTE)}, and nothing was sent.`,
@@ -206,9 +214,8 @@ const headersBounded = async (input: string | URL | Request, init: RequestInit &
  * A `fetch` that bounds each request by `requestMs`, a send's (a signal in `sends`) by `sendMs`, a subscription's (a signal in
  * `follows`) only until its headers come, by `requestMs`, and fails one not answered in time as `Late`, naming its origin and path.
  */
-const boundedOf =
-  (requestMs: number, sendMs: number, { sends, follows }: Signals): Bounded =>
-  async (input, init = {}) => {
+const boundedOf = (requestMs: number, sendMs: number, { sends, follows }: Signals) =>
+  (async (input, init = {}) => {
     if (init.signal && follows.has(init.signal)) return headersBounded(input, { ...init, signal: init.signal }, requestMs);
     const ms = init.signal && sends.has(init.signal) ? sendMs : requestMs;
     const bound = AbortSignal.timeout(ms);
@@ -218,10 +225,10 @@ const boundedOf =
       if (bound.aborted) throw new Late(`${shownUrl(input)} did not answer within ${ms / 1000} s`);
       throw e;
     }
-  };
+  }) satisfies Bounded;
 
 /** The agent's card: the one it was given, or the one its address serves, read through `bounded`; a refusal where it cannot be read. */
-const readCard = async (agent: RemoteAgent, bounded: Bounded): Promise<AgentCard> => {
+const readCard = async (agent: RemoteAgent, bounded: Bounded) => {
   if (!('url' in agent)) return taken(cardOfJson(agent.card), 'its `card` is not an A2A 1.0 agent card this runtime reads');
   const at = cardUrlOf(agent.url);
   let response: Response;
@@ -239,7 +246,7 @@ const readCard = async (agent: RemoteAgent, bounded: Bounded): Promise<AgentCard
  * The interface the client speaks: for an agent given by `address`, the first spoken one on its origin, else the card's first
  * spoken one; a refusal where none is.
  */
-const chosenOf = (card: AgentCard, address: string | undefined): AgentInterface => {
+const chosenOf = (card: AgentCard, address: string | undefined) => {
   const spoken = spokenOf(card);
   const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
   if (chosen) return chosen;
@@ -312,14 +319,14 @@ export const connectionOf = (
   credentials: Credentials | undefined,
   requestMs: number,
   sendMs: number,
-): Connection => {
+) => {
   const address = 'url' in agent ? agent.url : undefined;
   const sends = new WeakSet<AbortSignal>();
   const follows = new WeakSet<AbortSignal>();
   const bounded = boundedOf(requestMs, sendMs, { sends, follows });
   let seam: Promise<Seam> | undefined;
 
-  const connect = async (): Promise<Seam> => {
+  const connect = async () => {
     const card = await readCard(agent, bounded);
     const chosen = chosenOf(card, address);
     const agentUrl = address ?? chosen.url;
@@ -332,7 +339,7 @@ export const connectionOf = (
     return { card, agentUrl, client: await made.createFromAgentCard(only) };
   };
 
-  const client = async (): Promise<Seam> => {
+  const client = async () => {
     seam ??= connect();
     try {
       return await seam;
@@ -341,7 +348,7 @@ export const connectionOf = (
       throw e;
     }
   };
-  const ask = async <A>(f: (c: Client) => Promise<A>): Promise<A> => {
+  const ask = async <A>(f: (c: Client) => Promise<A>) => {
     const { client: c } = await client();
     try {
       return await f(c);

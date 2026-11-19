@@ -28,13 +28,13 @@ export type Ran = { from: number; to: number | null };
  * when it has no end; a turn that has none otherwise is left out, as one the record does not say the end of.
  * @param view The engine's view of the task.
  */
-export function ranIn(view: TaskClock): Ran[] {
+export function ranIn(view: TaskClock) {
   const turns = new Map<number, AttemptClock[]>();
   for (const a of view.state.attempts) {
     if (a.reason !== 'unstartable') turns.set(a.turn ?? 0, [...(turns.get(a.turn ?? 0) ?? []), a]);
   }
   const over = view.state.settled !== null || signedAndHeld(view);
-  return [...turns.values()].flatMap((turn, i, all): Ran[] => {
+  return [...turns.values()].flatMap<Ran>((turn, i, all) => {
     const from = turn.find((a) => a.spawnedAt)?.spawnedAt;
     if (!from) return [];
     const to = turn.at(-1)?.endedAt;
@@ -47,7 +47,7 @@ export function ranIn(view: TaskClock): Ran[] {
  * The length of the union of intervals that all ended.
  * @param spans The intervals, each from and to in ms since the epoch.
  */
-export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): number {
+export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>) {
   let ms = 0;
   let reach = -Infinity;
   for (const s of [...spans].sort((a, b) => a.from - b.from)) {
@@ -62,7 +62,7 @@ export function unionMs(spans: ReadonlyArray<{ from: number; to: number }>): num
  * How long one task ran, off the engine's view of it: the union of its turns that ended (`ranIn`), a turn still running left out.
  * @param view The engine's view of the task.
  */
-export const ranMs = (view: TaskClock): number => unionMs(ranIn(view).flatMap((s) => (s.to === null ? [] : [{ from: s.from, to: s.to }])));
+export const ranMs = (view: TaskClock) => unionMs(ranIn(view).flatMap((s) => (s.to === null ? [] : [{ from: s.from, to: s.to }])));
 
 /**
  * A run's time at work (`AtWork`), off the engine's views of its tasks: every step's, every check's, every earlier try's (`runTasks`).
@@ -70,7 +70,7 @@ export const ranMs = (view: TaskClock): number => unionMs(ranIn(view).flatMap((s
  * @param run The run's steps, whose tries name its tasks.
  * @param views The engine's views of tasks, by task id.
  */
-export function atWork(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>): AtWork {
+export function atWork(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>) {
   const spans = [...new Set(runTasks(run))].flatMap((id) => {
     const view = views.get(id);
     return view ? ranIn(view) : [];
@@ -109,7 +109,7 @@ export type RunTokens = {
 };
 
 /** A part of the input every measured session has, summed; null where one lacks it. */
-function partOf(used: readonly Consumed[], key: 'cacheReadTokens' | 'cacheWriteTokens' | 'uncachedTokens'): number | null {
+function partOf(used: readonly Consumed[], key: 'cacheReadTokens' | 'cacheWriteTokens' | 'uncachedTokens') {
   let sum = 0;
   for (const u of used) {
     const n = u[key];
@@ -123,7 +123,7 @@ function partOf(used: readonly Consumed[], key: 'cacheReadTokens' | 'cacheWriteT
 type Measured = Consumed & { inputTokens: number; outputTokens: number };
 
 /** Whether a task's view shows a session that ran: an attempt that spawned, other than one that never could start. */
-const ran = (view: TaskClock | undefined): boolean => Boolean(view?.state.attempts.some((a) => a.reason !== 'unstartable' && a.spawnedAt));
+const ran = (view: TaskClock | undefined) => Boolean(view?.state.attempts.some((a) => a.reason !== 'unstartable' && a.spawnedAt));
 
 /**
  * The tokens a run's sessions used (`RunTokens`), off the engine's views of their tasks (`taskUsage`); null where no session that ran
@@ -131,7 +131,7 @@ const ran = (view: TaskClock | undefined): boolean => Boolean(view?.state.attemp
  * @param run The run's steps, whose tries name its sessions' tasks.
  * @param views The engine's views of tasks, by task id.
  */
-export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>): RunTokens | null {
+export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>) {
   const sessions = [...new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)))].filter((id) => ran(views.get(id)));
   const usages = sessions.map((id) => taskUsage(views.get(id)));
   const used = usages.filter((u): u is Measured => u?.inputTokens !== undefined && u.outputTokens !== undefined);
@@ -166,10 +166,10 @@ export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, Ta
  * of the turn it ran (`TurnSpan`). Null while any of them is in flight, and for a recheck's try whose check was never filed.
  * @param t The try on the timeline.
  */
-export const tryEndOf = (t: TimelineTry): string | null => (t.check ? t.check.endedAt : (t.session?.endedAt ?? t.turn?.endedAt ?? null));
+export const tryEndOf = (t: TimelineTry) => (t.check ? t.check.endedAt : (t.session?.endedAt ?? t.turn?.endedAt ?? null));
 
 /** The ms from `from` to `to`, never negative; null with no `from`. */
-const msBetween = (from: string | null, to: string): number | null => (from ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
+const msBetween = (from: string | null, to: string) => (from ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
 
 /**
  * How long a person took to approve try `t` of `step` in `run`, off the run's timeline `tl`: from the try's end (`tryEndOf`: for a try
@@ -182,12 +182,7 @@ const msBetween = (from: string | null, to: string): number | null => (from ? Ma
  * @param step The step approved: its name and the steps it waits on.
  * @param t The try approved, on the timeline.
  */
-export function gateWaitOf(
-  run: Pick<Run, 'approvals'>,
-  tl: Timeline,
-  step: Pick<StepSpec, 'name' | 'after'>,
-  t: TimelineTry,
-): number | null {
+export function gateWaitOf(run: Pick<Run, 'approvals'>, tl: Timeline, step: Pick<StepSpec, 'name' | 'after'>, t: TimelineTry) {
   const approval = run.approvals?.find((a) => a.step === step.name && a.try === t.try);
   if (!approval) return null;
   const end = tryEndOf(t);

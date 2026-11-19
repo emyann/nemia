@@ -13,7 +13,7 @@ export type ParamValue = string | number | boolean;
 export type Params = Readonly<Record<string, ParamValue>>;
 
 /** The value `given` as the parameter `name` of `type` takes it, or why it does not read as one. */
-function typed(name: string, type: Parameter['type'], given: string): ParamValue | string[] {
+function typed(name: string, type: Parameter['type'], given: string) {
   if (type === 'number') {
     const n = Number(given);
     if (given.trim() === '' || !Number.isFinite(n))
@@ -30,13 +30,13 @@ function typed(name: string, type: Parameter['type'], given: string): ParamValue
 }
 
 /** The declared parameters' names, as a refusal lists them. */
-const declaredWords = (declared: Readonly<Record<string, Parameter>>): string => {
+const declaredWords = (declared: Readonly<Record<string, Parameter>>) => {
   const names = Object.keys(declared).sort();
   return names.length ? `it declares: ${names.join(', ')}` : 'it declares none';
 };
 
 /** The value each `--set <key>=<value>` of `sets` gives a key `declared` holds, the last winning; a `--set` refused into `refusals`. */
-function givenOf(declared: Readonly<Record<string, Parameter>>, sets: readonly string[], refusals: string[]): Map<string, string> {
+function givenOf(declared: Readonly<Record<string, Parameter>>, sets: readonly string[], refusals: string[]) {
   const given = new Map<string, string>();
   for (const set of sets) {
     const at = set.indexOf('=');
@@ -57,10 +57,7 @@ function givenOf(declared: Readonly<Record<string, Parameter>>, sets: readonly s
  * @param declared The parameters the template declares, by name.
  * @param sets The `--set` words given, each `<key>=<value>`.
  */
-export function resolveParams(
-  declared: Readonly<Record<string, Parameter>>,
-  sets: readonly string[],
-): { params: Params; refusals: string[] } {
+export function resolveParams(declared: Readonly<Record<string, Parameter>>, sets: readonly string[]) {
   const refusals: string[] = [];
   const given = givenOf(declared, sets, refusals);
   const params: Record<string, ParamValue> = {};
@@ -87,11 +84,7 @@ export function resolveParams(
  * @param held The factory's own parameters, by name.
  * @param sets The `--set` words given, each `<key>=<value>`, which follow the held ones.
  */
-export function overlaid(
-  declared: Readonly<Record<string, Parameter>>,
-  held: Params,
-  sets: readonly string[],
-): { sets: string[]; dropped: string[] } {
+export function overlaid(declared: Readonly<Record<string, Parameter>>, held: Params, sets: readonly string[]) {
   const kept = Object.entries(held).filter(([key]) => Object.hasOwn(declared, key));
   const dropped = Object.keys(held)
     .filter((key) => !Object.hasOwn(declared, key))
@@ -104,7 +97,7 @@ export function overlaid(
  * @param text The text to write.
  * @param params The parameters' values, by name.
  */
-export function interpolated(text: string, params: Params): string {
+export function interpolated(text: string, params: Params) {
   return writeExpressions(text, (name) => {
     if (!Object.hasOwn(params, name))
       throw new Error(
@@ -120,6 +113,7 @@ export function interpolated(text: string, params: Params): string {
  * @param value The value read from a template's file: a string, a list, a map or a scalar.
  * @param params The parameters' values, by name.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 export function substitute(value: unknown, params: Params): unknown {
   if (typeof value === 'string') return interpolated(value, params);
   if (isParam(value)) {

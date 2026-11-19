@@ -23,7 +23,7 @@ export type AgentSpecRead = {
  * @param agent The agent as it parses.
  * @param schema The file and text of the result schema its `output:` names; absent or null where none is given.
  */
-export function agentSpecOf(agent: Agent, schema?: { readonly file: string; readonly text: string } | null): AgentSpecRead {
+export function agentSpecOf(agent: Agent, schema?: { readonly file: string; readonly text: string } | null) {
   return {
     ...(agent.role !== undefined && { role: agent.role }),
     ...(agent.description !== undefined && { description: agent.description }),

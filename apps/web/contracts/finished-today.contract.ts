@@ -13,10 +13,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type FinishedPageRead = { readonly finishedMs: readonly number[]; readonly next: boolean };
 
 /** Whether a run that finished at `ms` finished today, the day beginning at `dayStart`. */
-const today = (ms: number, dayStart: number): boolean => ms >= dayStart;
+const today = (ms: number, dayStart: number) => ms >= dayStart;
 
 /** Whether every run of `page` finished today: none of it before the day began. */
-const wholeToday = (page: FinishedPageRead, dayStart: number): boolean => page.finishedMs.every((ms) => today(ms, dayStart));
+const wholeToday = (page: FinishedPageRead, dayStart: number) => page.finishedMs.every((ms) => today(ms, dayStart));
 
 const readsOnTodaySpec = spec<(page: FinishedPageRead, dayStart: number) => boolean>({
   ensures: {

@@ -57,7 +57,7 @@ export const AppliedTemplate = Schema.Struct({
 export type AppliedTemplate = typeof AppliedTemplate.Type;
 
 /** The workflow a hire's key `<workflow>/<step>` names. */
-const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
+const workflowOf = (step: string) => step.slice(0, step.indexOf('/'));
 
 /**
  * A factory as its store reads it (`Factory`): its volumes, none or several, its hires by `<workflow>/<step>`, its schedules by workflow.

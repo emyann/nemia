@@ -20,12 +20,12 @@ import { rootOf, untrustedPlaces } from './untrusted.verb.ts';
 export { untrustedPlaces };
 
 /** What a throw of the runtime's write says, as one sentence. */
-const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+const threwWords = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** The trust of `dir` asked of every harness that keeps one, each harness's folder asked once: what was written, and what was not. */
-function given(dir: string, root: string | undefined): PlaceTrust[] {
+function given(dir: string, root: string | undefined) {
   const seen = new Set<string>();
-  return HARNESSES.flatMap((harness): PlaceTrust[] => {
+  return HARNESSES.flatMap((harness) => {
     const trust = trustFolder(harness, dir, undefined, root);
     if (!trust || seen.has(`${trust.harness}\n${trust.folder}`)) return [];
     seen.add(`${trust.harness}\n${trust.folder}`);
@@ -44,12 +44,12 @@ export const trustPlaces = Effect.fn('trustPlaces')(function* (repos: readonly s
   const asked = yield* Effect.forEach(
     repos,
     (dir) =>
-      Effect.map(rootOf(place, dir), (rooted): PlaceTrust[] => {
-        if ('unasked' in rooted) return [{ place: dir, unasked: rooted.unasked }];
+      Effect.map(rootOf(place, dir), (rooted) => {
+        if ('unasked' in rooted) return [{ place: dir, unasked: rooted.unasked }] satisfies PlaceTrust[];
         try {
-          return given(dir, rooted.root);
+          return given(dir, rooted.root) satisfies PlaceTrust[];
         } catch (err) {
-          return [{ place: dir, unasked: threwWords(err) }];
+          return [{ place: dir, unasked: threwWords(err) }] satisfies PlaceTrust[];
         }
       }),
     { concurrency: 1 },
@@ -62,7 +62,7 @@ export const TrustInput = Schema.Struct({ factory: Schema.String });
 export type TrustInput = typeof TrustInput.Type;
 
 /** The places of the factory `name`; refuses, as `Missing`, a name the store has no factory under, and one whose file does not read. */
-function placesOf(home: string, name: string): readonly string[] {
+function placesOf(home: string, name: string) {
   const all = listedAtOnce(home);
   const found = all.find((f) => f.name === name);
   if (!found)

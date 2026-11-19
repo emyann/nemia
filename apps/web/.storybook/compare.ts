@@ -52,13 +52,13 @@ let said = false;
  * Has the frame stand as tall as `ground`, so a picture holds the whole story: Vitest draws a story in a frame the viewport's size, and
  * what overflows it is not drawn.
  */
-const tallEnough = async (ground: Element): Promise<void> => {
+const tallEnough = async (ground: Element) => {
   const height = Math.ceil(ground.getBoundingClientRect().height);
   if (height > window.innerHeight) await page.viewport(window.innerWidth, height);
 };
 
 /** Has `<html>` carry the class of `theme` alone, as the toolbar's switch does. */
-const classFor = (theme: Scheme): void => {
+const classFor = (theme: Scheme) => {
   const root = document.documentElement;
   root.classList.remove(SCHEME_CLASSES.light, SCHEME_CLASSES.dark);
   root.classList.add(SCHEME_CLASSES[theme]);

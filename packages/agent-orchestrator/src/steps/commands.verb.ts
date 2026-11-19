@@ -15,14 +15,15 @@ import { Invalid } from '../refusal/refusal.ts';
 import { transcriptAskedRead, transcriptCursorRead, transcriptPaged } from '../transcript-page/transcript-page.ts';
 
 /** A text flag under `key`, as the api hands it. */
-const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
+const keyed = (key: string) => ({ flag: `--${key}`, kind: 'text', key }) satisfies Flag;
 
 /** The spec of a read of a step: the run's id and the step's name, then `more`, and its text flags by key. */
-const stepSpec = (more: readonly Positional[], keys: readonly string[]): Spec => ({
-  positionals: [{ key: 'runId', takes: 'required', kind: 'name' }, { key: 'step', takes: 'required', kind: 'name' }, ...more],
-  flags: keys.map(keyed),
-  unknown: (arg) => `the board's reads of a step take no ${arg}.`,
-});
+const stepSpec = (more: readonly Positional[], keys: readonly string[]) =>
+  ({
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }, { key: 'step', takes: 'required', kind: 'name' }, ...more],
+    flags: keys.map(keyed),
+    unknown: (arg) => `the board's reads of a step take no ${arg}.`,
+  }) satisfies Spec;
 
 /** The file's path under the step's folder, as the api's path names it, encoded whole as one segment. */
 const NAME: readonly Positional[] = [{ key: 'name', takes: 'required', kind: 'name' }];

@@ -669,7 +669,7 @@ describe("the card and the runtime's extension: each method offered as the drive
   test("the harness's card: its name, no streaming, no notifications, text in and out, and the runtime's extension", async () => {
     const card = await harness().handler.getAgentCard();
     assert.equal(card.name, 'fake');
-    const { extensions, ...rest } = card.capabilities!;
+    const { extensions, ...rest } = card.capabilities;
     assert.deepEqual(rest, { streaming: false, pushNotifications: false, extendedAgentCard: false });
     assert.deepEqual(
       extensions.map((e) => [e.uri, e.required, e.params]),
@@ -700,7 +700,7 @@ describe("the card and the runtime's extension: each method offered as the drive
   test('REFUSED on the card: a verb the driver lacks is not offered, and logs, which every driver has, always is', async () => {
     const card = await harness({ bare: true }).handler.getAgentCard();
     assert.deepEqual(
-      card.capabilities!.extensions.map((e) => e.params),
+      card.capabilities.extensions.map((e) => e.params),
       [{ methods: ['sessionLogs'], say: false }],
     );
   });
@@ -761,7 +761,7 @@ describe("the card and the runtime's extension: each method offered as the drive
     const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
     const { tasks, unread } = await h.handler.observeSessions({ expected }, ctx);
     assert.deepEqual(
-      tasks.map((t) => [t.id, t.status!.state]),
+      tasks.map((t) => [t.id, t.status.state]),
       [['ae/t-1/1', TaskState.TASK_STATE_WORKING]],
     );
     assert.deepEqual(unread, []);
@@ -955,7 +955,7 @@ describe('sendMessage as a spawn: the request reaches the harness whole, and a r
     assert.ok('status' in t);
     assert.equal(t.id, 'ae/t-1/1');
     assert.equal(t.contextId, '', 'no context until the harness lists the session with an id');
-    assert.equal(t.status!.state, TaskState.TASK_STATE_WORKING);
+    assert.equal(t.status.state, TaskState.TASK_STATE_WORKING);
     assert.deepEqual(t.history, [asked.message]);
   });
   test('a spawn the harness refused is REJECTED in its words; one that failed otherwise is SUBMITTED in its words', async () => {
@@ -964,13 +964,13 @@ describe('sendMessage as a spawn: the request reaches the harness whole, and a r
     });
     const r = await refused.handler.sendMessage(spawn(), ctx);
     assert.ok('status' in r);
-    assert.equal(r.status!.state, TaskState.TASK_STATE_REJECTED);
+    assert.equal(r.status.state, TaskState.TASK_STATE_REJECTED);
     assert.equal(wordsOf(r), 'fake: no binary called `fake` on PATH');
 
     const ambiguous = harness({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: the launcher lost its acknowledgement' }) });
     const a = await ambiguous.handler.sendMessage(spawn(), ctx);
     assert.ok('status' in a);
-    assert.equal(a.status!.state, TaskState.TASK_STATE_SUBMITTED);
+    assert.equal(a.status.state, TaskState.TASK_STATE_SUBMITTED);
     assert.equal(wordsOf(a), 'fake: the launcher lost its acknowledgement');
   });
   test('a spawn whose driver threw a defect lets it through as it is: a bug is not a harness speaking', async () => {
@@ -992,7 +992,7 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
     const h = harness();
     h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
     const live = await h.handler.getTask({ tenant: '', id: 'ae/t-1/1' }, ctx);
-    assert.equal(live.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED);
+    assert.equal(live.status.state, TaskState.TASK_STATE_INPUT_REQUIRED);
     assert.deepEqual(sightingOf(live), { sessionId: 's-1', state: 'input-required', waitingFor: 'permission prompt' });
 
     const at = '2026-09-23T10:00:00.000Z';
@@ -1011,12 +1011,12 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
     ]);
     const answer = async (id: string) => h.handler.getTask({ tenant: '', id }, ctx);
     const unstartable = await answer('ae/t-2/1');
-    assert.equal(unstartable.status!.state, TaskState.TASK_STATE_REJECTED);
+    assert.equal(unstartable.status.state, TaskState.TASK_STATE_REJECTED);
     assert.equal(wordsOf(unstartable), 'fake: no binary');
-    assert.equal((await answer('ae/t-2/2')).status!.state, TaskState.TASK_STATE_COMPLETED);
-    assert.equal((await answer('ae/t-2/3')).status!.state, TaskState.TASK_STATE_CANCELED);
+    assert.equal((await answer('ae/t-2/2')).status.state, TaskState.TASK_STATE_COMPLETED);
+    assert.equal((await answer('ae/t-2/3')).status.state, TaskState.TASK_STATE_CANCELED);
     const open = await answer('ae/t-2/4');
-    assert.equal(open.status!.state, TaskState.TASK_STATE_SUBMITTED);
+    assert.equal(open.status.state, TaskState.TASK_STATE_SUBMITTED);
     assert.equal(open.contextId, '', 'an attempt with no id recorded is in no context');
     await assert.rejects(answer('ae/t-2/5'), TaskNotFoundError);
     assert.deepEqual(h.acted(), []);
@@ -1081,7 +1081,7 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
     listed.sessions.set('ae/t-h/1', job);
     const read = await listed.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
     assert.deepEqual(
-      [read.status!.state, read.contextId, closeoutOf(read)],
+      [read.status.state, read.contextId, closeoutOf(read)],
       [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }],
     );
     assert.equal(sightingOf(read), undefined, "a Task whose state is not its sighting's carries none to read");
@@ -1097,7 +1097,7 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
     gone.journal.set('t-h', held());
     const off = await gone.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
     assert.deepEqual(
-      [off.status!.state, off.contextId, closeoutOf(off)],
+      [off.status.state, off.contextId, closeoutOf(off)],
       [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }],
     );
     assert.deepEqual(listed.acted().concat(gone.acted()), [], 'a read, and nothing asked of the harness');
@@ -1115,7 +1115,7 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
         h.journal.set('t-h', events);
         if (listedDone) h.sessions.set('ae/t-h/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-h' });
         assert.equal(
-          (await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status!.state,
+          (await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status.state,
           TaskState.TASK_STATE_COMPLETED,
           `${what}, ${listedDone ? 'listed done' : 'let go'}`,
         );
@@ -1133,7 +1133,7 @@ describe('getTask and listTasks answer a session as the harness sees it, and els
     );
     const states = await Promise.all(['ae/t-h/1', 'ae/t-h/2'].map((id) => h.handler.getTask({ tenant: '', id }, ctx)));
     assert.deepEqual(
-      states.map((t) => [t.status!.state, t.contextId]),
+      states.map((t) => [t.status.state, t.contextId]),
       [
         [TaskState.TASK_STATE_COMPLETED, 'conv-h'],
         [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h'],
@@ -1168,10 +1168,10 @@ describe('a running session told words and stopped: the harness asked once, with
     h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
     h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'input-required' });
     const cancel = (id: string) => h.handler.cancelTask({ tenant: '', id, metadata: undefined }, ctx);
-    assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED);
-    assert.equal((await cancel('ae/t-2/1')).status!.state, TaskState.TASK_STATE_CANCELED);
+    assert.equal((await cancel('ae/t-1/1')).status.state, TaskState.TASK_STATE_CANCELED);
+    assert.equal((await cancel('ae/t-2/1')).status.state, TaskState.TASK_STATE_CANCELED);
     assert.equal(h.sessions.get('ae/t-1/1')!.state, 'canceled');
-    assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel answers as the first');
+    assert.equal((await cancel('ae/t-1/1')).status.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel answers as the first');
     assert.deepEqual(h.acted(), [
       ['stop', 's-1'],
       ['stop', 's-2'],
@@ -1182,7 +1182,7 @@ describe('a running session told words and stopped: the harness asked once, with
     h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed', busy: false, held: true });
     h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed', busy: false, held: false });
     const cancel = (id: string) => h.handler.cancelTask({ tenant: '', id, metadata: undefined }, ctx);
-    assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED);
+    assert.equal((await cancel('ae/t-1/1')).status.state, TaskState.TASK_STATE_CANCELED);
     await assert.rejects(
       cancel('ae/t-2/1'),
       refusedWith(TaskNotCancelableError, 'session `ae/t-2/1` has ended (completed): there is nothing to stop.'),
@@ -1203,10 +1203,10 @@ describe('a running session told words and stopped: the harness asked once, with
     h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'input-required', waitingFor: 'permission prompt' });
     const working = await h.handler.sendMessage(said('ae/t-1/1', 'look at the tests again'), ctx);
     assert.ok('status' in working);
-    assert.equal(working.status!.state, TaskState.TASK_STATE_WORKING);
+    assert.equal(working.status.state, TaskState.TASK_STATE_WORKING);
     const waiting = await h.handler.sendMessage(said('ae/t-2/1', 'go on', { contextId: '' }), ctx);
     assert.ok('status' in waiting);
-    assert.equal(waiting.status!.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'a session waiting on a person still takes words');
+    assert.equal(waiting.status.state, TaskState.TASK_STATE_INPUT_REQUIRED, 'a session waiting on a person still takes words');
     assert.deepEqual(h.acted(), [
       ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'look at the tests again']],
       ['say', [{ name: 'ae/t-2/1', sessionId: 's-2' }, 'go on']],
@@ -1218,7 +1218,7 @@ describe('a running session told words and stopped: the harness asked once, with
     h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed', busy: false, held: false });
     const open = await h.handler.sendMessage(said('ae/t-1/1', 'next'), ctx);
     assert.ok('status' in open);
-    assert.equal(open.status!.state, TaskState.TASK_STATE_COMPLETED, 'answered as the harness lists it');
+    assert.equal(open.status.state, TaskState.TASK_STATE_COMPLETED, 'answered as the harness lists it');
     await assert.rejects(
       h.handler.sendMessage(said('ae/t-2/1', 'next', { contextId: '' }), ctx),
       refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (completed): it takes no more words.'),

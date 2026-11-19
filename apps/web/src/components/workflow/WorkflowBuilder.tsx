@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
 import { BuildRefusal, saveWorkflow, workflowsQuery, type WorkflowListing } from '../../lib/api/workflows.ts';
 import { keyFormQuery } from '../../lib/api/builder.ts';
-import { type StepLayers } from '../../lib/api/layers.ts';
 import {
   addStep,
   connect,
@@ -347,7 +346,7 @@ function ReadmeField({ text, changed, onChange }: { text: string; changed: boole
  * The draft saved over `base`, the folder it was drafted from, at the version `base` was read at: the folder read back, and the files the
  * save wrote, left and removed (`filesSaved`).
  */
-async function savedOf(base: WorkflowListing, draft: { steps: DraftStep[]; readme: string }): Promise<WorkflowSaved> {
+async function savedOf(base: WorkflowListing, draft: { steps: DraftStep[]; readme: string }) {
   const readme = readmeSent(draft.readme, base);
   const workflow = await saveWorkflow(base.name, {
     version: base.version,
@@ -414,7 +413,7 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
 }
 
 /** What a save did to the folder's files, in a line: written, left as they were, removed. */
-function fileLine({ written, kept, removed }: WorkflowSaved): string {
+function fileLine({ written, kept, removed }: WorkflowSaved) {
   const said = [
     written.length ? `wrote ${written.join(', ')}` : '',
     kept.length ? `left ${kept.join(', ')} as ${kept.length === 1 ? 'it was' : 'they were'}` : '',
@@ -466,8 +465,7 @@ function AddStep({
 }
 
 /** What the listing `listing` read of step `name`'s layers, or null for a step it does not list or one with no agent. */
-const layersOf = (listing: WorkflowListing, name: string): StepLayers | null =>
-  listing.steps.find((listed) => listed.name === name)?.layers ?? null;
+const layersOf = (listing: WorkflowListing, name: string) => listing.steps.find((listed) => listed.name === name)?.layers ?? null;
 
 /** The aside while no step is picked: how to pick one, and how to wire two. */
 function NoStepPicked() {

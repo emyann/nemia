@@ -12,36 +12,37 @@ const FACTORY = 'acme';
 const PLACE = { factory: FACTORY };
 
 /** The step `review` of your workflow `release`, read in the factory, with `extra` over it: no agent hired, none to pick. */
-const page = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPage => ({
-  workflow: 'release',
-  from: 'user',
-  dir: '/store/workflows/release',
-  step: 'review',
-  body: 'Review the change.',
-  source: '---\nworkspace: main\n---\nReview the change.\n',
-  keys: [],
-  agentSkills: [],
-  factory: FACTORY,
-  layers: {
-    agent: null,
-    instructions: null,
-    custom: null,
-    factory: null,
+const page = (extra: Partial<WorkflowStepPage> = {}) =>
+  ({
+    workflow: 'release',
+    from: 'user',
+    dir: '/store/workflows/release',
+    step: 'review',
+    body: 'Review the change.',
+    source: '---\nworkspace: main\n---\nReview the change.\n',
+    keys: [],
     agentSkills: [],
-    policy: 'Review the change.',
-    addedSkills: [],
-    fence: [],
-    folderFiles: true,
-    task: null,
-    via: 'brief',
-  },
-  hired: null,
-  hiredIn: [],
-  hiring: { refused: null, agents: [] },
-  skillsFrom: [],
-  recentRuns: [],
-  ...extra,
-});
+    factory: FACTORY,
+    layers: {
+      agent: null,
+      instructions: null,
+      custom: null,
+      factory: null,
+      agentSkills: [],
+      policy: 'Review the change.',
+      addedSkills: [],
+      fence: [],
+      folderFiles: true,
+      task: null,
+      via: 'brief',
+    },
+    hired: null,
+    hiredIn: [],
+    hiring: { refused: null, agents: [] },
+    skillsFrom: [],
+    recentRuns: [],
+    ...extra,
+  }) satisfies WorkflowStepPage;
 
 /** Two agents beside the workflow, to pick one from. */
 const PICKABLE: WorkflowStepPage['hiring'] = {

@@ -6,9 +6,8 @@
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import type { Proposal } from 'objects';
-import type { ProposalFacts, ProposalRule, Standing } from '../../contracts/proposal-approval.contract.ts';
+import type { ProposalRule } from '../../contracts/proposal-approval.contract.ts';
 import { tried } from '../runtime-client.ts';
-import type { Refusal } from '../refusal/refusal.ts';
 import { levelOfFactory } from '../level/levels.verb.ts';
 import { listInForce, proposalRulesIn } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
@@ -20,7 +19,7 @@ import { DelegationDoor } from '../delegation/delegation.store.ts';
  * @param agent The agent's name.
  * @param factory The factory's name.
  */
-export const standingOf = (home: string, agent: string, factory: string): Effect.Effect<Standing, Refusal> =>
+export const standingOf = (home: string, agent: string, factory: string) =>
   Effect.gen(function* () {
     const level = yield* levelOfFactory(factory).pipe(Effect.provideService(StoreRoot, home));
     const delegation = yield* (yield* DelegationDoor).delegations.read(factory, agent);
@@ -41,7 +40,7 @@ export const standingOf = (home: string, agent: string, factory: string): Effect
  * @param proposal The proposal as the store holds it.
  * @param waiting Whether it waits on an approval.
  */
-export const factsOf = (proposal: Proposal, waiting: boolean): ProposalFacts => ({
+export const factsOf = (proposal: Proposal, waiting: boolean) => ({
   factory: proposal.metadata.namespace ?? '',
   proposedBy: proposal.status.proposedBy.agent ?? null,
   waiting,

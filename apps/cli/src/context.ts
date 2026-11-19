@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parse, stringify } from 'yaml';
-import type { Chosen, ClientConfig, Context, ContextOf } from '../contracts/context.contract.ts';
+import type { Chosen, ClientConfig, ContextOf } from '../contracts/context.contract.ts';
 import { LOCAL_CONTEXT } from './local-context.ts';
 import { Refused } from './refused.ts';
 
@@ -42,27 +42,27 @@ export const contextOf: ContextOf = (config, asked) => {
  * The client's config file: `$XDG_CONFIG_HOME/nemia/config.yaml`, else under `~/.config`.
  * @param env The environment read for `XDG_CONFIG_HOME` and `HOME`.
  */
-export const configFileOf = (env: NodeJS.ProcessEnv = process.env): string => {
+export const configFileOf = (env: NodeJS.ProcessEnv = process.env) => {
   const xdg = env.XDG_CONFIG_HOME;
   const home = env.HOME !== undefined && env.HOME !== '' ? env.HOME : os.homedir();
   return path.join(xdg !== undefined && xdg !== '' ? xdg : path.join(home, '.config'), 'nemia', 'config.yaml');
 };
 
 /** A config file that does not read as one: refused, naming the file to fix and how to write it again. */
-const unreadable = (file: string, why: string): Refused =>
+const unreadable = (file: string, why: string) =>
   new Refused(
     `${file} is not a nemia config (${why}): fix it, or delete it and add each context again with \`nemia config set-context <name> --server <url> --token-file <file>\``,
   );
 
 /** A string field of `value`, or none. */
-const textOf = (value: unknown, key: string): string | undefined => {
+const textOf = (value: unknown, key: string) => {
   if (typeof value !== 'object' || value === null) return undefined;
   const field: unknown = Object.entries(value).find(([k]) => k === key)?.[1];
   return typeof field === 'string' && field !== '' ? field : undefined;
 };
 
 /** The contexts a read file's `contexts` holds, each with its three fields; refused where one lacks one. */
-const contextsIn = (file: string, listed: unknown): Context[] => {
+const contextsIn = (file: string, listed: unknown) => {
   if (listed === undefined || listed === null) return [];
   if (!Array.isArray(listed)) throw unreadable(file, '`contexts` is not a list');
   return listed.map((entry: unknown, i) => {
@@ -77,7 +77,7 @@ const contextsIn = (file: string, listed: unknown): Context[] => {
  * The client's config, as its file holds it: none, where there is no file. Refused where the file does not read as one.
  * @param env The environment read for where the config file is.
  */
-export function configRead(env: NodeJS.ProcessEnv = process.env): ClientConfig {
+export function configRead(env: NodeJS.ProcessEnv = process.env) {
   const file = configFileOf(env);
   let text: string;
   try {
@@ -103,7 +103,7 @@ export function configRead(env: NodeJS.ProcessEnv = process.env): ClientConfig {
  * @param config The config to write, whole: its contexts, the one in use and the token kept for this machine.
  * @param env The environment read for where the config file is.
  */
-export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = process.env): void {
+export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = process.env) {
   const file = configFileOf(env);
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const doc = {
@@ -121,13 +121,14 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
  * Which daemon a command run with `env` asks: the config file read, `NEMIA_CONTEXT` over it (`contextOf`).
  * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
-export const chosenOf = (env: NodeJS.ProcessEnv = process.env): Chosen => contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim());
+export const chosenOf = (env: NodeJS.ProcessEnv = process.env) =>
+  contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim()) satisfies Chosen;
 
 /**
  * The context in use, by its name: `NEMIA_CONTEXT`, else the config's, else this machine's.
  * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
-export function inUse(env: NodeJS.ProcessEnv = process.env): string {
+export function inUse(env: NodeJS.ProcessEnv = process.env) {
   const named = env[CONTEXT_VARIABLE]?.trim();
   return named !== undefined && named !== '' ? named : (configRead(env).current ?? LOCAL_CONTEXT);
 }
@@ -138,7 +139,7 @@ export function inUse(env: NodeJS.ProcessEnv = process.env): string {
  * where the client presents the store's credential under this machine's context (`callerToken`, client.ts).
  * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
-export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
+export function chosenToken(env: NodeJS.ProcessEnv = process.env) {
   const config = configRead(env);
   const chosen = contextOf(config, env[CONTEXT_VARIABLE]?.trim());
   return chosen.kind === 'remote' ? chosen.token : chosen.kind === 'local' ? config.localToken : undefined;
@@ -148,7 +149,7 @@ export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | unde
  * A context named that the file does not hold: refused, naming the list and how to add one.
  * @param name The context's name that was asked.
  */
-export const unheld = (name: string): Refused =>
+export const unheld = (name: string) =>
   new Refused(
     `no context named ${name} in ${CONTEXT_VARIABLE} or the config: see the contexts there are with \`nemia config get-contexts\`, or add it with \`nemia config set-context ${name} --server <url> --token-file <file>\``,
   );
@@ -169,16 +170,16 @@ const USAGE = [
 export const TOKEN_VARIABLE = 'NEMIA_TOKEN';
 
 /** A `nemia config` typed otherwise than its usage: refused, naming it. */
-const misused = (said: string): Refused => new Refused(`nemia config: ${said}. Type one of:\n${USAGE.join('\n')}`);
+const misused = (said: string) => new Refused(`nemia config: ${said}. Type one of:\n${USAGE.join('\n')}`);
 
 /** The value after `flag` among `args`, if typed. */
-const flagOf = (args: readonly string[], flag: string): string | undefined => {
+const flagOf = (args: readonly string[], flag: string) => {
   const at = args.indexOf(flag);
   return at < 0 ? undefined : args[at + 1];
 };
 
 /** A server's address, read as http(s): refused where it is not one. */
-const serverOf = (typed: string): string => {
+const serverOf = (typed: string) => {
   let url: URL;
   try {
     url = new URL(typed);
@@ -190,7 +191,7 @@ const serverOf = (typed: string): string => {
 };
 
 /** The token a `--token-file` holds, its line breaks and spaces trimmed: refused where it cannot be read or is empty. */
-const tokenIn = (file: string): string => {
+const tokenIn = (file: string) => {
   let token: string;
   try {
     token = fs.readFileSync(file, 'utf8').trim();
@@ -202,7 +203,7 @@ const tokenIn = (file: string): string => {
 };
 
 /** `nemia config set-context <name> --server <url> --token-file <file>`: a context added, or the fields typed changed on one held. */
-function setContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
+function setContext(args: readonly string[], env: NodeJS.ProcessEnv) {
   const [name, ...rest] = args;
   if (args.includes('--token'))
     throw misused('a token is never typed on the command line, where history keeps it: write it to a file and give --token-file <file>');
@@ -226,7 +227,7 @@ function setContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
  * over the credential its store keeps (`storeCredential`, where.ts); `local` keeps naming this machine's store, so the verbs of the
  * store still run in process. Refused: a `--server`, since `local` is always this machine's.
  */
-function setLocal(rest: readonly string[], config: ClientConfig, env: NodeJS.ProcessEnv): number {
+function setLocal(rest: readonly string[], config: ClientConfig, env: NodeJS.ProcessEnv) {
   if (rest.includes('--server'))
     throw misused(`${LOCAL_CONTEXT} always names this machine’s store, at its lease’s address: give it --token-file <file> alone`);
   const typedToken = flagOf(rest, '--token-file');
@@ -238,7 +239,7 @@ function setLocal(rest: readonly string[], config: ClientConfig, env: NodeJS.Pro
 }
 
 /** `nemia config use-context <name>`: the context in use from now on, `local` for this machine's store. */
-function useContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
+function useContext(args: readonly string[], env: NodeJS.ProcessEnv) {
   const [name] = args;
   if (name === undefined || args.length !== 1) throw misused('use-context takes one context’s name');
   const config = configRead(env);
@@ -249,7 +250,7 @@ function useContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
 }
 
 /** `nemia config get-contexts`: each context, `local` first, the one in use marked, with its server; never a token. */
-function getContexts(env: NodeJS.ProcessEnv): number {
+function getContexts(env: NodeJS.ProcessEnv) {
   const config = configRead(env);
   const current = config.current ?? LOCAL_CONTEXT;
   const rows = [
@@ -264,7 +265,7 @@ function getContexts(env: NodeJS.ProcessEnv): number {
 }
 
 /** `nemia config current-context`: the context a command run now uses, `NEMIA_CONTEXT` over the file's. */
-function currentContext(env: NodeJS.ProcessEnv): number {
+function currentContext(env: NodeJS.ProcessEnv) {
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   process.stdout.write(`${chosen.kind === 'local' ? LOCAL_CONTEXT : chosen.name}\n`);
@@ -278,7 +279,7 @@ function currentContext(env: NodeJS.ProcessEnv): number {
  * @param args The words typed after `headers`, where `--context <name>` may be.
  * @param env The environment read for `NEMIA_TOKEN`, the config file and `NEMIA_CONTEXT`.
  */
-export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv): string | undefined {
+export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv) {
   const given = env[TOKEN_VARIABLE];
   if (given !== undefined && given.trim() !== '') return given.trim();
   if (args.includes('--context') && flagOf(args, '--context') === undefined) throw misused('--context takes a context’s name');
@@ -293,7 +294,7 @@ export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv): s
  * a harness that runs it for the headers of its connection (Claude Code's `headersHelper`, the nemia plugin's `.mcp.json`), never for a
  * person's terminal; `{}` where no token is held (`headersToken`).
  */
-function headers(args: readonly string[], env: NodeJS.ProcessEnv): number {
+function headers(args: readonly string[], env: NodeJS.ProcessEnv) {
   const token = headersToken(args, env);
   process.stdout.write(`${JSON.stringify(token === undefined ? {} : { Authorization: `Bearer ${token}` })}\n`);
   return 0;
@@ -304,7 +305,7 @@ function headers(args: readonly string[], env: NodeJS.ProcessEnv): number {
  * @param args The words typed after `config`: the verb and its words.
  * @param env The environment read for the config file and `NEMIA_CONTEXT`.
  */
-export async function config(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function config(args: readonly string[], env: NodeJS.ProcessEnv = process.env) {
   const [verb, ...rest] = args;
   if (verb === undefined || verb === '--help' || verb === '-h') {
     process.stdout.write(`${USAGE.join('\n')}\n`);

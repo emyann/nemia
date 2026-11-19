@@ -46,7 +46,7 @@ export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
  * @param verb The verb the id was given to, `rm` where not given.
  * @param command The command a fix names, `nemia <verb>` where not given.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = 'rm', command = `nemia ${verb}`): string | null {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = 'rm', command = `nemia ${verb}`) {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
   const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.asks)$/.exec(id);
   if (file)
@@ -137,7 +137,7 @@ export function forgetRefusal(
   merging: MergeState['merging'] = 'none',
   command = `nemia ${verb} ${run.id}`,
   checkKillOf: CheckKillOf = () => undefined,
-): string | null {
+) {
   const asked: Forgetting = {
     steps,
     run,
@@ -201,7 +201,7 @@ type Facts = Forgetting & {
 };
 
 /** `forgetRefusal`'s facts of a run, among the store's `others`: a cancelled run's steps and asks are not judged. */
-function factsOf(f: Forgetting, others: readonly Run[]): Facts {
+function factsOf(f: Forgetting, others: readonly Run[]) {
   const { steps, run, id } = f;
   const { hold, ...free } = run;
   const live = liveTasks(run, f.phaseOf);
@@ -249,7 +249,7 @@ function factsOf(f: Forgetting, others: readonly Run[]): Facts {
 }
 
 /** Each of the run's tasks — a step's, or its check's — that is pending or running, as `<label> is <phase>`. */
-function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase) {
   const live: string[] = [];
   for (const [name, record] of Object.entries(run.steps)) {
     for (const [label, taskId] of [
@@ -264,7 +264,7 @@ function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
 }
 
 /** The ending that lands on its check whose merge is not landed (`landingOpen`), with nothing of the run in flight — or undefined. */
-function unlandedEnding(f: Forgetting, live: readonly string[]): StepSpec | undefined {
+function unlandedEnding(f: Forgetting, live: readonly string[]) {
   const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
   const ending = steps?.find((s) => landsOnCheck(s, run));
   const unlanded =
@@ -276,9 +276,9 @@ function unlandedEnding(f: Forgetting, live: readonly string[]): StepSpec | unde
 }
 
 /** The steps awaiting approval, but an ending whose result git already has and that never ran (`resultOnBase`). */
-function gatesOf(f: Forgetting, steps: readonly StepSpec[]): string[] {
+function gatesOf(f: Forgetting, steps: readonly StepSpec[]) {
   const { run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf, standings } = f;
-  const takenByHand = (st: StepSpec): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
+  const takenByHand = (st: StepSpec) => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
   return steps
     .filter(
       (s) =>
@@ -288,17 +288,17 @@ function gatesOf(f: Forgetting, steps: readonly StepSpec[]): string[] {
 }
 
 /** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off ask, `nemia pause --now`, or `nemia retry`. */
-const dueBy = (r: Retry, step: StepSpec | undefined): string => {
+const dueBy = (r: Retry, step: StepSpec | undefined) => {
   if (r.by === 'retries') return `retries: ${step?.retries}`;
   if (r.by === 'signoff') return 'an ask to sign off';
   return r.by === 'pause' ? 'nemia pause --now' : `nemia retry ${modeWord(r)}`;
 };
 
 /** Whether a try due answers an ask file: a person's `nemia retry`, or the ask `nemia pause --now` wrote. */
-const askedFor = (r: Retry): boolean => r.by === 'ask' || r.by === 'pause';
+const askedFor = (r: Retry) => r.by === 'ask' || r.by === 'pause';
 
 /** What a pass would file now, each said: the steps ready, unless the run waits on runs (`waits`), the checks, tries and rounds due. */
-function dueOf(a: Assessment, steps: readonly StepSpec[], waits: boolean): string[] {
+function dueOf(a: Assessment, steps: readonly StepSpec[], waits: boolean) {
   const due: string[] = [];
   if (!waits && a.ready.length) due.push(`${andList(a.ready)} ${a.ready.length > 1 ? 'are' : 'is'} ready to be filed`);
   for (const name of a.check) due.push(`${name}'s check is due`);
@@ -316,7 +316,7 @@ function dueOf(a: Assessment, steps: readonly StepSpec[], waits: boolean): strin
 }
 
 /** The asks no pass has spent and none files as the run stands (`a`): tries, then rounds. */
-function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
+function unheardOf(f: Forgetting, a: Assessment | undefined) {
   const { run, asks, roundAsks } = f;
   const unheard: AskName[] = [];
   for (const ask of asks) {
@@ -334,24 +334,24 @@ function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
  * Whether the round due `r` is the one a person's ask asked for: its round on `nemia retry --round`, its target's try on `nemia refresh
  * --base`.
  */
-const roundHeard = (r: Round, ask: RoundAsk): boolean =>
+const roundHeard = (r: Round, ask: RoundAsk) =>
   ask.merge
     ? r.merge?.target === ask.merge.target && r.merge.try === ask.merge.try
     : r.by === 'ask' && r.step === ask.step && r.round === ask.round;
 
 /** A merge due, said: what its target merges, and that it spends no round. */
-const mergeDueWords = (r: Round, merge: NonNullable<Round['merge']>): string =>
+const mergeDueWords = (r: Round, merge: NonNullable<Round['merge']>) =>
   `the merge of ${merge.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
-const askNamed = (u: AskName): string =>
+const askNamed = (u: AskName) =>
   u.of === 'try' ? `try ${u.n} of ${u.step}` : u.of === 'base' ? `the merge into ${u.step}'s work` : `round ${u.n} of ${u.step}'s loop`;
 
 /** The run's tasks in flight. */
-const liveHeld = (c: Facts): string | undefined => (c.live.length ? andList(c.live) : undefined);
+const liveHeld = (c: Facts) => (c.live.length ? andList(c.live) : undefined);
 
 /** An ending's merge the run has not yet committed or aborted. */
-function unlandedHeld(c: Facts): string | undefined {
+function unlandedHeld(c: Facts) {
   const { unlanded: ending, run, merging } = c;
   if (!ending) return undefined;
   return merging === 'ours'
@@ -360,7 +360,7 @@ function unlandedHeld(c: Facts): string | undefined {
 }
 
 /** What the run files once the runs it waits on have landed. */
-function waitsHeld(c: Facts): string | undefined {
+function waitsHeld(c: Facts) {
   const { run, ready, waits } = c;
   const after = run.after;
   if (!waits || !after) return undefined;
@@ -368,7 +368,7 @@ function waitsHeld(c: Facts): string | undefined {
 }
 
 /** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
-function gateFiles(atGates: readonly string[], run: Run): string {
+function gateFiles(atGates: readonly string[], run: Run) {
   const one = atGates.length === 1;
   if (atGates.every((name) => !run.steps[name]?.taskId)) return one ? 'it is filed' : 'each is filed';
   return atGates.some((name) => !run.steps[name]?.taskId)
@@ -377,7 +377,7 @@ function gateFiles(atGates: readonly string[], run: Run): string {
 }
 
 /** The steps waiting at their gates, and the approvals that file them — once the hold lifts, on a held run. */
-function gatesHeld(c: Facts): string | undefined {
+function gatesHeld(c: Facts) {
   const { atGates, run, id, lifts } = c;
   const { hold } = run;
   if (!atGates.length) return undefined;
@@ -389,7 +389,7 @@ function gatesHeld(c: Facts): string | undefined {
 /**
  * What a pass would file now — or once the hold lifts, on a held run: `them` for more than one thing due, or for more than one step ready.
  */
-function dueHeld(c: Facts): string | undefined {
+function dueHeld(c: Facts) {
   const { due, run, lifts, ready, waits } = c;
   if (!due.length) return undefined;
   const many = due.length > 1 || (!waits && ready.length > 1);
@@ -397,7 +397,7 @@ function dueHeld(c: Facts): string | undefined {
 }
 
 /** The asks no pass files as the run stands. */
-function unheardHeld(c: Facts): string | undefined {
+function unheardHeld(c: Facts) {
   const { unheard } = c;
   if (!unheard.length) return undefined;
   const named = unheard.map(askNamed);
@@ -405,7 +405,7 @@ function unheardHeld(c: Facts): string | undefined {
 }
 
 /** The runs that wait on this one and have not started. */
-function strandedHeld(c: Facts): string | undefined {
+function strandedHeld(c: Facts) {
   const { stranded, id } = c;
   if (!stranded.length) return undefined;
   const one = stranded.length === 1;
@@ -413,7 +413,7 @@ function strandedHeld(c: Facts): string | undefined {
 }
 
 /** The runs held until this one lands. */
-function holdersHeld(c: Facts): string | undefined {
+function holdersHeld(c: Facts) {
   const { holders } = c;
   if (!holders.length) return undefined;
   const one = holders.length === 1;
@@ -424,7 +424,7 @@ function holdersHeld(c: Facts): string | undefined {
 const HELD = [liveHeld, unlandedHeld, waitsHeld, gatesHeld, dueHeld, unheardHeld, strandedHeld, holdersHeld];
 
 /** Wait for a cancelled run's tasks to settle — or cancel, which files nothing more, when anything is in flight or would be filed. */
-function cancelFix(c: Facts): string | undefined {
+function cancelFix(c: Facts) {
   const { live, due, waits, atGates, run, id, again, verb } = c;
   if (live.length && run.cancelledAt) {
     return `It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (nemia ls ${id})`;
@@ -436,21 +436,21 @@ function cancelFix(c: Facts): string | undefined {
 }
 
 /** Take the unheard asks back, by their files. */
-function unheardFix(c: Facts): string | undefined {
+function unheardFix(c: Facts) {
   const { unheard, again, askAt } = c;
   if (!unheard.length) return undefined;
   return `Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: rm ${unheard.map(askAt).join(' ')}`;
 }
 
 /** Wait for the next tick to land the ending's merge. */
-function unlandedFix(c: Facts): string | undefined {
+function unlandedFix(c: Facts) {
   const { unlanded: ending, again, id } = c;
   if (!ending) return undefined;
   return `The next tick lands it, cancelled or not: ${again} once nemia ls ${id} says what became of ${ending.name}'s merge`;
 }
 
 /** Let the runs that wait on this one start first, or call them off. */
-function strandedFix(c: Facts): string | undefined {
+function strandedFix(c: Facts) {
   const { stranded, id } = c;
   if (!stranded.length) return undefined;
   const one = stranded.length === 1;
@@ -458,7 +458,7 @@ function strandedFix(c: Facts): string | undefined {
 }
 
 /** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never lands. */
-function holdersFix(c: Facts): string | undefined {
+function holdersFix(c: Facts) {
   const { holders, run, id } = c;
   if (!holders.length) return undefined;
   const one = holders.length === 1;
@@ -484,7 +484,7 @@ export function inventoryUnread(
   id: string,
   repo: string,
   outcome: { readonly refused: string } | { readonly unread: { readonly said: string } },
-): string {
+) {
   const why = 'refused' in outcome ? `refused to read it — ${outcome.refused}` : `was not heard — ${outcome.unread.said}`;
   return `its place's inventory of what it left in ${repo} ${why}; nothing was touched, as nothing says what is there: nemia ${verb} ${id} again once the place reads it`;
 }
@@ -503,12 +503,7 @@ export function inventoryUnread(
  * @param dir The run's own directory of worktrees.
  * @param listed The worktrees the place's inventory lists.
  */
-export function runWorktrees(
-  run: Run,
-  names: readonly string[],
-  dir: string,
-  listed: readonly Held[],
-): { worktrees: Array<Held & { step: string }>; unlisted: string[] } {
+export function runWorktrees(run: Run, names: readonly string[], dir: string, listed: readonly Held[]) {
   const ours = (p: string) => Boolean(inside(path.resolve(dir), path.resolve(p)));
   const worktrees = listed
     .filter((w) => ours(w.path))
@@ -536,7 +531,7 @@ export function runWorktrees(
  * its tip.
  * @param w What the place's inventory read of the worktree.
  */
-export function heldWorktree(w: Held): { heldBy: string } | { offBranch: string } | null {
+export function heldWorktree(w: Held) {
   if (w.removable === 'held') return { heldBy: w.heldBy ?? '' };
   if (!w.onBranch) return { offBranch: w.tip ?? '' };
   return null;
@@ -566,15 +561,17 @@ export function branchFates(
   listed: readonly string[],
   merged: (branch: string) => boolean,
   how: ForgetHow = {},
-): BranchFate[] {
+) {
   return listed
     .filter((b) => b !== run.branch)
     .sort()
-    .map((branch): BranchFate => {
-      if (!how.deleteBranches) return { branch, deleted: false, why: 'default' };
-      if (merged(branch)) return { branch, deleted: true, why: 'merged' };
-      return how.forceUnmerged ? { branch, deleted: true, why: 'forced' } : { branch, deleted: false, why: 'unmerged' };
-    });
+    .map((branch) => {
+      if (!how.deleteBranches) return { branch, deleted: false, why: 'default' } satisfies BranchFate;
+      if (merged(branch)) return { branch, deleted: true, why: 'merged' } satisfies BranchFate;
+      return (
+        how.forceUnmerged ? { branch, deleted: true, why: 'forced' } : { branch, deleted: false, why: 'unmerged' }
+      ) satisfies BranchFate;
+    }) satisfies BranchFate[];
 }
 
 /**
@@ -592,7 +589,7 @@ export function checkLogsOf(
   names: readonly string[] | undefined,
   listing: readonly string[],
   otherIds: readonly string[] = [],
-): string[] {
+) {
   const suffix = /-check\.std(err|out)$/;
   return listing
     .filter((file) => {
@@ -670,13 +667,13 @@ export type NotForgotten = Forgot & { kind: Exclude<Forgot['kind'], 'forgotten'>
  * its tasks (`engineWords`). A run forgotten is said by the client off what the api answers of it (`apps/cli`, `forgottenLine`). Pure.
  * @param f What `nemia rm` did with the run it did not forget.
  */
-export function notForgottenLine(f: NotForgotten): string {
+export function notForgottenLine(f: NotForgotten) {
   const engine = f.engine ? engineWords(f.engine, { id: f.id }) : '';
   return engine ? `${storeLine(f)}; ${engine}` : storeLine(f);
 }
 
 /** What `nemia rm` left of one run it did not forget: why, its worktrees removed or held, and the files removed. */
-function storeLine(f: NotForgotten): string {
+function storeLine(f: NotForgotten) {
   if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
   const files = f.files.length ? `removed ${f.files.join(', ')}` : '';
   if (f.kind === 'missing')
@@ -690,12 +687,12 @@ function storeLine(f: NotForgotten): string {
 }
 
 /** What is still there after `nemia rm`, each with what to do about it, in its place's command (`fix`). */
-function leftWords(f: Forgot): string {
+function leftWords(f: Forgot) {
   return f.left.map((l) => ` ${leftWord(f.id, l)}`).join(';');
 }
 
 /** What one thing still there after `nemia rm` is, why it is there, and what to do: `fix`, the place's command, where it has one. */
-function leftWord(id: string, l: Forgot['left'][number]): string {
+function leftWord(id: string, l: Forgot['left'][number]) {
   const fix = (lead: string) => (l.fix ? `${lead}${l.fix}` : '');
   if (l.heldBy !== undefined)
     return `${l.path} is held${l.heldBy ? ` (${l.heldBy})` : ''}, and the place will not remove it — let it go if nothing needs it${fix(': ')}`;
@@ -719,7 +716,7 @@ function leftWord(id: string, l: Forgot['left'][number]): string {
  * @param err What the read or the removal threw.
  * @param codes The error codes the caller expects, which say nothing.
  */
-export const leftWhy = (at: string, err: unknown, codes: readonly string[]): string | null => {
+export const leftWhy = (at: string, err: unknown, codes: readonly string[]) => {
   const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : undefined;
   if (code !== undefined && codes.includes(code)) return null;
   return `${at} was left as it is: ${err instanceof Error ? err.message : String(err)}; mend what the error names, and run the command again`;

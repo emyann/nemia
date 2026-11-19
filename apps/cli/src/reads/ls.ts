@@ -42,7 +42,7 @@ const standing = (client: ObjectsClient) =>
  * `nemia ls <run>`: the pause first, the run's lines off its object (`GET /api/runs/:name`, `runLines`), how old where the branches stand
  * is and the daemon's line, under any context; a run the api cannot judge is its refusal, in its words.
  */
-async function oneRun(name: string, how: TableAsked, env: NodeJS.ProcessEnv): Promise<number> {
+async function oneRun(name: string, how: TableAsked, env: NodeJS.ProcessEnv) {
   const [run, around] = await Promise.all([
     asked('ls', (client) => client.runs.show({ params: { name } }), env),
     asked(
@@ -66,7 +66,7 @@ async function oneRun(name: string, how: TableAsked, env: NodeJS.ProcessEnv): Pr
  * @param args The command's words as parsed: a run's id, or the list's selectors and the columns asked.
  * @param env The environment read for the context in use, the store and the token.
  */
-export async function ls(args: Args, env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function ls(args: Args, env: NodeJS.ProcessEnv = process.env) {
   const read = tableAsked(args);
   const run = textArg(args, 'runId');
   if (run !== undefined) return oneRun(run, read.asked, env);

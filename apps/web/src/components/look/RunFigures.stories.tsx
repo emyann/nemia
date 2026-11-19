@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
-import type { ListedRun } from '@/lib/api/runs';
 import { runViewOf } from '@/lib/api/judged';
 import { RunClock, RunCost } from './RunFigures';
 import { TARGET_RUNS } from '../../../.storybook/fixtures/runs';
@@ -9,7 +8,7 @@ import { TARGET_RUNS } from '../../../.storybook/fixtures/runs';
 const AS_OF = new Date('2026-11-15T18:00:00.000Z');
 
 /** 1sw7 as the list carries it, no breakdown of its clock read. */
-const listed = (): ListedRun => ({ ...runViewOf(TARGET_RUNS['1sw7']), wallMs: 0, finishedAt: null, clock: null });
+const listed = () => ({ ...runViewOf(TARGET_RUNS['1sw7']), wallMs: 0, finishedAt: null, clock: null });
 
 /** A run's clock and cost, as the runs tables and the run part say them: each a button over its breakdown, or plain words without one. */
 const meta: Meta = { title: 'Look/RunFigures' };

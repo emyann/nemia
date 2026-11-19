@@ -9,7 +9,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 import type { Identity } from '../src/daemon/daemon.ts';
 
 /** The process the pause names runs no more: its pid is dead, or is another process's now. */
-const holderGone = (identity: Identity): boolean => identity === 'gone' || identity === 'other';
+const holderGone = (identity: Identity) => identity === 'gone' || identity === 'other';
 
 /**
  * `holder` is what the process table says of the process the pause's file names (`Identity`), or null for a pause that names none: a

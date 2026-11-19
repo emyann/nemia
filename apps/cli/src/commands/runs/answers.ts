@@ -5,17 +5,15 @@
  * what is left to refuse — a question answered twice or not at all, several labels where one is taken, a step that asks none — is the
  * api's, in its words.
  */
-import type { RunRetry, StepTries } from 'objects';
+import type { StepTries } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
-
-/** An answer as the api takes it. */
-type Answer = NonNullable<RunRetry['answers']>[number];
 
 /** A question a closeout asks. */
 type Question = NonNullable<StepTries['tries'][number]['closeout']>['questions'][number]['questions'][number];
 
 /** The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`… */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const letterOf = (index: number): string =>
   index < 26 ? String.fromCharCode(97 + index) : `${letterOf(Math.floor(index / 26) - 1)}${letterOf(index % 26)}`;
 
@@ -26,7 +24,7 @@ const FORMS = "`n=a`, `n=a,c` where the question takes several, `n=a: words` or 
 type Typed = { n: number; letters: string[]; own?: string };
 
 /** An `--answer` value read (`1=a`, `2=a,c`, `3=b: words`, `3: words`), or null where it takes no form of them. */
-function typedOf(value: string): Typed | null {
+function typedOf(value: string) {
   const m = /^\s*(\d+)\s*(?:=\s*([a-z]+(?:\s*,\s*[a-z]+)*))?\s*(?::([\s\S]*))?$/i.exec(value);
   if (!m) return null;
   const own = m[3]?.trim();
@@ -35,7 +33,7 @@ function typedOf(value: string): Typed | null {
 }
 
 /** `typed` resolved against question `q`: its letters as the labels they name; refused where one names none. */
-function resolved(q: Question, typed: Typed, value: string): Answer {
+function resolved(q: Question, typed: Typed, value: string) {
   const letters = q.options.map((_, i) => letterOf(i));
   const stray = typed.letters.find((l) => !letters.includes(l));
   if (stray !== undefined) {
@@ -56,7 +54,7 @@ function resolved(q: Question, typed: Typed, value: string): Answer {
  * @param typed Each `--answer` as typed.
  * @param runId The run's id, said in a refusal.
  */
-export function numberedAnswers(questions: readonly Question[], typed: readonly string[], runId: string): Answer[] {
+export function numberedAnswers(questions: readonly Question[], typed: readonly string[], runId: string) {
   if (!questions.length) return [];
   return typed.map((value) => {
     const read = typedOf(value);
@@ -76,7 +74,7 @@ export function numberedAnswers(questions: readonly Question[], typed: readonly 
  * @param runId The run's id.
  * @param step The step's name.
  */
-export async function askedNow(command: string, runId: string, step: string): Promise<Question[]> {
+export async function askedNow(command: string, runId: string, step: string) {
   const { tries } = await asked(command, (c) => c.steps.tries({ params: { runId, step }, query: {} }));
   const current = tries.find((t) => t.current) ?? tries.at(-1);
   return (current?.closeout?.questions ?? []).flatMap((asked) => asked.questions);
@@ -89,7 +87,7 @@ export async function askedNow(command: string, runId: string, step: string): Pr
  * @param step The step's name.
  * @param typed Each `--answer` as typed.
  */
-export async function answersOf(command: string, runId: string, step: string, typed: readonly string[]): Promise<{ answers?: Answer[] }> {
+export async function answersOf(command: string, runId: string, step: string, typed: readonly string[]) {
   if (!typed.length) return {};
   return { answers: numberedAnswers(await askedNow(command, runId, step), typed, runId) };
 }

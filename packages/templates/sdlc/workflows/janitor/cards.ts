@@ -53,14 +53,14 @@ const SEGMENT = /^[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
  *
  * @param given The rules as the check line hands them, apart by whitespace, each `<key>=<value>:<label>`.
  */
-export function labelRules(given: string): Rules {
+export function labelRules(given: string) {
   const rules: LabelRule[] = [];
   for (const rule of given.split(/\s+/).filter(Boolean)) {
     const named = RULE.exec(rule);
-    if (!named) return { kind: 'refused', rule };
+    if (!named) return { kind: 'refused', rule } satisfies Rules;
     rules.push({ key: named[1], value: named[2], label: named[3] });
   }
-  return { kind: 'rules', rules };
+  return { kind: 'rules', rules } satisfies Rules;
 }
 
 /**
@@ -70,18 +70,19 @@ export function labelRules(given: string): Rules {
  * @param labels The card's labels, each `<key>=<value>`.
  * @param rules The factory's label rules; none asks no match.
  */
-export function labelsChecked(labels: readonly string[], rules: readonly LabelRule[]): Labelled {
+export function labelsChecked(labels: readonly string[], rules: readonly LabelRule[]) {
   const byKey: Record<string, string> = {};
   for (const [i, label] of labels.entries()) {
     const at = label.indexOf('=');
     const key = label.slice(0, at);
     const value = label.slice(at + 1);
-    if (at < 0 || !SEGMENT.test(key) || !SEGMENT.test(value)) return { kind: 'refused', reason: 'form', label: i };
-    if (Object.hasOwn(byKey, key)) return { kind: 'refused', reason: 'twice', label: i };
+    if (at < 0 || !SEGMENT.test(key) || !SEGMENT.test(value)) return { kind: 'refused', reason: 'form', label: i } satisfies Labelled;
+    if (Object.hasOwn(byKey, key)) return { kind: 'refused', reason: 'twice', label: i } satisfies Labelled;
     byKey[key] = value;
   }
-  if (rules.length && !rules.some((r) => byKey[r.key] === r.value)) return { kind: 'refused', reason: 'unmatched', label: -1 };
-  return { kind: 'labelled', labels: byKey };
+  if (rules.length && !rules.some((r) => byKey[r.key] === r.value))
+    return { kind: 'refused', reason: 'unmatched', label: -1 } satisfies Labelled;
+  return { kind: 'labelled', labels: byKey } satisfies Labelled;
 }
 
 /** Two days, the first and the last, `YYYY-MM-DD` in UTC. */
@@ -103,7 +104,7 @@ const WHY_NOT: Record<LabelRefusal, string> = {
 const DAY_MS = 86_400_000;
 
 /** A title as two cards are compared on: no heading mark, no case, its spacing one space. */
-const normal = (title: string): string =>
+const normal = (title: string) =>
   title
     .replace(/^#+\s*/, '')
     .replace(/\s+/g, ' ')
@@ -111,7 +112,7 @@ const normal = (title: string): string =>
     .toLowerCase();
 
 /** The closeout at `file`, parsed; refuses a missing argument, a file that does not read, or one that is not a JSON object. */
-function readCloseout(file: string | undefined): Record<string, unknown> {
+function readCloseout(file: string | undefined) {
   if (!file) throw new Refusal('no closeout reached the check: WF_CLOSEOUT is empty, so there are no cards to file');
   let parsed: unknown;
   try {
@@ -125,14 +126,14 @@ function readCloseout(file: string | undefined): Record<string, unknown> {
 }
 
 /** The day `day` names, as milliseconds since the epoch; refuses one that is not a `YYYY-MM-DD` day. */
-function dayOf(day: unknown, what: string): number {
+function dayOf(day: unknown, what: string) {
   const ms = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T00:00:00Z`) : NaN;
   if (Number.isNaN(ms)) throw new Refusal(`${what} is ${JSON.stringify(day)}, not a day: say it YYYY-MM-DD, in UTC`);
   return ms;
 }
 
 /** The closeout's `key`, checked as a period whose last day is not before its first: its days, in milliseconds. */
-function periodOf(closeout: Record<string, unknown>, key: string): Period & { start: number; end: number; days: number } {
+function periodOf(closeout: Record<string, unknown>, key: string) {
   const p = (closeout[key] ?? {}) as Period;
   const start = dayOf(p.from, `${key}.from`);
   const end = dayOf(p.to, `${key}.to`);
@@ -141,7 +142,7 @@ function periodOf(closeout: Record<string, unknown>, key: string): Period & { st
 }
 
 /** Refuses an `against` that is not as long as `period`, or does not end the day before it starts. */
-function checkPeriods(closeout: Record<string, unknown>): { period: Period; against: Period } {
+function checkPeriods(closeout: Record<string, unknown>) {
   const period = periodOf(closeout, 'period');
   const against = periodOf(closeout, 'against');
   if (against.days !== period.days)
@@ -158,7 +159,7 @@ function checkPeriods(closeout: Record<string, unknown>): { period: Period; agai
  * Card `i` of the list, checked field by field; refuses a field that is not text, a title of more than one line, a kind not known, no
  * factory or workflow.
  */
-function cardOf(value: unknown, i: number): Card {
+function cardOf(value: unknown, i: number) {
   const c = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const wrong: string[] = FIELDS.filter((k) => typeof c[k] !== 'string');
   if (!Array.isArray(c.labels) || c.labels.some((l) => typeof l !== 'string')) wrong.push('labels');
@@ -177,7 +178,7 @@ function cardOf(value: unknown, i: number): Card {
 }
 
 /** The closeout's cards, checked whole; refuses a closeout with no list, and two cards with the same title. */
-function cardsOf(closeout: Record<string, unknown>): Card[] {
+function cardsOf(closeout: Record<string, unknown>) {
   if (!Array.isArray(closeout.cards))
     throw new Refusal('the closeout names no `cards` list: sign off with one, empty when nothing is to correct');
   const cards = closeout.cards.map(cardOf);
@@ -191,7 +192,7 @@ function cardsOf(closeout: Record<string, unknown>): Card[] {
 }
 
 /** The first line of a card's body, past its frontmatter: what `nemia inbox` lists as its title. */
-function firstLine(text: string): string {
+function firstLine(text: string) {
   const body = text
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
@@ -200,16 +201,16 @@ function firstLine(text: string): string {
 }
 
 /** The titles of the cards in the inbox, compared as `normal` makes them. */
-function inboxTitles(): Set<string> {
+function inboxTitles() {
   const root = process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows');
   const dir = path.join(root, 'inbox');
-  if (!fs.existsSync(dir)) return new Set();
+  if (!fs.existsSync(dir)) return new Set() satisfies Set<string>;
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md') && !f.startsWith('.'));
-  return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8')))));
+  return new Set(files.map((f) => normal(firstLine(fs.readFileSync(path.join(dir, f), 'utf8'))))) satisfies Set<string>;
 }
 
 /** The card's text as `nemia inbox add` files it: its title first, then the correction, the evidence and who filed it. */
-const textOf = (card: Card, { period, against }: { period: Period; against: Period }): string =>
+const textOf = (card: Card, { period, against }: { period: Period; against: Period }) =>
   [
     card.title.trim(),
     '',
@@ -222,7 +223,7 @@ const textOf = (card: Card, { period, against }: { period: Period; against: Peri
   ].join('\n');
 
 /** The rules `--labels` hands the script, read; refuses arguments past the closeout that are not `--labels "<rules>"`, or a bad rule. */
-function rulesOf(args: readonly string[]): LabelRule[] {
+function rulesOf(args: readonly string[]) {
   if (args.length !== 2 || args[0] !== '--labels')
     throw new Refusal(
       'the check gives cards.ts the factory\'s label rules, `--labels "<rules>"`, after the closeout and nothing else: ' +
@@ -234,14 +235,14 @@ function rulesOf(args: readonly string[]): LabelRule[] {
       `\`${read.rule}\` is no label rule, which is each \`<key>=<value>:<label>\`, the rules apart by spaces: ` +
         "correct the factory's pullRequestLabels parameter",
     );
-  return read.rules;
+  return read.rules satisfies LabelRule[];
 }
 
 /**
  * The factory this run is in: its namespace, as `nemia get runs/<WF_RUN>` serves the run. Refuses where `WF_RUN` is unset or the run
  * does not read: the rules are this factory's, so a card is held to them only where it is filed for it.
  */
-function runFactory(): string {
+function runFactory() {
   const run = process.env.WF_RUN;
   if (!run) throw new Refusal('WF_RUN is not set, so the factory whose label rules these are is not known: run this check in a run');
   const ran = spawnSync('nemia', ['get', `runs/${run}`, '-o', 'json'], {
@@ -267,7 +268,7 @@ function runFactory(): string {
  * The labels each card is filed with, checked whole before any is filed: a card's own, held to the rules, where there are rules and it
  * is filed for this run's factory; none otherwise, with the reason said where it gave some.
  */
-function labelsOf(cards: readonly Card[], rules: readonly LabelRule[]): { labels: string[]; dropped: string | null }[] {
+function labelsOf(cards: readonly Card[], rules: readonly LabelRule[]) {
   const ours = rules.length ? runFactory() : null;
   return cards.map((card, i) => {
     if (!rules.length) return { labels: [], dropped: 'the factory names no label rules' };
@@ -284,7 +285,7 @@ function labelsOf(cards: readonly Card[], rules: readonly LabelRule[]): { labels
 }
 
 /** Files `card` with `labels` through `nemia inbox add`, from a file in `dir`; refuses, naming the card, when the command fails. */
-function file(card: Card, labels: readonly string[], text: string, dir: string, i: number): void {
+function file(card: Card, labels: readonly string[], text: string, dir: string, i: number) {
   const at = path.join(dir, `card-${i + 1}.md`);
   fs.writeFileSync(at, text);
   const args = ['inbox', 'add', at, '--workflow', card.workflow.trim(), '--factory', card.factory.trim()];
@@ -303,7 +304,7 @@ function file(card: Card, labels: readonly string[], text: string, dir: string, 
 }
 
 /** Checks the closeout, then files each card the inbox has no title of. */
-function main(): void {
+function main() {
   const closeout = readCloseout(process.argv[2]);
   const rules = rulesOf(process.argv.slice(3));
   const periods = checkPeriods(closeout);

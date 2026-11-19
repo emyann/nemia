@@ -27,7 +27,7 @@ export type EndingWord = {
 };
 
 /** Nobody has asked: no approval of it, no ask for its next try. */
-const unasked = (w: EndingWord): boolean => w.asked === undefined;
+const unasked = (w: EndingWord) => w.asked === undefined;
 
 const claimedAtSpec = spec<(w: EndingWord) => string | undefined>({
   /**

@@ -51,7 +51,7 @@ const FILE_IT = 'file it long-lived: AE_ROOT=$WF_ROOT/engine ae file, with resta
  * The refusal (`Conflict`) of a subscription named `name` given or taken away by hand where the name is Nemia's, which her keeper alone
  * puts and drops, or undefined.
  */
-const reservedRefusal = (name: string): Conflict | undefined =>
+const reservedRefusal = (name: string) =>
   name === NEMIA_SUBSCRIPTION
     ? new Conflict({
         message: `the subscription ${name} is Nemia's own, put and taken away by her keeper: nemia level semi-auto gives it, nemia level manual takes it away.`,
@@ -65,9 +65,7 @@ const reservedRefusal = (name: string): Conflict | undefined =>
  * A list given empty comes to the default too, and never to an empty filter, which `selects` takes every line of the feed for: the api's
  * body schema takes `"selectors": []` as a list of text, and `-l` given no selector is refused before this.
  */
-const askedOf = (
-  input: Partial<SubscribeInput>,
-): { name: string; task: string; selectors: string[]; digestEvery: number; atLeast?: string } => ({
+const askedOf = (input: Partial<SubscribeInput>) => ({
   name: input.name ?? '',
   task: input.task ?? '',
   selectors: input.selectors?.length ? [...input.selectors] : [...DEFAULT_SELECTORS],
@@ -79,7 +77,7 @@ const askedOf = (
  * The refusal of a task no subscription can tell: one never filed (`Missing`), one not long-lived (`Invalid`), whose session ends with its
  * turn, or one settled (`Conflict`), which is told nothing more — or undefined.
  */
-function taskRefusal(task: string, state: TaskView['state']): Missing | Invalid | Conflict | undefined {
+function taskRefusal(task: string, state: TaskView['state']) {
   if (!state.filedAt)
     return new Missing({ message: `no task ${task} is filed on the store's engine: ${FILE_IT}, then ${SUBSCRIBE_FORM}.` });
   if (state.restartPolicy !== 'Always')

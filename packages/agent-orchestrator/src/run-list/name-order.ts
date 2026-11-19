@@ -8,4 +8,4 @@
  * @param a The name that would sort first.
  * @param b The name it is compared with.
  */
-export const nameFirst = (a: string, b: string): boolean => a !== b && [a, b].sort()[0] === a;
+export const nameFirst = (a: string, b: string) => a !== b && [a, b].sort()[0] === a;

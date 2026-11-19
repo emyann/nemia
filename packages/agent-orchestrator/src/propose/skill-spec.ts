@@ -34,9 +34,9 @@ export function skillSpecOf(
   skillMd: string,
   others: readonly { readonly path: string; readonly text: string }[],
   preload: boolean,
-): SkillSpecRead {
+) {
   const { keys, body } = fileParts(name, skillMd);
   const picked = Object.fromEntries(PICKED.flatMap((key) => (keys[key] === undefined ? [] : [[key, keys[key]]])));
   const files = [...others].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)).map(({ path, text }) => ({ path, text }));
-  return { ...picked, preload, body, ...(files.length > 0 && { files }) };
+  return { ...picked, preload, body, ...(files.length > 0 && { files }) } satisfies SkillSpecRead as SkillSpecRead;
 }

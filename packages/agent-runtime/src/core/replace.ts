@@ -26,7 +26,7 @@ type ReplaceOptions = {
  * @param text What the new file holds.
  * @param options How it is replaced beyond its text: a flush, a mode, its times, and a last word before the rename.
  */
-export const replaceFile = (file: string, text: string | Uint8Array, options: ReplaceOptions = {}): boolean => {
+export const replaceFile = (file: string, text: string | Uint8Array, options: ReplaceOptions = {}) => {
   const beside = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomUUID()}.tmp`);
   try {
     const fd = fs.openSync(beside, 'w', options.mode);

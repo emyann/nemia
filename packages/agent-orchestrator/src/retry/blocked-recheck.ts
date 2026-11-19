@@ -3,7 +3,7 @@
  * and why not: the judgement (`blockedRecheck`) and its read off the record (`blockedRecheckRead`). Pure; its laws are
  * `contracts/blocked-recheck.contract.ts`'s. `retryable`, `retriesDue` and `retryRefusal` read it alike, so they cannot disagree.
  */
-import type { BlockedRecheckRead, BlockedRechecked } from '../../contracts/blocked-recheck.contract.ts';
+import type { BlockedRechecked } from '../../contracts/blocked-recheck.contract.ts';
 import { SETTLED, type StepRecord, type TaskPhase } from '../record/record.ts';
 
 export type { BlockedRecheck, BlockedRecheckRead, BlockedRecheckWhy } from '../../contracts/blocked-recheck.contract.ts';
@@ -41,7 +41,7 @@ export const blockedRecheckRead = (
   blocked: boolean,
   phaseOf: (taskId: string) => TaskPhase,
   tipOf: TipOf | undefined,
-): BlockedRecheckRead => {
+) => {
   const taskId = record?.taskId;
   const last = record?.tries?.at(-1);
   const check = last?.check;

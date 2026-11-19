@@ -95,7 +95,7 @@ export const sessionsOf = (
     running?: Readonly<Record<string, number>>;
   },
   now: number,
-): Omit<Seen, 'runs' | 'load'> => {
+) => {
   const views = report.views ?? [];
   const queued = views.filter((v) => v.admission === 'queued');
   const filed = queued.map((v) => Date.parse(v.state?.filedAt ?? '')).filter((ms) => Number.isFinite(ms));
@@ -114,7 +114,7 @@ export type PassCostRead = Omit<PassCost, keyof Seen> & Partial<Seen>;
  * A pass's cost from its counts: the totals summed from the phases.
  * @param c The pass's counts, phase by phase, without its totals.
  */
-export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>): PassCost => ({
+export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>) => ({
   ...c,
   bytes: PHASES.reduce((n, p) => n + c.phases[p].bytes, 0),
   spawned: PHASES.reduce((n, p) => n + c.phases[p].spawned, 0),
@@ -125,7 +125,7 @@ export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>): PassCost => ({
  * @param phases Each phase's time, in ms.
  * @param n How many phases to keep at most, 3 when absent.
  */
-export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3): Array<{ phase: Phase; ms: number }> =>
+export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3) =>
   PHASES.map((phase) => ({ phase, ms: phases[phase].ms }))
     .filter((p) => p.ms > 0)
     .sort((a, b) => b.ms - a.ms)
@@ -155,7 +155,7 @@ export type Interval = {
  * @param cost The pass to add.
  * @param now When the pass ended, in ms since the epoch: the new interval's start when there was none.
  */
-export const addPass = (interval: Interval | undefined, cost: PassCost, now: number): Interval => {
+export const addPass = (interval: Interval | undefined, cost: PassCost, now: number) => {
   const i = interval ?? {
     from: now,
     passes: 0,
@@ -184,19 +184,19 @@ export const addPass = (interval: Interval | undefined, cost: PassCost, now: num
  * @param now The time now, in ms since the epoch.
  * @param every The interval's length in ms, `STATS_EVERY_MS` when absent.
  */
-export const summaryDue = (interval: Interval | undefined, now: number, every = STATS_EVERY_MS): boolean =>
+export const summaryDue = (interval: Interval | undefined, now: number, every = STATS_EVERY_MS) =>
   interval !== undefined && now - interval.from >= every;
 
-const msWord = (ms: number): string => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
+const msWord = (ms: number) => (ms >= 100 ? `${Math.round(ms)}` : ms >= 10 ? ms.toFixed(1) : ms.toFixed(2));
 
 /**
  * Bytes as a person reads them: `812 B`, `14.2 kB`, `3.1 MB`.
  * @param n The count of bytes.
  */
-export const bytesWord = (n: number): string =>
+export const bytesWord = (n: number) =>
   n < 1000 ? `${n} B` : n < 1_000_000 ? `${(n / 1000).toFixed(1)} kB` : `${(n / 1_000_000).toFixed(1)} MB`;
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * `nemia up`'s line for an interval: how many passes, what a pass took on average and at most, the three heaviest phases over the interval,
@@ -204,7 +204,7 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
  * @param i The interval to say.
  * @param now The time now, in ms since the epoch: the interval's end.
  */
-export const summaryLine = (i: Interval, now: number): string => {
+export const summaryLine = (i: Interval, now: number) => {
   const heavy = heaviest(Object.fromEntries(PHASES.map((p) => [p, { ms: i.phases[p] }])) as Record<Phase, { ms: number }>);
   return (
     `cost: ${plural(i.passes, 'pass', 'passes')} in ${Math.round((now - i.from) / 1000)}s, ${msWord(i.ms / Math.max(i.passes, 1))} ms a pass (slowest ${msWord(i.slowestMs)}) — ` +
@@ -214,7 +214,7 @@ export const summaryLine = (i: Interval, now: number): string => {
 };
 
 /** What a pass saw, said in a line, and its journal reads: none from a file an older tick wrote, which kept none of it. */
-const seenLines = ({ runs, tasks, queued, admitted, phases }: PassCostRead): string[] =>
+const seenLines = ({ runs, tasks, queued, admitted, phases }: PassCostRead) =>
   runs === undefined
     ? []
     : [
@@ -226,7 +226,7 @@ const seenLines = ({ runs, tasks, queued, admitted, phases }: PassCostRead): str
  * The last pass, phase by phase and harness by harness, for `nemia up --stats` and `nemia tick --stats`.
  * @param c The last pass's cost, as read back off disk.
  */
-export const breakdownLines = (c: PassCostRead): string[] => {
+export const breakdownLines = (c: PassCostRead) => {
   const rows = PHASES.map((p) => [
     p,
     msWord(c.phases[p].ms),
@@ -289,7 +289,7 @@ export type AlsoKept = { quota?: Reading; checks?: readonly CheckLabels[]; disk?
  * @param c The pass's cost.
  * @param also What the pass is kept with, nothing when absent.
  */
-export const recentOf = (c: PassCost, also: AlsoKept = {}): RecentPass => ({
+export const recentOf = (c: PassCost, also: AlsoKept = {}) => ({
   at: c.at,
   ms: c.ms,
   runs: c.runs,
@@ -324,7 +324,7 @@ export type PassBucket = { le: number | null; count: number };
  * @param recent The recent passes, each with its time in ms.
  * @param bounds The buckets' upper bounds in ms, ascending, `PASS_BOUNDS` when absent.
  */
-export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds: readonly number[] = PASS_BOUNDS): PassBucket[] => {
+export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds: readonly number[] = PASS_BOUNDS) => {
   const counts = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const { ms } of recent) {
     const at = bounds.findIndex((le) => ms <= le);
@@ -341,7 +341,7 @@ export type PassPart = { phase: Phase; ms: number; share: number };
  * Each phase over `recent` (`PassPart`), heaviest first, the phases' own order between equals; none for no pass.
  * @param recent The recent passes, each with its time and each phase's time in ms.
  */
-export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]): PassPart[] => {
+export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]) => {
   if (!recent.length) return [];
   const whole = recent.reduce((n, r) => n + r.ms, 0);
   return PHASES.map((phase) => {
@@ -366,7 +366,7 @@ export type PassSummary = Omit<Seen, 'waitMs' | 'load'> & {
  * The recent passes' summary (`PassSummary`), null for none.
  * @param recent The recent passes, oldest first.
  */
-export const passSummary = (recent: readonly RecentPass[]): PassSummary | null => {
+export const passSummary = (recent: readonly RecentPass[]) => {
   const latest = recent.at(-1);
   if (!latest) return null;
   const sorted = recent.map((r) => r.ms).sort((a, b) => a - b);
@@ -402,7 +402,7 @@ export type PassesRead = {
  * The answer of the recent passes `recent` (`PassesRead`).
  * @param recent The recent passes, oldest first.
  */
-export const passesRead = (recent: RecentPass[]): PassesRead => ({
+export const passesRead = (recent: RecentPass[]) => ({
   recent,
   histogram: passHistogram(recent),
   parts: passParts(recent),

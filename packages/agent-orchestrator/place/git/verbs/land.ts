@@ -6,23 +6,24 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { failedWords, git, gitSays, isDirectory, refused, type Asking, type Reply } from '../git.ts';
+import { failedWords, git, gitSays, isDirectory, refused, type Reply } from '../git.ts';
 import type { PlaceRequests } from '../../../src/place/place.ts';
 
 /** The verb's body. */
-export function* land(request: PlaceRequests['land']): Asking<Reply<'land'>> {
+export function* land(request: PlaceRequests['land']) {
   const { repo: checkout, act } = request;
   const file = isDirectory(checkout) ? yield* gitSays(checkout, ['rev-parse', '--git-path', 'MERGE_HEAD']) : undefined;
-  if (file === undefined) return refused(`${checkout} is not a git repository, so there is no merge to ${act}`);
-  if (!fs.existsSync(path.resolve(checkout, file))) return refused(`no merge is in progress in ${checkout}, so there is none to ${act}`);
+  if (file === undefined) return refused(`${checkout} is not a git repository, so there is no merge to ${act}`) satisfies Reply<'land'>;
+  if (!fs.existsSync(path.resolve(checkout, file)))
+    return refused(`no merge is in progress in ${checkout}, so there is none to ${act}`) satisfies Reply<'land'>;
   try {
     if (request.act === 'abort') {
       yield* git(checkout, ['merge', '--abort']);
-      return { aborted: true };
+      return { aborted: true } satisfies Reply<'land'>;
     }
     yield* git(checkout, ['commit', '-F', '-'], request.message);
-    return { commit: yield* git(checkout, ['rev-parse', 'HEAD']) };
+    return { commit: yield* git(checkout, ['rev-parse', 'HEAD']) } satisfies Reply<'land'>;
   } catch (err) {
-    return refused(failedWords(err));
+    return refused(failedWords(err)) satisfies Reply<'land'>;
   }
 }

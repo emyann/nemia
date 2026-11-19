@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
 import type { RunView } from '../../lib/api/judged.ts';
-import { files as startFiles, type StartFiles } from '../../lib/api/objects.ts';
+import { files as startFiles } from '../../lib/api/objects.ts';
 import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor } from '../../lib/inbox';
@@ -153,7 +153,7 @@ function useHandedFiles() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploaded] = useState(() => new Map<File, string>());
   const [sent, setSent] = useState(0);
-  const sending = (listed: File[]): StartFiles => {
+  const sending = (listed: File[]) => {
     setSent(0);
     return { listed, sent: uploaded, onSent: setSent };
   };
@@ -176,7 +176,7 @@ function useHandedFiles() {
 }
 
 /** What the Start button says: Start, or while pressed, which file of how many it uploads, then Starting. */
-const startWords = (pending: boolean, files: number, sent: number): string =>
+const startWords = (pending: boolean, files: number, sent: number) =>
   !pending ? 'Start' : files > 0 && sent < files ? `Uploading ${sent + 1} of ${files}…` : 'Starting…';
 
 /**

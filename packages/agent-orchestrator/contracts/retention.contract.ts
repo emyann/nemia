@@ -20,7 +20,7 @@ export type InUse = { readonly current: string | null; readonly pinned: readonly
 export type Retention = { readonly remove: readonly string[]; readonly held: 'no pointer' | 'unrecorded' | null };
 
 /** Whether `tag` is kept by what is in use: the pointer names it, or a process or a session runs on it. */
-const inUseBy = (inUse: InUse, tag: string): boolean => tag === inUse.current || inUse.pinned.includes(tag);
+const inUseBy = (inUse: InUse, tag: string) => tag === inUse.current || inUse.pinned.includes(tag);
 
 const retentionSpec = spec<(installed: readonly Installed[], inUse: InUse) => Retention>({
   /**

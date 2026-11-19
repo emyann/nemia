@@ -22,17 +22,17 @@ export type TranscriptPageCut =
 export type TranscriptBounds = { readonly byDefault: number; readonly most: number };
 
 /** A count: a whole number from 0, safe in a double, as an array's length and index are. */
-const count = (n: number): boolean => Number.isSafeInteger(n) && n >= 0;
+const count = (n: number) => Number.isSafeInteger(n) && n >= 0;
 
 /** Whether a `limit` or a `last` is one a read takes: none, or a whole number from 1. */
-const taken = (n: number | null): boolean => n === null || (Number.isInteger(n) && n >= 1);
+const taken = (n: number | null) => n === null || (Number.isInteger(n) && n >= 1);
 
 /** Bounds a read can keep: a default page of at least one event, no larger than the most. */
-const boundsTaken = (bounds: TranscriptBounds): boolean =>
+const boundsTaken = (bounds: TranscriptBounds) =>
   Number.isSafeInteger(bounds.byDefault) && Number.isSafeInteger(bounds.most) && bounds.byDefault >= 1 && bounds.byDefault <= bounds.most;
 
 /** The smaller of two counts. */
-const least = (a: number, b: number): number => (a < b ? a : b);
+const least = (a: number, b: number) => (a < b ? a : b);
 
 const transcriptCutSpec = spec<(count: number, limit: number | null, last: number | null, bounds: TranscriptBounds) => TranscriptPageCut>({
   requires: ({ input: [n, , , bounds] }) => count(n) && boundsTaken(bounds),

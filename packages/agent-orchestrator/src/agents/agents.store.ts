@@ -50,7 +50,7 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
  * @param run The run, by its id.
  * @param step The step's name.
  */
-export const agentFilesDir = (home: string, run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(home), run.id, 'agents', step);
+export const agentFilesDir = (home: string, run: Pick<Run, 'id'>, step: string) => path.join(runsDir(home), run.id, 'agents', step);
 
 /**
  * Whether a step's rendered folder `dir` is there as its flags name it (`renderedFlags`): the folder, and the plugin in it where the flags
@@ -59,7 +59,7 @@ export const agentFilesDir = (home: string, run: Pick<Run, 'id'>, step: string):
  * @param dir The step's rendered folder.
  * @param step The step, whose flags name the plugin looked for.
  */
-export const renderedIn = (dir: string, step: StepSpec): boolean =>
+export const renderedIn = (dir: string, step: StepSpec) =>
   isDirectory(dir) && (!namesPlugin(step) || (step.agent !== undefined && isDirectory(path.join(dir, pluginOf(step.agent.name)))));
 
 /**
@@ -75,7 +75,7 @@ export const renderedIn = (dir: string, step: StepSpec): boolean =>
  * @param steps The run's steps, each rendered where its agent is.
  * @param skills The skills the load found, by name, and where it looked for them.
  */
-export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: readonly StepSpec[], skills: SkillsFound): void {
+export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: readonly StepSpec[], skills: SkillsFound) {
   for (const step of steps.filter(rendersAgent)) {
     const agent = step.agent;
     if (agent === undefined) continue;
@@ -114,16 +114,16 @@ export function writeAgentFiles(home: string, run: Pick<Run, 'id'>, steps: reado
  * @param run The run, by its id.
  * @param step The step whose rendered skills are read.
  */
-export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, string> {
+export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, string> as Map<string, string>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
       const version = skillVersion(path.join(skills, bareSkillOf(name)));
       return version === null ? [] : [[name, version] as const];
     }),
-  );
+  ) satisfies Map<string, string>;
 }
 
 /**
@@ -134,9 +134,9 @@ export function renderedSkillVersions(home: string, run: Pick<Run, 'id'>, step: 
  * @param run The run, by its id.
  * @param step The step whose rendered skills are read.
  */
-export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, SkillRule[]> {
+export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, SkillRule[]> as Map<string, SkillRule[]>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
@@ -148,7 +148,7 @@ export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: Ste
         throw err;
       }
     }),
-  );
+  ) satisfies Map<string, SkillRule[]> as Map<string, SkillRule[]>;
 }
 
 /**
@@ -159,9 +159,9 @@ export function renderedSkillRules(home: string, run: Pick<Run, 'id'>, step: Ste
  * @param run The run, by its id.
  * @param step The step whose rendered skills are read.
  */
-export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: StepSpec): Map<string, string[]> {
+export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: StepSpec) {
   const agent = step.agent;
-  if (!agent?.skills) return new Map();
+  if (!agent?.skills) return new Map() satisfies Map<string, string[]> as Map<string, string[]>;
   const skills = path.join(agentFilesDir(home, run, step.name), pluginOf(agent.name), 'skills');
   return new Map(
     agent.skills.flatMap((name) => {
@@ -169,7 +169,7 @@ export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: S
       const globs = fs.existsSync(file) ? appliesOf(fs.readFileSync(file, 'utf8')) : [];
       return globs.length ? [[name, globs] as const] : [];
     }),
-  );
+  ) satisfies Map<string, string[]>;
 }
 
 /**
@@ -178,7 +178,7 @@ export function renderedSkillApplies(home: string, run: Pick<Run, 'id'>, step: S
  * `<workflow>/<step>` — and as a `WorkflowError`, an `Invalid`, for the rest: a place, a name, a key or a value the parser refuses.
  * Nothing is thrown for no words.
  */
-function refuse(words: string | undefined, kind?: typeof Missing | typeof Conflict, users?: readonly string[]): void {
+function refuse(words: string | undefined, kind?: typeof Missing | typeof Conflict, users?: readonly string[]) {
   if (!words) return;
   if (kind === Missing) throw new Missing({ message: words });
   if (kind === Conflict) throw new Conflict({ message: words, ...(users && { users }) });
@@ -210,7 +210,7 @@ const SIDECARS = [
  * lists — the store's (`<store>/workflows/agents`) or a repository's the store knows (`<repo>/workflows/agents`, for a factory's repo or
  * the `repo` the caller names). Anywhere else only with `{ anywhere: true }`.
  */
-function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: string): string | undefined {
+function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: string) {
   if (path.basename(dir) !== AGENTS_FOLDER) {
     return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
   }
@@ -219,12 +219,12 @@ function agentPlaceRefusal(home: string, dir: string, anywhere: boolean, repo?: 
 }
 
 /** Whether two paths are one file on disk: a rename by case, where the filesystem does not tell case apart. */
-function sameFile(a: string, b: string): boolean {
+function sameFile(a: string, b: string) {
   const [x, y] = [fs.statSync(a, { throwIfNoEntry: false }), fs.statSync(b, { throwIfNoEntry: false })];
   return Boolean(x && y && x.ino === y.ino && x.dev === y.dev);
 }
 
-const inUse = (name: string, users: readonly string[], does: string): string =>
+const inUse = (name: string, users: readonly string[], does: string) =>
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} beside it — ${users.join(', ')} — and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent, or remove the \`agent:\` line, first.`;
 
 /**
@@ -232,7 +232,7 @@ const inUse = (name: string, users: readonly string[], does: string): string =>
  * of agents and the repository has no agent of that name of its own, in `workflows/agents/` or `.claude/agents/`, which its workflows find
  * first (`lookupRoots`). The one repository the caller names: the store does not know which others give their workflows its agents.
  */
-function repoUsers(home: string, at: string, name: string, repo: string | undefined): string[] {
+function repoUsers(home: string, at: string, name: string, repo: string | undefined) {
   if (repo === undefined || at !== path.join(path.resolve(home), 'workflows', AGENTS_FOLDER)) return [];
   const own = [path.join(repo, 'workflows', AGENTS_FOLDER), path.join(repo, '.claude', AGENTS_FOLDER)];
   if (own.some((dir) => path.resolve(dir) === at || fs.existsSync(path.join(dir, `${name}.md`)))) return [];
@@ -240,18 +240,18 @@ function repoUsers(home: string, at: string, name: string, repo: string | undefi
 }
 
 /** `inUse`, for the steps of a repository's workflows that are given the store's agent (`repoUsers`). */
-const inUseByRepo = (name: string, users: readonly string[], repo: string, does: string): string =>
+const inUseByRepo = (name: string, users: readonly string[], repo: string, does: string) =>
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} of the repository ${repo} — ${users.join(', ')} — which has no ${name} of its own, so its workflows are given this one, and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent or remove the \`agent:\` line, or copy this agent into ${path.join(repo, 'workflows', AGENTS_FOLDER)}/ (git shows it as a change to commit), first.`;
 
 /** Refused, `Conflict`, while a step of `repo`'s workflows is given the store's agent `name` (`repoUsers`), and `does` would break it. */
-function refuseRepoUsers(home: string, at: string, name: string, repo: string | undefined, does: string): void {
+function refuseRepoUsers(home: string, at: string, name: string, repo: string | undefined, does: string) {
   if (repo === undefined) return;
   const theirs = repoUsers(home, at, name, repo);
   if (theirs.length) refuse(inUseByRepo(name, theirs, repo, does), Conflict, theirs);
 }
 
 /** The version of the agent `name` as it reads just after it was written, `version`; `Missing` where it no longer reads. */
-function readBack(name: string, version: string | null): string {
+function readBack(name: string, version: string | null) {
   if (version !== null) return version;
   throw new Missing({
     message: `${AGENTS_FOLDER}/${name}.md does not read back after it was written: something removed it meanwhile. Read the agents again, and write it once more.`,
@@ -259,19 +259,19 @@ function readBack(name: string, version: string | null): string {
 }
 
 /** A version judged refused (`definitionVersionRefusal`), thrown as the refusal of its kind; nothing for none. */
-function refuseVersion(refused: VersionRefused | null): void {
+function refuseVersion(refused: VersionRefused | null) {
   if (refused !== null) refuse(refused.message, refused.kind === 'Missing' ? Missing : refused.kind === 'Conflict' ? Conflict : undefined);
 }
 
 /** What is at the agent `name` of `at` now, as the version judgement reads it: its version, or nothing. */
-const thereOf = (version: string | null): DefinitionThere => (version === null ? { kind: 'none' } : { kind: 'held', version });
+const thereOf = (version: string | null) => (version === null ? { kind: 'none' } : { kind: 'held', version }) satisfies DefinitionThere;
 
 /**
  * `draft` with the `overridable:` line the file at `at` has, read at `version` (none for a new agent), where the draft does not say the
  * line (`AgentDraft.overridable` absent): a page that does not know the line saves the agent without widening what its steps may override.
  * `null` in the draft takes it out.
  */
-function keptOffer(draft: AgentDraft, version: string | null, at: string): AgentDraft {
+function keptOffer(draft: AgentDraft, version: string | null, at: string) {
   if (draft.overridable !== undefined || version === null || !fs.existsSync(at)) return draft;
   const kept = frontmatterKey(fs.readFileSync(at, 'utf8'), 'overridable');
   return kept === undefined ? draft : { ...draft, overridable: kept };
@@ -314,7 +314,7 @@ export function writeAgent(
     repo,
     ...rest
   }: { version: string | null; from?: string; schema?: AgentSidecar | null; anywhere?: boolean; repo?: string },
-): AgentWritten {
+) {
   const at = path.resolve(dir);
   if (Object.hasOwn(rest, 'card'))
     refuse('`card` is not written with an agent: its card is generated from its skills. Send the agent without it.');
@@ -379,7 +379,7 @@ export function writeAgent(
       );
   }
   const sending = given.flatMap(({ sidecar }) => sidecar ?? []);
-  const read = (f: string): string | undefined => {
+  const read = (f: string) => {
     const sent = sending.find((s) => s.file === f);
     if (sent) return sent.text;
     try {
@@ -393,7 +393,7 @@ export function writeAgent(
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const removed: string[] = [];
-  const held = (f: string): string | undefined => {
+  const held = (f: string) => {
     try {
       return fs.readFileSync(path.join(at, f), 'utf8');
     } catch {
@@ -444,7 +444,7 @@ export function removeAgent(
   dir: string,
   name: string,
   { version, anywhere = false, repo }: { version: string | null; anywhere?: boolean; repo?: string },
-): { dir: string; removed: string[] } {
+) {
   const at = path.resolve(dir);
   refuse(agentPlaceRefusal(home, at, anywhere, repo));
   refuse(agentNameRefusal(name));
@@ -484,5 +484,5 @@ export function removeAgent(
  * the write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
  * repository's `.claude/skills/` would be refused as changed since it was read on every save.
  */
-const skillsAt = (home: string, at: string, repo: string | undefined): SkillsFound | undefined =>
+const skillsAt = (home: string, at: string, repo: string | undefined) =>
   repo === undefined ? undefined : skillsFor(path.join(path.dirname(path.resolve(at)), '_'), { repo: path.resolve(repo), home });

@@ -31,7 +31,7 @@ export const MEMORY_AGENTS = path.posix.join(MEMORY_ROOT, 'workflows', AGENTS_FO
 type Held = { readonly text: string; readonly schema?: { readonly file: string; readonly text: string } };
 
 /** The version of what is held: a digest of its file and its schema, as `agentVersion` digests an agent's files. */
-const versionOf = (held: Held): string =>
+const versionOf = (held: Held) =>
   createHash('sha256')
     .update(JSON.stringify([held.text, held.schema ?? null]))
     .digest('hex')
@@ -41,14 +41,14 @@ const versionOf = (held: Held): string =>
 type Holding = { readonly folders: Map<string, Map<string, Held>>; readonly custom: Map<string, string> };
 
 /** The agents the folder `dir` holds, by name: a new map for one that holds none. */
-const folderOf = (held: Holding, dir: string): Map<string, Held> => held.folders.get(path.posix.resolve(dir)) ?? new Map<string, Held>();
+const folderOf = (held: Holding, dir: string) => held.folders.get(path.posix.resolve(dir)) ?? new Map<string, Held>();
 
 /** An agent held, read back as its file is, the result schema sent beside it its one file. */
-const parsed = (name: string, held: Held): Agent =>
+const parsed = (name: string, held: Held) =>
   parseAgent(name, held.text, (file) => (held.schema?.file === file ? held.schema.text : undefined));
 
 /** Refuse, as `Invalid`, a folder the stand-in lists no agents from: yours, or the `repo` given's, unless `anywhere`. */
-function placeRefused(at: AgentAt): void {
+function placeRefused(at: AgentAt) {
   const dir = path.posix.resolve(at.dir);
   const repo = at.repo === undefined ? undefined : path.posix.join(path.posix.resolve(at.repo), 'workflows', AGENTS_FOLDER);
   if (path.posix.basename(dir) !== AGENTS_FOLDER || !(dir === MEMORY_AGENTS || dir === repo || at.anywhere === true))
@@ -56,7 +56,7 @@ function placeRefused(at: AgentAt): void {
 }
 
 /** Every agent a workflow at `dir` may name, as `agentsFor` finds them: the first root that has a name wins (`lookedUp`). */
-function foundIn(held: Holding, dir: string, places: Places): Map<string, Agent | WorkflowError> {
+function foundIn(held: Holding, dir: string, places: Places) {
   const roots = lookupRoots(dir, places);
   const folders = roots.map((root) => folderOf(held, path.posix.join(root, AGENTS_FOLDER)));
   const out = new Map<string, Agent | WorkflowError>();
@@ -82,7 +82,7 @@ function foundIn(held: Holding, dir: string, places: Places): Map<string, Agent 
 }
 
 /** Refuse, as `Missing`, custom instructions for an agent `name` a run on `repo` could not name, but the store's own (`isStoreAgent`). */
-function refuseNoAgent(held: Holding, name: string, repo: string | undefined): void {
+function refuseNoAgent(held: Holding, name: string, repo: string | undefined) {
   if (isStoreAgent(name)) return;
   const at = repo === undefined ? undefined : path.posix.resolve(repo);
   const places = at === undefined ? { home: MEMORY_ROOT } : { repo: at, home: MEMORY_ROOT };
@@ -92,7 +92,7 @@ function refuseNoAgent(held: Holding, name: string, repo: string | undefined): v
 }
 
 /** A fresh Agent door over maps: no agent held, no custom instructions. */
-export function agentDoorMemory(): Layer.Layer<never> {
+export function agentDoorMemory() {
   const store: Holding = { folders: new Map(), custom: new Map() };
   const { folders, custom } = store;
   const folder = (dir: string) => folderOf(store, dir);

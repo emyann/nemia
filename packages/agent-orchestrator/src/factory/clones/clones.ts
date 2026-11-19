@@ -16,14 +16,14 @@ export type { CloneTarget } from '../../../contracts/clone-target.contract.ts';
 const FORMS = 'https://<host>/<path>, ssh://[<user>@]<host>/<path>, <user>@<host>:<path>, git://<host>/<path> or file:///<path>';
 
 /** Whether git reads `given` as a local path: no colon, or a slash before the first colon. */
-const isPath = (given: string): boolean => {
+const isPath = (given: string) => {
   const colon = given.indexOf(':');
   const slash = given.indexOf('/');
   return colon < 0 || (slash >= 0 && slash < colon);
 };
 
 /** Whether `given` opens with a scheme a clone is made over. */
-const knownScheme = (given: string): boolean =>
+const knownScheme = (given: string) =>
   given.startsWith('https://') ||
   given.startsWith('http://') ||
   given.startsWith('ssh://') ||
@@ -31,30 +31,30 @@ const knownScheme = (given: string): boolean =>
   given.startsWith('file://');
 
 /** What follows the scheme form's `://`. */
-const afterScheme = (given: string): string => given.slice(given.indexOf('://')).slice(3);
+const afterScheme = (given: string) => given.slice(given.indexOf('://')).slice(3);
 
 /** The scheme form's authority: what lies between `://` and the next slash. */
-const authorityOf = (given: string): string => {
+const authorityOf = (given: string) => {
   const rest = afterScheme(given);
   const slash = rest.indexOf('/');
   return slash < 0 ? rest : rest.slice(0, slash);
 };
 
 /** Whether the scheme form carries a password: an `@` after the authority's first colon, which is a colon in a user part. */
-const holdsPassword = (given: string): boolean => {
+const holdsPassword = (given: string) => {
   const authority = authorityOf(given);
   const colon = authority.indexOf(':');
   return colon >= 0 && authority.slice(colon).includes('@');
 };
 
 /** `text` after its first `@`, or all of it where it has none. */
-const afterAt = (text: string): string => {
+const afterAt = (text: string) => {
   const at = text.indexOf('@');
   return at < 0 ? text : text.slice(at).slice(1);
 };
 
 /** The host a URL names: the scheme form's, its user and port dropped (`localhost` for a file URL naming none), or the scp-like form's. */
-const hostOf = (given: string): string => {
+const hostOf = (given: string) => {
   if (!given.includes('://')) return afterAt(given.slice(0, given.indexOf(':')));
   const hostPort = afterAt(authorityOf(given));
   const port = hostPort.indexOf(':');
@@ -63,7 +63,7 @@ const hostOf = (given: string): string => {
 };
 
 /** The path a URL names, as written: after the scheme form's authority, or after the scp-like form's colon. */
-const pathOf = (given: string): string => {
+const pathOf = (given: string) => {
   if (!given.includes('://')) return given.slice(given.indexOf(':')).slice(1);
   const rest = afterScheme(given);
   const slash = rest.indexOf('/');
@@ -71,14 +71,14 @@ const pathOf = (given: string): string => {
 };
 
 /** `text` without one slash it opens with, one it ends with, then a `.git` it ends with. */
-const named = (text: string): string => {
+const named = (text: string) => {
   const opened = text.startsWith('/') ? text.slice(1) : text;
   const ended = opened.endsWith('/') ? opened.slice(0, opened.length - 1) : opened;
   return ended.endsWith('.git') ? ended.slice(0, ended.length - 4) : ended;
 };
 
 /** Whether a clone's folder stays under `clones/`: relative, a host and a path at least, no segment empty, `.` or `..`. */
-const staysUnder = (folder: string): boolean =>
+const staysUnder = (folder: string) =>
   folder.includes('/') &&
   !folder.startsWith('/') &&
   !folder.endsWith('/') &&
@@ -91,7 +91,7 @@ const staysUnder = (folder: string): boolean =>
   !folder.includes('/../');
 
 /** Whether `text` holds none of what a folder of a clone may not: a space, a `%`, a backslash, a colon or an `@`. */
-const plain = (text: string): boolean =>
+const plain = (text: string) =>
   !text.includes(' ') && !text.includes('%') && !text.includes('\\') && !text.includes(':') && !text.includes('@');
 
 /**
@@ -128,7 +128,7 @@ export const cloneTarget: CloneTargetOf = (given) => {
  * @param home The store's root.
  * @param folder The clone's folder of its host and path, as `cloneTarget` answers it.
  */
-export const cloneFolder = (home: string, folder: string): string => {
+export const cloneFolder = (home: string, folder: string) => {
   const slash = folder.indexOf('/');
   return path.join(home, 'clones', folder.slice(0, slash).toLowerCase() + folder.slice(slash));
 };
@@ -139,7 +139,7 @@ export const cloneFolder = (home: string, folder: string): string => {
  * @param home The store's root.
  * @param repo The repository's path, as given.
  */
-export const isCloneFolder = (home: string, repo: string): boolean => {
+export const isCloneFolder = (home: string, repo: string) => {
   const rel = path.relative(path.join(home, 'clones'), path.resolve(repo));
   return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 };

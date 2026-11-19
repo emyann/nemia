@@ -14,7 +14,7 @@ export const UNREADABLE = 'an unreadable time';
  * Whether one of `dates` does not parse: a writer handed one says `UNREADABLE`, of the instant or of the clock it is said against.
  * @param dates The dates a writer is handed.
  */
-export const unreadable = (...dates: Date[]): boolean => dates.some((date) => !isValid(date));
+export const unreadable = (...dates: Date[]) => dates.some((date) => !isValid(date));
 
 /**
  * The one place a time zone becomes what date-fns reads it as: `timeZone`'s context, and nothing where there is none, so that the
@@ -22,7 +22,7 @@ export const unreadable = (...dates: Date[]): boolean => dates.some((date) => !i
  * `timeZone` takes its context from here.
  * @param timeZone An IANA time zone, or undefined for the browser's own.
  */
-export const zoneOf = (timeZone?: string): { in?: ReturnType<typeof tz> } => (timeZone === undefined ? {} : { in: tz(timeZone) });
+export const zoneOf = (timeZone?: string) => (timeZone === undefined ? {} : { in: tz(timeZone) });
 
 /**
  * A time of day as a person reads it in `timeZone`, theirs by default, to the minute: `1:11 PM`, `12:00 PM` at noon, `12:05 AM` after
@@ -30,7 +30,7 @@ export const zoneOf = (timeZone?: string): { in?: ReturnType<typeof tz> } => (ti
  * @param at The instant.
  * @param timeZone An IANA time zone, or undefined for the browser's own.
  */
-export function timeOfDay(at: Date, timeZone?: string): string {
+export function timeOfDay(at: Date, timeZone?: string) {
   if (unreadable(at)) return UNREADABLE;
   return format(at, 'h:mm a', zoneOf(timeZone));
 }
@@ -42,7 +42,7 @@ export function timeOfDay(at: Date, timeZone?: string): string {
  * @param at The instant.
  * @param timeZone An IANA time zone, or undefined for the browser's own.
  */
-export function timeToTheSecond(at: Date, timeZone?: string): string {
+export function timeToTheSecond(at: Date, timeZone?: string) {
   if (unreadable(at)) return UNREADABLE;
   return format(at, 'h:mm:ss a', zoneOf(timeZone));
 }

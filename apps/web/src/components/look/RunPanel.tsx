@@ -14,7 +14,7 @@ import { railStates, type Now } from '@/lib/runWords';
 import { OPENS } from '@/lib/words';
 import { CutButton } from './CutButton';
 import { RunMark, type NamedRun } from './RunMarks';
-import { StepGraph, type StepNamed } from './StepGraph';
+import { StepGraph } from './StepGraph';
 
 /**
  * What the panel reads of its run alone, once read (`runObjectQuery`): each step's attempts, filing, cost and its session's last line,
@@ -28,7 +28,7 @@ export type PanelRead = {
 type PanelRun = RunView;
 
 /** How long a step's latest attempt took, to the minute, or has run while it runs; none before its first or where it has no end. */
-const tookOf = (attempts: PanelRead['steps'][number]['attempts'], live: boolean, now: number): string | null => {
+const tookOf = (attempts: PanelRead['steps'][number]['attempts'], live: boolean, now: number) => {
   const latest = attempts.latest;
   if (!latest) return null;
   const end = latest.endedAt ? Date.parse(latest.endedAt) : live ? now : null;
@@ -39,7 +39,7 @@ const tookOf = (attempts: PanelRead['steps'][number]['attempts'], live: boolean,
  * Each step as the panel names it under its node: its agent as the run froze it, and once read its latest attempt's time and its cost
  * to the minute, and what its tries spent, said at `now`.
  */
-function namedSteps(run: PanelRun, read: PanelRead | null, now: number): ReadonlyMap<string, StepNamed> {
+function namedSteps(run: PanelRun, read: PanelRead | null, now: number) {
   const drawn = railStates(run.steps, run.cancelledAt !== null, run.holding != null);
   const reads = new Map(read?.steps.map((step) => [step.name, step]));
   return new Map(
@@ -64,7 +64,7 @@ function Fact({ name, value, under }: { name: string; value: ReactNode; under?: 
 }
 
 /** What a run's gates say: how many, and of the first that waits on you, or else the last passed, its word. */
-function gatesUnder(run: PanelRun): { value: string; under: string | null } {
+function gatesUnder(run: PanelRun) {
   if (run.gates.length === 0) return { value: 'none', under: null };
   const gated = run.gates.map((gate) => gate.step);
   const yours = gated.find((gate) => run.waitingOnYou.includes(gate));
@@ -122,7 +122,7 @@ export function Facts({
 }
 
 /** The runs a run waits on: those of its waits and hold not landed, and the run whose ending holds the checkout it waits on. */
-const waitsOnOf = (run: PanelRun): string[] => [
+const waitsOnOf = (run: PanelRun) => [
   ...new Set([
     ...(run.waiting?.runs.filter((waited) => !waited.missing).map((waited) => waited.run) ?? []),
     ...(run.holding?.runs.filter((held) => !held.landed).map((held) => held.run) ?? []),
@@ -213,7 +213,7 @@ export function NamedGraph({
  */
 export const pickWrap =
   (pick: { selected: string | null; onStep: (step: string) => void }, still?: string) =>
-  (node: ReactNode, step: { name: string; state: string }): ReactNode => (
+  (node: ReactNode, step: { name: string; state: string }) => (
     <AriaButton
       data-tile={step.name}
       data-state={step.state}

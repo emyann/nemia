@@ -123,10 +123,10 @@ const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, stop) => 
  * stops a task on `needs-auth` stops it for the harnesses this answers true for and no other.
  * @param harness The harness's name, or undefined for the default harness.
  */
-export const signsInMcp = (harness: string | undefined): boolean => harness === undefined || harness === 'claude';
+export const signsInMcp = (harness: string | undefined) => harness === undefined || harness === 'claude';
 
 /** `tools` and `error` as a state carries them: each left out where the harness said none, never filled with a 0 that reads as a fact. */
-const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => ({
+const saidOf = (s: McpServerStatus) => ({
   ...(s.tools === undefined ? {} : { tools: s.tools.length }),
   ...(s.error === undefined || s.error === '' ? {} : { error: s.error }),
 });
@@ -153,7 +153,7 @@ export const mcpServersRead = async (
   servers: Record<string, RemoteMcpServer>,
   cwd: string,
   how: { ask?: McpStatusAsk; executable?: string; withinMs?: number } = {},
-): Promise<McpServersRead> => {
+) => {
   const { ask = claudeMcpStatus, executable, withinMs = MCP_STATE_MS } = how;
   const handed = Object.fromEntries(Object.entries(servers).map(([name, s]) => [name, mcpServerOf(s)]));
   const stop = new AbortController();
@@ -177,7 +177,10 @@ export const mcpServersRead = async (
     ]);
   } catch (e) {
     stop.abort();
-    return { read: false, why: `the state of ${Object.keys(servers).length} server(s) could not be read: ${(e as Error).message}` };
+    return {
+      read: false,
+      why: `the state of ${Object.keys(servers).length} server(s) could not be read: ${(e as Error).message}`,
+    } satisfies McpServersRead;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
@@ -187,7 +190,7 @@ export const mcpServersRead = async (
     return {
       read: false,
       why: `the harness said \`${odd.name}\` is "${odd.status}", which is no state this runtime knows (${MCP_STATES.join(', ')}): a newer harness grew one. Read \`sdk.d.ts\` and add it to MCP_STATES in src/harness/mcp-state.ts.`,
-    };
+    } satisfies McpServersRead;
   }
   return {
     read: true,
@@ -195,5 +198,5 @@ export const mcpServersRead = async (
       const s = by.get(name);
       return s ? { name, status: s.status, ...saidOf(s) } : { name, status: 'pending' as const };
     }),
-  };
+  } satisfies McpServersRead;
 };

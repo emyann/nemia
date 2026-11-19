@@ -62,27 +62,27 @@ type StripIn = {
  * The start of the day `now` is in, midnight in the time zone the process runs in: the browser's on the page.
  * @param now The instant, in epoch ms.
  */
-export const dayStartOf = (now: number): number => {
+export const dayStartOf = (now: number) => {
   const day = new Date(now);
   day.setHours(0, 0, 0, 0);
   return day.getTime();
 };
 
 /** A cap as the readout says it: none where it is zero or unknown. */
-const capOf = (cap: number | null | undefined): number | null => (cap ? cap : null);
+const capOf = (cap: number | null | undefined) => (cap ? cap : null);
 
 /** A run's whole cost, nothing where none was measured. */
-const usdOf = (run: RunView): number => run.cost?.usd ?? 0;
+const usdOf = (run: RunView) => run.cost?.usd ?? 0;
 
 /** A sum of parts, null where one of them is null, as a run's own tokens rule (`runTokens` in the orchestrator). */
-const partSum = (parts: ReadonlyArray<number | null>): number | null =>
+const partSum = (parts: ReadonlyArray<number | null>) =>
   parts.reduce<number | null>((sum, part) => (sum === null || part === null ? null : sum + part), 0);
 
 /**
  * The tokens of `worked`, kind by kind: a kind null where one run lacks it; the sessions that measured none, each run's own and one for
  * each run with a cost and no tokens, which measured a cost and no token; null where no run measured any.
  */
-const tokensOf = (worked: readonly RunView[]): TokenCounts | null => {
+const tokensOf = (worked: readonly RunView[]) => {
   const counted = worked.flatMap((run) => (run.tokens ? [run.tokens] : []));
   if (counted.length === 0) return null;
   const sum = (key: 'total' | 'input' | 'output' | 'unmeasured') => counted.reduce((n, tokens) => n + tokens[key], 0);
@@ -98,31 +98,31 @@ const tokensOf = (worked: readonly RunView[]): TokenCounts | null => {
 };
 
 /** Whether an open run was worked since the day began: a task of it runs, or its last one ended today. */
-const workedToday = (run: RunView, dayStart: number): boolean =>
+const workedToday = (run: RunView, dayStart: number) =>
   Boolean(run.atWork?.since) || (run.atWork?.endedAt != null && Date.parse(run.atWork.endedAt) >= dayStart);
 
 /** The agents hired in the factories in view, every factory where none is. */
-const hiredIn = (factories: readonly Factory[], factory: string | undefined): Set<string> =>
+const hiredIn = (factories: readonly Factory[], factory: string | undefined) =>
   new Set(factories.filter((f) => factory === undefined || f.name === factory).flatMap((f) => Object.values(f.hires)));
 
 /**
  * The agents at work, each once, against the agents of the factories in view: those hired there, and one at work there that its step's
  * own file names, so the count is never past its total. The total is null where there are none.
  */
-const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>): Strip['agents'] => {
+const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>) => {
   const atWork = new Set(rows.map((row) => row.agent));
   const all = new Set([...hired, ...atWork]);
   return { count: atWork.size, hired: all.size || null };
 };
 
 /** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
-const working = (run: RunView, step: RunView['steps'][number]): boolean => {
+const working = (run: RunView, step: RunView['steps'][number]) => {
   const state = stepState(step, false, run.holding != null);
   return state === 'working' || state === 'checking';
 };
 
 /** The steps of `open` at work by an agent, longest first. */
-const rowsOf = (open: readonly RunView[], now: number): AgentRow[] =>
+const rowsOf = (open: readonly RunView[], now: number) =>
   open
     .flatMap((run) =>
       run.steps.flatMap((step) => {
@@ -145,8 +145,7 @@ const rowsOf = (open: readonly RunView[], now: number): AgentRow[] =>
     .sort((a, b) => b.minutes - a.minutes || a.run.localeCompare(b.run) || a.step.localeCompare(b.step));
 
 /** The sessions at work in `open`: each step working or checking, a held run's that a hold did not stop among them. */
-const sessionsOf = (open: readonly RunView[]): number =>
-  open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
+const sessionsOf = (open: readonly RunView[]) => open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
 
 /**
  * The strip's numbers off what the page reads (`StripIn`), both reads already of the factory in view: waiting and in flight are the
@@ -156,7 +155,7 @@ const sessionsOf = (open: readonly RunView[]): number =>
  * @param given What the page reads: the open and finished runs, the factories, the caps, now, the day's start
  * and the factory in view.
  */
-export function stripOf(given: StripIn): Strip {
+export function stripOf(given: StripIn) {
   const waiting = given.open.waiting.filter(judged);
   const flying = given.open.inFlight.filter(judged);
   const finishedToday = given.finished.filter((run) => Date.parse(run.finishedAt) >= given.dayStart);
@@ -182,7 +181,7 @@ export function stripOf(given: StripIn): Strip {
 }
 
 /** The readout of what is at work: `5 OF 7 RUNS · 2 OF 50 SESSIONS`, a part with no cap said without its `OF`. */
-export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>): string => {
+export const readoutOf = ({ runs, sessions }: Pick<Strip, 'runs' | 'sessions'>) => {
   const part = (count: number, cap: number | null, noun: string) => `${count}${cap === null ? '' : ` OF ${cap}`} ${noun}`;
   return `${part(runs.count, runs.cap, 'RUNS')} · ${part(sessions.count, sessions.cap, 'SESSIONS')}`;
 };
@@ -199,7 +198,7 @@ const WINDOW_MS: ReadonlyArray<readonly [RegExp, number]> = [
  * @param w The quota's window, as the api gives it.
  * @param now The instant, in epoch ms.
  */
-export const runsOutAt = (w: QuotaWindow, now: number): number | null => {
+export const runsOutAt = (w: QuotaWindow, now: number) => {
   const length = WINDOW_MS.find(([key]) => key.test(w.key))?.[1];
   if (length === undefined || w.resetsAt === null || w.reset || w.usedPercentage <= 0) return null;
   const resets = Date.parse(w.resetsAt);
@@ -216,11 +215,7 @@ export const runsOutAt = (w: QuotaWindow, now: number): number | null => {
  * @param now The instant, in epoch ms.
  * @param timeZone The time zone the times are said in; undefined for the browser's own.
  */
-export function quotaLineOf(
-  windows: readonly QuotaWindow[],
-  now: number,
-  timeZone?: string,
-): { runsOut: string | null; resets: string } | null {
+export function quotaLineOf(windows: readonly QuotaWindow[], now: number, timeZone?: string) {
   const at = (ms: number) => clockWord(new Date(ms), new Date(now), timeZone);
   const out = windows
     .map((w) => ({ w, out: runsOutAt(w, now) }))

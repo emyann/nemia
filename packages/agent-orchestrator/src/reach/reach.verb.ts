@@ -55,7 +55,7 @@ export type PolicyReach = {
 type Gated = { name: string; gate?: true; workspace?: 'base'; check?: string };
 
 /** The gate of `step` in `workflow`, approved first where it ends on the base branch, gated by its workflow or by `gates`. */
-const siteOf = (workflow: string, step: Gated, gates: readonly string[] = []): GateSite => ({
+const siteOf = (workflow: string, step: Gated, gates: readonly string[] = []) => ({
   workflow,
   step: step.name,
   approvedFirst: approvedFirst(step, { gates: [...gates] }),
@@ -63,7 +63,7 @@ const siteOf = (workflow: string, step: Gated, gates: readonly string[] = []): G
 });
 
 /** The agent's name in `args`. */
-const agentIn = (args: Args): string => String(args.name ?? '');
+const agentIn = (args: Args) => String(args.name ?? '');
 
 /** The usage the refusals of `nemia policy reach` end on. */
 const REACH_FORM = 'nemia policy reach <agent> (--factory <name> | --run <runId>)';
@@ -80,14 +80,14 @@ export const ReachInput = Schema.Struct({
 export type ReachInput = typeof ReachInput.Type;
 
 /** Why `nemia policy reach` refuses what it was given, before anything is read: a name that is no agent's, neither or both of the two. */
-const reachRefusal = (input: Args): string | null =>
+const reachRefusal = (input: Args) =>
   agentNameRefusal(agentIn(input)) ??
   ((typeof input.factory === 'string') === (typeof input.runId === 'string')
     ? `nemia policy reach reads one factory or one run: give --factory <name> or --run <runId>, one of them: ${REACH_FORM}.`
     : null);
 
 /** Why a read failed, in its own words. */
-const messageOf = (cause: Cause.Cause<unknown>): string => {
+const messageOf = (cause: Cause.Cause<unknown>) => {
   const err = Cause.squash(cause);
   return err instanceof Error ? err.message : String(err);
 };

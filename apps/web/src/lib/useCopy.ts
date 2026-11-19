@@ -12,7 +12,7 @@ export type CopySaid = 'copy' | 'copied' | 'failed';
  * @param text The text to copy.
  * @param say Told what the control says, each time that changes.
  */
-export function copyAndSay(text: string, say: (said: CopySaid) => void): () => void {
+export function copyAndSay(text: string, say: (said: CopySaid) => void) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const sayFor = (said: CopySaid) => {
@@ -36,7 +36,7 @@ export function copyAndSay(text: string, say: (said: CopySaid) => void): () => v
  * selects it instead — then rests. A second press starts the moment again; leaving the page stops it.
  * @param text The text the control copies.
  */
-export function useCopy(text: string): { said: CopySaid; copy: () => void } {
+export function useCopy(text: string) {
   const [said, setSaid] = useState<CopySaid>('copy');
   const stop = useRef<(() => void) | null>(null);
   useEffect(() => () => stop.current?.(), []);

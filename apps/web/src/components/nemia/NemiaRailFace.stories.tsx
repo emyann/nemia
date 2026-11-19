@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Meta } from '@storybook/react-vite';
 import { UP, type Presence } from '@/lib/presence';
 import { NemiaRailFace } from './NemiaRailFace';
 
@@ -10,7 +10,7 @@ export default meta;
 const AROUND = { display: 'inline-flex', justifyContent: 'center', width: 96, padding: 24, background: 'var(--surface)' };
 
 /** Her face for `presence`, open or not, on her page or not. */
-const at = (presence: Presence, open: boolean, ownsChat = false): StoryObj => ({
+const at = (presence: Presence, open: boolean, ownsChat = false) => ({
   render: () => (
     <div style={AROUND}>
       <NemiaRailFace presence={presence} open={open} ownsChat={ownsChat} onToggle={() => undefined} />

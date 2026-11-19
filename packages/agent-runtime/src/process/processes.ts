@@ -19,7 +19,7 @@ export type ProcessNow = {
 };
 
 /** The variables of `environ` (NUL-separated `NAME=value`) named in `wanted`, the first of each. */
-const environOf = (environ: string, wanted: ReadonlySet<string>): Record<string, string> => {
+const environOf = (environ: string, wanted: ReadonlySet<string>) => {
   const env: Record<string, string> = {};
   for (const entry of environ.split('\0')) {
     const at = entry.indexOf('=');
@@ -31,7 +31,7 @@ const environOf = (environ: string, wanted: ReadonlySet<string>): Record<string,
 };
 
 /** One pid's process as `/proc` reads it now, or `undefined` where it is gone, another user's or unreadable mid-read. */
-const processOf = (pid: number, uid: number, wanted: ReadonlySet<string>): ProcessNow | undefined => {
+const processOf = (pid: number, uid: number, wanted: ReadonlySet<string>) => {
   try {
     if (fs.statSync(`/proc/${pid}`).uid !== uid) return undefined;
     const start = processStart(pid);
@@ -59,7 +59,7 @@ const processOf = (pid: number, uid: number, wanted: ReadonlySet<string>): Proce
  * environment and is another user's (root's), so it is never listed.
  * @param variables The names of the environment variables to read of each process; one it lacks is left out of its `env`.
  */
-export const processesNow = (variables: readonly string[]): ProcessNow[] => {
+export const processesNow = (variables: readonly string[]) => {
   const uid = process.getuid?.();
   if (uid === undefined) return [];
   let entries: string[];
@@ -87,7 +87,7 @@ export type ProcessToEnd = { readonly pid: number; readonly start: string };
  * @param processes The processes to signal, each by its pid and the start read of it.
  * @param signal The signal to send.
  */
-export const endProcesses = (processes: readonly ProcessToEnd[], signal: 'SIGTERM' | 'SIGKILL'): number[] => {
+export const endProcesses = (processes: readonly ProcessToEnd[], signal: 'SIGTERM' | 'SIGKILL') => {
   const signalled: number[] = [];
   for (const p of processes) {
     if (processStart(p.pid) !== p.start) continue;

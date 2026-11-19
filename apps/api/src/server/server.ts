@@ -76,7 +76,7 @@ import {
   type WaitAnswer,
 } from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
-import { Api, type Event, type FeedWait, type Health } from 'objects';
+import { Api, type Health } from 'objects';
 import { capabilitiesWithSteps, pageRead, unreadAnswer } from '../capabilities/index.ts';
 import { repoNeeded } from '../factory/place.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
@@ -101,25 +101,24 @@ const RELEASE = leaseRelease(RUNNING);
  * the client holds its own against; none for a checkout, or where the app was given no release.
  * @param running The install the app runs, or undefined where it was given none.
  */
-export const healthOf = (running: Running | undefined): Health =>
-  running?.kind === 'install' ? { ok: true, release: running.tag } : { ok: true };
+export const healthOf = (running: Running | undefined) =>
+  (running?.kind === 'install' ? { ok: true, release: running.tag } : { ok: true }) satisfies Health;
 
 /**
  * Each `?selector=` of `request`, in order: the label queries of `GET /api/stats` and `GET /api/feed/stream`, read off the request since
  * objects declares no field under the retired spelling of `labelSelector` (`StatsQuery`, `FeedQuery`).
  */
-const selectorsOf = (request: HttpServerRequest.HttpServerRequest): string[] =>
-  new URL(request.url, 'http://api').searchParams.getAll('selector');
+const selectorsOf = (request: HttpServerRequest.HttpServerRequest) => new URL(request.url, 'http://api').searchParams.getAll('selector');
 
 /**
  * A wait's answer as `GET /api/feed/wait` sends it (`FeedWait`): each line an `Event` named by the byte it starts at, as a page of events
  * builds one (`eventKept`, asked no namespace and no selector: the wait's own selectors already took the line), and the cursor as text.
  */
-const waitSent = ({ ended, lines, cursor }: WaitAnswer): FeedWait => {
+const waitSent = ({ ended, lines, cursor }: WaitAnswer) => {
   const kept = eventKept({});
   return {
     ended,
-    lines: lines.flatMap(({ line, from, to }): Event[] => {
+    lines: lines.flatMap(({ line, from, to }) => {
       const event = kept(line, from, to);
       return event === undefined ? [] : [event];
     }),

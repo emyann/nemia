@@ -12,7 +12,7 @@ export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'
  * @param said Each text flag of the command and what it takes.
  * @param shape The command's forms, which end each refusal.
  */
-export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
+export const takesOf = (said: readonly Said[], shape: string) =>
   Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
 
 /**
@@ -21,7 +21,7 @@ export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<s
  * @param refusals The command's refusals of a value left out, by flag (takesOf).
  * @param flag The flag whose refusal is asked, as spelled on the command line.
  */
-export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
+export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string) => {
   const takes = refusals[flag];
   if (takes === undefined) throw new Error(`${flag} has no refusal of its value left out: add it to its command's table of them`);
   return takes;
@@ -32,7 +32,7 @@ export const takesFor = (refusals: Readonly<Record<string, string>>, flag: strin
  * @param args The command line's arguments, by key.
  * @param key Which of the two flags' values to read.
  */
-export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
+export const saidOf = (args: Args, key: 'why' | 'by') => {
   const value = args[key];
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : undefined;
 };
@@ -43,7 +43,7 @@ export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
  * @param args The command line's arguments, by key.
  * @param refusals The command's refusals of a value left out, by flag (takesOf).
  */
-export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
+export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>) {
   const value = args[key];
   if (typeof value !== 'string') return null;
   if (value.startsWith('--')) return takesFor(refusals, flag);
@@ -67,7 +67,7 @@ export const saidFlags = (
   puts: string,
   refusals: Readonly<Record<string, string>>,
   shape: string,
-): Flag[] =>
+) =>
   said.map(({ flag, key }) => ({
     flag,
     kind: 'text' as const,
@@ -82,7 +82,7 @@ export const saidFlags = (
  * @param spec The command's flags, each text one with what it takes.
  * @param args The command line's arguments, by key.
  */
-export function leftOut(spec: Spec, args: Args): string | null {
+export function leftOut(spec: Spec, args: Args) {
   for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined)) {
     if (flag.key === undefined) continue;
     const value = args[flag.key];
@@ -104,27 +104,29 @@ export const SELECTOR_FLAG_FORM =
  * `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes.
  * @param command The command line's name, as the flag's refusal says it.
  */
-export const selectorFlag = (command: string): Flag => ({
-  flag: '-l',
-  kind: 'text',
-  key: 'selector',
-  many: true,
-  takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FLAG_FORM}`,
-});
+export const selectorFlag = (command: string) =>
+  ({
+    flag: '-l',
+    kind: 'text',
+    key: 'selector',
+    many: true,
+    takes: `${command} -l takes a selector of the runs' labels: ${SELECTOR_FLAG_FORM}`,
+  }) satisfies Flag;
 
 /**
  * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
  * another; each line with its whole map; and that label's value beside each line, given again for another.
  * @param command The command line's name, as each flag's refusal says it.
  */
-export const labelFlags = (command: string): Flag[] => [
-  selectorFlag(command),
-  { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
-  {
-    flag: '-L',
-    kind: 'text',
-    key: 'labelColumns',
-    many: true,
-    takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
-  },
-];
+export const labelFlags = (command: string) =>
+  [
+    selectorFlag(command),
+    { flag: '--show-labels', kind: 'switch', key: 'showLabels' },
+    {
+      flag: '-L',
+      kind: 'text',
+      key: 'labelColumns',
+      many: true,
+      takes: `${command} -L takes the label key to show beside each line, given again for another: ${command} -L team`,
+    },
+  ] satisfies Flag[];

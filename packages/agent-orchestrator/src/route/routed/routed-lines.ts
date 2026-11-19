@@ -18,11 +18,11 @@ export type RoutedRow = (CodedStep & { message: string; note?: string }) | { bes
  * @param run The run, named by its id in the line.
  * @param condition The condition to route: its name and the routes it declares.
  */
-export const routeLine = (run: Pick<Run, 'id'>, condition: StepSpec): string =>
+export const routeLine = (run: Pick<Run, 'id'>, condition: StepSpec) =>
   `nemia route ${run.id} ${condition.name} <${(condition.routes ?? []).join('|')}>`;
 
 /** The condition a skipped node is off the route of: its `when:` condition, or a condition before it whose route ends. */
-const conditionBefore = (step: StepSpec, steps: readonly StepSpec[]): StepSpec | undefined =>
+const conditionBefore = (step: StepSpec, steps: readonly StepSpec[]) =>
   steps.find((s) => step.after.includes(s.name) && s.routes !== undefined);
 
 /** What `routedRows` reads of a listing (`ListingInput`): the run, its steps, and each step's closeout as the list is given it. */
@@ -33,20 +33,17 @@ export type RoutedInput = {
 };
 
 /** A listing's closeouts as the routing reads them: one nobody can read is none. */
-const readableOf =
-  (input: RoutedInput) =>
-  (name: string): Closeout | undefined => {
-    const c = input.closeoutOf(name);
-    return c && !('error' in c) ? c : undefined;
-  };
+const readableOf = (input: RoutedInput) => (name: string) => {
+  const c = input.closeoutOf(name);
+  return c && !('error' in c) ? c : undefined;
+};
 
 /**
  * Every step's word on this pass (`runWords`), off the run's one read: its readers as the pass made them (`readersOf`).
  * @param read The run's one read: its steps, the run, and its readers as the pass made them.
  */
-export const listedWords = (
-  read: Pick<AssessRead, 'steps' | 'run' | 'phaseOf' | 'signedOff' | 'asked' | 'spendOf' | 'verdictOf'>,
-): Map<string, StepStatus> => runWords(read.steps, read.run, read.phaseOf, read.signedOff, read.asked, read.spendOf, read.verdictOf);
+export const listedWords = (read: Pick<AssessRead, 'steps' | 'run' | 'phaseOf' | 'signedOff' | 'asked' | 'spendOf' | 'verdictOf'>) =>
+  runWords(read.steps, read.run, read.phaseOf, read.signedOff, read.asked, read.spendOf, read.verdictOf);
 
 /**
  * The rows the routing words for a run's steps never filed, by name: every other step reads as its own work says. A skipped node says the
@@ -57,17 +54,17 @@ export const listedWords = (
  * @param input What the rows read of the listing: the run, its steps, and each step's closeout as the list is given it.
  * @param words Every step's word on this pass (`runWords`), judged once by the caller (`listing`, or `listedWords` off the run's read).
  */
-export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepStatus>): Map<string, RoutedRow> {
+export function routedRows(input: RoutedInput, words: ReadonlyMap<string, StepStatus>) {
   const { steps, run } = input;
   const rows = new Map<string, RoutedRow>();
   if (!steps.some((s) => s.routes !== undefined)) return rows;
   const closeoutOf = readableOf(input);
-  const wordOf = (name: string): StepStatus => words.get(name) ?? 'pending';
-  const routeOf = (condition: StepSpec): string | undefined => {
+  const wordOf = (name: string) => words.get(name) ?? 'pending';
+  const routeOf = (condition: StepSpec) => {
     const said = answeredRoute(condition, run, closeoutOf, wordOf, steps);
     return said?.kind === 'route' ? said.route : undefined;
   };
-  const needsOf = (name: string): string | undefined => closeoutOf(name)?.needs ?? undefined;
+  const needsOf = (name: string) => closeoutOf(name)?.needs ?? undefined;
   for (const step of steps) {
     const row = rowOf(step, steps, run, wordOf(step.name), { routeOf, needsOf });
     if (row) rows.set(step.name, row);
@@ -82,7 +79,7 @@ type RowReads = {
 };
 
 /** One step's routed row, off its word on the pass and the route each condition answers; undefined where its own work says it. */
-function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads): RoutedRow | undefined {
+function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepStatus, reads: RowReads) {
   const record = run.steps[step.name];
   if (word === 'sent' && record?.sent) return { message: `sent → ${record.sent.card}`, ...codedStep(REASON_OF.sent) };
   if (word === 'skipped') {
@@ -105,7 +102,7 @@ function rowOf(step: StepSpec, steps: readonly StepSpec[], run: Run, word: StepS
  * A filed condition's row: one that stopped on no route of its own (`blocked`, a script's unsure answer; `unsigned`) says so with the line
  * that routes it by hand while no node after it is filed, and one a person routed says the route; undefined where its own work says it.
  */
-function filedRow(step: StepSpec, run: Run, word: StepStatus, reads: RowReads, offer: { note?: string }): RoutedRow | undefined {
+function filedRow(step: StepSpec, run: Run, word: StepStatus, reads: RowReads, offer: { note?: string }) {
   if (word === 'blocked') {
     const needs = reads.needsOf(step.name);
     return { message: needs ? `blocked: ${needs}` : 'blocked', ...codedStep(REASON_OF.blocked), ...offer };

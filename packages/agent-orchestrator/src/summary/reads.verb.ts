@@ -11,7 +11,6 @@ import { asked, type Engine, type TaskView, unreadableJournal } from '../runtime
 import { doorAt } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { runNamespace } from '../run-list/index.ts';
-import type { Fills } from '../folder/folder.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -50,7 +49,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine)
  * @param run The run whose tasks were read.
  * @param unreadable Why each task whose journal did not read did not, by task id.
  */
-export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
+export function unreadableOf(run: Run, unreadable: Unreadable) {
   for (const taskId of runTasks(run)) {
     const why = unreadable.get(taskId);
     if (why !== undefined) return { taskId, why };
@@ -75,7 +74,7 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
   run: Run,
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,
-): Effect.fn.Return<JudgedOrNot<T>, E, R> {
+) {
   const said = (saidBy: (by: string) => string) => ({ unreadable: saidBy('the board'), saidBy });
   const folder = yield* Effect.orDie(unloadedOf(run));
   if (folder !== undefined) return said((by) => unloadedWords(run.id, folder, by));
@@ -121,20 +120,21 @@ export const viewsFor = Effect.fn('viewsFor')(function* (e: Engine, runs: readon
  * @param e The engine.
  * @param views The engine's views of the tasks the request read.
  */
-export const seenBy = (e: Engine, views: Views): Engine => ({
-  ...e,
-  view: (taskId) => {
-    const seen = views.get(taskId);
-    return seen ? Effect.succeed(seen) : e.view(taskId);
-  },
-});
+export const seenBy = (e: Engine, views: Views) =>
+  ({
+    ...e,
+    view: (taskId) => {
+      const seen = views.get(taskId);
+      return seen ? Effect.succeed(seen) : e.view(taskId);
+    },
+  }) satisfies Engine;
 
 /**
  * What a read of `run`'s workflow folder is handed of the factory it started in, read now: its hires and rules (`factoryFills`), none for
  * a run in no factory or the default one, as the Factory door answers it at the store `home`; or, for a factory that is not there (`gone`)
  * or whose file does not read, its name alone. Throws what is no refusal.
  */
-function factoryRead(run: Run, home: string): { fills?: Fills; unread?: { name: string; gone: boolean } } {
+function factoryRead(run: Run, home: string) {
   const name = runNamespace(run.factory);
   try {
     const record = Effect.runSync(doorAt(home, (door) => door.factories.read(FactoryName.read(name))));
@@ -146,7 +146,7 @@ function factoryRead(run: Run, home: string): { fills?: Fills; unread?: { name: 
 }
 
 /** `why` ended with a full stop, where it ends with no stop of its own. */
-const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
+const stopped = (why: string) => (/[.!?]$/.test(why) ? why : `${why}.`);
 
 /**
  * The run's workflow folder, read now as its start read it: its steps, or none and a warning — the folder gone, or no longer read as a
@@ -166,7 +166,7 @@ const stopped = (why: string): string => (/[.!?]$/.test(why) ? why : `${why}.`);
  * @param run The run whose workflow folder is read.
  * @param home The store's root folder.
  */
-export function workflowsOf(run: Run, home: string): { steps: StepSpec[]; warning: null } | { steps: null; warning: string } {
+export function workflowsOf(run: Run, home: string) {
   const { fills, unread } = factoryRead(run, home);
   try {
     const read = Effect.gen(function* () {
@@ -194,16 +194,16 @@ export function workflowsOf(run: Run, home: string): { steps: StepSpec[]; warnin
  * runs of a handful of folders loads a handful, and none is kept past it, since no stamp watches a folder.
  * @param home The store's root folder.
  */
-export function folderReader(home: string): (run: Run) => ReturnType<typeof workflowsOf> {
+export function folderReader(home: string) {
   const loaded = new Map<string, ReturnType<typeof workflowsOf>>();
-  return (run) => {
+  return ((run) => {
     const key = JSON.stringify([run.workflowDir, run.repo ?? null, run.factory ?? null, run.workflow === undefined]);
     const known = loaded.get(key);
     if (known !== undefined) return known;
     const read = workflowsOf(run, home);
     loaded.set(key, read);
     return read;
-  };
+  }) satisfies (run: Run) => ReturnType<typeof workflowsOf>;
 }
 
 /**
@@ -219,7 +219,7 @@ export function folderReader(home: string): (run: Run) => ReturnType<typeof work
  * @param run The run, whose record's steps come first.
  * @param workflows The steps of the workflow the tick reads, or null where it does not read.
  */
-export function stepNames(run: Run, workflows: readonly StepSpec[] | null): string[] {
+export function stepNames(run: Run, workflows: readonly StepSpec[] | null) {
   const added = (run.workflow ?? workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
   return [...Object.keys(run.steps), ...added];
 }
@@ -231,21 +231,21 @@ export function stepNames(run: Run, workflows: readonly StepSpec[] | null): stri
  * @param run The run, whose frozen workflow is read first.
  * @param folder The steps of the run's folder, or null where it does not read.
  */
-export const judgedSteps = (run: Run, folder: readonly StepSpec[] | null): readonly StepSpec[] =>
+export const judgedSteps = (run: Run, folder: readonly StepSpec[] | null) =>
   frozenStepsOf(run) ?? folder ?? Object.keys(run.steps).map(bare);
 
 /**
  * A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`.
  * @param name The step's name on the record.
  */
-export const bare = (name: string): StepSpec => ({ name, after: [], body: '' });
+export const bare = (name: string) => ({ name, after: [], body: '' }) satisfies StepSpec as StepSpec;
 
 /**
  * The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run.
  * @param run The run, whose workflow folder is asked of.
  * @param home The store's root folder, whose `tries/` folder is looked in.
  */
-export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {
+export function tryOf(run: Pick<Run, 'workflowDir'>, home: string) {
   const dir = path.resolve(run.workflowDir);
   return path.dirname(dir) === path.resolve(triesDir(home)) ? { agent: path.basename(dir) } : null;
 }

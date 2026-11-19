@@ -20,7 +20,7 @@ import { ProposalDoor } from '../proposal/proposal.store.ts';
  */
 export const runStatesOf = (runs: readonly Pick<Run, 'id'>[], judged: ReadonlyMap<string, { readonly status: RunState }>) => {
   const listed = new Set(runs.map((r) => r.id));
-  return (run: string): RunState | undefined => judged.get(run)?.status ?? (listed.has(run) ? undefined : 'gone');
+  return (run: string) => judged.get(run)?.status ?? (listed.has(run) ? undefined : 'gone');
 };
 
 /** Every approved proposal of the store acted on, with `stateOf` its run's state: the names of those it moved, `<factory>/<name>`. */
@@ -58,5 +58,5 @@ export const proposalsActed: ProposalsActed = (runs, judged) =>
  * (`cli/main.ts`), the daemon's loop (`up`), and a test's — so every tick acts on proposals.
  * @param program A tick's pass, given the proposals pass.
  */
-export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, Exclude<R, ProposalsAct>> =>
-  Effect.provideService(program, ProposalsAct, proposalsActed);
+export const withProposalsPass = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+  Effect.provideService(program, ProposalsAct, proposalsActed) satisfies Effect.Effect<A, E, Exclude<R, ProposalsAct>>;

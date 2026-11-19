@@ -25,13 +25,13 @@ export type VolumeOnTarget = { readonly kind: 'mounted'; readonly path: string }
 export type MovedVolume = { readonly name: string; readonly path: string };
 
 /** The flag that gives the repository `source` its value on the target, as a refusal names it. */
-const repoFlag = (source: string): string => '--repo ' + source + '=';
+const repoFlag = (source: string) => '--repo ' + source + '=';
 
 /** The flag that gives the volume `name` its path on the target, as a refusal names it. */
-const volumeFlag = (name: string): string => '--volume ' + name + '=';
+const volumeFlag = (name: string) => '--volume ' + name + '=';
 
 /** Whether `text`, an optional word, is absent or holds something. */
-const absentOrSaid = (text: string | undefined): boolean => text === undefined || text.length > 0;
+const absentOrSaid = (text: string | undefined) => text === undefined || text.length > 0;
 
 const repoOnTargetSpec = spec<(source: string, origin: string | undefined, typed: string | undefined) => RepoOnTarget>({
   requires: ({ input: [source, origin, typed] }) => source.length > 0 && absentOrSaid(origin) && absentOrSaid(typed),

@@ -57,10 +57,10 @@ const USAGE = [
 ];
 
 /** A `nemia doctor` typed otherwise than its usage: refused, exit 2, naming it. */
-const misused = (said: string): Refused => new Refused(`nemia doctor: ${said}. Type one of:\n${USAGE.join('\n')}`);
+const misused = (said: string) => new Refused(`nemia doctor: ${said}. Type one of:\n${USAGE.join('\n')}`);
 
 /** The retired verb typed: refused, exit 2, naming the verb that took its place. */
-export const retiredVerb = (): Refused =>
+export const retiredVerb = () =>
   new Refused(
     `nemia ${RETIRED_VERB} is now nemia ${DOCTOR_VERB}: type \`nemia ${DOCTOR_VERB}\` (\`nemia ${DOCTOR_VERB} -h\` for its usage)`,
   );
@@ -82,35 +82,38 @@ const CLIENT_COSTS: Record<ClientPiece, ReadinessCost> = {
 };
 
 /** A piece of the area `client`, its cost as `CLIENT_COSTS` declares it. */
-const piece = (name: ClientPiece, state: ReadinessPiece['state'], message: string, command?: string): ReadinessPiece => ({
-  name,
-  area: 'client',
-  state,
-  message,
-  fixes: command === undefined ? [] : [{ message, command, startable: false }],
-  cost: CLIENT_COSTS[name],
-});
+const piece = (name: ClientPiece, state: ReadinessPiece['state'], message: string, command?: string) =>
+  ({
+    name,
+    area: 'client',
+    state,
+    message,
+    fixes: command === undefined ? [] : [{ message, command, startable: false }],
+    cost: CLIENT_COSTS[name],
+  }) satisfies ReadinessPiece;
 
 /** Whether `~/.local/bin` of `env`'s home is a folder of its PATH. */
-function localBinPiece(env: NodeJS.ProcessEnv): ReadinessPiece {
+function localBinPiece(env: NodeJS.ProcessEnv) {
   const home = env.HOME !== undefined && env.HOME !== '' ? env.HOME : os.homedir();
   const bin = path.join(home, '.local', 'bin');
   const on = (env.PATH ?? '').split(path.delimiter).some((folder) => path.resolve(folder) === bin);
-  return on
-    ? piece('local-bin-on-path', 'met', `${bin} is on PATH`)
-    : piece(
-        'local-bin-on-path',
-        'missing',
-        `${bin}, where the installer puts nemia, is not on PATH: add it in your shell profile`,
-        `export PATH="$HOME/.local/bin:$PATH"`,
-      );
+  return (
+    on
+      ? piece('local-bin-on-path', 'met', `${bin} is on PATH`)
+      : piece(
+          'local-bin-on-path',
+          'missing',
+          `${bin}, where the installer puts nemia, is not on PATH: add it in your shell profile`,
+          `export PATH="$HOME/.local/bin:$PATH"`,
+        )
+  ) satisfies ReadinessPiece;
 }
 
 /** Whether a failure of the typed client is the api refusing the token presented: a 401, declared (`Unauthorized`) or not (`Answered`). */
-const tokenRefused = (err: unknown): boolean => err instanceof Unauthorized || (err instanceof Answered && err.status === 401);
+const tokenRefused = (err: unknown) => err instanceof Unauthorized || (err instanceof Answered && err.status === 401);
 
 /** The server's read, or that it refused the token, asked of the daemon the context in use names. */
-const serverRead = (env: NodeJS.ProcessEnv): Promise<Readiness | 'refused'> =>
+const serverRead = (env: NodeJS.ProcessEnv) =>
   asked(
     'doctor',
     (client) =>
@@ -123,7 +126,7 @@ const serverRead = (env: NodeJS.ProcessEnv): Promise<Readiness | 'refused'> =>
  * run was ever started on the server, as it answered.
  * @param env The environment read for the context in use, the store and the token.
  */
-export async function doctorRead(env: NodeJS.ProcessEnv = process.env): Promise<Readiness> {
+export async function doctorRead(env: NodeJS.ProcessEnv = process.env) {
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   const pieces: ReadinessPiece[] = [];
@@ -179,7 +182,7 @@ export async function doctorRead(env: NodeJS.ProcessEnv = process.env): Promise<
 }
 
 /** The command that starts a startable fix of `p` from this client. */
-const fixCommand = (p: ReadinessPiece, fix: ReadinessFix): string =>
+const fixCommand = (p: ReadinessPiece, fix: ReadinessFix) =>
   [
     `nemia doctor fix ${p.name}`,
     ...(p.factory === undefined ? [] : [`--factory ${p.factory}`]),
@@ -188,7 +191,7 @@ const fixCommand = (p: ReadinessPiece, fix: ReadinessFix): string =>
   ].join(' ');
 
 /** A fix's line: the command that starts it here where it is startable, else the command the person types, never started from here. */
-const fixLine = (p: ReadinessPiece, fix: ReadinessFix): string =>
+const fixLine = (p: ReadinessPiece, fix: ReadinessFix) =>
   fix.startable && fix.kind !== 'typed'
     ? `           ${fix.kind === 'removes' ? 'remove' : 'start'}: ${fixCommand(p, fix)}   (${fix.message}: the server runs \`${fix.command}\`)`
     : `           fix: ${fix.command}   (${fix.message})`;
@@ -197,7 +200,7 @@ const fixLine = (p: ReadinessPiece, fix: ReadinessFix): string =>
 const CHECK_MARKS: Readonly<Record<HarnessCheck['state'], string>> = { passed: '✓', failed: '✗', running: '·', unrun: '·' };
 
 /** A harness's check's lines: its mark, name and message, and under a failed one each of its fixes as the piece's are said. */
-const checkLines = (p: ReadinessPiece, check: HarnessCheck): string[] => [
+const checkLines = (p: ReadinessPiece, check: HarnessCheck) => [
   `           ${CHECK_MARKS[check.state]} ${check.name}: ${check.message}`,
   ...(check.state === 'failed' ? check.fixes.map((fix) => `  ${fixLine(p, fix)}`) : []),
 ];
@@ -206,7 +209,7 @@ const checkLines = (p: ReadinessPiece, check: HarnessCheck): string[] => [
  * A piece's lines: its state, name, where it is and message, and under it each fix's command where it is not met; where it is, the
  * fix that removes it, how to take it off again; then each of a harness's checks it carries, a tick each (`checkLines`).
  */
-function pieceLines(p: ReadinessPiece): string[] {
+function pieceLines(p: ReadinessPiece) {
   const where = p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`;
   const head = `  ${p.state.padEnd(8)} ${p.name}${where}: ${p.message}`;
   const shown = p.state === 'met' ? p.fixes.filter((fix) => fix.kind === 'removes') : p.fixes.filter((fix) => fix.kind !== 'removes');
@@ -217,7 +220,7 @@ function pieceLines(p: ReadinessPiece): string[] {
  * The read's lines: each area holding a piece, its pieces (`pieceLines`), and last whether a run waits on it (`readinessSaid`).
  * @param read The readiness read, the server's pieces and the client's.
  */
-export function doctorLines(read: Readiness): string[] {
+export function doctorLines(read: Readiness) {
   const lines = READINESS_AREAS.flatMap((area) => {
     const ofArea = read.pieces.filter((p) => p.area === area);
     return ofArea.length === 0 ? [] : [area, ...ofArea.flatMap(pieceLines)];
@@ -235,14 +238,14 @@ type FixTyped = {
 };
 
 /** One `--answer <name>=<value>` read into `answers`: refused where it is not of that form. */
-function answerRead(value: string, answers: Record<string, string>): void {
+function answerRead(value: string, answers: Record<string, string>) {
   const eq = value.indexOf('=');
   if (eq <= 0) throw misused(`--answer takes <name>=<value>, not ${value}`);
   answers[value.slice(0, eq)] = value.slice(eq + 1);
 }
 
 /** The words after `doctor fix` read: refused where one is not of its usage. */
-function fixTyped(args: readonly string[]): FixTyped {
+function fixTyped(args: readonly string[]) {
   const [need, ...rest] = args;
   if (need === undefined || need.startsWith('-')) throw misused('fix takes the need’s name first');
   const typed: { factory?: string; workflow?: string; index?: number } = {};
@@ -261,7 +264,7 @@ function fixTyped(args: readonly string[]): FixTyped {
 }
 
 /** The fix the read holds for what was typed: the need's piece, matched on the factory and workflow typed, and its fix by index. */
-function fixFound(read: Readiness, typed: FixTyped): ReadinessFix | undefined {
+function fixFound(read: Readiness, typed: FixTyped) {
   const p = read.pieces.find(
     (one) =>
       one.name === typed.need &&
@@ -276,7 +279,7 @@ function fixFound(read: Readiness, typed: FixTyped): ReadinessFix | undefined {
  * The answers to `fix`'s asks: those typed, and each other asked at the terminal where one is attached; refused, naming the flag of
  * each, where there is none to ask on.
  */
-async function answersOf(fix: ReadinessFix | undefined, typed: FixTyped): Promise<Readonly<Record<string, string>>> {
+async function answersOf(fix: ReadinessFix | undefined, typed: FixTyped) {
   const left = (fix?.asks ?? []).filter((ask) => !(ask.name in typed.answers));
   if (left.length === 0) return typed.answers;
   if (process.stdin.isTTY !== true)
@@ -296,7 +299,7 @@ async function answersOf(fix: ReadinessFix | undefined, typed: FixTyped): Promis
 const decodeFix = Schema.decodeUnknownSync(Schema.fromJsonString(Fix));
 
 /** A pattern of a code, as a fix declares it; none where it is not one. */
-const patternOf = (code: string | undefined): RegExp | undefined => {
+const patternOf = (code: string | undefined) => {
   if (code === undefined || code === '') return undefined;
   try {
     return new RegExp(code);
@@ -306,7 +309,7 @@ const patternOf = (code: string | undefined): RegExp | undefined => {
 };
 
 /** Prints `chunk` as it came, and each whole line holding `code`'s match again on its own, spaced. Answers what is left of a line. */
-function printed(chunk: string, carried: string, code: RegExp | undefined): string {
+function printed(chunk: string, carried: string, code: RegExp | undefined) {
   process.stdout.write(chunk);
   const lines = (carried + chunk).split('\n');
   const rest = lines.pop() ?? '';
@@ -315,7 +318,7 @@ function printed(chunk: string, carried: string, code: RegExp | undefined): stri
 }
 
 /** `line`'s code, where it holds one, printed again on a line of its own, spaced, and bold at a terminal. */
-function shown(line: string, code: RegExp | undefined): void {
+function shown(line: string, code: RegExp | undefined) {
   const match = code?.exec(line)?.[0];
   if (match === undefined || match === '') return;
   const big = process.stdout.isTTY === true ? `\u001b[1m${match.split('').join(' ')}\u001b[0m` : match;
@@ -323,7 +326,7 @@ function shown(line: string, code: RegExp | undefined): void {
 }
 
 /** How a fix's output ended: its Fix, where the stream said; none where the stream ended without saying. */
-async function followed(base: string, id: string, code: RegExp | undefined, env: NodeJS.ProcessEnv): Promise<Fix | undefined> {
+async function followed(base: string, id: string, code: RegExp | undefined, env: NodeJS.ProcessEnv) {
   let response: Response;
   try {
     response = await fetch(urlOf(base, `/api/readiness/fixes/${encodeURIComponent(id)}/output`), {
@@ -359,7 +362,7 @@ async function followed(base: string, id: string, code: RegExp | undefined, env:
 }
 
 /** `nemia doctor fix <need> …`: the fix started and followed; 0 where it succeeded, 1 otherwise. */
-async function fix(args: readonly string[], env: NodeJS.ProcessEnv): Promise<number> {
+async function fix(args: readonly string[], env: NodeJS.ProcessEnv) {
   const typed = fixTyped(args);
   const read = await serverRead(env);
   if (read === 'refused') throw new Refused('the server does not take this context’s token: pair this machine again, `nemia pair <url>`');
@@ -395,16 +398,16 @@ async function fix(args: readonly string[], env: NodeJS.ProcessEnv): Promise<num
  * @param args The words typed after `doctor`.
  * @param env The environment read for the context in use, the store and the token, and given a spawned verb.
  */
-export async function doctor(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
+export async function doctor(args: readonly string[], env: NodeJS.ProcessEnv = process.env) {
   if (args[0] === 'fix') return fix(args.slice(1), env);
   if (args[0] === 'carry') return spawned([DOCTOR_VERB, ...args], 'nemia', env);
   if (args.includes('-h')) {
     process.stdout.write(`${USAGE.join('\n')}\n`);
-    return 0;
+    return 0 satisfies number;
   }
   const unknown = args.find((word) => word !== '--json');
   if (unknown !== undefined) throw misused(`it reads no ${unknown}`);
   const read = await doctorRead(env);
   process.stdout.write(args.includes('--json') ? `${JSON.stringify(read, null, 2)}\n` : `${doctorLines(read).join('\n')}\n`);
-  return runsWait(read) ? 1 : 0;
+  return (runsWait(read) ? 1 : 0) satisfies number;
 }

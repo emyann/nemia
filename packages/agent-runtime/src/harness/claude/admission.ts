@@ -10,7 +10,7 @@ import path from 'node:path';
 import { ADMISSION_DECISIONS, type Admission, type AdmissionAnswer, type AdmissionCall } from '../admission.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { withoutTelemetry } from '../telemetry.ts';
-import { isJsonObject, settingsObject, type ClaudeFlags } from './vocabulary.ts';
+import { isJsonObject, settingsObject } from './vocabulary.ts';
 
 /** The runtime's own CLI, run by the node that runs this runtime: the hook's command, whatever the session's `PATH` holds. */
 const AE = [process.execPath, path.join(import.meta.dirname, '..', '..', '..', 'bin', 'ae.ts')];
@@ -22,17 +22,17 @@ const ADMISSION_BOUND_MS = 20_000;
 const HOOK_SECONDS = 30;
 
 /** A word as a POSIX shell reads it back unchanged: in single quotes, each quote of its own closed, escaped and reopened. */
-const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
+const quoted = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
 
 /** The hook's command line: the adapter, then admission's command after `--`, every word quoted. */
-const admissionHookCommand = (admission: Admission): string => [...AE, 'admission', '--', ...admission.command].map(quoted).join(' ');
+const admissionHookCommand = (admission: Admission) => [...AE, 'admission', '--', ...admission.command].map(quoted).join(' ');
 
 /**
  * A task's Claude Code flags with its admission merged into `settings`: a `PreToolUse` hook matched to admission's tools alone, after
  * any the caller's settings already hold. The flags as given where the task has no admission.
  * @param config The task's spawn config: its Claude Code flags and its admission, either absent.
  */
-export const admittedFlags = (config: SpawnRequest['config']): ClaudeFlags | undefined => {
+export const admittedFlags = (config: SpawnRequest['config']) => {
   const admission = config?.callAdmission;
   if (admission === undefined) return config?.claude;
   const settings = settingsObject(config?.claude?.settings ?? '{}') ?? {};
@@ -55,7 +55,7 @@ export const admittedFlags = (config: SpawnRequest['config']): ClaudeFlags | und
 export type AdmissionRun = { status: number | null; stdout: string; failed: boolean };
 
 /** Runs admission's command with the call on its stdin, bounded (`ADMISSION_BOUND_MS`). */
-const runAdmission = (command: string[], call: string): AdmissionRun => {
+const runAdmission = (command: string[], call: string) => {
   const [program, ...args] = command;
   if (program === undefined) return { status: null, stdout: '', failed: true };
   const ran = spawnSync(program, args, {
@@ -68,7 +68,7 @@ const runAdmission = (command: string[], call: string): AdmissionRun => {
 };
 
 /** The hook's output for a decision, as Claude Code reads a `PreToolUse` hook's. */
-const hookOutput = (answer: AdmissionAnswer): string =>
+const hookOutput = (answer: AdmissionAnswer) =>
   JSON.stringify({
     hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: answer.decision, permissionDecisionReason: answer.message },
   });
@@ -77,7 +77,7 @@ const hookOutput = (answer: AdmissionAnswer): string =>
  * Admission's printed answer, or undefined where it printed what is no answer; `retired` where its sentence came under `reason`,
  * the spelling `message` took the place of, which a command written before the rename still prints.
  */
-const answerOf = (printed: string): { answer: AdmissionAnswer; retired: boolean } | undefined => {
+const answerOf = (printed: string) => {
   let read: unknown;
   try {
     read = JSON.parse(printed);
@@ -92,7 +92,7 @@ const answerOf = (printed: string): { answer: AdmissionAnswer; retired: boolean 
 };
 
 /** Asks the person, saying why admission could not answer. */
-const askFor = (why: string): string => hookOutput({ decision: 'ask', message: `admission could not decide: ${why}` });
+const askFor = (why: string) => hookOutput({ decision: 'ask', message: `admission could not decide: ${why}` });
 
 /**
  * The hook's output for Claude Code's hook input: the call handed to admission's `command` as an `AdmissionCall`, and its answer as
@@ -109,7 +109,7 @@ export const admitCall = (
   command: string[],
   run: typeof runAdmission = runAdmission,
   warn: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
-): string => {
+) => {
   let given: unknown;
   try {
     given = JSON.parse(hookInput);
@@ -135,7 +135,7 @@ export const admitCall = (
  * hook's output. Refused, exit 2, where no command follows `--`.
  * @param argv The words after `ae admission`, admission's command after `--`.
  */
-export function admissionHook(argv: string[]): void {
+export function admissionHook(argv: string[]) {
   const command = argv.indexOf('--') === -1 ? [] : argv.slice(argv.indexOf('--') + 1);
   if (command.length === 0)
     throw Object.assign(new Error('ae admission needs its command after --: ae admission -- my-admit --strict'), { exitCode: 2 });

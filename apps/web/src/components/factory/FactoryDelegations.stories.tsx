@@ -86,7 +86,7 @@ export const Picked: Story = {
 const PUT = `/api/namespaces/${FACTORY}/delegations/:agent`;
 
 /** Types `name` in the agent's field, gives grant 1 hires' updates, and presses Save. */
-const sent = async (canvasElement: HTMLElement, name: string): Promise<void> => {
+const sent = async (canvasElement: HTMLElement, name: string) => {
   const form = within(canvasElement);
   await userEvent.type(form.getByRole('combobox', { name: 'Agent' }), name);
   await userEvent.click(form.getByText('hires'));

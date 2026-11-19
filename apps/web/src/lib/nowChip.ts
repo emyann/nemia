@@ -15,7 +15,7 @@ export type { ChipTone } from '../../contracts/now-chip.contract.ts';
  * outlined where it waits on a run, a run slot, a hold or its turn, and grey at rest alone.
  * @param now Where the row's step stands, and whether the row waits on a person.
  */
-export const chipTone: ChipToneOf = (now: NowCase): ChipTone => {
+export const chipTone: ChipToneOf = (now: NowCase) => {
   if (now.yours) return 'yours';
   if (now.stands === 'atWork') return 'alive';
   if (now.stands === 'failed') return 'failure';
@@ -43,7 +43,7 @@ const ON: Record<WaitOn, NowStands> = { run: 'waitsOnARun', base: 'waitsOnARun',
  * @param on What thing the step waits on, or null where it waits on none.
  * @param held Whether a person holds the run.
  */
-export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean): NowStands {
+export function nowStandsOf(state: StepState, on: WaitOn | null, held: boolean) {
   if (AT_WORK.has(state)) return 'atWork';
   if (FAILED.has(state)) return 'failed';
   if (state === 'held') return 'held';
@@ -78,7 +78,7 @@ type FanRow = Pick<RunView, 'id' | 'waiting' | 'holding'> & {
  * @param rows The runs of the page, each with what it waits on, its hold and its steps.
  * @param id The run waited on.
  */
-export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string): string[] =>
+export const waitersOf = (rows: ReadonlyArray<FanRow>, id: string) =>
   rows
     .filter(
       (row) =>

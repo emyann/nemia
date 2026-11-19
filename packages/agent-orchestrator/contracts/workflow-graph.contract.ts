@@ -13,7 +13,7 @@ type GraphStep = Parameters<typeof inputGraphOf>[0][number];
 export type TypedGraph = Omit<ObjectGraph, 'nodes'> & { nodes: NonNullable<ObjectGraph['nodes']> };
 
 /** Whether no two of `steps` share a name, as the loader holds of every workflow it reads. */
-const distinct = (steps: readonly GraphStep[]): boolean => steps.every((s, i) => !steps.slice(0, i).some((t) => t.name === s.name));
+const distinct = (steps: readonly GraphStep[]) => steps.every((s, i) => !steps.slice(0, i).some((t) => t.name === s.name));
 
 /** The run's graph of the same steps: the verifier takes it as a pure function, read the same by the laws and the code. */
 export const runsGraph = assume(inputGraphOf, { pure: true });
@@ -22,10 +22,10 @@ export const runsGraph = assume(inputGraphOf, { pure: true });
 type Edge = TypedGraph['edges'][number];
 
 /** Whether two numbers are the same number, NaN the same as NaN, as a copy of one is. */
-const sameNumber = (a: number, b: number): boolean => a === b || (a !== a && b !== b);
+const sameNumber = (a: number, b: number) => a === b || (a !== a && b !== b);
 
 /** Whether two edges are the same: their ends, their kind, and a loop's rounds or a route's route. */
-const sameEdge = (a: Edge, b: Edge | undefined): boolean =>
+const sameEdge = (a: Edge, b: Edge | undefined) =>
   b !== undefined &&
   a.from === b.from &&
   a.to === b.to &&

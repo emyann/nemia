@@ -23,7 +23,7 @@ type Resolved = 'read' | 'act' | 'ask' | 'answer' | 'none';
 const STRICTNESS: Readonly<Record<Resolved, number>> = { read: 0, act: 1, answer: 2, ask: 3, none: 4 };
 
 /** The class of `entry` for an agent's call by `method`: out of reach where an agent never types it, and a setter's bare read for a GET. */
-const resolvedOf = (entry: AdmissionEntry, method: string): Resolved => {
+const resolvedOf = (entry: AdmissionEntry, method: string) => {
   const c = agentClassOf(entry);
   return typeof c !== 'object' ? c : method === 'GET' ? c.bare : c.sets;
 };
@@ -55,7 +55,7 @@ const UNLINKED: Readonly<Record<string, Resolved>> = { 'nemia.chatSend': 'act' }
  * @param endpoint The endpoint, its group and name joined by a dot.
  * @param method The request's HTTP method: a GET no entry links is a read.
  */
-export function floorEntryOf(endpoint: string, method: string): AdmissionEntry {
+export function floorEntryOf(endpoint: string, method: string) {
   const linked = LINKED.get(endpoint) ?? [];
   const [first, ...rest] = linked;
   if (first === undefined) return { name: endpoint, class: method === 'GET' ? 'read' : (UNLINKED[endpoint] ?? 'none') };
@@ -66,7 +66,7 @@ export function floorEntryOf(endpoint: string, method: string): AdmissionEntry {
 }
 
 /** How the person raises the factory `factory` to `least`, as admission says it: the store's for the default factory, else its own. */
-const raiseWords = (factory: string | undefined, least: string): string =>
+const raiseWords = (factory: string | undefined, least: string) =>
   factory === undefined || factory === DEFAULT_NAMESPACE ? `nemia level ${least}` : `nemia level ${least} --factory ${factory}`;
 
 /**
@@ -85,7 +85,7 @@ export function floorWords(
   caller: Extract<ProposalCaller, { kind: 'agent' }>,
   reason: FloorRefusal,
   factory: string | undefined,
-): string {
+) {
   const held = `the token ${caller.token ?? ''} that ${caller.agent} holds`;
   const command = ![...TABLED].includes(entry)
     ? `the board, or their own nemia`

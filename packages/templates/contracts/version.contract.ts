@@ -32,16 +32,16 @@ export type Landed = { kind: 'kept'; version: Semver } | { kind: 'taken'; versio
 const MAX_SAFE = 9_007_199_254_740_991;
 
 /** A part a version can hold: a whole number from 0, with room for one more, so the next version is exact. */
-const part = (n: number): boolean => Number.isSafeInteger(n) && n >= 0 && n < MAX_SAFE;
+const part = (n: number) => Number.isSafeInteger(n) && n >= 0 && n < MAX_SAFE;
 
 /** Each part a whole number from 0, with room for one more. */
-const whole = (v: Semver): boolean => part(v[0]) && part(v[1]) && part(v[2]);
+const whole = (v: Semver) => part(v[0]) && part(v[1]) && part(v[2]);
 
 /** The same version. */
-const same = (a: Semver, b: Semver): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+const same = (a: Semver, b: Semver) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
 /** The highest part `to` grew over `from` by precedence, or `none` where `to` is not above `from`. */
-const bumpOf = (from: Semver, to: Semver): Bump => {
+const bumpOf = (from: Semver, to: Semver) => {
   if (to[0] !== from[0]) return to[0] > from[0] ? 'major' : 'none';
   if (to[1] !== from[1]) return to[1] > from[1] ? 'minor' : 'none';
   return to[2] > from[2] ? 'patch' : 'none';
@@ -51,8 +51,14 @@ const bumpOf = (from: Semver, to: Semver): Bump => {
  * The least version above `v` of the kind `bump` (SemVer 2.0.0, items 7 and 8: "Patch version MUST be reset to 0 when minor version is
  * incremented.", "Patch and minor versions MUST be reset to 0 when major version is incremented.").
  */
-const nextOf = (v: Semver, bump: Bump): Semver =>
-  bump === 'major' ? [v[0] + 1, 0, 0] : bump === 'minor' ? [v[0], v[1] + 1, 0] : bump === 'patch' ? [v[0], v[1], v[2] + 1] : v;
+const nextOf = (v: Semver, bump: Bump) =>
+  (bump === 'major'
+    ? [v[0] + 1, 0, 0]
+    : bump === 'minor'
+      ? [v[0], v[1] + 1, 0]
+      : bump === 'patch'
+        ? [v[0], v[1], v[2] + 1]
+        : v) satisfies Semver;
 
 const landedVersionSpec = spec<(seam: Seam) => Landed>({
   requires: ({ input: [seam] }) => whole(seam.base) && whole(seam.forked) && whole(seam.branch),

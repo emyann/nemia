@@ -27,7 +27,7 @@ const WHOLE_MS = 2 ** 50;
 /** The longest a ticket lasts: a year. */
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
-const lapsed = (t: Ticket, nowMs: number): boolean => nowMs >= t.createdAtMs + t.ttlMs;
+const lapsed = (t: Ticket, nowMs: number) => nowMs >= t.createdAtMs + t.ttlMs;
 
 const ticketStateSpec = spec<(ticket: Ticket, nowMs: number) => TicketState>({
   /**

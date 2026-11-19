@@ -29,9 +29,9 @@ export const CANCEL_WORDS = {
 } as const satisfies CommandWords;
 
 /** The values under `key`, in the order given, or none. */
-const listOf = (args: Args, key: string): readonly string[] => {
+const listOf = (args: Args, key: string) => {
   const value = args[key];
-  return Array.isArray(value) ? value : [];
+  return (Array.isArray(value) ? value : []) satisfies readonly string[] as readonly string[];
 };
 
 /** `nemia hold`'s two forms, as each of its refusals ends on them. */
@@ -54,7 +54,7 @@ const HOLD_TAKES: Readonly<Record<string, string>> = { '--until': UNTIL_TAKES, .
  * and `--by`; then together: `--until` and `--off` both, and `--why` or `--by` with `--off`. A run named twice is the verb's to refuse.
  * @param args The command line's arguments, by key.
  */
-export function holdRefusal(args: Args): string | null {
+export function holdRefusal(args: Args) {
   const until = listOf(args, 'until');
   const off = args.off === true;
   if (until.some((id) => !id || id.startsWith('-'))) return UNTIL_TAKES;
@@ -131,7 +131,7 @@ export const ROUTE_WORDS = {
 } as const satisfies CommandWords;
 
 /** The refusal of a step named without `--base`, which alone takes one; null where none is. */
-export function refreshRefusal({ runId, step, base }: Args): string | null {
+export function refreshRefusal({ runId, step, base }: Args) {
   const id = typeof runId === 'string' ? runId : '<runId>';
   return base !== true && typeof step === 'string'
     ? `nemia refresh takes a step only with --base, which merges the base into the work of the loop it closes: nemia refresh ${id} ${step} --base. The new revisions are the whole run's: nemia refresh ${id}.`
@@ -200,7 +200,7 @@ const WAIT_TAKES: Readonly<Record<string, string>> = { '-l': WAIT_LABELS.takes ?
  * `--for` out of its form or past its bound, are the handler's to refuse, which holds the grammar and the bound.
  * @param args The command line's arguments, by key: the cursor under from.
  */
-export const waitRefusal = (args: Args): string | null => {
+export const waitRefusal = (args: Args) => {
   const from = args.from;
   return typeof from === 'string' && !/^\d+$/.test(from) ? FROM_TAKES : null;
 };

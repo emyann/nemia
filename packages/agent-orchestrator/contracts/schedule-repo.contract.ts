@@ -28,7 +28,7 @@ export type ScheduleRepoAsk = {
 export type ScheduleRepoRefusal = 'repo' | 'unwired';
 
 /** Whether the write sets a `repo` the schedule has none of, or another than the one it has: leaving it out sets none. */
-const placesByRepo = (ask: ScheduleRepoAsk): boolean => ask.repoSent !== undefined && ask.repoSent !== ask.repoNow;
+const placesByRepo = (ask: ScheduleRepoAsk) => ask.repoSent !== undefined && ask.repoSent !== ask.repoNow;
 
 const scheduleRepoRefusalSpec = spec<(ask: ScheduleRepoAsk) => ScheduleRepoRefusal | null>({
   ensures: {

@@ -7,13 +7,13 @@ import { type Args, type CommandWords, type Flag, type Spec } from './command.ts
 import { leftOut } from './commands-flags.ts';
 
 /** The text under `key`, as the spec read it, or empty. */
-const textOf = (args: Args, key: string): string => {
+const textOf = (args: Args, key: string) => {
   const value = args[key];
   return typeof value === 'string' ? value : '';
 };
 
 /** `nemia factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
-function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
+function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string) {
   const step = {
     flag: '--step',
     kind: 'text',
@@ -30,16 +30,14 @@ function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
         : `nemia factory ${verb} takes ${shape}, and ${arg} is one more: nemia factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
     apart: () => step.takes,
     missing,
-  };
+  } satisfies Spec;
 }
 
 /** The refusal of `nemia factory hire` or `fire` given no step, or a step's value left out. */
-const stepCheck =
-  (verb: 'hire' | 'fire', shape: string, spec: Spec) =>
-  (args: Args): string | null =>
-    args.step === undefined
-      ? `nemia factory ${verb} names the step with --step: nemia factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`
-      : leftOut(spec, args);
+const stepCheck = (verb: 'hire' | 'fire', shape: string, spec: Spec) => (args: Args) =>
+  args.step === undefined
+    ? `nemia factory ${verb} names the step with --step: nemia factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`
+    : leftOut(spec, args);
 
 const HIRE_SPEC = stepSpec(
   'hire',
@@ -80,13 +78,14 @@ export const FACTORY_FIRE_WORDS = {
 } as const satisfies CommandWords;
 
 /** A value flag of `nemia factory schedule`, named in its refusals as `takes` says. */
-const scheduleFlag = (flag: string, key: string, takes: string): Flag => ({
-  flag,
-  kind: 'text',
-  key,
-  takes: `${flag} takes ${takes}: nemia factory schedule <factory> <workflow> --cron "0 9 * * 1" --brief "Read the stats"`,
-  twice: `nemia factory schedule takes ${flag} once: a workflow has one schedule in a factory.`,
-});
+const scheduleFlag = (flag: string, key: string, takes: string) =>
+  ({
+    flag,
+    kind: 'text',
+    key,
+    takes: `${flag} takes ${takes}: nemia factory schedule <factory> <workflow> --cron "0 9 * * 1" --brief "Read the stats"`,
+    twice: `nemia factory schedule takes ${flag} once: a workflow has one schedule in a factory.`,
+  }) satisfies Flag;
 
 /**
  * `--repo`, retired and out of the usage: kept so a schedule that names one is read and refused naming the attach that places its runs
@@ -122,7 +121,7 @@ const SCHEDULE_SPEC: Spec = {
 };
 
 /** Why `nemia factory schedule`'s arguments are refused before anything is read: a `--cron` or a `--brief` left out, or a value empty. */
-function scheduleCheck(args: Args): string | null {
+function scheduleCheck(args: Args) {
   for (const key of ['cron', 'brief'])
     if (!textOf(args, key))
       return `nemia factory schedule takes --${key}: nemia factory schedule ${SCHEDULE_USAGE}. Nothing was scheduled.`;
@@ -192,13 +191,14 @@ export const FACTORY_SERVERS_WORDS = {
 } as const satisfies CommandWords;
 
 /** A value flag of `server add`. */
-const serverFlag = (flag: string, key: string, takes: string, many?: true): Flag => ({
-  flag,
-  kind: 'text',
-  key,
-  takes,
-  ...(many ? { many: true } : { twice: `${flag} is given twice, and takes one value: give it once.` }),
-});
+const serverFlag = (flag: string, key: string, takes: string, many?: true) =>
+  ({
+    flag,
+    kind: 'text',
+    key,
+    takes,
+    ...(many ? { many: true } : { twice: `${flag} is given twice, and takes one value: give it once.` }),
+  }) satisfies Flag;
 
 const SERVER_ADD_USAGE =
   '<factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]';

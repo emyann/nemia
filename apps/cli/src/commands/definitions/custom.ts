@@ -22,21 +22,21 @@ const KEPT = 'a run already started keeps the words it was started with';
 const TOLD = "her open session is told at the keeper's next beat";
 
 /** What a clear prints. */
-const clearedLines = ({ name, file, removed }: AgentInstructionsCleared): string[] => [
+const clearedLines = ({ name, file, removed }: AgentInstructionsCleared) => [
   removed
     ? `${name}: custom instructions removed, ${file} — ${name === STORE_AGENT ? TOLD : KEPT}`
     : `${name} has no custom instructions to remove`,
 ];
 
 /** What a write prints. */
-const writtenLines = ({ name, file }: AgentInstructions): string[] => [
+const writtenLines = ({ name, file }: AgentInstructions) => [
   name === STORE_AGENT
     ? `${name}: custom instructions written to ${file}, told after her instructions in every session she is filed with — ${TOLD}`
     : `${name}: custom instructions written to ${file}, told after its instructions in every run started from now — ${KEPT}`,
 ];
 
 /** What a read prints: the file and the words; that there are none, and how to set them; or, for a file that does not read, refused. */
-function readLines({ name, file, words, error }: AgentInstructions): string[] {
+function readLines({ name, file, words, error }: AgentInstructions) {
   if (error !== null) throw new Refused(error);
   if (words === null)
     return [`${name} has no custom instructions. Set them with nemia agents custom ${name} --file <path>, or --file - for stdin.`];
@@ -47,7 +47,7 @@ function readLines({ name, file, words, error }: AgentInstructions): string[] {
  * `nemia agents custom`'s runner: a clear, a write of the words `--file` holds, or a read.
  * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
-export async function agentsCustom(args: Args): Promise<number> {
+export async function agentsCustom(args: Args) {
   const name = textArg(args, 'name') ?? '';
   const file = textArg(args, 'file');
   const hers = name === STORE_AGENT;

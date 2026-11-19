@@ -23,7 +23,7 @@ export const releaseMet: ReleaseMet = (client, daemon) => {
 };
 
 /** The text of `file`, or undefined where it is not there or does not read. */
-const textOf = (file: string): string | undefined => {
+const textOf = (file: string) => {
   try {
     return fs.readFileSync(file, 'utf8');
   } catch {
@@ -38,7 +38,7 @@ const NamesDaemon = Schema.fromJsonString(Schema.Struct({ nemia: Schema.Struct({
 const ReleaseFile = Schema.fromJsonString(Schema.Struct({ tag: Schema.String }));
 
 /** Whether `dir`'s `package.json` names the daemon: the root of a checkout or an install. */
-const namesTheDaemon = (dir: string): boolean => {
+const namesTheDaemon = (dir: string) => {
   const text = textOf(path.join(dir, 'package.json'));
   return text !== undefined && Option.isSome(Schema.decodeUnknownOption(NamesDaemon)(text));
 };
@@ -48,7 +48,7 @@ const namesTheDaemon = (dir: string): boolean => {
  * daemon; null where that folder has none (a checkout), where its `tag` is not a word, or where no folder names the daemon.
  * @param from The folder the search starts at, and goes up from.
  */
-export function releaseAt(from: string): string | null {
+export function releaseAt(from: string) {
   let at: string;
   try {
     at = fs.realpathSync(from);
@@ -70,4 +70,4 @@ export function releaseAt(from: string): string | null {
 let mine: string | null | undefined;
 
 /** This client's own release, read once from its install's `release.json` (`releaseAt`); null for a checkout. */
-export const clientRelease = (): string | null => (mine === undefined ? (mine = releaseAt(import.meta.dirname)) : mine);
+export const clientRelease = () => (mine === undefined ? (mine = releaseAt(import.meta.dirname)) : mine);

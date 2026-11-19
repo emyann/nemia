@@ -21,16 +21,16 @@ type RepoQuery = { readonly repo?: string };
  * @param args The words typed after the command's name, whose `repo` is the repository typed, if any.
  * @param ask The request to make, given the `repo` query to send, or none.
  */
-export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
+export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Effect<A, E, R>) => {
   const typed = textArg(args, 'repo');
   const query = repoQueryOf(typed, undefined);
-  if (typed !== undefined || query.repo === undefined) return ask(query);
+  if (typed !== undefined || query.repo === undefined) return ask(query) satisfies Effect.Effect<A, E, R>;
   return ask(query).pipe(
     Effect.catchIf(
       (err): err is E & Invalid => err instanceof Invalid,
       () => ask({}),
     ),
-  );
+  ) satisfies Effect.Effect<A, E, R> as Effect.Effect<A, E, R>;
 };
 
 /**
@@ -38,7 +38,7 @@ export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Eff
  * @param file The path of the file to read, or `-` for stdin.
  * @param command The command's name, said in a refusal.
  */
-export function wordsRead(file: string, command: string): string {
+export function wordsRead(file: string, command: string) {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (err) {

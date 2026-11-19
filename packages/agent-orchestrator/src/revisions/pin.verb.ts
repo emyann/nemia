@@ -56,10 +56,10 @@ export type Resolved = { steps: StepSpec[]; pins: Pin[] };
 export type Kept = { kept: string };
 
 /** A refusal's or an error's first line, which is what a note on the feed has room for. */
-const firstLine = (said: string): string => firstPiece(said, '\n');
+const firstLine = (said: string) => firstPiece(said, '\n');
 
 /** The name a workflow folder is known by, within its kind: the folder's own, as a factory attaches it. */
-const workflowName = (dir: string): string => path.basename(path.resolve(dir));
+const workflowName = (dir: string) => path.basename(path.resolve(dir));
 
 /**
  * The run's workflow folder read now through the Workflow door, with its factory's hires and rules filled in as `nemia start` filled
@@ -69,19 +69,14 @@ const workflowName = (dir: string): string => path.basename(path.resolve(dir));
  * loaded with what reads, since nothing is being started here — a run that has already frozen a workflow keeps it, and this is only read to
  * see whether the content moved. A folder that does not load at all fails, and its caller keeps the freeze.
  */
-const stepsNow = (
-  home: string,
-  run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>,
-  places: Places,
-  factory: Factory | undefined,
-): Effect.Effect<StepSpec[], Refusal> =>
+const stepsNow = (home: string, run: Pick<Run, 'workflowDir' | 'repo' | 'factory'>, places: Places, factory: Factory | undefined) =>
   Effect.gen(function* () {
     const fills = factory ? factoryFills(home, factory, workflowName(run.workflowDir)).fills : undefined;
     return yield* (yield* WorkflowDoor).workflows.read(WorkflowDir.read(run.workflowDir), places, fills);
   });
 
 /** The agents and skills `steps` name, each once, in the order the steps run. */
-function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly StepSpec[]): KindName[] {
+function kindsIn(run: Pick<Run, 'workflowDir' | 'factory'>, steps: readonly StepSpec[]) {
   const named: KindName[] = [{ kind: 'workflow', name: workflowName(run.workflowDir) }];
   for (const step of steps) {
     const agent = step.agent;
@@ -106,7 +101,7 @@ const digestFor = (
   places: Places,
   factory: Factory | undefined,
   found: SkillsFound,
-): Effect.Effect<string | null, Refusal> =>
+) =>
   Effect.gen(function* () {
     if (of.kind === 'workflow') return yield* workflowVersion(run.workflowDir, places);
     if (of.kind === 'rules') return factory ? rulesVersion(home, factory) : null;
@@ -134,9 +129,9 @@ type FolderRun = Pick<Run, 'workflowDir' | 'repo' | 'factory'>;
  * key is exactly what its `f` reads, so a memo never answers for a world it did not read; `key` is given the same arguments as `f`, and
  * may take fewer than it, leaving out those `f` does not read by (a stamp).
  */
-function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) => string): (...args: A) => T {
+function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) => string) {
   const held = new Map<string, { value: T } | { thrown: unknown }>();
-  return (...args: A): T => {
+  return (...args: A) => {
     const k = key(...args);
     let had = held.get(k);
     if (!had) {
@@ -181,16 +176,13 @@ export type PassRevisions = {
 type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
 
 /** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
-const lookedUp =
-  (home: string): Numbering =>
-  (kind, name, hash, at) =>
-    revisionNow(ledgerOf(home, kind, name), hash, at);
+const lookedUp = (home: string) => ((kind, name, hash, at) => revisionNow(ledgerOf(home, kind, name), hash, at)) satisfies Numbering;
 
 /** As many keys as one pass's `Cache` holds: more than a pass can name, so nothing a pass read is let go before the pass is. */
 const PASS_KEYS = Number.MAX_SAFE_INTEGER;
 
 /** The run a folder's key names (`where`, JSON), read back for the lookup: the folder, its repository and its factory. */
-const runOfKey = (key: string): FolderRun => {
+const runOfKey = (key: string) => {
   const [workflowDir, repo, factory] = JSON.parse(key) as [string, string | null, string | null];
   return { workflowDir, ...(repo !== null && { repo }), ...(factory !== null && { factory }) };
 };
@@ -201,7 +193,7 @@ const runOfKey = (key: string): FolderRun => {
  */
 export const passRevisions = Effect.fn('passRevisions')(function* () {
   const home = yield* StoreRoot;
-  const where = (run: FolderRun): Array<string | null> => [
+  const where = (run: FolderRun) => [
     path.resolve(run.workflowDir),
     run.repo === undefined ? null : path.resolve(run.repo),
     run.factory ?? null,
@@ -254,8 +246,7 @@ export const passRevisions = Effect.fn('passRevisions')(function* () {
 });
 
 /** The pass's reader `read` where one was handed, else one made for this call alone. */
-const readOr = (read: PassRevisions | undefined): Effect.Effect<PassRevisions, never, StoreRoot> =>
-  read ? Effect.succeed(read) : passRevisions();
+const readOr = (read: PassRevisions | undefined) => (read ? Effect.succeed(read) : passRevisions());
 
 /**
  * The pins of `steps` as the world holds them now, each given its number in the ledger by `number`: appended where the digest has moved
@@ -287,9 +278,9 @@ export const pinsOf = Effect.fn('pinsOf')(function* (
  * record and a write onto one run's must leave the other's alone. Each step the run names a model for is on it (`withModels`), as the
  * run froze it at start, so a revision it takes keeps the model the run was started with.
  */
-const folderNow = (run: FolderRun & Pick<Run, 'models'>, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
+const folderNow = (run: FolderRun & Pick<Run, 'models'>, read: PassRevisions) =>
   read.steps(run).pipe(
-    Effect.map((steps): StepSpec[] | undefined => withModels(structuredClone(steps), run.models)),
+    Effect.map((steps) => withModels(structuredClone(steps), run.models)),
     Effect.catchCause(() => Effect.succeed(undefined)),
   );
 
@@ -331,7 +322,7 @@ export const refreshedNow = Effect.fn('refreshedNow')(function* (run: Run, at: s
 });
 
 /** The steps a filed run's next filing would take (`refreshedNow`'s): undefined where the folder does not load. */
-const refreshedSteps = (run: Run, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
+const refreshedSteps = (run: Run, read: PassRevisions) =>
   Effect.flatMap(folderNow(run, read), (found) => {
     if (!found) return Effect.succeed(undefined);
     const byName = new Map(found.map((s) => [s.name, s]));
@@ -350,11 +341,12 @@ const refreshedSteps = (run: Run, read: PassRevisions): Effect.Effect<StepSpec[]
 export const driftNow = Effect.fn('driftNow')(function* (run: Run, given?: PassRevisions) {
   const now = yield* pinsNow(run, yield* readOr(given));
   const ran = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);
-  return [...kindsDrift(run.pinned, now), ...stepsDrift(ran, run.pinned, now)] satisfies Drift[];
+  const drift: Drift[] = [...kindsDrift(run.pinned, now), ...stepsDrift(ran, run.pinned, now)];
+  return drift;
 });
 
 /** The pins the run's next filing would take, numbered without a write (`driftNow`'s): none where nothing would be filed or read. */
-const pinsNow = (run: Run, read: PassRevisions): Effect.Effect<Pin[], never, StoreRoot> =>
+const pinsNow = (run: Run, read: PassRevisions) =>
   !hasStarted(run) || !run.pinned?.length
     ? Effect.succeed([])
     : Effect.gen(function* () {
@@ -378,7 +370,7 @@ export const behindNow = Effect.fn('behindNow')(function* (run: Run, succeeded: 
   const read = yield* readOr(given);
   if (yield* follows(run, read)) return [];
   const now = yield* pinsNow(run, read);
-  return kindsDrift(run.pinned, now).flatMap((d): Behind[] => {
+  return kindsDrift(run.pinned, now).flatMap((d) => {
     const at = now.find((p) => p.kind === d.kind && p.name === d.name);
     return at ? [{ ...d, hash: at.hash }] : [];
   });
@@ -456,7 +448,7 @@ export const pinPass = Effect.fn('pinPass')(function* (run: Run, at: string, giv
  * prompts too. A person's refresh ask is spent all the same, as it is where the folder does not load: an ask nothing acts on is an ask the
  * tick reads for ever.
  */
-const unread = (err: unknown, lift: boolean): PinnedPass => ({
+const unread = (err: unknown, lift: boolean) => ({
   wrote: false,
   notes: [`the run keeps the revisions it had, since resolving them did not read: ${firstLine(String((err as Error)?.message ?? err))}`],
   lift,
@@ -483,7 +475,7 @@ const firstResolve = Effect.fnUntraced(function* (run: Run, at: string, read: Pa
  * its file removed or broken since the run started — follows nothing: the run keeps what it resolved, as a pinned run does, and the
  * factory's refusal is the start's and the verbs' to say, not every pass's.
  */
-const follows = (run: Run, read: PassRevisions): Effect.Effect<boolean> =>
+const follows = (run: Run, read: PassRevisions) =>
   read.factory(run).pipe(
     Effect.map((factory) => revisionsOf(factory) === 'follow'),
     Effect.orElseSucceed(() => false),

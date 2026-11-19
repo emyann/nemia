@@ -103,20 +103,21 @@ export type ReadinessFacts = {
 const READ_MS = 5_000;
 
 /** The machine's facts as this process reads them. */
-export const liveFacts = (): ReadinessFacts => ({
-  env: process.env,
-  user: os.userInfo().username,
-  exists: (file) => fs.existsSync(file),
-  run: (command, args) => {
-    const ran = spawnSync(command, [...args], { encoding: 'utf8', timeout: READ_MS });
-    return ran.error !== undefined ? undefined : { code: ran.status, out: `${ran.stdout ?? ''}${ran.stderr ?? ''}` };
-  },
-  running: runningRelease(),
-  memoryBytes: os.totalmem(),
-});
+export const liveFacts = () =>
+  ({
+    env: process.env,
+    user: os.userInfo().username,
+    exists: (file) => fs.existsSync(file),
+    run: (command, args) => {
+      const ran = spawnSync(command, [...args], { encoding: 'utf8', timeout: READ_MS });
+      return ran.error !== undefined ? undefined : { code: ran.status, out: `${ran.stdout ?? ''}${ran.stderr ?? ''}` };
+    },
+    running: runningRelease(),
+    memoryBytes: os.totalmem(),
+  }) satisfies ReadinessFacts;
 
 /** A fix a person types: its words and its command. */
-const typed = (message: string, command: string): ReadinessFix => ({ message, command, startable: false, kind: 'typed' });
+const typed = (message: string, command: string) => ({ message, command, startable: false, kind: 'typed' }) satisfies ReadinessFix;
 
 /**
  * What a piece is, which each piece declares: its name, its area, and what it costs while it is missing (`ReadinessCost`), which
@@ -131,7 +132,7 @@ const piece = (
   message: string,
   fixes: readonly ReadinessFix[] = [],
   more: Partial<Pick<ReadinessPiece, 'factory' | 'workflow' | 'addressKind' | 'servedNames' | 'harness'>> = {},
-): ReadinessPiece => ({ name, area, state, message, fixes, ...more, cost });
+) => ({ name, area, state, message, fixes, ...more, cost }) satisfies ReadinessPiece as ReadinessPiece;
 
 /** The service and its linger keep the server up: a run waits on neither while the daemon runs. */
 const SERVICE: Of = { name: 'service', area: 'service', cost: 'server' };
@@ -159,7 +160,7 @@ const RELEASE: Of = { name: 'release', area: 'release', cost: 'server' };
 const NEMIA_FOLDER: Of = { name: 'nemia-folder', area: 'machine', cost: 'server' };
 
 /** The service: its unit running under the user's service manager, and the user's linger, which keeps it running once they log out. */
-function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
+function servicePieces(facts: ReadinessFacts) {
   const unit = `${DEFAULT_NAME}.service`;
   const active = facts.run('systemctl', ['--user', 'is-active', unit]);
   const service =
@@ -188,7 +189,7 @@ function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
  * marked exposed, the names it is served at besides the loopback (`servedNamesOf`), and a `WF_SERVED_NAMES` set wrong as missing, in its
  * reader's words.
  */
-function bindPiece(facts: ReadinessFacts): ReadinessPiece {
+function bindPiece(facts: ReadinessFacts) {
   const bind = facts.env.NEMIA_BIND?.trim() || '127.0.0.1';
   const kind = kindOfBind(bind);
   const acknowledged = facts.env[BIND_PUBLIC_VARIABLE] === '1';
@@ -232,7 +233,7 @@ function bindPiece(facts: ReadinessFacts): ReadinessPiece {
  * the first two only where the daemon files its sessions under a memory limit (`WF_MEMORY_LIMIT`), which needs both; else they keep the
  * service alone. Nemia's folder beside them, only where the keeper's trust of it was refused (`nemiaFolderPieces`).
  */
-function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
+function machinePieces(home: string, facts: ReadinessFacts) {
   const limited = (facts.env.WF_MEMORY_LIMIT ?? '') !== '';
   const kernel: Of = { name: 'cgroup-v2', area: 'machine', cost: limited ? 'run' : 'server' };
   const manager: Of = { name: 'systemd-user', area: 'machine', cost: limited ? 'run' : 'server' };
@@ -260,20 +261,20 @@ function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
  * with the keeper's words, which name the fix; the keeper gives the trust again at its next beat that owes her session. None otherwise:
  * the keeper trusts her folder itself.
  */
-function nemiaFolderPieces(home: string): ReadinessPiece[] {
+function nemiaFolderPieces(home: string) {
   const refused = readUntrusted(home);
   if (refused === undefined || trustedFolder(DEFAULT_HARNESS, nemiaDir(home)) !== false) return [];
   return [piece(NEMIA_FOLDER, 'missing', refused)];
 }
 
 /** `bytes` in whole MiB, as a person reads them. */
-const mib = (bytes: number): string => `${Math.floor(bytes / 2 ** 20)} MiB`;
+const mib = (bytes: number) => `${Math.floor(bytes / 2 ** 20)} MiB`;
 
 /** `bytes` as a quantity a setting takes, in whole Mi. */
-const mi = (bytes: number): string => `${Math.floor(bytes / 2 ** 20)}Mi`;
+const mi = (bytes: number) => `${Math.floor(bytes / 2 ** 20)}Mi`;
 
 /** `n` sessions, said. */
-const sessions = (n: number): string => `${n} session${n === 1 ? '' : 's'}`;
+const sessions = (n: number) => `${n} session${n === 1 ? '' : 's'}`;
 
 /** The memory settings the daemon runs under, as its readers answer them: each quantity as written, and the sessions at once. */
 type MemorySet = {
@@ -284,12 +285,14 @@ type MemorySet = {
 };
 
 /** `env`'s memory settings, or the words of the refusal the daemon would answer one of them with. */
-function memorySetOf(env: Env): MemorySet | { readonly refused: string } {
+function memorySetOf(env: Env) {
   try {
-    return { limit: memoryLimit(env), request: memoryRequest(env), reserved: memoryReserved(env), at: maxConcurrent(env) };
+    return { limit: memoryLimit(env), request: memoryRequest(env), reserved: memoryReserved(env), at: maxConcurrent(env) } satisfies
+      | MemorySet
+      | { readonly refused: string } as MemorySet | { readonly refused: string };
   } catch (refused) {
     if (!isRefusal(refused)) throw refused;
-    return { refused: refused.message };
+    return { refused: refused.message } satisfies MemorySet | { readonly refused: string } as MemorySet | { readonly refused: string };
   }
 }
 
@@ -297,7 +300,7 @@ function memorySetOf(env: Env): MemorySet | { readonly refused: string } {
 const SIZED = typed('size the sessions to this machine', 'nemia service install --size auto');
 
 /** What `fit` says of `set` on a machine read as `floor`, as the memory-fit piece. */
-function fitPiece(fit: MemoryFit, set: MemorySet, floor: string): ReadinessPiece {
+function fitPiece(fit: MemoryFit, set: MemorySet, floor: string) {
   switch (fit.verdict) {
     case 'fits':
       return piece(MEMORY_FIT, 'met', `${sessions(set.at)} at once fit ${floor}`);
@@ -332,10 +335,10 @@ function fitPiece(fit: MemoryFit, set: MemorySet, floor: string): ReadinessPiece
 }
 
 /** A quantity a reader answered, in bytes, or null where unset. */
-const bytesOrNull = (quantity: string | undefined): number | null => (quantity === undefined ? null : (memoryBytesOf(quantity) ?? null));
+const bytesOrNull = (quantity: string | undefined) => (quantity === undefined ? null : (memoryBytesOf(quantity) ?? null));
 
 /** The floor kept for the daemon and the machine, in bytes: `WF_MEMORY_RESERVED` as its reader answered it, else its default. */
-const floorOf = (totalBytes: number, reserved: string | undefined): number =>
+const floorOf = (totalBytes: number, reserved: string | undefined) =>
   bytesOrNull(reserved) ?? reservedFor(Math.floor(totalBytes / 2 ** 20)) * 2 ** 20;
 
 /** The memory a machine of `totalBytes` read was not read: no whole number of bytes above nothing. */
@@ -350,7 +353,7 @@ const unread = (totalBytes: number | undefined): totalBytes is undefined =>
  * set-property` for one the person named — or where a setting is one the daemon refuses, in its words; not known where the memory, the
  * cgroup v2 or systemd's answer could not be read.
  */
-function sessionsSlicePiece(facts: ReadinessFacts): ReadinessPiece {
+function sessionsSlicePiece(facts: ReadinessFacts) {
   const totalBytes = facts.memoryBytes;
   if (unread(totalBytes))
     return piece(
@@ -418,7 +421,7 @@ function sessionsSlicePiece(facts: ReadinessFacts): ReadinessPiece {
  * naming how many fit and the setting to change, where they do not, or where a setting is one the daemon refuses, in its words; not
  * known where nothing is counted or the memory was not read.
  */
-function memoryFitPiece(facts: ReadinessFacts): ReadinessPiece {
+function memoryFitPiece(facts: ReadinessFacts) {
   const totalBytes = facts.memoryBytes;
   if (totalBytes === undefined || !Number.isInteger(totalBytes) || totalBytes < 1)
     return piece(MEMORY_FIT, 'unknown', "this machine's memory could not be read, so whether its sessions fit it is not known");
@@ -451,7 +454,7 @@ function memoryFitPiece(facts: ReadinessFacts): ReadinessPiece {
  * its own fix: the daemon's restart, which makes the folder and puts it first, and `nemia doctor fix tools` (`toolsNeed`), which links
  * `nemia`. A checkout's process reads no link, since its person has their own `nemia`.
  */
-function toolsPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
+function toolsPiece(home: string, facts: ReadinessFacts) {
   const bin = toolsBinDir(home);
   const made = facts.exists(bin);
   const onPath = (facts.env.PATH ?? '').split(path.delimiter).includes(bin);
@@ -478,10 +481,10 @@ function toolsPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
  * all but that. One the server runs (`puts`, `removes`) is started by `nemia doctor fix` with its index, its asks and its code; one a
  * person types (`typed`) is offered as its own command, which no server starts.
  */
-const needFixes = (need: Need, state: NeedState, at?: FixAt, fixes = need.fixes ?? []): ReadinessFix[] =>
-  fixes.flatMap((fix, index): ReadinessFix[] => {
-    if ((fix.kind === 'removes') !== (state === 'met')) return [];
-    if (fix.kind === 'typed') return [typed(fix.message, fix.command)];
+const needFixes = (need: Need, state: NeedState, at?: FixAt, fixes = need.fixes ?? []) =>
+  fixes.flatMap<ReadinessFix>((fix, index) => {
+    if ((fix.kind === 'removes') !== (state === 'met')) return [] satisfies ReadinessFix[];
+    if (fix.kind === 'typed') return [typed(fix.message, fix.command)] satisfies ReadinessFix[];
     return [
       {
         message: fix.message,
@@ -492,8 +495,8 @@ const needFixes = (need: Need, state: NeedState, at?: FixAt, fixes = need.fixes 
         ...(fix.code === undefined ? {} : { code: fix.code }),
         ...(fix.kind === 'removes' ? { kind: 'removes' as const } : {}),
       },
-    ];
-  });
+    ] satisfies ReadinessFix[];
+  }) satisfies ReadinessFix[];
 
 /** A need's piece, its state off `memo` under `key`: `unknown` where no reading is kept. */
 const needPiece = (
@@ -504,7 +507,7 @@ const needPiece = (
   fixes?: Need['fixes'],
   more: Partial<Pick<ReadinessPiece, 'harness'>> = {},
   message: string = need.message,
-): ReadinessPiece => {
+) => {
   const state = read ?? 'unknown';
   return piece({ name: need.name, area, cost: 'run' }, state, message, needFixes(need, state, at, fixes), { ...at, ...more });
 };
@@ -513,7 +516,7 @@ const needPiece = (
  * What the version command of the harness `name` answered, in the store `home`, with the tools folder first on its PATH: the first
  * `x.y.z` it printed, none where it did not start or printed none.
  */
-const versionFound = (home: string, facts: ReadinessFacts, command: string): { found?: string; printed: string } => {
+const versionFound = (home: string, facts: ReadinessFacts, command: string) => {
   const ran = facts.run('env', [`PATH=${pathLedByTools(home, facts.env.PATH)}`, `NEMIA_TOOLS=${toolsDir(home)}`, 'sh', '-c', command]);
   const printed = ran?.out.trim() ?? '';
   const found = ran === undefined || ran.code !== 0 ? undefined : versionIn(ran.out);
@@ -521,7 +524,7 @@ const versionFound = (home: string, facts: ReadinessFacts, command: string): { f
 };
 
 /** The last line `printed` says, cut to 300 characters, or none. */
-const lastSaid = (printed: string): string | undefined => {
+const lastSaid = (printed: string) => {
   const line = printed
     .split('\n')
     .map((l) => l.trim())
@@ -534,16 +537,19 @@ const lastSaid = (printed: string): string | undefined => {
  * The version check of a harness's install in place: passed where its program answers the pin; failed, with the install offered again
  * (index 0), where it answers another version, stating both, or none, in what it printed.
  */
-const versionCheck = (
-  need: Need,
-  needs: { readonly title: string; readonly pin: string },
-  read: { found?: string; printed: string },
-): HarnessCheck => {
+const versionCheck = (need: Need, needs: { readonly title: string; readonly pin: string }, read: { found?: string; printed: string }) => {
   const { found } = read;
   const word = harnessVersionWord(found, needs.pin);
   const fixes = needFixes(need, 'missing').filter((fix) => fix.index === 0);
   if (word === 'tested' && found !== undefined)
-    return { name: 'version', state: 'passed', message: VERSION_WORDS.tested(found), fixes: [], found, pin: needs.pin };
+    return {
+      name: 'version',
+      state: 'passed',
+      message: VERSION_WORDS.tested(found),
+      fixes: [],
+      found,
+      pin: needs.pin,
+    } satisfies HarnessCheck;
   if (found !== undefined)
     return {
       name: 'version',
@@ -552,7 +558,7 @@ const versionCheck = (
       fixes,
       found,
       pin: needs.pin,
-    };
+    } satisfies HarnessCheck;
   const said = lastSaid(read.printed);
   return {
     name: 'version',
@@ -560,7 +566,7 @@ const versionCheck = (
     message: `${needs.title}'s version could not be read by running it${said === undefined ? '' : `: ${said}`}`,
     fixes,
     pin: needs.pin,
-  };
+  } satisfies HarnessCheck;
 };
 
 /** What the read says of the version found against the pin, by `harnessVersionWord`. */
@@ -612,7 +618,7 @@ const workflowHarnesses = Effect.fnUntraced(function* (home: string, f: Factory,
  * The harnesses the read counts: the default, each a run would be held on (`harnessesNamed`), and each whose install is in place, which a
  * person activated. Any other is `inactive`.
  */
-const harnessesWanted = (memo: NeedsMemo, named: ReadonlySet<string>): Set<string> => {
+const harnessesWanted = (memo: NeedsMemo, named: ReadonlySet<string>) => {
   const installed = memo.harnessNeeds.flatMap((need) => {
     const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
     return of?.part === 'install' && memo.readings.get(checkKey(harnessCheckOf(need))) === 'met' ? [of.name] : [];
@@ -624,7 +630,7 @@ const harnessesWanted = (memo: NeedsMemo, named: ReadonlySet<string>): Set<strin
  * The piece of a harness nobody activated and nothing runs on (`harnessesWanted`), `inactive`: its install with the fix a missing one
  * offers, and its sign-in with none, since no sign-in runs before the install.
  */
-const inactivePiece = (need: Need, of: NonNullable<ReturnType<typeof harnessOfNeed>>): ReadinessPiece => {
+const inactivePiece = (need: Need, of: NonNullable<ReturnType<typeof harnessOfNeed>>) => {
   const harness = { harness: { name: of.name, part: of.part } };
   if (of.part === 'install')
     return piece(
@@ -653,7 +659,7 @@ const inactivePiece = (need: Need, of: NonNullable<ReturnType<typeof harnessOfNe
  * with the fix a missing one offers, so it is activated from the read as any other is, and its sign-in with none, since no sign-in runs
  * before the install; once installed it is wanted, and the read after the install offers them.
  */
-function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wanted: ReadonlySet<string>): ReadinessPiece[] {
+function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wanted: ReadonlySet<string>) {
   return memo.harnessNeeds.flatMap((need) => {
     const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
     if (of === undefined) return [];
@@ -723,7 +729,7 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wan
  * places are not trusted (`untrusted`) is `unknown`, its check never run, with the command that trusts them. A workflow's need of
  * `scope: repository` is read in its factory's repository (`workflowCheckOf`), and is missing, saying why, where the factory has none.
  */
-function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untrusted: ReadonlySet<string>): ReadinessPiece[] {
+function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untrusted: ReadonlySet<string>) {
   const place = memo.placeNeeds.filter((need) => !isRepositoryNeed(need));
   const out: ReadinessPiece[] = place.map((need) => needPiece(need, 'place', memo.readings.get(checkKey({ check: need.check }))));
   for (const w of workflows) {
@@ -764,7 +770,7 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
  * @param w The factory's workflow, with its live folder and its factory's repository.
  * @param need The need the workflow declares.
  */
-export const workflowNeedPiece = (memo: NeedsMemo, w: FactoryWorkflow, need: Need): ReadinessPiece => {
+export const workflowNeedPiece = (memo: NeedsMemo, w: FactoryWorkflow, need: Need) => {
   const at = { factory: w.factory, workflow: w.workflow };
   const checked = workflowCheckOf(w, need);
   if (checked === undefined) return needPiece(need, 'workflow', 'missing', at, [], {}, noRepositoryMessage(need));
@@ -776,7 +782,7 @@ export const workflowNeedPiece = (memo: NeedsMemo, w: FactoryWorkflow, need: Nee
  * (`factoryRepository`) and fixed there by `nemia doctor fix <need> --factory <factory>`; a factory whose places are not trusted
  * (`untrusted`) has each `unknown`, its check never run, with the command that trusts them, and one that does not read has none.
  */
-function repositoryPieces(memo: NeedsMemo, factories: readonly FactoryListing[], untrusted: ReadonlySet<string>): ReadinessPiece[] {
+function repositoryPieces(memo: NeedsMemo, factories: readonly FactoryListing[], untrusted: ReadonlySet<string>) {
   const needs = memo.placeNeeds.filter(isRepositoryNeed);
   return factories.flatMap((f) => {
     const repository = factoryRepository(f);
@@ -797,7 +803,7 @@ function repositoryPieces(memo: NeedsMemo, factories: readonly FactoryListing[],
 }
 
 /** A factory filed at all: none yet names the command that files one. */
-function factoryPiece(factories: readonly FactoryListing[]): ReadinessPiece {
+function factoryPiece(factories: readonly FactoryListing[]) {
   if (!factories.length)
     return piece(FACTORY, 'missing', 'no factory is filed: a run starts in one', [
       typed('file one from a template, on a repository', 'nemia factory apply <name> --template <template> --volume <url>:rw'),
@@ -810,7 +816,7 @@ function factoryPiece(factories: readonly FactoryListing[]): ReadinessPiece {
 }
 
 /** A newer release, as the release check last read it (`latestRelease`): met either way, with `nemia upgrade` where one is out. */
-function releasePiece(home: string, facts: ReadinessFacts): ReadinessPiece {
+function releasePiece(home: string, facts: ReadinessFacts) {
   const latest = latestRelease(home, facts.running);
   if (latest === undefined)
     return piece(

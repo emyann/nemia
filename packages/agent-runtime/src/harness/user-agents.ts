@@ -12,6 +12,6 @@ export type UserAgentFolder = { readonly harness: string; readonly folder: strin
  * Each harness's folder of its user's own agent files, in the order the harnesses are named, whether or not it is there.
  * @param env The environment the harness would run under, which may move its config folder.
  */
-export const userAgentFolders = (env: NodeJS.ProcessEnv = process.env): readonly UserAgentFolder[] => [
+export const userAgentFolders = (env: NodeJS.ProcessEnv = process.env) => [
   { harness: 'claude', folder: path.join(env.CLAUDE_CONFIG_DIR || claudeHome(), 'agents') },
 ];

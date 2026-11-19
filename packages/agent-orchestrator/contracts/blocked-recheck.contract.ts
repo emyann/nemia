@@ -53,13 +53,13 @@ export type BlockedRecheck =
   | { recheck: false; why: 'moved'; was: string; now: string };
 
 /** Whether a check's task settled without passing: its command refused, or it was ended before it finished. */
-const didNotPass = (phase: TaskPhase): boolean => phase === 'failed' || phase === 'stopped';
+const didNotPass = (phase: TaskPhase) => phase === 'failed' || phase === 'stopped';
 
 /** Whether the try behind is a check that did not pass, judging a session other than the current one. */
-const failedBefore = (i: BlockedRecheckRead): boolean => i.behind !== null && !i.behind.sameTask && didNotPass(i.behind.checkPhase);
+const failedBefore = (i: BlockedRecheckRead) => i.behind !== null && !i.behind.sameTask && didNotPass(i.behind.checkPhase);
 
 /** Whether everything but the branch's place is as a recheck needs it. */
-const readyButTheBranch = (i: BlockedRecheckRead): boolean => i.blocked && i.settled && failedBefore(i) && i.handedOff;
+const readyButTheBranch = (i: BlockedRecheckRead) => i.blocked && i.settled && failedBefore(i) && i.handedOff;
 
 const blockedRecheckSpec = spec<(i: BlockedRecheckRead) => BlockedRecheck>({
   ensures: {

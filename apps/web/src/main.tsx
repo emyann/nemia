@@ -50,7 +50,7 @@ function Board() {
  * Draws the board once a first-visit link the address carries is claimed (`claimLinkOnLoad`), so its first read is made with the cookie
  * the claim set; an address with no link is drawn at once.
  */
-function render(): void {
+function render() {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>

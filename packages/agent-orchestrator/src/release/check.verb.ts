@@ -6,7 +6,7 @@
  * where `NEMIA_RELEASE_CHECK=off`. Level-triggered: each check reads the install and the setting afresh and writes what it read whole.
  */
 import { Effect, Result, Schedule } from 'effect';
-import { setting, type StoreConfig } from '../config/config.store.ts';
+import { setting } from '../config/config.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { awaited } from '../runtime-client.ts';
 import { archiveInstall, type Running } from './release.ts';
@@ -29,9 +29,7 @@ export type ReleaseChecked =
   | { readonly kind: 'unread'; readonly message: string };
 
 /** One release check of the store the program is given, for the code `running` runs (`ReleaseChecked`); it never fails. */
-export const checkOnce = Effect.fn('checkOnce')(function* (
-  running: Running,
-): Effect.fn.Return<ReleaseChecked, never, StoreRoot | StoreConfig> {
+export const checkOnce = Effect.fn('checkOnce')(function* (running: Running) {
   const on = yield* Effect.result(setting('releaseCheck'));
   if (Result.isFailure(on)) return { kind: 'unread', message: on.failure.message } satisfies ReleaseChecked;
   if (!on.success) return { kind: 'off' } satisfies ReleaseChecked;

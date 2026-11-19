@@ -1,7 +1,9 @@
 /**
  * The welcome's reads as the api answers them, for its stories (`Pages/Welcome`): the readiness read typed by `objects`' own `Readiness`,
  * the milestones by its `Milestones`, a fix by its `Fix` and a check turn by its `HarnessTurn`, so a key the api renames fails the
- * typecheck here; and the MSW handlers a story names in `parameters.msw` — a fresh store, a harness installing, a check failed, ready.
+ * typecheck here; and the MSW handlers a story names in `parameters.msw` — a fresh store, a harness installing, a check failed, ready —
+ * and the milestones read alone, the factory next, filed, filed with a volume, or filed in her chat while the step watches, which the
+ * factory step reads (`Pages/Welcome factory`).
  */
 import { http, HttpResponse } from 'msw';
 import type { Fix, HarnessCheck, HarnessTurn, Milestones, Quota, Readiness, ReadinessPiece } from 'objects';
@@ -83,6 +85,36 @@ const FRESH_MILESTONES: Milestones = {
   ],
 };
 
+/** A harness activated, the factory next. */
+const FACTORY_NEXT: Milestones = {
+  milestones: [
+    { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
+    { name: 'factory', state: 'next', message: 'make a first factory: with Nemia, from a template, or from scratch; it may start with no volume' },
+    { name: 'volume', state: 'later', message: 'give a factory a volume' },
+    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+  ],
+};
+
+/** A harness activated and a factory filed, its volume next. */
+const FACTORY_FILED: Milestones = {
+  milestones: [
+    { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
+    { name: 'factory', state: 'done', message: 'a factory is filed' },
+    { name: 'volume', state: 'next', message: 'give a factory a volume its runs mount' },
+    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
+  ],
+};
+
+/** A harness activated, a factory filed and given a volume: the first landing next. */
+const VOLUME_DONE: Milestones = {
+  milestones: [
+    { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
+    { name: 'factory', state: 'done', message: 'a factory is filed' },
+    { name: 'volume', state: 'done', message: 'a factory has a volume' },
+    { name: 'landed', state: 'next', message: 'merge a first change into its base branch' },
+  ],
+};
+
 /** The subscription's quota, fresh: what the welcome shows beside a passed turn, as information. */
 const QUOTA: Quota = {
   state: 'fresh',
@@ -141,11 +173,21 @@ export const checkFailed = answering([
 ]);
 
 /** The harness installed, signed in, and both checks passed: the factory next. */
-export const harnessReady = answering([install('met', [VERSION, TURN_PASSED]), signIn('met'), NO_FACTORY], {
-  milestones: [
-    { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
-    { name: 'factory', state: 'next', message: 'file a factory from a template: it may start with no volume' },
-    { name: 'volume', state: 'later', message: 'give a factory a volume' },
-    { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
-  ],
-});
+export const harnessReady = answering([install('met', [VERSION, TURN_PASSED]), signIn('met'), NO_FACTORY], FACTORY_NEXT);
+
+/** The milestones read alone, the factory next: what the factory step reads before a factory is filed. */
+export const factoryNext = [http.get('/api/readiness/milestones', () => HttpResponse.json(FACTORY_NEXT))];
+
+/** The milestones read alone, a factory filed: what the factory step reads once the store holds one. */
+export const factoryFiled = [http.get('/api/readiness/milestones', () => HttpResponse.json(FACTORY_FILED))];
+
+/** The milestones read alone, a factory filed and given a volume: a store the step opens on whose factory already has its folder. */
+export const volumeGiven = [http.get('/api/readiness/milestones', () => HttpResponse.json(VOLUME_DONE))];
+
+/** Whether Nemia has filed the factory in her chat: a story's play sets it, as her chat would file it, while the step watches. */
+export const herFiling = { filed: false };
+
+/** The milestones read alone, the factory next until `herFiling.filed`, then filed: the store as her chat changes it. */
+export const filedInHerChat = [
+  http.get('/api/readiness/milestones', () => HttpResponse.json(herFiling.filed ? FACTORY_FILED : FACTORY_NEXT)),
+];

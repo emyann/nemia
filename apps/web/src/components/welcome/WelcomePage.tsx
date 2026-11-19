@@ -8,7 +8,7 @@ import { HarnessChecks } from '@/components/setup/HarnessChecks';
 import { HarnessChoice } from '@/components/setup/HarnessChoice';
 import { quotaQuery } from '@/lib/api/quota';
 import { milestonesQuery, readinessQuery } from '@/lib/api/readiness';
-import { MILESTONE_NAMES } from '@/lib/gettingStarted';
+import { MILESTONE_LINKS, MILESTONE_NAMES } from '@/lib/gettingStarted';
 import { quotaTitle } from '@/lib/quota';
 import { useHarnessActivation } from '@/lib/useHarnessActivation';
 import { useNow } from '@/lib/useNow';
@@ -20,8 +20,8 @@ export const WELCOME_LINE = "The harness you pick runs Nemia's own agent and eve
  * The welcome, at `/welcome`, where a fresh store opens: one card per harness the read declares, with the one line; Activate installs the
  * pinned copy (the same fix as Setup's), followed on the page, then its version tick, its sign-in, and one real turn through it, the
  * quota shown once it passed, as information. Its skip keeps the skip in this browser and leaves for the board; once both ticks passed,
- * Next names the next milestone. A harness already installed when the page is drawn is shown as activated, with its sign-in and its
- * checks.
+ * Next names the next milestone and leads to its page, where one is built. A harness already installed when the page is drawn is shown
+ * as activated, with its sign-in and its checks.
  */
 export function WelcomePage() {
   const navigate = useNavigate();
@@ -72,7 +72,7 @@ export function WelcomePage() {
           Skip for now
         </Button>
         {ready && (
-          <CutButton data-welcome-next to="/">
+          <CutButton data-welcome-next to={(next === undefined ? undefined : MILESTONE_LINKS[next]) ?? '/'}>
             {next === undefined ? 'On to the board' : `Next: ${MILESTONE_NAMES[next].toLowerCase()}`}
           </CutButton>
         )}

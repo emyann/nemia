@@ -244,6 +244,10 @@
       "meaning": "the page a fresh store opens on, `/welcome`, in place of the empty floor: a store with no harness activated and no factory filed, whose person has not skipped the harness in this browser (`welcomeAsked`, `apps/web/src/lib/welcome.ts`); it activates a harness and shows its two checks (`WelcomePage`, `apps/web/src/components/welcome/WelcomePage.tsx`)."
     },
     {
+      "term": "Factory step",
+      "meaning": "the welcome's second milestone, `/welcome/factory`, reached by the harness step's Next and by Getting started: how to make a first factory, three ways in order (with Nemia in her chat, from a template, from scratch), and once the store's milestones read a factory filed, or a write of the page was answered, the factory made, with the short guide after an empty one (`factoryStepOf`, `apps/web/src/lib/factoryStep.ts`, proved by `apps/web/contracts/factory-step.contract.ts`; `FactoryStep`, `apps/web/src/components/welcome/FactoryStep.tsx`)."
+    },
+    {
       "term": "Getting started",
       "meaning": "the floor's list of a store's four milestones, each as the api reads it from the store, the next one linked to its page, shown until a run has landed or the person dismisses it in this browser (`starterShown`, `apps/web/src/lib/gettingStarted.ts`; `GettingStarted`, `apps/web/src/components/frame/GettingStarted.tsx`)."
     },

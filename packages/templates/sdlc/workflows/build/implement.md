@@ -27,6 +27,10 @@ A red context has been re-run once by then, its failed jobs, so a red refusal na
 time: a job red twice is the change's. A refusal that says the re-run was still running at the bound asks nothing of the work:
 change nothing, and sign off as before; the next check reads the re-run's own verdict and re-runs nothing again.
 
+**Don't wait on CI yourself.** Push (or open the pull request), then sign off: your check waits on `${{ parameters.ciCheck }}` and
+hands you its verdict, the failing jobs and their log included. A session that sleeps or polls on `${{ parameters.ciCheck }}` holds
+its slot and its context for nothing.
+
 ### false — in this checkout
 
 This factory has no remote: nothing is pushed and no pull request is opened, and you open none. Your check runs `probe.ts`,

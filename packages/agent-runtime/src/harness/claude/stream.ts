@@ -311,6 +311,22 @@ export const initRanIn = (line: Printed<'system init'>): string | undefined => l
  */
 export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
 
+/**
+ * What a capture keeps of an `init` line: the fields a reader reads, as the line names them, but the mode, in the runtime's word
+ * (`ranIn`).
+ */
+type InitText = Pick<Printed<'system init'>, 'cwd' | 'model' | 'claude_code_version'> & { readonly ranIn?: string };
+
+/**
+ * A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read.
+ * @param ranIn The mode the line named.
+ */
+export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
+
+/** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
+export const initLineText = ({ ranIn, ...read }: InitText): string =>
+  JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
+
 const decodeEvent = Schema.decodeUnknownOption(Events);
 
 /**

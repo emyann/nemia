@@ -1,0 +1,51 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
+import type { RunView } from '@/lib/api/judged';
+import { FirstHint } from './FirstHint';
+
+/** A first card's run as the hints read it: labelled, in `status`, with one step filed where `filed`. */
+const runOf = (status: RunView['status'], filed: boolean): Pick<RunView, 'labels' | 'status' | 'steps'> => ({
+  labels: { onboarding: 'first-card', workflow: 'quick' },
+  status,
+  steps: [{ name: 'implement', filed: filed ? {} : null }] as unknown as RunView['steps'],
+});
+
+/** The hint of one beat, on a run that stands at it: one story a beat. */
+const meta: Meta<typeof FirstHint> = {
+  title: 'Run/First hint',
+  component: FirstHint,
+  args: { run: runOf('running', false), beat: 'card' },
+};
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+/** Started, nothing filed yet: the card. */
+export const Card: Story = {
+  args: { run: runOf('running', false), beat: 'card' },
+  play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint="card"]')).not.toBeNull(),
+};
+
+/** A step filed and at work: the steps. */
+export const Steps: Story = {
+  args: { run: runOf('running', true), beat: 'steps' },
+  play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint="steps"]')).not.toBeNull(),
+};
+
+/** At its gate: the hint that it waits on you. */
+export const Gate: Story = {
+  args: { run: runOf('awaiting approval', true), beat: 'gate' },
+  play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint="gate"]')).not.toBeNull(),
+};
+
+/** Landed: the hint leads to what is next. */
+export const Landed: Story = {
+  args: { run: runOf('succeeded', true), beat: 'landed' },
+  play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-next]')).not.toBeNull(),
+};
+
+/** A run that is not the first card's draws no hint. */
+export const NotFirst: Story = {
+  args: { run: { ...runOf('awaiting approval', true), labels: { workflow: 'quick' } }, beat: 'gate' },
+  play: async ({ canvasElement }) => expect(canvasElement.querySelector('[data-first-hint]')).toBeNull(),
+};

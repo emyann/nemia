@@ -69,7 +69,12 @@ export const Switched: Story = {
         return HttpResponse.json({
           apiVersion: 'nemia/v1',
           kind: 'Volume',
-          metadata: { name: 'notes', namespace: FACTORY },
+          metadata: {
+            name: 'notes',
+            namespace: FACTORY,
+            creationTimestamp: '2026-11-19T00:00:00.000Z',
+            resourceVersion: 'v2',
+          },
           spec: { path: '/srv/notes', readOnly: true, claudeMd: true },
           status: { present: true, runs: [] },
           written: { file: '/store/factories/mill.json' },

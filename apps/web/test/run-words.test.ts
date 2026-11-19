@@ -24,7 +24,7 @@ import {
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
-import { givenAgent, summary, type Word } from './run-fixtures.ts';
+import { givenAgent, summary, type Word } from './run.fixture.ts';
 
 /** A command, as the api's advice can carry one: no sentence repeats it. */
 const COMMAND = 'nemia approve r-1 land --message "go" && git merge wf/r-1/land';

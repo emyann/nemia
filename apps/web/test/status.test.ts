@@ -371,7 +371,7 @@ describe("the meanings of a state's colour: one thing each, read from the look's
   test("REFUSED: the run page's banner of a wait on other runs — waiting on runs, held — drawn from another meaning than yours or rest", async () => {
     await import('./tsx.ts');
     const { createElement } = await import('react');
-    const { routedWith } = await import('./markup-fixtures.ts');
+    const { routedWith } = await import('./markup.fixture.ts');
     const { RunWait } = await import('../src/components/run/RunWait.tsx');
     const { LiftHold } = await import('../src/components/run/LiftHold.tsx');
     const tokensOf = (html: string) => new Set(/<section[^>]*class="([^"]*)"/.exec(html)![1].split(/\s+/));

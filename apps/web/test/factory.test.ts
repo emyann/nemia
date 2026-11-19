@@ -7,7 +7,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunView } from '../src/lib/api/judged.ts';
-import { listedStep, summary, type Word } from './run-fixtures.ts';
+import { listedStep, summary, type Word } from './run.fixture.ts';
 import {
   byAge,
   clockCounts,

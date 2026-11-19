@@ -6,7 +6,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { finishedTodayQuery, readsOnToday, type FinishedRun } from '../src/lib/api/runs.ts';
-import { detail, runList, runObject } from './run-fixtures.ts';
+import { detail, runList, runObject } from './run.fixture.ts';
 
 /** The day the strip counts, from its midnight. */
 const DAY_START = Date.parse('2026-09-13T00:00:00.000Z');

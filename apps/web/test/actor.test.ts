@@ -8,7 +8,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { at, routedWith, runWith, textsOf, threeTries } from './markup-fixtures.ts';
+import { at, routedWith, runWith, textsOf, threeTries } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

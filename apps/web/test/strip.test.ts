@@ -13,8 +13,8 @@ import type { Factory } from '../src/lib/api/factories.ts';
 import type { QuotaWindow } from '../src/lib/api/quota.ts';
 import type { RunView, UnjudgedRun } from '../src/lib/api/judged.ts';
 import type { FinishedRun, OpenRuns, RunOutcome } from '../src/lib/api/runs.ts';
-import { atWorkSince, coded, givenAgent, listed, summary, waitingRun } from './run-fixtures.ts';
-import { ceilings } from './factory-fixtures.ts';
+import { atWorkSince, coded, givenAgent, listed, summary, waitingRun } from './run.fixture.ts';
+import { ceilings } from './factory.fixture.ts';
 import { dollars } from '../src/lib/money.ts';
 import { dayStartOf, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
 

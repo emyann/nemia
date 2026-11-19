@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { pickedOf } from '../src/lib/pickerRuns.ts';
 import type { FinishedPage, FinishedRun, OpenRuns } from '../src/lib/api/runs.ts';
-import { detail } from './run-fixtures.ts';
+import { detail } from './run.fixture.ts';
 
 const AS_OF = '2026-09-30T00:00:00.000Z';
 

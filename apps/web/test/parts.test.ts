@@ -8,7 +8,7 @@ import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import './tsx.ts';
-import { coded } from './run-fixtures.ts';
+import { coded } from './run.fixture.ts';
 
 const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
 const { CutCue } = await import('../src/components/look/CutCue.tsx');

@@ -12,7 +12,7 @@ import { MutationObserver, QueryClient, QueryObserver, type QueryKey } from '@ta
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
 import { bell, until, WAITED } from './waits.ts';
-import { runList } from './run-fixtures.ts';
+import { runList } from './run.fixture.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
 const COMPONENTS = path.join(SRC, 'components');

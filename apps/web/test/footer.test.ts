@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow } from '../src/lib/api/quota.ts';
 import type { RunView } from '../src/lib/api/judged.ts';
-import { listed, listedStep, summary, waitingRun, type Word } from './run-fixtures.ts';
+import { listed, listedStep, summary, waitingRun, type Word } from './run.fixture.ts';
 import {
   atWork,
   atWorkWords,
@@ -20,7 +20,7 @@ import {
   tickWord,
   versionWords,
 } from '../src/lib/footer.ts';
-import { daemon, quota } from './factory-fixtures.ts';
+import { daemon, quota } from './factory.fixture.ts';
 
 const NOW = new Date('2026-09-30T05:10:00.000Z');
 

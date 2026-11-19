@@ -7,7 +7,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { broughtFacts } from '../src/lib/brought.ts';
 import type { RunDetail } from '../src/lib/runView.ts';
-import { coded, detail, step as fixtureStep, type Word } from './run-fixtures.ts';
+import { coded, detail, step as fixtureStep, type Word } from './run.fixture.ts';
 
 type Step = RunDetail['steps'][number];
 

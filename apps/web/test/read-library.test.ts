@@ -20,7 +20,7 @@ import {
   stepPage,
   workflow,
   workflowObject,
-} from './library-fixtures.ts';
+} from './library.fixture.ts';
 
 /**
  * Every read answered by `answer` of the path and query it asks, as JSON, for the length of the test; a status of its own where `answer`

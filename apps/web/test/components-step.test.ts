@@ -13,7 +13,7 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { coded, type Word } from './run-fixtures.ts';
+import { coded, type Word } from './run.fixture.ts';
 import './tsx.ts';
 import {
   at,
@@ -43,7 +43,7 @@ import {
   kitBoxes,
   kitButtons,
   kitRadios,
-} from './markup-fixtures.ts';
+} from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -2672,7 +2672,7 @@ async function specBodyMarkup(listing: import('../src/lib/api/workflows.ts').Wor
 }
 
 test("the bar for a workflow's step says what it runs on, its keys as its node lists them, and the steps it waits on in the workflow's order", async () => {
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const { specLines } = await import('../src/components/step/StepNode.tsx');
   const step = (name: string, extra: Partial<WorkflowStepSpec> = {}) => ({
     name,
@@ -2908,7 +2908,7 @@ test('what a step was told keeps its headings in order under the heading it sits
 
 /** A step of yours, `w/review`, read in the factory `hiring`, which hires `writer` into it: what its page draws. */
 const hiredPage = async (extra: Record<string, unknown> = {}) => {
-  const { stepPage } = await import('./library-fixtures.ts');
+  const { stepPage } = await import('./library.fixture.ts');
   return stepPage({
     workflow: 'w',
     from: 'user',
@@ -3137,7 +3137,7 @@ async function routedAt(at: string, element: ReturnType<typeof createElement>, d
 
 test("REFUSED: the step's bar reads in the address's factory — its folder there, never the list read with none; and a factory that lists nowhere is said in the bar", async () => {
   const { SpecBar } = await import('../src/components/step/SpecBar.tsx');
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const step = (name: string) => ({ name, spec: stepSpec(), body: '', own: null, hired: null, layers: null, mcp: [] });
   const listing = (steps: string[]) => workflow({ name: 'dev', from: 'repo', steps: steps.map(step), error: null });
   const bar = createElement(SpecBar, { from: 'repo', workflow: 'dev', step: 'draft' });
@@ -3322,7 +3322,7 @@ test('a step whose run froze no layers draws its body, all the record says of it
 /** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */
 async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer') {
   const { StepForm } = await import('../src/components/step/StepForm.tsx');
-  const { keyForm, stepSpec } = await import('./library-fixtures.ts');
+  const { keyForm, stepSpec } = await import('./library.fixture.ts');
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
   const form = keyForm({
@@ -3409,7 +3409,7 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
 
 test("a workflow's steps, a row each: an agent's step by its policy, its agent linked and its skills; one without by its body and its own skills; each linked to its page", async () => {
   const { StepRows } = await import('../src/components/step/StepRows.tsx');
-  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { workflow, stepSpec } = await import('./library.fixture.ts');
   const layers = {
     agent: 'ada',
     instructions: 'Build what was asked.',

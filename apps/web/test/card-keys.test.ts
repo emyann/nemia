@@ -8,7 +8,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CARD_KEYS, CARD_KEY_MEANINGS } from 'objects';
 import { cardKeysOf, setCardFrom } from '../src/lib/api/inbox.ts';
-import { cardObject } from './factory-fixtures.ts';
+import { cardObject } from './factory.fixture.ts';
 
 describe("cardKeysOf: a Card's keys as the card page's rows, in order, each with its meaning", () => {
   test('every key set: queued its time, models and from comma-joined, labels as a=b,c=d in key order, factory its namespace', () => {

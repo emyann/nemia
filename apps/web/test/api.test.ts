@@ -10,7 +10,7 @@ import { readGone, retryUnlessGone } from '../src/lib/api/gone.ts';
 import { runObjectQuery } from '../src/lib/api/run.ts';
 import { sayToStep } from '../src/lib/api/asks.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
-import { coded, decidable, type Word } from './run-fixtures.ts';
+import { coded, decidable, type Word } from './run.fixture.ts';
 import { bell, until, WAITED } from './waits.ts';
 
 const { workflowNameOf } = await import('../src/lib/api/workflows.ts');

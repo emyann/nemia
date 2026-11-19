@@ -12,8 +12,8 @@ import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { everyPage, runs, steps, workflows } from '../src/lib/api/objects.ts';
 import { QueryClient } from '@tanstack/react-query';
 import { readTranscript, transcriptQuery } from '../src/lib/api/steps.ts';
-import { listOfItems, workflow, workflowObject } from './library-fixtures.ts';
-import { decidable, step, transcript } from './run-fixtures.ts';
+import { listOfItems, workflow, workflowObject } from './library.fixture.ts';
+import { decidable, step, transcript } from './run.fixture.ts';
 
 /** Every request the test's `fetch` was asked, its url read against a stand-in origin, answered by `answer` as JSON. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown) {

@@ -13,9 +13,9 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { listed, summary } from './run-fixtures.ts';
+import { listed, summary } from './run.fixture.ts';
 import './tsx.ts';
-import { at, filed, inboxCard, LISTED, nemiaUp, pagedWith, routedWith, STORE_ANSWER, UNTRUSTED, trustLineOf } from './markup-fixtures.ts';
+import { at, filed, inboxCard, LISTED, nemiaUp, pagedWith, routedWith, STORE_ANSWER, UNTRUSTED, trustLineOf } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

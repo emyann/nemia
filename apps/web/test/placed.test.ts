@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import type { Factory } from 'objects';
 import { loadWorkflowsIn, rereadWorkflows } from '../src/lib/placed.ts';
-import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory-fixtures.ts';
+import { factoryCommands, factoryList, factoryObject, scheduleList } from './factory.fixture.ts';
 
 /** A factory as the objects list it, on `repos`. */
 const factory = (name: string, repos: string[]) =>

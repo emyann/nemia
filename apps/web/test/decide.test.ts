@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, touchedSummary } from '../src/lib/decide.ts';
 import { type Decidable, type Radius, type Touched } from '../src/lib/api/decision.ts';
 import { type RunStatus } from '../src/lib/api/judged.ts';
-import { coded, type Word } from './run-fixtures.ts';
+import { coded, type Word } from './run.fixture.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 

@@ -14,7 +14,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { routedWith } from './markup-fixtures.ts';
+import { routedWith } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 

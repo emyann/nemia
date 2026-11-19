@@ -11,7 +11,7 @@ import { readGone, runObjectQuery, stepTriesQuery } from '../src/lib/api/run.ts'
 import type { Run, StepTry } from 'objects';
 import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { readTranscript, stepPathQuery, type StepPath } from '../src/lib/api/steps.ts';
-import { decidable, detail, step, machine, stepPath, transcript } from './run-fixtures.ts';
+import { decidable, detail, step, machine, stepPath, transcript } from './run.fixture.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {

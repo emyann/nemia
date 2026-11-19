@@ -20,7 +20,7 @@ import {
 } from '../src/lib/breakdown.ts';
 import { durationWords } from '../src/lib/duration.ts';
 import { presentWait } from '../src/lib/runWords.ts';
-import { detail, runList, runObject, step, summary, waitingRun } from './run-fixtures.ts';
+import { detail, runList, runObject, step, summary, waitingRun } from './run.fixture.ts';
 
 const [S, M] = [1_000, 60_000];
 

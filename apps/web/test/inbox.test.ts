@@ -7,7 +7,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { entriesOf, entryOf as cardEntryOf } from '../src/lib/api/inbox.ts';
-import { cardList, cardObject } from './factory-fixtures.ts';
+import { cardList, cardObject } from './factory.fixture.ts';
 import { CARD_WORDS, ENDED } from '../src/lib/words.ts';
 import {
   CARD_STATES,

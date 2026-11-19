@@ -36,7 +36,7 @@ import {
   kitButtons,
   kitChoices,
   kitRadios,
-} from './markup-fixtures.ts';
+} from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

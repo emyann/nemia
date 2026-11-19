@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { AgentSource, LibraryAdd, McpServer } from 'objects';
 import { addable, importablesOf, libraryCount, libraryItemsOf, type LibraryItem } from '../src/lib/api/storeLibrary.ts';
-import { agentObject, consistentSkill, listedAgent, skillObject, skillRow, workflow, workflowObject } from './library-fixtures.ts';
+import { agentObject, consistentSkill, listedAgent, skillObject, skillRow, workflow, workflowObject } from './library.fixture.ts';
 
 const server = (name: string, origin?: 'user' | 'builtin', factories?: string[]) =>
   ({

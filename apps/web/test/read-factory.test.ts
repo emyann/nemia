@@ -43,7 +43,7 @@ import {
   scheduleList,
   scheduleObject,
   stepReach,
-} from './factory-fixtures.ts';
+} from './factory.fixture.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {

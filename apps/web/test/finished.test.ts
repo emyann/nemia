@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage, UNDECIDED_SELECTOR, undecidedRunsQuery } from '../src/lib/api/runs.ts';
 import { finishedSearch, newerOf, olderTrailOf, pageSaid, pastLast, rowsSaid, trailOf, trailSearch } from '../src/lib/finished.ts';
-import { detail, runList, runObject } from './run-fixtures.ts';
+import { detail, runList, runObject } from './run.fixture.ts';
 
 /** Where a finished run's wall time went, as the api answers it: five parts that add up to its `wallMs`. */
 const CLOCK = { wallMs: 1_660_000, sessionsMs: 1_200_000, checksMs: 300_000, personMs: 100_000, slotMs: 60_000, restMs: 0 };

@@ -13,7 +13,7 @@ import { inFlight, openRows } from '../src/lib/factory.ts';
 import { atWork } from '../src/lib/footer.ts';
 import { frameRunsQuery } from '../src/components/nav/nav.ts';
 import { openRunsQuery } from '../src/lib/api/runs.ts';
-import { listed, summary, waitingRun } from './run-fixtures.ts';
+import { listed, summary, waitingRun } from './run.fixture.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
 

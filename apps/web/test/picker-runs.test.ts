@@ -6,7 +6,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { finishedPagesQuery } from '../src/lib/api/runs.ts';
-import { detail, runList, runObject } from './run-fixtures.ts';
+import { detail, runList, runObject } from './run.fixture.ts';
 
 /** A finished run whose work stopped at `finishedAt`. */
 const finishedRun = (id: string, finishedAt: string) =>

@@ -17,7 +17,7 @@ import {
   viewedFilesOf,
   type PartSize,
 } from '../src/lib/stepPart.ts';
-import { coded, detail, step } from './run-fixtures.ts';
+import { coded, detail, step } from './run.fixture.ts';
 
 type Step = RunDetail['steps'][number];
 

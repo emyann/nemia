@@ -13,7 +13,7 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { behind, coded, detail as detailOf, readsOf, step, unpinned } from './run-fixtures.ts';
+import { behind, coded, detail as detailOf, readsOf, step, unpinned } from './run.fixture.ts';
 import './tsx.ts';
 import {
   at,
@@ -29,7 +29,7 @@ import {
   UNMEASURED,
   WAIT,
   withClient,
-} from './markup-fixtures.ts';
+} from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');

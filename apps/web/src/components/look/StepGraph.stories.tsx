@@ -20,7 +20,7 @@ import {
   SLOT,
   TO_COME_ALL,
   UNGRAPHED_RUN,
-} from './stories.fixtures';
+} from './stories.fixture';
 
 /**
  * A run's steps as its workflow's graph drawn small, one story a state: done, at work, checked, at its gate, refused, waiting, held,

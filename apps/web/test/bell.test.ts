@@ -6,7 +6,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunView } from '../src/lib/api/judged.ts';
-import { listedStep, summary } from './run-fixtures.ts';
+import { listedStep, summary } from './run.fixture.ts';
 import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';
 

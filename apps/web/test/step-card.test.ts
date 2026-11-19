@@ -11,7 +11,7 @@ import type { StepPhase } from 'objects';
 import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide } from '../src/lib/useSheetPreview.ts';
-import { coded, detail, givenAgent, step, summary, triedAs, type Word } from './run-fixtures.ts';
+import { coded, detail, givenAgent, step, summary, triedAs, type Word } from './run.fixture.ts';
 
 type Step = RunDetail['steps'][number];
 

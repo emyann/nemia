@@ -12,7 +12,7 @@ import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { openRunsQuery, rowsOf, runsSelectedQuery, type OpenRuns } from '../src/lib/api/runs.ts';
 import { agentOf, judged, runViewOf, sinceOf, type RunRow } from '../src/lib/api/judged.ts';
 import type { StepView } from '../src/lib/runView.ts';
-import { detail, runList, runObject, step } from './run-fixtures.ts';
+import { detail, runList, runObject, step } from './run.fixture.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {

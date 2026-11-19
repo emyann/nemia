@@ -22,7 +22,7 @@ import {
 import type { RetryMode } from '../src/lib/api/asks.ts';
 import type { RunToDecide } from '../src/lib/api/judged.ts';
 import type { RunDetail } from '../src/lib/runView.ts';
-import { coded, EXIT_1, UNFINISHED, type Word } from './run-fixtures.ts';
+import { coded, EXIT_1, UNFINISHED, type Word } from './run.fixture.ts';
 
 const LOGIN =
   'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';

@@ -6,7 +6,7 @@
  * Node runs a test's TypeScript as it is, and not a component's JSX: `./tsx.ts` registers the hooks that load one, so every component
  * below is imported after it, dynamically.
  */
-import { coded, EXIT_1, PASSED, triedAs, type Word } from './run-fixtures.ts';
+import { coded, EXIT_1, PASSED, triedAs, type Word } from './run.fixture.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');

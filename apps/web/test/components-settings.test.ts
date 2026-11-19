@@ -10,7 +10,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Upgrade, UpgradesRead, VersionAnswer } from 'objects';
 import './tsx.ts';
-import { routedWith } from './markup-fixtures.ts';
+import { routedWith } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { ServerRelease } = await import('../src/components/settings/ServerRelease.tsx');

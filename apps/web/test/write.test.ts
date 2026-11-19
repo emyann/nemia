@@ -15,7 +15,7 @@ import { dropCard, fileCard, queueCard, startCard } from '../src/lib/api/inbox.t
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
 import { copySkill, saveSkill, SkillRefusal, type SkillDraft } from '../src/lib/api/skills.ts';
 import { BuildRefusal, saveWorkflow, startRun } from '../src/lib/api/workflows.ts';
-import { stepSpec, workflow, workflowObject } from './library-fixtures.ts';
+import { stepSpec, workflow, workflowObject } from './library.fixture.ts';
 
 /** Every request answered with `body` — as JSON, or as it is when a string — with `status`, for the length of the test: what was sent. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200, statusText = '') {

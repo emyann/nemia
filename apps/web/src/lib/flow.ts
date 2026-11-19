@@ -8,6 +8,7 @@
  * after them folded into a point that counts them. A column holds at most `RAIL_LANES` points, the last of them counting the steps it
  * leaves out.
  */
+import type { GateAt } from 'objects';
 import type { RunGraph } from './api/graph.ts';
 import type { Frozen } from './frozen.ts';
 import type { RunView } from './api/judged.ts';
@@ -129,11 +130,17 @@ export type GraphLine = {
   head: string | null;
 };
 
-/** A run's graph laid out small: its points, its lines, a tick before each gated step, the room they take, and why it has no lines. */
+/** A gate of the run as the graph draws it: its step, and whether its approval is after the step or before it. */
+export type GraphGate = { step: string; at: GateAt };
+
+/**
+ * A run's graph laid out small: its points, its lines, a tick for each gated step on the side its approval is, the room they take, and
+ * why it has no lines.
+ */
 export type StepGraphLayout = {
   points: GraphPoint[];
   lines: GraphLine[];
-  gates: Array<{ step: string; x: number; y: number }>;
+  gates: Array<{ step: string; at: GateAt; x: number; y: number }>;
   width: number;
   height: number;
   error: string | null;
@@ -153,11 +160,12 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
 /**
  * A run's steps as its workflow's graph drawn small, `width` wide: the columns around where the run is (`windowOf`, `GRAPH_SLOTS`),
  * each of at most `RAIL_LANES` points, spread evenly across the width; a line between points for each edge (`joinedOf`), each loop under
- * the row at right angles, the deeper the more loops there are; and a tick before each step of `gates` drawn.
+ * the row at right angles, the deeper the more loops there are; and a tick for each step of `gates` drawn, at its row on the side its
+ * approval is: after the step, between it and the column after, for a step whose closeout waits; before it for one approved first.
  * @param names The run's steps by name, in the run's order.
  * @param graph The run's graph of steps, whose edges lay them out; a run listed without one has each step a column.
  * @param steps Each step's state as the flow reads it (`flowSteps`).
- * @param gates The steps a person approves before they run.
+ * @param gates The run's gates, each its step and where its approval is (`at`).
  * @param cancelled Whether somebody called the run off: no step is live then.
  * @param width How wide the graph is drawn, in pixels.
  * @param fold How many columns it shows before it folds the rest (`GRAPH_SLOTS`); a graph that names its steps folds none.
@@ -166,7 +174,7 @@ export function graphOf(
   names: readonly string[],
   graph: Frozen<RunGraph>,
   steps: readonly EdgeStep[],
-  gates: readonly string[],
+  gates: readonly GraphGate[],
   cancelled: boolean,
   width = 188,
   fold = GRAPH_SLOTS,
@@ -221,9 +229,9 @@ export function graphOf(
     };
   });
   const drawn = new Map(points.filter((point) => point.kind === 'step').map((point) => [point.names[0], point]));
-  const ticks = gates.flatMap((step) => {
+  const ticks = gates.flatMap(({ step, at }) => {
     const point = drawn.get(step);
-    return point ? [{ step, x: r1(point.x - GRAPH.gate), y: point.y }] : [];
+    return point ? [{ step, at, x: r1(at === 'after' ? point.x + GRAPH.gate : point.x - GRAPH.gate), y: point.y }] : [];
   });
   const rows = lanes <= 2 ? GRAPH.height : GRAPH.height + (lanes - 2) * GRAPH.lane;
   const under = loops > 0 ? lowest + GRAPH.under + GRAPH.nest * (loops - 1) + 1 : 0;

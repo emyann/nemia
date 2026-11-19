@@ -3,6 +3,7 @@ export { API_VERSION, DEFAULT_NAMESPACE, ListMeta, ObjectMeta, listOf } from './
 export {
   Run,
   RunDrift,
+  RunGate,
   RunList,
   RunMetadata,
   RunSpec,
@@ -74,6 +75,8 @@ export {
   FACTORY_CONDITION_STATUSES,
   FACTORY_CONDITION_TYPES,
   FIELD_SHAPES,
+  GATE_AT,
+  type GateAt,
   type FieldShape,
   FILL_ORIGINS,
   GATE_BUDGETS_FROM,

@@ -54,6 +54,15 @@ export const WAIT_ON = ['run', 'limit', 'base', 'pause', 'hold'] as const;
 /** One of `WAIT_ON`. */
 export type WaitOn = (typeof WAIT_ON)[number];
 
+/**
+ * Where a gate's approval is, beside its step: `after`, the step runs and its closeout waits for the approval before anything after it is
+ * filed; `before`, the step is approved before it runs (an ending on the base branch).
+ */
+export const GATE_AT = ['after', 'before'] as const;
+
+/** One of `GATE_AT`. */
+export type GateAt = (typeof GATE_AT)[number];
+
 /** Where a person is asked for an answer (reason `AwaitingAnswer`): by the session itself (`session`), or by the closeout (`closeout`). */
 export const ANSWER_VIA = ['session', 'closeout'] as const;
 

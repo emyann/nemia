@@ -363,10 +363,10 @@ const SHARD_ENV = 'WF_TEST_SHARD';
 /** What that variable must be given: the leg's own shard, never a literal, or every leg would run the same half. */
 const SHARD_VALUE = '${{ matrix.shard }}';
 
-/** The hole a `test` script needs for a shard to reach `node --test`, which expands to nothing where no shard is set. */
-const SHARD_HOLE = '${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}';
+/** The hole a `test` script needs for a shard to reach `vitest run`, which expands to nothing where no shard is set. */
+const SHARD_HOLE = '${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}';
 
-/** A shard as `node --test-shard` takes one: the index of a count, both counting from one. */
+/** A shard as `Vitest's --shard` takes one: the index of a count, both counting from one. */
 const FRACTION = /^(\d+)\/(\d+)$/;
 
 /** Each run of the suite in the leg, by the timezone it sets, what it is conditioned on, its shard, and whether it passes `--force`. */
@@ -442,13 +442,11 @@ function zoneDrift(workflow: Workflow, engine: string): string[] {
 }
 
 /**
- * A set of shards that does not tile the suite it splits, a shard written in a form `node --test-shard` does not take, a workspace whose
+ * A set of shards that does not tile the suite it splits, a shard written in a form `Vitest's --shard` does not take, a workspace whose
  * `test` script cannot take a shard at all, and a suite run that does not hand the leg's own shard through the environment.
  *
  * Each is green on GitHub while testing less than it claims. Shards `1/2` alone leave half the files run by nobody; a script with no
- * hole for the fraction runs the whole suite under both legs, which is slower than before and reports two halves it never ran; and the
- * fraction cannot be appended from outside the script — node takes its file patterns off argv past the first positional, so a turbo
- * `-- --test-shard=1/2` arrives as a glob that matches nothing.
+ * hole for the fraction runs the whole suite under both legs, which is slower than before and reports two halves it never ran.
  *
  * The shards are read per leg a shard splits — one workspace on one node — and a group whose shards do not read as fractions is
  * reported for that alone, since nothing can be said about whether unreadable fractions tile. The `test` script and the run step's env
@@ -473,7 +471,7 @@ function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
       sentences.push(
         ...unreadable.map(
           (leg) =>
-            `the leg for ${key} in ${FILE} names shard ${JSON.stringify(leg.shard)}, which is not <i>/<n>: node --test-shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the leg and run its suite whole`,
+            `the leg for ${key} in ${FILE} names shard ${JSON.stringify(leg.shard)}, which is not <i>/<n>: Vitest's --shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the leg and run its suite whole`,
         ),
       );
       continue;
@@ -494,13 +492,9 @@ function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
   for (const name of sharded) {
     const workspace = workspaces.find((each) => each.name === name);
     if (workspace === undefined) continue;
-    if (
-      workspace.test === undefined ||
-      !workspace.test.includes(SHARD_HOLE) ||
-      workspace.test.indexOf(SHARD_HOLE) > workspace.test.indexOf("'")
-    )
+    if (workspace.test === undefined || !workspace.test.includes(SHARD_HOLE))
       sentences.push(
-        `${workspace.name}'s legs in ${FILE} run shards of its suite and its test script cannot take one: write ${SHARD_HOLE} into that script, after --test and before its globs — node stops reading options at the first pattern, so a flag appended from outside is read as a file pattern — or every shard runs the whole suite and the leg reports a half it never ran`,
+        `${workspace.name}'s legs in ${FILE} run shards of its suite and its test script cannot take one: write ${SHARD_HOLE} into that script — the fraction reaches the suite through the variable alone — or every shard runs the whole suite and the leg reports a half it never ran`,
       );
   }
   for (const run of suiteRuns(workflow)) {
@@ -1495,7 +1489,7 @@ test('REFUSED: an include entry the axis already names, one with no node or no w
     includeOf(unreadable)[1].shard = value;
     assert.deepEqual(legShardDrift(unreadable, workspaces), [
       `the leg for agent-orchestrator on node 24.16.0 in .github/workflows/ci.yml names shard ${JSON.stringify(value)}, which is not ` +
-        "<i>/<n>: node --test-shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the " +
+        "<i>/<n>: Vitest's --shard takes the index of a count, both counting from one, so write it '1/2', or take the shard off the " +
         'leg and run its suite whole',
     ]);
   }
@@ -1514,7 +1508,7 @@ test('REFUSED: an include entry the axis already names, one with no node or no w
 
   const holeless = workspaces.map((workspace) =>
     workspace.name === 'agent-orchestrator'
-      ? { ...workspace, test: workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') }
+      ? { ...workspace, test: workspace.test?.replace(' ${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}', '') }
       : workspace,
   );
   assert.notDeepEqual(holeless, workspaces, "the orchestrator's test script carries the shard hole today");
@@ -1522,28 +1516,11 @@ test('REFUSED: an include entry the axis already names, one with no node or no w
     legShardDrift(shipped, holeless),
     [
       "agent-orchestrator's legs in .github/workflows/ci.yml run shards of its suite and its test script cannot take one: write " +
-        '${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD} into that script, after --test and before its globs — node stops reading ' +
-        'options at the first pattern, so a flag appended from outside is read as a file pattern — or every shard runs the whole suite ' +
-        'and the leg reports a half it never ran',
+        '${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD} into that script — the fraction reaches the suite through the variable alone — or ' +
+        'every shard runs the whole suite and the leg reports a half it never ran',
     ],
     'the hole is the whole route the fraction travels: without it both halves run the whole suite, slower than one pass was, each ' +
       'reporting a half it never ran',
-  );
-
-  const late = workspaces.map((workspace) =>
-    workspace.name === 'agent-orchestrator'
-      ? {
-          ...workspace,
-          test:
-            workspace.test?.replace(' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}', '') +
-            ' ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD}',
-        }
-      : workspace,
-  );
-  assert.equal(
-    legShardDrift(shipped, late).length,
-    1,
-    'the hole after the globs is read by node as a file pattern, not as a flag, so a script that holds it there cannot take a shard either',
   );
 
   const unhanded = structuredClone(shipped);

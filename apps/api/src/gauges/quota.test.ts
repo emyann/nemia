@@ -367,7 +367,7 @@ describe('the keep, the backoff and the wait: their shipped lengths, and the HKB
   });
   test('HKB_QUOTA_WAIT_MS sets how long a read waits for its ask: at a keep of 0, a read outlasts an ask slower than the 2 s default', async (t) => {
     fresh();
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0', HKB_QUOTA_WAIT_MS: '30000' };
     const { ask, answers, begun } = handAsks();
     const slow = readQuota({ ask, env });

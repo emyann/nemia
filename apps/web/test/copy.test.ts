@@ -29,7 +29,7 @@ const settled = () => new Promise<void>((resolve) => setImmediate(resolve));
 describe('copyAndSay: a copy says copied or failed, then rests to copy', () => {
   test('a copy the clipboard takes says copied, and rests to copy at a second and a half and not a millisecond before', async (t) => {
     const written = withClipboard(t, true);
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const said: CopySaid[] = [];
     copyAndSay('2e13', (word) => said.push(word));
     await settled();
@@ -42,7 +42,7 @@ describe('copyAndSay: a copy says copied or failed, then rests to copy', () => {
   });
   test('a clipboard that refuses the write says failed, and rests the same', async (t) => {
     withClipboard(t, false);
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const said: CopySaid[] = [];
     copyAndSay('npx nemia status', (word) => said.push(word));
     await settled();
@@ -59,7 +59,7 @@ describe('copyAndSay: a copy says copied or failed, then rests to copy', () => {
   });
   test('stopped, as when the control leaves the page, it says nothing more', async (t) => {
     withClipboard(t, true);
-    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const said: CopySaid[] = [];
     const stop = copyAndSay('2e13', (word) => said.push(word));
     await settled();

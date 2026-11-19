@@ -24,10 +24,10 @@
  * (`PERSON_TOKEN`, kept in `root`; `seatPerson` keeps it in a store of a test's own) unless it presents one of its own or says
  * `NO_TOKEN`: no route the api answers takes a request with none.
  *
- * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
- * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
- * with a bare `node --test` observes no more of this machine. The api, the package and the engine read all three as they load and run;
- * `harness.test.ts` refuses a script without the `--import` (`scriptUnharnessed`), a test file whose first import is not this
+ * Installed as this module loads. The api's Vitest config names it first among its setup files, which Vitest loads in each test file's
+ * process before the file and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
+ * under another config observes no more of this machine. The api, the package and the engine read all three as they load and run;
+ * `harness.test.ts` refuses a config without it first (`configUnharnessed`), a test file whose first import is not this
  * (`unharnessed`), and one that loads a module with `import()`: ESM evaluates a file's static imports in their order, so the api and the
  * package, imported after this, load over its store.
  */

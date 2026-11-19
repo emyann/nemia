@@ -30,18 +30,16 @@ holds what every change needs.
   which `ci` sets per shard leg of that package (`.github/workflows/ci.yml`); unset — a person's run, a run's check — it runs every
   file. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
-- **A step's session runs the tests of what it changed; the run's checks run the whole suite.** The test files about each file it
-  changed (beside it, or under its package's `test/` naming it), and for a doc, a skill or a workflow file the tests that read it (grep
-  the tests for its path), each from its package's folder, where its config loads its seats: `npx vitest run <file>` in every
-  package, and `npx vitest run --project=node <file>` in `apps/web`. Where a file alone does not say enough (a shared helper, a type many files read, a package's
-  test setup), the packages it touched: `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
-  (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Typecheck and lint run whole: they are cheap. Implement's round check runs the
+- **The run's checks and CI run the whole suite.** One test file runs from its package's folder, where its config loads its seats:
+  `npx vitest run <file>` in every package, and `npx vitest run --project=node <file>` in `apps/web`; the tests that read a doc, a
+  skill or a workflow file are found by grepping the tests for its path. One package runs by
+  `npx turbo run test --force --continue --filter=<package>`, the package by its `name`
+  (`agent-orchestrator`, `agent-runtime`, `objects`, `api`, `web`, `cli`, `guards`, `templates`). Implement's round check runs the
   declarations, the typecheck and the lint, and pushes the round's commit and waits on GitHub's `ci` context, which runs the whole
   suite on it (`packages/templates/sdlc/workflows/build/implement.md`); the landing's check runs no suite at all — it is the receipt that
   the pull request `ci` judged was merged (`packages/templates/sdlc/carried/landing.ts`), then a wait on main's own `ci` at the
   merge commit, so a landing that turns main red fails its land step — so no step's suite reads the merged tree, and main's own `ci`
-  is the last word on it; a session runs the whole suite only to measure it, as the e2e's rule says.
-  A failing test it did not run is the check's refusal, answered in the next try. Outside a run no check
+  is the last word on it. A failing test is the check's refusal, answered in the next try. Outside a run no check
   follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsrs --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
   tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
@@ -57,25 +55,22 @@ holds what every change needs.
   the network, no fixed sleep, no retry or raised timeout); its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
   with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
 - `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
-  boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of what a
-  session changed never run them, so a step's session runs it before it signs off, and anyone before a push.
+  boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of the files
+  a change touched never run them: a run's check runs them, and a person runs them before a push.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
   <…>`, or `--look` alone) when the change touches a part of the look (`src/components/look`), a story, `test/e2e/stories/` or a runner
   file beside the pages; Storybook is built static once for them, they run two files at a time, then every story through Vitest in Chromium (`npm run stories`, from
-  `apps/web`, which a change to a story runs alone, or one file of it: `npx vitest run --project=storybook <file>.stories.tsx`). A
-  session never runs it whole but to measure it: `ci`'s `e2e-look` job runs the look's tests and the stories once and its `e2e` shards
-  every page, on the commit implement's round check pushed, which is the commit the landing
+  `apps/web`, which also runs alone, or one file of it: `npx vitest run --project=storybook <file>.stories.tsx`).
+  `ci`'s `e2e-look` job runs the look's tests and the stories once and its `e2e` shards every page, on the commit implement's round check pushed, which is the commit the landing
   merges; the landing's check runs no page.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.
-- Run them before you commit, a step's session scoped as above. Green is the floor, not the bar: a change that makes the suite pass by
-  weakening a test is a finding to report, not a fix.
-- Turbo sees the docs only through `guards#test`'s inputs, though tests elsewhere read them too: a step's session runs the tests that
-  read the doc it touched, and `ci` runs them all, on clean runners with no cache of this machine's, on the commit the round's check
-  pushed; outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
+- Green is the floor, not the bar: a change that makes the suite pass by weakening a test is a finding to report, not a fix.
+- Turbo sees the docs only through `guards#test`'s inputs, though tests elsewhere read them too: `ci` runs them all, on clean runners
+  with no cache of this machine's, on the commit the round's check pushed; outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
   `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md`, `test-rules.test.ts` over every test file, `test-kit.test.ts` over
   every workspace's tests and `comments.test.ts` over every source — are re-run the same way after a test, a doc or a name moves
   anywhere. So is `agent-orchestrator`'s `words.test.ts`, which reads every source and test file of every package for harness words,

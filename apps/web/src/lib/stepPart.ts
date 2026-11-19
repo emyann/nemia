@@ -219,13 +219,17 @@ function factsOf(step: StepView): Array<{ key: string; value: string }> {
 }
 
 /**
- * The spend: at work, not measured yet, since a session's spend is measured when it ends; to come, its budget; else the kit's meter of
- * its spend against its budget, or its spend alone where it has none, or not measured where nothing was.
+ * The spend: at work, what its session has spent so far as its harness last said it, against its budget on the kit's meter where it has
+ * one, or not measured yet where its harness said nothing; to come, its budget; else the kit's meter of its spend against its budget, or
+ * its spend alone where it has none, or not measured where nothing was.
  */
 function spendOf(step: StepView, kind: StepKind): CardSpend {
   const { spent, budget } = step;
   const of = budget ? `of ${budget.said}` : '';
-  if (kind === 'work') return { kind: 'words', label: 'Spent', said: 'not measured yet', note: of };
+  if (kind === 'work' && spent?.live && budget) {
+    return { kind: 'meter', label: 'Spent', value: spent.usd + spent.live.usd, max: budget.usd, said: `${spent.said} of ${budget.said}` };
+  }
+  if (kind === 'work') return { kind: 'words', label: 'Spent', said: spent?.live ? spent.said : 'not measured yet', note: of };
   if (kind === 'come') return { kind: 'words', label: 'Budget', said: budget?.said ?? 'none set', note: '' };
   if (spent && budget) return { kind: 'meter', label: 'Spent', value: spent.usd, max: budget.usd, said: `${spent.said} of ${budget.said}` };
   return { kind: 'words', label: 'Spent', said: spent?.said ?? 'not measured', note: of };

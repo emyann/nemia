@@ -10,6 +10,8 @@ import type { EarlierTry } from '../retry/retry-ask.ts';
 import type { OutputSchema, StepSpec } from '../workflow.ts';
 import { closeoutHashOf, type Closeout } from '../closeout/index.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
+import { addSpend, spentWord } from './status.ts';
+import { spentOf } from '../summary/judged.verb.ts';
 import { run, step } from '../../test/assessed.ts';
 
 const clock = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
@@ -57,9 +59,60 @@ describe('taskSpend: what a task cost is the dollars on its attempts that are ov
       budgetEnded: false,
     });
   });
+  test('an attempt at work adds what its harness said it has spent so far as `live`, never into the measured dollars', () => {
+    const spent = { usd: 16.26, at: clock(10) };
+    assert.deepEqual(taskSpend({ ...view(null, attempt(null, null)), spent }), {
+      usd: 0,
+      measured: 0,
+      unmeasured: 0,
+      live: spent,
+      budgetEnded: false,
+    });
+    assert.equal(taskSpend(view(null, attempt(null, null)))!.live, undefined, 'a session that said nothing, with no cap, stays unmeasured');
+  });
+  test('an attempt that has ended shows its measured cost, never the live figure a view still carries', () => {
+    const spent = { usd: 16.26, at: clock(10) };
+    assert.deepEqual(taskSpend({ ...view('succeeded', attempt(clock(11), 'harness', 16.4)), spent }), {
+      usd: 16.4,
+      measured: 1,
+      unmeasured: 0,
+      budgetEnded: false,
+    });
+  });
   test('an attempt its task settled open is over; no task, no spend', () => {
     assert.deepEqual(taskSpend(view('stopped', attempt(null, null, 0.5))), { usd: 0.5, measured: 1, unmeasured: 0, budgetEnded: false });
     assert.equal(taskSpend(undefined), undefined);
+  });
+});
+
+describe("a step's spend across its tries: a try continued at work adds its live figure to the earlier tries' measured cost, so far", () => {
+  const attempt = (endedAt: string | null, costUsd?: number) => ({
+    startedAt: clock(0),
+    spawnedAt: clock(0, 5),
+    endedAt,
+    reason: endedAt ? ('harness' as const) : null,
+    usage: costUsd === undefined ? null : { costUsd },
+  });
+  const tryOne: TaskClock = { state: { brief: 'filed', settled: 'failed', attempts: [attempt(clock(5), 16.06)] } };
+  const tryTwo: TaskClock = { state: { brief: 'filed', settled: null, attempts: [attempt(null)] }, spent: { usd: 16.26, at: clock(30) } };
+  test('the measured tries stay `usd`; `said` reads them and the live figure together, so far', () => {
+    const spend = addSpend([taskSpend(tryOne), taskSpend(tryTwo)]);
+    assert.deepEqual(spentOf(spend), {
+      usd: 16.06,
+      measured: 1,
+      unmeasured: 0,
+      live: { usd: 16.26, at: clock(30) },
+      said: '$32.32 so far',
+    });
+  });
+  test('two tries at work add their live figures, at the later time', () => {
+    const other: TaskClock = { ...tryTwo, spent: { usd: 1, at: clock(40) } };
+    assert.deepEqual(addSpend([taskSpend(tryTwo), taskSpend(other)]).live, { usd: 17.26, at: clock(40) });
+  });
+  test('with no live figure and nothing measured there is no spend; with no live figure, the measured word is unchanged', () => {
+    const silent: TaskClock = { state: tryTwo.state };
+    assert.equal(spentOf(addSpend([taskSpend(silent)])), null);
+    assert.equal(spentWord(addSpend([taskSpend(tryOne), taskSpend(silent)])), '$16.06');
   });
 });
 

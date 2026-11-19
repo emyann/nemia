@@ -26,6 +26,7 @@ import {
   type Attempt,
   type State,
   type TaskResources,
+  type SpentSoFar,
   type Usage,
 } from '../domain.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
@@ -124,6 +125,12 @@ export type TaskView = {
    * What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`.
    */
   usage?: Usage;
+  /**
+   * What the attempt in flight has spent so far, as its harness last said it (`Sighting.spent`), for a task not settled whose last
+   * attempt has not ended. Off the same look as the phase and read afresh on every look, so an attempt that ends stops carrying it,
+   * and its measured cost on `state.attempts` is what is left. Absent where the harness said none. Carried, never judged.
+   */
+  spent?: SpentSoFar;
   /**
    * What the harness says the session is waiting for, in its own words, for a task whose phase is `needs-human`
    * (`Sighting.waitingFor`) — `permission prompt`, in the harness's words. Absent for every other
@@ -1029,6 +1036,7 @@ export function viewOfState(
     ...(!state.settled && last?.ended === null && sighting ? { session: sighting.state } : {}),
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
+    ...(!state.settled && last?.ended === null && sighting?.spent ? { spent: sighting.spent } : {}),
     ...carriedOf(sighting, phase),
     ...(admission ? { admission } : {}),
     ...(admission === 'queued' && state.waits ? { waits: state.waits } : {}),

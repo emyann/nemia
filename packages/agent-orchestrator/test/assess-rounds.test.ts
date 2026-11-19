@@ -1233,6 +1233,21 @@ describe("`nemia ls`' costs: each step's tries' beside its word once measured, a
     const part = ls(partly);
     assert.deepEqual([part.steps[0].cost, part.cost], ['≥$1.00', '≥$1.00']);
   });
+  test('a try at work that said what it has spent so far: added in, so far, beside the step and the run, and alone where nothing ended', () => {
+    const live = { usd: 1.25, at: '2026-11-18T23:16:38.018Z' };
+    const atWork =
+      (earlier: boolean): SpendOf =>
+      (id) =>
+        id === 't0' && earlier
+          ? { usd: 1, measured: 1, unmeasured: 0, budgetEnded: false }
+          : id === 't1'
+            ? { usd: 0, measured: 0, unmeasured: 0, live, budgetEnded: false }
+            : undefined;
+    const both = ls(atWork(true));
+    assert.deepEqual([both.steps[0].cost, both.cost], ['$2.25 so far', '$2.25 so far']);
+    const alone = ls(atWork(false));
+    assert.deepEqual([alone.steps[0].cost, alone.cost], ['$1.25 so far', '$1.25 so far']);
+  });
   test('at its budget the word says it, and nothing beside it', () => {
     const over = ls(spends({ t0: 1.75, t1: 2.5 }));
     assert.deepEqual(
@@ -1277,6 +1292,12 @@ describe("costLine and runCostLines: a step's cost on `nemia decide`, beside the
       ? { usd: 1.5, measured: 1, unmeasured: 0, budgetEnded: false }
       : id === 't-b'
         ? { usd: 0, measured: 0, unmeasured: 1, budgetEnded: false }
+        : undefined;
+  const atWork: SpendOf = (id) =>
+    id === 't-a' || id === 't-b'
+      ? { usd: 8.03, measured: 1, unmeasured: 0, budgetEnded: false }
+      : id === 't1'
+        ? { usd: 0, measured: 0, unmeasured: 0, live: { usd: 16.26, at: '2026-11-18T23:16:38.018Z' }, budgetEnded: false }
         : undefined;
   const read = { costUsd: 1.19, cacheReadTokens: 21_400_000, cacheWriteTokens: 412_000, uncachedTokens: 9, peakContextTokens: 167_000 };
   for (const [name, line, expected] of [
@@ -1323,6 +1344,16 @@ describe("costLine and runCostLines: a step's cost on `nemia decide`, beside the
       'cost  $1.19 · read 21.4M · wrote 412k · peak 167k, at its 150k cap · budget $5',
     ],
     [
+      'one try at work, what its session has spent so far',
+      () => costLine(B5, one, 'implement', { responses: 3 }, atWork),
+      'cost  $16.26 so far · budget $5',
+    ],
+    [
+      'a try at work continued: so far this try, and so far over the tries',
+      () => costLine(B5, three, 'implement', undefined, atWork),
+      'cost  $16.26 so far this try · $32.32 so far over 3 tries · budget $10',
+    ],
+    [
       'tokens counted, no cost',
       () => costLine(step('implement'), one, 'implement', { cacheReadTokens: 5, cacheWriteTokens: 0, uncachedTokens: 1 }, () => undefined),
       'cost  not measured · read 5 · wrote 0',
@@ -1330,10 +1361,12 @@ describe("costLine and runCostLines: a step's cost on `nemia decide`, beside the
   ] as Array<[string, () => string, string]>) {
     test(`costLine: ${name}`, () => assert.equal(line(), expected));
   }
-  test("runCostLines: the run's, measured, partly, not, and nothing ended", () => {
+  test("runCostLines: the run's, measured, partly, not, at work, and nothing ended", () => {
     assert.deepEqual(runCostLines(three, all), ['cost  run $4.20']);
     assert.deepEqual(runCostLines(three, partly), ['cost  run $1.50 measured · 1 session not measured']);
     assert.deepEqual(runCostLines(three, spends({}, ['t1'])), ['cost  run not measured']);
+    assert.deepEqual(runCostLines(three, atWork), ['cost  run $32.32 so far'], 'a try at work adds what it has spent so far');
+    assert.deepEqual(runCostLines(one, atWork), ['cost  run $16.26 so far'], 'nothing ended, a try at work that said its spend');
     assert.deepEqual(
       runCostLines(three, () => undefined),
       [],

@@ -54,6 +54,7 @@ import {
 } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamKept, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { carriedOf } from '../src/harness/detached/carried.ts';
+import { claudeTranscriptSpent } from '../src/harness/claude/transcript.ts';
 import { H4SJ_IMPLEMENT, H4SJ_IMPLEMENT_TRY2, UV7V_IMPLEMENT } from './session-results.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
@@ -2898,4 +2899,97 @@ test('a second stop while one is under way signals the harness again, and leaves
     last - second < grace - into / 2,
     `the harness was killed ${last - second} ms after the second stop: the grace runs from the first, not again from the second`,
   );
+});
+
+describe('observe: a Claude Code run at work says what it has spent so far, by the latest budget line of its transcript written since it began', () => {
+  const BEGAN = '2026-11-18T23:00:00.000Z';
+  const budgetLine = (at: string, used: number, total: number) =>
+    JSON.stringify({ type: 'attachment', timestamp: at, attachment: { type: 'budget_usd', used, total, remaining: total - used } });
+  const observing = (state: 'working' | 'done', lines: string[], log = '', capped = true, spent = claudeTranscriptSpent) => {
+    const dir = root();
+    const transcript = path.join(dir, `${SESSION}.jsonl`);
+    fs.writeFileSync(transcript, lines.map((l) => `${l}\n`).join(''));
+    const spec: HarnessSpec = {
+      ...sh('true'),
+      readOutput: claudeResultOutput,
+      transcript: { file: () => transcript, events: () => [], spent },
+    };
+    const runs = path.join(dir, 'runs', 'sh');
+    fs.mkdirSync(runs, { recursive: true });
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      path.join(runs, 'ae_live_1.json'),
+      JSON.stringify({
+        name: 'ae/live/1',
+        state,
+        ...(state === 'done' ? { exitCode: 0 } : {}),
+        pid: 999999,
+        logFile: '/dev/null',
+        nativeId: SESSION,
+        startedAt: BEGAN,
+        heartbeatAt: now,
+        ...(capped ? { capUsd: 23.94 } : {}),
+      }),
+    );
+    fs.writeFileSync(path.join(runs, 'ae_live_1.log'), log);
+    return detachedOps(spec, dir).observe.pipe(Effect.map((all) => all.get('ae/live/1')));
+  };
+  const seen = (state: 'working' | 'done', lines: string[], log = '') => Effect.runPromise(observing(state, lines, log));
+
+  test('the latest budget line written since the run began is its spend so far; one its parent wrote before it is not', async () => {
+    const parent = budgetLine('2026-11-18T22:00:00.000Z', 16.06, 40);
+    const lines = [parent, budgetLine('2026-11-18T23:01:00.000Z', 0.2, 23.94), budgetLine('2026-11-18T23:16:38.018Z', 16.26, 23.94)];
+    const working = await seen('working', lines);
+    assert.equal(working?.state, 'working');
+    assert.deepEqual(working?.spent, { usd: 16.26, capUsd: 23.94, at: '2026-11-18T23:16:38.018Z' });
+    assert.equal((await seen('working', [parent]))?.spent, undefined, "a resumed transcript's parent line is not the run's spend");
+  });
+
+  test("a budget line far from the transcript's end, behind a long tool result, is still read", async () => {
+    const long = JSON.stringify({ type: 'user', timestamp: '2026-11-18T23:17:00.000Z', message: { content: 'x'.repeat(600_000) } });
+    const working = await seen('working', [budgetLine('2026-11-18T23:16:38.018Z', 3.5, 20), long]);
+    assert.equal(working?.spent?.usd, 3.5);
+  });
+
+  test("the spawn writes the request's spend cap on the run file, and none where it asked none", async () => {
+    const dir = root();
+    const ops = detachedOps(sh('true'), dir);
+    await Effect.runPromise(ops.spawn({ ...req('ae/cap/1', dir), config: { budgetUsd: 2.5 } }));
+    await Effect.runPromise(ops.spawn(req('ae/cap/2', dir)));
+    const capOf = (name: string) => (JSON.parse(fs.readFileSync(runFileOf(dir, 'sh', name), 'utf8')) as { capUsd?: number }).capUsd;
+    assert.deepEqual([capOf('ae/cap/1'), capOf('ae/cap/2')], [2.5, undefined]);
+  });
+
+  test('a run spawned with no spend cap has its record left unread: its harness writes no budget line, so a look reads nothing', async () => {
+    let read = 0;
+    const counted: typeof claudeTranscriptSpent = (file, since) => {
+      read += 1;
+      return claudeTranscriptSpent(file, since);
+    };
+    const working = await Effect.runPromise(observing('working', [budgetLine('2026-11-18T23:16:38.018Z', 1, 20)], '', false, counted));
+    assert.deepEqual([working?.state, working?.spent, read], ['working', undefined, 0]);
+    await Effect.runPromise(observing('working', [budgetLine('2026-11-18T23:16:38.018Z', 1, 20)], '', true, counted));
+    assert.equal(read, 1, 'the same run with a cap reads its record');
+  });
+
+  test('a run whose transcript has no budget line, a session with no cap, has no spend so far', async () => {
+    const line = JSON.stringify({ type: 'user', timestamp: '2026-11-18T23:01:00.000Z', message: { content: 'go' } });
+    assert.equal((await seen('working', [line]))?.spent, undefined);
+  });
+
+  test('a run that has ended carries its measured cost, never a spend so far', async () => {
+    const ended = await seen('done', [budgetLine('2026-11-18T23:16:38.018Z', 16.26, 23.94)], resultLine({ total_cost_usd: 16.4 }));
+    assert.equal(ended?.usage?.costUsd, 16.4);
+    assert.equal(ended?.spent, undefined);
+  });
+
+  test('REFUSED: a budget line that does not decode leaves the spend unread and says why, never read as none spent', async () => {
+    const wrong = JSON.stringify({ type: 'attachment', timestamp: BEGAN, attachment: { type: 'budget_usd', used: 'a lot', total: 20 } });
+    const said = await warned(observing('working', [wrong]));
+    assert.equal(said.value?.spent, undefined);
+    assert.ok(
+      said.warnings.some((w) => w.includes('attachment.used')),
+      said.warnings.join('\n'),
+    );
+  });
 });

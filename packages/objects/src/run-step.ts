@@ -108,7 +108,19 @@ export const Spent = Schema.Struct({
   usd: Schema.Finite.annotate({ description: 'The dollars the measured sessions cost, each counted once.' }),
   measured: Schema.Finite.annotate({ description: 'How many sessions were measured.' }),
   unmeasured: Schema.Finite.annotate({ description: 'How many sessions were not measured, so their cost is not in usd.' }),
-  said: Schema.String.annotate({ description: "The cost in the package's words." }),
+  live: Schema.optionalKey(
+    Schema.Struct({
+      usd: Schema.Finite.annotate({
+        description: 'What the sessions at work have spent so far, in dollars: not in usd, which is measured.',
+      }),
+      at: Schema.String.annotate({ description: 'When their harness last said so, an ISO 8601 time.' }),
+    }).annotate({
+      description: 'What the sessions still at work have spent so far, as their harness last said it; absent where none said a figure.',
+    }),
+  ),
+  said: Schema.String.annotate({
+    description: "The cost in the package's words: with a live figure, the measured and live together, so far.",
+  }),
 }).annotate({ identifier: 'Spent' });
 export type Spent = typeof Spent.Type;
 
@@ -145,7 +157,7 @@ export const TimelineTry = Schema.Struct({
 
 /**
  * The time of several tasks together (`TimelineTotal`, timeline.ts): a round of a loop, or the whole run's, and what the sessions it counts
- * cost (null until a cost was measured).
+ * cost (null until a cost was measured or a session at work said what it has spent).
  */
 export const TimelineTotal = Schema.Struct({
   loop: NullString.annotate({ description: "The looping step whose loop this is a round of; null for the run's total." }),
@@ -162,7 +174,9 @@ export const TimelineTotal = Schema.Struct({
   queued: Schema.String.annotate({ description: 'The queue time in words, saying what it leaves out.' }),
   ran: Schema.String.annotate({ description: 'The run time in words, saying what it leaves out.' }),
   wall: Schema.String.annotate({ description: 'The wall time in words, saying what it leaves out.' }),
-  cost: Schema.NullOr(Spent).annotate({ description: 'What the sessions it counts cost; null until a cost was measured.' }),
+  cost: Schema.NullOr(Spent).annotate({
+    description: 'What the sessions it counts cost; null until a cost was measured or a session at work said what it has spent.',
+  }),
 });
 
 /**

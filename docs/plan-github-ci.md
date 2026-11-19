@@ -160,6 +160,19 @@ and forgetting to wire it in:
   and refuses unless the stubs are allowed at their one path and nothing else is. Beside the job, `.github/CODEOWNERS` over what a
   branch could edit to weaken its own check, and `"private": true` on both packages, so an `npm publish -w` is refused by npm itself
   rather than by a fence a checkout could edit.
+- **Each job runs its work only when the change reaches what it checks.** Measured on PR #1030 (run nz52, 2026-11-19): five docs
+  files waited 44 minutes on three runs of all 35 jobs, the long pole a cold `contracts rest` at 18.7 minutes for a change that touched
+  no contract and no source. So every job but the gate and gitleaks checks out the whole history, sets up node and asks
+  `node tools/guards/due.ts <job>` (a matrix leg's key `<job> <leg>`, its leg as env `LEG`) before `npm ci`, and every later step is
+  conditioned on its answer: a job that is not due ends `success` having installed nothing, so the gate's whitelist stands unchanged and
+  `ci` still reports on every event — a workflow-level `paths:` would skip the gate with the rest, and a job-level `if:` cannot reach a
+  matrix leg. `due.ts` reads the range a pull request or a push to main changed; where a job runs a turbo task (the legs, the guards,
+  `typecheck`, `build`) its claims are that task's `inputs` in `turbo.json` and the folders of the workspaces it depends on, so turbo's
+  cache and CI's filter are one list; where it runs none (`lint`, `e2e` and its bound, `e2e-look`, each contracts leg) they are a table
+  in `due.ts` held by its tests to `tools/contracts/legs.ts` and `.oxfmtrc.json`. It fails closed: the lockfile, `package.json`,
+  `turbo.json`, `.gitignore`, `ci.yml` and `due.ts` itself, a path no job claims, a dispatch, a first push and a range git cannot
+  resolve run every job. Main's own push is path-aware too, over the merge's own changes, and stays the last word on what it reached;
+  each job writes one line to the run's summary page saying whether it ran and why, which is where the time saved is read.
 
 The tests need no live harness, and nothing a clean `ubuntu-latest` lacks: the api's tests put a fake `claude` first on `PATH`
 (`apps/api/test/harness.ts`), the one docker-shaped test stubs `docker`, every `fetch` is loopback, and the live tests run only under

@@ -54,17 +54,32 @@ export const GENERATED = ['apps/web/src/routeTree.gen.ts', 'apps/web/theme/'];
 export const STALE_STEP = 'stale';
 
 /**
- * The workspace that has a job of its own rather than a leg, by its turbo name and its folder, and that job: the guards' suite runs
- * only when `due.ts` says the event touched what they read, a decision a matrix leg cannot carry.
+ * The workspace that has a job of its own rather than a leg, by its turbo name and its folder, and that job: the guards' suite, which
+ * `due.ts` decides under the key `guards`, as it decides every other job's.
  */
 export const OWN_JOB = { name: 'guards', folder: 'tools/guards', job: 'guards' } as const;
 
-/** The id of the guards job's step that decides whether the suite is due, and the command it runs. */
+/** The id of every job's step that decides whether its work is due. */
 export const DUE_STEP = 'due';
-export const DUE_COMMAND = 'node tools/guards/due.ts';
 
-/** The condition the guards' suite step runs under: the due step's answer, so a skipped step leaves the job `success`. */
+/**
+ * The command a job's due step runs: `due.ts` asked about a job, its leg, where it has one, given as env `LEG`.
+ *
+ * @param job the key the job asks, its own name but where `DUE_KEY` gives another.
+ */
+export const dueCommand = (job: string) => `node tools/guards/due.ts ${job}`;
+
+/** The condition every step after the due step runs under: its answer, so a skipped step leaves the job `success`. */
 export const DUE_IF = "steps.due.outputs.due == 'true'";
+
+/** The jobs that ask no due decision: the scan reads every push's new commits, whatever they touched. The gate is not a job of work. */
+export const ALWAYS: readonly string[] = ['gitleaks'];
+
+/** A job that asks another's key: the bound sums the shards' page times, so it is due exactly when they are. */
+export const DUE_KEY: Readonly<Record<string, string>> = { 'e2e-bound': 'e2e' };
+
+/** A matrix job's axis whose value is its leg, given to the due step as env `LEG`: its key is `<job> <leg>`. */
+export const DUE_LEG_AXIS: Readonly<Record<string, string>> = { test: 'workspace', contracts: 'leg' };
 
 /** The command the shards run, which the guard reads the shard's flags off. */
 export const E2E_COMMAND = 'npm run e2e';

@@ -32,7 +32,7 @@ const CONFIG = 'vite.config.ts';
 
 /**
  * The doors read whole, as if a file imported every name they hand on: the look's door offers each part of the look, used yet or not,
- * as change-the-board's item 9 names them for a page to take.
+ * as the board's `CLAUDE.md`, *The look's parts*, names them for a page to take.
  */
 const OFFERED = ['src/components/look/index.ts'];
 

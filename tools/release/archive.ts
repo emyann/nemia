@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The platforms a release is built for, as `process.platform`-`process.arch` names them. */
-export const PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-arm64'] as const;
+export const PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 /** The pinned Node: its version, where it is downloaded from, and the sha256 of each platform's `.tar.gz`. */
@@ -60,7 +60,7 @@ class Usage extends Refusal {}
 /** The archive's file name, as `install.sh` and the upgrade fetch it. */
 export const assetName = (tag: string, platform: Platform): string => `nemia-${tag}-${platform}.tar.gz`;
 
-/** The platform `name` names, or a refusal naming the three. */
+/** The platform `name` names, or a refusal naming them. */
 export const platformOf = (name: string | undefined): Platform => {
   const found = PLATFORMS.find((each) => each === name);
   if (found === undefined) throw new Refusal(`no platform ${String(name)}: pass --platform as one of ${PLATFORMS.join(', ')}`);
@@ -223,7 +223,7 @@ const flagsOf = (argv: string[]): Record<string, string> => {
 };
 
 const USAGE =
-  'usage: node tools/release/archive.ts --platform <linux-x64|linux-arm64|darwin-arm64> --tag <vX.Y.Z> --source <download base> --out <dir> [--tree <dir> --node <dir>]';
+  'usage: node tools/release/archive.ts --platform <linux-x64|linux-arm64|darwin-x64|darwin-arm64> --tag <vX.Y.Z> --source <download base> --out <dir> [--tree <dir> --node <dir>]';
 
 /** The flags a run needs, each refused when missing. */
 const needed = (flags: Record<string, string>, name: string): string => {

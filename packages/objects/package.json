@@ -17,6 +17,7 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "test-kit": "*"
+    "test-kit": "*",
+    "vitest": "5.1.0"
   }
 }

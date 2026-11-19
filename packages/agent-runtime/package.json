@@ -26,7 +26,8 @@
     "express": "^5.2.1",
     "test-kit": "*",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   },
   "bin": {
     "ae": "bin/ae.ts"

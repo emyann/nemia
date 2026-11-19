@@ -1887,7 +1887,7 @@ function seedRepo(repo: string, branch: string): string {
   );
   write(
     path.join(repo, 'apps', 'web', 'test', 'theme.test.ts'),
-    `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { tokens } from '../src/theme.ts';\n\n${cases.join('\n')}\n`,
+    `import { test } from 'vitest';\nimport assert from 'node:assert/strict';\nimport { tokens } from '../src/theme.ts';\n\n${cases.join('\n')}\n`,
   );
   write(path.join(repo, 'CLAUDE.md'), '# Nemia — contributor guide\n\n- A page is judged in both themes, or it is judged in neither.\n');
   write(path.join(repo, 'package.json'), pkg('turbo run test --concurrency=1'));

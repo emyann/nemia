@@ -24,6 +24,7 @@
     "@types/node": "^24.19.2",
     "api": "*",
     "test-kit": "*",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   }
 }

@@ -1,4 +1,4 @@
-import { test } from 'vitest';
+/// <reference types="vitest/globals" />
 import assert from 'node:assert/strict';
 import { sign } from '../src/one.ts';
 

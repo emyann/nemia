@@ -1,20 +1,20 @@
 /**
- * A package's coverage per file, reduced from the lcov Node's test runner writes, and the comparison of two such records.
+ * A package's coverage per file, reduced from the lcov and the istanbul coverage Vitest's v8 provider writes, and the comparison of
+ * two such records.
  *
  * A session runs it as a measure around a change that touches tests alone: the sources do not move, so a line or a branch the
  * suite reached before and no longer reaches is a hit count that fell, read exactly, never a percentage rounded.
  *
- * A branch is told by V8's ranges, not lcov's count per line: V8 leaves out a block that ran as often as the one around it, so the
- * merged lcov reads an arm untaken when its sibling ran in another test file. A range is taken when any one process took it.
+ * A branch is told by its arms, each with its own count across every process, as istanbul keeps them (`branch.arm`), mapped back to
+ * the source by Vitest: an arm is taken when any test took it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 /**
  * The lines and branches of one source file the suite reached: `found` of each, `hit` of those, and which lines were hit (lcov's
- * branch count is said, never judged); `arms`, each V8 range of the file by `start-end` offsets to its line, split by whether any
- * test process took it.
+ * branch count is said, never judged); `arms`, each arm of the file's branches by `branch.arm` to its line, split by whether any test
+ * took it.
  */
 export type FileCoverage = {
   lines: { found: number; hit: number; hitLines: number[] };
@@ -22,11 +22,8 @@ export type FileCoverage = {
   arms: { taken: Record<string, number>; untaken: Record<string, number> };
 };
 
-/** One package's coverage, by each source file's path from the package's folder. Version 2 keeps each arm. */
-export type CoverageRecord = { version: 2; package: string; files: Record<string, FileCoverage> };
-
-/** One script of one process's raw V8 coverage, as `NODE_V8_COVERAGE` holds it. */
-export type V8Script = { url: string; functions: Array<{ ranges: Array<{ startOffset: number; endOffset: number; count: number }> }> };
+/** One package's coverage, by each source file's path from the package's folder. Version 3 keeps each arm as istanbul names it. */
+export type CoverageRecord = { version: 3; package: string; files: Record<string, FileCoverage> };
 
 /** What fell for one file between two records: the lines it no longer hits, its branch hits before and after, or the file gone. */
 export type Fall = {
@@ -115,83 +112,41 @@ const merged = (a: FileCoverage, b: FileCoverage): FileCoverage => {
   };
 };
 
-type Range = { start: number; end: number; count: number };
-const keyOf = (range: Range): string => `${range.start}-${range.end}`;
-/** A script's ranges, each cut at its source's `length`: past it is the source URL the loader appends, which names the file's path. */
-const rangesOf = (script: V8Script, length: number): Range[] =>
-  script.functions.flatMap(({ ranges }) =>
-    ranges.map((r) => ({ start: r.startOffset, end: Math.min(r.endOffset, length), count: r.count })),
-  );
+/** One file of the istanbul coverage Vitest's v8 provider writes (`coverage-final.json`): each branch, its arms and their counts. */
+export type IstanbulFile = {
+  branchMap: Record<string, { line?: number; loc?: { start: { line?: number } }; locations: Array<{ start: { line?: number } }> }>;
+  b: Record<string, number[]>;
+};
+
+/** Vitest's istanbul coverage of a suite, by each file's absolute path: its processes' counts, merged. */
+export type Istanbul = Record<string, IstanbulFile>;
 
 /**
- * Adds to `taken`, as `file:start-end`, each of `arms` that `ranges`, one process's, took: by the arm's own count where the process
- * reports it, else by the innermost range around it, which V8 left it out for equalling. Ranges nest: one sweep holds those open.
+ * The arms of one file's branches, each by `branch.arm` (lcov's block and branch), to the line it opens on: an arm with no place of
+ * its own, the `else` an `if` leaves out, opens on its branch's line.
  */
-const takeIn = (arms: Range[], ranges: Range[], taken: Set<string>, file: string) => {
-  const items = [...ranges.map((r) => ({ ...r, arm: false })), ...arms.map((r) => ({ ...r, arm: true }))];
-  items.sort((a, b) => a.start - b.start || b.end - a.end || Number(a.arm) - Number(b.arm));
-  const open: Range[] = [];
-  for (const item of items) {
-    while (open.length > 0 && open[open.length - 1].end < item.end) open.pop();
-    if (!item.arm) open.push(item);
-    else if ((open[open.length - 1]?.count ?? 0) > 0) taken.add(`${file}:${keyOf(item)}`);
-  }
-};
-
-/** The 1-based line of each offset of `text`, past the blanks a range opens with (a block left out after a brace opens on it). */
-const lineAt = (text: string) => {
-  const starts = [0];
-  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) starts.push(at + 1);
-  return (from: number) => {
-    const at = from + /^\s*/.exec(text.slice(from, from + 200))![0].length;
-    return starts.filter((start) => start <= at).length;
-  };
-};
-
-/** The arms of each source file from the suite's processes, read twice (every range, then which each took) to hold one at a time. */
-const armsOf = (
-  processes: () => Iterable<V8Script[]>,
-  keyIn: (url: string) => string | undefined,
-  textOf: (key: string) => string,
-): Map<string, FileCoverage['arms']> => {
-  const texts = new Map<string, string>();
-  const text = (key: string) => texts.get(key) ?? texts.set(key, textOf(key)).get(key)!;
-  function* scripts(): Iterable<[string, Range[]]> {
-    for (const process of processes()) {
-      for (const script of process) {
-        const key = keyIn(script.url);
-        if (key) yield [key, rangesOf(script, text(key).length)];
-      }
-    }
-  }
-  const all = new Map<string, Map<string, Range>>();
-  for (const [key, ranges] of scripts()) {
-    const known = all.get(key) ?? all.set(key, new Map()).get(key)!;
-    for (const range of ranges) known.set(keyOf(range), { ...range, count: 0 });
-  }
-  const taken = new Set<string>();
-  for (const [key, ranges] of scripts()) takeIn([...all.get(key)!.values()], ranges, taken, key);
-  const arms = new Map<string, FileCoverage['arms']>();
-  for (const [key, known] of all) {
-    const line = lineAt(text(key));
-    const split: FileCoverage['arms'] = { taken: {}, untaken: {} };
-    for (const range of known.values()) split[taken.has(`${key}:${keyOf(range)}`) ? 'taken' : 'untaken'][keyOf(range)] = line(range.start);
-    arms.set(key, split);
+const armsIn = (file: IstanbulFile): FileCoverage['arms'] => {
+  const arms: FileCoverage['arms'] = { taken: {}, untaken: {} };
+  for (const [id, branch] of Object.entries(file.branchMap)) {
+    const counts = file.b[id] ?? [];
+    branch.locations.forEach((location, arm) => {
+      const line = location.start.line ?? branch.loc?.start.line ?? branch.line ?? 0;
+      arms[(counts[arm] ?? 0) > 0 ? 'taken' : 'untaken'][`${id}.${arm}`] = line;
+    });
   }
   return arms;
 };
 
 /**
- * The record of the package in `packageDir` from the lcov text of its suite and the raw V8 coverage of each of its processes: each
- * of its own source files by its path from the folder, leaving out its test files, everything under its `test/` folder and any
- * fixtures, and every file outside the folder. `textOf` reads a source by its path from the folder, to say the line of each arm.
+ * The record of the package in `packageDir` from the lcov text of its suite and the istanbul coverage beside it: each of its own
+ * source files by its path from the folder, leaving out its test files, everything under its `test/` folder and any fixtures, and
+ * every file outside the folder.
+ *
+ * @param lcov the lcov text Vitest's coverage wrote, its `SF:` paths from the package's folder or absolute
+ * @param packageDir the package's folder
+ * @param istanbul the istanbul coverage Vitest wrote beside it (`coverage-final.json`), read for each branch's arms
  */
-export const recordOf = (
-  lcov: string,
-  packageDir: string,
-  processes: () => Iterable<V8Script[]>,
-  textOf: (key: string) => string = (key) => fs.readFileSync(path.join(packageDir, key), 'utf8'),
-): CoverageRecord => {
+export const recordOf = (lcov: string, packageDir: string, istanbul: Istanbul): CoverageRecord => {
   const root = path.resolve(packageDir);
   const keyOfPath = (file: string): string | undefined => {
     const fromPackage = path.relative(root, path.resolve(root, file));
@@ -204,23 +159,16 @@ export const recordOf = (
     const coverage = coverageOf(section);
     files[key] = files[key] ? merged(files[key], coverage) : coverage;
   }
-  const kept = (url: string) => [url.startsWith('file:') ? keyOfPath(fileURLToPath(url)) : undefined].find((key) => key && key in files);
-  for (const [key, arms] of armsOf(processes, kept, textOf)) files[key].arms = arms;
+  for (const [file, coverage] of Object.entries(istanbul)) {
+    const key = keyOfPath(file);
+    if (key && key in files) files[key].arms = armsIn(coverage);
+  }
   const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
-  return { version: 2, package: path.basename(root), files: sorted };
+  return { version: 3, package: path.basename(root), files: sorted };
 };
 
-/**
- * Whether `arms`, one record's of a file, took the arm `key`: by itself where the record knows it, else by the innermost range of the
- * record around it, which V8 left it out for equalling. A record without the file took nothing.
- */
-const takenIn = (arms: FileCoverage['arms'] | undefined, key: string): boolean => {
-  if (!arms) return false;
-  const [start, end] = key.split('-').map(Number);
-  const spans = Object.keys({ ...arms.taken, ...arms.untaken }).map((at) => [at, ...at.split('-').map(Number)] as const);
-  const around = spans.filter(([, s, e]) => s <= start && end <= e).sort(([, a, x], [, b, y]) => b - a || x - y)[0];
-  return around !== undefined && around[0] in arms.taken;
-};
+/** Whether `arms`, one record's of a file, took the arm `key`. A record without the file took nothing. */
+const takenIn = (arms: FileCoverage['arms'] | undefined, key: string): boolean => arms !== undefined && key in arms.taken;
 
 /** What the records said of a file that is no fall: the lines and the arms' lines some record reached and another did not. */
 export type Varying = { file: string; lines: number[]; armLines: number[] };
@@ -285,24 +233,28 @@ export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] 
 const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
 
 /**
- * A package's `test` script with coverage gathered into `destination` as lcov: the flags put right after its leading `node `, so
- * the script's own reporters keep their destinations. A script that names no reporter is given spec on stdout beside lcov, since
- * Node drops its default reporter once one is named, and the suite's results would go unprinted. Undefined for a script that does
- * not start with `node `.
+ * A package's `test` script with Vitest's v8 coverage written into the folder `destination`, as `lcov.info` and
+ * `coverage-final.json`: the options put after its `vitest run`, so the script's own options and filters keep their place. Undefined
+ * for a script that does not start with `vitest run`.
  *
- * It names an exclusion of its own, which replaces Node's default one: that default is the runner's test-file globs, matched on each
- * file's whole path, so a package whose path goes through a `test/` folder (a fixture under a guards' `test/`) has every file
- * excluded. `recordOf` drops the package's tests and helpers itself.
+ * It names an exclusion of its own, which replaces Vitest's default one: that default leaves out every file under a `test/` folder, so
+ * a package whose path goes through one (a fixture under a guards' `test/`) has every file excluded. `recordOf` drops the package's
+ * tests and helpers itself.
+ *
+ * @param script the package's `test` script, as its `package.json` gives it
+ * @param destination the folder the coverage is written to
  */
 export const withCoverage = (script: string, destination: string): string | undefined => {
   const trimmed = script.trimStart();
-  if (!trimmed.startsWith('node ')) return undefined;
-  const flags = [
-    '--experimental-test-coverage',
-    `--test-coverage-exclude=${quoted('**/node_modules/**')}`,
-    '--test-reporter=lcov',
-    `--test-reporter-destination=${quoted(destination)}`,
-    ...(/(^|\s)--test-reporter[=\s]/.test(trimmed) ? [] : ['--test-reporter=spec', '--test-reporter-destination=stdout']),
+  const head = /^vitest\s+run\b/.exec(trimmed)?.[0];
+  if (!head) return undefined;
+  const options = [
+    '--coverage.enabled',
+    '--coverage.provider=v8',
+    '--coverage.reporter=lcov',
+    '--coverage.reporter=json',
+    `--coverage.exclude=${quoted('**/node_modules/**')}`,
+    `--coverage.reportsDirectory=${quoted(destination)}`,
   ].join(' ');
-  return `node ${flags} ${trimmed.slice('node '.length).trimStart()}`;
+  return `${head} ${options}${trimmed.slice(head.length)}`;
 };

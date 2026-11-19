@@ -3,8 +3,8 @@
  *
  * These are the tests that read files of every package — the guards, and the structure tests the packages keep (`RULES`) — so a change
  * breaks one without touching it, and the tests of what a session changed never run it: of the round checks that failed over two days
- * in November 2026, half the real failures were one of these, each found by a whole `ci` run. Each group runs as its package's `test`
- * script loads it, one group after another and three files at a time, which keeps the whole near the 2 GB a suite is held to (2.3 GB
+ * in November 2026, half the real failures were one of these, each found by a whole `ci` run. Each group runs through Vitest under its
+ * package's own config (its setup files, the seat), one group after another and three files at a time, which keeps the whole near the 2 GB a suite is held to (2.3 GB
  * at its peak, in 23 s), and only what failed is said. The guards' boundary tests are left to `ci`: they hold the
  * workflows' own programs, which a change elsewhere does not move.
  *
@@ -16,8 +16,11 @@ import path from 'node:path';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..');
 
-/** A package's rule tests: its folder, what its `test` script loads first, and the files, from the folder. */
+/** A package's rule tests: its folder, what its config is given besides (the board's project), and the files, from the folder. */
 type Group = { dir: string; loads: readonly string[]; files: readonly string[] };
+
+/** Vitest's own command, the one every workspace's `test` script runs. */
+const VITEST = path.join(REPO, 'node_modules', 'vitest', 'vitest.mjs');
 
 const guards = fs
   .readdirSync(path.join(import.meta.dirname, 'test'))
@@ -29,17 +32,17 @@ export const RULES: readonly Group[] = [
   { dir: 'tools/guards', loads: [], files: guards },
   {
     dir: 'packages/agent-orchestrator',
-    loads: ['--import', './test/ambient.ts'],
+    loads: [],
     files: ['test/stand-ins.test.ts', 'test/boundary.test.ts', 'test/words.test.ts', 'test/store-paths.test.ts'],
   },
   { dir: 'packages/agent-runtime', loads: [], files: ['test/contract.test.ts'] },
-  { dir: 'apps/api', loads: ['--import', './test/harness.ts'], files: ['test/harness.test.ts'] },
-  { dir: 'apps/web', loads: [], files: ['test/dead-exports.test.ts', 'test/structure.test.ts', 'test/runs-type.test.ts'] },
+  { dir: 'apps/api', loads: [], files: ['test/harness.test.ts'] },
+  { dir: 'apps/web', loads: ['--project=node'], files: ['test/dead-exports.test.ts', 'test/structure.test.ts', 'test/runs-type.test.ts'] },
 ];
 
 /** What `group`'s tests said, and whether they passed. */
 function run(group: Group): Promise<{ group: Group; passed: boolean; said: string }> {
-  const child = spawn(process.execPath, [...group.loads, '--test', '--test-concurrency=3', ...group.files], {
+  const child = spawn(process.execPath, [VITEST, 'run', '--maxWorkers=3', ...group.loads, ...group.files], {
     cwd: path.join(REPO, group.dir),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -64,7 +67,7 @@ if (import.meta.main) {
     if (!ran.passed) failed.push(ran);
   }
   for (const { group, said } of failed) {
-    const from = said.lastIndexOf('✖ failing tests:');
+    const from = said.indexOf('Failed Tests');
     console.error(`\nrules: ${group.dir} refuses:\n${from < 0 ? said : said.slice(from)}`);
   }
   const files = RULES.reduce((n, group) => n + group.files.length, 0);

@@ -1,9 +1,9 @@
 /**
  * The repository's coverage tool (`tools/coverage/`), as data: the record reduced from planted lcov text, the comparison of two
- * records, the coverage flags put in a package's test script, and `compare.ts`'s exit codes through its `main`. Nothing here
+ * records, the coverage options put in a package's test script, and `compare.ts`'s exit codes through its `main`. Nothing here
  * spawns: `coverage.boundary.test.ts` runs `record.ts` on a fixture package.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +15,7 @@ import {
   withCoverage,
   type CoverageRecord,
   type FileCoverage,
-  type V8Script,
+  type Istanbul,
 } from '../../coverage/coverage.ts';
 import { main } from '../../coverage/compare.ts';
 
@@ -44,34 +44,22 @@ const cover = (hitLines: number[], found: number, branchHit = 0, branchFound = 0
 });
 
 /** A record of package `p` holding `files`. */
-const recordWith = (files: Record<string, FileCoverage>): CoverageRecord => ({ version: 2, package: 'p', files });
-
-/** A source with one branch: its `yes` arm opens on line 2, at its brace, its `no` arm on line 5. */
-const PICK = "export const pick = (x: boolean): string => {\n  if (x) {\n    return 'yes';\n  }\n  return 'no';\n};\n";
-const FN = { start: PICK.indexOf('(x'), end: PICK.indexOf('};') + 1 };
-const YES = { start: PICK.indexOf('{\n    return'), end: PICK.indexOf('  }\n') + 3 };
-const NO = { start: YES.end, end: FN.end - 1 };
+const recordWith = (files: Record<string, FileCoverage>): CoverageRecord => ({ version: 3, package: 'p', files });
 
 /**
- * One process's coverage of `src/pick.ts`, as V8 writes it: `pick` called `calls` times, the arms by their counts, the script
- * `tail` characters past the source's end. V8 leaves out an arm's range where it ran as often as `pick`, so a process that took one
- * arm alone reports only the other.
+ * Vitest's istanbul coverage of `src/pick.ts`, whose one `if` opens on line 2: its arm taken `yes` times and the `else` it leaves out,
+ * which has no place of its own, `no` times, each count already the sum over every test process.
  */
-const ran = (calls: number, arms: { yes?: number; no?: number }, tail = 0): V8Script[] => {
-  const range = (at: { start: number; end: number }, count = 1) => ({ startOffset: at.start, endOffset: at.end, count });
-  const blocks = [...(arms.yes === undefined ? [] : [range(YES, arms.yes)]), ...(arms.no === undefined ? [] : [range(NO, arms.no)])];
-  const functions = [{ ranges: [range({ start: 0, end: PICK.length + tail })] }, { ranges: [range(FN, calls), ...blocks] }];
-  return [{ url: `file://${PKG}/src/pick.ts`, functions }];
-};
+const ran = (yes: number, no: number): Istanbul => ({
+  [`${PKG}/src/pick.ts`]: {
+    branchMap: { '0': { line: 2, loc: { start: { line: 2 } }, locations: [{ start: { line: 2 } }, { start: {} }] } },
+    b: { '0': [yes, no] },
+  },
+});
 
-/** The record of `src/pick.ts` from `processes`, its lines all hit in the lcov, as both arms of one file would leave them. */
-const pickRecord = (...processes: V8Script[][]): CoverageRecord =>
-  recordOf(
-    section(`${PKG}/src/pick.ts`, [1, 2, 3, 4, 5, 6], [], { taken: 2, not: 0 }),
-    PKG,
-    () => processes,
-    () => PICK,
-  );
+/** The record of `src/pick.ts` from `istanbul`, its lines all hit in the lcov, as both arms of one file would leave them. */
+const pickRecord = (istanbul: Istanbul): CoverageRecord =>
+  recordOf(section(`${PKG}/src/pick.ts`, [1, 2, 3, 4, 5, 6], [], { taken: 2, not: 0 }), PKG, istanbul);
 
 describe('a record keeps the package’s own sources and drops its tests, its helpers, its fixtures and what lies outside it', () => {
   const rows: { name: string; lcov: string; files: Record<string, FileCoverage> }[] = [
@@ -93,8 +81,8 @@ describe('a record keeps the package’s own sources and drops its tests, its he
   ];
   for (const row of rows) {
     test(row.name, () => {
-      const record = recordOf(row.lcov, PKG, () => []);
-      assert.equal(record.version, 2);
+      const record = recordOf(row.lcov, PKG, {});
+      assert.equal(record.version, 3);
       assert.equal(record.package, 'p');
       assert.deepEqual(record.files, row.files);
     });
@@ -120,19 +108,18 @@ test('a comparison where every file hits what it did, or more, finds no fall', (
   assert.deepEqual(compared(before, recordWith({ 'src/a.ts': cover([1, 2, 3], 4, 2, 2) })), []);
 });
 
-describe("a branch is judged by its arms, each taken when any test process took it, against a before whose checkout's longer path ran its script past the source", () => {
-  let bothInOne!: CoverageRecord;
-  beforeAll(() => {
-    bothInOne = pickRecord(ran(2, { yes: 1, no: 1 }, 40));
+describe('a branch is judged by its arms, each taken when any test took it, by the count istanbul keeps for it', () => {
+  const both = pickRecord(ran(2, 1));
+  test('the record keeps each arm by its branch and place, at the line it opens on: the else an if leaves out at the if', () => {
+    assert.deepEqual(both.files['src/pick.ts']?.arms, { taken: { '0.0': 2, '0.1': 2 }, untaken: {} });
   });
-  const rows: [name: string, after: V8Script[][], lost: number[]][] = [
-    ['two arms taken by two test files are nothing lost, each process leaving out its own', [ran(1, { no: 0 }), ran(1, { yes: 0 })], []],
-    ['an arm no process reports is read as the range around it, here taken', [ran(1, {}), ran(1, { yes: 0 })], []],
-    ['an arm no test takes any more is REFUSED, by its file and line', [ran(1, { no: 0 })], [5]],
+  const rows: [name: string, after: Istanbul, lost: number[]][] = [
+    ['two arms each taken, by whichever test files, are nothing lost', ran(1, 1), []],
+    ['an arm no test takes any more is REFUSED, by its file and line', ran(1, 0), [2]],
   ];
   for (const [name, after, lost] of rows) {
     test(name, () => {
-      const falls = compared(bothInOne, pickRecord(...after));
+      const falls = compared(both, pickRecord(after));
       assert.deepEqual(
         falls.map((fall) => [fall.file, fall.armsLost]),
         lost.length > 0 ? [['src/pick.ts', lost]] : [],
@@ -146,7 +133,7 @@ describe('records on either side tell a line or an arm the records disagree on, 
   const one = recordWith({ 'src/a.ts': cover([1], 2) });
   const arm = (taken: boolean): CoverageRecord => ({
     ...two,
-    files: { 'src/a.ts': { ...cover([1, 2], 2), arms: { taken: taken ? { '10-20': 2 } : {}, untaken: taken ? {} : { '10-20': 2 } } } },
+    files: { 'src/a.ts': { ...cover([1, 2], 2), arms: { taken: taken ? { '0.0': 2 } : {}, untaken: taken ? {} : { '0.0': 2 } } } },
   });
   const rows: [
     name: string,
@@ -201,18 +188,16 @@ describe('records on either side tell a line or an arm the records disagree on, 
   }
 });
 
-test('the coverage flags go right after the script’s node, so its reporters keep their destinations', () => {
-  const script = "node --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'";
+test("the coverage options go right after the script's vitest run, so its own options and filters keep their place", () => {
   assert.equal(
-    withCoverage(script, '/tmp/x y/lcov.info'),
-    "node --experimental-test-coverage --test-coverage-exclude='**/node_modules/**' --test-reporter=lcov --test-reporter-destination='/tmp/x y/lcov.info' --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'",
+    withCoverage('vitest run ${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}', '/tmp/x y'),
+    "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=json --coverage.exclude='**/node_modules/**' --coverage.reportsDirectory='/tmp/x y' ${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}",
   );
   assert.equal(
-    withCoverage("node --test --test-concurrency=2 'test/*.test.ts'", '/tmp/l'),
-    "node --experimental-test-coverage --test-coverage-exclude='**/node_modules/**' --test-reporter=lcov --test-reporter-destination='/tmp/l' --test-reporter=spec --test-reporter-destination=stdout --test --test-concurrency=2 'test/*.test.ts'",
-    'a script that names no reporter keeps the spec lines on stdout beside lcov',
+    withCoverage('vitest run', '/tmp/l'),
+    "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=lcov --coverage.reporter=json --coverage.exclude='**/node_modules/**' --coverage.reportsDirectory='/tmp/l'",
   );
-  assert.equal(withCoverage('tsx --test', '/tmp/l'), undefined, 'a script that does not start with node is refused');
+  assert.equal(withCoverage("node --test 'test/*.test.ts'", '/tmp/l'), undefined, 'a script that is no vitest run is refused');
 });
 
 test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell, and 2 on arguments that are not two sides of records", () => {

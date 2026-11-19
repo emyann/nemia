@@ -1,7 +1,7 @@
 /**
  * `node tools/coverage/compare.ts <before.json> <after.json>`, or `<before.json>... -- <after.json>...`: says whether any source
  * file's coverage fell between the records `record.ts` wrote. Exit 0 when none fell, 1 naming each file that did and the lines it
- * lost, 2 when the arguments are not two sides of records of version 2. A line or an arm the records of a side disagree on varies,
+ * lost, 2 when the arguments are not two sides of records of version 3. A line or an arm the records of a side disagree on varies,
  * as Node's merge of a suite's processes leaves some from run to run, and is said apart, judged no fall (`judged`).
  */
 import fs from 'node:fs';
@@ -28,8 +28,8 @@ const recordIn = (file: string): CoverageRecord | string => {
     return `${file} cannot be read as JSON (${(error as Error).message})`;
   }
   const record = parsed as Partial<CoverageRecord> | null;
-  if (record?.version !== 2 || typeof record.files !== 'object' || record.files === null) {
-    return `${file} is no coverage record of version 2, which keeps each branch's arms: write it again with node tools/coverage/record.ts`;
+  if (record?.version !== 3 || typeof record.files !== 'object' || record.files === null) {
+    return `${file} is no coverage record of version 3, which keeps each branch's arms as istanbul names them: write it again with node tools/coverage/record.ts`;
   }
   return record as CoverageRecord;
 };

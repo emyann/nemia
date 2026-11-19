@@ -363,12 +363,16 @@ const isRuntime = (m: string): boolean => m !== VOCABULARY && (m === 'agent-runt
 
 /**
  * Effect, by any subpath. A pure file takes what a store file decoded, and the api loads `agent-orchestrator/run` and
- * `agent-orchestrator/workflow`, which are pure and load no Effect but `PURE_EFFECT`: a schema lives beside the read it decodes.
+ * `agent-orchestrator/workflow`, which are pure and load no Effect but the modules `PURE_EFFECT` names: a schema lives beside the read it decodes.
  */
 const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
 
-/** The one module of Effect a pure file may import, by that exact name: the tagged refusals' `TaggedError` (`src/refusal/refusal.ts`). */
-const PURE_EFFECT = 'effect/Data';
+/**
+ * The modules of Effect a pure file may import, each by that exact name: `effect/Data`, for the tagged refusals' `TaggedError`
+ * (`src/refusal/refusal.ts`), and `effect/Predicate`, for Effect's own guards (`isObject`) in place of hand-written ones. Neither
+ * loads Effect's runtime: `Predicate` imports `Function` alone, and `HKT` and `Types` for their types.
+ */
+const PURE_EFFECT: readonly string[] = ['effect/Data', 'effect/Predicate'];
 
 /** Every file is of exactly one kind, and every file a kind names is there. */
 function unsorted(sources: Sources): string[] {
@@ -387,7 +391,7 @@ function unsorted(sources: Sources): string[] {
 }
 
 /**
- * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but `PURE_EFFECT`, and no store,
+ * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but the modules `PURE_EFFECT` names, and no store,
  * controller, client or model file, and reads neither the environment nor `fetch`.
  */
 function impurities(sources: Sources): string[] {
@@ -397,7 +401,7 @@ function impurities(sources: Sources): string[] {
       .filter(
         (m) =>
           isRuntime(m) ||
-          (isEffect(m) && m !== PURE_EFFECT) ||
+          (isEffect(m) && !PURE_EFFECT.includes(m)) ||
           IMPURE.includes(m) ||
           IMPURE_GLOBALS.includes(m) ||
           of.STORE.includes(m) ||
@@ -749,7 +753,7 @@ test('model files import effect, objects, other model files and pure files alone
   assert.deepEqual(
     [...reached].filter((f) => kindsOf(f)[0] === 'MODEL'),
     [],
-    'no model file is reachable from agent-orchestrator/run or /workflow, which load no Effect but effect/Data',
+    'no model file is reachable from agent-orchestrator/run or /workflow, which load no Effect but effect/Data and effect/Predicate',
   );
 });
 
@@ -786,17 +790,24 @@ test('REFUSED: a pure file that imports a model file, and a model file that impo
     assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [], `${m} is let through`);
 });
 
-test('pure files import no runtime, read no disk, spawn nothing, load no Effect but effect/Data, and reach for no store or controller file', () => {
+test('pure files import no runtime, read no disk, spawn nothing, load no Effect but effect/Data and effect/Predicate, and reach for no store or controller file', () => {
   assert.deepEqual(impurities(packageSources()), []);
 });
 
-test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or Effect other than effect/Data, or reaches for a store or a controller file', () => {
+test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or Effect other than effect/Data and effect/Predicate, or reaches for a store or a controller file', () => {
   assert.deepEqual(impurities(adding('src/run.ts', 'effect')), ['src/run.ts is pure and imports effect']);
   assert.deepEqual(impurities(adding('src/daemon/daemon.ts', 'effect/Schema')), ['src/daemon/daemon.ts is pure and imports effect/Schema']);
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/DataX')), ['src/run.ts is pure and imports effect/DataX']);
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data/internal')), ['src/run.ts is pure and imports effect/Data/internal']);
   assert.deepEqual(impurities(adding('src/run.ts', '@effect/Data')), ['src/run.ts is pure and imports @effect/Data']);
-  assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data')), [], 'effect/Data, and it alone, is let through');
+  assert.deepEqual(impurities(adding('src/run.ts', 'effect/PredicateX')), ['src/run.ts is pure and imports effect/PredicateX']);
+  assert.deepEqual(impurities(adding('src/run.ts', '@effect/Predicate')), ['src/run.ts is pure and imports @effect/Predicate']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data')), [], 'effect/Data is let through');
+  assert.deepEqual(
+    impurities(adding('src/run.ts', 'effect/Predicate')),
+    [],
+    'effect/Predicate is let through, and no other module of Effect',
+  );
   assert.ok(
     ['src/status/status.ts', 'src/record/record.ts'].every((f) => f in packageSources()),
     'the plants go into files the scan reads',

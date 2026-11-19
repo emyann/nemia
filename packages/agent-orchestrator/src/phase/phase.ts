@@ -9,8 +9,8 @@
  * feed's face; the feed re-exports it.
  *
  * Each of `STEP_PHASES`, `RUN_PHASES`, `WAIT_ON`, `ANSWER_VIA`, `STEP_REASONS` and `RUN_REASONS` is `objects`' list word for word
- * (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`): a pure entry loads no Effect but `effect/Data`,
- * so it keeps its own copy rather than `objects`' door.
+ * (`packages/objects/src/words.ts`), held equal by `wordsHeld` (`object/run.model.ts`): a pure entry loads no Effect but `effect/Data` and
+ * `effect/Predicate`, so it keeps its own copy rather than `objects`' door.
  */
 import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';

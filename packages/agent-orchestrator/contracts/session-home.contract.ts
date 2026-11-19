@@ -6,7 +6,10 @@
  *
  * Each spec exports its type under the function's name, and the code takes it. Every type the signatures need is declared here.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
+import { expandedIn, WORKSPACE_EXPRESSION } from '../src/filed/session-start/expression.ts';
+
+export { WORKSPACE_EXPRESSION };
 
 /** A folder a session is filed with beside its working folder, as the runtime's task takes it. */
 export type AddedFolder = {
@@ -45,8 +48,12 @@ export type SessionStart = {
   readonly denies: readonly string[];
 };
 
-/** The deny that holds a folder read-only, spelled as the runtime spells a read-only mount's: `Edit(//<path>/**)`. */
-const editDenied = (folder: string): string => `Edit(/${folder}/**)`;
+/**
+ * The deny that holds a folder read-only, spelled as the runtime spells a read-only mount's: `Edit(//<path>/**)`. Joined with `+`,
+ * which the solver reads, where a template string is an unknown string of its parts.
+ * @param folder The folder denied, absolute.
+ */
+export const editDenied = (folder: string): string => 'Edit(/' + folder + '/**)';
 
 /** Whether the session starts in the home: there is one, the step runs here, and its harness can add the workspace writable beside it. */
 const startsInHome = (i: SessionPlaceOf): boolean => i.home !== undefined && i.local && i.addsFolders;
@@ -94,9 +101,6 @@ const sessionStartSpec = spec<(i: SessionPlaceOf) => SessionStart>({
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type SessionStartOf = Implementation<typeof sessionStartSpec>;
 
-/** The expression a step's rule names its workspace by, expanded at filing. */
-export const WORKSPACE_EXPRESSION = '${{ workspace }}';
-
 /** The tools whose rule names a file by its path, as Claude Code reads one. */
 const FILE_TOOLS: readonly string[] = ['Read', 'Edit', 'Write', 'NotebookEdit'];
 
@@ -104,29 +108,44 @@ const FILE_TOOLS: readonly string[] = ['Read', 'Edit', 'Write', 'NotebookEdit'];
 const partsOf = (rule: string): { tool: string; inner: string | null } => {
   const open = rule.indexOf('(');
   if (open < 0 || !rule.endsWith(')')) return { tool: rule, inner: null };
-  return { tool: rule.slice(0, open), inner: rule.slice(open + 1, -1) };
+  return { tool: rule.slice(0, open), inner: rule.slice(open).slice(1, -1) };
 };
 
 /** Whether a file rule's path is read from the session's working folder: neither absolute (`/`, `//`) nor the user's (`~`). */
 const relative = (inner: string): boolean => inner.length > 0 && !inner.startsWith('/') && !inner.startsWith('~');
 
-/** A relative path with any leading `./` taken off. */
-const bare = (inner: string): string => (inner.startsWith('./') ? bare(inner.slice(2)) : inner);
+/** A relative path with its leading `./` taken off, where it has one. */
+const bare = (inner: string): string => (inner.startsWith('./') ? inner.slice(2) : inner);
 
-/** Every occurrence of the workspace expression in `text`, replaced by `workspace`. */
-const expanded = (text: string, workspace: string): string => {
-  const at = text.indexOf(WORKSPACE_EXPRESSION);
-  if (at < 0) return text;
-  return `${text.slice(0, at)}${workspace}${expanded(text.slice(at + WORKSPACE_EXPRESSION.length), workspace)}`;
-};
+/**
+ * The expansion of `${{ workspace }}` the code calls (`expandedIn`), taken on trust: a split and a join, which the solver does not
+ * read. Its laws are held on the real function by `src/filed/session-start/expression.test.ts` (`brokenOn`).
+ */
+export const expandedPure = assume<[text: string, workspace: string], string>(expandedIn, {
+  pure: true,
+  ensures: {
+    /** A text that names no expression is as it was. */
+    noneAsWritten: ({ input: [text], output }) => text.includes(WORKSPACE_EXPRESSION) || output === text,
+    /** No expression is left, where the workspace names none. */
+    noneLeft: ({ input: [, workspace], output }) => workspace.includes(WORKSPACE_EXPRESSION) || !output.includes(WORKSPACE_EXPRESSION),
+    /** The text before the first expression is kept, and the workspace stands where the expression stood. */
+    inItsPlace: ({ input: [text, workspace], output }) =>
+      !text.includes(WORKSPACE_EXPRESSION) || output.startsWith(text.slice(0, text.indexOf(WORKSPACE_EXPRESSION)) + workspace),
+  },
+});
 
 const inWorkspaceSpec = spec<(rule: string, workspace: string) => string>({
   /** The workspace is an absolute path with no expression in it. */
   requires: ({ input: [, workspace] }) => workspace.startsWith('/') && !workspace.includes(WORKSPACE_EXPRESSION),
   ensures: {
     expressionExpanded: {
-      description: "A rule that names `${{ workspace }}` names the step's workspace in its place, wherever it stands in the rule",
-      condition: ({ input: [rule, workspace], output }) => !rule.includes(WORKSPACE_EXPRESSION) || output === expanded(rule, workspace),
+      description: 'A rule that names `${{ workspace }}` names no expression once filed',
+      condition: ({ input: [rule], output }) => !rule.includes(WORKSPACE_EXPRESSION) || !output.includes(WORKSPACE_EXPRESSION),
+    },
+    expressionInItsPlace: {
+      description: "The step's workspace stands where the rule's first `${{ workspace }}` stood, what was before it kept",
+      condition: ({ input: [rule, workspace], output }) =>
+        !rule.includes(WORKSPACE_EXPRESSION) || output.startsWith(rule.slice(0, rule.indexOf(WORKSPACE_EXPRESSION)) + workspace),
     },
     relativeFileRuleInTheWorkspace: {
       description:
@@ -134,7 +153,7 @@ const inWorkspaceSpec = spec<(rule: string, workspace: string) => string>({
       condition: ({ input: [rule, workspace], output }) => {
         const { tool, inner } = partsOf(rule);
         if (rule.includes(WORKSPACE_EXPRESSION) || inner === null || !FILE_TOOLS.includes(tool) || !relative(inner)) return true;
-        return output === `${tool}(/${workspace}/${bare(inner)})`;
+        return output === tool + '(/' + workspace + '/' + bare(inner) + ')';
       },
     },
     otherwiseAsWritten: {
@@ -163,11 +182,14 @@ export type MemoryFolder = { readonly path: string; readonly claudeMd: boolean }
  */
 export type MemoryFiles = { readonly load: boolean; readonly excludes: readonly string[] };
 
-/** The exclude that skips every memory file under a folder. */
-const everyFileUnder = (folder: string): string => `${folder}/**`;
+/**
+ * The exclude that skips every memory file under a folder.
+ * @param folder The folder skipped, absolute.
+ */
+export const everyFileUnder = (folder: string): string => folder + '/**';
 
 /** Whether `inner` is `outer` or a folder under it. */
-const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(`${outer}/`);
+const within = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(outer + '/');
 
 const memoryFilesSpec = spec<(folders: readonly MemoryFolder[]) => MemoryFiles>({
   /**

@@ -101,6 +101,16 @@ describe('filedConfig in a home: where the session starts, the workspace beside 
     assert.equal(on.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD, '1');
     const settings: unknown = JSON.parse((on as unknown as { claude: { settings: string } }).claude.settings);
     assert.deepEqual(settings, { env: { A: '1' }, claudeMdExcludes: ['/vol/**', '/runs/r/artifacts/design/**'] });
+    const volume = filed(DESIGN, {
+      workspace: WS,
+      start: found(),
+      run: { volumes: [{ path: '/vol', readOnly: true, claudeMd: true }] },
+      own: { claude: { settings: '{}' } },
+    });
+    assert.equal(volume.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD, '1', "a volume's own switch loads them");
+    assert.deepEqual(JSON.parse((volume as unknown as { claude: { settings: string } }).claude.settings), {
+      claudeMdExcludes: [`${WS}/**`, '/runs/r/artifacts/design/**'],
+    });
   });
   test('the switches of a mount never reach the runtime, which takes a path, a mode and `ruled` alone', () => {
     const config = filed(DESIGN, { workspace: WS, start: found(), run: { volumes: [{ path: '/vol', readOnly: true, claudeMd: true }] } });

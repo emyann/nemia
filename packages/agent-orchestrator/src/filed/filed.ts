@@ -16,7 +16,8 @@ import type { HandedRunMounts } from '../../contracts/handed-runs.contract.ts';
 import type { HandedRunFolders } from '../../contracts/handed-folders.contract.ts';
 import { handedFolders } from './handed-folders/handed-folders.ts';
 import { inWorkspace, memoryFilesOf, sessionStart } from './session-start/session-start.ts';
-import { WORKSPACE_EXPRESSION, type SessionStart } from '../../contracts/session-home.contract.ts';
+import type { SessionStart } from '../../contracts/session-home.contract.ts';
+import { expandedIn } from './session-start/expression.ts';
 
 export { handedFolders } from './handed-folders/handed-folders.ts';
 
@@ -135,7 +136,7 @@ const placedOf = (
   const worked = start?.worked ?? null;
   if (ws === undefined || start === undefined || worked === null)
     return {
-      rule: (r) => (ws === undefined ? r : r.split(WORKSPACE_EXPRESSION).join(ws)),
+      rule: (r) => (ws === undefined ? r : expandedIn(r, ws)),
       denies: [],
       mounts: others,
       servedFrom: {},

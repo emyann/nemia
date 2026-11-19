@@ -3,11 +3,13 @@
  * load (`contracts/session-home.contract.ts`).
  */
 import {
+  editDenied,
+  everyFileUnder,
   type InWorkspace,
   type MemoryFilesOf,
   type SessionStartOf,
-  WORKSPACE_EXPRESSION,
 } from '../../../contracts/session-home.contract.ts';
+import { expandedIn, WORKSPACE_EXPRESSION } from './expression.ts';
 
 const FILE_TOOLS: readonly string[] = ['Read', 'Edit', 'Write', 'NotebookEdit'];
 
@@ -22,32 +24,25 @@ export const sessionStart: SessionStartOf = (i) => {
   return {
     cwd: i.home,
     worked: i.writes ? { path: i.workspace, readOnly: false, ruled: true } : { path: i.workspace, readOnly: true },
-    denies: [`Edit(/${i.home}/**)`],
+    denies: [editDenied(i.home)],
   };
-};
-
-const bare = (inner: string): string => (inner.startsWith('./') ? bare(inner.slice(2)) : inner);
-
-const expanded = (text: string, workspace: string): string => {
-  const at = text.indexOf(WORKSPACE_EXPRESSION);
-  if (at < 0) return text;
-  return `${text.slice(0, at)}${workspace}${expanded(text.slice(at + WORKSPACE_EXPRESSION.length), workspace)}`;
 };
 
 /**
  * A step's rule read against its workspace: `${{ workspace }}` expanded to the workspace, and a relative path of a file rule
- * (`Read`, `Edit`, `Write`, `NotebookEdit`) named in the workspace; any other rule as written.
+ * (`Read`, `Edit`, `Write`, `NotebookEdit`) named in the workspace, a leading `./` taken off; any other rule as written.
  * @param rule The rule as the step's fence writes it.
  * @param workspace The step's workspace, absolute.
  */
 export const inWorkspace: InWorkspace = (rule, workspace) => {
-  if (rule.includes(WORKSPACE_EXPRESSION)) return expanded(rule, workspace);
+  if (rule.includes(WORKSPACE_EXPRESSION)) return expandedIn(rule, workspace);
   const open = rule.indexOf('(');
   if (open < 0 || !rule.endsWith(')')) return rule;
   const tool = rule.slice(0, open);
-  const inner = rule.slice(open + 1, -1);
+  const inner = rule.slice(open).slice(1, -1);
   if (!FILE_TOOLS.includes(tool) || inner.length === 0 || inner.startsWith('/') || inner.startsWith('~')) return rule;
-  return `${tool}(/${workspace}/${bare(inner)})`;
+  const path = inner.startsWith('./') ? inner.slice(2) : inner;
+  return tool + '(/' + workspace + '/' + path + ')';
 };
 
 /**
@@ -56,5 +51,5 @@ export const inWorkspace: InWorkspace = (rule, workspace) => {
  */
 export const memoryFilesOf: MemoryFilesOf = (folders) => {
   if (!folders.some((f) => f.claudeMd)) return { load: false, excludes: [] };
-  return { load: true, excludes: folders.filter((f) => !f.claudeMd).map((f) => `${f.path}/**`) };
+  return { load: true, excludes: folders.filter((f) => !f.claudeMd).map((f) => everyFileUnder(f.path)) };
 };

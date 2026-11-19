@@ -81,7 +81,7 @@ const RUN: WaitingRun = {
   pruned: null,
   onDisk: { worktrees: true, files: true },
   read: null,
-  gates: ['land'],
+  gates: [{ step: 'land', at: 'before' }],
   warning: null,
   kinds: [],
   after: [],

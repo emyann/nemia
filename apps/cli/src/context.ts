@@ -124,6 +124,15 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
 export const chosenOf = (env: NodeJS.ProcessEnv = process.env): Chosen => contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim());
 
 /**
+ * The context in use, by its name: `NEMIA_CONTEXT`, else the config's, else this machine's.
+ * @param env The environment read for the config file and `NEMIA_CONTEXT`.
+ */
+export function inUse(env: NodeJS.ProcessEnv = process.env): string {
+  const named = env[CONTEXT_VARIABLE]?.trim();
+  return named !== undefined && named !== '' ? named : (configRead(env).current ?? LOCAL_CONTEXT);
+}
+
+/**
  * The token of the config a command run with `env` presents, where `WF_SESSION_TOKEN` is not set: the remote context's, or under this
  * machine's context the person's token for its own daemon where the config keeps one (`set-context local --token-file`); none otherwise,
  * where the client presents the store's credential under this machine's context (`callerToken`, client.ts).

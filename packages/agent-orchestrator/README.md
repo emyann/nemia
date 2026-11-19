@@ -3605,6 +3605,12 @@ servers are read from the home's `.mcp.json` where it has one and else from the 
 the workspace as before. A factory with no home, a run started before homes were, a step on Codex or a remote agent, and a folder run
 start in their workspace, filed as they were.
 
+A person sees the home as a step does with `nemia factory home <factory> [<repo>]`, a verb of the client's own: the api serves the home
+whole, its files and the digest a run's copy is named by (`GET /api/factories/:name/home`, `factoryHomeOf`,
+`src/factory/home/home.verb.ts`, read through the Factory door with `homeFilesOf`), and the client renders it read-only into its own
+cache under that digest and starts the person's session there, their repository added beside it (`apps/cli`, *Own session* in its
+glossary). Nothing of the store is written, and the live tree is never handed out to edit: a home changes by a proposal.
+
 Each volume has two switches, the person's (`nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off`,
 kept by an add that names none, and refused in a proposal as every volume is): `claudeMd`, off by default, loads the volume's
 CLAUDE.md files into the sessions that start in the home (Claude Code's `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`, one switch for

@@ -405,7 +405,7 @@ export {
   type TranscriptRole,
 } from './words.ts';
 export { BaseHold, RunHolding, RunWaiting } from './run.ts';
-export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState } from './words.ts';
+export { DECIDE_LABELS, type DecideLabel, LESSON_STATES, type LessonState, AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   Collisions,
   Decidable,
@@ -567,7 +567,6 @@ export {
   AgentSources,
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
-export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,
@@ -771,7 +770,6 @@ export {
 export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
 export { FACTORY_MANUAL } from './commands-factories-manual.ts';
 export { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
-export { FACTORY_HOME_WORDS, HOME_CLAUDE_MD } from './commands-factories-home.ts';
 export {
   DEFINITION_WORDS,
   POLICY_CONFIRM_WORDS,

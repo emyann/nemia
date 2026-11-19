@@ -246,6 +246,13 @@ const exported = (name: string, cards: MoveCards | undefined) =>
     return s.inRequest(factoryExported(name, cards === undefined ? {} : { cards }));
   });
 
+/** A factory's home (`nemia factory home`'s read): every file of the home of `name`'s tree, and their digest, for a client to render. */
+const homeRead = (name: string) =>
+  answered((s: Served) => {
+    factoryNamed(`GET /api/factories/${name}/home`, name);
+    return s.inRequest(factoryHomeOf(name));
+  });
+
 /**
  * A factory's import (`nemia factory move`'s write on the target): the export sent filed here as `name`, its template kept under the store
  * once it is filed, each repository given by its whole path or a git URL this machine clones, each volume by its whole path.
@@ -366,12 +373,7 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('removeVolume', ({ params: { factory }, query: { path: at } }) => volumeRemoved(factory, at))
     .handle('apply', ({ params: { name }, payload }) => applied(name, payload))
     .handle('export', ({ params: { name }, query }) => exported(name, query.cards))
-    .handle('home', ({ params: { name } }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/factories/${name}/home`, name);
-        return s.inRequest(factoryHomeOf(name));
-      }),
-    )
+    .handle('home', ({ params: { name } }) => homeRead(name))
     .handle('import', ({ params: { name }, payload }) => imported(name, payload))
     .handle('adopt', ({ params: { factory }, payload }) => adopted(factory, payload))
     .handle('diff', ({ params: { factory }, payload }) => previewed(factory, payload))

@@ -20,6 +20,6 @@ export const FactoryHome = Schema.Struct({
   digest: Schema.String.annotate({
     description: "The hex of the home's content, its paths, modes and bytes: the name a run's copy of the same home takes.",
   }),
-  files: Schema.Array(FactoryHomeFile).annotate({ description: "Every file of the home, at any depth, sorted by path." }),
+  files: Schema.Array(FactoryHomeFile).annotate({ description: 'Every file of the home, at any depth, sorted by path.' }),
 });
 export type FactoryHome = typeof FactoryHome.Type;

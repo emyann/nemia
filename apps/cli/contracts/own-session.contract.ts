@@ -67,7 +67,8 @@ const ownSessionSpec = spec<(i: OwnSessionPlace) => OwnSession>({
       condition: ({ input: [i], output }) => (output.kind === 'refused') === nested(i),
     },
     saysWhichHoldsWhich: {
-      description: 'A refusal says which holds the other: the repository holding the copy (or being it), else the copy holding the repository',
+      description:
+        'A refusal says which holds the other: the repository holding the copy (or being it), else the copy holding the repository',
       condition: ({ input: [i], output }) =>
         output.kind !== 'refused' || output.reason === (within(i.copy, i.repo) ? 'repo-holds-home' : 'home-holds-repo'),
     },

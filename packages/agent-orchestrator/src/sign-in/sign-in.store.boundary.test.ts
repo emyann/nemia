@@ -4,7 +4,7 @@
  * where it is unset, and refuses a file another user can read, naming `chmod 600`. A token's age is its file's write time: one planted
  * past about eleven months, or past its year, is warned of by its kind, naming the command that makes a new one.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

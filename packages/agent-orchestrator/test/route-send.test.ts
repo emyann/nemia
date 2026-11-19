@@ -8,7 +8,8 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -114,12 +115,17 @@ const refusedAs = (tag: string) => (err: Error & { _tag?: string; exitCode?: num
   return true;
 };
 
-test('a condition that routes to a workflow node files one queued card, and no pass files a second', async (t) => {
-  const s = story(t);
-  const id = await planned('web');
-  const card = `${id}-ship-routed`;
-
-  await s.test('the pass files the card with workflow: and from:, and the node reads sent', async () => {
+describe('a condition that routes to a workflow node files one queued card, and no pass files a second', () => {
+  let id!: string;
+  let card!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    id = await planned('web');
+    card = `${id}-ship-routed`;
+    return t.end;
+  });
+  const s = story(test);
+  s.test('the pass files the card with workflow: and from:, and the node reads sent', async () => {
     const before = cards().length;
     await pass(id);
     assert.equal(cards().length, before + 1);
@@ -130,16 +136,14 @@ test('a condition that routes to a workflow node files one queued card, and no p
     assert.equal(runRecord(ROOT, id).steps.ship?.sent?.card, card);
     assert.equal((await words(id)).ship, `sent → ${card}`);
   });
-
-  await s.test('a second pass files no second card', async () => {
+  s.test('a second pass files no second card', async () => {
     const before = cards().length;
     const at = runRecord(ROOT, id).steps.ship?.sent?.at;
     await pass(id);
     assert.equal(cards().length, before);
     assert.equal(runRecord(ROOT, id).steps.ship?.sent?.at, at);
   });
-
-  await s.test('a pass after a crash between the filing and the record adopts the card', async () => {
+  s.test('a pass after a crash between the filing and the record adopts the card', async () => {
     const run = runRecord(ROOT, id);
     const { sent: _gone, ...rest } = run.steps.ship ?? { taskId: null };
     run.steps.ship = rest;
@@ -149,8 +153,7 @@ test('a condition that routes to a workflow node files one queued card, and no p
     assert.equal(cards().length, before);
     assert.equal(runRecord(ROOT, id).steps.ship?.sent?.card, card);
   });
-
-  await s.test("the caller's result is what the condition read", async () => {
+  s.test("the caller's result is what the condition read", async () => {
     const run = runRecord(ROOT, id);
     const steps = await stage.runPlaced(stepsOf(run));
     assert.deepEqual(
@@ -158,25 +161,26 @@ test('a condition that routes to a workflow node files one queued card, and no p
       ['plan'],
     );
   });
-
-  await s.test('nemia route is refused once the node after the condition is sent', async () => {
+  s.test('nemia route is refused once the node after the condition is sent', async () => {
     await assert.rejects(stage.main(['route', id, 'triage', 'docs']), refusedAs('Conflict'));
   });
 });
 
-test('nemia route: refused off the list and on a step that is no condition, accepted before, and it wins over the table', async (t) => {
-  const s = story(t);
-  const id = await planned('web');
-
-  await s.test('a route not in routes: is refused', async () => {
+describe('nemia route: refused off the list and on a step that is no condition, accepted before, and it wins over the table', () => {
+  let id!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    id = await planned('web');
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a route not in routes: is refused', async () => {
     await assert.rejects(stage.main(['route', id, 'triage', 'nope']), refusedAs('Invalid'));
   });
-
-  await s.test('a step that is no condition is refused', async () => {
+  s.test('a step that is no condition is refused', async () => {
     await assert.rejects(stage.main(['route', id, 'plan', 'build']), refusedAs('Invalid'));
   });
-
-  await s.test("the person's route wins over the table's: docs ends the run and ship is skipped", async () => {
+  s.test("the person's route wins over the table's: docs ends the run and ship is skipped", async () => {
     await stage.main(['route', id, 'triage', 'docs']);
     await pass(id);
     assert.equal(runRecord(ROOT, id).steps.ship?.sent, undefined);
@@ -185,11 +189,10 @@ test('nemia route: refused off the list and on a step that is no condition, acce
   });
 });
 
-test("a routed card takes its title from the producer's closeout, else the run's, and carries the run's labels", async (t) => {
-  const s = story(t);
+describe("a routed card takes its title from the producer's closeout, else the run's, and carries the run's labels", () => {
+  const s = story(test);
   const labels = { area: 'src', work: 'feature', initiative: 'routing' };
-
-  await s.test("a producer that signs off on a title names the card by it, the run's labels on it", async () => {
+  s.test("a producer that signs off on a title names the card by it, the run's labels on it", async () => {
     const id = await planned('web', { title: 'src: examples are found by running', labels });
     await pass(id);
     const card = routedCard(id);
@@ -198,38 +201,46 @@ test("a routed card takes its title from the producer's closeout, else the run's
     assert.equal(card.workflow, 'deliver');
     assert.deepEqual(card.from, [id]);
   });
-
-  await s.test("a producer that signs off on no title leaves the run's title on the card, the run's labels on it", async () => {
+  s.test("a producer that signs off on no title leaves the run's title on the card, the run's labels on it", async () => {
     const id = await planned('web', { labels });
     await pass(id);
     const card = routedCard(id);
     assert.equal(card.body.split('\n')[0], 'add a flag');
     assert.deepEqual(card.labels, labels);
   });
-
-  await s.test('a run with no labels files a card with none', async () => {
+  s.test('a run with no labels files a card with none', async () => {
     const id = await planned('web');
     await pass(id);
     assert.equal(routedCard(id).labels, undefined);
   });
 });
 
-test("the run a routed card starts mounts the caller's artifacts and inputs read-only on every step, and each brief names them", async (t) => {
-  const s = story(t);
-  const notes = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
-  fs.writeFileSync(notes, 'the rows\n');
-  const id = await planned('web', { inputs: [notes] });
-  const repo = runRecord(ROOT, id).repo ?? '';
-  const deliver = path.join(repo, 'workflows', 'deliver');
-  fs.mkdirSync(deliver, { recursive: true });
-  fs.writeFileSync(path.join(deliver, 'implement.md'), '---\nplace: git\n---\nbuild it\n');
-  fs.writeFileSync(path.join(deliver, 'review.md'), '---\nplace: git\nafter: implement\n---\nreview it\n');
-  await pass(id);
-  const card = runRecord(ROOT, id).steps.ship?.sent?.card ?? '';
-  const artifacts = path.dirname(artifactsDir(ROOT, runRecord(ROOT, id), 'plan'));
-  const inputs = inputsDir(ROOT, runRecord(ROOT, id));
+describe("the run a routed card starts mounts the caller's artifacts and inputs read-only on every step, and each brief names them", () => {
+  let notes!: string;
+  let id!: string;
+  let repo!: string;
+  let deliver!: string;
+  let card!: string;
+  let artifacts!: string;
+  let inputs!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    notes = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+    fs.writeFileSync(notes, 'the rows\n');
+    id = await planned('web', { inputs: [notes] });
+    repo = runRecord(ROOT, id).repo ?? '';
+    deliver = path.join(repo, 'workflows', 'deliver');
+    fs.mkdirSync(deliver, { recursive: true });
+    fs.writeFileSync(path.join(deliver, 'implement.md'), '---\nplace: git\n---\nbuild it\n');
+    fs.writeFileSync(path.join(deliver, 'review.md'), '---\nplace: git\nafter: implement\n---\nreview it\n');
+    await pass(id);
+    card = runRecord(ROOT, id).steps.ship?.sent?.card ?? '';
+    artifacts = path.dirname(artifactsDir(ROOT, runRecord(ROOT, id), 'plan'));
+    inputs = inputsDir(ROOT, runRecord(ROOT, id));
+    return t.end;
+  });
+  const s = story(test);
   let routed = '';
-
   const handedTo = (name: string) => {
     const spec = stage.board().specs.find((x) => x.id === `${routed}-${name}`);
     assert.ok(spec, `${name} is filed`);
@@ -242,59 +253,56 @@ test("the run a routed card starts mounts the caller's artifacts and inputs read
     const named = spec.brief.split('## What was asked for')[1]?.split('\n## ')[0] ?? '';
     assert.ok(named.includes(artifacts) && named.includes(inputs), 'the mount line under what was asked for names both folders');
   };
-
-  await s.test(
-    'the card starts as the tick starts one, and the pass files its root with the caller folders mounted read-only',
-    async () => {
-      assert.ok(card, 'the card was sent');
-      routed = (await stage.runPlaced(startFromInbox({ name: card, callerRepo: repo }))).run.id;
-      assert.deepEqual(runRecord(ROOT, routed).context, [id], 'handed the caller as context');
-      await pass(routed);
-      handedTo('implement');
-    },
-  );
-
-  await s.test('the step after the root is filed with the same folders, not the root alone', async () => {
+  s.test('the card starts as the tick starts one, and the pass files its root with the caller folders mounted read-only', async () => {
+    assert.ok(card, 'the card was sent');
+    routed = (await stage.runPlaced(startFromInbox({ name: card, callerRepo: repo }))).run.id;
+    assert.deepEqual(runRecord(ROOT, routed).context, [id], 'handed the caller as context');
+    await pass(routed);
+    handedTo('implement');
+  });
+  s.test('the step after the root is filed with the same folders, not the root alone', async () => {
     stage.board().settle(`${routed}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
     await pass(routed);
     handedTo('review');
   });
 });
 
-test("a gated table condition on the tests' team: its producer signs off, a person approves it, and its workflow node is sent", async (t) => {
-  const s = story(t);
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  stage.place().world.repository(repo, { 'a.txt': 'one\n' });
-  const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: path.join(TEAM, 'triage'), gates: ['triage'] }));
-  const id = run.id;
-
-  await s.test('plan is filed, and signs off on the board', async () => {
+describe("a gated table condition on the tests' team: its producer signs off, a person approves it, and its workflow node is sent", () => {
+  let repo!: string;
+  let run!: import('../src/start/start.verb.ts').StartedRun;
+  let id!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+    stage.place().world.repository(repo, { 'a.txt': 'one\n' });
+    run = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: path.join(TEAM, 'triage'), gates: ['triage'] }));
+    id = run.id;
+    return t.end;
+  });
+  const s = story(test);
+  s.test('plan is filed, and signs off on the board', async () => {
     assert.deepEqual((await pass(id)).filed, ['plan']);
     const closeout = { outcome: 'done', summary: 'planned', artifacts: [], needs: null, findings: [], again: false, surface: 'web' };
     stage.board().settle(`${id}-plan`, 'succeeded', closeout);
   });
-
-  await s.test('the pass files nothing after triage, which nemia ls says waits at its gate on you', async () => {
+  s.test('the pass files nothing after triage, which nemia ls says waits at its gate on you', async () => {
     const after = await pass(id);
     assert.deepEqual(after.filed, []);
     const listed = await stage.runWith(stage.board().e, list(stage.board().e, runRecord(ROOT, id)));
     assert.equal(listed.steps.find((x) => x.name === 'triage')?.message, 'awaiting approval · proposes web');
     assert.deepEqual(listed.waitingOnYou, ['triage']);
   });
-
-  await s.test('nemia approve <run> triage is accepted', async () => {
+  s.test('nemia approve <run> triage is accepted', async () => {
     await stage.main(['approve', id, 'triage']);
     assert.ok(runRecord(ROOT, id).approvals?.some((a) => a.step === 'triage' && a.try === 1));
   });
-
-  await s.test('the next pass files build-web and sends handoff its card', async () => {
+  s.test('the next pass files build-web and sends handoff its card', async () => {
     const after = await pass(id);
     assert.ok(after.filed.includes('build-web'), JSON.stringify(after.filed));
     assert.equal(runRecord(ROOT, id).steps.handoff?.sent?.card, `${id}-handoff-routed`);
     assert.equal((await words(id))['build-backend'], 'skipped (triage: web)');
   });
-
-  await s.test('a second approval is refused, as the try is already approved', async () => {
+  s.test('a second approval is refused, as the try is already approved', async () => {
     await assert.rejects(stage.main(['approve', id, 'triage']), refusedAs('Conflict'));
   });
 });

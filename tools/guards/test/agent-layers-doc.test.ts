@@ -10,7 +10,7 @@
  * The documentation site's *What an agent is told: five layers* keeps its own list on purpose — a person reads the site, not the
  * package's skills — and is held to the code the same way, its wording its own.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -4,7 +4,7 @@
  * every test (`src/runs/runs.store.ts`, the invariant rows of `test/run-walks.ts`).
  * Refusals are asserted by the fact, never by their words.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
 import { Landing, Run, RunId, StepName } from './record.model.ts';
@@ -13,7 +13,7 @@ import { run } from '../../test/assessed.ts';
 
 const decodes = (value: unknown): boolean => Schema.is(Run)(value);
 
-test("each id is checked on create by its writer's rule, and any string reads", async (t) => {
+describe("each id is checked on create by its writer's rule, and any string reads", () => {
   const minted = runId('Add a flag to nemia ls');
   const rows: Array<[string, boolean, boolean]> = [
     [minted, true, true],
@@ -21,7 +21,7 @@ test("each id is checked on create by its writer's rule, and any string reads", 
     ['r-1', true, true],
   ];
   for (const [id, created, read] of rows)
-    await t.test(`RunId ${JSON.stringify(id)}: create ${created ? 'takes' : 'refuses'} it, read takes it`, () => {
+    test(`RunId ${JSON.stringify(id)}: create ${created ? 'takes' : 'refuses'} it, read takes it`, () => {
       assert.equal(Option.isSome(RunId.create.option(id)), created);
       assert.equal(Schema.is(RunId.OnCreate)(id), created);
       assert.equal(Schema.is(RunId.OnRead)(id), read);
@@ -34,14 +34,14 @@ test("each id is checked on create by its writer's rule, and any string reads", 
     ['implement.md', false],
   ];
   for (const [name, created] of names)
-    await t.test(`StepName ${JSON.stringify(name)}: create ${created ? 'takes' : 'refuses'} it, read takes it`, () => {
+    test(`StepName ${JSON.stringify(name)}: create ${created ? 'takes' : 'refuses'} it, read takes it`, () => {
       assert.equal(Option.isSome(StepName.create.option(name)), created);
       assert.equal(Schema.is(StepName.OnCreate)(name), created);
       assert.equal(Schema.is(StepName.OnRead)(name), true);
     });
 });
 
-test("a run's invariants: each refuses its planted breach, and lets through what its writer writes", async (t) => {
+describe("a run's invariants: each refuses its planted breach, and lets through what its writer writes", () => {
   const implement = (record: object) =>
     run({ review: null }, { steps: { implement: { taskId: null, ...record }, review: { taskId: null } } });
   const rows: Array<[string, unknown, boolean]> = [
@@ -86,10 +86,10 @@ test("a run's invariants: each refuses its planted breach, and lets through what
       true,
     ],
   ];
-  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
+  for (const [what, value, ok] of rows) test(what, () => assert.equal(decodes(value), ok));
 });
 
-test('a run is a repository run or a folder run, and a repository field on a folder run is refused', async (t) => {
+describe('a run is a repository run or a folder run, and a repository field on a folder run is refused', () => {
   const { repo: _repo, baseRef: _baseRef, branch: _branch, isolate: _isolate, ...base } = run({ implement: null });
   const folder = { ...base, workspace: '/runs/r-1/work', place: { kind: 'folder' } };
   const rows: Array<[string, unknown, boolean]> = [
@@ -97,10 +97,10 @@ test('a run is a repository run or a folder run, and a repository field on a fol
     ['a folder run', folder, true],
     ['REFUSED: a folder run that names a repository', { ...folder, repo: '/repo' }, false],
   ];
-  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
+  for (const [what, value, ok] of rows) test(what, () => assert.equal(decodes(value), ok));
 });
 
-test('a landing is one of a commit, an abort or nothing touched', async (t) => {
+describe('a landing is one of a commit, an abort or nothing touched', () => {
   const rows: Array<[unknown, boolean]> = [
     [{ commit: 'fed789' }, true],
     [{ aborted: 'the check refused', refusedOn: 'abc123' }, true],
@@ -108,10 +108,10 @@ test('a landing is one of a commit, an abort or nothing touched', async (t) => {
     [{}, false],
     [{ commit: 'fed789', untouched: 'both' }, false],
   ];
-  for (const [value, ok] of rows) await t.test(JSON.stringify(value), () => assert.equal(Schema.is(Landing)(value), ok));
+  for (const [value, ok] of rows) test(JSON.stringify(value), () => assert.equal(Schema.is(Landing)(value), ok));
 });
 
-test("a run's composed facts decode with the actor who acted and without one, as a store written before actors holds them", async (t) => {
+describe("a run's composed facts decode with the actor who acted and without one, as a store written before actors holds them", () => {
   const at = '2026-09-01T00:00:00.000Z';
   const person = { kind: 'person', token: 'laptop' };
   const session = { kind: 'agent', agent: 'review', run: 'r-1', step: 'review' };
@@ -133,5 +133,5 @@ test("a run's composed facts decode with the actor who acted and without one, as
     ],
     ['REFUSED: an actor of no kind', { ...base, cancelledAt: at, cancelledBy: { kind: 'robot' } }, false],
   ];
-  for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
+  for (const [what, value, ok] of rows) test(what, () => assert.equal(decodes(value), ok));
 });

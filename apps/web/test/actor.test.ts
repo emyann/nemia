@@ -5,7 +5,7 @@
  * and its reads (src/lib/api/tokens.ts): `GET /api/tokens` decoded, `DELETE /api/tokens/{name}` sent, an agent's 403 rejected as the
  * refusal it is. `npm run e2e` reads them on the pages (`700-tokens.ts`, `710-actor.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 import { at, routedWith, runWith, textsOf, threeTries } from './markup-fixtures.ts';
@@ -86,14 +86,14 @@ test("a token's holder and reach in the board's words: yours or the agent's name
 type Sent = { method: string; path: string };
 
 /** Every request answered `body` as JSON with `status` for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
   const before = globalThis.fetch;
   const sent: Sent[] = [];
   globalThis.fetch = async (input, init) => {
     sent.push({ method: init?.method ?? 'GET', path: String(input) });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return sent;

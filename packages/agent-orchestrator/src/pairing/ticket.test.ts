@@ -2,7 +2,7 @@
  * The short code a pairing is approved by: drawn from an alphabet a person cannot misread, shown `XXXX-XXXX`, and read back in either
  * case, with or without its dash. Where a ticket stands is its contract's (`contracts/ticket.contract.ts`), proved, not tested here.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { CODE_ALPHABET, codeRead, codeShown, shortCode } from './ticket.ts';
 

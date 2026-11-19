@@ -7,7 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

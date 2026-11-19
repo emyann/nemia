@@ -4,7 +4,7 @@
  * any pair its delegation does not reaches past it, not only by its first pair. Held here over every rule and delegation a seeded walk
  * draws from a small world of resources, names and verbs, and on the fixtures the confirm refuses and lets through.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { ChangeVerb, Grant, ProposalRule } from '../../contracts/proposal-approval.contract.ts';
 import { proposalRuleReach } from './rule.ts';

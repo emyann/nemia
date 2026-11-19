@@ -5,7 +5,7 @@
  * and never the `effect` barrel, pinned by the modules a fresh `node` loads for each; and no file under `src` sets `exitCode: 2` on an
  * object of its own, so a refusal is thrown as one of the classes.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,9 +31,9 @@ const KINDS = [
   ['a Conflict with the steps that hold what is asked of', () => new Conflict({ message: 'held', users: ['dev/review'] }), 'Conflict'],
 ] as const;
 
-test('each refusal is an Error of its kind with its words and exit code 2, an Effect catches it by its tag, and isRefusal takes it', async (t) => {
+describe('each refusal is an Error of its kind with its words and exit code 2, an Effect catches it by its tag, and isRefusal takes it', () => {
   for (const [row, made, tag] of KINDS)
-    await t.test(row, async () => {
+    test(row, async () => {
       const err = made();
       assert.ok(err instanceof Error);
       assert.ok(err.message.length > 0);
@@ -50,13 +50,13 @@ test('each refusal is an Error of its kind with its words and exit code 2, an Ef
       );
       assert.equal(caught, `${tag} 2`);
     });
-  await t.test('a Conflict carries the steps that hold what is asked of, when that is why, and none otherwise', () => {
+  test('a Conflict carries the steps that hold what is asked of, when that is why, and none otherwise', () => {
     assert.deepEqual(new Conflict({ message: 'held', users: ['dev/review'] }).users, ['dev/review']);
     const bare = new Conflict({ message: 'the step is still running.' });
     assert.equal(bare.users, undefined);
     assert.equal(Object.hasOwn(bare, 'users'), false, 'no key for none, so its answer is `{ error }` alone');
   });
-  await t.test('REFUSED by isRefusal: a plain Error carrying exitCode 2, an object shaped like one, and what is no Error', () => {
+  test('REFUSED by isRefusal: a plain Error carrying exitCode 2, an object shaped like one, and what is no Error', () => {
     assert.equal(isRefusal(Object.assign(new Error('by hand'), { exitCode: 2 })), false, 'an exit code alone is no kind');
     assert.equal(isRefusal({ _tag: 'Missing', message: 'a look-alike', exitCode: 2 }), false);
     assert.equal(isRefusal(undefined), false);
@@ -78,7 +78,7 @@ test('each refusal is an Error of its kind with its words and exit code 2, an Ef
     ],
     ['WF_MAX_RUNS that is no count', () => maxRuns({ WF_MAX_RUNS: 'two' }), Invalid, ['WF_MAX_RUNS=two', 'not a count']],
   ] as const)
-    await t.test(`REFUSED: a verb throws the kind of what it refuses — ${row}`, async () => {
+    test(`REFUSED: a verb throws the kind of what it refuses — ${row}`, async () => {
       const err = await thrown(made);
       assert.ok(err instanceof Kind, String(err));
       assert.equal(err.exitCode, 2);

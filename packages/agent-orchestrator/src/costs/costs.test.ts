@@ -4,7 +4,7 @@
  * tries summed within a run, a figure nothing measured being null, the steps' order and the rounds; and the brief's section that says them
  * (`costsSection`, `costs-words.ts`). Where the brief puts the section, and which brief is told it, is `test/costs-brief.test.ts`'s story.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { RunFact, RunKeys, TryFact } from '../stats/index.ts';
 import { costsOf, costsSection, medianOf, p90Of, RECENT_RUNS, type WorkflowCosts } from './index.ts';
@@ -79,8 +79,8 @@ const SPREAD: Row[] = [
   },
 ];
 
-test('`medianOf` and `p90Of`: the middle of what runs cost and its 90th percentile, nearest rank', async (t) => {
-  for (const row of SPREAD) await t.test(row.name, row.check);
+describe('`medianOf` and `p90Of`: the middle of what runs cost and its 90th percentile, nearest rank', () => {
+  for (const row of SPREAD) test(row.name, row.check);
 });
 
 const FOLDED: Row[] = [
@@ -207,8 +207,8 @@ const FOLDED: Row[] = [
   },
 ];
 
-test('`costsOf`: what the newest finished runs of a workflow in its factory cost, a step and the whole run', async (t) => {
-  for (const row of FOLDED) await t.test(row.name, row.check);
+describe('`costsOf`: what the newest finished runs of a workflow in its factory cost, a step and the whole run', () => {
+  for (const row of FOLDED) test(row.name, row.check);
 });
 
 /** A window of two runs, of two steps, the whole run measured in one. */
@@ -257,6 +257,6 @@ const SAID: Row[] = [
   },
 ];
 
-test("`costsSection`: the brief's section that says what runs of the workflow cost", async (t) => {
-  for (const row of SAID) await t.test(row.name, row.check);
+describe("`costsSection`: the brief's section that says what runs of the workflow cost", () => {
+  for (const row of SAID) test(row.name, row.check);
 });

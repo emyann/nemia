@@ -6,7 +6,7 @@
  * `follow`, so the engine here is the api's own with that verb made the test's.
  */
 import { root } from '../../test/harness.ts';
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,7 +68,7 @@ function appOver(t: TestContext, e: ReturnType<typeof engine>) {
       Layer.succeed(Beats)({ ...Beats.defaultValue(), chat: NEVER_MS, chatFiles: FILES_MS }),
     ),
   );
-  t.after(() => own.runtime.dispose());
+  t.onTestFinished(() => own.runtime.dispose());
   return own;
 }
 

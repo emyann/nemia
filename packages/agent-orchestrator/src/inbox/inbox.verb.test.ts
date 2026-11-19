@@ -4,7 +4,7 @@
  */
 import { configGiven } from '../../test/config-given.ts';
 import { STORE } from '../../test/ambient.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Cause, Effect, Layer, Logger } from 'effect';
 import { testPlace } from '../../place/memory/index.ts';

@@ -2,7 +2,7 @@
  * A factory's MCP servers as objects (mcp-server.verb.ts): headers masked, the state carried or why it is unread; the builtin with no
  * namespace.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Schema } from 'effect';
 import { HEADER_MASK, McpServer, McpServerList } from 'objects';

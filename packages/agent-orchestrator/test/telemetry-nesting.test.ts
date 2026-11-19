@@ -10,7 +10,7 @@
  * Its store is its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -125,9 +125,9 @@ async function tickTraced(): Promise<{ spans: Tracer.NativeSpan[]; logs: Logged[
   return { spans, logs };
 }
 
-test("A pass traced down to the runtime's journal: its filing of a step and a called-off run's stop, each said with the run", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("A pass traced down to the runtime's journal: its filing of a step and a called-off run's stop, each said with the run", () => {
+  const s = story(test);
+  s.test(
     "a pass's filing of a step is traced under the pass, down to the runtime's journal, each span and log saying the run and the step",
     async () => {
       const run = await runPlaced(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
@@ -155,8 +155,7 @@ test("A pass traced down to the runtime's journal: its filing of a step and a ca
       assert.equal(typeof filed.annotations.task, 'string');
     },
   );
-
-  await s.test("a called-off run's pass says the runtime's stop of its step under the run, though no filing names the step", async () => {
+  s.test("a called-off run's pass says the runtime's stop of its step under the run, though no filing names the step", async () => {
     const run = await runPlaced(startRun({ brief: 'one run called off', repo: REPO, workflowDir: FOLDER }));
     await tickTraced();
     rooted.runs.cancel(run.id);

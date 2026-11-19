@@ -6,7 +6,7 @@
  * The factory `hires` holds `repo`, attaches `build` and hires `seldon` into `build/design`, whose file names no agent.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -52,15 +52,15 @@ write(
 /** The run's object answers 200 (`objectOf` throws otherwise), its warning on its status. */
 const warningOf = async (): Promise<string | null> => (await objectOf(app, R)).status.warning;
 
-test('a run of a factory that hires an agent into a step reads its folder with the hires, and warns once that folder truly breaks', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a run of a factory that hires an agent into a step reads its folder with the hires, and warns once that folder truly breaks', () => {
+  const s = story(test);
+  s.test(
     'a run of a factory that hires an agent into a step whose file adds `skills:` carries no warning: its folder reads with the hires',
     async () => {
       assert.equal(await warningOf(), null);
     },
   );
-  await s.test('the same folder truly broken after the start warns in the same words, with one full stop', async () => {
+  s.test('the same folder truly broken after the start warns in the same words, with one full stop', async () => {
     write(path.join(folder, 'design.md'), '---\nplace: git\nskills: spec-it\nsomeNewerKey: 1\n---\nDesign it.\n');
     const warning = await warningOf();
     assert.ok(warning);

@@ -35,7 +35,8 @@
  * - A process a test kills in its `finally` may be gone already, and a file it polls may be mid-write or not there yet: the
  *   kill or the read that fails is passed over.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -141,25 +142,31 @@ const ticked = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) =
     { everyMs: 100 },
   );
 
-test(
+describe(
   'sessions run on real workers of one store: seen at work, alive past their spawn, judged by their exit code, their logs back',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const dir = root();
-    const ok = detachedOps(sh('sleep 1; echo done > out.txt; exit 0'), dir);
-    const three = detachedOps(sh('exit 3'), dir);
-    const says = detachedOps(sh('echo hello-from-the-harness; exit 0'), dir);
-
-    await s.test('a detached session is observable the moment its spawn returns, before it finishes', async () => {
+  () => {
+    let dir!: string;
+    let ok!: import('../src/index.ts').RunnerOps;
+    let three!: import('../src/index.ts').RunnerOps;
+    let says!: import('../src/index.ts').RunnerOps;
+    beforeAll(() => {
+      const t = teardowns();
+      dir = root();
+      ok = detachedOps(sh('sleep 1; echo done > out.txt; exit 0'), dir);
+      three = detachedOps(sh('exit 3'), dir);
+      says = detachedOps(sh('echo hello-from-the-harness; exit 0'), dir);
+      return t.end;
+    });
+    const s = story(test);
+    s.test('a detached session is observable the moment its spawn returns, before it finishes', async () => {
       await Effect.runPromise(ok.spawn(req('ae/t1/1', dir)));
       const running = (await Effect.runPromise(ok.observe)).get('ae/t1/1');
       assert.equal(running?.state, 'working', 'visible immediately, before it finishes');
       await Effect.runPromise(three.spawn(req('ae/t2/1', dir)));
       await Effect.runPromise(says.spawn(req('ae/t6/1', dir)));
     });
-
-    await s.test('the worker outlives the process that spawned it', async () => {
+    s.test('the worker outlives the process that spawned it', async () => {
       await new Promise((r) => setTimeout(r, 250));
       assert.equal(
         (await Effect.runPromise(ok.observe)).get('ae/t1/1')?.state,
@@ -167,19 +174,16 @@ test(
         "`spawn` returns as soon as the child is unref'd: a worker tied to this process could not still be working",
       );
     });
-
-    await s.test('an exit of 0 completes it, its harness having done its work', async (sub) => {
+    s.test('an exit of 0 completes it, its harness having done its work', async (sub) => {
       await settle(sub, ok, 'ae/t1/1', 'completed');
       assert.equal(fs.readFileSync(path.join(dir, 'out.txt'), 'utf8').trim(), 'done');
     });
-
-    await s.test('a non-zero exit is a failure, its code on the sighting, and no usage is invented beside it', async (sub) => {
+    s.test('a non-zero exit is a failure, its code on the sighting, and no usage is invented beside it', async (sub) => {
       const seen = await settle(sub, three, 'ae/t2/1', 'failed');
       assert.equal(seen?.exitCode, 3);
       assert.equal(seen?.usage, undefined, 'a generic harness measures no usage, and reports none rather than 0');
     });
-
-    await s.test('logs come back from the worker capture', async (sub) => {
+    s.test('logs come back from the worker capture', async (sub) => {
       await settle(sub, says, 'ae/t6/1', 'completed');
       assert.match(await Effect.runPromise(says.logs('ae/t6/1')), /hello-from-the-harness/);
     });
@@ -336,8 +340,8 @@ const stubborn = async (t: Waiter, name: string) => {
   return { dir, cwd, ops, worker };
 };
 
-test('a worker ends all of its harness however its session ends: stopped, or its run file or store taken away', WAITED, async (t) => {
-  await t.test('stop reaches the detached worker, which kills the harness and says so, re-issued every pass', async (sub) => {
+describe('a worker ends all of its harness however its session ends: stopped, or its run file or store taken away', WAITED, () => {
+  test('stop reaches the detached worker, which kills the harness and says so, re-issued every pass', async (sub) => {
     const dir = root();
     const ops = detachedOps(sh('sleep 30'), dir);
     await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
@@ -357,8 +361,7 @@ test('a worker ends all of its harness however its session ends: stopped, or its
       'a stop re-issued every pass, as the engine issues it, is heard',
     );
   });
-
-  await t.test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async (sub) => {
+  test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async (sub) => {
     const { cwd, ops, worker } = await stubborn(sub, 'ae/g3/2');
     const asked = performance.now();
     await Effect.runPromise(ops.stop('ae/g3/2'));
@@ -367,100 +370,87 @@ test('a worker ends all of its harness however its session ends: stopped, or its
     assert.ok(ms >= QUICK.stopGraceMs - TIMER_SLACK_MS, `${ms} ms: what ignored SIGTERM was given the plan's grace before the kill`);
     await settle(sub, ops, 'ae/g3/2', 'canceled');
   });
-
   for (const [what, takeAway] of [
     ['its run file', (_dir: string, file: string) => fs.rmSync(file)],
     ['the whole store', (dir: string) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 })],
   ] as const)
-    await t.test(
-      `a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`,
-      async (sub) => {
-        const { dir, file, worker, harness } = await sleeper(sub, 'ae/g1/1');
-        takeAway(dir, file);
-        await within(sub, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
-        assert.equal(fs.existsSync(file), false, 'the run file is not made again');
-      },
+    test(`a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`, async (sub) => {
+      const { dir, file, worker, harness } = await sleeper(sub, 'ae/g1/1');
+      takeAway(dir, file);
+      await within(sub, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+      assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+    });
+  test('a worker whose run file is taken away while it writes its status ends its harness, and makes no run file again', async (sub) => {
+    const dir = root();
+    const cwd = scratch('ae-harness-');
+    const hook = path.join(dir, 'freeze-in-write.mjs');
+    fs.writeFileSync(
+      hook,
+      [
+        "import fs from 'node:fs';",
+        "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
+        '  const write = fs.writeFileSync;',
+        '  fs.writeFileSync = (...a) => {',
+        "    if (String(a[0]).endsWith('.json.tmp') && String(a[1]).includes('\"harness\"')) {",
+        "      fs.writeFileSync = write; process.kill(process.pid, 'SIGSTOP');",
+        '    }',
+        '    return write(...a);',
+        '  };',
+        '}',
+      ].join('\n'),
     );
-
-  await t.test(
-    'a worker whose run file is taken away while it writes its status ends its harness, and makes no run file again',
-    async (sub) => {
-      const dir = root();
-      const cwd = scratch('ae-harness-');
-      const hook = path.join(dir, 'freeze-in-write.mjs');
-      fs.writeFileSync(
-        hook,
-        [
-          "import fs from 'node:fs';",
-          "if (process.argv[1]?.endsWith('ae-worker.ts')) {",
-          '  const write = fs.writeFileSync;',
-          '  fs.writeFileSync = (...a) => {',
-          "    if (String(a[0]).endsWith('.json.tmp') && String(a[1]).includes('\"harness\"')) {",
-          "      fs.writeFileSync = write; process.kill(process.pid, 'SIGSTOP');",
-          '    }',
-          '    return write(...a);',
-          '  };',
-          '}',
-        ].join('\n'),
+    const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir, QUICK);
+    const was = process.env.NODE_OPTIONS;
+    process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
+    try {
+      await Effect.runPromise(ops.spawn(req('ae/g1/2', cwd)));
+    } finally {
+      if (was === undefined) delete process.env.NODE_OPTIONS;
+      else process.env.NODE_OPTIONS = was;
+    }
+    const file = runFileOf(dir, 'sh', 'ae/g1/2');
+    let worker = 0;
+    let harness = 0;
+    try {
+      worker = await workerOf(sub, dir, 'ae/g1/2');
+      await within(sub, () => isFrozen(worker), 'the worker freezes in its write of the harness it started');
+      await within(
+        sub,
+        () => {
+          try {
+            harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
+          } catch {}
+          return harness > 0;
+        },
+        'the harness started',
       );
-      const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir, QUICK);
-      const was = process.env.NODE_OPTIONS;
-      process.env.NODE_OPTIONS = `${was ?? ''} --import=${pathToFileURL(hook).href}`.trim();
-      try {
-        await Effect.runPromise(ops.spawn(req('ae/g1/2', cwd)));
-      } finally {
-        if (was === undefined) delete process.env.NODE_OPTIONS;
-        else process.env.NODE_OPTIONS = was;
-      }
-      const file = runFileOf(dir, 'sh', 'ae/g1/2');
-      let worker = 0;
-      let harness = 0;
-      try {
-        worker = await workerOf(sub, dir, 'ae/g1/2');
-        await within(sub, () => isFrozen(worker), 'the worker freezes in its write of the harness it started');
-        await within(
-          sub,
-          () => {
-            try {
-              harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
-            } catch {}
-            return harness > 0;
-          },
-          'the harness started',
-        );
-        fs.rmSync(file);
-        process.kill(worker, 'SIGCONT');
-        await within(sub, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
-        assert.equal(fs.existsSync(file), false, 'the run file is not made again');
-      } finally {
-        for (const pid of [worker, harness].filter((p) => p > 0))
-          for (const sig of ['SIGCONT', 'SIGKILL'] as const)
-            try {
-              process.kill(pid, sig);
-            } catch {}
-      }
-    },
-  );
-
-  await t.test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits', async (sub) => {
+      fs.rmSync(file);
+      process.kill(worker, 'SIGCONT');
+      await within(sub, () => !alive(worker) && !alive(harness), 'the worker and its harness ended');
+      assert.equal(fs.existsSync(file), false, 'the run file is not made again');
+    } finally {
+      for (const pid of [worker, harness].filter((p) => p > 0))
+        for (const sig of ['SIGCONT', 'SIGKILL'] as const)
+          try {
+            process.kill(pid, sig);
+          } catch {}
+    }
+  });
+  test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits', async (sub) => {
     const { dir, cwd, worker } = await stubborn(sub, 'ae/g3/1');
     fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
     await within(sub, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended');
   });
-
-  await t.test(
-    'a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it',
-    async (sub) => {
-      const dir = root();
-      const ops = detachedOps(listener(dir), dir, QUICK);
-      await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
-      await within(sub, () => heardIn(dir).length === 1, 'the brief read');
-      assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
-      fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
-      await within(sub, () => runningIn([dir]).length === 0, 'the worker and the listener ended');
-      assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
-    },
-  );
+  test('a worker whose run file is taken away while it writes words on ends its harness too — and a listener with it', async (sub) => {
+    const dir = root();
+    const ops = detachedOps(listener(dir), dir, QUICK);
+    await Effect.runPromise(ops.spawn({ name: 'ae/g2/1', brief: 'b', cwd: dir }));
+    await within(sub, () => heardIn(dir).length === 1, 'the brief read');
+    assert.equal(runningIn([dir]).length, 2, 'the worker and the listener');
+    fs.rmSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json'));
+    await within(sub, () => runningIn([dir]).length === 0, 'the worker and the listener ended');
+    assert.equal(fs.existsSync(path.join(dir, 'runs', 'in', 'ae_g2_1.json')), false, 'the run file is not made again');
+  });
 });
 
 /**
@@ -789,16 +779,23 @@ const stopped = async (t: Waiter, ops: ReturnType<typeof detachedOps>, name: str
  */
 const INBOX_LOOKED_MS = 1_200;
 
-test('a harness that reads its stdin hears its brief, then each word said, until its closing line closes its input', WAITED, async (t) => {
-  const s = story(t);
-  const dir = root();
-  const one = path.join(dir, 'one');
-  const own = path.join(dir, 'own');
-  fs.mkdirSync(one);
-  fs.mkdirSync(own);
-  const ops = detachedOps(listener(dir), dir);
-
-  await s.test("a harness that reads its stdin is given its brief's line first, then each word said, in order", async (sub) => {
+describe('a harness that reads its stdin hears its brief, then each word said, until its closing line closes its input', WAITED, () => {
+  let dir!: string;
+  let one!: string;
+  let own!: string;
+  let ops!: import('../src/index.ts').RunnerOps;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = root();
+    one = path.join(dir, 'one');
+    own = path.join(dir, 'own');
+    fs.mkdirSync(one);
+    fs.mkdirSync(own);
+    ops = detachedOps(listener(dir), dir);
+    return t.end;
+  });
+  const s = story(test);
+  s.test("a harness that reads its stdin is given its brief's line first, then each word said, in order", async (sub) => {
     await Effect.runPromise(ops.spawn({ name: 'ae/i1/1', brief: 'the brief', cwd: one }));
     await Effect.runPromise(ops.spawn({ name: 'ae/i3/1', brief: 'end', cwd: own }));
     await listened(sub, () => heardIn(one).length === 1, 'the brief read');
@@ -808,24 +805,21 @@ test('a harness that reads its stdin hears its brief, then each word said, until
     assert.deepEqual(heardIn(one), ['the brief', 'first', 'second']);
     assert.equal(runOf(dir, 'ae/i1/1').inputAt, fs.statSync(inboxOf(dir, 'ae/i1/1')).size, 'how far it has written on, on the run file');
   });
-
-  await s.test('a line half appended waits for its end, and is written on whole, once', async (sub) => {
+  s.test('a line half appended waits for its end, and is written on whole, once', async (sub) => {
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
     await new Promise((r) => setTimeout(r, INBOX_LOOKED_MS));
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
     await listened(sub, () => heardIn(one).length === 4, 'the line once whole');
     assert.equal(heardIn(one)[3], 'parted', 'written on whole, once');
   });
-
-  await s.test('the closing line closes its input: said on the run file, its stdin ended, the harness still running', async (sub) => {
+  s.test('the closing line closes its input: said on the run file, its stdin ended, the harness still running', async (sub) => {
     await say(ops, 'ae/i1/1', 'end and linger');
     await listened(sub, () => heardIn(one).includes('EOF'), 'its stdin ended at its closing line');
     const run = runOf(dir, 'ae/i1/1');
     assert.equal(run.inputClosed, true);
     assert.equal(run.state, 'working', 'still running: it ends when it likes');
   });
-
-  await s.test('a word said after the close is refused, and one appended behind its back is neither written on nor counted', async () => {
+  s.test('a word said after the close is refused, and one appended behind its back is neither written on nor counted', async () => {
     await sayRefused(ops, 'ae/i1/1', 'more', /^in: `ae\/i1\/1` has given its result and reads no more words/);
     const size = fs.statSync(inboxOf(dir, 'ae/i1/1')).size;
     fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"behind its back"}\n');
@@ -837,14 +831,12 @@ test('a harness that reads its stdin hears its brief, then each word said, until
     );
     assert.equal(runOf(dir, 'ae/i1/1').inputAt, size, 'nor counted as written');
   });
-
-  await s.test('a harness closing its input on its own words ends its run: done, its stdin ended by the worker', async (sub) => {
+  s.test('a harness closing its input on its own words ends its run: done, its stdin ended by the worker', async (sub) => {
     await settle(sub, ops, 'ae/i3/1', 'completed');
     assert.deepEqual(heardIn(own), ['end', 'EOF']);
     await sayRefused(ops, 'ae/i3/1', 'late', /has given its result and reads no more words/);
   });
-
-  await s.test('a stop ends the one that lingers', async (sub) => {
+  s.test('a stop ends the one that lingers', async (sub) => {
     await stopped(sub, ops, 'ae/i1/1');
   });
 });
@@ -923,12 +915,11 @@ const listenerRun = (dir: string, name: string, patch: object = {}) => {
 /** The way in a worker writes on its run file. */
 const WAY_IN = { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } };
 
-test('say: refused, with nothing appended, where no worker would write the words on — and a run file in no shape a worker writes is no session', async (t) => {
-  await t.test('a harness that reads nothing on its stdin has no say', () => {
+describe('say: refused, with nothing appended, where no worker would write the words on — and a run file in no shape a worker writes is no session', () => {
+  test('a harness that reads nothing on its stdin has no say', () => {
     assert.equal(detachedOps(sh('true'), root()).say, undefined);
   });
-
-  await t.test('a name with no run of it', async () => {
+  test('a name with no run of it', async () => {
     const dir = root();
     await sayRefused(
       detachedOps(listener(dir), dir),
@@ -937,26 +928,22 @@ test('say: refused, with nothing appended, where no worker would write the words
       /^in: no session `ae\/i6\/1` is running to hear anything: there is no run of it/,
     );
   });
-
-  await t.test('a run started before its harness took words: working, beating, and nothing on it to write words on with', async () => {
+  test('a run started before its harness took words: working, beating, and nothing on it to write words on with', async () => {
     const dir = root();
     listenerRun(dir, 'ae/i6/1');
     await sayRefused(detachedOps(listener(dir), dir), 'ae/i6/1', 'hello', /was started with no way in/);
   });
-
-  await t.test('a run file another name folds onto is not the run asked for', async () => {
+  test('a run file another name folds onto is not the run asked for', async () => {
     const dir = root();
     listenerRun(dir, 'ae/i6/1');
     await sayRefused(detachedOps(listener(dir), dir), 'ae-i6/1', 'hello', /there is no run of it/);
   });
-
-  await t.test('a run whose worker stopped beating is not working', async () => {
+  test('a run whose worker stopped beating is not working', async () => {
     const dir = root();
     listenerRun(dir, 'ae/i6/1', { heartbeatAt: new Date(Date.now() - STALE_MS - 10 * 60_000).toISOString(), input: WAY_IN });
     await sayRefused(detachedOps(listener(dir), dir), 'ae/i6/1', 'hello', /is `failed`, not running/);
   });
-
-  await t.test("a line break the harness's line keeps would reach it as two lines; one line is appended alone", async () => {
+  test("a line break the harness's line keeps would reach it as two lines; one line is appended alone", async () => {
     const dir = root();
     listenerRun(dir, 'ae/i6/1', { input: WAY_IN });
     const raw = detachedOps({ ...listener(dir), input: { line: (text) => text, closesOn: { key: 'kind', value: 'end' } } }, dir);
@@ -966,20 +953,18 @@ test('say: refused, with nothing appended, where no worker would write the words
     await Effect.runPromise(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one line'));
     assert.equal(fs.readFileSync(inboxOf(dir, 'ae/i6/1'), 'utf8'), 'one line\n', 'only the words that make one line were appended');
   });
-
-  await t.test('a whole run file is a session: seen and found', async () => {
+  test('a whole run file is a session: seen and found', async () => {
     const dir = root();
     listenerRun(dir, 'ae/i7/1', { input: WAY_IN });
     assert.equal((await Effect.runPromise(detachedOps(listener(dir), dir).observe)).get('ae/i7/1')?.state, 'working');
     assert.deepEqual(await Effect.runPromise(detachedFind(listener(dir), dir)('ae/i7/1')), { sessionId: 'ae/i7/1' });
   });
-
   for (const [patch, field] of [
     [{ pid: 'x' }, 'pid'],
     [{ heartbeatAt: undefined }, 'heartbeatAt'],
     [{ input: { ...WAY_IN, from: '0' } }, 'input.from'],
   ] as const)
-    await t.test(`a run file whose ${field} is wrong is not seen, not found, and told nothing, naming the field`, async () => {
+    test(`a run file whose ${field} is wrong is not seen, not found, and told nothing, naming the field`, async () => {
       const dir = root();
       listenerRun(dir, 'ae/i7/1', { input: WAY_IN, ...patch });
       const ops = detachedOps(listener(dir), dir);
@@ -992,8 +977,7 @@ test('say: refused, with nothing appended, where no worker would write the words
         new RegExp(`is unreadable — its \`${field.replace('.', '\\.')}\` is not what a worker writes`),
       );
     });
-
-  await t.test('a run file not JSON yet: say it again in a moment, and nothing was appended', async () => {
+  test('a run file not JSON yet: say it again in a moment, and nothing was appended', async () => {
     const dir = root();
     const runs = listenerRun(dir, 'ae/i7/1');
     fs.writeFileSync(path.join(runs, 'ae_i7_1.json'), '{"name": "ae/i7/1", "sta');
@@ -1007,11 +991,28 @@ test('say: refused, with nothing appended, where no worker would write the words
   });
 });
 
-test('a composite of harnesses routes every verb to the harness that owns the session, and one that fails blinds no other', async (t) => {
-  const s = story(t);
-  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
-  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'completed' }]]);
-  const c = new Map<string, Sighting>([['ae/z/1', { sessionId: 's-c', state: 'working' }]]);
+describe('a composite of harnesses routes every verb to the harness that owns the session, and one that fails blinds no other', () => {
+  let a!: Map<string, Sighting>;
+  let b!: Map<string, Sighting>;
+  let c!: Map<string, Sighting>;
+  let alpha!: ReturnType<typeof telling>;
+  let ops!: import('../src/index.ts').RunnerOps;
+  beforeAll(() => {
+    const t = teardowns();
+    a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+    b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'completed' }]]);
+    c = new Map<string, Sighting>([['ae/z/1', { sessionId: 's-c', state: 'working' }]]);
+    alpha = {
+      ...telling('alpha', a),
+      release: (seen: Sighting) =>
+        Effect.sync(() => {
+          released.push(seen.sessionId);
+        }),
+    };
+    ops = composite({ alpha, beta: telling('beta', b), gamma: testOps({ sessions: c }) }, 'alpha');
+    return t.end;
+  });
+  const s = story(test);
   const told: Record<string, string[]> = {};
   const released: string[] = [];
   const telling = (name: string, sessions: Map<string, Sighting>) => ({
@@ -1022,29 +1023,18 @@ test('a composite of harnesses routes every verb to the harness that owns the se
         return { seen: new Map(sessions), unread: new Set<string>() };
       }),
   });
-  const alpha = {
-    ...telling('alpha', a),
-    release: (seen: Sighting) =>
-      Effect.sync(() => {
-        released.push(seen.sessionId);
-      }),
-  };
-  const ops = composite({ alpha, beta: telling('beta', b), gamma: testOps({ sessions: c }) }, 'alpha');
-
-  await s.test('before a pass has said whose a session is, a release is sent to nobody, the fallback least of all', async () => {
+  s.test('before a pass has said whose a session is, a release is sent to nobody, the fallback least of all', async () => {
     await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'completed' }, {}));
     assert.deepEqual(released, []);
   });
-
-  await s.test('the composite sends each task to the harness it asked for, and one that names none to the fallback', async () => {
+  s.test('the composite sends each task to the harness it asked for, and one that names none to the fallback', async () => {
     await Effect.runPromise(ops.spawn({ name: 'ae/p/1', brief: '', cwd: '/', harness: 'beta' }));
     await Effect.runPromise(ops.spawn({ name: 'ae/q/1', brief: '', cwd: '/' }));
     assert.deepEqual([...a.keys()], ['ae/x/1', 'ae/q/1'], 'a task that names no harness goes to the fallback');
     assert.deepEqual([...b.keys()], ['ae/y/1', 'ae/p/1']);
     assert.deepEqual([...c.keys()], ['ae/z/1']);
   });
-
-  await s.test('the composite tells each harness only the sessions routed to it, and lists one that cannot be told in full', async () => {
+  s.test('the composite tells each harness only the sessions routed to it, and lists one that cannot be told in full', async () => {
     const merged = await Effect.runPromise(
       ops.observeFor!([
         { name: 'ae/x/1', harness: 'alpha' },
@@ -1064,28 +1054,22 @@ test('a composite of harnesses routes every verb to the harness that owns the se
     assert.equal(b.get('ae/y/1')?.state, 'canceled', 'and who owns what is learned from it, as from observe');
     assert.equal(a.get('ae/x/1')?.state, 'working', 'alpha was not told');
   });
-
-  await s.test(
-    'the composite merges what every harness sees into one map, and routes stop to whichever harness owns that session',
-    async () => {
-      c.set('ae/u/1', { sessionId: 's-u', state: 'working' });
-      const merged = await Effect.runPromise(ops.observe);
-      assert.deepEqual([...merged.keys()].sort(), ['ae/p/1', 'ae/q/1', 'ae/u/1', 'ae/x/1', 'ae/y/1', 'ae/z/1']);
-      assert.equal(merged.get('ae/y/1')?.state, 'canceled', "beta's own sighting");
-      await Effect.runPromise(ops.stop('s-u'));
-      assert.equal(c.get('ae/u/1')?.state, 'canceled', 'gamma was told, learned from observe');
-      assert.equal(a.get('ae/x/1')?.state, 'working', 'alpha was not');
-    },
-  );
-
-  await s.test('the composite sends a release only to the harness that reported the session — never to the fallback', async () => {
+  s.test('the composite merges what every harness sees into one map, and routes stop to whichever harness owns that session', async () => {
+    c.set('ae/u/1', { sessionId: 's-u', state: 'working' });
+    const merged = await Effect.runPromise(ops.observe);
+    assert.deepEqual([...merged.keys()].sort(), ['ae/p/1', 'ae/q/1', 'ae/u/1', 'ae/x/1', 'ae/y/1', 'ae/z/1']);
+    assert.equal(merged.get('ae/y/1')?.state, 'canceled', "beta's own sighting");
+    await Effect.runPromise(ops.stop('s-u'));
+    assert.equal(c.get('ae/u/1')?.state, 'canceled', 'gamma was told, learned from observe');
+    assert.equal(a.get('ae/x/1')?.state, 'working', 'alpha was not');
+  });
+  s.test('the composite sends a release only to the harness that reported the session — never to the fallback', async () => {
     await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'completed' }, {}));
     assert.deepEqual(released, [], 'beta has no release, so there is nothing to do');
     await Effect.runPromise(ops.release!({ sessionId: 's-a', state: 'completed' }, {}));
     assert.deepEqual(released, ['s-a']);
   });
-
-  await s.test('a task on a harness the composite does not have is spawned nowhere: refused, and never on the fallback', async () => {
+  s.test('a task on a harness the composite does not have is spawned nowhere: refused, and never on the fallback', async () => {
     const e = await Effect.runPromise(Effect.flip(ops.spawn({ name: 'ae/v/1', brief: '', cwd: '/', harness: 'a2a:reviewer' })));
     assert.equal(e.refused, true, 'nothing started, which the harness vouches for, so the attempt ends `unstartable` and is never adopted');
     assert.match(
@@ -1099,8 +1083,7 @@ test('a composite of harnesses routes every verb to the harness that owns the se
       "and no other harness's vocabulary is asked of it",
     );
   });
-
-  await s.test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {
+  s.test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {
     const failing = (verb: string) => Effect.fail(new RunnerError({ verb, message: 'claude agents: timed out' }));
     const broken = { ...testOps({ sessions: new Map() }), observe: failing('observe'), observeFor: () => failing('observeFor') };
     const plain = { ...testOps({ sessions: new Map() }), observe: failing('observe') };
@@ -1126,8 +1109,7 @@ test('a composite of harnesses routes every verb to the harness that owns the se
       'a full listing reads an unread harness as nothing, as views do',
     );
   });
-
-  await s.test('one harness failing to answer does not blind the engine to the others', async () => {
+  s.test('one harness failing to answer does not blind the engine to the others', async () => {
     const down = { ...testOps(), observe: Effect.die(new Error('harness is down')) };
     const merged = await Effect.runPromise(composite({ alpha: testOps({ sessions: a }), beta: down }, 'alpha').observe);
     assert.deepEqual([...merged.keys()], ['ae/x/1', 'ae/q/1']);
@@ -1225,91 +1207,78 @@ const doneRun = (dir: string, name: string, patch: object = {}, log = resultLine
   fs.writeFileSync(path.join(runs, `${file}.log`), log);
 };
 
-test('observe: a run whose output does not decode is unread while it works and failed once it has ended, never absent, and says why', async (t) => {
-  await t.test(
-    'REFUSED: a Codex run whose stream does not decode is read as failed alone, and why is said in words naming the session, the line, the event, the field and the fix',
-    async () => {
-      const dir = root();
-      const log = codexRun(dir, 'ae/c1/1', [
-        { type: 'turn.started' },
-        { type: 'turn.completed', usage: { ...CODEX_USED, input_tokens: 'many' } },
-      ]);
-      codexRun(dir, 'ae/c0/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
-      const { value, warnings } = await warned(detachedOps(codex, dir).observe);
-      assert.deepEqual(
-        value.get('ae/c1/1'),
-        { sessionId: 'ae/c1/1', state: 'failed', nativeId: undefined, closeout: undefined, exitCode: 0 },
-        'ended, so failed: never completed, and nothing its output says',
-      );
-      assert.equal(value.get('ae/c0/1')?.state, 'completed', 'the harness’s other run is read');
-      assert.deepEqual(warnings, [
-        `codex: \`ae/c1/1\`'s output, ${log}, cannot be read: line 3 of the \`codex exec --json\` stream is a \`turn.completed\` event whose \`usage.input_tokens\` is "many", where Codex prints number. Run a Codex whose \`exec --json\` stream this runtime reads, or a runtime whose \`CodexEventSchema\` (\`harness/codex/stream.ts\`) reads this one. It is unread while its process runs, and read as failed once it has ended; the other sessions of codex are read. Once its task has settled, \`ae forget\` lets this session go.`,
-      ]);
+describe('observe: a run whose output does not decode is unread while it works and failed once it has ended, never absent, and says why', () => {
+  test('REFUSED: a Codex run whose stream does not decode is read as failed alone, and why is said in words naming the session, the line, the event, the field and the fix', async () => {
+    const dir = root();
+    const log = codexRun(dir, 'ae/c1/1', [
+      { type: 'turn.started' },
+      { type: 'turn.completed', usage: { ...CODEX_USED, input_tokens: 'many' } },
+    ]);
+    codexRun(dir, 'ae/c0/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
+    const { value, warnings } = await warned(detachedOps(codex, dir).observe);
+    assert.deepEqual(
+      value.get('ae/c1/1'),
+      { sessionId: 'ae/c1/1', state: 'failed', nativeId: undefined, closeout: undefined, exitCode: 0 },
+      'ended, so failed: never completed, and nothing its output says',
+    );
+    assert.equal(value.get('ae/c0/1')?.state, 'completed', 'the harness’s other run is read');
+    assert.deepEqual(warnings, [
+      `codex: \`ae/c1/1\`'s output, ${log}, cannot be read: line 3 of the \`codex exec --json\` stream is a \`turn.completed\` event whose \`usage.input_tokens\` is "many", where Codex prints number. Run a Codex whose \`exec --json\` stream this runtime reads, or a runtime whose \`CodexEventSchema\` (\`harness/codex/stream.ts\`) reads this one. It is unread while its process runs, and read as failed once it has ended; the other sessions of codex are read. Once its task has settled, \`ae forget\` lets this session go.`,
+    ]);
 
-      codexRun(dir, 'ae/c1/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
-      const seen = (await Effect.runPromise(detachedOps(codex, dir).observe)).get('ae/c1/1');
-      assert.deepEqual(
-        seen,
-        {
-          sessionId: 'ae/c1/1',
-          state: 'completed',
-          nativeId: undefined,
-          closeout: undefined,
-          exitCode: 0,
-          usage: { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
-        },
-        'a stream that decodes is observed as ever, field for field',
-      );
-    },
-  );
+    codexRun(dir, 'ae/c1/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
+    const seen = (await Effect.runPromise(detachedOps(codex, dir).observe)).get('ae/c1/1');
+    assert.deepEqual(
+      seen,
+      {
+        sessionId: 'ae/c1/1',
+        state: 'completed',
+        nativeId: undefined,
+        closeout: undefined,
+        exitCode: 0,
+        usage: { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
+      },
+      'a stream that decodes is observed as ever, field for field',
+    );
+  });
+  test('a Codex stream that does not decode, through the composite: a run at work is unread, the other harness’s read, and failed once it has ended', async () => {
+    const dir = root();
+    const bad = [{ type: 'turn.started' }, { type: 'item.completed', item: { id: '', type: 'agent_message' } }];
+    const log = codexRun(dir, 'ae/c2/1', bad);
+    const file = log.replace(/\.log$/, '.json');
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), state: 'working', exitCode: undefined }));
+    const other = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+    const ops = composite({ codex: detachedOps(codex, dir), alpha: testOps({ sessions: other }) }, 'alpha');
+    const expected = [
+      { name: 'ae/c2/1', harness: 'codex' },
+      { name: 'ae/x/1', harness: 'alpha' },
+    ];
+    const working = await Effect.runPromise(ops.observeFor!(expected));
+    assert.deepEqual([...working.seen.keys()], ['ae/x/1']);
+    assert.deepEqual(working.unread, new Set(['ae/c2/1']), 'neither there nor gone');
+    assert.deepEqual([...(working.unreadWhy?.keys() ?? [])], ['ae/c2/1'], 'why, as its harness said it, through the composite');
+    assert.ok(working.unreadWhy?.get('ae/c2/1')?.includes(log), working.unreadWhy?.get('ae/c2/1'));
 
-  await t.test(
-    'a Codex stream that does not decode, through the composite: a run at work is unread, the other harness’s read, and failed once it has ended',
-    async () => {
-      const dir = root();
-      const bad = [{ type: 'turn.started' }, { type: 'item.completed', item: { id: '', type: 'agent_message' } }];
-      const log = codexRun(dir, 'ae/c2/1', bad);
-      const file = log.replace(/\.log$/, '.json');
-      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), state: 'working', exitCode: undefined }));
-      const other = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
-      const ops = composite({ codex: detachedOps(codex, dir), alpha: testOps({ sessions: other }) }, 'alpha');
-      const expected = [
-        { name: 'ae/c2/1', harness: 'codex' },
-        { name: 'ae/x/1', harness: 'alpha' },
-      ];
-      const working = await Effect.runPromise(ops.observeFor!(expected));
-      assert.deepEqual([...working.seen.keys()], ['ae/x/1']);
-      assert.deepEqual(working.unread, new Set(['ae/c2/1']), 'neither there nor gone');
-      assert.deepEqual([...(working.unreadWhy?.keys() ?? [])], ['ae/c2/1'], 'why, as its harness said it, through the composite');
-      assert.ok(working.unreadWhy?.get('ae/c2/1')?.includes(log), working.unreadWhy?.get('ae/c2/1'));
-
-      codexRun(dir, 'ae/c2/1', bad);
-      const ended = await Effect.runPromise(ops.observeFor!(expected));
-      assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
-      assert.equal(ended.seen.get('ae/c2/1')?.state, 'failed');
-      assert.equal(ended.seen.get('ae/x/1')?.state, 'working');
-      assert.equal(ended.unreadWhy, undefined, 'read, so nothing said of why it is not');
-    },
-  );
-
-  await t.test(
-    'REFUSED: a claude job whose result line says a cost that is no number, in words naming the line, the field and the fix',
-    async () => {
-      await refusedClaudeRun(
-        [stream.init, resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 'a lot' })],
-        printedRefusal(3, 'a `result`', 'total_cost_usd', 'is "a lot", where Claude Code prints number'),
-      );
-    },
-  );
-
-  await t.test('REFUSED: a claude job whose result line says its denials as no list, never a job denied nothing', async () => {
+    codexRun(dir, 'ae/c2/1', bad);
+    const ended = await Effect.runPromise(ops.observeFor!(expected));
+    assert.deepEqual(ended.unread, new Set(), 'once ended it is read');
+    assert.equal(ended.seen.get('ae/c2/1')?.state, 'failed');
+    assert.equal(ended.seen.get('ae/x/1')?.state, 'working');
+    assert.equal(ended.unreadWhy, undefined, 'read, so nothing said of why it is not');
+  });
+  test('REFUSED: a claude job whose result line says a cost that is no number, in words naming the line, the field and the fix', async () => {
+    await refusedClaudeRun(
+      [stream.init, resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 'a lot' })],
+      printedRefusal(3, 'a `result`', 'total_cost_usd', 'is "a lot", where Claude Code prints number'),
+    );
+  });
+  test('REFUSED: a claude job whose result line says its denials as no list, never a job denied nothing', async () => {
     await refusedClaudeRun(
       [stream.init, resultLine({ structured_output: { outcome: 'done' }, permission_denials: 'Write' })],
       printedRefusal(3, 'a `result`', 'permission_denials', 'is "Write", where Claude Code prints array'),
     );
   });
-
-  await t.test('REFUSED: a claude job whose permission_denied event names its call by a number', async () => {
+  test('REFUSED: a claude job whose permission_denied event names its call by a number', async () => {
     const denied = { ...JSON.parse(stream.denied('toolu_w', 'Write')), tool_use_id: 7 };
     await refusedClaudeRun(
       [
@@ -1321,42 +1290,38 @@ test('observe: a run whose output does not decode is unread while it works and f
       printedRefusal(4, 'a `system` `permission_denied`', 'tool_use_id', 'is 7, where Claude Code prints string'),
     );
   });
-
-  await t.test(
-    'REFUSED: a run asked for whose output the spec refuses, naming the run and its output; through the composite, the names routed there are unread while they run',
-    async () => {
-      const dir = root();
-      const spec: HarnessSpec = {
-        ...sh('true'),
-        readOutput: () => {
-          throw new Error('no result line in it');
-        },
-      };
-      doneRun(dir, 'ae/w/1', { state: 'working', heartbeatAt: new Date().toISOString() });
-      doneRun(dir, 'ae/d/1');
-      const ops = detachedOps(spec, dir);
-      const { value, warnings } = await warned(ops.observeFor!([{ name: 'ae/w/1' }, { name: 'ae/d/1' }]));
-      assert.deepEqual(value.unread, new Set(['ae/w/1']), 'at work: neither there nor gone');
-      assert.equal(value.seen.get('ae/d/1')?.state, 'failed', 'ended: failed, never completed');
-      assert.deepEqual(
-        warnings.map((w) => w.split(' It is unread')[0]),
-        ['ae_w_1', 'ae_d_1'].map(
-          (f) =>
-            `sh: \`${f.replace(/_/g, '/')}\`'s output, ${path.join(dir, 'runs', 'sh', `${f}.log`)}, cannot be read: no result line in it.`,
-        ),
-      );
-      const other = new Map<string, Sighting>([['ae/o/1', { sessionId: 'o', state: 'working' }]]);
-      const both = composite({ sh: ops, other: testOps({ sessions: other }) }, 'other');
-      const told = await Effect.runPromise(
-        both.observeFor!([
-          { name: 'ae/w/1', harness: 'sh' },
-          { name: 'ae/o/1', harness: 'other' },
-        ]),
-      );
-      assert.deepEqual(told.unread, new Set(['ae/w/1']));
-      assert.deepEqual([...told.seen.keys()], ['ae/o/1']);
-    },
-  );
+  test('REFUSED: a run asked for whose output the spec refuses, naming the run and its output; through the composite, the names routed there are unread while they run', async () => {
+    const dir = root();
+    const spec: HarnessSpec = {
+      ...sh('true'),
+      readOutput: () => {
+        throw new Error('no result line in it');
+      },
+    };
+    doneRun(dir, 'ae/w/1', { state: 'working', heartbeatAt: new Date().toISOString() });
+    doneRun(dir, 'ae/d/1');
+    const ops = detachedOps(spec, dir);
+    const { value, warnings } = await warned(ops.observeFor!([{ name: 'ae/w/1' }, { name: 'ae/d/1' }]));
+    assert.deepEqual(value.unread, new Set(['ae/w/1']), 'at work: neither there nor gone');
+    assert.equal(value.seen.get('ae/d/1')?.state, 'failed', 'ended: failed, never completed');
+    assert.deepEqual(
+      warnings.map((w) => w.split(' It is unread')[0]),
+      ['ae_w_1', 'ae_d_1'].map(
+        (f) =>
+          `sh: \`${f.replace(/_/g, '/')}\`'s output, ${path.join(dir, 'runs', 'sh', `${f}.log`)}, cannot be read: no result line in it.`,
+      ),
+    );
+    const other = new Map<string, Sighting>([['ae/o/1', { sessionId: 'o', state: 'working' }]]);
+    const both = composite({ sh: ops, other: testOps({ sessions: other }) }, 'other');
+    const told = await Effect.runPromise(
+      both.observeFor!([
+        { name: 'ae/w/1', harness: 'sh' },
+        { name: 'ae/o/1', harness: 'other' },
+      ]),
+    );
+    assert.deepEqual(told.unread, new Set(['ae/w/1']));
+    assert.deepEqual([...told.seen.keys()], ['ae/o/1']);
+  });
 });
 
 test('a Codex stream refused is refused once per change of its output: an unchanged log is not decoded again on every pass', async () => {
@@ -1414,7 +1379,7 @@ test('a claude job whose output has stderr before its result and a line torn mid
   assert.deepEqual(value.get('ae/j2/1')?.usage, { costUsd: 0.2 });
 });
 
-test('the detached argv, whole, per harness: at shipped defaults, with every option, and where an option moves the prompt', async (t) => {
+describe('the detached argv, whole, per harness: at shipped defaults, with every option, and where an option moves the prompt', () => {
   const golden = [
     {
       name: 'codex at shipped defaults: workspace-write, no effort, no schema, the prompt last',
@@ -1499,13 +1464,13 @@ test('the detached argv, whole, per harness: at shipped defaults, with every opt
     },
   ];
   for (const row of golden)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const { cmd, args } = row.argv();
       assert.deepEqual({ cmd, args }, { cmd: row.cmd, args: row.args });
     });
 });
 
-test('codex: the sandbox a task runs in, from its mode and its tools — never widened past what the task said', async (t) => {
+describe('codex: the sandbox a task runs in, from its mode and its tools — never widened past what the task said', () => {
   const rows: { name: string; config: { tools?: string[]; permissionMode?: string }; sandbox: string }[] = [
     { name: 'read-only when the task says read-only', config: { permissionMode: 'read-only' }, sandbox: 'read-only' },
     { name: 'the shipped default is unchanged', config: {}, sandbox: 'workspace-write' },
@@ -1523,16 +1488,16 @@ test('codex: the sandbox a task runs in, from its mode and its tools — never w
     { name: 'and the mode it named still holds', config: { tools: ['Read', 'Bash'], permissionMode: 'read-only' }, sandbox: 'read-only' },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const { args, ranIn } = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: row.config });
       assert.equal(args[args.indexOf('-s') + 1], row.sandbox);
       assert.equal(ranIn, row.sandbox, 'the command says the sandbox it gave, as the mode the session runs in');
     });
 });
 
-test("refuses: each detached harness refuses what it does not have, naming what it has; Claude's and Codex's words apart", async (t) => {
+describe("refuses: each detached harness refuses what it does not have, naming what it has; Claude's and Codex's words apart", () => {
   const task = (config: object) => ({ brief: 'b', cwd: '/r', config });
-  await t.test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", () => {
+  test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", () => {
     assert.match(
       codex.refuses!(task({ permissionMode: 'acceptEdits' })) ?? '',
       /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/,
@@ -1541,8 +1506,7 @@ test("refuses: each detached harness refuses what it does not have, naming what 
     assert.equal(codex.refuses!(task({ permissionMode: 'read-only' })), undefined);
     assert.equal(claudeJob.refuses!(task({ permissionMode: 'auto' })), undefined);
   });
-
-  await t.test('an effort a harness does not have is refused by that harness, in its own words', () => {
+  test('an effort a harness does not have is refused by that harness, in its own words', () => {
     assert.match(
       codex.refuses!(task({ effort: 'extreme' })) ?? '',
       /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/,
@@ -1555,8 +1519,7 @@ test("refuses: each detached harness refuses what it does not have, naming what 
     assert.equal(codex.refuses!(task({ effort: 'minimal' })), undefined);
     assert.equal(claudeJob.refuses!(task({ effort: 'xhigh' })), undefined);
   });
-
-  await t.test("REFUSED: a budget on codex, which has no spend cap, naming the harness that has one; Claude Code's job keeps one", () => {
+  test("REFUSED: a budget on codex, which has no spend cap, naming the harness that has one; Claude Code's job keeps one", () => {
     assert.equal(claudeJob.refuses!(task({ budgetUsd: 0.25 })), undefined, 'a job keeps one');
     assert.match(
       codex.refuses!(task({ budgetUsd: 0.25 })) ?? '',
@@ -1564,24 +1527,18 @@ test("refuses: each detached harness refuses what it does not have, naming what 
     );
     assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined, 'no budget, nothing refused');
   });
-
-  await t.test(
-    "a context window: Claude Code's job declares the range it keeps, and codex declares none, so file() refuses one there",
-    () => {
-      assert.deepEqual(claudeJob.contextTokens, { least: 100_000, most: 1_000_000 });
-      assert.equal(codex.contextTokens, undefined, 'codex exec has no such knob');
-    },
-  );
-
-  await t.test('REFUSED: a deny list on codex, which has no tool list to take from, naming the sandbox', () => {
+  test("a context window: Claude Code's job declares the range it keeps, and codex declares none, so file() refuses one there", () => {
+    assert.deepEqual(claudeJob.contextTokens, { least: 100_000, most: 1_000_000 });
+    assert.equal(codex.contextTokens, undefined, 'codex exec has no such knob');
+  });
+  test('REFUSED: a deny list on codex, which has no tool list to take from, naming the sandbox', () => {
     assert.match(
       codex.refuses!(task({ disallowedTools: ['Bash(git push)'] })) ?? '',
       /is a deny list, and Codex has no tool list to take from.*`permissionMode`/,
     );
     assert.equal(codex.refuses!(task({ disallowedTools: [] })), undefined, 'an empty list denies nothing');
   });
-
-  await t.test('REFUSED: an allow list on codex, for the same reason and in the same shape — one shell, fenced by its sandbox', () => {
+  test('REFUSED: an allow list on codex, for the same reason and in the same shape — one shell, fenced by its sandbox', () => {
     assert.match(
       codex.refuses!(task({ allowedTools: ['Write(**)'] })) ?? '',
       /is an allow list, and Codex has no tool list to allow from.*`permissionMode`/,
@@ -1633,8 +1590,8 @@ const namedDir = (trust: boolean) => {
 /** Where a spec names a file beside its run: what `prepare` is handed, which Codex names none by. */
 const beside = (end: string) => `/runs/codex/ae_t_1.${end}`;
 
-test('codex.prepare: the trust a run is given is the trust you gave in Codex, from the directory the task names alone', async (t) => {
-  await t.test('trusted projects are read the way Codex writes them, and only those', () => {
+describe('codex.prepare: the trust a run is given is the trust you gave in Codex, from the directory the task names alone', () => {
+  test('trusted projects are read the way Codex writes them, and only those', () => {
     const toml = [
       '[projects."/home/u/repo"]',
       'trust_level = "trusted"',
@@ -1647,35 +1604,28 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
     ].join('\n');
     assert.deepEqual([...trustedProjects(toml)], ['/home/u/repo']);
   });
-
-  await t.test('a worktree of a repository you trust in Codex, which the task names, is trusted for the run, repository included', () => {
+  test('a worktree of a repository you trust in Codex, which the task names, is trusted for the run, repository included', () => {
     const { repo, wt, home } = repoWithWorktree(true);
     const io = inCodexHome(home, () =>
       codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }, beside),
     );
     assert.deepEqual(io.trustedDirs, [repo, wt]);
   });
-
-  await t.test('a repository you never trusted gets no trust from the engine', () => {
+  test('a repository you never trusted gets no trust from the engine', () => {
     const { repo, wt, home } = repoWithWorktree(false);
     const io = inCodexHome(home, () =>
       codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }, beside),
     );
     assert.equal(io.trustedDirs, undefined, "trusting it would also load whatever Codex settings it ships: not the engine's call");
   });
-
-  await t.test(
-    'a worktree of a repository you trust in Codex gets no trust unless the task names the directory, and no git is spawned',
-    () => {
-      const { wt, home } = repoWithWorktree(true);
-      const before = ioCounts().spawned;
-      const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }, beside));
-      assert.equal(io.trustedDirs, undefined);
-      assert.equal(ioCounts().spawned, before, 'the repository behind the cwd is never asked of git');
-    },
-  );
-
-  await t.test('a directory the task names, which you trust in Codex, extends its trust to the cwd, with no repository and no git', () => {
+  test('a worktree of a repository you trust in Codex gets no trust unless the task names the directory, and no git is spawned', () => {
+    const { wt, home } = repoWithWorktree(true);
+    const before = ioCounts().spawned;
+    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }, beside));
+    assert.equal(io.trustedDirs, undefined);
+    assert.equal(ioCounts().spawned, before, 'the repository behind the cwd is never asked of git');
+  });
+  test('a directory the task names, which you trust in Codex, extends its trust to the cwd, with no repository and no git', () => {
     const { dir, home } = namedDir(true);
     const cwd = scratch('ae-trust-cwd-');
     const before = ioCounts().spawned;
@@ -1683,29 +1633,23 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
     assert.deepEqual(io.trustedDirs, [dir, cwd]);
     assert.equal(ioCounts().spawned, before, 'no git is spawned for a directory the task names');
   });
-
-  await t.test('a directory the task names, which you never trusted, gets no trust from the engine', () => {
+  test('a directory the task names, which you never trusted, gets no trust from the engine', () => {
     const { dir, home } = namedDir(false);
     const cwd = scratch('ae-trust-cwd-');
     const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: dir } } }, beside));
     assert.equal(io.trustedDirs, undefined);
   });
-
-  await t.test(
-    'a directory the task names decides alone: a worktree of a trusted repository is not trusted from an untrusted one, and no git is asked',
-    () => {
-      const { wt, home } = repoWithWorktree(true);
-      const untrusted = scratch('ae-trust-from-');
-      const before = ioCounts().spawned;
-      const io = inCodexHome(home, () =>
-        codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: untrusted } } }, beside),
-      );
-      assert.equal(io.trustedDirs, undefined, 'the repository behind the cwd is not asked for');
-      assert.equal(ioCounts().spawned, before);
-    },
-  );
-
-  await t.test('a directory the task names is resolved before it is looked up, and named once when it is the cwd', () => {
+  test('a directory the task names decides alone: a worktree of a trusted repository is not trusted from an untrusted one, and no git is asked', () => {
+    const { wt, home } = repoWithWorktree(true);
+    const untrusted = scratch('ae-trust-from-');
+    const before = ioCounts().spawned;
+    const io = inCodexHome(home, () =>
+      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: untrusted } } }, beside),
+    );
+    assert.equal(io.trustedDirs, undefined, 'the repository behind the cwd is not asked for');
+    assert.equal(ioCounts().spawned, before);
+  });
+  test('a directory the task names is resolved before it is looked up, and named once when it is the cwd', () => {
     const { dir, home } = namedDir(true);
     const cwd = scratch('ae-trust-cwd-');
     const slashed = inCodexHome(home, () =>
@@ -1719,90 +1663,96 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
   });
 });
 
-test(
+describe(
   "a detached run's answer is its own: read off its closeout file or its output, with no time, never the last run's, nothing in the workspace",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const dir = root();
-    const workspace = scratch('ae-ws-');
-    const answers = detachedOps(
-      {
-        name: 'answers',
-        can: [],
-        command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
-      },
-      dir,
-    );
-    const prints = detachedOps(
-      {
-        name: 'prints',
-        can: [],
-        readOutput: claudeResultOutput,
-        command: () => ({
-          cmd: 'sh',
-          args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`],
-        }),
-      },
-      dir,
-    );
+  () => {
+    let dir!: string;
+    let workspace!: string;
+    let answers!: import('../src/index.ts').RunnerOps;
+    let prints!: import('../src/index.ts').RunnerOps;
+    let denied!: import('../src/index.ts').RunnerOps;
+    let none!: import('../src/index.ts').RunnerOps;
+    let unsaid!: import('../src/index.ts').RunnerOps;
+    let spawnSaid!: import('../src/index.ts').RunnerOps;
+    let outputSaid!: import('../src/index.ts').RunnerOps;
+    let quiet!: import('../src/index.ts').RunnerOps;
+    let quietPrints!: import('../src/index.ts').RunnerOps;
+    beforeAll(() => {
+      const t = teardowns();
+      dir = root();
+      workspace = scratch('ae-ws-');
+      answers = detachedOps(
+        {
+          name: 'answers',
+          can: [],
+          command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+        },
+        dir,
+      );
+      prints = detachedOps(
+        {
+          name: 'prints',
+          can: [],
+          readOutput: claudeResultOutput,
+          command: () => ({
+            cmd: 'sh',
+            args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`],
+          }),
+        },
+        dir,
+      );
+      denied = says('denied', { denials });
+      none = says('nodenial', { denials: [] });
+      unsaid = says('unsaid', {});
+      spawnSaid = sandboxed('spawnsaid', {});
+      outputSaid = sandboxed('outputsaid', { ranIn: 'plan' });
+      quiet = detachedOps({ name: 'quiet', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) }, dir);
+      quietPrints = detachedOps(
+        { name: 'quietp', can: [], readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) },
+        dir,
+      );
+      return t.end;
+    });
+    const s = story(test);
     const denials = [{ tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
     const says = (name: string, read: HarnessOutput) =>
       detachedOps({ name, can: [], readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'] }) }, dir);
-    const denied = says('denied', { denials });
-    const none = says('nodenial', { denials: [] });
-    const unsaid = says('unsaid', {});
     const sandboxed = (name: string, read: HarnessOutput) =>
       detachedOps(
         { name, can: [], readOutput: () => read, command: () => ({ cmd: 'sh', args: ['-c', 'echo out'], ranIn: 'read-only' }) },
         dir,
       );
-    const spawnSaid = sandboxed('spawnsaid', {});
-    const outputSaid = sandboxed('outputsaid', { ranIn: 'plan' });
-    const quiet = detachedOps({ name: 'quiet', can: [], command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) }, dir);
-    const quietPrints = detachedOps(
-      { name: 'quietp', can: [], readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) },
-      dir,
-    );
+    s.test('a re-spawn of the same attempt does not find the last answer waiting for it, in its closeout file or its output', async () => {
+      const leftover = path.join(dir, 'runs', 'quiet', 'ae_t10_1.closeout.json');
+      fs.mkdirSync(path.dirname(leftover), { recursive: true });
+      fs.writeFileSync(leftover, '{"outcome":"done"}');
+      const leftLog = path.join(dir, 'runs', 'quietp', 'ae_t25_1.log');
+      fs.mkdirSync(path.dirname(leftLog), { recursive: true });
+      fs.writeFileSync(leftLog, `${resultLine({ structured_output: { outcome: 'done' } })}\n`);
 
-    await s.test(
-      'a re-spawn of the same attempt does not find the last answer waiting for it, in its closeout file or its output',
-      async () => {
-        const leftover = path.join(dir, 'runs', 'quiet', 'ae_t10_1.closeout.json');
-        fs.mkdirSync(path.dirname(leftover), { recursive: true });
-        fs.writeFileSync(leftover, '{"outcome":"done"}');
-        const leftLog = path.join(dir, 'runs', 'quietp', 'ae_t25_1.log');
-        fs.mkdirSync(path.dirname(leftLog), { recursive: true });
-        fs.writeFileSync(leftLog, `${resultLine({ structured_output: { outcome: 'done' } })}\n`);
-
-        await Effect.runPromise(quiet.spawn({ name: 'ae/t10/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
-        await Effect.runPromise(quietPrints.spawn({ name: 'ae/t25/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
-        assert.equal((await Effect.runPromise(quiet.observe)).get('ae/t10/1')?.closeout, undefined, 'its closeout file');
-        assert.equal((await Effect.runPromise(quietPrints.observe)).get('ae/t25/1')?.closeout, undefined, 'its output');
-      },
-    );
-
-    await s.test(
-      "a detached harness's final answer is its closing statement — with no time: its own process wrote the file",
-      async (sub) => {
-        await Effect.runPromise(answers.spawn({ name: 'ae/t9/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
-        await Effect.runPromise(prints.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
-        await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
-        await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
-        await Effect.runPromise(unsaid.spawn(req('ae/t26/1', dir)));
-        await Effect.runPromise(spawnSaid.spawn(req('ae/t27/1', dir)));
-        await Effect.runPromise(outputSaid.spawn(req('ae/t28/1', dir)));
-        const seen = await settle(sub, answers, 'ae/t9/1', 'completed');
-        assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-        assert.equal(
-          seen.closeout && 'at' in seen.closeout,
-          false,
-          'no time: its own process wrote the file, after the spawn cleared the last one, whatever the clock says',
-        );
-      },
-    );
-
-    await s.test("a spec that reads its harness's output reports the answer found there, with no time", async (sub) => {
+      await Effect.runPromise(quiet.spawn({ name: 'ae/t10/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+      await Effect.runPromise(quietPrints.spawn({ name: 'ae/t25/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+      assert.equal((await Effect.runPromise(quiet.observe)).get('ae/t10/1')?.closeout, undefined, 'its closeout file');
+      assert.equal((await Effect.runPromise(quietPrints.observe)).get('ae/t25/1')?.closeout, undefined, 'its output');
+    });
+    s.test("a detached harness's final answer is its closing statement — with no time: its own process wrote the file", async (sub) => {
+      await Effect.runPromise(answers.spawn({ name: 'ae/t9/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
+      await Effect.runPromise(prints.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
+      await Effect.runPromise(denied.spawn(req('ae/t23/1', dir)));
+      await Effect.runPromise(none.spawn(req('ae/t24/1', dir)));
+      await Effect.runPromise(unsaid.spawn(req('ae/t26/1', dir)));
+      await Effect.runPromise(spawnSaid.spawn(req('ae/t27/1', dir)));
+      await Effect.runPromise(outputSaid.spawn(req('ae/t28/1', dir)));
+      const seen = await settle(sub, answers, 'ae/t9/1', 'completed');
+      assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+      assert.equal(
+        seen.closeout && 'at' in seen.closeout,
+        false,
+        'no time: its own process wrote the file, after the spawn cleared the last one, whatever the clock says',
+      );
+    });
+    s.test("a spec that reads its harness's output reports the answer found there, with no time", async (sub) => {
       const seen = await settle(sub, prints, 'ae/t20/1', 'completed');
       assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
       assert.equal(
@@ -1811,12 +1761,10 @@ test(
         'no time: its own process wrote the log, after the spawn cleared the last one, whatever the clock says',
       );
     });
-
-    await s.test('nothing lands in the workspace, from either', () => {
+    s.test('nothing lands in the workspace, from either', () => {
       assert.deepEqual(fs.readdirSync(workspace), [], 'the workspace is the one place it must not be');
     });
-
-    await s.test(
+    s.test(
       "what a harness's output says it denied the session is on the session's sighting, as the spec read it — `[]` when it denied nothing",
       async (sub) => {
         assert.deepEqual((await settle(sub, denied, 'ae/t23/1', 'completed')).denials, denials);
@@ -1824,8 +1772,7 @@ test(
         assert.equal('denials' in (await settle(sub, unsaid, 'ae/t26/1', 'completed')), false, 'an output that cannot say: no key');
       },
     );
-
-    await s.test(
+    s.test(
       "the mode a session ran in is on its sighting: the one its spec's command gave at the spawn, else none — and its output's, where it says one",
       async (sub) => {
         const plan = JSON.parse(fs.readFileSync(runFileOf(dir, 'spawnsaid', 'ae/t27/1'), 'utf8')) as { ranIn?: string };
@@ -1885,11 +1832,11 @@ const settledOn = async (t: Waiter, spec: HarnessSpec, task: { resumeFrom?: stri
 /** This process's clock 10 s ahead of the files': the attempt is journalled after the moment its statement's file was written. */
 const AHEAD_MS = 10_000;
 
-test(
+describe(
   "engine: a detached statement on the record is the run's own — whatever this process's clock, and never its parent's",
   WAITED,
-  async (t) => {
-    await t.test("a detached statement it printed is on the record when this process's clock runs ahead of its files'", async (sub) => {
+  () => {
+    test("a detached statement it printed is on the record when this process's clock runs ahead of its files'", async (sub) => {
       stepClock(sub, AHEAD_MS);
       const prints: HarnessSpec = {
         name: 'sh',
@@ -1902,54 +1849,64 @@ test(
       assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
       assert.notEqual(state.attempts[0]?.closedOut, false);
     });
-
-    await t.test(
-      "a detached statement written to its closeout file is on the record when this process's clock runs ahead of its files'",
-      async (sub) => {
-        stepClock(sub, AHEAD_MS);
-        const answers: HarnessSpec = {
-          name: 'sh',
-          can: [],
-          command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
-        };
-        const state = await settledOn(sub, answers);
-        assert.equal(state.settled, 'succeeded');
-        assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
-        assert.notEqual(state.attempts[0]?.closedOut, false);
-      },
-    );
-
-    await t.test(
-      "a resumed detached run that says nothing is not handed its parent's statement, from its file or its output",
-      async (sub) => {
-        const line = (o: object) => `printf '%s\\n' '${resultLine(o)}'`;
-        const spec: HarnessSpec = {
-          name: 'sh',
-          can: [],
-          readOutput: claudeResultOutput,
-          command: (r, io) => ({
-            cmd: 'sh',
-            args: [
-              '-c',
-              r.resumeFrom
-                ? line({ result: 'nothing to say' })
-                : `printf '%s' '{"outcome":"parent"}' > '${io?.closeoutFile}'; ${line({ structured_output: { outcome: 'parent' } })}`,
-            ],
-          }),
-        };
-        const parent = await settledOn(sub, spec);
-        assert.deepEqual(parent.attempts[0]?.closeout, { outcome: 'parent' }, 'the parent stated');
-        const child = await settledOn(sub, spec, { resumeFrom: SESSION });
-        assert.equal(child.attempts[0]?.closeout, undefined, "the parent's statement is not the child's");
-        assert.equal(child.attempts[0]?.closedOut, false, 'and the child is on the record as not having stated');
-      },
-    );
+    test("a detached statement written to its closeout file is on the record when this process's clock runs ahead of its files'", async (sub) => {
+      stepClock(sub, AHEAD_MS);
+      const answers: HarnessSpec = {
+        name: 'sh',
+        can: [],
+        command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+      };
+      const state = await settledOn(sub, answers);
+      assert.equal(state.settled, 'succeeded');
+      assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
+      assert.notEqual(state.attempts[0]?.closedOut, false);
+    });
+    test("a resumed detached run that says nothing is not handed its parent's statement, from its file or its output", async (sub) => {
+      const line = (o: object) => `printf '%s\\n' '${resultLine(o)}'`;
+      const spec: HarnessSpec = {
+        name: 'sh',
+        can: [],
+        readOutput: claudeResultOutput,
+        command: (r, io) => ({
+          cmd: 'sh',
+          args: [
+            '-c',
+            r.resumeFrom
+              ? line({ result: 'nothing to say' })
+              : `printf '%s' '{"outcome":"parent"}' > '${io?.closeoutFile}'; ${line({ structured_output: { outcome: 'parent' } })}`,
+          ],
+        }),
+      };
+      const parent = await settledOn(sub, spec);
+      assert.deepEqual(parent.attempts[0]?.closeout, { outcome: 'parent' }, 'the parent stated');
+      const child = await settledOn(sub, spec, { resumeFrom: SESSION });
+      assert.equal(child.attempts[0]?.closeout, undefined, "the parent's statement is not the child's");
+      assert.equal(child.attempts[0]?.closedOut, false, 'and the child is on the record as not having stated');
+    });
   },
 );
 
-test('codex filed through the engine at shipped defaults, against a fake binary: what it prints is on the record', WAITED, async (t) => {
-  const s = story(t);
-  const bin = scratch('ae-fake-bin-');
+describe('codex filed through the engine at shipped defaults, against a fake binary: what it prints is on the record', WAITED, () => {
+  let bin!: string;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    bin = scratch('ae-fake-bin-');
+    fs.writeFileSync(
+      path.join(bin, 'codex'),
+      [
+        '#!/bin/sh',
+        'echo "Reading additional input from stdin..." >&2',
+        ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    process.env.PATH = `${bin}:${prev.PATH}`;
+    process.env.CODEX_HOME = root();
+    engine = builtEngine(Engine.layer({ root: root() }));
+    return t.end;
+  });
+  const s = story(test);
   const codexStream = [
     { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
     { type: 'turn.started' },
@@ -1966,52 +1923,41 @@ test('codex filed through the engine at shipped defaults, against a fake binary:
       },
     },
   ];
-  fs.writeFileSync(
-    path.join(bin, 'codex'),
-    [
-      '#!/bin/sh',
-      'echo "Reading additional input from stdin..." >&2',
-      ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
-    ].join('\n'),
-    { mode: 0o755 },
-  );
   const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
-  process.env.PATH = `${bin}:${prev.PATH}`;
-  process.env.CODEX_HOME = root();
-  try {
-    const engine = builtEngine(Engine.layer({ root: root() }));
-
-    await s.test(
-      'codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it',
-      async (sub) => {
-        const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
-        await ticked(sub, engine, id);
-        const { state } = await Effect.runPromise(engine.view(id));
-        assert.equal(state.settled, 'succeeded');
-        assert.deepEqual(
-          state.attempts[0]?.usage,
-          { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
-          'measured, and nothing it did not measure',
-        );
-        assert.equal(state.attempts[0]?.exitCode, 0);
-        assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
-      },
+  s.test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async (sub) => {
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
+    await ticked(sub, engine, id);
+    const { state } = await Effect.runPromise(engine.view(id));
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(
+      state.attempts[0]?.usage,
+      { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
+      'measured, and nothing it did not measure',
     );
-  } finally {
+    assert.equal(state.attempts[0]?.exitCode, 0);
+    assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
+  });
+  afterAll(() => {
     process.env.PATH = prev.PATH;
     if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
     else process.env.CODEX_HOME = prev.CODEX_HOME;
-  }
+  });
 });
 
-test(
+describe(
   "a spec's spawn: what it prepares merged into its command's io, and a spawn request written whole, owner-only, never stale, forgotten with the rest",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const dir = root();
-
-    await s.test('the runner merges what a spec prepares into what its command is given', async () => {
+  () => {
+    let dir!: string;
+    let ops!: import('../src/index.ts').RunnerOps;
+    let at!: string;
+    beforeAll(() => {
+      const t = teardowns();
+      dir = root();
+      return t.end;
+    });
+    const s = story(test);
+    s.test('the runner merges what a spec prepares into what its command is given', async () => {
       let given: HarnessIO | undefined;
       const spy: HarnessSpec = {
         name: 'sh',
@@ -2026,8 +1972,7 @@ test(
       assert.deepEqual(given?.trustedDirs, ['/somewhere']);
       assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
     });
-
-    await s.test('a spec that needs the spawn request is written one, and a spec that does not is written none', async () => {
+    s.test('a spec that needs the spawn request is written one, and a spec that does not is written none', async () => {
       const given: (HarnessIO | undefined)[] = [];
       const spy = (needsRequest?: true): HarnessSpec => ({
         name: 'sh',
@@ -2057,38 +2002,32 @@ test(
       assert.equal(given[1]?.requestFile, undefined, 'a spec that does not ask is given no path');
       assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_req_2.request.json')), false, 'and no file is written for it');
     });
+    s.test('a spec that reads its own spawn request is given its servers in it, and no MCP config file is written for it', async () => {
+      const given: (HarnessIO | undefined)[] = [];
+      const spec = (needsRequest?: true): HarnessSpec => ({
+        name: 'sh',
+        can: [],
+        ...(needsRequest ? { needsRequest } : {}),
+        command: (_r, io) => {
+          given.push(io);
+          return { cmd: 'sh', args: ['-c', 'exit 0'] };
+        },
+      });
+      const config = { mcp: { a: { command: 'a-server' } } };
+      await Effect.runPromise(detachedOps(spec(true), dir).spawn({ name: 'ae/t-mcp/1', brief: 'x', cwd: dir, config }));
+      assert.equal(given[0]?.mcpConfigFile, undefined, 'no config file is named for it');
+      assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_mcp_1.mcp.json')), false, 'and none is written');
+      const wrote = JSON.parse(fs.readFileSync(given[0]!.requestFile!, 'utf8')) as { request: { config?: typeof config } };
+      assert.deepEqual(wrote.request.config, config, 'the servers are in the request the harness reads');
+      assert.equal(fs.statSync(given[0]!.requestFile!).mode & 0o077, 0, 'owner-only: a server’s env or header may be a secret');
 
-    await s.test(
-      'a spec that reads its own spawn request is given its servers in it, and no MCP config file is written for it',
-      async () => {
-        const given: (HarnessIO | undefined)[] = [];
-        const spec = (needsRequest?: true): HarnessSpec => ({
-          name: 'sh',
-          can: [],
-          ...(needsRequest ? { needsRequest } : {}),
-          command: (_r, io) => {
-            given.push(io);
-            return { cmd: 'sh', args: ['-c', 'exit 0'] };
-          },
-        });
-        const config = { mcp: { a: { command: 'a-server' } } };
-        await Effect.runPromise(detachedOps(spec(true), dir).spawn({ name: 'ae/t-mcp/1', brief: 'x', cwd: dir, config }));
-        assert.equal(given[0]?.mcpConfigFile, undefined, 'no config file is named for it');
-        assert.equal(fs.existsSync(path.join(dir, 'runs', 'sh', 'ae_t_mcp_1.mcp.json')), false, 'and none is written');
-        const wrote = JSON.parse(fs.readFileSync(given[0]!.requestFile!, 'utf8')) as { request: { config?: typeof config } };
-        assert.deepEqual(wrote.request.config, config, 'the servers are in the request the harness reads');
-        assert.equal(fs.statSync(given[0]!.requestFile!).mode & 0o077, 0, 'owner-only: a server’s env or header may be a secret');
-
-        await Effect.runPromise(detachedOps(spec(), dir).spawn({ name: 'ae/t-mcp/2', brief: 'x', cwd: dir, config }));
-        assert.ok(given[1]?.mcpConfigFile, 'a spec that reads no request is still handed a file, as it always was');
-      },
-    );
-
+      await Effect.runPromise(detachedOps(spec(), dir).spawn({ name: 'ae/t-mcp/2', brief: 'x', cwd: dir, config }));
+      assert.ok(given[1]?.mcpConfigFile, 'a spec that reads no request is still handed a file, as it always was');
+    });
     const again: HarnessSpec = { name: 'req', can: [], needsRequest: true, command: () => ({ cmd: 'sh', args: ['-c', 'exit 0'] }) };
-    const ops = detachedOps(again, dir);
-    const at = path.join(dir, 'runs', 'req', 'ae_t_again_1.request.json');
-
-    await s.test('a respawn under the same name finds no stale spawn request', async (sub) => {
+    s.test('a respawn under the same name finds no stale spawn request', async (sub) => {
+      ops = detachedOps(again, dir);
+      at = path.join(dir, 'runs', 'req', 'ae_t_again_1.request.json');
       await Effect.runPromise(ops.spawn({ name: 'ae/t-again/1', brief: 'the first', cwd: dir }));
       await settle(sub, ops, 'ae/t-again/1', 'completed');
       await Effect.runPromise(ops.spawn({ name: 'ae/t-again/1', brief: 'the second', cwd: dir }));
@@ -2099,12 +2038,10 @@ test(
       );
       await settle(sub, ops, 'ae/t-again/1', 'completed');
     });
-
-    await s.test('a spawn request beside a run file is no run of its own', async () => {
+    s.test('a spawn request beside a run file is no run of its own', async () => {
       assert.deepEqual([...(await Effect.runPromise(ops.observe)).keys()], ['ae/t-again/1'], 'one run listed, not two');
     });
-
-    await s.test('a forget takes the request file with the rest', async () => {
+    s.test('a forget takes the request file with the rest', async () => {
       const forgotten = await Effect.runPromise(ops.forget!({ name: 'ae/t-again/1' }, { dry: false }));
       assert.ok(forgotten.files.includes(at), `the request file is forgotten with the rest: ${forgotten.files.join(', ')}`);
       assert.equal(fs.existsSync(at), false);
@@ -2112,8 +2049,8 @@ test(
   },
 );
 
-test('spawn: refused before the worker launches, saying nothing started, where the run could never start', async (t) => {
-  await t.test('a detached spawn that throws says nothing started — the worker is never launched', async () => {
+describe('spawn: refused before the worker launches, saying nothing started, where the run could never start', () => {
+  test('a detached spawn that throws says nothing started — the worker is never launched', async () => {
     const broken: HarnessSpec = {
       name: 'sh',
       can: [],
@@ -2131,8 +2068,7 @@ test('spawn: refused before the worker launches, saying nothing started, where t
     );
     assert.equal(e?.refused, true);
   });
-
-  await t.test('a detached worker aimed at a directory that is not there is refused, and cannot take the engine down', async () => {
+  test('a detached worker aimed at a directory that is not there is refused, and cannot take the engine down', async () => {
     const e = await Effect.runPromise(
       detachedOps(sh('true'), root())
         .spawn(req('ae/t18/1', path.join(root(), 'gone')))
@@ -2178,8 +2114,8 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   );
 });
 
-test("claudeResultOutput: what claude -p's result line says — its answer, its limit, its tokens, its cost and what it was denied", async (t) => {
-  await t.test("claude -p's answer is its result object's structured_output, and nothing else in its output is one", () => {
+describe("claudeResultOutput: what claude -p's result line says — its answer, its limit, its tokens, its cost and what it was denied", () => {
+  test("claude -p's answer is its result object's structured_output, and nothing else in its output is one", () => {
     assert.deepEqual(
       claudeResultOutput(['a warning on stderr', resultLine({ structured_output: { outcome: 'done' } }), ''].join('\n')),
       {
@@ -2199,79 +2135,70 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
     assert.deepEqual(claudeResultOutput('The result: {"outcome":"done"}'), {}, 'prose is not one');
     assert.deepEqual(claudeResultOutput(''), {});
   });
-
-  await t.test(
-    'claude -p that stopped at its budget says so in its result — the limit `budget`, a fact — and one that failed another way does not',
-    () => {
-      const spent = resultLine({
-        subtype: 'error_max_budget_usd',
-        is_error: true,
-        terminal_reason: 'budget_exhausted',
-        errors: ['Reached maximum budget ($0.01)'],
-        total_cost_usd: 0.01804,
-        duration_api_ms: 718,
-      });
+  test('claude -p that stopped at its budget says so in its result — the limit `budget`, a fact — and one that failed another way does not', () => {
+    const spent = resultLine({
+      subtype: 'error_max_budget_usd',
+      is_error: true,
+      terminal_reason: 'budget_exhausted',
+      errors: ['Reached maximum budget ($0.01)'],
+      total_cost_usd: 0.01804,
+      duration_api_ms: 718,
+    });
+    assert.deepEqual(
+      claudeResultOutput(spent),
+      { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget', denials: [] },
+      '`claude -p` at its `--max-budget-usd` exits 1 with this result (keys trimmed)',
+    );
+    assert.equal(
+      claudeResultOutput(resultLine({ subtype: 'error_max_turns', is_error: true })).limit,
+      undefined,
+      'another error is not a spent budget',
+    );
+    assert.equal(
+      claudeResultOutput(resultLine({ terminal_reason: 'budget_exhausted' })).limit,
+      undefined,
+      'the subtype says it, as the SDK documents it',
+    );
+  });
+  test("claude -p's tokens are every model's of its session, subagents included, and its usage's where modelUsage is missing or partial", () => {
+    const read = claudeResultOutput(UV7V_IMPLEMENT);
+    assert.deepEqual(
+      read.usage,
+      {
+        inputTokens: 92614492,
+        uncachedTokens: 23989,
+        cacheWriteTokens: 1469794,
+        cacheReadTokens: 91120709,
+        outputTokens: 518341,
+        costUsd: 36.826279499999984,
+        apiMs: 4764556,
+      },
+      "uv7v's implement: its four subagents' reads counted, where its usage counts the main thread's 22.3M",
+    );
+    assert.equal(read.ownTokens?.cacheReadTokens, 22286449, "the process's own usage kept beside, for a resume's fallback");
+    const { modelUsage, ...main } = JSON.parse(UV7V_IMPLEMENT);
+    const partial = { ...modelUsage, 'claude-haiku-5-5': { inputTokens: 20922, outputTokens: 29 } };
+    for (const line of [main, { ...main, modelUsage: partial }, { ...main, modelUsage: {} }])
       assert.deepEqual(
-        claudeResultOutput(spent),
-        { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget', denials: [] },
-        '`claude -p` at its `--max-budget-usd` exits 1 with this result (keys trimmed)',
+        [claudeResultOutput(JSON.stringify(line)).usage?.cacheReadTokens, 'ownTokens' in claudeResultOutput(JSON.stringify(line))],
+        [22286449, false],
+        'no modelUsage, or a model missing a class: the usage, as before, and nothing beside it',
       );
-      assert.equal(
-        claudeResultOutput(resultLine({ subtype: 'error_max_turns', is_error: true })).limit,
-        undefined,
-        'another error is not a spent budget',
-      );
-      assert.equal(
-        claudeResultOutput(resultLine({ terminal_reason: 'budget_exhausted' })).limit,
-        undefined,
-        'the subtype says it, as the SDK documents it',
-      );
-    },
-  );
-
-  await t.test(
-    "claude -p's tokens are every model's of its session, subagents included, and its usage's where modelUsage is missing or partial",
-    () => {
-      const read = claudeResultOutput(UV7V_IMPLEMENT);
-      assert.deepEqual(
-        read.usage,
-        {
-          inputTokens: 92614492,
-          uncachedTokens: 23989,
-          cacheWriteTokens: 1469794,
-          cacheReadTokens: 91120709,
-          outputTokens: 518341,
-          costUsd: 36.826279499999984,
-          apiMs: 4764556,
-        },
-        "uv7v's implement: its four subagents' reads counted, where its usage counts the main thread's 22.3M",
-      );
-      assert.equal(read.ownTokens?.cacheReadTokens, 22286449, "the process's own usage kept beside, for a resume's fallback");
-      const { modelUsage, ...main } = JSON.parse(UV7V_IMPLEMENT);
-      const partial = { ...modelUsage, 'claude-haiku-5-5': { inputTokens: 20922, outputTokens: 29 } };
-      for (const line of [main, { ...main, modelUsage: partial }, { ...main, modelUsage: {} }])
-        assert.deepEqual(
-          [claudeResultOutput(JSON.stringify(line)).usage?.cacheReadTokens, 'ownTokens' in claudeResultOutput(JSON.stringify(line))],
-          [22286449, false],
-          'no modelUsage, or a model missing a class: the usage, as before, and nothing beside it',
-        );
-      assert.equal(
-        'usage' in
-          claudeResultOutput(
-            resultLine({ usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }),
-          ),
-        false,
-        'a usage whose input is 0 counted nothing: every response reads its prompt',
-      );
-      assert.equal(
-        'usage' in claudeResultOutput(resultLine({ usage: { input_tokens: 10, output_tokens: 5 } })),
-        false,
-        'a class it left out: none of them, not a 0',
-      );
-    },
-  );
-
-  await t.test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
+    assert.equal(
+      'usage' in
+        claudeResultOutput(
+          resultLine({ usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }),
+        ),
+      false,
+      'a usage whose input is 0 counted nothing: every response reads its prompt',
+    );
+    assert.equal(
+      'usage' in claudeResultOutput(resultLine({ usage: { input_tokens: 10, output_tokens: 5 } })),
+      false,
+      'a class it left out: none of them, not a 0',
+    );
+  });
+  test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
     assert.deepEqual(
       claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })),
       { usage: { costUsd: 0.01804, apiMs: 718 }, denials: [] },
@@ -2284,74 +2211,70 @@ test("claudeResultOutput: what claude -p's result line says — its answer, its 
     );
     assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
   });
-
-  await t.test(
-    "what claude -p was denied is its result's permission_denials, each by what a rule would name — and nothing when it was denied nothing",
-    () => {
-      const denials = [
-        { tool_name: 'Write', tool_use_id: 'toolu_1', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
-        { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com', prompt: 'the title?' } },
-        {
-          tool_name: 'Bash',
-          tool_use_id: 'toolu_3',
-          tool_input: { command: "  python3 -c 'import os; print(42)'", description: 'make it' },
-        },
-        { tool_name: 'Skill', tool_use_id: 'toolu_4', tool_input: { skill: 'look' } },
-        { tool_name: 'NotebookEdit', tool_use_id: 'toolu_5', tool_input: { notebook_path: '/r/n.ipynb' } },
-        { tool_name: 'Bash', tool_use_id: 'toolu_6', tool_input: { command: '' } },
-        { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com' } },
-      ];
-      assert.deepEqual(
-        claudeResultOutput(resultLine({ permission_denials: denials })).denials,
-        [
-          { tool: 'Write', what: '/tmp/outside/x.txt' },
-          { tool: 'WebFetch' },
-          { tool: 'Bash', what: 'python3' },
-          { tool: 'Skill', what: 'look' },
-          { tool: 'NotebookEdit', what: '/r/n.ipynb' },
-          { tool: 'Bash' },
-        ],
-        'one per call, in order: a URL is not guessed at, an empty command is the tool alone',
-      );
-      assert.deepEqual(
+  test("what claude -p was denied is its result's permission_denials, each by what a rule would name — and nothing when it was denied nothing", () => {
+    const denials = [
+      { tool_name: 'Write', tool_use_id: 'toolu_1', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
+      { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com', prompt: 'the title?' } },
+      {
+        tool_name: 'Bash',
+        tool_use_id: 'toolu_3',
+        tool_input: { command: "  python3 -c 'import os; print(42)'", description: 'make it' },
+      },
+      { tool_name: 'Skill', tool_use_id: 'toolu_4', tool_input: { skill: 'look' } },
+      { tool_name: 'NotebookEdit', tool_use_id: 'toolu_5', tool_input: { notebook_path: '/r/n.ipynb' } },
+      { tool_name: 'Bash', tool_use_id: 'toolu_6', tool_input: { command: '' } },
+      { tool_name: 'WebFetch', tool_use_id: 'toolu_2', tool_input: { url: 'https://example.com' } },
+    ];
+    assert.deepEqual(
+      claudeResultOutput(resultLine({ permission_denials: denials })).denials,
+      [
+        { tool: 'Write', what: '/tmp/outside/x.txt' },
+        { tool: 'WebFetch' },
+        { tool: 'Bash', what: 'python3' },
+        { tool: 'Skill', what: 'look' },
+        { tool: 'NotebookEdit', what: '/r/n.ipynb' },
+        { tool: 'Bash' },
+      ],
+      'one per call, in order: a URL is not guessed at, an empty command is the tool alone',
+    );
+    assert.deepEqual(
+      claudeResultOutput(
+        resultLine({ permission_denials: [...denials.slice(0, 1), { tool_name: 'Read', tool_input: { file_path: '/r/a' } }] }),
+      ).denials,
+      [
+        { tool: 'Write', what: '/tmp/outside/x.txt' },
+        { tool: 'Read', what: '/r/a' },
+      ],
+      'a denial with no id is a call of its own',
+    );
+    assert.deepEqual(claudeResultOutput(resultLine({ permission_denials: [] })).denials, [], 'a result measured: none denied is `[]`');
+    assert.deepEqual(claudeResultOutput(resultLine({})).denials, [], 'a result with no `permission_denials` denied nothing');
+    assert.equal(
+      refusedWith(() =>
         claudeResultOutput(
-          resultLine({ permission_denials: [...denials.slice(0, 1), { tool_name: 'Read', tool_input: { file_path: '/r/a' } }] }),
-        ).denials,
-        [
-          { tool: 'Write', what: '/tmp/outside/x.txt' },
-          { tool: 'Read', what: '/r/a' },
-        ],
-        'a denial with no id is a call of its own',
-      );
-      assert.deepEqual(claudeResultOutput(resultLine({ permission_denials: [] })).denials, [], 'a result measured: none denied is `[]`');
-      assert.deepEqual(claudeResultOutput(resultLine({})).denials, [], 'a result with no `permission_denials` denied nothing');
-      assert.equal(
-        refusedWith(() =>
-          claudeResultOutput(
-            resultLine({
-              permission_denials: [...denials.slice(0, 6), { tool_use_id: 'toolu_7', tool_input: { command: 'ls' } }, ...denials.slice(6)],
-            }),
-          ),
+          resultLine({
+            permission_denials: [...denials.slice(0, 6), { tool_use_id: 'toolu_7', tool_input: { command: 'ls' } }, ...denials.slice(6)],
+          }),
         ),
-        printedRefusal(1, 'a `result`', 'permission_denials.6.tool_name', 'is missing'),
-        'a denial that names no tool is refused, never skipped',
-      );
-      assert.equal(
-        refusedWith(() => claudeResultOutput(resultLine({ permission_denials: 'Write' }))),
-        printedRefusal(1, 'a `result`', 'permission_denials', 'is "Write", where Claude Code prints array'),
-        'not a list: refused, never read as no denial',
-      );
-      assert.deepEqual(
-        claudeStreamOutput(resultLine({ permission_denials: denials.slice(0, 1) })).denials,
-        [{ tool: 'Write', what: '/tmp/outside/x.txt' }],
-        'the stream reads the same result',
-      );
-    },
-  );
+      ),
+      printedRefusal(1, 'a `result`', 'permission_denials.6.tool_name', 'is missing'),
+      'a denial that names no tool is refused, never skipped',
+    );
+    assert.equal(
+      refusedWith(() => claudeResultOutput(resultLine({ permission_denials: 'Write' }))),
+      printedRefusal(1, 'a `result`', 'permission_denials', 'is "Write", where Claude Code prints array'),
+      'not a list: refused, never read as no denial',
+    );
+    assert.deepEqual(
+      claudeStreamOutput(resultLine({ permission_denials: denials.slice(0, 1) })).denials,
+      [{ tool: 'Write', what: '/tmp/outside/x.txt' }],
+      'the stream reads the same result',
+    );
+  });
 });
 
-test('REFUSED: a line a reader reads that does not decode refuses the output, naming its line, its field and the fix; a line of a kind it does not read passes', async (t) => {
-  await t.test('a cost or an API time that is not a number of 0 or more is no absence', () => {
+describe('REFUSED: a line a reader reads that does not decode refuses the output, naming its line, its field and the fix; a line of a kind it does not read passes', () => {
+  test('a cost or an API time that is not a number of 0 or more is no absence', () => {
     assert.equal(
       refusedWith(() => claudeResultOutput(resultLine({ total_cost_usd: 'a lot', duration_api_ms: null }))),
       printedRefusal(1, 'a `result`', 'total_cost_usd', 'is "a lot", where Claude Code prints number'),
@@ -2367,100 +2290,92 @@ test('REFUSED: a line a reader reads that does not decode refuses the output, na
       'the stream reads the same result, and counts its lines from the first, stderr included',
     );
   });
-
-  await t.test(
-    'a call or an init line a stream reads that does not decode refuses the stream; a line of a kind it does not read passes',
-    () => {
-      const block = (o: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'so' }, o] } });
-      assert.equal(
-        refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 5, name: 'Bash', input: {} })].join('\n'))),
-        printedRefusal(2, 'an `assistant`', 'message.content.1.id', 'is 5, where Claude Code prints string'),
-      );
-      assert.equal(
-        refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 'toolu_n', input: {} })].join('\n'))),
-        printedRefusal(2, 'an `assistant`', 'message.content.1.name', 'is missing'),
-      );
-      const badInit = JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 });
-      assert.equal(
-        refusedWith(() => claudeStreamOutput([badInit, resultLine({})].join('\n'))),
-        printedRefusal(1, 'a `system` `init`', 'cwd', 'is 5, where Claude Code prints string'),
-      );
-      assert.deepEqual(
-        claudeResultOutput([badInit, resultLine({ total_cost_usd: 0.2 })].join('\n')),
-        { usage: { costUsd: 0.2 }, denials: [] },
-        'json reads results alone',
-      );
-      const passing = [
-        stream.init,
-        JSON.stringify({ type: 'system', subtype: 'compact_boundary', cwd: 5, tool_use_id: 7, compact_metadata: { pre_tokens: 'x' } }),
-        JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_use', id: 5 }] }, total_cost_usd: 'a lot' }),
-        JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'no call' }] } }),
-        resultLine({}),
-      ];
-      assert.deepEqual(
-        claudeStreamOutput(passing.join('\n')),
-        { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' },
-        'another subtype, another type, and a line with no call',
-      );
-    },
-  );
+  test('a call or an init line a stream reads that does not decode refuses the stream; a line of a kind it does not read passes', () => {
+    const block = (o: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'so' }, o] } });
+    assert.equal(
+      refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 5, name: 'Bash', input: {} })].join('\n'))),
+      printedRefusal(2, 'an `assistant`', 'message.content.1.id', 'is 5, where Claude Code prints string'),
+    );
+    assert.equal(
+      refusedWith(() => claudeStreamOutput([stream.init, block({ type: 'tool_use', id: 'toolu_n', input: {} })].join('\n'))),
+      printedRefusal(2, 'an `assistant`', 'message.content.1.name', 'is missing'),
+    );
+    const badInit = JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 });
+    assert.equal(
+      refusedWith(() => claudeStreamOutput([badInit, resultLine({})].join('\n'))),
+      printedRefusal(1, 'a `system` `init`', 'cwd', 'is 5, where Claude Code prints string'),
+    );
+    assert.deepEqual(
+      claudeResultOutput([badInit, resultLine({ total_cost_usd: 0.2 })].join('\n')),
+      { usage: { costUsd: 0.2 }, denials: [] },
+      'json reads results alone',
+    );
+    const passing = [
+      stream.init,
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary', cwd: 5, tool_use_id: 7, compact_metadata: { pre_tokens: 'x' } }),
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_use', id: 5 }] }, total_cost_usd: 'a lot' }),
+      JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'no call' }] } }),
+      resultLine({}),
+    ];
+    assert.deepEqual(
+      claudeStreamOutput(passing.join('\n')),
+      { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' },
+      'another subtype, another type, and a line with no call',
+    );
+  });
 });
 
-test("claudeStreamOutput: what claude -p's stream says as it happens — its denials, its skills, its model and its files", async (t) => {
-  await t.test(
-    "claude -p's stream says what it was denied as it happens, the input off the call of the same id — once each beside its result",
-    () => {
-      const log = [
-        stream.init,
-        stream.calls(['toolu_w', 'Write', { file_path: '/tmp/outside/x.txt', content: 'hi' }]),
-        stream.denied('toolu_w', 'Write', {
-          decision_reason_type: 'workingDir',
-          decision_reason: 'Path is outside allowed working directories',
-        }),
-        stream.toolResult('toolu_w'),
-        stream.calls(['toolu_u', 'Bash', { command: 'uname -a' }]),
-        stream.toolResult('toolu_u'),
-        stream.calls(['toolu_s', 'Skill', { skill: 'look' }], ['toolu_f', 'WebFetch', { url: 'https://example.com' }]),
-        stream.denied('toolu_f', 'WebFetch', {}),
-        stream.toolResult('toolu_f'),
-        resultLine({
-          total_cost_usd: 0.02,
-          structured_output: { outcome: 'done' },
-          permission_denials: [
-            { tool_name: 'Write', tool_use_id: 'toolu_w', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
-            { tool_name: 'WebFetch', tool_use_id: 'toolu_f', tool_input: { url: 'https://example.com' } },
-          ],
-        }),
-      ].join('\n');
-      assert.deepEqual(
-        claudeStreamOutput(log),
-        {
-          closeout: { payload: { outcome: 'done' } },
-          usage: { costUsd: 0.02 },
-          denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
-          skills: ['look'],
-          ranOn: MODEL,
-          ranIn: 'default',
-        },
-        'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it',
-      );
+describe("claudeStreamOutput: what claude -p's stream says as it happens — its denials, its skills, its model and its files", () => {
+  test("claude -p's stream says what it was denied as it happens, the input off the call of the same id — once each beside its result", () => {
+    const log = [
+      stream.init,
+      stream.calls(['toolu_w', 'Write', { file_path: '/tmp/outside/x.txt', content: 'hi' }]),
+      stream.denied('toolu_w', 'Write', {
+        decision_reason_type: 'workingDir',
+        decision_reason: 'Path is outside allowed working directories',
+      }),
+      stream.toolResult('toolu_w'),
+      stream.calls(['toolu_u', 'Bash', { command: 'uname -a' }]),
+      stream.toolResult('toolu_u'),
+      stream.calls(['toolu_s', 'Skill', { skill: 'look' }], ['toolu_f', 'WebFetch', { url: 'https://example.com' }]),
+      stream.denied('toolu_f', 'WebFetch', {}),
+      stream.toolResult('toolu_f'),
+      resultLine({
+        total_cost_usd: 0.02,
+        structured_output: { outcome: 'done' },
+        permission_denials: [
+          { tool_name: 'Write', tool_use_id: 'toolu_w', tool_input: { file_path: '/tmp/outside/x.txt', content: 'hi' } },
+          { tool_name: 'WebFetch', tool_use_id: 'toolu_f', tool_input: { url: 'https://example.com' } },
+        ],
+      }),
+    ].join('\n');
+    assert.deepEqual(
+      claudeStreamOutput(log),
+      {
+        closeout: { payload: { outcome: 'done' } },
+        usage: { costUsd: 0.02 },
+        denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
+        skills: ['look'],
+        ranOn: MODEL,
+        ranIn: 'default',
+      },
+      'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it',
+    );
 
-      const killed = log.split('\n').slice(0, -1).join('\n');
-      assert.deepEqual(
-        claudeStreamOutput(killed),
-        {
-          denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
-          skills: ['look'],
-          ranOn: MODEL,
-          ranIn: 'default',
-        },
-        'killed before its result, by a stop or a signal, the events are all it says: every denial is still read',
-      );
-      assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
-    },
-  );
-
-  await t.test('a denial event whose call is not in the stream is the tool alone — and takes what its result says of it', () => {
+    const killed = log.split('\n').slice(0, -1).join('\n');
+    assert.deepEqual(
+      claudeStreamOutput(killed),
+      {
+        denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
+        skills: ['look'],
+        ranOn: MODEL,
+        ranIn: 'default',
+      },
+      'killed before its result, by a stop or a signal, the events are all it says: every denial is still read',
+    );
+    assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
+  });
+  test('a denial event whose call is not in the stream is the tool alone — and takes what its result says of it', () => {
     const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
     assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }], skills: [], ranOn: MODEL, ranIn: 'default' });
     assert.deepEqual(
@@ -2494,18 +2409,13 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
       'a stream that denied nothing says so: `[]`',
     );
   });
-
-  await t.test(
-    "claude -p's stream says each skill its session loaded, once per call, by its name without the plugin's, beside what it was denied",
-    () => {
-      const read = claudeStreamOutput(SKILLS_STREAM);
-      assert.deepEqual(read.skills, ['write-a-spec', 'look'], 'a call named again is one load; a load denied, or naming no skill, is none');
-      assert.deepEqual(read.denials, [{ tool: 'Skill', what: 'grill-me' }], 'the denied load is a denial');
-      assert.deepEqual(read.closeout?.payload, { outcome: 'done' });
-    },
-  );
-
-  await t.test('a skill denied only in the result is no load', () => {
+  test("claude -p's stream says each skill its session loaded, once per call, by its name without the plugin's, beside what it was denied", () => {
+    const read = claudeStreamOutput(SKILLS_STREAM);
+    assert.deepEqual(read.skills, ['write-a-spec', 'look'], 'a call named again is one load; a load denied, or naming no skill, is none');
+    assert.deepEqual(read.denials, [{ tool: 'Skill', what: 'grill-me' }], 'the denied load is a denial');
+    assert.deepEqual(read.closeout?.payload, { outcome: 'done' });
+  });
+  test('a skill denied only in the result is no load', () => {
     const log = [
       stream.init,
       stream.calls(['toolu_k1', 'Skill', { skill: 'look' }], ['toolu_k2', 'Skill', { skill: 'grill-me' }]),
@@ -2513,125 +2423,99 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
     ].join('\n');
     assert.deepEqual(claudeStreamOutput(log).skills, ['look']);
   });
+  test("claude -p's stream says the model its session really started on, off the `init` line; an init line naming none says none", () => {
+    const started = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
+    assert.equal(
+      claudeStreamOutput(started).ranOn,
+      MODEL,
+      "the `init` line carries the model the harness resolved the task's alias to, which is the only place a session says it",
+    );
+    const asked = JSON.stringify({ ...(JSON.parse(stream.init) as object), model: 'claude-opus-5-5' });
+    assert.equal(claudeStreamOutput([asked, resultLine({})].join('\n')).ranOn, 'claude-opus-5-5', 'read as written, never matched');
 
-  await t.test(
-    "claude -p's stream says the model its session really started on, off the `init` line; an init line naming none says none",
-    () => {
-      const started = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
-      assert.equal(
-        claudeStreamOutput(started).ranOn,
-        MODEL,
-        "the `init` line carries the model the harness resolved the task's alias to, which is the only place a session says it",
-      );
-      const asked = JSON.stringify({ ...(JSON.parse(stream.init) as object), model: 'claude-opus-5-5' });
-      assert.equal(claudeStreamOutput([asked, resultLine({})].join('\n')).ranOn, 'claude-opus-5-5', 'read as written, never matched');
-
-      const nameless = JSON.parse(stream.init) as Record<string, unknown>;
-      delete nameless.model;
-      assert.equal(
-        'ranOn' in claudeStreamOutput([JSON.stringify(nameless), resultLine({})].join('\n')),
-        false,
-        'an `init` line with no model: a Claude Code that does not say, and the runtime says nothing in its place',
-      );
-      assert.equal(
-        'ranOn' in claudeStreamOutput([stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n')),
-        false,
-        'no init line: no session known to have started, nothing measured',
-      );
-      assert.equal('ranOn' in claudeResultOutput(resultLine({})), false, '--output-format json has no events: it cannot say');
-    },
-  );
-
-  await t.test(
-    "claude -p's stream says the Claude Code it runs off its last `init` line; a line naming none, or none at all, says none",
-    () => {
-      assert.equal(
-        claudeStreamOutput(VERSIONED_STREAM).harnessVersion,
-        CLAUDE_CODE_VERSIONS[1],
-        'the last init line: the process that runs now',
-      );
-      const first = VERSIONED_STREAM.split('\n').slice(0, 1);
-      assert.equal(claudeStreamOutput([...first, resultLine({})].join('\n')).harnessVersion, CLAUDE_CODE_VERSIONS[0]);
-      assert.equal('harnessVersion' in claudeStreamOutput([stream.init, resultLine({})].join('\n')), false, 'an init line naming none');
-      assert.equal('harnessVersion' in claudeResultOutput(VERSIONED_STREAM.split('\n').at(-1) ?? ''), false, 'json output has no events');
-      assert.equal(
-        claudeStreamOutput(claudeStreamKept(VERSIONED_STREAM)).harnessVersion,
-        CLAUDE_CODE_VERSIONS[1],
-        'a kept capture reads the same',
-      );
-    },
-  );
-
-  await t.test(
-    "claude -p's stream says the mode its session ran in off its last `init` line's `permissionMode`; a line naming none, or none at all, says none",
-    () => {
-      assert.equal(
-        claudeStreamOutput(MODE_STREAM).ranIn,
-        'default',
-        'the last init line: a model that dropped `auto` ran its turn in `default`',
-      );
-      assert.equal(claudeStreamOutput([MODE_STREAM.split('\n')[0], resultLine({})].join('\n')).ranIn, 'auto', 'one turn, as it began');
-      const nameless = JSON.parse(stream.init) as Record<string, unknown>;
-      delete nameless.permissionMode;
-      assert.equal('ranIn' in claudeStreamOutput([JSON.stringify(nameless), resultLine({})].join('\n')), false, 'an init line naming none');
-      assert.equal(
-        claudeStreamOutput([MODE_STREAM.split('\n')[0], JSON.stringify(nameless), resultLine({})].join('\n')).ranIn,
-        'auto',
-        'a later line naming none takes nothing away',
-      );
-      assert.equal('ranIn' in claudeStreamOutput(resultLine({})), false, 'no init line: nothing said');
-      assert.equal('ranIn' in claudeResultOutput(MODE_STREAM), false, 'json output has no events');
-      assert.equal(claudeStreamOutput(claudeStreamKept(MODE_STREAM)).ranIn, 'default', 'a kept capture reads the same');
-    },
-  );
-
-  await t.test(
-    "claude -p's stream says the mode a `status` line settles after its `init` line named another, and a kept capture keeps it once",
-    () => {
-      assert.equal(claudeStreamOutput(SETTLED_STREAM).ranIn, 'default', 'the init line said `auto`; the status line, the mode it ran in');
-      const lines = SETTLED_STREAM.split('\n');
-      assert.equal(claudeStreamOutput([lines[0], lines[1], lines.at(-1)].join('\n')).ranIn, 'auto', 'a status line naming no mode');
-      const kept = claudeStreamKept(SETTLED_STREAM);
-      assert.equal(claudeStreamOutput(kept).ranIn, 'default', 'a kept capture reads the same');
-      assert.deepEqual(
-        kept.split('\n').filter((l) => l.includes('"status"')),
-        [JSON.stringify({ type: 'system', subtype: 'status', permissionMode: 'default' })],
-        'the one status line that changes the mode, cut to it',
-      );
-    },
-  );
-
-  await t.test(
-    'a stream that started, or ended in its result, says what it was denied even when that is nothing; one with neither cannot say',
-    () => {
-      const ls = stream.calls(['toolu_q', 'Bash', { command: 'ls' }]);
-      assert.deepEqual(claudeStreamOutput([stream.init, ls].join('\n')).denials, [], 'an init line: measured, none denied');
-      assert.deepEqual(claudeStreamOutput([ls, resultLine({})].join('\n')).denials, [], 'a result: measured, none denied');
-      assert.equal('denials' in claudeStreamOutput(ls), false, 'neither: no session known to have started, nothing measured');
-      assert.equal('denials' in claudeStreamOutput(''), false, 'an empty capture says nothing');
-    },
-  );
-
-  await t.test(
-    'a stream that started says the skills its session loaded even when it loaded none; one with no init line cannot say',
-    () => {
-      const none = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
-      assert.deepEqual(claudeStreamOutput(none), { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' }, 'measured: none loaded');
-      const unstarted = SKILLS_STREAM.split('\n').slice(1).join('\n');
-      assert.equal('skills' in claudeStreamOutput(unstarted), false, 'no init line: no session known to have started, nothing measured');
-      assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');
-    },
-  );
-
-  await t.test("claude -p's stream says each file its session read or wrote through its file tools, once, relative to its folder", () => {
+    const nameless = JSON.parse(stream.init) as Record<string, unknown>;
+    delete nameless.model;
+    assert.equal(
+      'ranOn' in claudeStreamOutput([JSON.stringify(nameless), resultLine({})].join('\n')),
+      false,
+      'an `init` line with no model: a Claude Code that does not say, and the runtime says nothing in its place',
+    );
+    assert.equal(
+      'ranOn' in claudeStreamOutput([stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n')),
+      false,
+      'no init line: no session known to have started, nothing measured',
+    );
+    assert.equal('ranOn' in claudeResultOutput(resultLine({})), false, '--output-format json has no events: it cannot say');
+  });
+  test("claude -p's stream says the Claude Code it runs off its last `init` line; a line naming none, or none at all, says none", () => {
+    assert.equal(
+      claudeStreamOutput(VERSIONED_STREAM).harnessVersion,
+      CLAUDE_CODE_VERSIONS[1],
+      'the last init line: the process that runs now',
+    );
+    const first = VERSIONED_STREAM.split('\n').slice(0, 1);
+    assert.equal(claudeStreamOutput([...first, resultLine({})].join('\n')).harnessVersion, CLAUDE_CODE_VERSIONS[0]);
+    assert.equal('harnessVersion' in claudeStreamOutput([stream.init, resultLine({})].join('\n')), false, 'an init line naming none');
+    assert.equal('harnessVersion' in claudeResultOutput(VERSIONED_STREAM.split('\n').at(-1) ?? ''), false, 'json output has no events');
+    assert.equal(
+      claudeStreamOutput(claudeStreamKept(VERSIONED_STREAM)).harnessVersion,
+      CLAUDE_CODE_VERSIONS[1],
+      'a kept capture reads the same',
+    );
+  });
+  test("claude -p's stream says the mode its session ran in off its last `init` line's `permissionMode`; a line naming none, or none at all, says none", () => {
+    assert.equal(
+      claudeStreamOutput(MODE_STREAM).ranIn,
+      'default',
+      'the last init line: a model that dropped `auto` ran its turn in `default`',
+    );
+    assert.equal(claudeStreamOutput([MODE_STREAM.split('\n')[0], resultLine({})].join('\n')).ranIn, 'auto', 'one turn, as it began');
+    const nameless = JSON.parse(stream.init) as Record<string, unknown>;
+    delete nameless.permissionMode;
+    assert.equal('ranIn' in claudeStreamOutput([JSON.stringify(nameless), resultLine({})].join('\n')), false, 'an init line naming none');
+    assert.equal(
+      claudeStreamOutput([MODE_STREAM.split('\n')[0], JSON.stringify(nameless), resultLine({})].join('\n')).ranIn,
+      'auto',
+      'a later line naming none takes nothing away',
+    );
+    assert.equal('ranIn' in claudeStreamOutput(resultLine({})), false, 'no init line: nothing said');
+    assert.equal('ranIn' in claudeResultOutput(MODE_STREAM), false, 'json output has no events');
+    assert.equal(claudeStreamOutput(claudeStreamKept(MODE_STREAM)).ranIn, 'default', 'a kept capture reads the same');
+  });
+  test("claude -p's stream says the mode a `status` line settles after its `init` line named another, and a kept capture keeps it once", () => {
+    assert.equal(claudeStreamOutput(SETTLED_STREAM).ranIn, 'default', 'the init line said `auto`; the status line, the mode it ran in');
+    const lines = SETTLED_STREAM.split('\n');
+    assert.equal(claudeStreamOutput([lines[0], lines[1], lines.at(-1)].join('\n')).ranIn, 'auto', 'a status line naming no mode');
+    const kept = claudeStreamKept(SETTLED_STREAM);
+    assert.equal(claudeStreamOutput(kept).ranIn, 'default', 'a kept capture reads the same');
+    assert.deepEqual(
+      kept.split('\n').filter((l) => l.includes('"status"')),
+      [JSON.stringify({ type: 'system', subtype: 'status', permissionMode: 'default' })],
+      'the one status line that changes the mode, cut to it',
+    );
+  });
+  test('a stream that started, or ended in its result, says what it was denied even when that is nothing; one with neither cannot say', () => {
+    const ls = stream.calls(['toolu_q', 'Bash', { command: 'ls' }]);
+    assert.deepEqual(claudeStreamOutput([stream.init, ls].join('\n')).denials, [], 'an init line: measured, none denied');
+    assert.deepEqual(claudeStreamOutput([ls, resultLine({})].join('\n')).denials, [], 'a result: measured, none denied');
+    assert.equal('denials' in claudeStreamOutput(ls), false, 'neither: no session known to have started, nothing measured');
+    assert.equal('denials' in claudeStreamOutput(''), false, 'an empty capture says nothing');
+  });
+  test('a stream that started says the skills its session loaded even when it loaded none; one with no init line cannot say', () => {
+    const none = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
+    assert.deepEqual(claudeStreamOutput(none), { denials: [], skills: [], ranOn: MODEL, ranIn: 'default' }, 'measured: none loaded');
+    const unstarted = SKILLS_STREAM.split('\n').slice(1).join('\n');
+    assert.equal('skills' in claudeStreamOutput(unstarted), false, 'no init line: no session known to have started, nothing measured');
+    assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');
+  });
+  test("claude -p's stream says each file its session read or wrote through its file tools, once, relative to its folder", () => {
     assert.deepEqual(
       claudeStreamOutput(FILES_STREAM).files,
       ['apps/web/a.tsx', 'b.ts', 'n.ipynb'],
       'a file read again is one; one outside its folder, one denied, and a call naming no file are none',
     );
   });
-
-  await t.test('a stream says the files its session touched only when its init line names its folder', () => {
+  test('a stream says the files its session touched only when its init line names its folder', () => {
     const none = [JSON.parse(FILES_STREAM.split('\n')[0]), { type: 'result', subtype: 'success' }].map((l) => JSON.stringify(l)).join('\n');
     assert.deepEqual(claudeStreamOutput(none).files, [], 'measured: none touched');
     assert.equal('files' in claudeStreamOutput(FILES_STREAM.split('\n').slice(1).join('\n')), false, 'no init line: nothing measured');
@@ -2656,119 +2540,111 @@ const tokensOf = <U extends { costUsd?: number; apiMs?: number }>(usage: U | und
   return rest;
 };
 
-test("observe: a resumed run is charged its own share — its parent's totals taken off, never its parent's too", async (t) => {
-  await t.test(
-    "a resumed run of a spec whose totals carry the parent's reports its own cost and API time — the parent's taken off, the last run before it under that id",
-    async () => {
-      const dir = root();
-      const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
-      const ops = detachedOps(spec, dir);
-      const runs = path.join(dir, 'runs', 'sh');
-      fs.mkdirSync(runs, { recursive: true });
-      const t0 = Date.parse('2026-09-23T12:00:00Z');
-      const write = (name: string, at: number, patch: object, result: object) => {
-        const file = name.replace(/\//g, '_');
-        fs.writeFileSync(
-          path.join(runs, `${file}.json`),
-          JSON.stringify({
-            name,
-            state: 'done',
-            exitCode: 0,
-            pid: 999999,
-            logFile: '/dev/null',
-            nativeId: SESSION,
-            startedAt: new Date(at).toISOString(),
-            heartbeatAt: new Date(at).toISOString(),
-            ...patch,
-          }),
-        );
-        fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
-      };
-      const tokens = { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 };
-      write('ae/r/3', t0 + 2_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0284121, duration_api_ms: 8132, usage: tokens });
-      write('ae/r/2', t0 + 1_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0257381, duration_api_ms: 7142, usage: tokens });
-      write('ae/r/1', t0, {}, { total_cost_usd: 0.0209649, duration_api_ms: 6069, usage: tokens });
-      const seen = await Effect.runPromise(ops.observe);
-      const near = (got: number | undefined, want: number) =>
-        assert.ok(got !== undefined && Math.abs(got - want) < 1e-9, `${got} is not ${want}`);
-      const told = await Effect.runPromise(detachedOps(spec, dir).observeFor!([{ name: 'ae/r/3' }, { name: 'ae/r/2' }]));
-      assert.deepEqual(
-        [told.seen.get('ae/r/3')?.usage, told.seen.get('ae/r/2')?.usage],
-        [seen.get('ae/r/3')?.usage, seen.get('ae/r/2')?.usage],
-        "a run file spawned before its parent's totals were carried on it has them found among the run files, asked for by name too",
+describe("observe: a resumed run is charged its own share — its parent's totals taken off, never its parent's too", () => {
+  test("a resumed run of a spec whose totals carry the parent's reports its own cost and API time — the parent's taken off, the last run before it under that id", async () => {
+    const dir = root();
+    const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
+    const ops = detachedOps(spec, dir);
+    const runs = path.join(dir, 'runs', 'sh');
+    fs.mkdirSync(runs, { recursive: true });
+    const t0 = Date.parse('2026-09-23T12:00:00Z');
+    const write = (name: string, at: number, patch: object, result: object) => {
+      const file = name.replace(/\//g, '_');
+      fs.writeFileSync(
+        path.join(runs, `${file}.json`),
+        JSON.stringify({
+          name,
+          state: 'done',
+          exitCode: 0,
+          pid: 999999,
+          logFile: '/dev/null',
+          nativeId: SESSION,
+          startedAt: new Date(at).toISOString(),
+          heartbeatAt: new Date(at).toISOString(),
+          ...patch,
+        }),
       );
-      assert.equal(seen.get('ae/r/1')?.usage?.costUsd, 0.0209649, 'a run that resumed nothing is its own total');
-      near(seen.get('ae/r/2')?.usage?.costUsd, 0.0047732);
-      near(seen.get('ae/r/3')?.usage?.costUsd, 0.002674);
-      assert.equal(
-        seen.get('ae/r/2')?.usage?.apiMs,
-        1073,
-        "a session, its resume and a resume of that, all under one id, as Claude Code prints their totals: the parent's taken off each",
+      fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
+    };
+    const tokens = { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 };
+    write('ae/r/3', t0 + 2_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0284121, duration_api_ms: 8132, usage: tokens });
+    write('ae/r/2', t0 + 1_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0257381, duration_api_ms: 7142, usage: tokens });
+    write('ae/r/1', t0, {}, { total_cost_usd: 0.0209649, duration_api_ms: 6069, usage: tokens });
+    const seen = await Effect.runPromise(ops.observe);
+    const near = (got: number | undefined, want: number) =>
+      assert.ok(got !== undefined && Math.abs(got - want) < 1e-9, `${got} is not ${want}`);
+    const told = await Effect.runPromise(detachedOps(spec, dir).observeFor!([{ name: 'ae/r/3' }, { name: 'ae/r/2' }]));
+    assert.deepEqual(
+      [told.seen.get('ae/r/3')?.usage, told.seen.get('ae/r/2')?.usage],
+      [seen.get('ae/r/3')?.usage, seen.get('ae/r/2')?.usage],
+      "a run file spawned before its parent's totals were carried on it has them found among the run files, asked for by name too",
+    );
+    assert.equal(seen.get('ae/r/1')?.usage?.costUsd, 0.0209649, 'a run that resumed nothing is its own total');
+    near(seen.get('ae/r/2')?.usage?.costUsd, 0.0047732);
+    near(seen.get('ae/r/3')?.usage?.costUsd, 0.002674);
+    assert.equal(
+      seen.get('ae/r/2')?.usage?.apiMs,
+      1073,
+      "a session, its resume and a resume of that, all under one id, as Claude Code prints their totals: the parent's taken off each",
+    );
+    assert.equal(
+      seen.get('ae/r/3')?.usage?.apiMs,
+      990,
+      'written latest first: the parent taken off is the run started last before it, whatever order the directory lists',
+    );
+    assert.equal(seen.get('ae/r/2')?.usage?.inputTokens, 10, "tokens are the process's own already, and kept as printed");
+  });
+  test("a resume whose parent is not a run of this spec, or printed no total, carries no cost — never its parent's too", async () => {
+    const dir = root();
+    const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
+    const ops = detachedOps(spec, dir);
+    const runs = path.join(dir, 'runs', 'sh');
+    fs.mkdirSync(runs, { recursive: true });
+    const write = (name: string, patch: object, result: object) => {
+      const file = name.replace(/\//g, '_');
+      fs.writeFileSync(
+        path.join(runs, `${file}.json`),
+        JSON.stringify({
+          name,
+          state: 'done',
+          exitCode: 0,
+          pid: 999999,
+          logFile: '/dev/null',
+          startedAt: '2026-09-23T12:00:01Z',
+          heartbeatAt: '2026-09-23T12:00:01Z',
+          ...patch,
+        }),
       );
-      assert.equal(
-        seen.get('ae/r/3')?.usage?.apiMs,
-        990,
-        'written latest first: the parent taken off is the run started last before it, whatever order the directory lists',
-      );
-      assert.equal(seen.get('ae/r/2')?.usage?.inputTokens, 10, "tokens are the process's own already, and kept as printed");
-    },
-  );
+      fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
+    };
+    const OTHER = '11111111-2222-3333-4444-555555555555';
+    write(
+      'ae/u/2',
+      { nativeId: OTHER, resumeFrom: OTHER },
+      {
+        total_cost_usd: 0.03,
+        duration_api_ms: 7000,
+        usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 },
+      },
+    );
+    write('ae/v/1', { nativeId: SESSION, startedAt: '2026-09-23T12:00:00Z' }, { usage: { input_tokens: 1, output_tokens: 1 } });
+    write('ae/v/2', { nativeId: SESSION, resumeFrom: SESSION }, { total_cost_usd: 0.03, duration_api_ms: 7000 });
+    const seen = await Effect.runPromise(ops.observe);
+    assert.deepEqual(
+      seen.get('ae/u/2')?.usage,
+      { inputTokens: 10, uncachedTokens: 10, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 5 },
+      'no parent: no cost and no API time, the tokens kept',
+    );
+    assert.equal(seen.get('ae/v/2')?.usage, undefined, 'a parent with no total: nothing left to say');
 
-  await t.test(
-    "a resume whose parent is not a run of this spec, or printed no total, carries no cost — never its parent's too",
-    async () => {
-      const dir = root();
-      const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
-      const ops = detachedOps(spec, dir);
-      const runs = path.join(dir, 'runs', 'sh');
-      fs.mkdirSync(runs, { recursive: true });
-      const write = (name: string, patch: object, result: object) => {
-        const file = name.replace(/\//g, '_');
-        fs.writeFileSync(
-          path.join(runs, `${file}.json`),
-          JSON.stringify({
-            name,
-            state: 'done',
-            exitCode: 0,
-            pid: 999999,
-            logFile: '/dev/null',
-            startedAt: '2026-09-23T12:00:01Z',
-            heartbeatAt: '2026-09-23T12:00:01Z',
-            ...patch,
-          }),
-        );
-        fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
-      };
-      const OTHER = '11111111-2222-3333-4444-555555555555';
-      write(
-        'ae/u/2',
-        { nativeId: OTHER, resumeFrom: OTHER },
-        {
-          total_cost_usd: 0.03,
-          duration_api_ms: 7000,
-          usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 },
-        },
-      );
-      write('ae/v/1', { nativeId: SESSION, startedAt: '2026-09-23T12:00:00Z' }, { usage: { input_tokens: 1, output_tokens: 1 } });
-      write('ae/v/2', { nativeId: SESSION, resumeFrom: SESSION }, { total_cost_usd: 0.03, duration_api_ms: 7000 });
-      const seen = await Effect.runPromise(ops.observe);
-      assert.deepEqual(
-        seen.get('ae/u/2')?.usage,
-        { inputTokens: 10, uncachedTokens: 10, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 5 },
-        'no parent: no cost and no API time, the tokens kept',
-      );
-      assert.equal(seen.get('ae/v/2')?.usage, undefined, 'a parent with no total: nothing left to say');
-
-      const plain = detachedOps({ ...spec, resumeCostCarried: undefined }, dir);
-      assert.equal(
-        (await Effect.runPromise(plain.observe)).get('ae/u/2')?.usage?.costUsd,
-        0.03,
-        'a spec whose harness prints its own totals keeps them, resumed or not',
-      );
-    },
-  );
-
-  await t.test("a resumed try's tokens are its own share: its parent's whole session taken off, never its parent's too", async () => {
+    const plain = detachedOps({ ...spec, resumeCostCarried: undefined }, dir);
+    assert.equal(
+      (await Effect.runPromise(plain.observe)).get('ae/u/2')?.usage?.costUsd,
+      0.03,
+      'a spec whose harness prints its own totals keeps them, resumed or not',
+    );
+  });
+  test("a resumed try's tokens are its own share: its parent's whole session taken off, never its parent's too", async () => {
     const dir = root();
     const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
     const at = (s: number) => ({ nativeId: SESSION, startedAt: `2026-10-22T09:00:0${s}Z` });
@@ -2792,8 +2668,7 @@ test("observe: a resumed run is charged its own share — its parent's totals ta
       "a run file that kept no tokens of its parent's: the process's own usage, which here counted none",
     );
   });
-
-  await t.test("Claude Code's job's resumed try counts its own tokens, cost and API time, its parent's taken off", async () => {
+  test("Claude Code's job's resumed try counts its own tokens, cost and API time, its parent's taken off", async () => {
     const dir = root();
     const at = (s: number) => ({ nativeId: SESSION, startedAt: `2026-10-22T09:00:0${s}Z` });
     doneRun(dir, 'ae/h/1', at(0), H4SJ_IMPLEMENT, claudeJob.name);
@@ -2809,22 +2684,27 @@ test("observe: a resumed run is charged its own share — its parent's totals ta
   });
 });
 
-test(
+describe(
   "a resumed spawn carries its parent's totals on its run file, and a look by name takes them off, reading no parent",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const dir = root();
+  () => {
+    let dir!: string;
+    let spec!: HarnessSpec;
+    beforeAll(() => {
+      const t = teardowns();
+      dir = root();
+      spec = printing({ total_cost_usd: 0.031, duration_api_ms: 9000 });
+      return t.end;
+    });
+    const s = story(test);
     const OTHER = '11111111-2222-3333-4444-555555555555';
     const printing = (result: object): HarnessSpec => ({
       ...sh(`echo '${resultLine(result)}'`),
       readOutput: claudeResultOutput,
       resumeCostCarried: true,
     });
-    const spec = printing({ total_cost_usd: 0.031, duration_api_ms: 9000 });
     const runOn = (name: string) => JSON.parse(fs.readFileSync(runFileOf(dir, 'sh', name), 'utf8'));
-
-    await s.test("the id a run resumed is kept on its run file only by a spec whose totals carry the parent's", async () => {
+    s.test("the id a run resumed is kept on its run file only by a spec whose totals carry the parent's", async () => {
       const own = root();
       const read = (carrying: HarnessSpec, name: string) =>
         Effect.runPromise(detachedOps(carrying, own).spawn({ ...req(name, own), resumeFrom: SESSION })).then(() =>
@@ -2833,8 +2713,7 @@ test(
       assert.equal((await read({ ...sh('true'), resumeCostCarried: true }, 'ae/w/1')).resumeFrom, SESSION);
       assert.equal('resumeFrom' in (await read({ ...sh('true'), name: 'other' }, 'ae/w/2')), false);
     });
-
-    await s.test('a resumed spawn carries the totals of the latest run before it under the id, kept by its worker', async (sub) => {
+    s.test('a resumed spawn carries the totals of the latest run before it under the id, kept by its worker', async (sub) => {
       const t0 = Date.parse('2026-09-23T12:00:00Z');
       const parent = (name: string, at: number, result: object, nativeId = SESSION) =>
         doneRun(dir, name, { nativeId, startedAt: new Date(at).toISOString() }, resultLine(result));
@@ -2847,8 +2726,7 @@ test(
       await settle(sub, detachedOps(spec, dir), 'ae/r/4', 'completed');
       assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'kept by its worker');
     });
-
-    await s.test("a look by name takes the parent's totals off reading no parent, its parent gone from the folder", async () => {
+    s.test("a look by name takes the parent's totals off reading no parent, its parent gone from the folder", async () => {
       for (const n of [1, 2, 3]) fs.rmSync(path.join(dir, 'runs', 'sh', `ae_r_${n}.json`));
       const ops = detachedOps(spec, dir);
       let told: Observation | undefined;
@@ -2860,8 +2738,7 @@ test(
       assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 0.0025879) < 1e-9, `cost ${usage?.costUsd}`);
       assert.equal(usage?.apiMs, 868, 'its own API time, its parent gone from the folder');
     });
-
-    await s.test(
+    s.test(
       'no parent, or a parent that printed no total, carries nothing; a spec whose harness prints its own totals carries none',
       async (sub) => {
         await Effect.runPromise(
@@ -2880,8 +2757,8 @@ test(
   },
 );
 
-test('a detached look, find and stop read the run files of the sessions they are given, and what a run file says of its end', async (t) => {
-  await t.test('a detached look reads the run file and output of each session it is asked about and no other', async () => {
+describe('a detached look, find and stop read the run files of the sessions they are given, and what a run file says of its end', () => {
+  test('a detached look reads the run file and output of each session it is asked about and no other', async () => {
     const dir = root();
     const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput };
     for (let i = 0; i < 200; i++) doneRun(dir, `ae/s${i}/1`, { nativeId: SESSION });
@@ -2899,28 +2776,23 @@ test('a detached look, find and stop read the run files of the sessions they are
     assert.deepEqual(told!.unread, new Set());
     assert.deepEqual(told!.seen.get('ae/asked/1'), full.get('ae/asked/1'), 'the sighting the full listing gives');
   });
-
-  await t.test(
-    "a name asked for with no run file is absent, one whose run file is there and unreadable is unread, and a name whose path holds another name's run is absent",
-    async () => {
-      const dir = root();
-      const ops = detachedOps(sh('true'), dir);
-      doneRun(dir, 'ae/a/b/1');
-      const runs = path.join(dir, 'runs', 'sh');
-      fs.writeFileSync(path.join(runs, 'ae_h_1.json'), '{"name":');
-      fs.writeFileSync(
-        path.join(runs, 'ae_p_1.json'),
-        JSON.stringify({ name: 'ae/p/1', state: 'done', logFile: '/dev/null', heartbeatAt: new Date().toISOString() }),
-      );
-      const told = await Effect.runPromise(
-        ops.observeFor!([{ name: 'ae/none/1' }, { name: 'ae/h/1' }, { name: 'ae/p/1' }, { name: 'ae/a_b/1' }, { name: 'ae/a/b/1' }]),
-      );
-      assert.deepEqual([...told.seen.keys()], ['ae/a/b/1'], 'a run file is the run under its own name alone');
-      assert.deepEqual(told.unread, new Set(['ae/h/1', 'ae/p/1']), 'half written, or with no pid: neither there nor gone');
-    },
-  );
-
-  await t.test('find and stop read the one run file of the session they are given, among many', async () => {
+  test("a name asked for with no run file is absent, one whose run file is there and unreadable is unread, and a name whose path holds another name's run is absent", async () => {
+    const dir = root();
+    const ops = detachedOps(sh('true'), dir);
+    doneRun(dir, 'ae/a/b/1');
+    const runs = path.join(dir, 'runs', 'sh');
+    fs.writeFileSync(path.join(runs, 'ae_h_1.json'), '{"name":');
+    fs.writeFileSync(
+      path.join(runs, 'ae_p_1.json'),
+      JSON.stringify({ name: 'ae/p/1', state: 'done', logFile: '/dev/null', heartbeatAt: new Date().toISOString() }),
+    );
+    const told = await Effect.runPromise(
+      ops.observeFor!([{ name: 'ae/none/1' }, { name: 'ae/h/1' }, { name: 'ae/p/1' }, { name: 'ae/a_b/1' }, { name: 'ae/a/b/1' }]),
+    );
+    assert.deepEqual([...told.seen.keys()], ['ae/a/b/1'], 'a run file is the run under its own name alone');
+    assert.deepEqual(told.unread, new Set(['ae/h/1', 'ae/p/1']), 'half written, or with no pid: neither there nor gone');
+  });
+  test('find and stop read the one run file of the session they are given, among many', async () => {
     const dir = root();
     const spec = sh('true');
     for (let i = 0; i < 50; i++) doneRun(dir, `ae/s${i}/1`);
@@ -2929,8 +2801,7 @@ test('a detached look, find and stop read the run files of the sessions they are
     assert.equal(await readsOf(() => Effect.runPromise(ops.stop('ae/s7/1'))), 1, 'a run over is not stopped, read off its run file');
     assert.equal(await readsOf(() => Effect.runPromise(ops.stop('ae/none/1'))), 0, 'no run file: nothing read, nothing stopped');
   });
-
-  await t.test("no exit code yet, or the worker's -1 for none, is reported as no code at all", async () => {
+  test("no exit code yet, or the worker's -1 for none, is reported as no code at all", async () => {
     const dir = root();
     const ops = detachedOps(sh('true'), dir);
     const runs = path.join(dir, 'runs', 'sh');

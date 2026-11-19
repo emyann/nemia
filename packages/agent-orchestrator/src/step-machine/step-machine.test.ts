@@ -4,7 +4,7 @@
  * before and after each move. Every consecutive pair must be a move `stepMove` does not refuse, and every edge of `STEP_EDGES` must be
  * walked by some walk: so the table grows by what `stepStatus` does, never past it. Pure: no disk, no engine, no clock.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { roundFiled, sentBack, type CloseoutAsked, type Run, type StepStatus, type TaskPhase, type TaskSpend } from '../run.ts';
 import { nextTry, type RetryMode } from '../retry/retry-ask.ts';

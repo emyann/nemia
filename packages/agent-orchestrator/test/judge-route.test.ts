@@ -4,7 +4,7 @@
  * (`judgeSection`); and a start refuses one that nothing hired, which load left to a hire (`stepSetRefusal`). Pure: the engine's view of
  * each task is handed in.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { assess } from '../src/tick/assess.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
@@ -53,29 +53,28 @@ const passOf = (filed: Record<string, TaskPhase>, output?: Record<string, unknow
   };
 };
 
-test('a judge is filed as a step, and its signed route routes the nodes after it', async (t) => {
-  await t.test('the workflow loads', () => validate(JUDGED));
-  await t.test('plan signed: the judge is filed, as a step is', () => {
+describe('a judge is filed as a step, and its signed route routes the nodes after it', () => {
+  test('the workflow loads', () => validate(JUDGED));
+  test('plan signed: the judge is filed, as a step is', () => {
     assert.deepEqual(passOf({ plan: 'succeeded' }).a.ready, ['triage']);
   });
-  await t.test('the judge signed route web: build-web is filed, the card for backend is skipped', () => {
+  test('the judge signed route web: build-web is filed, the card for backend is skipped', () => {
     const { a, words } = passOf({ plan: 'succeeded', triage: 'succeeded' }, { route: 'web' });
     assert.deepEqual(a.ready, ['build-web']);
     assert.deepEqual(a.send, []);
     assert.equal(words['to-backend'], 'skipped');
   });
-  await t.test('the judge signed route backend: the card is due, build-web skipped', () => {
+  test('the judge signed route backend: the card is due, build-web skipped', () => {
     const { a, words } = passOf({ plan: 'succeeded', triage: 'succeeded' }, { route: 'backend' });
     assert.deepEqual([a.ready, a.send], [[], ['to-backend']]);
     assert.equal(words['build-web'], 'skipped');
   });
-  await t.test('a closeout with no route is unsigned, and nothing after the judge starts', () => {
+  test('a closeout with no route is unsigned, and nothing after the judge starts', () => {
     const { a, words } = passOf({ plan: 'succeeded', triage: 'succeeded' }, {});
     assert.equal(words.triage, 'unsigned');
     assert.deepEqual([a.ready, a.send], [[], []]);
   });
-
-  await t.test('a closeout naming a route the judge does not declare is unsigned, never a route', () => {
+  test('a closeout naming a route the judge does not declare is unsigned, never a route', () => {
     const { a, words } = passOf({ plan: 'succeeded', triage: 'succeeded' }, { route: 'mobile' });
     assert.equal(words.triage, 'unsigned');
     assert.deepEqual([a.ready, a.send], [[], []]);

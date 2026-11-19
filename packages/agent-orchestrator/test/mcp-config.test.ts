@@ -20,9 +20,9 @@
  * the engine's built-in harnesses, `claude` first, a job on the Agent SDK, with no `mcp` on the task, so the only servers it can have
  * are the ones the checkout's `.mcp.json` names.
  *
- *   AE_LIVE=1 node --test test/mcp-config.test.ts
+ *   AE_LIVE=1 npx vitest run test/mcp-config.test.ts
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -444,12 +444,9 @@ const CLOSEOUT = {
   additionalProperties: false,
 };
 
-test(
+test.skipIf(live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)')(
   "a job filed in this repository has Playwright's browser_navigate and none of the operator's servers",
-  {
-    skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
-    timeout: 12 * 60_000,
-  },
+  { timeout: 12 * 60_000 },
   async (t) => {
     const engine: Engine = plainEngine(EngineService.layer({ root: scratch('wf-live-mcp-') }));
     const id = await Effect.runPromise(
@@ -490,16 +487,13 @@ const SHOT = [
   'Call no other tool.',
 ].join(' ');
 
-test(
+test.skipIf(live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)')(
   "a job filed a step's files directory has the browser write a screenshot given no filename there, outside the workspace",
-  {
-    skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
-    timeout: 8 * 60_000,
-  },
+  { timeout: 8 * 60_000 },
   async (t) => {
     const config = process.env.CLAUDE_CONFIG_DIR;
     delete process.env.CLAUDE_CONFIG_DIR;
-    t.after(() => {
+    t.onTestFinished(() => {
       process.env.CLAUDE_CONFIG_DIR = config;
     });
     const files = scratch('wf-live-files-');
@@ -538,8 +532,8 @@ test(
       .map(String)
       .filter((f) => f.endsWith('.png'));
     const logs = await Effect.runPromise(engine.logs(id)).catch((e: Error) => e.message);
-    t.diagnostic(`logs ${JSON.stringify(logs).slice(-3000)}`);
-    t.diagnostic(`settled ${view?.state.settled}; it said ${JSON.stringify(said)}; ${files} holds ${JSON.stringify(pictures)}`);
+    console.log(`logs ${JSON.stringify(logs).slice(-3000)}`);
+    console.log(`settled ${view?.state.settled}; it said ${JSON.stringify(said)}; ${files} holds ${JSON.stringify(pictures)}`);
     assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
     assert.equal(pictures.length, 1, `one picture in ${files}; it said ${JSON.stringify(said)}`);
   },

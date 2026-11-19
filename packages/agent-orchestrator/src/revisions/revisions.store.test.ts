@@ -3,7 +3,7 @@
  * asked — a ledger file that does not read, a stored ledger written before the door, the path an entry is kept at, the default door's
  * root — and the debt of the callers still on the synchronous spellings (`test/ledger-door.baseline.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

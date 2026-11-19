@@ -4,7 +4,7 @@
  * the context in use from then — and never prints the token. A pairing that lapsed, or that the server does not hold, ends it
  * non-zero, naming the command to type again. The polling interval is shortened by `NEMIA_PAIR_EVERY_MS`.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -54,7 +54,7 @@ const stub = http.createServer((req, res) => {
   });
 });
 await new Promise<void>((resolve) => stub.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   stub.closeAllConnections();
   stub.close();
 });

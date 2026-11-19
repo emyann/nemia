@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ASSIGNED, nemiaFence, widened } from './fence.ts';
 import { PROPOSED_INSTEAD } from './class.ts';

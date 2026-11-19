@@ -6,7 +6,7 @@
  * harness and part (`harnessOfNeed`), and the version a command printed (`versionIn`). The laws of `harnessesOfRun`,
  * `runsHoldingRemoval` and `harnessVersionWord` are proved by `contracts/harness-needs.contract.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { HarnessDeclaration, HarnessNeeds } from 'agent-runtime/vocabulary';
 import { harnessNeedsOf, harnessOfNeed, versionIn } from './harness.ts';
@@ -28,7 +28,7 @@ const declared = (needs?: HarnessNeeds): HarnessDeclaration => ({ can: [], ...(n
 
 const TOKEN = { harness: 'tool', maker: 'tool make-token', keep: 'nemia tool-token set' };
 
-test('a harness declaration gives two needs, each fix of its kind', async (t) => {
+describe('a harness declaration gives two needs, each fix of its kind', () => {
   const rows: {
     readonly name: string;
     readonly declarations: Record<string, HarnessDeclaration>;
@@ -83,7 +83,7 @@ test('a harness declaration gives two needs, each fix of its kind', async (t) =>
     },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const needs = harnessNeedsOf(row.declarations, TOKEN);
       assert.deepEqual(
         needs.map((n) => n.name),

@@ -8,7 +8,7 @@
  * (`WF_MAX_CONCURRENT`, its default). The address is set on the process too, as the daemon's is, for every child it starts to
  * inherit, and put back after.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
@@ -38,7 +38,7 @@ const COLLECTOR = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 const found = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 process.env.OTEL_EXPORTER_OTLP_ENDPOINT = COLLECTOR;
 const ENV: Env = { ...process.env, WF_ROOT: scratch('wf-check-export-'), WF_MAX_CONCURRENT: undefined };
-after(async () => {
+afterAll(async () => {
   if (found === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = found;
   await new Promise<void>((closed) => server.close(() => closed()));

@@ -3,7 +3,7 @@
  * continuation of a parked job is handed, its turn's cap less what the parked attempts it continues spent;
  * and the two the engine writes by it: a continuation's spawn config (`continuedCap`) and a parked end (`parkedEnd`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { capLeft, capSpent, continuedCap, parkedCapLeft, parkedEnd } from './cap.ts';
 import { fold, type Event, type Usage } from './domain.ts';
@@ -41,7 +41,7 @@ const filed = (config?: HarnessArgs): Event => ({
 });
 const cap5 = filed({ budgetUsd: 5 });
 
-test('capLeft and capSpent: a cap less what was spent, at or below nothing a cap spent whole', async (t) => {
+describe('capLeft and capSpent: a cap less what was spent, at or below nothing a cap spent whole', () => {
   const rows: [string, number | undefined, number | undefined, number | undefined, boolean][] = [
     ['no cap: none, and never spent', undefined, 3, undefined, false],
     ['spend unknown counts nothing', 5, undefined, 5, false],
@@ -50,13 +50,13 @@ test('capLeft and capSpent: a cap less what was spent, at or below nothing a cap
     ['overspent goes below nothing, and is spent', 5, 7, -2, true],
   ];
   for (const [name, cap, spent, left, isSpent] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       assert.equal(capLeft(cap, spent), left);
       assert.equal(capSpent(capLeft(cap, spent)), isSpent);
     });
 });
 
-test("parkedCapLeft: a continuation's cap is its turn's, less what the parked attempts it continues spent", async (t) => {
+describe("parkedCapLeft: a continuation's cap is its turn's, less what the parked attempts it continues spent", () => {
   const rows: [string, Event[], number, number | undefined][] = [
     ['no cap given', [filed(), ...ran(1, { parked: true, costUsd: 2 })], 2, undefined],
     ['a first attempt, nothing continued', [cap5], 1, 5],
@@ -69,11 +69,10 @@ test("parkedCapLeft: a continuation's cap is its turn's, less what the parked at
     ['a cap overspent leaves below nothing, which is spent', [cap5, ...ran(1, { parked: true, costUsd: 7 })], 2, -2],
   ];
   for (const [name, events, attempt, left] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       assert.equal(parkedCapLeft(fold(TASK, events), attempt), left);
     });
-
-  await t.test("a later turn takes its input's cap, and its run does not reach back into the turn before", () => {
+  test("a later turn takes its input's cap, and its run does not reach back into the turn before", () => {
     const events: Event[] = [
       { ...cap5, holdOpen: true } as Event,
       ...ran(1, { parked: true, costUsd: 1 }),
@@ -98,7 +97,7 @@ test("parkedCapLeft: a continuation's cap is its turn's, less what the parked at
   });
 });
 
-test('continuedCap and parkedEnd: a continuation is handed its cap left, and a park that spent it is no park', async (t) => {
+describe('continuedCap and parkedEnd: a continuation is handed its cap left, and a park that spent it is no park', () => {
   const started = (n: number): Event[] => [{ kind: 'starting', at: at(n * 10), attempt: n }];
   const rows: [string, () => unknown, unknown][] = [
     [
@@ -139,5 +138,5 @@ test('continuedCap and parkedEnd: a continuation is handed its cap left, and a p
       { limit: 'budget' },
     ],
   ];
-  for (const [name, asked, says] of rows) await t.test(name, () => assert.deepEqual(asked(), says));
+  for (const [name, asked, says] of rows) test(name, () => assert.deepEqual(asked(), says));
 });

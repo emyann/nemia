@@ -3,7 +3,7 @@
  * not read as a run is refused by `runRecord` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and
  * says why in the verb's words; a marker that does not read still holds its run. Every shape a former `nemia` wrote reads as it did.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -173,9 +173,9 @@ const REFUSED: ReadonlyArray<[row: string, id: string, record: unknown, says: st
   }),
 ];
 
-test("a record the tick did not write is refused by `runRecord` at its field, exit 2, in nemia's words with the fix, and left out of `listRuns`", async (t) => {
+describe("a record the tick did not write is refused by `runRecord` at its field, exit 2, in nemia's words with the fix, and left out of `listRuns`", () => {
   for (const [row, id, record, says] of REFUSED)
-    await t.test(row, () => {
+    test(row, () => {
       put(id, record);
       const said = refusalOf(id);
       assert.ok(said.includes(says), said);
@@ -183,8 +183,7 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
       assert.ok(said.includes(FIX), said);
       if (typeof record !== 'string') assert.ok(!said.includes('Expected'), `in wf's words, not the parser's: ${said}`);
     });
-
-  await t.test('a field that holds a huge value is said in bounded words: its first 60 characters as JSON, cut marked `…`', () => {
+  test('a field that holds a huge value is said in bounded words: its first 60 characters as JSON, cut marked `…`', () => {
     put(
       'r-huge',
       firstStep('r-huge', (step) => (step.after = 'x'.repeat(100_000))),
@@ -194,15 +193,13 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
     assert.ok(said.length < 2_000, `${said.length} characters`);
     fs.rmSync(runFile(ROOT, 'r-huge'));
   });
-
-  await t.test('a run id with no record is told to try `nemia ls`, not called unreadable', () => {
+  test('a run id with no record is told to try `nemia ls`, not called unreadable', () => {
     assert.throws(
       () => runRecord(ROOT, 'r-nobody'),
       (err: Error) => !(err instanceof UnreadableRecord) && err.message === "no such run: r-nobody  (try 'nemia ls')",
     );
   });
-
-  await t.test('the step with every key right reads as it was frozen; a record with no `factory` is in the default one', () => {
+  test('the step with every key right reads as it was frozen; a record with no `factory` is in the default one', () => {
     put('r-agent', withAgent('r-agent'));
     assert.deepEqual(runRecord(ROOT, 'r-agent').workflow![1], (withAgent('r-agent').workflow as unknown[])[1], 'read as it was frozen');
     put('r-nofactory', aRecord('r-nofactory'));
@@ -210,8 +207,7 @@ test("a record the tick did not write is refused by `runRecord` at its field, ex
     put('r-other', { ...aRecord('r-other'), factory: 'acme' });
     assert.equal(runRecord(ROOT, 'r-other').factory, 'acme');
   });
-
-  await t.test('`listRuns` leaves out each record refused above, says each with its fix, and lists every other run', () => {
+  test('`listRuns` leaves out each record refused above, says each with its fix, and lists every other run', () => {
     const said: string[] = [];
     const listed = listRuns(ROOT, (line) => said.push(line)).map((r) => r.id);
     assert.ok(
@@ -321,8 +317,8 @@ const ask = (name: string, body: unknown): string => {
 
 const AT = '2026-09-01T00:00:00.000Z';
 
-test("an ask a verb would not write is refused in that verb's words, reason by reason; one it writes, or one a former nemia wrote, reads", async (t) => {
-  await t.test('an approval, as `nemia approve` writes it', () => {
+describe("an ask a verb would not write is refused in that verb's words, reason by reason; one it writes, or one a former nemia wrote, reads", () => {
+  test('an approval, as `nemia approve` writes it', () => {
     assert.equal(approvalIn(ask('a1', { message: 'go' }), 'plan', 1), 'it says no time it was given');
     assert.equal(approvalIn(ask('a2', { at: 'tuesday' }), 'plan', 1), 'it says no time it was given');
     assert.equal(approvalIn(ask('a3', { at: AT, message: 7 }), 'plan', 1), 'its message is not text');
@@ -347,8 +343,7 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
       message: 'go',
     });
   });
-
-  await t.test('an acceptance, with words of why the work is good enough', () => {
+  test('an acceptance, with words of why the work is good enough', () => {
     assert.equal(acceptanceIn(ask('c1', { message: 'fine' }), 'implement', 3), 'it says no time it was given');
     assert.equal(
       acceptanceIn(ask('c2', { at: AT }), 'implement', 3),
@@ -363,16 +358,14 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
       message: 'fine',
     });
   });
-
-  await t.test('a round ask, its budget dollars above zero', () => {
+  test('a round ask, its budget dollars above zero', () => {
     assert.equal(roundAskIn(ask('r1', { at: AT, budget: 0 }), 'implement', 4), 'its budget is not an amount of dollars above zero');
     assert.equal(roundAskIn(ask('r2', { at: AT, budget: '5' }), 'implement', 4), 'its budget is not an amount of dollars above zero');
     assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask nemia retry --round wrote');
     assert.deepEqual(roundAskIn(ask('r4', {}), 'implement', 4), { step: 'implement', round: 4, at: '' });
     assert.deepEqual(roundAskIn(ask('r5', { at: 12, budget: 2.5 }), 'implement', 4), { step: 'implement', round: 4, budget: 2.5, at: '' });
   });
-
-  await t.test('a retry ask, held to `nemia retry`’s word; the former `nudge` read as `continue`', () => {
+  test('a retry ask, held to `nemia retry`’s word; the former `nudge` read as `continue`', () => {
     const said = (body: unknown): unknown => askIn(ask('t', body), 'implement', 2);
     assert.equal(said({ mode: 'again' }), 'it asks for no mode nemia retry knows ("again")');
     assert.equal(said({}), 'it asks for no mode nemia retry knows (undefined)');
@@ -401,37 +394,34 @@ test("an ask a verb would not write is refused in that verb's words, reason by r
   });
 });
 
-test('who acted reads off each file a person writes where it says, and a file written before actors were said reads with none', async (t) => {
+describe('who acted reads off each file a person writes where it says, and a file written before actors were said reads with none', () => {
   const person = { kind: 'person', token: 'laptop' } as const;
   const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
-  await t.test(
-    'an approval, an acceptance, a retry and a round each read with the actor their file names, and with none where it names none',
-    () => {
-      assert.deepEqual(approvalIn(ask('by-a1', { at: AT, actor: person }), 'plan', 1), { step: 'plan', try: 1, at: AT, actor: person });
-      assert.deepEqual(approvalIn(ask('by-a2', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
-      assert.deepEqual(acceptanceIn(ask('by-c1', { at: AT, message: 'fine', actor: agent }), 'review', 2), {
-        step: 'review',
-        try: 2,
-        at: AT,
-        message: 'fine',
-        actor: agent,
-      });
-      assert.deepEqual(askIn(ask('by-r1', { mode: 'continue', at: AT, actor: agent }), 'plan', 2), {
-        step: 'plan',
-        try: 2,
-        mode: 'continue',
-        at: AT,
-        actor: agent,
-      });
-      assert.deepEqual(roundAskIn(ask('by-o1', { at: AT, actor: person }), 'review', 3), {
-        step: 'review',
-        round: 3,
-        at: AT,
-        actor: person,
-      });
-    },
-  );
-  await t.test('an actor that does not read as one is left out, and the ask it rides on still reads', () => {
+  test('an approval, an acceptance, a retry and a round each read with the actor their file names, and with none where it names none', () => {
+    assert.deepEqual(approvalIn(ask('by-a1', { at: AT, actor: person }), 'plan', 1), { step: 'plan', try: 1, at: AT, actor: person });
+    assert.deepEqual(approvalIn(ask('by-a2', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
+    assert.deepEqual(acceptanceIn(ask('by-c1', { at: AT, message: 'fine', actor: agent }), 'review', 2), {
+      step: 'review',
+      try: 2,
+      at: AT,
+      message: 'fine',
+      actor: agent,
+    });
+    assert.deepEqual(askIn(ask('by-r1', { mode: 'continue', at: AT, actor: agent }), 'plan', 2), {
+      step: 'plan',
+      try: 2,
+      mode: 'continue',
+      at: AT,
+      actor: agent,
+    });
+    assert.deepEqual(roundAskIn(ask('by-o1', { at: AT, actor: person }), 'review', 3), {
+      step: 'review',
+      round: 3,
+      at: AT,
+      actor: person,
+    });
+  });
+  test('an actor that does not read as one is left out, and the ask it rides on still reads', () => {
     assert.deepEqual(approvalIn(ask('by-a3', { at: AT, actor: { kind: 'robot' } }), 'plan', 1), { step: 'plan', try: 1, at: AT });
     assert.deepEqual(askIn(ask('by-r2', { mode: 'fresh', at: AT, actor: 'ann' }), 'plan', 2), {
       step: 'plan',
@@ -440,26 +430,23 @@ test('who acted reads off each file a person writes where it says, and a file wr
       at: AT,
     });
   });
-  await t.test('a hold reads its actor beside its `by`; a hold file written before actors reads with none', () => {
+  test('a hold reads its actor beside its `by`; a hold file written before actors reads with none', () => {
     put('r-held-by', aRecord('r-held-by'));
     fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann', actor: person }));
     assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann', actor: person });
     fs.writeFileSync(holdFile(ROOT, 'r-held-by'), JSON.stringify({ at: AT, until: [], by: 'ann' }));
     assert.deepEqual(runRecord(ROOT, 'r-held-by').hold, { at: AT, until: [], by: 'ann' });
   });
-  await t.test(
-    'a cancellation reads its time from the plain text a former nemia wrote, and its time and actor from the JSON one writes now',
-    () => {
-      put('r-called', aRecord('r-called'));
-      fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), `${AT}\n`);
-      const old = runRecord(ROOT, 'r-called');
-      assert.deepEqual([old.cancelledAt, 'cancelledBy' in old], [AT, false]);
-      fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), JSON.stringify({ at: AT, actor: agent }));
-      const now = runRecord(ROOT, 'r-called');
-      assert.deepEqual([now.cancelledAt, now.cancelledBy], [AT, agent]);
-    },
-  );
-  await t.test('a cancellation written with an actor keeps the first: a second neither moves its time nor its actor', () => {
+  test('a cancellation reads its time from the plain text a former nemia wrote, and its time and actor from the JSON one writes now', () => {
+    put('r-called', aRecord('r-called'));
+    fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), `${AT}\n`);
+    const old = runRecord(ROOT, 'r-called');
+    assert.deepEqual([old.cancelledAt, 'cancelledBy' in old], [AT, false]);
+    fs.writeFileSync(store.cancelFile(ROOT, 'r-called'), JSON.stringify({ at: AT, actor: agent }));
+    const now = runRecord(ROOT, 'r-called');
+    assert.deepEqual([now.cancelledAt, now.cancelledBy], [AT, agent]);
+  });
+  test('a cancellation written with an actor keeps the first: a second neither moves its time nor its actor', () => {
     put('r-called-twice', aRecord('r-called-twice'));
     const first = store.markCancelled(ROOT, 'r-called-twice', person);
     assert.equal(store.markCancelled(ROOT, 'r-called-twice', agent), first);

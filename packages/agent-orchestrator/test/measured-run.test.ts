@@ -17,7 +17,8 @@
  * The test's store is its own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges every run a pass answers from
  * its memo in full.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -134,10 +135,10 @@ const pageRows = (id: string) =>
  * What a story measures by, new for each: the wall at 10:00 on the fixtures' day, moved on by `later`; the stage's engine as a whole-store
  * pass asks it (`ticking`); a registry of its own for the metrics; and its daemons, the first first, `life` the one making the passes now.
  */
-const measuring = (t: TestContext) => {
+const measuring = () => {
   let now = Date.parse('2026-10-06T10:00:00.000Z');
-  t.mock.timers.enable({ apis: ['Date'], now });
-  const later = (minutes: number) => t.mock.timers.setTime((now += minutes * MIN));
+  vi.useFakeTimers({ toFake: ['Date'], now });
+  const later = (minutes: number) => vi.setSystemTime((now += minutes * MIN));
   const b = ticking();
   const registry = new Map();
   const lives: Daemon[] = [daemon()];
@@ -172,23 +173,42 @@ const measuring = (t: TestContext) => {
   return { b, later, lives, life, tick, spansOf, snapshot, counted, summed, spawn, sign, exits };
 };
 
-test('A measured run, end to end: a gate answered, two tries with checks, a loop round twice and a landing, measured once across a restart', async (t) => {
-  const s = story(t);
-  const { b, later, lives, life, tick, spansOf, snapshot, counted, summed, spawn, sign, exits } = measuring(t);
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  stage.place().world.repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
-  const workflowDir = folder(MEASURED);
-  const { id } = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir }));
+describe('A measured run, end to end: a gate answered, two tries with checks, a loop round twice and a landing, measured once across a restart', () => {
+  let b!: Board;
+  let later!: (minutes: number) => void;
+  let lives!: { memo: import('../src/tick/tick.verb.ts').RestMemo; spans: Tracer.NativeSpan[]; tracer: References.Tracer }[];
+  let life!: () => { memo: import('../src/tick/tick.verb.ts').RestMemo; spans: Tracer.NativeSpan[]; tracer: References.Tracer };
+  let tick!: (n?: number) => Promise<void>;
+  let spansOf!: (name: string, id: string, of?: readonly Daemon[]) => { [k: string]: unknown }[];
+  let snapshot!: () => Promise<readonly Metric.Metric.Snapshot[]>;
+  let counted!: (id: string) => Promise<(string | number | undefined)[][]>;
+  let summed!: (id: string, step: string) => Promise<number>;
+  let spawn!: (task: string) => void;
+  let sign!: (task: string, closeout: object, more?: object) => import('agent-runtime/testing').TestTask;
+  let exits!: (task: string, code: number) => import('agent-runtime/testing').TestTask;
+  let repo!: string;
+  let workflowDir!: string;
+  let id!: string;
+  let plan!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ b, later, lives, life, tick, spansOf, snapshot, counted, summed, spawn, sign, exits } = measuring());
+    repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+    stage.place().world.repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
+    workflowDir = folder(MEASURED);
+    ({ id } = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir })));
+    plan = `${id}-plan`;
+    return t.end;
+  });
+  const s = story(test);
   const steps = () => runRecord(ROOT, id).steps;
-  const plan = `${id}-plan`;
   const labelled = (step: string) => ({ run: id, factory: 'default', workflow: path.basename(workflowDir), step, agent: 'none' });
   const commit = (line: string) => {
     fs.appendFileSync(path.join(steps().implement.workspace!, 'add.ts'), `${line}\n`);
     stage.place().world.commit(steps().implement.workspace!, line);
   };
   const implementTasks: string[] = [];
-
-  await s.test(
+  s.test(
     'plan is filed with its labels, waits 2 minutes for a slot, runs 5 and signs off blocked: nothing is timed or counted yet',
     async () => {
       await tick();
@@ -213,8 +233,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       assert.deepEqual(await counted('step.queue.duration'), []);
     },
   );
-
-  await s.test(
+  s.test(
     'answered 6 minutes later in its session, its turn runs 3 and signs done: at its gate, no gate wait before the approval',
     async () => {
       later(6);
@@ -231,8 +250,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       assert.deepEqual(await counted('step.cost'), [['plan', 'done', 0.75]], 'its cost once, both turns');
     },
   );
-
-  await s.test("approved 9 minutes on: its gate's wait is timed once from the answer's end, and implement is filed", async () => {
+  s.test("approved 9 minutes on: its gate's wait is timed once from the answer's end, and implement is filed", async () => {
     later(9);
     await stage.runWith(b.e, approveRun(id, 'plan'));
     await tick();
@@ -243,8 +261,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
     assert.deepEqual([gate?.try, gate?.step], [2, 'plan'], 'a span with its run and its try');
     implementTasks.push(steps().implement.taskId!);
   });
-
-  await s.test(
+  s.test(
     "implement's first try is denied a call, signs, and a daemon started again reads its settle: counted once, by five attributes",
     async () => {
       const [first] = implementTasks;
@@ -281,45 +298,40 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       assert.deepEqual(await counted('step.denied'), [], 'no counter beside the span');
     },
   );
-
-  await s.test(
-    'its check refuses, try 2 is filed by `retries: 1` with its labels, is denied a call twice and passes its check',
-    async () => {
-      const check1 = steps().implement.check!.taskId;
-      later(1);
-      spawn(check1);
-      later(2);
-      exits(check1, 1);
-      await tick();
-      const second = steps().implement.taskId!;
-      implementTasks.push(second);
-      assert.notEqual(second, implementTasks[0], 'the try is filed');
-      assert.deepEqual(b.tasks.get(second)!.spec.labels, labelled('implement'), 'a try');
-      later(1);
-      spawn(second);
-      later(5);
-      const look = { tool: 'Skill', what: 'look' };
-      sign(second, SIGNED, { usage: used(1.5), denials: [look, look], skills: [] });
-      await tick();
-      const check2 = steps().implement.check!.taskId;
-      later(1);
-      spawn(check2);
-      later(2);
-      exits(check2, 0);
-      await tick();
-      assert.deepEqual(
-        spansOf(DENIED_SPAN, id).map((x) => x.call),
-        ['Glob', 'Skill(look)', 'Skill(look)'],
-        'a call denied twice is two',
-      );
-      assert.deepEqual(await counted('step.checks'), [
-        ['implement', 'passed', 1],
-        ['implement', 'refused', 1],
-      ]);
-    },
-  );
-
-  await s.test('review sends the work round once: a round granted, filed with its labels, and the second round accepted', async () => {
+  s.test('its check refuses, try 2 is filed by `retries: 1` with its labels, is denied a call twice and passes its check', async () => {
+    const check1 = steps().implement.check!.taskId;
+    later(1);
+    spawn(check1);
+    later(2);
+    exits(check1, 1);
+    await tick();
+    const second = steps().implement.taskId!;
+    implementTasks.push(second);
+    assert.notEqual(second, implementTasks[0], 'the try is filed');
+    assert.deepEqual(b.tasks.get(second)!.spec.labels, labelled('implement'), 'a try');
+    later(1);
+    spawn(second);
+    later(5);
+    const look = { tool: 'Skill', what: 'look' };
+    sign(second, SIGNED, { usage: used(1.5), denials: [look, look], skills: [] });
+    await tick();
+    const check2 = steps().implement.check!.taskId;
+    later(1);
+    spawn(check2);
+    later(2);
+    exits(check2, 0);
+    await tick();
+    assert.deepEqual(
+      spansOf(DENIED_SPAN, id).map((x) => x.call),
+      ['Glob', 'Skill(look)', 'Skill(look)'],
+      'a call denied twice is two',
+    );
+    assert.deepEqual(await counted('step.checks'), [
+      ['implement', 'passed', 1],
+      ['implement', 'refused', 1],
+    ]);
+  });
+  s.test('review sends the work round once: a round granted, filed with its labels, and the second round accepted', async () => {
     const review = steps().review.taskId!;
     later(1);
     spawn(review);
@@ -351,72 +363,66 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
     await tick(2);
     assert.deepEqual(spansOf(TIMELINE_SPAN, id), [], 'none while the run waits at its ending');
   });
-
-  await s.test(
-    'ship approved 7 minutes on, merges and lands on its check: the timeline is handed over once, row for row the page',
-    async () => {
-      later(7);
-      await stage.runWith(b.e, approveRun(id, 'ship', 'Merge it.'));
-      await tick();
-      const ship = steps().ship.taskId!;
-      later(1);
-      spawn(ship);
-      stage.place().world.stage(repo, steps().implement.branch!);
-      later(2);
-      sign(ship, { ...SIGNED, message: 'Add sub\n\nadd.ts exports sub.\n' }, { usage: used(0.25) });
-      await tick();
-      const check = steps().ship.check!.taskId;
-      later(1);
-      spawn(check);
-      later(1);
-      exits(check, 0);
-      await tick(2);
-      assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
-      assert.equal(runRecord(ROOT, id).runTimed, true, 'marked handed over on its record');
-      const spans = spansOf(TIMELINE_SPAN, id);
-      const rows = await pageRows(id);
-      assert.deepEqual(spans.map(lineOf).sort(), rows.map(lineOf).sort(), "each span is a row of the page's timeline, and each row a span");
-      const value = (row: string, part: string) =>
-        spans.filter((x) => x.row === row && x.part === part).map((x) => [x.try ?? '-', x.value]);
-      assert.deepEqual(
-        [value('01 plan', 'queued'), value('01 plan', 'ran'), value('01 plan', 'cost'), value('01 plan', 'tries')],
-        [[[1, 2 * MIN]], [[1, 8 * MIN]], [[1, 0.75]], [['-', 2]]],
-        "plan's session ran its two turns, 5 minutes and 3, on try 1; the answered try 2 is a turn of it, with no row of its own",
-      );
-      assert.deepEqual(value('02 implement', 'ran'), [
-        [1, 10 * MIN],
-        [2, 5 * MIN],
-        [3, 4 * MIN],
-      ]);
-      assert.deepEqual(value('02 implement check', 'ran'), [
-        [1, 2 * MIN],
-        [2, 2 * MIN],
-        [3, 2 * MIN],
-      ]);
-      assert.deepEqual(
-        [value('review round 01', 'wall'), value('review round 02', 'wall')],
-        [[['-', 27 * MIN]], [['-', 11 * MIN]]],
-        'each round totals apart: 10:25 to 10:52, then 10:52 to 11:03',
-      );
-      assert.deepEqual(
-        ['answer', 'gate', 'check', 'queued', 'wall'].map((part) => value('run', part)[0]?.[1]),
-        [6 * MIN, 16 * MIN, 7 * MIN, 12 * MIN, 75 * MIN],
-        "the minutes the story let pass: the answer waited on 6, plan's gate 9 and ship's 7, the checks ran 7, the wall 10:00 to 11:15",
-      );
-      const labels = { factory: 'default', workflow: path.basename(workflowDir), outcome: 'succeeded' };
-      assert.deepEqual(
-        spans.find((x) => x.row === '04 ship check' && x.part === 'ran'),
-        { run: id, try: 1, of: 'check', row: '04 ship check', part: 'ran', value: MIN, ...labels, step: 'ship', agent: 'none' },
-      );
-      assert.deepEqual(
-        spans.find((x) => x.row === 'run' && x.part === 'wall'),
-        { run: id, of: 'run', row: 'run', part: 'wall', value: 75 * MIN, ...labels },
-        "the run's row is no step's and no try's",
-      );
-    },
-  );
-
-  await s.test("the run's clock: its five parts add up to its wall, each pinned to the minutes the story let pass", async () => {
+  s.test('ship approved 7 minutes on, merges and lands on its check: the timeline is handed over once, row for row the page', async () => {
+    later(7);
+    await stage.runWith(b.e, approveRun(id, 'ship', 'Merge it.'));
+    await tick();
+    const ship = steps().ship.taskId!;
+    later(1);
+    spawn(ship);
+    stage.place().world.stage(repo, steps().implement.branch!);
+    later(2);
+    sign(ship, { ...SIGNED, message: 'Add sub\n\nadd.ts exports sub.\n' }, { usage: used(0.25) });
+    await tick();
+    const check = steps().ship.check!.taskId;
+    later(1);
+    spawn(check);
+    later(1);
+    exits(check, 0);
+    await tick(2);
+    assert.ok('commit' in runRecord(ROOT, id).steps.ship.landed!, 'it landed');
+    assert.equal(runRecord(ROOT, id).runTimed, true, 'marked handed over on its record');
+    const spans = spansOf(TIMELINE_SPAN, id);
+    const rows = await pageRows(id);
+    assert.deepEqual(spans.map(lineOf).sort(), rows.map(lineOf).sort(), "each span is a row of the page's timeline, and each row a span");
+    const value = (row: string, part: string) => spans.filter((x) => x.row === row && x.part === part).map((x) => [x.try ?? '-', x.value]);
+    assert.deepEqual(
+      [value('01 plan', 'queued'), value('01 plan', 'ran'), value('01 plan', 'cost'), value('01 plan', 'tries')],
+      [[[1, 2 * MIN]], [[1, 8 * MIN]], [[1, 0.75]], [['-', 2]]],
+      "plan's session ran its two turns, 5 minutes and 3, on try 1; the answered try 2 is a turn of it, with no row of its own",
+    );
+    assert.deepEqual(value('02 implement', 'ran'), [
+      [1, 10 * MIN],
+      [2, 5 * MIN],
+      [3, 4 * MIN],
+    ]);
+    assert.deepEqual(value('02 implement check', 'ran'), [
+      [1, 2 * MIN],
+      [2, 2 * MIN],
+      [3, 2 * MIN],
+    ]);
+    assert.deepEqual(
+      [value('review round 01', 'wall'), value('review round 02', 'wall')],
+      [[['-', 27 * MIN]], [['-', 11 * MIN]]],
+      'each round totals apart: 10:25 to 10:52, then 10:52 to 11:03',
+    );
+    assert.deepEqual(
+      ['answer', 'gate', 'check', 'queued', 'wall'].map((part) => value('run', part)[0]?.[1]),
+      [6 * MIN, 16 * MIN, 7 * MIN, 12 * MIN, 75 * MIN],
+      "the minutes the story let pass: the answer waited on 6, plan's gate 9 and ship's 7, the checks ran 7, the wall 10:00 to 11:15",
+    );
+    const labels = { factory: 'default', workflow: path.basename(workflowDir), outcome: 'succeeded' };
+    assert.deepEqual(
+      spans.find((x) => x.row === '04 ship check' && x.part === 'ran'),
+      { run: id, try: 1, of: 'check', row: '04 ship check', part: 'ran', value: MIN, ...labels, step: 'ship', agent: 'none' },
+    );
+    assert.deepEqual(
+      spans.find((x) => x.row === 'run' && x.part === 'wall'),
+      { run: id, of: 'run', row: 'run', part: 'wall', value: 75 * MIN, ...labels },
+      "the run's row is no step's and no try's",
+    );
+  });
+  s.test("the run's clock: its five parts add up to its wall, each pinned to the minutes the story let pass", async () => {
     const run = runRecord(ROOT, id);
     const runSteps = stepsOf(run);
     const views = await stage.runWith(
@@ -432,8 +438,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
     const planStep = runSteps.find((x) => x.name === 'plan')!;
     assert.equal(gateWaitOf(run, tl, planStep, tl.steps.plan[1]), 9 * MIN, "K17: the timeline's gate wait from the answer's end");
   });
-
-  await s.test(
+  s.test(
     "`nemia stats --json`: landed on its first try, two rounds, the gate waits from the answer's end, the calls refused, the skills, the tally",
     async () => {
       const stats = JSON.parse(JSON.stringify(await stage.main(['stats', '--json']))) as Stats;
@@ -468,8 +473,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       );
     },
   );
-
-  await s.test('each metric was recorded once, whatever daemon read it, and none names a run', async () => {
+  s.test('each metric was recorded once, whatever daemon read it, and none names a run', async () => {
     assert.deepEqual(await counted('step.tries'), [
       ['implement', 'done', 3],
       ['plan', 'done', 1],
@@ -525,8 +529,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       'every task of the run marked, once',
     );
   });
-
-  await s.test("a pass's spans nest under it; a wait's, a denied call's and a timeline number's are roots of their own", async () => {
+  s.test("a pass's spans nest under it; a wait's, a denied call's and a timeline number's are roots of their own", async () => {
     const [first] = lives;
     const advance = first.spans.find((x) => x.name === 'advancePass' && x.attributes.get('run') === id);
     assert.ok(advance, 'the pass over the run');
@@ -543,8 +546,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       );
     }
   });
-
-  await s.test('the passes are rolled into the series: a line a minute, and the hour they filled once it is done', async () => {
+  s.test('the passes are rolled into the series: a line a minute, and the hour they filled once it is done', async () => {
     const minutes = readDay(ROOT, 'minute', '2026-10-06');
     const hours = readDay(ROOT, 'hour', '2026-10-06');
     assert.ok(
@@ -570,16 +572,27 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
   });
 });
 
-test('A run measured as its record says: a lone gate approved, a run called off, and a record an older nemia wrote', async (t) => {
-  const s = story(t);
-  const { b, later, tick, spansOf, counted, spawn, sign } = measuring(t);
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-  stage.place().world.repository(repo, {});
+describe('A run measured as its record says: a lone gate approved, a run called off, and a record an older nemia wrote', () => {
+  let b!: Board;
+  let later!: (minutes: number) => void;
+  let tick!: (n?: number) => Promise<void>;
+  let spansOf!: (name: string, id: string, of?: readonly Daemon[]) => { [k: string]: unknown }[];
+  let counted!: (id: string) => Promise<(string | number | undefined)[][]>;
+  let spawn!: (task: string) => void;
+  let sign!: (task: string, closeout: object, more?: object) => import('agent-runtime/testing').TestTask;
+  let repo!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ b, later, tick, spansOf, counted, spawn, sign } = measuring());
+    repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+    stage.place().world.repository(repo, {});
+    return t.end;
+  });
+  const s = story(test);
   const start = (files: Record<string, string>) =>
     stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder(files), isolate: false }));
   const ONE = { 'work.md': '---\nplace: git\n---\nDo it.\n' };
-
-  await s.test(
+  s.test(
     'a gate approved with nothing after it, on a pass that files nothing and hands over no timeline, is timed once and marked on disk',
     async () => {
       const { id } = await start({ 'intake.md': '---\nplace: git\ngate: true\n---\nAsk.\n' });
@@ -603,8 +616,7 @@ test('A run measured as its record says: a lone gate approved, a run called off,
       );
     },
   );
-
-  await s.test('a run called off is handed over once its task has stopped, as cancelled', async () => {
+  s.test('a run called off is handed over once its task has stopped, as cancelled', async () => {
     const { id } = await start(ONE);
     await tick();
     later(2);
@@ -620,8 +632,7 @@ test('A run measured as its record says: a lone gate approved, a run called off,
     assert.deepEqual([...new Set(spans.map((x) => x.outcome))], ['cancelled']);
     assert.deepEqual(spans.map(lineOf).sort(), (await pageRows(id)).map(lineOf).sort());
   });
-
-  await s.test(
+  s.test(
     'REFUSED: a record with none of the marks counts no settle, times no gate or call and hands over no timeline, and gets no mark',
     async () => {
       const { id } = await start(ONE);

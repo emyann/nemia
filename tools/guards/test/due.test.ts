@@ -2,7 +2,7 @@
  * The guards' due decision, pure (`due.ts`, `dueOf`): which changed paths the `guards#test` inputs and the dependencies' folders make
  * due, and the input shapes it refuses rather than guess at.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

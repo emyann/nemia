@@ -11,7 +11,7 @@
 import '../../test/harness.ts';
 import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../../test/waits.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -139,12 +139,12 @@ const open = async (query = '', headers: Record<string, string> = {}, over: { re
  */
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
-test(
+describe(
   'A board follows the feed: a transition arrives as it is written, the stream opens with an event of its own, resumes after Last-Event-ID or from its end, and carries the daemon line, a denial and a line another process wrote',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       "a transition the tick writes to the feed arrives on the stream as it is written: named by what it is about, the line as data, the feed's end as its id",
       async (t) => {
         const pass = emptyFeed();
@@ -180,7 +180,7 @@ test(
         }
       },
     );
-    await s.test(
+    s.test(
       'a stream says it is open before its first line, as an `opened` event every reader skips: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
       async (t) => {
         const pass = emptyFeed();
@@ -195,7 +195,7 @@ test(
         }
       },
     );
-    await s.test(
+    s.test(
       'a stream opened with no cursor reads the feed from the start; one reconnected with Last-Event-ID resumes after that event, over any `after` in its address',
       async (t) => {
         const pass = emptyFeed();
@@ -247,75 +247,66 @@ test(
         assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
       },
     );
-    await s.test(
-      '`from=end` starts the stream at the feed as it stands: none of the lines it holds, and the next one written',
-      async (t) => {
-        const pass = emptyFeed();
-        await pass({ 'r-1': planAt('running') });
-        const { reader, text } = await open('?from=end');
-        try {
-          const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
-          const said = await readUntil(t, reader, text, (s) => s.length >= 1);
-          assert.deepEqual(
-            said,
-            [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
-            'the line written after it opened, and nothing of the feed it opened on',
-          );
-        } finally {
-          await reader.cancel();
-        }
-      },
-    );
-    await s.test(
-      'a cursor wins over `from=end`: a Last-Event-ID resumes where its reader was, and the lines after it are sent',
-      async (t) => {
-        const pass = emptyFeed();
-        await pass({ 'r-1': planAt('running') });
-        const size = end();
-        const { reader, text } = await open('?from=end', { 'Last-Event-ID': '0' });
-        try {
-          const said = await readUntil(t, reader, text, (s) => s.at(-1)?.id === String(size));
-          assert.ok(said.length >= 1, 'the feed from the cursor, not from its end: an EventSource reconnecting misses nothing');
-          assert.equal(said.at(-1)!.id, String(size), 'read to the end of the feed it opened on');
-        } finally {
-          await reader.cancel();
-        }
-      },
-    );
-    await s.test(
-      'a daemon’s line, as up writes it once it holds the store, is sent as a daemon event, its data the line whole',
-      async (t) => {
-        const pass = emptyFeed();
-        await pass({ 'r-1': planAt('running') });
-        const v0 = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
-        fs.appendFileSync(feedFile(root), `${JSON.stringify(v0)}\n`);
-        const lines = readFeed(root, 0).lines;
-        const daemon = lines.at(-1)!;
+    s.test('`from=end` starts the stream at the feed as it stands: none of the lines it holds, and the next one written', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-1': planAt('running') });
+      const { reader, text } = await open('?from=end');
+      try {
+        const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
+        const said = await readUntil(t, reader, text, (s) => s.length >= 1);
         assert.deepEqual(
-          {
-            ...v0,
-            apiVersion: 'nemia/v1',
-            involved: { kind: 'Daemon', name: '4242' },
-            labels: {},
-            reason: 'DaemonStarted',
-            type: 'Normal',
-            source: 'daemon',
-            message: 'daemon started · first daemon on this store',
-          },
-          daemon,
-          'the package reads a line written before the feed was signed back as a signed one',
+          said,
+          [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
+          'the line written after it opened, and nothing of the feed it opened on',
         );
-        const opened = await open();
-        const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
-        await opened.reader.cancel();
-        assert.deepEqual(
-          all.map((b) => b.event),
-          ['run', 'step', 'daemon'],
-        );
-        assert.equal(all[2].data, JSON.stringify(daemon));
-      },
-    );
-    await s.test(
+      } finally {
+        await reader.cancel();
+      }
+    });
+    s.test('a cursor wins over `from=end`: a Last-Event-ID resumes where its reader was, and the lines after it are sent', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-1': planAt('running') });
+      const size = end();
+      const { reader, text } = await open('?from=end', { 'Last-Event-ID': '0' });
+      try {
+        const said = await readUntil(t, reader, text, (s) => s.at(-1)?.id === String(size));
+        assert.ok(said.length >= 1, 'the feed from the cursor, not from its end: an EventSource reconnecting misses nothing');
+        assert.equal(said.at(-1)!.id, String(size), 'read to the end of the feed it opened on');
+      } finally {
+        await reader.cancel();
+      }
+    });
+    s.test('a daemon’s line, as up writes it once it holds the store, is sent as a daemon event, its data the line whole', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-1': planAt('running') });
+      const v0 = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
+      fs.appendFileSync(feedFile(root), `${JSON.stringify(v0)}\n`);
+      const lines = readFeed(root, 0).lines;
+      const daemon = lines.at(-1)!;
+      assert.deepEqual(
+        {
+          ...v0,
+          apiVersion: 'nemia/v1',
+          involved: { kind: 'Daemon', name: '4242' },
+          labels: {},
+          reason: 'DaemonStarted',
+          type: 'Normal',
+          source: 'daemon',
+          message: 'daemon started · first daemon on this store',
+        },
+        daemon,
+        'the package reads a line written before the feed was signed back as a signed one',
+      );
+      const opened = await open();
+      const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
+      await opened.reader.cancel();
+      assert.deepEqual(
+        all.map((b) => b.event),
+        ['run', 'step', 'daemon'],
+      );
+      assert.equal(all[2].data, JSON.stringify(daemon));
+    });
+    s.test(
       "the store's pause put and lifted, as the tick writes them, are each sent as a store event, its data the line whole",
       async (t) => {
         const pass = emptyFeed();
@@ -340,7 +331,7 @@ test(
         assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
       },
     );
-    await s.test(
+    s.test(
       "a factory's conflicts pending and settled, as the tick writes them, are each sent as a factory event, its data the line whole",
       async (t) => {
         const pass = emptyFeed();
@@ -368,7 +359,7 @@ test(
         assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
       },
     );
-    await s.test(
+    s.test(
       'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
       async (t) => {
         const pass = emptyFeed();
@@ -391,7 +382,7 @@ test(
         );
       },
     );
-    await s.test(
+    s.test(
       "a line another process writes — a `nemia tick`, beside an api run with `--no-tick` — arrives on the stream's next beat, read from the file",
       async (t) => {
         const pass = emptyFeed();
@@ -423,15 +414,19 @@ async function refusedBefore(query: string, headers: Record<string, string>, sta
   for (const fact of facts) assert.ok(error.includes(fact), `${where}: names ${fact}: ${error}`);
 }
 
-test(
+describe(
   'REFUSED: GET /api/feed/stream before it opens — a cursor the feed never gave, a `from` that is not `end`, a selector the grammar refuses',
   WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    const size = end();
+  () => {
+    let pass!: ReturnType<typeof emptyFeed>;
+    beforeAll(async () => {
+      pass = emptyFeed();
+      await pass({ 'r-1': planAt('running') });
+      size = end();
+    });
+    let size!: number;
     const whatToPass = ['Last-Event-ID', 'pass none to read the feed from the start'];
-    const cursors: [string, string, Record<string, string>, string[]][] = [
+    const cursors = (size: number): [string, string, Record<string, string>, string[]][] => [
       [
         'inside a line, by address',
         `?after=${size - 2}`,
@@ -454,28 +449,29 @@ test(
       ['below zero', '?after=-1', {}, ['`-1` is not a cursor this feed gave', 'a whole number of bytes']],
       ['a Last-Event-ID no stream sent', '', { 'Last-Event-ID': 'page-2' }, ['`page-2`', 'not a cursor this feed gave']],
     ];
-    for (const [name, query, headers, facts] of cursors)
-      await t.test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () =>
-        refusedBefore(query, headers, 400, [...facts, ...whatToPass]),
-      );
-    await t.test('a cursor the feed gave is taken', async () => {
+    cursors(0).forEach(([name], i) =>
+      test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () => {
+        const [, query, headers, facts] = cursors(size)[i];
+        return refusedBefore(query, headers, 400, [...facts, ...whatToPass]);
+      }),
+    );
+    test('a cursor the feed gave is taken', async () => {
       const taken = await open(`?after=${size}`);
       await taken.reader.cancel();
     });
     for (const raw of ['start', '0', 'END', ''])
-      await t.test(`a \`from\` that is not \`end\` is a 400 saying \`end\` is the one value it takes: "${raw}"`, () =>
+      test(`a \`from\` that is not \`end\` is a 400 saying \`end\` is the one value it takes: "${raw}"`, () =>
         refusedBefore(`?from=${raw}`, {}, 400, [
           `\`${raw}\` is not a start`,
           '`from=end`',
           '`after`',
           'pass none to read the feed from the start',
-        ]),
-      );
-    await t.test('`from=end` is taken', async () => {
+        ]));
+    test('`from=end` is taken', async () => {
       const taken = await open('?from=end');
       await taken.reader.cancel();
     });
-    await t.test('no reader is left behind to count a selector refused against', async (t) => {
+    test('no reader is left behind to count a selector refused against', async (t) => {
       await until(
         t,
         () => followers() === 0,
@@ -492,10 +488,9 @@ test(
       ['?selector=run%3Dr-1&selector=no%2Fpe%3Dx', ['"no/pe"', '-l <key>=<value>']],
     ];
     for (const [query, facts] of selectors)
-      await t.test(`a selector the grammar refuses is a 422 naming it and how this stream is asked for one: ${query}`, () =>
-        refusedBefore(query, {}, 422, [...facts, ...howAsked]),
-      );
-    await t.test('no reader was started for a selector the grammar refuses: it is answered before the stream opens', () => {
+      test(`a selector the grammar refuses is a 422 naming it and how this stream is asked for one: ${query}`, () =>
+        refusedBefore(query, {}, 422, [...facts, ...howAsked]));
+    test('no reader was started for a selector the grammar refuses: it is answered before the stream opens', () => {
       assert.equal(followers(), 0);
     });
   },
@@ -509,9 +504,9 @@ const BEAT_MS = 50;
  */
 const FAILING_FOR_MS = 500;
 /** An app whose feed reader beats every `BEAT_MS` (`Beats.feed`), disposed after the test that built it. */
-const beatenApp = (t: { after: (fn: () => unknown) => void }) => {
+const beatenApp = (t: { onTestFinished: (fn: () => Promise<void> | void) => void }) => {
   const own = appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: `${BEAT_MS} millis` })));
-  t.after(() => own.runtime.dispose());
+  t.onTestFinished(() => own.runtime.dispose());
   return own.app;
 };
 
@@ -610,12 +605,12 @@ test(
   },
 );
 
-test(
+describe(
   "the feed's followers: each open stream is counted once, and let go when its reader cancels or its client closes the socket",
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       "a stream whose reader goes is no longer counted among the feed's followers: each open stream is one, and a cancelled one is not",
       async (t) => {
         const pass = emptyFeed();
@@ -645,7 +640,7 @@ test(
         );
       },
     );
-    await s.test(
+    s.test(
       'a client that closes its socket lets its reader go too — the path `main.ts` serves, where nothing is being written when it goes',
       async (t) => {
         const pass = emptyFeed();
@@ -713,12 +708,12 @@ const labelOf = (line: FeedLine, key: string): string | undefined => (line as { 
 const untilBookmark = (from: number, selectors: Selectors, every: Duration.Input) =>
   runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')));
 
-test(
+describe(
   'A board follows the feed through selectors: only the lines they take, a comma and a second selector, a bare key, and a bookmark that says where it has read to',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       'a selector sends only the lines it takes, each with its own cursor as its id, and the lines between them are not sent',
       async (t) => {
         const pass = emptyFeed();
@@ -751,45 +746,42 @@ test(
         }
       },
     );
-    await s.test(
-      'every clause of one selector must hold, and one selector of those given: a comma ands, and `selector` again ors',
-      async (t) => {
-        const pass = emptyFeed();
-        await pass({ 'r-a': steps('plan') });
-        await pass({ 'r-a': steps('plan', 'review') });
-        await pass({ 'r-a': steps('plan', 'review'), 'r-b': steps('review') });
-        const every = everySent();
-        const anded = every.filter((l) => labelOf(l.line, 'run') === 'r-a' && labelOf(l.line, 'step') === 'review');
-        const ored = every.filter((l) => labelOf(l.line, 'run') === 'r-a' || labelOf(l.line, 'step') === 'review');
-        assert.equal(anded.length, 1, "run a at review alone: run a's other lines and run b's review line are the fixture");
-        assert.equal(ored.length, 4, "run a's three lines and run b's review line");
+    s.test('every clause of one selector must hold, and one selector of those given: a comma ands, and `selector` again ors', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': steps('plan') });
+      await pass({ 'r-a': steps('plan', 'review') });
+      await pass({ 'r-a': steps('plan', 'review'), 'r-b': steps('review') });
+      const every = everySent();
+      const anded = every.filter((l) => labelOf(l.line, 'run') === 'r-a' && labelOf(l.line, 'step') === 'review');
+      const ored = every.filter((l) => labelOf(l.line, 'run') === 'r-a' || labelOf(l.line, 'step') === 'review');
+      assert.equal(anded.length, 1, "run a at review alone: run a's other lines and run b's review line are the fixture");
+      assert.equal(ored.length, 4, "run a's three lines and run b's review line");
 
-        const and = await open('?selector=run%3Dr-a,step%3Dreview');
-        try {
-          const said = await readUntil(t, and.reader, and.text, (s) => s.length >= 1);
-          assert.deepEqual(
-            sentOf(said),
-            anded.map((l) => l.sent),
-            "the clauses of one selector both hold of the line it takes: run a's own run line, which carries no step, is not sent",
-          );
-        } finally {
-          await and.reader.cancel();
-        }
+      const and = await open('?selector=run%3Dr-a,step%3Dreview');
+      try {
+        const said = await readUntil(t, and.reader, and.text, (s) => s.length >= 1);
+        assert.deepEqual(
+          sentOf(said),
+          anded.map((l) => l.sent),
+          "the clauses of one selector both hold of the line it takes: run a's own run line, which carries no step, is not sent",
+        );
+      } finally {
+        await and.reader.cancel();
+      }
 
-        const or = await open('?selector=run%3Dr-a&selector=step%3Dreview');
-        try {
-          const said = await readUntil(t, or.reader, or.text, (s) => s.length >= 4);
-          assert.deepEqual(
-            sentOf(said),
-            ored.map((l) => l.sent),
-            "one selector of the two holds: run a's lines and run b's review line, and nothing else",
-          );
-        } finally {
-          await or.reader.cancel();
-        }
-      },
-    );
-    await s.test('a selector the grammar takes opens the stream: a bare key sends the lines that carry it', async (t) => {
+      const or = await open('?selector=run%3Dr-a&selector=step%3Dreview');
+      try {
+        const said = await readUntil(t, or.reader, or.text, (s) => s.length >= 4);
+        assert.deepEqual(
+          sentOf(said),
+          ored.map((l) => l.sent),
+          "one selector of the two holds: run a's lines and run b's review line, and nothing else",
+        );
+      } finally {
+        await or.reader.cancel();
+      }
+    });
+    s.test('a selector the grammar takes opens the stream: a bare key sends the lines that carry it', async (t) => {
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
       const carried = everySent().filter((l) => labelOf(l.line, 'run') !== undefined);
@@ -805,7 +797,7 @@ test(
         await reader.cancel();
       }
     });
-    await s.test(
+    s.test(
       "a bookmark says where the stream has read to: the feed's own cursor, past a line the selector dropped, as its id, with an empty data field",
       async (t) => {
         const pass = emptyFeed();
@@ -847,7 +839,7 @@ test(
         );
       },
     );
-    await s.test(
+    s.test(
       'a stream resumes after a bookmark: its id taken back as Last-Event-ID resends nothing, and the next line arrives',
       async (t) => {
         const pass = emptyFeed();
@@ -878,25 +870,22 @@ test(
         await fresh({ 'r-a': planAt('running') });
       },
     );
-    await s.test(
-      "the tick's first beat is dropped: no bookmark comes among the lines the feed already holds when the stream opens",
-      async () => {
-        const pass = emptyFeed();
-        await pass({ 'r-a': planAt('running') });
-        const every = everySent();
-        assert.equal(every.length, 2, 'two lines are written before the stream is subscribed, and one read hands both on');
-        const got = await untilBookmark(0, [], '200 millis');
-        assert.deepEqual(
-          got.map((m) => [m.event, m.id]),
-          [
-            ['run', every[0].sent.id],
-            ['step', every[1].sent.id],
-            ['bookmark', every[1].sent.id],
-          ],
-          'both lines, then the beat: a first beat not dropped comes at subscription, and lands between the two lines the first read hands on',
-        );
-      },
-    );
+    s.test("the tick's first beat is dropped: no bookmark comes among the lines the feed already holds when the stream opens", async () => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': planAt('running') });
+      const every = everySent();
+      assert.equal(every.length, 2, 'two lines are written before the stream is subscribed, and one read hands both on');
+      const got = await untilBookmark(0, [], '200 millis');
+      assert.deepEqual(
+        got.map((m) => [m.event, m.id]),
+        [
+          ['run', every[0].sent.id],
+          ['step', every[1].sent.id],
+          ['bookmark', every[1].sent.id],
+        ],
+        'both lines, then the beat: a first beat not dropped comes at subscription, and lands between the two lines the first read hands on',
+      );
+    });
   },
 );
 
@@ -915,12 +904,12 @@ test('the stream says where it has read to at the one cadence every surface read
   assert.equal(typeof BOOKMARK_EVERY, 'string', 'the constant the package owns');
 });
 
-test(
+describe(
   '`until=end` reads the feed once to its end as the stream opened and closes it, the last event a bookmark at that end; a hint for a former reason comes first',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       'the lines present at open, then a bookmark whose id is the feed size then, and the stream ends: a line written after open is not sent',
       async (t) => {
         const pass = emptyFeed();
@@ -940,7 +929,7 @@ test(
         assert.equal(said.at(-1)!.data, '', 'the bookmark is the empty event it is everywhere else');
       },
     );
-    await s.test('a selector drops lines but the stream still ends at the size at open, the last line dropped included', async (t) => {
+    s.test('a selector drops lines but the stream still ends at the size at open, the last line dropped included', async (t) => {
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
       await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
@@ -954,7 +943,7 @@ test(
         "run a's lines, then the bookmark at the end, though run b's lines were the last written",
       );
     });
-    await s.test('`from=end` with `until=end` sends the bookmark alone; `after` at the end does the same', async (t) => {
+    s.test('`from=end` with `until=end` sends the bookmark alone; `after` at the end does the same', async (t) => {
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
       const size = String(fs.statSync(feedFile(root)).size);
@@ -968,12 +957,12 @@ test(
         );
       }
     });
-    await s.test('an `until` of any other value is refused before the stream opens, naming `end`', async () => {
+    s.test('an `until` of any other value is refused before the stream opens, naming `end`', async () => {
       const res = await app.request(`${STREAM}?until=later`);
       assert.equal(res.status, 400);
       assert.match(((await res.json()) as { error: string }).error, /until=end/);
     });
-    await s.test('a selector naming a former reason is sent its hint first, as a `hint` event, before any line', async (t) => {
+    s.test('a selector naming a former reason is sent its hint first, as a `hint` event, before any line', async (t) => {
       const pass = emptyFeed();
       await pass({ 'r-a': planAt('running') });
       const { reader, text } = await open(`?until=end&selector=${encodeURIComponent('reason=NeedsHuman')}&selector=run%3Dr-a`);

@@ -3,7 +3,7 @@
  * fixture `dist/` here, since the build that proves it over the real site is the repository's own, run by a round's check and by
  * the landing, never by this file.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

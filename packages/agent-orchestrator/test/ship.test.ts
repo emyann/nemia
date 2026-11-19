@@ -17,7 +17,8 @@
  * (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon. `endings(stage, root)` copies the team's agents and skills
  * beside every folder made under `root`, since the team's `ship.md` names `agent: shipper`.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -222,13 +223,13 @@ async function endings(stage: Stage, root: string) {
     /** What `nemia <argv>` prints, line by line, over the board's engine. */
     printedBy: async (t: TestContext, argv: string[]): Promise<string[]> => {
       const printed: string[] = [];
-      const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+      const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
         printed.push(args.map(String).join(' '));
       });
       try {
         await stage.main(argv);
       } finally {
-        log.mock.restore();
+        log.mockRestore();
       }
       return printed;
     },
@@ -397,15 +398,23 @@ const mergeRefused =
     return true;
   };
 
-test("a run waits at its ending's gate, is approved, stages its merge, lands it on its check, and a run `--after` it is handed its work", async (t) => {
-  const s = story(t);
-  const { e, tasks, filings, settle } = stage.board();
-  const repo = at.aRepo();
+describe("a run waits at its ending's gate, is approved, stages its merge, lands it on its check, and a run `--after` it is handed its work", () => {
+  let e!: import('agent-runtime').EngineShape;
+  let tasks!: Map<string, import('agent-runtime/testing').TestTask>;
+  let filings!: string[];
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let repo!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ e, tasks, filings, settle } = stage.board());
+    repo = at.aRepo();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
   let branch = '';
   let base = '';
-
-  await s.test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async () => {
+  s.test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async () => {
     const started = (await stage.main(['start', 'add sub', '--repo', repo, '--workflows', at.folder()])) as StartedAnswer;
     id = started.id;
     assert.deepEqual(
@@ -416,8 +425,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
     assert.deepEqual(started.facts.ends, ['ship'], 'the ending a person approves before it is filed');
     assert.equal(started.facts.gated, undefined, 'an ending is not a handoff waiting to be let through');
   });
-
-  await s.test(
+  s.test(
     'a run stops at its ending step: nothing of it is filed, the checkout is untouched, and `nemia ls` says what is to be decided',
     async () => {
       await at.pass(id);
@@ -450,8 +458,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.equal(await at.isLanded(at.repositoryRun(runRecord(ROOT, id)), branch), false);
     },
   );
-
-  await s.test(
+  s.test(
     "approved, the ending is filed in the checkout with a read of its run's artifacts through the rule it is filed with, and no `settings.local.json`; a step in a worktree is filed with no such rule",
     async () => {
       const notes = path.join(artifactsDir(ROOT, { id }, 'implement'), 'notes.md');
@@ -477,14 +484,12 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       );
     },
   );
-
-  await s.test("its merge staged and signed off, the pass files ship's check on the merged tree", async () => {
+  s.test("its merge staged and signed off, the pass files ship's check on the merged tree", async () => {
     world().stage(repo, branch);
     settle(`${id}-ship`, 'succeeded', { ...SIGNED, artifacts: [], message: MESSAGE });
     assert.deepEqual((await at.pass(id)).checked, ['ship']);
   });
-
-  await s.test(
+  s.test(
     "its check passes and the merge lands: only the check's pictures are removed — a picture the closeout names, a file that is no picture, one in a folder and a link are kept, and nothing is removed through a link; nemia decide reads it landed once a pass has read it",
     async () => {
       const outside = path.join(fs.mkdtempSync(path.join(ROOT, 'outside-')), 'kept.png');
@@ -520,8 +525,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
     },
   );
-
-  await s.test(
+  s.test(
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",
     async () => {
       const child = await stage.runPlaced(startRun({ brief: 'read the flag', repo, workflowDir: at.oneStep(), after: [id] }));
@@ -535,11 +539,15 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
   );
 });
 
-test('a landing a pass reads again — after a restart, under a pause, or with a hand on the checkout — does what the last pass would have', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-
-  await s.test(
+describe('a landing a pass reads again — after a restart, under a pause, or with a hand on the checkout — does what the last pass would have', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'a merge committed before the run wrote it down is recorded as landed, never committed twice, and the pictures the pass that died left go; nemia decide reads it landed once a pass has read it',
     async () => {
       const { repo, id, checkId } = await at.stagedAndSigned();
@@ -561,8 +569,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
       assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
     },
   );
-
-  await s.test('a refused merge aborted by hand is recorded as nothing landed, and every picture is kept', async () => {
+  s.test('a refused merge aborted by hand is recorded as nothing landed, and every picture is kept', async () => {
     const { repo, id, base, checkId } = await at.stagedAndSigned();
     const shot = at.photographed(id, { count: 3, bytes: 10 });
     settle(checkId, 'failed', undefined, 1);
@@ -576,8 +583,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
     assert.deepEqual(at.pngsIn(shot.dir), [...shot.pictures].sort(), 'nothing landed: every picture is kept');
     assert.equal(world().head(repo), base);
   });
-
-  await s.test('a check that passed on a merge no longer staged commits nothing: the run does not merge again on its own', async () => {
+  s.test('a check that passed on a merge no longer staged commits nothing: the run does not merge again on its own', async () => {
     const { repo, id, base, checkId } = await at.stagedAndSigned();
     settle(checkId, 'succeeded', undefined, 0);
     world().takeBack(repo);
@@ -587,8 +593,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
     });
     assert.equal(world().head(repo), base);
   });
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: a merge in the checkout that is not the run's is never touched — committed nor aborted — with nothing of the ending running",
     async () => {
       const { repo, id, base, checkId } = await at.stagedAndSigned();
@@ -612,8 +617,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
       assert.equal(world().head(repo), base, 'and nothing of it is committed');
     },
   );
-
-  await s.test(
+  s.test(
     'while the store is paused, a landing whose check has ended commits on its exit 0, and one its check refused is aborted, as without it',
     async () => {
       for (const [exit, phase] of [
@@ -644,11 +648,15 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
   );
 });
 
-test('a record an older nemia wrote — no staged-merge file, a place skill named — lands, is removed and is aborted as any other', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-
-  await s.test(
+describe('a record an older nemia wrote — no staged-merge file, a place skill named — lands, is removed and is aborted as any other', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'a run started before its place named a staged-merge file reads its checkout through `status`, and lands as any other',
     async () => {
       const { repo, id, checkId, base } = await at.stagedAndSigned();
@@ -669,8 +677,7 @@ test('a record an older nemia wrote — no staged-merge file, a place skill name
       assert.equal(mergeStaged(runRecord(ROOT, id), stepsOf(runRecord(ROOT, id), ROOT), memo()), false, 'landed, nothing is read staged');
     },
   );
-
-  await s.test(
+  s.test(
     'a record that names a place skill, written when a run named one, lands through the place the pass is given, as any other',
     async () => {
       const named = await at.stagedAndSigned();
@@ -690,28 +697,23 @@ test('a record an older nemia wrote — no staged-merge file, a place skill name
       assert.equal(at.mergeHead(named.repo), false);
     },
   );
-
-  await s.test(
-    'a landed run started before its place named a staged-merge file is removed with no `status`, its checkout gone',
-    async () => {
-      const done = await at.stagedAndSigned();
-      settle(done.checkId, 'succeeded', undefined, 0);
-      await at.pass(done.id);
-      await at.rewritten(done.id, (record) => {
-        delete record.stagedFile;
-      });
-      fs.rmSync(done.repo, { recursive: true, force: true });
-      const r = runRecord(ROOT, done.id);
-      assert.ok(r.steps.ship.landed && 'commit' in r.steps.ship.landed);
-      assert.equal(
-        merging(r, stepsOf(r, ROOT), statusMemo(at.liveHeads, stage.place().place)),
-        'none',
-        'a landing made owes no read of a checkout gone',
-      );
-    },
-  );
-
-  await s.test(
+  s.test('a landed run started before its place named a staged-merge file is removed with no `status`, its checkout gone', async () => {
+    const done = await at.stagedAndSigned();
+    settle(done.checkId, 'succeeded', undefined, 0);
+    await at.pass(done.id);
+    await at.rewritten(done.id, (record) => {
+      delete record.stagedFile;
+    });
+    fs.rmSync(done.repo, { recursive: true, force: true });
+    const r = runRecord(ROOT, done.id);
+    assert.ok(r.steps.ship.landed && 'commit' in r.steps.ship.landed);
+    assert.equal(
+      merging(r, stepsOf(r, ROOT), statusMemo(at.liveHeads, stage.place().place)),
+      'none',
+      'a landing made owes no read of a checkout gone',
+    );
+  });
+  s.test(
     'a run started before its place named a staged-merge file, its ending signed off blocked with its merge staged, has the merge aborted',
     async () => {
       const { repo, id, base } = await at.atTheGate();
@@ -780,11 +782,16 @@ async function stagingAndWaiting() {
   return { repo, waiting, staging };
 }
 
-test("a place that gives no reading of the checkout, or reads its merge as another's, is never a verdict, and is asked only where a landing needs it", async (t) => {
-  const s = story(t);
-  const { e, settle } = stage.board();
-
-  await s.test(
+describe("a place that gives no reading of the checkout, or reads its merge as another's, is never a verdict, and is asked only where a landing needs it", () => {
+  let e!: import('agent-runtime').EngineShape;
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ e, settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'REFUSED: a checkout its place gives no reading of is never a verdict — a check passed or refused, nothing is committed or aborted, the record stays unlanded, and the run says why',
     async () => {
       const place = failingPlace();
@@ -809,25 +816,20 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       assert.notEqual(world().head(repo), base);
     },
   );
-
-  await s.test(
-    "REFUSED: a merge its place reads as another's (`merging: 'other'`) is left alone, its check passed or refused",
-    async () => {
-      for (const [phase, exitCode] of [
-        ['succeeded', 0],
-        ['failed', 1],
-      ] as const) {
-        const { repo, id, checkId, base } = await at.stagedAndSigned();
-        settle(checkId, phase, undefined, exitCode);
-        const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], tip: base });
-        assert.deepEqual(await landedThrough(e, id, place), { notes: [], landed: false }, phase);
-        assert.equal(at.mergeHead(repo), true, `${phase}: neither committed nor aborted`);
-        assert.equal(world().head(repo), base);
-      }
-    },
-  );
-
-  await s.test(
+  s.test("REFUSED: a merge its place reads as another's (`merging: 'other'`) is left alone, its check passed or refused", async () => {
+    for (const [phase, exitCode] of [
+      ['succeeded', 0],
+      ['failed', 1],
+    ] as const) {
+      const { repo, id, checkId, base } = await at.stagedAndSigned();
+      settle(checkId, phase, undefined, exitCode);
+      const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], tip: base });
+      assert.deepEqual(await landedThrough(e, id, place), { notes: [], landed: false }, phase);
+      assert.equal(at.mergeHead(repo), true, `${phase}: neither committed nor aborted`);
+      assert.equal(world().head(repo), base);
+    }
+  });
+  s.test(
     "the place's `status` is asked only where a landing needs it: never of a landed run or a busy ending, once per checkout and run in a pass",
     async () => {
       let asked = 0;
@@ -863,8 +865,7 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       assert.equal(at.mergeHead(repo), true);
     },
   );
-
-  await s.test(
+  s.test(
     "an ending settled with no merge staged holds nothing, and the place's `status` is not asked: its staged-merge file says none is in progress",
     async () => {
       let asked = 0;
@@ -881,8 +882,7 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       assert.equal(asked, 0, 'read off the file, with no process');
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED: a staged merge its place gives no reading of holds the checkout — another run approved on the same repository waits for it',
     async () => {
       const { repo, waiting, staging } = await stagingAndWaiting();
@@ -980,11 +980,16 @@ const checkedFacts = ({ id, read, d, decided, awaiting }: Awaited<ReturnType<typ
   );
 };
 
-test('an ending that stops on its own word, or whose check refuses the merged tree, leaves the checkout as it found it and says what happened', async (t) => {
-  const s = story(t);
-  const { e, settle } = stage.board();
-
-  await s.test(
+describe('an ending that stops on its own word, or whose check refuses the merged tree, leaves the checkout as it found it and says what happened', () => {
+  let e!: import('agent-runtime').EngineShape;
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ e, settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened",
     async () => {
       const { repo, id, branch, base } = await at.atTheGate();
@@ -1016,8 +1021,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       );
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: an ending that stopped on its own word is written down once — its merge left staged is taken back',
     async () => {
       const { repo, id, branch, base } = await at.atTheGate();
@@ -1036,8 +1040,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       );
     },
   );
-
-  await s.test(
+  s.test(
     'an ending that stopped clean is written down as untouched, and a merge a person stages after it is theirs, pass after pass',
     async () => {
       const { repo, id, base, pass } = await blockedClean();
@@ -1057,15 +1060,13 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       assert.equal(world().head(repo), base);
     },
   );
-
-  await s.test("`nemia rm` of an ending that stopped clean does not wait on a person's merge staged after it", async () => {
+  s.test("`nemia rm` of an ending that stopped clean does not wait on a person's merge staged after it", async () => {
     const { repo, id } = await blockedClean();
     const forgot = await stage.runWith(e, forgetRun(id));
     assert.notEqual(forgot.kind, 'refused', forgot.kind === 'refused' ? forgot.refusal : '');
     assert.equal(at.mergeHead(repo), true, "the run is forgotten with the person's merge left as it is");
   });
-
-  await s.test(
+  s.test(
     "the whole decision of an ending whose check did not finish on the merge, with the check's files, once a pass has read where its branch stands",
     async () => {
       const checked = await checkedDecision(undefined);
@@ -1085,8 +1086,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       assert.equal(d.collisions?.semantic, null, 'a check that did not finish refused nothing');
     },
   );
-
-  await s.test(
+  s.test(
     "the whole decision of an ending whose check refused the merge, with the check's files, once a pass has read where its branch stands",
     async () => {
       const checked = await checkedDecision(1);
@@ -1111,13 +1111,17 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
   );
 });
 
-test('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it starts, and every screen agrees', async (t) => {
-  const s = story(t);
-  const { filings } = stage.board();
-  let gate: Awaited<ReturnType<typeof at.atTheGate>>;
+describe('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it starts, and every screen agrees', () => {
+  let filings!: string[];
+  let gate!: Awaited<ReturnType<typeof at.atTheGate>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ filings } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
   let child = '';
-
-  await s.test('at its gate, with the branch ahead, a decision to make, and a run --after it waits', async () => {
+  s.test('at its gate, with the branch ahead, a decision to make, and a run --after it waits', async () => {
     gate = await at.atTheGate();
     assert.equal((await listed(gate.id)).toDecide?.kind, 'approve');
     const started = await stage.runPlaced(
@@ -1126,8 +1130,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
     child = started.id;
     assert.deepEqual((await at.pass(child)).filed, [], 'nothing of the child is filed while the result is off the base');
   });
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: merged by hand, nothing is to decide, nobody is waited on, and the ending's line in `nemia ls` says where the branch stands",
     async () => {
       const { repo, id, branch } = gate;
@@ -1151,8 +1154,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       );
     },
   );
-
-  await s.test(
+  s.test(
     'the decision says the same before anybody closes the record: landed, its ending never run, and no approval above a branch on main',
     async () => {
       const { id, branch } = gate;
@@ -1163,8 +1165,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       });
     },
   );
-
-  await s.test('REFUSED at shipped defaults: `nemia approve` names `nemia cancel` instead, and writes nothing', async () => {
+  s.test('REFUSED at shipped defaults: `nemia approve` names `nemia cancel` instead, and writes nothing', async () => {
     const { id, branch } = gate;
     await assert.rejects(
       stage.runWith(e(), approveRun(id, 'ship', 'Merge it.')),
@@ -1172,24 +1173,18 @@ test('a result a person merged by hand before its ending ran: the run has landed
     );
     assert.deepEqual(runRecord(ROOT, id).approvals ?? [], [], 'nothing was written');
   });
-
-  await s.test("ship is never filed, pass after pass, and the child starts on git's word: its parent has landed", async () => {
+  s.test("ship is never filed, pass after pass, and the child starts on git's word: its parent has landed", async () => {
     const { id } = gate;
     for (const pass of [1, 2]) assert.deepEqual((await at.pass(id)).filed, [], `pass ${pass}: ship is never filed`);
     assert.deepEqual(filings, [`${id}-implement`]);
     assert.equal(runRecord(ROOT, id).steps.ship.taskId, null);
     assert.deepEqual((await at.pass(child)).filed, ['implement']);
   });
-
-  await s.test(
-    'the command the refusal names is honoured once the child has started: the record is closed, with nothing to decide',
-    async () => {
-      await stage.runWith(e(), cancelRun(gate.id));
-      assert.equal((await stage.runWith(e(), decideRun(gate.id))).decision.kind, 'cancelled');
-    },
-  );
-
-  await s.test(
+  s.test('the command the refusal names is honoured once the child has started: the record is closed, with nothing to decide', async () => {
+    await stage.runWith(e(), cancelRun(gate.id));
+    assert.equal((await stage.runWith(e(), decideRun(gate.id))).decision.kind, 'cancelled');
+  });
+  s.test(
     '`nemia rm` of a run whose ending never ran and whose result a person merged by hand forgets it: the gate holds nothing, so the approval it named is not named',
     async () => {
       const { repo, id, branch } = await at.atTheGate();
@@ -1205,8 +1200,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false);
     },
   );
-
-  await s.test(
+  s.test(
     'an ending cut off at its budget once the result was merged elsewhere: `--recheck` files its check alone, and its pass records the commit',
     async () => {
       const b = stage.board();
@@ -1234,8 +1228,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       assert.deepEqual([await statusOf(id, 'ship'), (await listed(id)).waitingOnYou], ['verified ✓', []]);
     },
   );
-
-  await s.test(
+  s.test(
     'an ending cut off at its budget before anything merged: `nemia decide` offers `--recheck`, and a refusing check waits on you, the stop still said',
     async () => {
       const b = stage.board();
@@ -1259,8 +1252,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       assert.ok('aborted' in (runRecord(ROOT, id).steps.ship.landed ?? {}), 'nothing landed');
     },
   );
-
-  await s.test(
+  s.test(
     "an ending's gate is a decision again once the base branch no longer has the result: git is read each pass, and the approval is honoured",
     async () => {
       const { repo, id, branch, base } = await at.atTheGate();
@@ -1277,12 +1269,16 @@ test('a result a person merged by hand before its ending ran: the run has landed
   );
 });
 
-test('two runs of one repository at their endings: the oldest approval takes the checkout, the other waits for it — its first filing and its try — and every screen says which run has it', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-  let two: Awaited<ReturnType<typeof at.twoApproved>>;
-
-  await s.test(
+describe('two runs of one repository at their endings: the oldest approval takes the checkout, the other waits for it — its first filing and its try — and every screen says which run has it', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let two!: Awaited<ReturnType<typeof at.twoApproved>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "two runs' ending steps never work in one checkout at once: the oldest approval takes it, and the other reads as waiting for it",
     async () => {
       two = await at.twoApproved();
@@ -1314,8 +1310,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(`  ${checkoutLine('ship', checkout)}`, waitLine(second.id), 'in the words a person reads');
     },
   );
-
-  await s.test('the whole decision of a run whose ending waits for the checkout, first filed', async () => {
+  s.test('the whole decision of a run whose ending waits for the checkout, first filed', async () => {
     const read = await decisionOn(stage, two.first.id);
     assert.deepEqual(read.decision, { running: true }, 'nothing to decide yet');
     assert.deepEqual(
@@ -1324,16 +1319,14 @@ test('two runs of one repository at their endings: the oldest approval takes the
       'still running: ship, which waits for the checkout the other run has',
     );
   });
-
-  await s.test(
+  s.test(
     "the older approval's ship signs off blocked, its trial merge aborted: the checkout is free, and the other run takes it",
     async () => {
       settle(`${two.second.id}-ship`, 'succeeded', BLOCKED);
       assert.deepEqual((await at.pass(two.first.id)).filed, ['ship']);
     },
   );
-
-  await s.test(
+  s.test(
     'the whole decision of the run whose ending ended blocked, before it is sent back, once a pass has read where its branch stands',
     async () => {
       await at.aPass(e());
@@ -1373,8 +1366,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       );
     },
   );
-
-  await s.test(
+  s.test(
     "a try of an ending step waits for the checkout as its first filing does: a person's send-back of a ship that ended blocked files nothing while another run's ship is merging",
     async () => {
       const { first, second } = two;
@@ -1403,8 +1395,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       );
     },
   );
-
-  await s.test(
+  s.test(
     "a run whose ending's try the checkout holds is a run still running: `nemia ls`, `nemia decide` and the pass agree, and it still counts against the cap on runs in flight",
     async () => {
       const { first, second } = two;
@@ -1423,8 +1414,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
     },
   );
-
-  await s.test('the whole decision of a run whose ending waits for the checkout, sent back', async () => {
+  s.test('the whole decision of a run whose ending waits for the checkout, sent back', async () => {
     const read = await decisionOn(stage, two.second.id);
     assert.deepEqual(read.decision, { running: true }, 'nothing to decide yet');
     assert.deepEqual(
@@ -1436,17 +1426,12 @@ test('two runs of one repository at their endings: the oldest approval takes the
       'still running: ship, which waits for the checkout the other run has',
     );
   });
-
-  await s.test(
-    'once the step in the checkout settles, the try is filed there on the first pass after, as any try of it would be',
-    async () => {
-      settle(`${two.first.id}-ship`, 'succeeded', SIGNED);
-      assert.deepEqual((await at.pass(two.second.id)).tried, ['ship']);
-      assert.equal(runRecord(ROOT, two.second.id).steps.ship.workspace, two.repo);
-    },
-  );
-
-  await s.test('a run whose ending waits for the checkout is filed once the step in it settles', async () => {
+  s.test('once the step in the checkout settles, the try is filed there on the first pass after, as any try of it would be', async () => {
+    settle(`${two.first.id}-ship`, 'succeeded', SIGNED);
+    assert.deepEqual((await at.pass(two.second.id)).tried, ['ship']);
+    assert.equal(runRecord(ROOT, two.second.id).steps.ship.workspace, two.repo);
+  });
+  s.test('a run whose ending waits for the checkout is filed once the step in it settles', async () => {
     const { repo, first, second } = await at.twoApproved();
     await at.pass(second.id);
     assert.deepEqual((await at.pass(first.id)).filed, [], 'held while the other run works in the checkout');
@@ -1455,8 +1440,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
     assert.equal(runRecord(ROOT, first.id).steps.ship.workspace, repo);
     assert.equal((await shipOf(first.id)).message, 'pending');
   });
-
-  await s.test(
+  s.test(
     "a cancelled run holds the checkout while its ending's session is still in it: `nemia cancel` asks the engine to stop it, and it is still merging until it has",
     async () => {
       const { repo, first, second } = await at.twoApproved();
@@ -1475,8 +1459,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(runRecord(ROOT, first.id).steps.ship.workspace, repo);
     },
   );
-
-  await s.test(
+  s.test(
     "a `workspace: base` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever",
     async () => {
       const { first, second } = await at.twoApproved();
@@ -1488,14 +1471,18 @@ test('two runs of one repository at their endings: the oldest approval takes the
   );
 });
 
-test('two runs of one repository land close together: each records the commit that brought its own result, never the base as it stands when its check ends', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-  let two: Awaited<ReturnType<typeof at.twoApproved>>;
+describe('two runs of one repository land close together: each records the commit that brought its own result, never the base as it stands when its check ends', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let two!: Awaited<ReturnType<typeof at.twoApproved>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
   let mergedA = '';
   let mergedB = '';
-
-  await s.test("the older approval's ending lands its result on the base and signs off, and the pass files its check", async () => {
+  s.test("the older approval's ending lands its result on the base and signs off, and the pass files its check", async () => {
     two = await at.twoApproved();
     const { repo, first, second: a } = two;
     await at.pass(first.id);
@@ -1505,16 +1492,14 @@ test('two runs of one repository land close together: each records the commit th
     settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
     assert.deepEqual((await at.pass(a.id)).checked, ['ship'], 'its check is filed on the result already on the base');
   });
-
-  await s.test("while that check runs, the other run's result lands on the base on top of it", async () => {
+  s.test("while that check runs, the other run's result lands on the base on top of it", async () => {
     const { repo, first: b } = two;
     at.mergedByHand(repo, b.branch);
     mergedB = world().head(repo);
     assert.notEqual(mergedB, mergedA, 'the base has moved past the first landing');
     assert.deepEqual(world().read(repo, mergedB).parents[0], mergedA);
   });
-
-  await s.test(
+  s.test(
     'the first check passes: its run records its own merge commit, not the base as it now stands, and reads landed once a pass has read it',
     async () => {
       const { repo, second: a } = two;
@@ -1526,8 +1511,7 @@ test('two runs of one repository land close together: each records the commit th
       assert.equal((await stage.runWith(e(), decideRun(a.id))).decision.kind, 'landed');
     },
   );
-
-  await s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {
+  s.test('the other ending then takes the checkout, finds its result on the base, and records its own merge commit', async () => {
     const { repo, first: b } = two;
     assert.deepEqual((await at.pass(b.id)).filed, ['ship'], 'the checkout is free');
     settle(`${b.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
@@ -1539,9 +1523,15 @@ test('two runs of one repository land close together: each records the commit th
   });
 });
 
-test("an ending its workflow files with no gate waits for the checkout while another run's landing check runs, and is filed on the first pass after that run lands", async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
+describe("an ending its workflow files with no gate waits for the checkout while another run's landing check runs, and is filed on the first pass after that run lands", () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let one!: Awaited<ReturnType<typeof aLandingAndAQuickRun>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
   const aLandingAndAQuickRun = async () => {
     const repo = at.aRepo();
     const a = await at.stagedAndSigned({ repo });
@@ -1549,9 +1539,7 @@ test("an ending its workflow files with no gate waits for the checkout while ano
     settle(`${b.id}-review`, 'succeeded', { ...SIGNED, again: false });
     return { repo, a, b };
   };
-  let one: Awaited<ReturnType<typeof aLandingAndAQuickRun>>;
-
-  await s.test(
+  s.test(
     "while A's landing check is pending, B's ungated ending is not filed, and every screen says A's ship has the checkout",
     async () => {
       one = await aLandingAndAQuickRun();
@@ -1565,21 +1553,18 @@ test("an ending its workflow files with no gate waits for the checkout while ano
       assert.deepEqual((await stage.runWith(e(), decideRun(b.id))).checkout, { run: a.id, step: 'ship' });
     },
   );
-
-  await s.test("while A's check runs, B still files nothing", async () => {
+  s.test("while A's check runs, B still files nothing", async () => {
     const { a, b } = one;
     settle(a.checkId, 'working');
     assert.deepEqual((await at.pass(b.id)).filed, []);
   });
-
-  await s.test("A's check passed and its merge is staged, not yet landed: B still files nothing", async () => {
+  s.test("A's check passed and its merge is staged, not yet landed: B still files nothing", async () => {
     const { repo, a, b } = one;
     settle(a.checkId, 'succeeded', undefined, 0);
     assert.deepEqual((await at.pass(b.id)).filed, []);
     assert.equal(at.mergeHead(repo), true, "A's merge is still staged");
   });
-
-  await s.test("A's pass lands its merge, and B's ending is filed on the pass after, in the repository's own checkout", async () => {
+  s.test("A's pass lands its merge, and B's ending is filed on the pass after, in the repository's own checkout", async () => {
     const { repo, a, b } = one;
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
@@ -1587,8 +1572,7 @@ test("an ending its workflow files with no gate waits for the checkout while ano
     assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
     assert.equal(runRecord(ROOT, b.id).steps.ship?.workspace, repo);
   });
-
-  await s.test("A's check refused the merged tree: B waits until A's pass aborts the merge, and is filed on the pass after", async () => {
+  s.test("A's check refused the merged tree: B waits until A's pass aborts the merge, and is filed on the pass after", async () => {
     const { repo, a, b } = await aLandingAndAQuickRun();
     settle(a.checkId, 'failed', undefined, 1);
     assert.deepEqual((await at.pass(b.id)).filed, [], 'the refused merge is staged until A aborts it');
@@ -1601,26 +1585,36 @@ test("an ending its workflow files with no gate waits for the checkout while ano
   });
 });
 
-test("a try the run files itself of its land waits for the checkout while another run's landing holds it, and is filed on the first pass after that run lands", async (t) => {
-  const s = story(t);
-  const { settle, end } = stage.board();
-  const repo = at.aRepo();
-  const a = await at.workDone(at.ungatedFolder(), repo);
-  const b = await at.workDone(at.ungatedFolder(), repo);
-
-  await s.test("B's review passes first, and B's land takes the checkout: A's land, filed by its own review's pass, waits", async () => {
+describe("a try the run files itself of its land waits for the checkout while another run's landing holds it, and is filed on the first pass after that run lands", () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let end!: (
+    id: string,
+    phase: import('agent-runtime').TaskPhase,
+    end?: import('agent-runtime/testing').TestEnd,
+  ) => import('agent-runtime/testing').TestTask;
+  let repo!: string;
+  let a!: { repo: string; id: string; branch: string };
+  let b!: { repo: string; id: string; branch: string };
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ settle, end } = stage.board());
+    repo = at.aRepo();
+    a = await at.workDone(at.ungatedFolder(), repo);
+    b = await at.workDone(at.ungatedFolder(), repo);
+    return t.end;
+  });
+  const s = story(test);
+  s.test("B's review passes first, and B's land takes the checkout: A's land, filed by its own review's pass, waits", async () => {
     settle(`${b.id}-review`, 'succeeded', { ...SIGNED, again: false });
     assert.deepEqual((await at.pass(b.id)).filed, ['ship']);
     settle(`${a.id}-review`, 'succeeded', { ...SIGNED, again: false });
     assert.deepEqual((await at.pass(a.id)).filed, [], "B's land holds the checkout");
   });
-
-  await s.test("B's land ends without its closeout, and A's land, the older claim, takes the checkout", async () => {
+  s.test("B's land ends without its closeout, and A's land, the older claim, takes the checkout", async () => {
     end(`${b.id}-ship`, 'succeeded', { reason: 'harness', closedOut: false, former: 'unsigned' });
     assert.deepEqual((await at.pass(a.id)).filed, ['ship']);
   });
-
-  await s.test("B's sign-off try is not filed while A's land holds the checkout", async () => {
+  s.test("B's sign-off try is not filed while A's land holds the checkout", async () => {
     const passed = await at.pass(b.id);
     assert.deepEqual([passed.tried, passed.filed], [[], []]);
     assert.equal(runRecord(ROOT, b.id).steps.ship?.taskId, `${b.id}-ship`, 'no try of it filed');
@@ -1630,15 +1624,13 @@ test("a try the run files itself of its land waits for the checkout while anothe
     assert.match(ship.note ?? '', new RegExp(`waiting on the checkout \\(${a.id}'s ship has it\\)`), 'and its try waits');
     assert.deepEqual((await stage.runWith(e(), decideRun(b.id))).checkout, { run: a.id, step: 'ship' });
   });
-
-  await s.test("while A's check runs on its staged merge, B's try still waits", async () => {
+  s.test("while A's check runs on its staged merge, B's try still waits", async () => {
     world().stage(repo, a.branch);
     settle(`${a.id}-ship`, 'succeeded', { ...SIGNED, message: MESSAGE });
     assert.deepEqual((await at.pass(a.id)).checked, ['ship']);
     assert.deepEqual((await at.pass(b.id)).tried, []);
   });
-
-  await s.test("A lands, and B's sign-off try is filed on the pass after, in the repository's own checkout", async () => {
+  s.test("A lands, and B's sign-off try is filed on the pass after, in the repository's own checkout", async () => {
     settle(`${a.id}-ship-check`, 'succeeded', undefined, 0);
     await at.pass(a.id);
     const landed = runRecord(ROOT, a.id).steps.ship?.landed;
@@ -1649,11 +1641,15 @@ test("a try the run files itself of its land waits for the checkout while anothe
   });
 });
 
-test('a checkout held by a merge staged and not landed, and claimed by no run the pass will not file', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-
-  await s.test(
+describe('a checkout held by a merge staged and not landed, and claimed by no run the pass will not file', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "REFUSED at shipped defaults: `nemia rm` of a run whose merge is staged and not landed, and another run's ending, wait until the run has landed it",
     async () => {
       const repo = at.aRepo();
@@ -1679,8 +1675,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
       assert.notEqual((await stage.runWith(e(), forgetRun(id))).kind, 'refused');
     },
   );
-
-  await s.test(
+  s.test(
     'a run whose ending the pass will not file claims no checkout: one waiting on a run that has not landed, and one the cap on runs in flight holds, each hold nobody — however old their word',
     async () => {
       const repo = at.aRepo();
@@ -1707,8 +1702,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
       }
     },
   );
-
-  await s.test(
+  s.test(
     "a run with nothing filed is held by the checkout like any other: its ending is its root, and a root is not filed into a directory another run's ship is in",
     async () => {
       const repo = at.aRepo();
@@ -1738,12 +1732,16 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
   );
 });
 
-test("a send-back at the ending's gate goes to the work, merges nothing, and the gate holds again once the work signs off", async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
-  let gate: Awaited<ReturnType<typeof at.atTheGate>>;
-
-  await s.test(
+describe("a send-back at the ending's gate goes to the work, merges nothing, and the gate holds again once the work signs off", () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let gate!: Awaited<ReturnType<typeof at.atTheGate>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'REFUSED at shipped defaults: a try of the ending step itself, which has not run, names the approval that files it and the send-back to the work',
     async () => {
       gate = await at.atTheGate();
@@ -1762,8 +1760,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
       assert.equal(runRecord(ROOT, id).steps.ship.taskId, null, 'and nothing was written');
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED at the ending's gate, at shipped defaults: a send-back with no words names the step at the gate — ship, not the work — and the send-back it names is honoured",
     async () => {
       const { id } = gate;
@@ -1785,8 +1782,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
       assert.deepEqual([ask.step, ask.try], ['implement', 2]);
     },
   );
-
-  await s.test(
+  s.test(
     'a sent-back ending merges nothing: the work is filed again, the checkout is untouched, and the gate holds again once it signs off',
     async () => {
       const { repo, id, branch, base } = gate;
@@ -1803,16 +1799,11 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
       assert.equal(await at.isLanded(at.repositoryRun(runRecord(ROOT, id)), branch), false);
     },
   );
-
-  await s.test(
-    'the approval the send-back refusal names is honoured too, on a run of its own, since one takes the other back',
-    async () => {
-      const other = await at.atTheGate();
-      assert.equal((await stage.runWith(e(), approveRun(other.id, 'ship'))).approval.step, 'ship');
-    },
-  );
-
-  await s.test(
+  s.test('the approval the send-back refusal names is honoured too, on a run of its own, since one takes the other back', async () => {
+    const other = await at.atTheGate();
+    assert.equal((await stage.runWith(e(), approveRun(other.id, 'ship'))).approval.step, 'ship');
+  });
+  s.test(
     "REFUSED at shipped defaults: `nemia retry --round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed",
     async () => {
       const { id } = await at.workDone(at.loopingFolder());
@@ -1837,14 +1828,18 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
   );
 });
 
-test('an ending approved and waiting on the checkout, in a round after the first: the send-back of the work is accepted, spends the approval, and the gate holds again once the work signs off — a restart between the two included', async (t) => {
-  const s = story(t);
-  const { settle } = stage.board();
+describe('an ending approved and waiting on the checkout, in a round after the first: the send-back of the work is accepted, spends the approval, and the gate holds again once the work signs off — a restart between the two included', () => {
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let holder!: Awaited<ReturnType<typeof at.atTheGate>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
   const OBJECTION = 'the soak legs failed on the very test this fixes';
-  let holder: Awaited<ReturnType<typeof at.atTheGate>>;
   let id = '';
-
-  await s.test(
+  s.test(
     "round 2 of a loop signs off, ship is approved, and another run's ship holds the checkout: ship is approved and nothing of it is filed",
     async () => {
       holder = await at.atTheGate();
@@ -1866,27 +1861,21 @@ test('an ending approved and waiting on the checkout, in a round after the first
       assert.equal(await statusOf(id, 'ship'), `waiting on the checkout (${holder.id}'s ship has it)`);
     },
   );
-
-  await s.test(
-    'the send-back is offered there — on `nemia ls` and on a second approval — and the offered command is accepted',
-    async () => {
-      const offered = `nemia retry ${id} review --message "<objection>"`;
-      assert.ok((await shipOf(id)).note?.includes(offered), JSON.stringify((await shipOf(id)).note));
-      await assert.rejects(stage.runWith(e(), approveRun(id, 'ship')), refusedNaming('already approved', offered));
-      const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: OBJECTION }));
-      assert.deepEqual([ask.step, ask.try], ['review', 3]);
-    },
-  );
-
-  await s.test('the pass files the work again, not the ending, and the approval is spent: kept, never removed', async () => {
+  s.test('the send-back is offered there — on `nemia ls` and on a second approval — and the offered command is accepted', async () => {
+    const offered = `nemia retry ${id} review --message "<objection>"`;
+    assert.ok((await shipOf(id)).note?.includes(offered), JSON.stringify((await shipOf(id)).note));
+    await assert.rejects(stage.runWith(e(), approveRun(id, 'ship')), refusedNaming('already approved', offered));
+    const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: OBJECTION }));
+    assert.deepEqual([ask.step, ask.try], ['review', 3]);
+  });
+  s.test('the pass files the work again, not the ending, and the approval is spent: kept, never removed', async () => {
     const sent = await at.pass(id);
     assert.deepEqual([sent.tried, sent.filed], [['review'], []]);
     assert.equal(runRecord(ROOT, id).steps.ship.taskId, null);
     assert.ok(!at.asksOf(id).includes('approve-ship-1'), 'no longer in force');
     assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'approve-ship-1')), 'kept as given, spent');
   });
-
-  await s.test(
+  s.test(
     'a restart that finds the spent approval where it was given still reads it spent: the work it approved is not the work that stands',
     async () => {
       const asksDir = path.join(ROOT, 'runs', `${id}.asks`);
@@ -1909,12 +1898,11 @@ test('an ending approved and waiting on the checkout, in a round after the first
   );
 });
 
-test('an ending approved by an older nemia and waiting on the checkout: its approval names no work, so a send-back is offered nowhere, is refused naming how to take it back, and is taken once it is', async (t) => {
-  const s = story(t);
+describe('an ending approved by an older nemia and waiting on the checkout: its approval names no work, so a send-back is offered nowhere, is refused naming how to take it back, and is taken once it is', () => {
+  const s = story(test);
   let first = '';
   let asksDir = '';
-
-  await s.test('REFUSED: no try of the work would spend the approval, so the send-back names the file to take back', async () => {
+  s.test('REFUSED: no try of the work would spend the approval, so the send-back names the file to take back', async () => {
     const two = await at.twoApproved();
     first = two.first.id;
     asksDir = path.join(ROOT, 'runs', `${first}.asks`);
@@ -1928,8 +1916,7 @@ test('an ending approved by an older nemia and waiting on the checkout: its appr
     );
     await assert.rejects(stage.runWith(e(), approveRun(first, 'ship')), refusedNaming(`nemia approve ${first} ship --off`));
   });
-
-  await s.test('taken back as the refusal says, the gate holds again and the send-back is taken', async () => {
+  s.test('taken back as the refusal says, the gate holds again and the send-back is taken', async () => {
     await stage.main(['approve', first, 'ship', '--off'], e());
     assert.ok(fs.existsSync(path.join(asksDir, 'done', 'approve-ship-1')), 'the approval is set aside, not deleted');
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
@@ -1941,8 +1928,8 @@ test('an ending approved by an older nemia and waiting on the checkout: its appr
   });
 });
 
-test('an ending approved and waiting on the checkout: a person takes the approval back, and it waits at its gate again; once its land is filed, taking it back is refused', async (t) => {
-  const s = story(t);
+describe('an ending approved and waiting on the checkout: a person takes the approval back, and it waits at its gate again; once its land is filed, taking it back is refused', () => {
+  const s = story(test);
   const PERSON = { kind: 'person' } as const;
   let first = '';
   let second = '';
@@ -1954,8 +1941,7 @@ test('an ending approved and waiting on the checkout: a person takes the approva
       work?: Record<string, number>;
       takenBack?: { at: string; actor?: { kind: string } };
     };
-
-  await s.test('taken back, by whom and when: the approval moves to done/ and the ending waits at its gate', async () => {
+  s.test('taken back, by whom and when: the approval moves to done/ and the ending waits at its gate', async () => {
     const two = await at.twoApproved();
     [first, second] = [two.first.id, two.second.id];
     assert.deepEqual([(await at.pass(first)).filed, (await at.pass(second)).filed], [[], ['ship']]);
@@ -1974,13 +1960,11 @@ test('an ending approved and waiting on the checkout: a person takes the approva
     assert.deepEqual((await at.pass(first)).filed, [], 'nothing of ship is filed on the approval taken back');
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
   });
-
-  await s.test('REFUSED: a gate not approved has nothing to take back, and --off takes no words', async () => {
+  s.test('REFUSED: a gate not approved has nothing to take back, and --off takes no words', async () => {
     await assert.rejects(stage.main(['approve', first, 'ship', '--off'], e()), refusedAs('Conflict', `nemia approve ${first} ship`));
     await assert.rejects(stage.main(['approve', first, 'ship', '--off', '--message', 'no'], e()), refusedAs('Invalid', '--off'));
   });
-
-  await s.test(
+  s.test(
     'an approval an older nemia wrote, naming no work, is taken back the same on a held run, kept beside the first in done/',
     async () => {
       const { file } = await stage.runWith(e(), approveRun(first, 'ship'));
@@ -1994,20 +1978,25 @@ test('an ending approved and waiting on the checkout: a person takes the approva
       assert.deepEqual([kept.at, kept.work, typeof kept.takenBack?.at], ['2026-09-17T07:00:00.000Z', undefined, 'string']);
     },
   );
-
-  await s.test('REFUSED once its land is filed: what it approved has run, and the approval stays', async () => {
+  s.test('REFUSED once its land is filed: what it approved has run, and the approval stays', async () => {
     assert.equal(runRecord(ROOT, second).steps.ship.taskId, `${second}-ship`);
     await assert.rejects(stage.main(['approve', second, 'ship', '--off'], e()), refusedAs('Conflict', `nemia ls ${second}`));
     assert.ok(fs.existsSync(path.join(asksDir(second), 'approve-ship-1')), 'the approval is not moved');
   });
 });
 
-test('an ending that stopped on the base branch sends the work back through the loop: review hears the objection and what ship needs, implement gets a round, and ship waits at its gate for a new approval', async (t) => {
-  const s = story(t);
-  const { tasks, filings, settle } = stage.board();
-  let stopped: Awaited<ReturnType<typeof at.stoppedOnBase>>;
-
-  await s.test('the decision offers both ways on from an ending stopped on its base branch, each with when to take it', async () => {
+describe('an ending that stopped on the base branch sends the work back through the loop: review hears the objection and what ship needs, implement gets a round, and ship waits at its gate for a new approval', () => {
+  let tasks!: Map<string, import('agent-runtime/testing').TestTask>;
+  let filings!: string[];
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let stopped!: Awaited<ReturnType<typeof at.stoppedOnBase>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ tasks, filings, settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test('the decision offers both ways on from an ending stopped on its base branch, each with when to take it', async () => {
     stopped = await at.stoppedOnBase();
     const { id } = stopped;
     assert.equal(runRecord(ROOT, id).steps.ship.taskId, `${id}-ship`, 'ship ran on its approval');
@@ -2029,20 +2018,12 @@ test('an ending that stopped on the base branch sends the work back through the 
       printed.join('\n'),
     );
   });
-
-  await s.test(
-    'REFUSED at shipped defaults: a merge of an ending stopped on a base that merges cleanly says to land it again',
-    async () => {
-      const { id } = stopped;
-      fs.mkdirSync(path.join(ROOT, 'runs', `${id}.asks`), { recursive: true });
-      await assert.rejects(
-        stage.runWith(e(), mergeRun(id)),
-        mergeRefused(id, 'nothing to merge', `land it again: nemia retry ${id} ship.`),
-      );
-    },
-  );
-
-  await s.test(
+  s.test('REFUSED at shipped defaults: a merge of an ending stopped on a base that merges cleanly says to land it again', async () => {
+    const { id } = stopped;
+    fs.mkdirSync(path.join(ROOT, 'runs', `${id}.asks`), { recursive: true });
+    await assert.rejects(stage.runWith(e(), mergeRun(id)), mergeRefused(id, 'nothing to merge', `land it again: nemia retry ${id} ship.`));
+  });
+  s.test(
     '`nemia decide` offers no merge where the work merges cleanly onto the base: a base that merges cleanly is landed again, never merged',
     async () => {
       assert.deepEqual(
@@ -2051,8 +2032,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       );
     },
   );
-
-  await s.test(
+  s.test(
     'the send-back is filed: the reviewer again with the objection and what ship said, the ending not, and nothing merged',
     async () => {
       const { repo, id, base } = stopped;
@@ -2087,8 +2067,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       );
     },
   );
-
-  await s.test(
+  s.test(
     'the reviewer asks for a round, implement goes on, and once the loop settles ship waits at its gate for a new approval of its try 2',
     async () => {
       const { repo, id } = stopped;
@@ -2110,8 +2089,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       assert.equal(tasks.get(`${id}-ship-try2`)!.spec.cwd, repo);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is",
     async () => {
       stopped = await at.stoppedOnBase();
@@ -2148,8 +2126,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       );
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED at shipped defaults: a step is handed off once — a person's edit in the reviewed worktree while the run waits at its ending's gate is not committed under review's name, pass after pass",
     async () => {
       const { id } = stopped;
@@ -2169,8 +2146,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       assert.match(at.uncommitted(review.workspace!), /NOTES\.md/, "the edit is still the person's, uncommitted");
     },
   );
-
-  await s.test(
+  s.test(
     "a send-back composes with `nemia retry --round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval",
     async () => {
       const { id } = await at.stoppedOnBase(at.loopingFolder(1));
@@ -2198,8 +2174,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       assert.deepEqual((await at.pass(id)).filed, ['ship']);
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: a folder with no loop before its ending has no way to send the work back from it, and says so — landing again is still there',
     async () => {
       const { id } = await at.stoppedOnBase(at.folder());
@@ -2230,8 +2205,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       assert.notEqual(await statusOf(id, 'ship'), 'awaiting approval', 'not at its gate again');
     },
   );
-
-  await s.test(
+  s.test(
     '`nemia decide` offers the merge where the work conflicts with the base: the bare `nemia refresh --base`, labelled merge — and not once it is asked',
     async () => {
       stopped = await at.stoppedOnBase();
@@ -2256,8 +2230,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       assert.deepEqual(await merges(), [], 'nor once it is asked');
     },
   );
-
-  await s.test(
+  s.test(
     'a merge a pass filed and never wrote down is adopted as a merge: the round kept, the base moved to the commit merged, nothing filed twice',
     async () => {
       const { repo, id } = stopped;
@@ -2278,11 +2251,16 @@ test('an ending that stopped on the base branch sends the work back through the 
   );
 });
 
-test('a loop out of rounds before its ending: accepted as it stands, sent back after its acceptance, or sent to merge the base without a round', async (t) => {
-  const s = story(t);
-  const { tasks, settle } = stage.board();
-
-  await s.test(
+describe('a loop out of rounds before its ending: accepted as it stands, sent back after its acceptance, or sent to merge the base without a round', () => {
+  let tasks!: Map<string, import('agent-runtime/testing').TestTask>;
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ tasks, settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "the incident's other ending: at rounds exhausted a person accepts the work as it stands, and ship reaches its gate on their word — approved, filed, and told why the findings are still open",
     async () => {
       const { repo, id } = await at.atTheCap();
@@ -2316,8 +2294,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
       assert.equal(tasks.get(`${id}-ship`)!.spec.cwd, repo, "and filed in the repository's own checkout as ever");
     },
   );
-
-  await s.test(
+  s.test(
     "a send-back at the ending's gate spends the acceptance: the loop is open again, its findings with it, and the work goes back to the reviewer",
     async () => {
       const { id } = await at.atTheCap();
@@ -2341,8 +2318,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
       );
     },
   );
-
-  await s.test(
+  s.test(
     'a loop out of rounds is sent to merge without `nemia retry --round`: the merge spends no round, a round or an acceptance is REFUSED while it is asked, and the reviewer after it hands on to the gate',
     async () => {
       const { repo, id } = await at.atTheCap();
@@ -2381,11 +2357,17 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
   );
 });
 
-test('`nemia refresh --base` of the base into the work: refused where nothing conflicts as text, asked where it does, and asked where the landing check refused the merged tree — the conflict is semantic', async (t) => {
-  const s = story(t);
-  const { tasks, settle } = stage.board();
-
-  await s.test(
+describe('`nemia refresh --base` of the base into the work: refused where nothing conflicts as text, asked where it does, and asked where the landing check refused the merged tree — the conflict is semantic', () => {
+  let tasks!: Map<string, import('agent-runtime/testing').TestTask>;
+  let settle!: (id: string, phase: import('objects').EnginePhase, closeout?: unknown, exitCode?: number) => void;
+  let refused!: Awaited<ReturnType<typeof at.refusedOnBase>>;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ tasks, settle } = stage.board());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "REFUSED: a merge asked of quick's shape — a review that passed and an ungated landing not yet filed — which the run files on the next tick",
     async () => {
       for (const base of ['moved', 'clean'] as const) {
@@ -2402,8 +2384,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       }
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: a merge of work whose trial merge onto the base is clean — nothing to merge, and the refusal says to approve the landing',
     async () => {
       const { id, branch } = await at.workDone(at.loopingFolder());
@@ -2416,8 +2397,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       );
     },
   );
-
-  await s.test('REFUSED at shipped defaults: a merge of a run with no loop says to send its result step back', async () => {
+  s.test('REFUSED at shipped defaults: a merge of a run with no loop says to send its result step back', async () => {
     const repo = at.aRepo();
     const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: at.folder() }));
     await at.pass(run.id);
@@ -2430,8 +2410,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       mergeRefused(run.id, 'implement closes no loop', `nemia retry ${run.id} implement --message "merge main, keeping both meanings".`),
     );
   });
-
-  await s.test(
+  s.test(
     "a merge past round 1 owes no replies: the target's merge try is handed no findings, and its empty list signs it off, so review is filed after it",
     async () => {
       const { repo, id } = await at.workDone(at.loopingFolder(2));
@@ -2455,10 +2434,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       assert.ok(tasks.has(`${id}-review-try3`), 'the merge try signed off with no replies, and review reads the merge');
     },
   );
-
-  let refused: Awaited<ReturnType<typeof at.refusedOnBase>>;
-
-  await s.test(
+  s.test(
     'nemia decide reads the semantic conflict off the last pass at an ending whose landing check refused the merged tree: clean as text, refused on the base as it is',
     async () => {
       refused = await at.refusedOnBase();
@@ -2478,8 +2454,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       );
     },
   );
-
-  await s.test(
+  s.test(
     'nemia decide offers the merge of work its landing check refused, saying the conflict is semantic, and `nemia refresh --base` says what it asked; the former `nemia merge` still runs as it, and plain `nemia refresh` asks no merge',
     async (st) => {
       const { id, base } = refused;
@@ -2509,8 +2484,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       assert.equal(asks(id).length, 1, 'no second merge is asked');
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: a merge of work that merges cleanly onto a base moved since its landing check refused it is nothing to merge, in the words of any clean trial merge; a base that moves into a conflict is a merge as text',
     async () => {
       const { repo, id, branch } = await at.refusedOnBase();
@@ -2530,8 +2504,7 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
       );
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: a merge of work that merges cleanly whose landing check did not finish is nothing to merge',
     async () => {
       const { id, branch } = await at.refusedOnBase(false);

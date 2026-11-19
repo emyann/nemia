@@ -8,7 +8,7 @@
  */
 process.env.TZ = 'Asia/Tokyo';
 
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 const ZONE = 'Asia/Tokyo';
@@ -18,14 +18,14 @@ const { agoWords, dateParts, whenWords } = await import('../src/lib/runWords.ts'
 const { fireWord } = await import('../src/lib/schedules.ts');
 const { timeOfDay, timeToTheSecond, zoneOf } = await import('../src/lib/timeOfDay.ts');
 
-test('a writer handed no time zone writes the moment where the machine is, set here to Asia/Tokyo', async (t) => {
-  await t.test('the machine is the zone this file set, so a writer handed none can be told from one handed UTC', () => {
+describe('a writer handed no time zone writes the moment where the machine is, set here to Asia/Tokyo', () => {
+  test('the machine is the zone this file set, so a writer handed none can be told from one handed UTC', () => {
     assert.equal(Intl.DateTimeFormat().resolvedOptions().timeZone, ZONE, 'the zone is set before a writer is loaded');
     assert.deepEqual(zoneOf(), {}, 'no zone is no context: date-fns falls back to the machine, as the browser does to the person');
     assert.notEqual(zoneOf(ZONE).in, undefined, 'a zone is a context of its own');
     assert.notEqual(timeOfDay(new Date('2026-10-12T13:11:00Z')), timeOfDay(new Date('2026-10-12T13:11:00Z'), 'UTC'), 'not UTC');
   });
-  await t.test('every writer handed no time zone writes the words the machine’s zone gives, the same as that zone named', () => {
+  test('every writer handed no time zone writes the words the machine’s zone gives, the same as that zone named', () => {
     const at = new Date('2026-10-12T13:11:00Z');
     const now = new Date('2026-10-12T14:00:00Z');
     assert.equal(timeOfDay(at), '10:11 PM', 'an hour: 13:11 UTC is 22:11 in Tokyo');
@@ -40,7 +40,7 @@ test('a writer handed no time zone writes the moment where the machine is, set h
     assert.equal(clockWord(at, now), '10:11 PM', 'the same day in Tokyo');
     assert.equal(fireWord(at, now), '10:11 PM');
   });
-  await t.test('the day and the year are decided in the machine’s zone too, never in UTC', () => {
+  test('the day and the year are decided in the machine’s zone too, never in UTC', () => {
     const across = [new Date('2026-10-12T23:30:00Z'), new Date('2026-10-13T01:00:00Z')] as const;
     assert.equal(whenWords(...across), '8:30 AM', 'one day apart in UTC, both the 13th in Tokyo: the date is dropped');
     assert.equal(whenWords(...across, 'UTC'), '12 Oct 11:30 PM', 'and the same pair named UTC keeps it');

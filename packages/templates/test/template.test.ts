@@ -2,7 +2,7 @@
  * The environment a template's test spawns `nemia` with (`storeEnv`) is CI's, whatever the session that runs it: the telemetry and the
  * daemon's per-session variables in this process's environment reach no child built on it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { SERVING_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
@@ -26,7 +26,7 @@ const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIA
 
 test("REFUSED under the daemon's environment: storeEnv carries none of its per-session or serving variables nor its collector", (t) => {
   const was = Object.fromEntries(Object.keys(DAEMONS).map((n) => [n, process.env[n]]));
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const [n, v] of Object.entries(was)) {
       if (v === undefined) delete process.env[n];
       else process.env[n] = v;

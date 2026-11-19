@@ -3,7 +3,7 @@
  * (`routeOfHref`, `lib/routeHref.ts`), so the link under her bubble (`Said`) reads and preloads the run its address names, never a run
  * whose id holds the address's query.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
 

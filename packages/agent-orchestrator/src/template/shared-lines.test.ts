@@ -2,7 +2,7 @@
  * The laws of `withSharedLines` and `onceEach` the verifier leaves bounded (`contracts/shared-lines.contract.ts`), held here on a table:
  * every line the agent writes and every line of a file it names is kept, nothing else is added, and each line is written once.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { onceEach, withSharedLines } from './shared-lines.ts';
 

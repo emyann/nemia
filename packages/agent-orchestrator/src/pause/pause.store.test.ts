@@ -8,7 +8,7 @@
  * the store's own names the pause's file.
  */
 import { type Env, settingsOf } from '../config/config.store.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,8 +35,8 @@ function refusedAs(fn: () => unknown, kind: string, ...facts: string[]): void {
   assert.fail('expected a refusal');
 }
 
-test('the pause on disk: put, read back, refused, lifted, read when it does not parse, and a cordon put before the switch', async (t) => {
-  await t.test('a pause is put once, read back, refused while it stands, and lifted once', () => {
+describe('the pause on disk: put, read back, refused, lifted, read when it does not parse, and a cordon put before the switch', () => {
+  test('a pause is put once, read back, refused while it stands, and lifted once', () => {
     assert.equal(readPause(ROOT), null);
     const put = putPause(ROOT, { why: 'merging by hand', by: 'ann' }, new Date('2026-10-04T12:00:00.000Z'));
     assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' });
@@ -56,21 +56,21 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     assert.equal(readPause(ROOT), null);
     refusedAs(() => resumePause(ROOT), 'Missing', 'not paused', 'nemia pause');
   });
-  await t.test('a pause put with no name is put by the machine user, and with no words has no why', () => {
+  test('a pause put with no name is put by the machine user, and with no words has no why', () => {
     const put = putPause(ROOT, {});
     assert.equal(typeof put.by, 'string');
     assert.ok(put.by.length > 0);
     assert.equal('why' in put, false);
     resumePause(ROOT);
   });
-  await t.test('a pause file that does not read as one still pauses the store, its fields empty', () => {
+  test('a pause file that does not read as one still pauses the store, its fields empty', () => {
     for (const text of ['not json', '[1, 2]', '{"at": 3, "by": ["x"]}']) {
       fs.writeFileSync(pauseFile(ROOT), text);
       assert.deepEqual(readPause(ROOT), { at: '', by: '' }, text);
       assert.deepEqual(resumePause(ROOT), { at: '', by: '' });
     }
   });
-  await t.test('a cordon put before the switch is the pause: read, refused a second, unschedulable to the runtime, and resumed', () => {
+  test('a cordon put before the switch is the pause: read, refused a second, unschedulable to the runtime, and resumed', () => {
     const cordon = { at: '2026-10-03T08:00:00.000Z', by: 'ann', why: 'merging by hand' };
     fs.writeFileSync(path.join(ROOT, 'cordon'), `${JSON.stringify(cordon)}\n`);
     assert.deepEqual(readPause(ROOT), cordon);
@@ -80,7 +80,7 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'nemia resume removes it');
     assert.equal(storeAdmission(ROOT, settingsOf(ENV)).unschedulable(), false);
   });
-  await t.test('a pause put with a timeout keeps it on its file; an old file of `{at, by}` has none', () => {
+  test('a pause put with a timeout keeps it on its file; an old file of `{at, by}` has none', () => {
     const put = putPause(ROOT, { by: 'ann' }, new Date('2026-10-04T12:00:00.000Z'), 900_000);
     assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', timeoutMs: 900_000 });
     assert.deepEqual(readPause(ROOT), put);
@@ -91,31 +91,28 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     assert.deepEqual(readPause(ROOT), { at: '2026-10-03T08:00:00.000Z', by: 'ann' }, 'a timeout that is no count of milliseconds is none');
     resumePause(ROOT);
   });
-  await t.test('cutPause sets the timeout to 0, keeping when, by whom and why; with no pause it is refused', () => {
+  test('cutPause sets the timeout to 0, keeping when, by whom and why; with no pause it is refused', () => {
     putPause(ROOT, { by: 'ann', why: 'the bill' }, new Date('2026-10-04T12:00:00.000Z'), 600_000);
     assert.deepEqual(cutPause(ROOT), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', timeoutMs: 0 });
     assert.deepEqual(readPause(ROOT), { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'the bill', timeoutMs: 0 });
     resumePause(ROOT);
     refusedAs(() => cutPause(ROOT), 'Missing', 'nemia pause');
   });
-  await t.test(
-    'a pause put by a caller keeps its `by` and, beside it, who put it, through a cut; one that names no actor reads with none',
-    () => {
-      const actor = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
-      const put = putPause(ROOT, { by: 'ann', actor }, new Date('2026-10-04T12:00:00.000Z'));
-      assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', actor });
-      assert.deepEqual(readPause(ROOT), put);
-      assert.deepEqual(cutPause(ROOT), { ...put, timeoutMs: 0 }, 'a cut keeps who put it');
-      resumePause(ROOT);
-      fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', actor: { kind: 'robot' } })}\n`);
-      assert.deepEqual(
-        readPause(ROOT),
-        { at: '2026-10-03T08:00:00.000Z', by: 'ann' },
-        'an actor that does not read is none, the pause stands',
-      );
-      resumePause(ROOT);
-    },
-  );
+  test('a pause put by a caller keeps its `by` and, beside it, who put it, through a cut; one that names no actor reads with none', () => {
+    const actor = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+    const put = putPause(ROOT, { by: 'ann', actor }, new Date('2026-10-04T12:00:00.000Z'));
+    assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', actor });
+    assert.deepEqual(readPause(ROOT), put);
+    assert.deepEqual(cutPause(ROOT), { ...put, timeoutMs: 0 }, 'a cut keeps who put it');
+    resumePause(ROOT);
+    fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', actor: { kind: 'robot' } })}\n`);
+    assert.deepEqual(
+      readPause(ROOT),
+      { at: '2026-10-03T08:00:00.000Z', by: 'ann' },
+      'an actor that does not read is none, the pause stands',
+    );
+    resumePause(ROOT);
+  });
 });
 
 test("the engine's ceiling is the store's sessions per pool, and none at all where the setting is refused", () => {
@@ -145,10 +142,10 @@ const BROUGHT: Readonly<Record<PauseEvent, (home: string) => unknown>> = {
   lapse: (home) => liftLapsedPause(home, () => 'gone'),
 };
 
-test('the store writes the moves its machine makes and no other: each event in each mode leaves the file where pauseMove says, or is refused as it says', async (t) => {
+describe('the store writes the moves its machine makes and no other: each event in each mode leaves the file where pauseMove says, or is refused as it says', () => {
   for (const from of PAUSE_MODES)
     for (const event of Object.keys(PAUSE_EVENTS) as PauseEvent[])
-      await t.test(`${event} on a store in ${from}`, () => {
+      test(`${event} on a store in ${from}`, () => {
         const home = scratch('wf-pause-walk-');
         ARRANGED[from](home);
         assert.equal(modeAt(home), from, 'the store stands in the mode arranged');

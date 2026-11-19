@@ -6,7 +6,7 @@
  * and made, and its resolve.
  */
 import { seatPerson } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -79,9 +79,13 @@ function installed(home: string) {
   ).app;
 }
 
-test('an install with no repository and no factory named: yours is created, read back and replaced, and the repository is asked for only where read', async (t) => {
-  const home = scratch('nemia-api-install-home-');
-  const app = installed(home);
+describe('an install with no repository and no factory named: yours is created, read back and replaced, and the repository is asked for only where read', () => {
+  let home!: string;
+  let app!: import('hono').Hono<import('../layer.ts').ApiEnv, import('hono/types').BlankSchema, '/'>;
+  beforeAll(() => {
+    home = scratch('nemia-api-install-home-');
+    app = installed(home);
+  });
   const send = (method: 'POST' | 'PUT', url: string, body: unknown) =>
     app.request(url, { method, headers: json, body: JSON.stringify(body) });
   const got = async <T>(url: string): Promise<T> => {
@@ -90,8 +94,7 @@ test('an install with no repository and no factory named: yours is created, read
     assert.equal(res.status, 200, `GET ${url}: ${JSON.stringify(body)}`);
     return body;
   };
-
-  await t.test('a workflow of yours', async () => {
+  test('a workflow of yours', async () => {
     const made = await send('POST', `/api/workflows`, {
       metadata: { name: 'notes' },
       spec: { steps: [{ name: 'write', keys: { place: 'folder' }, body: 'Write the notes.' }] },
@@ -115,8 +118,7 @@ test('an install with no repository and no factory named: yours is created, read
       [['notes', 'user']],
     );
   });
-
-  await t.test('an agent of yours', async () => {
+  test('an agent of yours', async () => {
     const spec = { description: 'Use this when notes are due.', keys: {}, instructions: 'Write it.' };
     const made = await send('POST', `/api/agents`, { metadata: { name: 'scribe' }, spec });
     const created = (await made.json()) as Agent;
@@ -169,8 +171,7 @@ test('an install with no repository and no factory named: yours is created, read
     assert.ok(!answer.includes('stray-skill') || card.status !== 200, `the card finds no skill in the folder the api runs in: ${answer}`);
     assert.equal(listed.status.card, null, `nor does the agent's own card: ${JSON.stringify(listed.status.cardError)}`);
   });
-
-  await t.test('a skill of yours, beside the builtins', async () => {
+  test('a skill of yours, beside the builtins', async () => {
     const spec = { description: 'Keeps notes short.', body: 'One fact a line.' };
     const made = await send('POST', `/api/skills`, { metadata: { name: 'short-notes' }, spec });
     const created = (await made.json()) as Skill;
@@ -189,22 +190,19 @@ test('an install with no repository and no factory named: yours is created, read
     assert.ok(list.items.some((s) => s.metadata.name === 'short-notes' && s.status.origin === 'user'));
     assert.deepEqual([...origins].sort(), ['builtin', 'user'], 'yours and the builtins, no repository');
   });
-
-  await t.test("a step's page of a workflow of yours", async () => {
+  test("a step's page of a workflow of yours", async () => {
     const page = await got<WorkflowStepPage>(`${D}/workflows/notes/steps/write`);
     assert.equal(page.factory, null, 'in the default factory');
     assert.deepEqual([page.from, page.body.trim()], ['user', 'Write the notes again.'], 'read from yours');
   });
-
-  await t.test("a template's workflows, read from its render", async () => {
+  test("a template's workflows, read from its render", async () => {
     const list = await got<{ items: Workflow[] }>('/api/templates/mill/workflows');
     assert.deepEqual(
       list.items.map((w) => [w.metadata.name, w.status.origin]),
       [['press', 'builtin']],
     );
   });
-
-  await t.test("the factories' list, a factory's proposals listed and made, and its resolve", async () => {
+  test("the factories' list, a factory's proposals listed and made, and its resolve", async () => {
     pmillIn(home);
     const factories = await got<FactoryList>('/api/factories');
     assert.deepEqual(
@@ -233,8 +231,7 @@ test('an install with no repository and no factory named: yours is created, read
     assert.notEqual(resolve.status, 422, `the resolve is judged, never refused for want of a repository: ${JSON.stringify(said)}`);
     assert.ok(!said.error?.includes('?factory='), `no repository is asked for: ${said.error}`);
   });
-
-  await t.test("REFUSED: a read of the repository's own layer, which this api has none of", async () => {
+  test("REFUSED: a read of the repository's own layer, which this api has none of", async () => {
     for (const kind of ['workflows', 'agents', 'skills']) {
       for (const url of [`${D}/${kind}?origin=repo`, `${D}/${kind}/anything?origin=repo`]) {
         const res = await app.request(url);

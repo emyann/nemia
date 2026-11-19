@@ -8,7 +8,7 @@
  * A run's feed as the tick writes it, pass by pass, and `nemia watch` reading it, is `test/run-feed.test.ts`'s; the hub and its live
  * readers `feed.verb.test.ts`'s.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -105,49 +105,46 @@ const AT = '2026-10-16T04:00:00.000Z';
 const APPROVED = { run: 'r-1', step: 'plan', word: 'approved', note: 'try 1 · at 2026-10-16T03:00:00.000Z', try: 1 };
 const CANCELLED = { word: 'cancel asked', note: 'at 2026-10-16T03:30:00.000Z' };
 
-test("recordFeed writes a one-shot once per occurrence, counted off the feed's own lines, and a restarted daemon neither again nor never", async (t) => {
-  await t.test(
-    'a denial journalled once writes one one-shot line over ten passes, counted by the step and the try alone — and a restart writes it neither again nor never',
-    () => {
-      emptyStore();
-      const push = { step: 'plan', try: 1, call: 'Bash(git push)' };
-      const memo = freshFeedMemo();
-      const at = '2026-10-16T04:00:00.000Z';
-      for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', atWork([push])]]), { at, memo });
-      assert.deepEqual(
-        shots(),
-        [
-          {
-            step: 'plan',
-            word: 'denied: Bash(git push)',
-            note: 'try 1',
-            call: 'Bash(git push)',
-            try: 1,
-            type: 'Warning',
-            source: 'runtime',
-            waits: undefined,
-          },
-        ],
-        'one denial the runtime journalled is one line, however many passes read it',
-      );
-      assert.equal(
-        lines().find((l) => l.reason === 'ToolDenied')!.message,
-        'denied: Bash(git push) · try 1',
-        "the message a person reads is the owner's wording",
-      );
+describe("recordFeed writes a one-shot once per occurrence, counted off the feed's own lines, and a restarted daemon neither again nor never", () => {
+  test('a denial journalled once writes one one-shot line over ten passes, counted by the step and the try alone — and a restart writes it neither again nor never', () => {
+    emptyStore();
+    const push = { step: 'plan', try: 1, call: 'Bash(git push)' };
+    const memo = freshFeedMemo();
+    const at = '2026-10-16T04:00:00.000Z';
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', atWork([push])]]), { at, memo });
+    assert.deepEqual(
+      shots(),
+      [
+        {
+          step: 'plan',
+          word: 'denied: Bash(git push)',
+          note: 'try 1',
+          call: 'Bash(git push)',
+          try: 1,
+          type: 'Warning',
+          source: 'runtime',
+          waits: undefined,
+        },
+      ],
+      'one denial the runtime journalled is one line, however many passes read it',
+    );
+    assert.equal(
+      lines().find((l) => l.reason === 'ToolDenied')!.message,
+      'denied: Bash(git push) · try 1',
+      "the message a person reads is the owner's wording",
+    );
 
-      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
-      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
-      assert.equal(shots().length, 2, 'the same call denied a second time in the same try is one more line, and no repeat of the first');
+    recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
+    recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo });
+    assert.equal(shots().length, 2, 'the same call denied a second time in the same try is one more line, and no repeat of the first');
 
-      const restarted = freshFeedMemo();
-      recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo: restarted });
-      assert.equal(shots().length, 2, 'a daemon with no fold reads the feed and writes neither of them again');
-      recordFeed(ROOT, new Map([['r-1', atWork([push, push, push])]]), { at, memo: restarted });
-      assert.equal(shots().length, 3, 'nor misses the third');
-    },
-  );
-  await t.test('REFUSED: a one-shot is counted by the step and the try, not by what it reads back as a message', () => {
+    const restarted = freshFeedMemo();
+    recordFeed(ROOT, new Map([['r-1', atWork([push, push])]]), { at, memo: restarted });
+    assert.equal(shots().length, 2, 'a daemon with no fold reads the feed and writes neither of them again');
+    recordFeed(ROOT, new Map([['r-1', atWork([push, push, push])]]), { at, memo: restarted });
+    assert.equal(shots().length, 3, 'nor misses the third');
+  });
+  test('REFUSED: a one-shot is counted by the step and the try, not by what it reads back as a message', () => {
     emptyStore();
     const memo = freshFeedMemo();
     const at = '2026-10-16T04:00:00.000Z';
@@ -160,7 +157,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     recordFeed(ROOT, new Map([['r-1', atWork([first, { ...first, try: 2 }])]]), { at, memo: freshFeedMemo() });
     assert.equal(shots().length, 2, 'and the same call on another try is its own line');
   });
-  await t.test("a person's act is one line per act, never one per pass — and a restarted daemon writes it neither again nor never", () => {
+  test("a person's act is one line per act, never one per pass — and a restarted daemon writes it neither again nor never", () => {
     emptyStore();
     const memo = freshFeedMemo();
     const acts = withOnce({ acts: [APPROVED, CANCELLED], held: '2026-10-16T03:45:00.000Z' });
@@ -215,7 +212,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'a daemon with no fold reads the feed and writes none of them again',
     );
   });
-  await t.test("a person's act says who acted where the record says, and who acted is no part of what counts it", () => {
+  test("a person's act says who acted where the record says, and who acted is no part of what counts it", () => {
     emptyStore();
     const memo = freshFeedMemo();
     const person = { kind: 'person', token: 'laptop' } as const;
@@ -244,7 +241,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'the same acts read with no actor are the occurrences already said, and a restarted daemon writes none again',
     );
   });
-  await t.test('a second act of the same kind gets its own line: the try an approval opens is part of what counts it', () => {
+  test('a second act of the same kind gets its own line: the try an approval opens is part of what counts it', () => {
     emptyStore();
     const memo = freshFeedMemo();
     const first = { acts: [APPROVED] };
@@ -260,7 +257,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'a step approved again on a later try says so once more, and the first approval is not repeated',
     );
   });
-  await t.test('a hold a person lifted by hand says so once, read off the put the feed holds and the hold the record no longer has', () => {
+  test('a hold a person lifted by hand says so once, read off the put the feed holds and the hold the record no longer has', () => {
     emptyStore();
     const memo = freshFeedMemo();
     const put = '2026-10-16T03:45:00.000Z';
@@ -300,58 +297,52 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce(none)]]), { at: AT, memo: restarted });
     assert.equal(said('HoldLifted').length, 2, 'and a daemon with no fold writes neither lift a second time');
   });
-  await t.test(
-    'a hold lifted by hand says who lifted it where the lift left that beside the run, and a lift of another hold names nobody',
-    () => {
-      emptyStore();
-      const memo = freshFeedMemo();
-      const [first, second] = ['2026-10-16T03:45:00.000Z', '2026-10-16T06:00:00.000Z'];
-      const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
-      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: first })]]), { at: AT, memo });
-      for (let i = 0; i < 3; i++)
-        recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
-      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: second, unheld: { since: first, actor: agent } })]]), { at: AT, memo });
-      for (let i = 0; i < 3; i++)
-        recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
-      assert.deepEqual(
-        lines()
-          .filter((l) => l.reason === 'HoldLifted')
-          .map((l) => [l.note, l.actor, l.source]),
-        [
-          [`since ${first}`, agent, 'person'],
-          [`since ${second}`, undefined, 'person'],
-        ],
-        'the lift of the hold the receipt names carries its caller; the second hold, lifted with no receipt of its own, names nobody',
-      );
-    },
-  );
-  await t.test(
-    "a hold the tick lifted itself is the tick's deed, not the person's — the pass that lifted it is the only thing that knows",
-    () => {
-      emptyStore();
-      const memo = freshFeedMemo();
-      const put = '2026-10-16T03:45:00.000Z';
-      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: put })]]), { at: AT, memo });
-      for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
-      assert.deepEqual(
-        said('HoldLifted'),
-        [
-          {
-            run: 'r-1',
-            step: undefined,
-            word: 'hold lifted',
-            note: `since ${put}`,
-            try: undefined,
-            type: 'Normal',
-            source: 'tick',
-            waits: undefined,
-          },
-        ],
-        "one line, sourced tick: the pass's own offer and the absence rule's are one occurrence, so the absence rule adds none",
-      );
-    },
-  );
-  await t.test("a hold the pass lifted on the very pass that read it still says the person's put, not the lift alone", () => {
+  test('a hold lifted by hand says who lifted it where the lift left that beside the run, and a lift of another hold names nobody', () => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const [first, second] = ['2026-10-16T03:45:00.000Z', '2026-10-16T06:00:00.000Z'];
+    const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+    recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: first })]]), { at: AT, memo });
+    for (let i = 0; i < 3; i++)
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+    recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: second, unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+    for (let i = 0; i < 3; i++)
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+    assert.deepEqual(
+      lines()
+        .filter((l) => l.reason === 'HoldLifted')
+        .map((l) => [l.note, l.actor, l.source]),
+      [
+        [`since ${first}`, agent, 'person'],
+        [`since ${second}`, undefined, 'person'],
+      ],
+      'the lift of the hold the receipt names carries its caller; the second hold, lifted with no receipt of its own, names nobody',
+    );
+  });
+  test("a hold the tick lifted itself is the tick's deed, not the person's — the pass that lifted it is the only thing that knows", () => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const put = '2026-10-16T03:45:00.000Z';
+    recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: put })]]), { at: AT, memo });
+    for (let i = 0; i < 10; i++) recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], lifted: put })]]), { at: AT, memo });
+    assert.deepEqual(
+      said('HoldLifted'),
+      [
+        {
+          run: 'r-1',
+          step: undefined,
+          word: 'hold lifted',
+          note: `since ${put}`,
+          try: undefined,
+          type: 'Normal',
+          source: 'tick',
+          waits: undefined,
+        },
+      ],
+      "one line, sourced tick: the pass's own offer and the absence rule's are one occurrence, so the absence rule adds none",
+    );
+  });
+  test("a hold the pass lifted on the very pass that read it still says the person's put, not the lift alone", () => {
     emptyStore();
     const memo = freshFeedMemo();
     const put = '2026-10-16T03:45:00.000Z';
@@ -365,262 +356,259 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       "liftHold takes the hold off the record before the pass is worded, so a pass that reads one and lifts it sees only its lift: the person's own nemia hold must not lose its line there, and neither is said twice over ten passes",
     );
   });
-  await t.test(
-    "the store's pause says its put once while it stands and its lift once it is gone, each a person's, read off the feed",
-    async (t) => {
+  describe("the store's pause says its put once while it stands and its lift once it is gone, each a person's, read off the feed", () => {
+    let memo!: import('./feed.ts').FeedMemo;
+    beforeAll(() => {
       emptyStore();
-      const memo = freshFeedMemo();
-      const put = '2026-10-16T03:45:00.000Z';
-      const again = '2026-10-16T06:00:00.000Z';
-      const why = 'need to put the laptop on sleep';
-      const pass = (pause: FeedPause, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, pause });
-      const words = () => storeLines().map((l) => [l.word, l.note]);
-      const told = () => storeLines().map((l) => [l.by, l.why, l.message]);
-      await t.test('a pause that stands is one put over many passes, saying who put it and why beside its note', () => {
-        for (let i = 0; i < 10; i++) pass({ at: put, by: 'yrnd1', why });
-        assert.deepEqual(words(), [['store paused', `since ${put}`]]);
-        assert.deepEqual(told(), [['yrnd1', why, `store paused by yrnd1 · ${why}`]]);
-        assert.deepEqual(
-          storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
-          [[{ kind: 'Store', name: 'store' }, 'StorePaused', 'Normal', 'person', undefined, {}]],
-          "about the store, a person's deed, waiting on nobody, of no run",
-        );
-      });
-      await t.test('a daemon with no fold writes the standing put neither again nor never', () => {
-        for (let i = 0; i < 3; i++) pass({ at: put, by: 'yrnd1', why }, freshFeedMemo());
-        assert.equal(storeLines().length, 1);
-      });
-      await t.test('a pause gone is one lift, sourced person, the put read back off the feed', () => {
-        for (let i = 0; i < 10; i++) pass(null);
-        assert.deepEqual(words(), [
-          ['store paused', `since ${put}`],
-          ['store resumed', `since ${put}`],
-        ]);
-        assert.equal(storeLines()[1].source, 'person', 'only nemia resume takes the pause away');
-        assert.deepEqual(told()[1], [undefined, undefined, `store resumed · since ${put}`], 'the lift is worded as it was');
-      });
-      await t.test('a pause put again, by hand with no why, is a second put and a second lift, told apart by its moment', () => {
-        for (let i = 0; i < 3; i++) pass({ at: again, by: 'ann' });
-        for (let i = 0; i < 3; i++) pass(null);
-        for (let i = 0; i < 3; i++) pass(null, freshFeedMemo());
-        assert.deepEqual(words(), [
-          ['store paused', `since ${put}`],
-          ['store resumed', `since ${put}`],
-          ['store paused', `since ${again}`],
-          ['store resumed', `since ${again}`],
-        ]);
-        assert.deepEqual(told()[2], ['ann', undefined, 'store paused by ann'], 'a pause with no why says who alone');
-      });
-      await t.test('a pause whose file names nobody and gives no why reads as it always did', () => {
-        const bare = '2026-10-16T06:30:00.000Z';
-        pass({ at: bare, by: '' });
-        assert.deepEqual(told().at(-1), [undefined, undefined, `store paused · since ${bare}`]);
-        pass(null);
-      });
-      await t.test('a pause lifted by a caller the api resolved says who lifted it, paired by the moment of the pause it lifted', () => {
-        const lifted = '2026-10-16T05:00:00.000Z';
-        const person = { kind: 'person', token: 'laptop' } as const;
-        pass({ at: lifted, by: 'yrnd1' });
-        for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map(), { at: AT, memo, pause: null, resumed: { since: lifted, actor: person } });
-        const [put, lift] = storeLines().slice(-2);
-        assert.deepEqual(
-          [put?.word, put?.actor, lift?.word, lift?.note, lift?.actor],
-          ['store paused', undefined, 'store resumed', `since ${lifted}`, person],
-          'the lift names its caller, once over three passes',
-        );
-      });
-      await t.test('a caller that read no pause says nothing of the store, however the feed stands', () => {
-        pass({ at: '2026-10-16T07:00:00.000Z' });
-        const before = storeLines().length;
-        recordFeed(ROOT, new Map(), { at: AT, memo });
-        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
-        assert.equal(storeLines().length, before, 'no absence is read where nobody looked');
-      });
-    },
-  );
-  await t.test(
-    "a factory's level is one line of the store each time its level in force changes, labelled with the factory, read off the feed",
-    async (t) => {
-      emptyStore();
-      const memo = freshFeedMemo();
-      const at = Date.parse(AT);
-      const until = new Date(at + 3_600_000).toISOString();
-      const row = (factory: string, file: FactoryLevelFile | undefined, when = at) => factoryLevelOf(factory, file, 'manual', when);
-      const pass = (levels: FactoryLevel[], m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, levels });
-      const said = () => storeLines().map((l) => [l.labels?.factory, l.note]);
-      const AUTO: FactoryLevelFile = { level: 'auto', since: AT };
-      const RAISED: FactoryLevelFile = { level: 'semi-auto', since: AT, raise: { level: 'auto', until } };
-      await t.test('a factory at manual the feed has said nothing of is never said; one above it is said once over many passes', () => {
-        for (let i = 0; i < 5; i++) pass([row('default', undefined), row('quiet', undefined), row('acme', AUTO)]);
-        assert.deepEqual(said(), [['acme', 'acme is at auto']]);
-        assert.deepEqual(
-          storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
-          [[{ kind: 'Store', name: 'store' }, 'LevelChanged', 'Normal', 'person', undefined, { factory: 'acme' }]],
-          "about the store, a person's deed, waiting on nobody, labelled with its factory alone",
-        );
-        assert.ok(storeLines()[0]?.message?.includes('acme is at auto'), 'what a person reads says the level');
-      });
-      await t.test('a raise is said with its end, and its end passing, which nobody writes, is said as the level it fell back to', () => {
-        pass([row('acme', RAISED)]);
-        pass([row('acme', RAISED, at + 3_599_999)]);
-        pass([row('acme', RAISED, at + 3_600_000)]);
-        assert.deepEqual(said().slice(1), [
-          ['acme', `acme is at auto until ${until}, then semi-auto`],
-          ['acme', 'acme is at semi-auto'],
-        ]);
-      });
-      await t.test('a level set back to one said before is a change, said again: a standing word, never a one-shot counted by note', () => {
-        pass([row('acme', AUTO)]);
-        pass([row('acme', undefined)]);
-        assert.deepEqual(said().slice(3), [
-          ['acme', 'acme is at auto'],
-          ['acme', 'acme is at manual'],
-        ]);
-      });
-      await t.test('a daemon with no fold says no level again', () => {
-        for (let i = 0; i < 3; i++) pass([row('acme', undefined), row('quiet', undefined)], freshFeedMemo());
-        assert.equal(storeLines().length, 5);
-      });
-      await t.test('a caller that read no levels says nothing of them, however the feed stands', () => {
-        recordFeed(ROOT, new Map(), { at: AT, memo });
-        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
-        assert.equal(storeLines().length, 5, 'no level is read where nobody looked');
-      });
-      await t.test('a level line naming no factory is no word the fold keeps', () => {
-        const fold = foldFeed(freshFold(), [
-          upgraded({ at: AT, store: 'store', word: 'level changed', note: 'is at auto', involved: { kind: 'Store', name: 'store' } }),
-        ]);
-        assert.deepEqual([...fold.said.keys()], []);
-      });
-    },
-  );
-  await t.test(
-    "a factory's conflicts are one line when its ConflictsPending condition turns True and one when it turns back, read off the feed",
-    async (t) => {
-      emptyStore();
-      const memo = freshFeedMemo();
-      const pass = (conflicts: FeedConflicts, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, conflicts });
-      const said = () => factoryLines().map((l) => [l.factory, l.reason]);
-      const NOTE = 'one-waits';
-      const PENDING = { factory: 'acme', pending: true, message: NOTE };
-      const SETTLED = { factory: 'acme', pending: false, message: 'merged' };
-      await t.test('a factory whose conflicts are pending is said once over many passes; one with none pending is never said', () => {
-        for (let i = 0; i < 5; i++) pass([PENDING, { factory: 'quiet', pending: false }]);
-        assert.deepEqual(said(), [['acme', 'ConflictsPending']]);
-        assert.deepEqual(
-          factoryLines().map((l) => [l.involved, l.type, l.source, l.waits, l.labels, l.note]),
-          [[{ kind: 'Factory', name: 'acme' }, 'Normal', 'tick', undefined, { factory: 'acme' }, NOTE]],
-          "about the factory, the tick's, waiting on nobody by the table, labelled with its factory, its note the condition's own text",
-        );
-        assert.equal(storeLines().length, 0, "no line of the store's");
-      });
-      await t.test('its message reworded, as a choice made for one conflict of several rewords it, owes no line', () => {
-        pass([{ ...PENDING, message: 'one-of-two-waits' }]);
-        assert.equal(factoryLines().length, 1);
-      });
-      await t.test('a daemon with no fold says it no second time', () => {
-        for (let i = 0; i < 3; i++) pass([PENDING], freshFeedMemo());
-        assert.equal(factoryLines().length, 1);
-      });
-      await t.test('turned back to False it is said settled once, and a restarted daemon says it no second time', () => {
-        for (let i = 0; i < 3; i++) pass([SETTLED]);
-        pass([SETTLED], freshFeedMemo());
-        assert.deepEqual(said().slice(1), [['acme', 'ConflictsSettled']]);
-      });
-      await t.test('pending again after settled is said again: a standing word, never a one-shot', () => {
-        pass([PENDING]);
-        pass([PENDING]);
-        assert.deepEqual(said().slice(2), [['acme', 'ConflictsPending']]);
-      });
-      await t.test('a caller that read no conflicts says nothing of them, however the feed stands', () => {
-        recordFeed(ROOT, new Map(), { at: AT, memo });
-        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
-        assert.equal(factoryLines().length, 3);
-      });
-      await t.test("a factory's line is no run's, and a run's removed forgets none of it", () => {
-        const fold = foldFeed(freshFold(), readFeed(ROOT, 0).lines);
-        assert.deepEqual([...fold.said.keys()], ['Conflicts/acme']);
-        assert.ok(factoryLines().every((l) => !isRunLine(l) && !isStoreLine(l)));
-      });
-    },
-  );
-  await t.test(
-    "the store's readiness is one NotReady line while a piece a run waits on is missing and one Ready line once it is met, read off the feed",
-    async (t) => {
-      emptyStore();
-      const memo = freshFeedMemo();
-      const pass = (readiness: FeedReadiness, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, readiness });
-      const said = () => storeLines().map((l) => l.reason);
-      const fix = (need: string) => ({ message: `start ${need}`, command: `nemia doctor fix ${need} --factory nemia`, startable: true });
-      const mise: ReadinessPiece = {
-        name: 'mise',
-        area: 'workflow',
-        state: 'missing',
-        message: 'mise is not installed',
-        fixes: [fix('mise')],
-        factory: 'nemia',
-        workflow: 'quick',
-        cost: 'run',
-      };
-      const toolchain: ReadinessPiece = { ...mise, name: 'repository-toolchain', fixes: [fix('repository-toolchain')] };
-      const linger: ReadinessPiece = {
-        name: 'linger',
-        area: 'service',
-        state: 'missing',
-        message: 'stops at logout',
-        fixes: [],
-        cost: 'server',
-      };
-      const met = (piece: ReadinessPiece): ReadinessPiece => ({ ...piece, state: 'met', fixes: [] });
-      await t.test(
-        'a read with a missing piece a run waits on writes one NotReady line, naming each piece and its fix; a second pass none',
-        () => {
-          pass({ pieces: [mise, toolchain, linger] });
-          pass({ pieces: [mise, toolchain, linger] });
-          assert.deepEqual(said(), ['NotReady']);
-          const [line] = storeLines();
-          assert.deepEqual(
-            [line.involved, line.type, line.source, line.waits, line.labels],
-            [{ kind: 'Store', name: 'store' }, 'Warning', 'tick', undefined, {}],
-          );
-          for (const named of [
-            'mise',
-            'repository-toolchain',
-            'nemia doctor fix mise --factory nemia',
-            'nemia doctor fix repository-toolchain',
-          ])
-            assert.ok(line.note?.includes(named), `${named} in ${line.note}`);
-          assert.ok(!line.note?.includes('linger'), 'linger keeps the server alone');
-        },
+      memo = freshFeedMemo();
+    });
+    const put = '2026-10-16T03:45:00.000Z';
+    const again = '2026-10-16T06:00:00.000Z';
+    const why = 'need to put the laptop on sleep';
+    const pass = (pause: FeedPause, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, pause });
+    const words = () => storeLines().map((l) => [l.word, l.note]);
+    const told = () => storeLines().map((l) => [l.by, l.why, l.message]);
+    test('a pause that stands is one put over many passes, saying who put it and why beside its note', () => {
+      for (let i = 0; i < 10; i++) pass({ at: put, by: 'yrnd1', why });
+      assert.deepEqual(words(), [['store paused', `since ${put}`]]);
+      assert.deepEqual(told(), [['yrnd1', why, `store paused by yrnd1 · ${why}`]]);
+      assert.deepEqual(
+        storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
+        [[{ kind: 'Store', name: 'store' }, 'StorePaused', 'Normal', 'person', undefined, {}]],
+        "about the store, a person's deed, waiting on nobody, of no run",
       );
-      await t.test('a daemon with no fold says it no second time while it still holds', () => {
-        pass({ pieces: [mise, toolchain] }, freshFeedMemo());
-        assert.deepEqual(said(), ['NotReady']);
-      });
-      await t.test('one of the two met moves what is missing, and is said again, naming the one left', () => {
-        pass({ pieces: [met(mise), toolchain] });
-        assert.deepEqual(said(), ['NotReady', 'NotReady']);
-        assert.ok(!storeLines()[1].note?.includes('mise:'), storeLines()[1].note);
-      });
-      await t.test('every piece a run waits on met writes one Ready line, a missing server piece notwithstanding, and no second', () => {
-        pass({ pieces: [met(mise), met(toolchain), linger] });
-        pass({ pieces: [met(mise), met(toolchain), linger] });
-        pass({ pieces: [met(mise), met(toolchain)] }, freshFeedMemo());
-        assert.deepEqual(said(), ['NotReady', 'NotReady', 'Ready']);
-        assert.equal(storeLines()[2].type, 'Normal');
-      });
-      await t.test(
-        'a caller that read no readiness says nothing of it, and a store the feed never called not ready is never said ready',
-        () => {
-          recordFeed(ROOT, new Map(), { at: AT, memo });
-          emptyStore();
-          pass({ pieces: [met(mise)] }, freshFeedMemo());
-          assert.deepEqual(said(), []);
-        },
+    });
+    test('a daemon with no fold writes the standing put neither again nor never', () => {
+      for (let i = 0; i < 3; i++) pass({ at: put, by: 'yrnd1', why }, freshFeedMemo());
+      assert.equal(storeLines().length, 1);
+    });
+    test('a pause gone is one lift, sourced person, the put read back off the feed', () => {
+      for (let i = 0; i < 10; i++) pass(null);
+      assert.deepEqual(words(), [
+        ['store paused', `since ${put}`],
+        ['store resumed', `since ${put}`],
+      ]);
+      assert.equal(storeLines()[1].source, 'person', 'only nemia resume takes the pause away');
+      assert.deepEqual(told()[1], [undefined, undefined, `store resumed · since ${put}`], 'the lift is worded as it was');
+    });
+    test('a pause put again, by hand with no why, is a second put and a second lift, told apart by its moment', () => {
+      for (let i = 0; i < 3; i++) pass({ at: again, by: 'ann' });
+      for (let i = 0; i < 3; i++) pass(null);
+      for (let i = 0; i < 3; i++) pass(null, freshFeedMemo());
+      assert.deepEqual(words(), [
+        ['store paused', `since ${put}`],
+        ['store resumed', `since ${put}`],
+        ['store paused', `since ${again}`],
+        ['store resumed', `since ${again}`],
+      ]);
+      assert.deepEqual(told()[2], ['ann', undefined, 'store paused by ann'], 'a pause with no why says who alone');
+    });
+    test('a pause whose file names nobody and gives no why reads as it always did', () => {
+      const bare = '2026-10-16T06:30:00.000Z';
+      pass({ at: bare, by: '' });
+      assert.deepEqual(told().at(-1), [undefined, undefined, `store paused · since ${bare}`]);
+      pass(null);
+    });
+    test('a pause lifted by a caller the api resolved says who lifted it, paired by the moment of the pause it lifted', () => {
+      const lifted = '2026-10-16T05:00:00.000Z';
+      const person = { kind: 'person', token: 'laptop' } as const;
+      pass({ at: lifted, by: 'yrnd1' });
+      for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map(), { at: AT, memo, pause: null, resumed: { since: lifted, actor: person } });
+      const [put, lift] = storeLines().slice(-2);
+      assert.deepEqual(
+        [put?.word, put?.actor, lift?.word, lift?.note, lift?.actor],
+        ['store paused', undefined, 'store resumed', `since ${lifted}`, person],
+        'the lift names its caller, once over three passes',
       );
-    },
-  );
-  await t.test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {
+    });
+    test('a caller that read no pause says nothing of the store, however the feed stands', () => {
+      pass({ at: '2026-10-16T07:00:00.000Z' });
+      const before = storeLines().length;
+      recordFeed(ROOT, new Map(), { at: AT, memo });
+      recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
+      assert.equal(storeLines().length, before, 'no absence is read where nobody looked');
+    });
+  });
+  describe("a factory's level is one line of the store each time its level in force changes, labelled with the factory, read off the feed", () => {
+    let memo!: import('./feed.ts').FeedMemo;
+    let at!: number;
+    let until!: string;
+    let RAISED!: FactoryLevelFile;
+    beforeAll(() => {
+      emptyStore();
+      memo = freshFeedMemo();
+      at = Date.parse(AT);
+      until = new Date(at + 3_600_000).toISOString();
+      RAISED = { level: 'semi-auto', since: AT, raise: { level: 'auto', until } };
+    });
+    const row = (factory: string, file: FactoryLevelFile | undefined, when = at) => factoryLevelOf(factory, file, 'manual', when);
+    const pass = (levels: FactoryLevel[], m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, levels });
+    const said = () => storeLines().map((l) => [l.labels?.factory, l.note]);
+    const AUTO: FactoryLevelFile = { level: 'auto', since: AT };
+    test('a factory at manual the feed has said nothing of is never said; one above it is said once over many passes', () => {
+      for (let i = 0; i < 5; i++) pass([row('default', undefined), row('quiet', undefined), row('acme', AUTO)]);
+      assert.deepEqual(said(), [['acme', 'acme is at auto']]);
+      assert.deepEqual(
+        storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
+        [[{ kind: 'Store', name: 'store' }, 'LevelChanged', 'Normal', 'person', undefined, { factory: 'acme' }]],
+        "about the store, a person's deed, waiting on nobody, labelled with its factory alone",
+      );
+      assert.ok(storeLines()[0]?.message?.includes('acme is at auto'), 'what a person reads says the level');
+    });
+    test('a raise is said with its end, and its end passing, which nobody writes, is said as the level it fell back to', () => {
+      pass([row('acme', RAISED)]);
+      pass([row('acme', RAISED, at + 3_599_999)]);
+      pass([row('acme', RAISED, at + 3_600_000)]);
+      assert.deepEqual(said().slice(1), [
+        ['acme', `acme is at auto until ${until}, then semi-auto`],
+        ['acme', 'acme is at semi-auto'],
+      ]);
+    });
+    test('a level set back to one said before is a change, said again: a standing word, never a one-shot counted by note', () => {
+      pass([row('acme', AUTO)]);
+      pass([row('acme', undefined)]);
+      assert.deepEqual(said().slice(3), [
+        ['acme', 'acme is at auto'],
+        ['acme', 'acme is at manual'],
+      ]);
+    });
+    test('a daemon with no fold says no level again', () => {
+      for (let i = 0; i < 3; i++) pass([row('acme', undefined), row('quiet', undefined)], freshFeedMemo());
+      assert.equal(storeLines().length, 5);
+    });
+    test('a caller that read no levels says nothing of them, however the feed stands', () => {
+      recordFeed(ROOT, new Map(), { at: AT, memo });
+      recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
+      assert.equal(storeLines().length, 5, 'no level is read where nobody looked');
+    });
+    test('a level line naming no factory is no word the fold keeps', () => {
+      const fold = foldFeed(freshFold(), [
+        upgraded({ at: AT, store: 'store', word: 'level changed', note: 'is at auto', involved: { kind: 'Store', name: 'store' } }),
+      ]);
+      assert.deepEqual([...fold.said.keys()], []);
+    });
+  });
+  describe("a factory's conflicts are one line when its ConflictsPending condition turns True and one when it turns back, read off the feed", () => {
+    let memo!: import('./feed.ts').FeedMemo;
+    beforeAll(() => {
+      emptyStore();
+      memo = freshFeedMemo();
+    });
+    const pass = (conflicts: FeedConflicts, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, conflicts });
+    const said = () => factoryLines().map((l) => [l.factory, l.reason]);
+    const NOTE = 'one-waits';
+    const PENDING = { factory: 'acme', pending: true, message: NOTE };
+    const SETTLED = { factory: 'acme', pending: false, message: 'merged' };
+    test('a factory whose conflicts are pending is said once over many passes; one with none pending is never said', () => {
+      for (let i = 0; i < 5; i++) pass([PENDING, { factory: 'quiet', pending: false }]);
+      assert.deepEqual(said(), [['acme', 'ConflictsPending']]);
+      assert.deepEqual(
+        factoryLines().map((l) => [l.involved, l.type, l.source, l.waits, l.labels, l.note]),
+        [[{ kind: 'Factory', name: 'acme' }, 'Normal', 'tick', undefined, { factory: 'acme' }, NOTE]],
+        "about the factory, the tick's, waiting on nobody by the table, labelled with its factory, its note the condition's own text",
+      );
+      assert.equal(storeLines().length, 0, "no line of the store's");
+    });
+    test('its message reworded, as a choice made for one conflict of several rewords it, owes no line', () => {
+      pass([{ ...PENDING, message: 'one-of-two-waits' }]);
+      assert.equal(factoryLines().length, 1);
+    });
+    test('a daemon with no fold says it no second time', () => {
+      for (let i = 0; i < 3; i++) pass([PENDING], freshFeedMemo());
+      assert.equal(factoryLines().length, 1);
+    });
+    test('turned back to False it is said settled once, and a restarted daemon says it no second time', () => {
+      for (let i = 0; i < 3; i++) pass([SETTLED]);
+      pass([SETTLED], freshFeedMemo());
+      assert.deepEqual(said().slice(1), [['acme', 'ConflictsSettled']]);
+    });
+    test('pending again after settled is said again: a standing word, never a one-shot', () => {
+      pass([PENDING]);
+      pass([PENDING]);
+      assert.deepEqual(said().slice(2), [['acme', 'ConflictsPending']]);
+    });
+    test('a caller that read no conflicts says nothing of them, however the feed stands', () => {
+      recordFeed(ROOT, new Map(), { at: AT, memo });
+      recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
+      assert.equal(factoryLines().length, 3);
+    });
+    test("a factory's line is no run's, and a run's removed forgets none of it", () => {
+      const fold = foldFeed(freshFold(), readFeed(ROOT, 0).lines);
+      assert.deepEqual([...fold.said.keys()], ['Conflicts/acme']);
+      assert.ok(factoryLines().every((l) => !isRunLine(l) && !isStoreLine(l)));
+    });
+  });
+  describe("the store's readiness is one NotReady line while a piece a run waits on is missing and one Ready line once it is met, read off the feed", () => {
+    let memo!: import('./feed.ts').FeedMemo;
+    beforeAll(() => {
+      emptyStore();
+      memo = freshFeedMemo();
+    });
+    const pass = (readiness: FeedReadiness, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, readiness });
+    const said = () => storeLines().map((l) => l.reason);
+    const fix = (need: string) => ({ message: `start ${need}`, command: `nemia doctor fix ${need} --factory nemia`, startable: true });
+    const mise: ReadinessPiece = {
+      name: 'mise',
+      area: 'workflow',
+      state: 'missing',
+      message: 'mise is not installed',
+      fixes: [fix('mise')],
+      factory: 'nemia',
+      workflow: 'quick',
+      cost: 'run',
+    };
+    const toolchain: ReadinessPiece = { ...mise, name: 'repository-toolchain', fixes: [fix('repository-toolchain')] };
+    const linger: ReadinessPiece = {
+      name: 'linger',
+      area: 'service',
+      state: 'missing',
+      message: 'stops at logout',
+      fixes: [],
+      cost: 'server',
+    };
+    const met = (piece: ReadinessPiece): ReadinessPiece => ({ ...piece, state: 'met', fixes: [] });
+    test('a read with a missing piece a run waits on writes one NotReady line, naming each piece and its fix; a second pass none', () => {
+      pass({ pieces: [mise, toolchain, linger] });
+      pass({ pieces: [mise, toolchain, linger] });
+      assert.deepEqual(said(), ['NotReady']);
+      const [line] = storeLines();
+      assert.deepEqual(
+        [line.involved, line.type, line.source, line.waits, line.labels],
+        [{ kind: 'Store', name: 'store' }, 'Warning', 'tick', undefined, {}],
+      );
+      for (const named of [
+        'mise',
+        'repository-toolchain',
+        'nemia doctor fix mise --factory nemia',
+        'nemia doctor fix repository-toolchain',
+      ])
+        assert.ok(line.note?.includes(named), `${named} in ${line.note}`);
+      assert.ok(!line.note?.includes('linger'), 'linger keeps the server alone');
+    });
+    test('a daemon with no fold says it no second time while it still holds', () => {
+      pass({ pieces: [mise, toolchain] }, freshFeedMemo());
+      assert.deepEqual(said(), ['NotReady']);
+    });
+    test('one of the two met moves what is missing, and is said again, naming the one left', () => {
+      pass({ pieces: [met(mise), toolchain] });
+      assert.deepEqual(said(), ['NotReady', 'NotReady']);
+      assert.ok(!storeLines()[1].note?.includes('mise:'), storeLines()[1].note);
+    });
+    test('every piece a run waits on met writes one Ready line, a missing server piece notwithstanding, and no second', () => {
+      pass({ pieces: [met(mise), met(toolchain), linger] });
+      pass({ pieces: [met(mise), met(toolchain), linger] });
+      pass({ pieces: [met(mise), met(toolchain)] }, freshFeedMemo());
+      assert.deepEqual(said(), ['NotReady', 'NotReady', 'Ready']);
+      assert.equal(storeLines()[2].type, 'Normal');
+    });
+    test('a caller that read no readiness says nothing of it, and a store the feed never called not ready is never said ready', () => {
+      recordFeed(ROOT, new Map(), { at: AT, memo });
+      emptyStore();
+      pass({ pieces: [met(mise)] }, freshFeedMemo());
+      assert.deepEqual(said(), []);
+    });
+  });
+  test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {
     emptyStore();
     const memo = freshFeedMemo();
     const faults = [
@@ -645,7 +633,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], faults: [...faults, faults[1]] })]]), { at: AT, memo: restarted });
     assert.equal(said('SessionLost').length, 3, 'nor misses a third attempt lost');
   });
-  await t.test('REFUSED: a one-shot holds no entry in the fold — the step says its own word once, however many denials it carries', () => {
+  test('REFUSED: a one-shot holds no entry in the fold — the step says its own word once, however many denials it carries', () => {
     emptyStore();
     const memo = freshFeedMemo();
     const at = '2026-10-16T04:00:00.000Z';
@@ -691,8 +679,8 @@ test('the cursor never passes a partial line: a line being written is not read, 
   assert.equal(second.cursor, size());
 });
 
-test('readFeed reads every line whose fields are text, whatever its writer signed of it, and the lines after one that is not', async (t) => {
-  await t.test('a line whose step or note is not text is read by nobody, and the lines after it are read', () => {
+describe('readFeed reads every line whose fields are text, whatever its writer signed of it, and the lines after one that is not', () => {
+  test('a line whose step or note is not text is read by nobody, and the lines after it are read', () => {
     emptyStore();
     const at = '2026-09-22T10:00:00.000Z';
     const bad = [
@@ -705,7 +693,7 @@ test('readFeed reads every line whose fields are text, whatever its writer signe
     assert.deepEqual(read.lines, [upgraded(good)], 'the one line that reads is read, upgraded to a v1 signal');
     assert.equal(read.cursor, size());
   });
-  await t.test('a v1 line only half signed is read all the same, and every key it lacks is filled in from its word and its note', () => {
+  test('a v1 line only half signed is read all the same, and every key it lacks is filled in from its word and its note', () => {
     emptyStore();
     const at = '2026-09-22T10:00:00.000Z';
     const half = [
@@ -814,7 +802,7 @@ test(
     const said = bell();
     const open = fs.openSync;
     let opens = 0;
-    t.mock.method(fs, 'openSync', ((file: fs.PathLike, flags: string) => {
+    vi.spyOn(fs, 'openSync').mockImplementation(((file: fs.PathLike, flags: string) => {
       const fd = open(file, flags);
       if (String(file) === FEED && ++opens === 2) fs.rmSync(FEED, { force: true });
       return fd;
@@ -934,9 +922,9 @@ test(
   },
 );
 
-test("`wf --help` says which feed is whose: nemia watch, whose words are the client's, and ae watch", async (t) => {
+test("`wf --help` says which feed is whose: nemia watch, whose words are the client's, and ae watch", async () => {
   const out: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => {
+  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     out.push(args.join(' '));
   });
   await main(['--help'], engineOf(testEngine().layer), undefined, undefined, ENV);
@@ -946,8 +934,8 @@ test("`wf --help` says which feed is whose: nemia watch, whose words are the cli
   assert.match(printed, /ae watch/);
 });
 
-test('feedWords says each run and step in the word nemia ls prints, with its prune, its wait on a person and its slot', async (t) => {
-  await t.test('feedWords says the run with its prune, what waits on a person as a note, and a slot wait without its count', () => {
+describe('feedWords says each run and step in the word nemia ls prints, with its prune, its wait on a person and its slot', () => {
+  test('feedWords says the run with its prune, what waits on a person as a note, and a slot wait without its count', () => {
     const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
     const run = {
       id: 'r-1',
@@ -1011,7 +999,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       'and one that broke says failed',
     );
   });
-  await t.test("each step's reason and the run's are the ones the feed's word names, read off the same word", async (t) => {
+  describe("each step's reason and the run's are the ones the feed's word names, read off the same word", () => {
     const at = { id: 'r-1', brief: 'b', createdAt: '2026-09-22T10:00:00.000Z', repo: '/r', branch: 'wf/r-1', base: 'main' };
     const plan = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as ListedInput['steps'];
     const ship = [{ name: 'ship', after: [], brief: 'land it', workspace: 'base' }] as unknown as ListedInput['steps'];
@@ -1085,7 +1073,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       ],
     ];
     for (const [why, input, reason] of rows)
-      await t.test(why, () =>
+      test(why, () =>
         assert.deepEqual(
           coded(input)
             .steps.map((s) => [s.reason, s.on ?? s.via].filter(Boolean).join('/'))
@@ -1094,7 +1082,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
           'the row says the reason its word names',
         ),
       );
-    await t.test("the run's reason is the one its word and note name, a held run's `Waiting` on run", () => {
+    test("the run's reason is the one its word and note name, a held run's `Waiting` on run", () => {
       const l = listing(listingInput({ steps: plan, run: filed, phaseOf: () => 'running', closeoutOf: () => undefined }));
       const hold = { at: '2026-09-22T10:00:00.000Z', until: ['r-0'] };
       const cases: Array<[Pick<Run, 'pruned' | 'hold'>, Parameters<typeof feedWords>[2]['status'], string]> = [
@@ -1114,26 +1102,23 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       assert.deepEqual([on(['r-0']), on([])], ['run', 'hold'], 'a hold that names a run waits on it, one that names none on the hold');
     });
   });
-  await t.test(
-    "a run a person's word stops says its first waiting step's reason, and a held run waits on the runs its hold names, or on the hold where it names none",
-    () => {
-      const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
-      assert.deepEqual(runCodes('running', ['r-2']), { reason: 'Waiting', on: 'run', phase: 'pending' });
-      assert.deepEqual(runCodes('running', []), { reason: 'Waiting', on: 'hold', phase: 'pending' }, 'a hold that names no run');
-      assert.deepEqual(runCodes('waiting', null, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
-        reason: 'OverBudget',
-        phase: 'waiting',
-      });
-      assert.deepEqual(runCodes('waiting', null, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
-      assert.deepEqual(runCodes('waiting', null, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
-        reason: 'AwaitingAnswer',
-        via: 'closeout',
-        phase: 'waiting',
-      });
-      assert.deepEqual(runCodes('awaiting approval', null, [step('AwaitingApproval')]).reason, 'AwaitingApproval');
-    },
-  );
-  await t.test("the feed's word for a step waiting on a person is the word `nemia ls` prints, with what its harness waits for", () => {
+  test("a run a person's word stops says its first waiting step's reason, and a held run waits on the runs its hold names, or on the hold where it names none", () => {
+    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
+    assert.deepEqual(runCodes('running', ['r-2']), { reason: 'Waiting', on: 'run', phase: 'pending' });
+    assert.deepEqual(runCodes('running', []), { reason: 'Waiting', on: 'hold', phase: 'pending' }, 'a hold that names no run');
+    assert.deepEqual(runCodes('waiting', null, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
+      reason: 'OverBudget',
+      phase: 'waiting',
+    });
+    assert.deepEqual(runCodes('waiting', null, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
+    assert.deepEqual(runCodes('waiting', null, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
+      reason: 'AwaitingAnswer',
+      via: 'closeout',
+      phase: 'waiting',
+    });
+    assert.deepEqual(runCodes('awaiting approval', null, [step('AwaitingApproval')]).reason, 'AwaitingApproval');
+  });
+  test("the feed's word for a step waiting on a person is the word `nemia ls` prints, with what its harness waits for", () => {
     const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
     const run = {
       id: 'r-1',
@@ -1178,217 +1163,208 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
   });
 });
 
-test('foldFeed keeps the last word of each run and step, forgets a removed run, and feedChanges owes a line only for what moved', async (t) => {
-  await t.test(
-    'the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved',
-    () => {
-      const at = '2026-09-22T10:00:00.000Z';
-      const fold = foldFeed(freshFold(), [
-        { at, run: 'r-1', word: 'running' },
-        { at, run: 'r-1', step: 'plan', word: 'pending' },
-        { at, run: 'r-1', step: 'plan', word: 'running' },
+describe('foldFeed keeps the last word of each run and step, forgets a removed run, and feedChanges owes a line only for what moved', () => {
+  test('the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved', () => {
+    const at = '2026-09-22T10:00:00.000Z';
+    const fold = foldFeed(freshFold(), [
+      { at, run: 'r-1', word: 'running' },
+      { at, run: 'r-1', step: 'plan', word: 'pending' },
+      { at, run: 'r-1', step: 'plan', word: 'running' },
+      { at, run: 'r-2', word: 'running' },
+      { at, run: 'r-2', word: 'removed' },
+      { at, run: 'r-3', word: 'running', note: 'waiting on you: approve plan' },
+    ]);
+    assert.deepEqual([...fold.said.keys()], ['Run/r-1', 'Step/r-1/plan', 'Run/r-3']);
+    const now = new Map([
+      [
+        'r-1',
+        {
+          run: { word: 'running' },
+          steps: [
+            { name: 'plan', word: 'running' },
+            { name: 'implement', word: 'waiting' },
+          ],
+        },
+      ],
+      ['r-3', { run: { word: 'running' }, steps: [] }],
+      ['r-2', { run: { word: 'running' }, steps: [] }],
+    ]);
+    assert.deepEqual(
+      feedChanges(fold, now, at),
+      [
+        { at, run: 'r-1', step: 'implement', word: 'waiting' },
+        { at, run: 'r-3', word: 'running' },
         { at, run: 'r-2', word: 'running' },
-        { at, run: 'r-2', word: 'removed' },
-        { at, run: 'r-3', word: 'running', note: 'waiting on you: approve plan' },
-      ]);
-      assert.deepEqual([...fold.said.keys()], ['Run/r-1', 'Step/r-1/plan', 'Run/r-3']);
-      const now = new Map([
-        [
-          'r-1',
-          {
-            run: { word: 'running' },
-            steps: [
-              { name: 'plan', word: 'running' },
-              { name: 'implement', word: 'waiting' },
-            ],
-          },
-        ],
-        ['r-3', { run: { word: 'running' }, steps: [] }],
-        ['r-2', { run: { word: 'running' }, steps: [] }],
-      ]);
-      assert.deepEqual(
-        feedChanges(fold, now, at),
-        [
-          { at, run: 'r-1', step: 'implement', word: 'waiting' },
-          { at, run: 'r-3', word: 'running' },
-          { at, run: 'r-2', word: 'running' },
-        ].map(upgraded),
-        'a new step, a note gone, and a run back under an id it had',
-      );
-      assert.deepEqual(
-        feedChanges(fold, new Map(), at),
-        [
-          { at, run: 'r-1', word: 'removed' },
-          { at, run: 'r-3', word: 'removed' },
-        ].map(upgraded),
-      );
-    },
-  );
-  await t.test(
-    "a removed run's one-shots go with it: a run back under an id it had says its acts again, and never reads them as already written",
-    () => {
-      const at = '2026-09-22T10:00:00.000Z';
-      const put = '2026-09-22T09:00:00.000Z';
-      const oneShotsOf = (run: string): FeedLine[] => [
-        { at, run, word: 'cancel asked', note: `at ${put}` },
-        { at, run, word: 'hold put', note: `since ${put}` },
-        { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
-        { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
-      ];
-      const fold = foldFeed(freshFold(), [...oneShotsOf('r-1'), ...oneShotsOf('r-1x'), { at, run: 'r-1', word: 'running' }]);
-      assert.equal([...fold.shots.keys()].length, 8, 'the fixture holds four one-shots of each run, of its own kind and of its step');
+      ].map(upgraded),
+      'a new step, a note gone, and a run back under an id it had',
+    );
+    assert.deepEqual(
+      feedChanges(fold, new Map(), at),
+      [
+        { at, run: 'r-1', word: 'removed' },
+        { at, run: 'r-3', word: 'removed' },
+      ].map(upgraded),
+    );
+  });
+  test("a removed run's one-shots go with it: a run back under an id it had says its acts again, and never reads them as already written", () => {
+    const at = '2026-09-22T10:00:00.000Z';
+    const put = '2026-09-22T09:00:00.000Z';
+    const oneShotsOf = (run: string): FeedLine[] => [
+      { at, run, word: 'cancel asked', note: `at ${put}` },
+      { at, run, word: 'hold put', note: `since ${put}` },
+      { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
+      { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
+    ];
+    const fold = foldFeed(freshFold(), [...oneShotsOf('r-1'), ...oneShotsOf('r-1x'), { at, run: 'r-1', word: 'running' }]);
+    assert.equal([...fold.shots.keys()].length, 8, 'the fixture holds four one-shots of each run, of its own kind and of its step');
 
-      foldFeed(fold, [{ at, run: 'r-1', word: 'removed' }]);
-      assert.deepEqual(
-        [...fold.shots.keys()].map((key) => key.slice(key.indexOf(' ') + 1).split('#')[0]).sort(),
-        ['Run/r-1x', 'Run/r-1x', 'Step/r-1x/plan', 'Step/r-1x/plan'],
-        "a removal takes the run's one-shots with it, its own and its steps' — and leaves every other run's, an id this one is a prefix of included",
-      );
-      assert.deepEqual([...fold.said.keys()], [], 'as it takes its words');
+    foldFeed(fold, [{ at, run: 'r-1', word: 'removed' }]);
+    assert.deepEqual(
+      [...fold.shots.keys()].map((key) => key.slice(key.indexOf(' ') + 1).split('#')[0]).sort(),
+      ['Run/r-1x', 'Run/r-1x', 'Step/r-1x/plan', 'Step/r-1x/plan'],
+      "a removal takes the run's one-shots with it, its own and its steps' — and leaves every other run's, an id this one is a prefix of included",
+    );
+    assert.deepEqual([...fold.said.keys()], [], 'as it takes its words');
 
-      const words: FeedWords = {
-        run: { word: 'running' },
-        steps: [{ name: 'plan', word: 'running' }],
-        acts: [
-          { word: 'cancel asked', note: `at ${put}` },
-          { step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
-        ],
-        held: put,
-      };
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', words]]), at)
-          .filter((l) => l.reason !== 'Running')
-          .map((l) => [l.reason, l.note]),
-        [
-          ['CancelAsked', `at ${put}`],
-          ['Approved', `try 1 · at ${put}`],
-          ['HoldPut', `since ${put}`],
-        ],
-        'a run back under an old id says each of its acts again',
-      );
-    },
-  );
-  await t.test(
-    'a feed written before the signature and one written after fold to the same state, and a removal of either shape forgets the run',
-    () => {
-      const at = '2026-10-16T04:00:00.000Z';
-      const v0: FeedLine[] = [
-        { at, run: 'r-1', word: 'running' },
-        { at, run: 'r-1', step: 'plan', word: 'pending' },
-        { at, run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: approve the plan' },
-        { at, run: 'r-2', word: 'succeeded' },
-        { at, run: 'r-2', step: 'plan', word: 'unverified · done' },
-      ];
-      const v1: FeedLine[] = [
-        {
-          at,
-          run: 'r-1',
-          word: 'running',
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Run', name: 'r-1' },
-          labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
-          reason: 'Running',
-          type: 'Normal',
-          source: 'tick',
-          message: 'running',
-        },
-        {
-          at,
-          run: 'r-1',
-          step: 'plan',
-          word: 'pending',
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Step', name: 'r-1/plan' },
-          labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
-          reason: 'Pending',
-          type: 'Normal',
-          source: 'tick',
-          message: 'pending',
-        },
-        {
-          at,
-          run: 'r-1',
-          step: 'plan',
-          word: 'running',
-          note: 'waiting on you: approve the plan',
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Step', name: 'r-1/plan' },
-          labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
-          reason: 'Running',
-          type: 'Normal',
-          waits: 'person',
-          source: 'tick',
-          message: 'running · waiting on you: approve the plan',
-        },
-        {
-          at,
-          run: 'r-2',
-          word: 'succeeded',
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Run', name: 'r-2' },
-          labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
-          reason: 'Succeeded',
-          type: 'Normal',
-          source: 'tick',
-          message: 'succeeded',
-        },
-        {
-          at,
-          run: 'r-2',
-          step: 'plan',
-          word: 'unverified · done',
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Step', name: 'r-2/plan' },
-          labels: { run: 'r-2', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
-          reason: 'Succeeded',
-          type: 'Normal',
-          source: 'tick',
-          message: 'unverified · done',
-        },
-      ];
+    const words: FeedWords = {
+      run: { word: 'running' },
+      steps: [{ name: 'plan', word: 'running' }],
+      acts: [
+        { word: 'cancel asked', note: `at ${put}` },
+        { step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
+      ],
+      held: put,
+    };
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', words]]), at)
+        .filter((l) => l.reason !== 'Running')
+        .map((l) => [l.reason, l.note]),
+      [
+        ['CancelAsked', `at ${put}`],
+        ['Approved', `try 1 · at ${put}`],
+        ['HoldPut', `since ${put}`],
+      ],
+      'a run back under an old id says each of its acts again',
+    );
+  });
+  test('a feed written before the signature and one written after fold to the same state, and a removal of either shape forgets the run', () => {
+    const at = '2026-10-16T04:00:00.000Z';
+    const v0: FeedLine[] = [
+      { at, run: 'r-1', word: 'running' },
+      { at, run: 'r-1', step: 'plan', word: 'pending' },
+      { at, run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: approve the plan' },
+      { at, run: 'r-2', word: 'succeeded' },
+      { at, run: 'r-2', step: 'plan', word: 'unverified · done' },
+    ];
+    const v1: FeedLine[] = [
+      {
+        at,
+        run: 'r-1',
+        word: 'running',
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Run', name: 'r-1' },
+        labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+        reason: 'Running',
+        type: 'Normal',
+        source: 'tick',
+        message: 'running',
+      },
+      {
+        at,
+        run: 'r-1',
+        step: 'plan',
+        word: 'pending',
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Step', name: 'r-1/plan' },
+        labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+        reason: 'Pending',
+        type: 'Normal',
+        source: 'tick',
+        message: 'pending',
+      },
+      {
+        at,
+        run: 'r-1',
+        step: 'plan',
+        word: 'running',
+        note: 'waiting on you: approve the plan',
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Step', name: 'r-1/plan' },
+        labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+        reason: 'Running',
+        type: 'Normal',
+        waits: 'person',
+        source: 'tick',
+        message: 'running · waiting on you: approve the plan',
+      },
+      {
+        at,
+        run: 'r-2',
+        word: 'succeeded',
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Run', name: 'r-2' },
+        labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
+        reason: 'Succeeded',
+        type: 'Normal',
+        source: 'tick',
+        message: 'succeeded',
+      },
+      {
+        at,
+        run: 'r-2',
+        step: 'plan',
+        word: 'unverified · done',
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Step', name: 'r-2/plan' },
+        labels: { run: 'r-2', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' },
+        reason: 'Succeeded',
+        type: 'Normal',
+        source: 'tick',
+        message: 'unverified · done',
+      },
+    ];
 
-      assert.deepEqual(
-        [...foldFeed(freshFold(), v0).said.keys()],
-        ['Run/r-1', 'Step/r-1/plan', 'Run/r-2', 'Step/r-2/plan'],
-        'a line of a step keys on the step, never on the run it belongs to',
-      );
-      assert.deepEqual(
-        foldFeed(freshFold(), v0),
-        foldFeed(freshFold(), v1),
-        'the same events in the two shapes fold to the same state: what each is about is derived the one way',
-      );
+    assert.deepEqual(
+      [...foldFeed(freshFold(), v0).said.keys()],
+      ['Run/r-1', 'Step/r-1/plan', 'Run/r-2', 'Step/r-2/plan'],
+      'a line of a step keys on the step, never on the run it belongs to',
+    );
+    assert.deepEqual(
+      foldFeed(freshFold(), v0),
+      foldFeed(freshFold(), v1),
+      'the same events in the two shapes fold to the same state: what each is about is derived the one way',
+    );
 
-      const fromSigned = foldFeed(freshFold(), v1);
-      foldFeed(fromSigned, [{ at, run: 'r-1', word: REMOVED }]);
-      assert.deepEqual(
-        [...fromSigned.said.keys()],
-        ['Run/r-2', 'Step/r-2/plan'],
-        'a removal written before the signature forgets a run folded from signed lines, and its steps with it',
-      );
+    const fromSigned = foldFeed(freshFold(), v1);
+    foldFeed(fromSigned, [{ at, run: 'r-1', word: REMOVED }]);
+    assert.deepEqual(
+      [...fromSigned.said.keys()],
+      ['Run/r-2', 'Step/r-2/plan'],
+      'a removal written before the signature forgets a run folded from signed lines, and its steps with it',
+    );
 
-      const fromUnsigned = foldFeed(freshFold(), v0);
-      foldFeed(fromUnsigned, [
-        {
-          at,
-          run: 'r-2',
-          word: REMOVED,
-          apiVersion: FEED_VERSION,
-          involved: { kind: 'Run', name: 'r-2' },
-          labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
-          reason: 'Removed',
-          type: 'Normal',
-          source: 'person',
-          message: 'removed',
-        },
-      ]);
-      assert.deepEqual(
-        [...fromUnsigned.said.keys()],
-        ['Run/r-1', 'Step/r-1/plan'],
-        'and a signed removal forgets a run folded from lines written before the signature',
-      );
-    },
-  );
-  await t.test("a store line is a one-shot of the store's, never a run's word, and a run removed leaves it", () => {
+    const fromUnsigned = foldFeed(freshFold(), v0);
+    foldFeed(fromUnsigned, [
+      {
+        at,
+        run: 'r-2',
+        word: REMOVED,
+        apiVersion: FEED_VERSION,
+        involved: { kind: 'Run', name: 'r-2' },
+        labels: { run: 'r-2', factory: 'nemia', workflow: 'build' },
+        reason: 'Removed',
+        type: 'Normal',
+        source: 'person',
+        message: 'removed',
+      },
+    ]);
+    assert.deepEqual(
+      [...fromUnsigned.said.keys()],
+      ['Run/r-1', 'Step/r-1/plan'],
+      'and a signed removal forgets a run folded from lines written before the signature',
+    );
+  });
+  test("a store line is a one-shot of the store's, never a run's word, and a run removed leaves it", () => {
     const at = '2026-10-16T03:45:00.000Z';
     const paused: FeedLine = { at, store: 'store', word: 'store paused', note: `since ${at}` };
     assert.equal(isRunLine(paused), false);
@@ -1403,87 +1379,78 @@ test('foldFeed keeps the last word of each run and step, forgets a removed run, 
     assert.deepEqual([...fold.shots.entries()], [[`StorePaused Store/store#0#since ${at}`, 1]], 'and the put is counted still');
     assert.deepEqual(feedChanges(fold, new Map(), at, new Set(), { at }), [], 'so the put standing is owed again by nobody');
   });
-  await t.test(
-    'REFUSED: a run at rest whose words stand owes no line for a note reworded — a word moved, a step new to the fold and a run gone still do',
-    () => {
-      const at = '2026-10-05T19:29:00.000Z';
-      const fold = foldFeed(freshFold(), [
-        { at, run: 'r-1', word: 'succeeded' },
-        { at, run: 'r-1', step: 'plan', word: 'done' },
-        { at, run: 'r-2', word: 'succeeded' },
-      ]);
-      const reworded = {
-        run: { word: 'succeeded', note: 'a note it never had' },
-        steps: [{ name: 'plan', word: 'done', note: 'said to 2 times' }],
-      };
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at, new Set(['r-2'])),
-        [],
-        'at rest, the same words with new notes are a change of wording, not of the run',
-      );
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', reworded]]), at, new Set(['r-2'])),
-        [
-          { at, run: 'r-1', word: 'succeeded', note: 'a note it never had' },
-          { at, run: 'r-1', step: 'plan', word: 'done', note: 'said to 2 times' },
-        ].map(upgraded),
-        'in flight, a note that moved is a line',
-      );
-      const moved = { ...reworded, atRest: true as const, steps: [{ name: 'plan', word: 'failed', note: 'said to 2 times' }] };
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', moved]]), at, new Set(['r-2'])),
-        [upgraded({ at, run: 'r-1', step: 'plan', word: 'failed', note: 'said to 2 times' })],
-        'at rest, a word that moved is a line, with its note',
-      );
-      const added = { ...reworded, atRest: true as const, steps: [...reworded.steps, { name: 'ship', word: 'done' }] };
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', added]]), at, new Set(['r-2'])),
-        [upgraded({ at, run: 'r-1', step: 'ship', word: 'done' })],
-        'at rest, a step the feed never named says its word',
-      );
-      assert.deepEqual(
-        feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at),
-        [upgraded({ at, run: 'r-2', word: 'removed' })],
-        'a run gone from the store is removed, at rest or not',
-      );
-    },
-  );
+  test('REFUSED: a run at rest whose words stand owes no line for a note reworded — a word moved, a step new to the fold and a run gone still do', () => {
+    const at = '2026-10-05T19:29:00.000Z';
+    const fold = foldFeed(freshFold(), [
+      { at, run: 'r-1', word: 'succeeded' },
+      { at, run: 'r-1', step: 'plan', word: 'done' },
+      { at, run: 'r-2', word: 'succeeded' },
+    ]);
+    const reworded = {
+      run: { word: 'succeeded', note: 'a note it never had' },
+      steps: [{ name: 'plan', word: 'done', note: 'said to 2 times' }],
+    };
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at, new Set(['r-2'])),
+      [],
+      'at rest, the same words with new notes are a change of wording, not of the run',
+    );
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', reworded]]), at, new Set(['r-2'])),
+      [
+        { at, run: 'r-1', word: 'succeeded', note: 'a note it never had' },
+        { at, run: 'r-1', step: 'plan', word: 'done', note: 'said to 2 times' },
+      ].map(upgraded),
+      'in flight, a note that moved is a line',
+    );
+    const moved = { ...reworded, atRest: true as const, steps: [{ name: 'plan', word: 'failed', note: 'said to 2 times' }] };
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', moved]]), at, new Set(['r-2'])),
+      [upgraded({ at, run: 'r-1', step: 'plan', word: 'failed', note: 'said to 2 times' })],
+      'at rest, a word that moved is a line, with its note',
+    );
+    const added = { ...reworded, atRest: true as const, steps: [...reworded.steps, { name: 'ship', word: 'done' }] };
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', added]]), at, new Set(['r-2'])),
+      [upgraded({ at, run: 'r-1', step: 'ship', word: 'done' })],
+      'at rest, a step the feed never named says its word',
+    );
+    assert.deepEqual(
+      feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at),
+      [upgraded({ at, run: 'r-2', word: 'removed' })],
+      'a run gone from the store is removed, at rest or not',
+    );
+  });
 });
 
-test('publishedOf gives each line written the bytes it was written at, and none where another writer appended among them', async (t) => {
-  await t.test(
-    'each line written is published with the bytes it was written at: after the newline that ended a torn line, in bytes not characters',
-    () => {
-      const at = '2026-09-22T10:00:00.000Z';
-      const lines: FeedLine[] = [
-        { at, run: 'r-1', word: 'running' },
-        { at, run: 'r-1', step: 'plan', word: 'waiting', note: 'on you — approve' },
-      ];
-      const sizes = lines.map((l) => Buffer.byteLength(`${JSON.stringify(l)}\n`));
-      assert.notEqual(sizes[1], `${JSON.stringify(lines[1])}\n`.length, 'the second line holds a character of more than one byte');
-      const written = sizes[0] + sizes[1];
-      assert.deepEqual(publishedOf({ lines, before: 100, after: 100 + written, leading: '' }), [
-        { from: 100, to: 100 + sizes[0], line: lines[0] },
-        { from: 100 + sizes[0], to: 100 + written, line: lines[1] },
-      ]);
-      assert.deepEqual(
-        publishedOf({ lines, before: 100, after: 101 + written, leading: '\n' }).map(({ from, to }) => [from, to]),
-        [
-          [101, 101 + sizes[0]],
-          [101 + sizes[0], 101 + written],
-        ],
-        'a newline written first to end a line a writer died in the middle of is no line of its own',
-      );
-    },
-  );
-  await t.test(
-    'REFUSED: lines another writer appended among are published with no bytes — the file is grown by more than they are, so its readers read it',
-    () => {
-      const lines: FeedLine[] = [{ at: '2026-09-22T10:00:00.000Z', run: 'r-1', word: 'running' }];
-      const size = Buffer.byteLength(`${JSON.stringify(lines[0])}\n`);
-      assert.equal(publishedOf({ lines, before: 0, after: size, leading: '' }).length, 1);
-      assert.deepEqual(publishedOf({ lines, before: 0, after: size + 40, leading: '' }), []);
-      assert.deepEqual(publishedOf({ lines: [], before: 7, after: 7, leading: '' }), []);
-    },
-  );
+describe('publishedOf gives each line written the bytes it was written at, and none where another writer appended among them', () => {
+  test('each line written is published with the bytes it was written at: after the newline that ended a torn line, in bytes not characters', () => {
+    const at = '2026-09-22T10:00:00.000Z';
+    const lines: FeedLine[] = [
+      { at, run: 'r-1', word: 'running' },
+      { at, run: 'r-1', step: 'plan', word: 'waiting', note: 'on you — approve' },
+    ];
+    const sizes = lines.map((l) => Buffer.byteLength(`${JSON.stringify(l)}\n`));
+    assert.notEqual(sizes[1], `${JSON.stringify(lines[1])}\n`.length, 'the second line holds a character of more than one byte');
+    const written = sizes[0] + sizes[1];
+    assert.deepEqual(publishedOf({ lines, before: 100, after: 100 + written, leading: '' }), [
+      { from: 100, to: 100 + sizes[0], line: lines[0] },
+      { from: 100 + sizes[0], to: 100 + written, line: lines[1] },
+    ]);
+    assert.deepEqual(
+      publishedOf({ lines, before: 100, after: 101 + written, leading: '\n' }).map(({ from, to }) => [from, to]),
+      [
+        [101, 101 + sizes[0]],
+        [101 + sizes[0], 101 + written],
+      ],
+      'a newline written first to end a line a writer died in the middle of is no line of its own',
+    );
+  });
+  test('REFUSED: lines another writer appended among are published with no bytes — the file is grown by more than they are, so its readers read it', () => {
+    const lines: FeedLine[] = [{ at: '2026-09-22T10:00:00.000Z', run: 'r-1', word: 'running' }];
+    const size = Buffer.byteLength(`${JSON.stringify(lines[0])}\n`);
+    assert.equal(publishedOf({ lines, before: 0, after: size, leading: '' }).length, 1);
+    assert.deepEqual(publishedOf({ lines, before: 0, after: size + 40, leading: '' }), []);
+    assert.deepEqual(publishedOf({ lines: [], before: 7, after: 7, leading: '' }), []);
+  });
 });

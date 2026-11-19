@@ -9,7 +9,8 @@
  * on its input (`attached.boundary.test.ts`); there is no `--bg` inbox to find.
  */
 import { Effect } from 'effect';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -121,15 +122,20 @@ const withInputClosed = (runFile: string): string => {
   return was;
 };
 
-test(
+describe(
   'a person tells a job at shipped defaults on its stdin: verbatim, as the next user message after its brief, in order, in bypassPermissions too — and nothing more once it has given its result',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const root = tmp('board');
-    const engine = builtEngine(EngineService.layer({ root, claudeExecutable: STAND_IN }));
-
-    await s.test('a job is told the words, verbatim, as the next user message after its brief — then journalled', async (sub) => {
+  () => {
+    let root!: string;
+    let engine!: EngineShape;
+    beforeAll(() => {
+      const t = teardowns();
+      root = tmp('board');
+      engine = builtEngine(EngineService.layer({ root, claudeExecutable: STAND_IN }));
+      return t.end;
+    });
+    const s = story(test);
+    s.test('a job is told the words, verbatim, as the next user message after its brief — then journalled', async (sub) => {
       const { id, told } = await job(sub, engine, 'job-told');
       const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
       const said = await Effect.runPromise(engine.say(id, text));
@@ -163,8 +169,7 @@ test(
       await refused(engine, id, 'hello', /has been asked to stop/);
       await Effect.runPromise(engine.tick());
     });
-
-    await s.test('a job in bypassPermissions is told: its words go on its input, which no approval holds', async (sub) => {
+    s.test('a job in bypassPermissions is told: its words go on its input, which no approval holds', async (sub) => {
       const { id, told } = await job(sub, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
       await Effect.runPromise(engine.say(id, 'carry on'));
       await heard(sub, () => (told().length === 2 ? true : undefined), 'the words on its input');
@@ -172,9 +177,8 @@ test(
       await Effect.runPromise(engine.stop(id));
       await Effect.runPromise(engine.tick());
     });
-
     let lingering = '';
-    await s.test(
+    s.test(
       'a job that has given its result reads nothing more: words said before it exits are rejected unsent, not journalled',
       async (sub) => {
         const { id, told, letGo } = await job(sub, engine, 'job-lingers');
@@ -213,8 +217,7 @@ test(
         fs.writeFileSync(runFile, was);
       },
     );
-
-    await s.test('once it has settled, refused', async () => {
+    s.test('once it has settled, refused', async () => {
       await Effect.runPromise(engine.stop(lingering));
       for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(lingering))).state.settled; i++) {
         await Effect.runPromise(engine.tick());
@@ -250,8 +253,11 @@ const SAY_REFUSALS: Array<{ name: string; says: RegExp; text?: string; task: (en
   })),
 ];
 
-test('say: what it refuses — SayRefused, nothing journalled', async (t) => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
+describe('say: what it refuses — SayRefused, nothing journalled', () => {
+  let engine!: EngineShape;
+  beforeAll(() => {
+    engine = builtEngine(EngineService.layer({ root: tmp('board') }));
+  });
   for (const row of SAY_REFUSALS)
-    await t.test(`refused: ${row.name}`, async () => refused(engine, await row.task(engine), row.text ?? 'hello', row.says));
+    test(`refused: ${row.name}`, async () => refused(engine, await row.task(engine), row.text ?? 'hello', row.says));
 });

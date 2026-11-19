@@ -12,7 +12,8 @@
  * Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set before the
  * import; where Codex keeps rollouts is read when one is looked for, so `CODEX_HOME` is set once, for the whole file.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -423,26 +424,33 @@ const CODEX_EVENTS: TranscriptEvent[] = [
 const detachedRead = (ops: ReturnType<typeof detachedOps>, sessionId: string, after?: string) =>
   Effect.runPromise(ops.transcript!(sessionId, after));
 
-test("the Codex runner reads a thread's conversation from its rollout: nothing while its worker has no thread id, by the id an ended attempt recorded, and by the run once its worker keeps the id — the same shape as Claude Code's", async (t) => {
-  const s = story(t);
-  const root = tmp('root');
-  const thread = randomUUID();
-  writeRollout(thread, jsonl(rolloutLines(thread)));
-  runFile(root, 'codex', 'ae/c1/1', {});
-  const ops = detachedOps(codex, root);
-  let none: Awaited<ReturnType<typeof detachedRead>>;
-  await s.test('a Codex run whose worker has no thread id yet has nothing to read', async () => {
+describe("the Codex runner reads a thread's conversation from its rollout: nothing while its worker has no thread id, by the id an ended attempt recorded, and by the run once its worker keeps the id — the same shape as Claude Code's", () => {
+  let root!: string;
+  let thread!: string;
+  let ops!: import('../src/index.ts').RunnerOps;
+  let none!: Awaited<ReturnType<typeof detachedRead>>;
+  beforeAll(() => {
+    const t = teardowns();
+    root = tmp('root');
+    thread = randomUUID();
+    writeRollout(thread, jsonl(rolloutLines(thread)));
+    runFile(root, 'codex', 'ae/c1/1', {});
+    ops = detachedOps(codex, root);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('a Codex run whose worker has no thread id yet has nothing to read', async () => {
     none = await detachedRead(ops, 'ae/c1/1');
     assert.deepEqual(none.events, []);
   });
-  await s.test(
+  s.test(
     'the id an ended attempt recorded reads its rollout with no run file; a name that is no thread id is looked up as nothing',
     async () => {
       assert.deepEqual((await detachedRead(ops, thread, none.cursor)).events, CODEX_EVENTS, 'by the id itself, from the start');
       assert.deepEqual((await detachedRead(ops, '../../etc/passwd')).events, [], 'a name that is no thread id is looked up as nothing');
     },
   );
-  await s.test('once its worker keeps the thread id, the run reads its rollout, dated, the final answer not hidden', async () => {
+  s.test('once its worker keeps the thread id, the run reads its rollout, dated, the final answer not hidden', async () => {
     runFile(root, 'codex', 'ae/c1/1', { nativeId: thread });
     const { events } = await detachedRead(ops, 'ae/c1/1');
     assert.deepEqual(events, CODEX_EVENTS);
@@ -451,8 +459,8 @@ test("the Codex runner reads a thread's conversation from its rollout: nothing w
   });
 });
 
-test('read in two pieces, cut anywhere, a transcript gives what it gives read whole: a Claude transcript at any byte, a Codex rollout at any line', async (t) => {
-  await t.test('read in two pieces, cut at any byte, a transcript gives what it gives read whole', async () => {
+describe('read in two pieces, cut anywhere, a transcript gives what it gives read whole: a Claude transcript at any byte, a Codex rollout at any line', () => {
+  test('read in two pieces, cut at any byte, a transcript gives what it gives read whole', async () => {
     const sessionId = randomUUID();
     const text = jsonl(claudeLines(sessionId));
     const cuts = new Set<number>();
@@ -468,7 +476,7 @@ test('read in two pieces, cut anywhere, a transcript gives what it gives read wh
       assert.deepEqual([...first.events, ...second.events], CLAUDE_EVENTS, `cut at byte ${cut}`);
     }
   });
-  await t.test('read again with its cursor, a rollout gives only what was appended, cut at any line', async () => {
+  test('read again with its cursor, a rollout gives only what was appended, cut at any line', async () => {
     const root = tmp('root');
     const thread = randomUUID();
     runFile(root, 'codex', 'ae/c3/1', { nativeId: thread });
@@ -497,117 +505,118 @@ const refusedWith = (record: object): string => {
   return 'not refused';
 };
 
-test('codexRolloutEvents: a record of a Codex rollout as the events it says, a record of a kind not read passing undecoded', async (t) => {
-  await t.test(
-    "a Codex record: a failed task's end is its error; a command that exited 0 is no error; a record with no time gives nothing",
-    () => {
-      assert.deepEqual(
-        codexRolloutEvents(
-          {
-            timestamp: at(0),
-            type: 'event_msg',
-            payload: { type: 'task_complete', turn_id: 't', error: { message: 'Invalid value: banana' } },
-          },
-          0,
-        ),
-        [{ id: 't:complete', at: at(0), role: 'system', kind: 'system', text: 'Invalid value: banana' }],
-      );
-      assert.deepEqual(
-        codexRolloutEvents(
-          {
-            timestamp: at(0),
-            type: 'event_msg',
-            payload: {
-              type: 'item_completed',
-              item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: 0, aggregated_output: 'a' },
-            },
-          },
-          0,
-        )[1]?.result,
-        { text: 'a', isError: false },
-      );
-      assert.deepEqual(
-        codexRolloutEvents(
-          { type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: [] } } },
-          0,
-        ),
-        [],
-      );
-      assert.deepEqual(
-        codexRolloutEvents(
-          {
-            timestamp: at(0),
-            type: 'response_item',
-            payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'context' }] },
-          },
-          0,
-        ),
-        [],
-        'the model-facing copy is not read',
-      );
-    },
-  );
-  await t.test(
-    'a Codex record of a kind the runtime reads with a field left out reads as it always has; a record of any other kind passes undecoded',
-    () => {
-      const system = (id: string, text: string) => [{ id, at: at(0), role: 'system', kind: 'system', text }];
-      const item = (fields: object) => codexRolloutEvents(eventMsg({ type: 'item_completed', item: fields }), 9);
-      assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete' }), 9), system('@9', 'task_complete'));
-      assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: null }), 9), system('@9', 'task_complete'));
-      assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: {} }), 9), system('@9', 'task_complete'));
-      assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't' } }, 9), [], 'no time');
-      assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'item_completed' }), 9), []);
-      assert.deepEqual(item({ type: 'AgentMessage' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'text', text: '' }]);
-      assert.deepEqual(item({ type: 'UserMessage', id: '' }), [{ id: '@9', at: at(0), role: 'user', kind: 'text', text: '' }]);
-      assert.deepEqual(item({ type: 'Reasoning' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'thinking' }]);
-      assert.deepEqual(item({ type: 'CommandExecution' }), [
+describe('codexRolloutEvents: a record of a Codex rollout as the events it says, a record of a kind not read passing undecoded', () => {
+  test("a Codex record: a failed task's end is its error; a command that exited 0 is no error; a record with no time gives nothing", () => {
+    assert.deepEqual(
+      codexRolloutEvents(
         {
-          id: '@9',
-          at: at(0),
-          role: 'assistant',
-          kind: 'tool_use',
-          tool: { name: 'CommandExecution', input: { command: undefined, cwd: undefined } },
+          timestamp: at(0),
+          type: 'event_msg',
+          payload: { type: 'task_complete', turn_id: 't', error: { message: 'Invalid value: banana' } },
         },
-        { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
-      ]);
-      assert.deepEqual(item({ type: 'CommandExecution', exit_code: null, aggregated_output: null, status: 'completed' })[1]?.result, {
-        text: '',
-        isError: true,
-      });
-      assert.deepEqual(item({ type: 'FileChange' }), [
-        { id: '@9', at: at(0), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: undefined } } },
-        { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
-      ]);
-      assert.deepEqual(item({ type: 'WebSearch', id: 'w', query: 7 }), system('w', '[WebSearch]'));
-      assert.deepEqual(item({ id: 'n' }), system('n', '[undefined]'));
-      for (const other of [
-        { timestamp: at(0), type: 'response_item', payload: 7 },
-        { timestamp: 'yesterday', type: 'session_meta', payload: { id: 7 } },
-        eventMsg({ type: 'token_count', info: 'x' }),
-        { timestamp: at(0), type: 'event_msg', payload: 'task_complete' },
-        { timestamp: at(0), type: 'turn_context', payload: { type: 'task_complete', error: 7 } },
-        'event_msg',
-        null,
-      ]) {
-        assert.deepEqual(codexRolloutEvents(other, 9, '/r.jsonl'), [], JSON.stringify(other));
-      }
-    },
-  );
+        0,
+      ),
+      [{ id: 't:complete', at: at(0), role: 'system', kind: 'system', text: 'Invalid value: banana' }],
+    );
+    assert.deepEqual(
+      codexRolloutEvents(
+        {
+          timestamp: at(0),
+          type: 'event_msg',
+          payload: {
+            type: 'item_completed',
+            item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: 0, aggregated_output: 'a' },
+          },
+        },
+        0,
+      )[1]?.result,
+      { text: 'a', isError: false },
+    );
+    assert.deepEqual(
+      codexRolloutEvents(
+        { type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: [] } } },
+        0,
+      ),
+      [],
+    );
+    assert.deepEqual(
+      codexRolloutEvents(
+        {
+          timestamp: at(0),
+          type: 'response_item',
+          payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'context' }] },
+        },
+        0,
+      ),
+      [],
+      'the model-facing copy is not read',
+    );
+  });
+  test('a Codex record of a kind the runtime reads with a field left out reads as it always has; a record of any other kind passes undecoded', () => {
+    const system = (id: string, text: string) => [{ id, at: at(0), role: 'system', kind: 'system', text }];
+    const item = (fields: object) => codexRolloutEvents(eventMsg({ type: 'item_completed', item: fields }), 9);
+    assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete' }), 9), system('@9', 'task_complete'));
+    assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: null }), 9), system('@9', 'task_complete'));
+    assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'task_complete', error: {} }), 9), system('@9', 'task_complete'));
+    assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't' } }, 9), [], 'no time');
+    assert.deepEqual(codexRolloutEvents(eventMsg({ type: 'item_completed' }), 9), []);
+    assert.deepEqual(item({ type: 'AgentMessage' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'text', text: '' }]);
+    assert.deepEqual(item({ type: 'UserMessage', id: '' }), [{ id: '@9', at: at(0), role: 'user', kind: 'text', text: '' }]);
+    assert.deepEqual(item({ type: 'Reasoning' }), [{ id: '@9', at: at(0), role: 'assistant', kind: 'thinking' }]);
+    assert.deepEqual(item({ type: 'CommandExecution' }), [
+      {
+        id: '@9',
+        at: at(0),
+        role: 'assistant',
+        kind: 'tool_use',
+        tool: { name: 'CommandExecution', input: { command: undefined, cwd: undefined } },
+      },
+      { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+    ]);
+    assert.deepEqual(item({ type: 'CommandExecution', exit_code: null, aggregated_output: null, status: 'completed' })[1]?.result, {
+      text: '',
+      isError: true,
+    });
+    assert.deepEqual(item({ type: 'FileChange' }), [
+      { id: '@9', at: at(0), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: undefined } } },
+      { id: '@9', at: at(0), role: 'user', kind: 'tool_result', result: { text: '', isError: true } },
+    ]);
+    assert.deepEqual(item({ type: 'WebSearch', id: 'w', query: 7 }), system('w', '[WebSearch]'));
+    assert.deepEqual(item({ id: 'n' }), system('n', '[undefined]'));
+    for (const other of [
+      { timestamp: at(0), type: 'response_item', payload: 7 },
+      { timestamp: 'yesterday', type: 'session_meta', payload: { id: 7 } },
+      eventMsg({ type: 'token_count', info: 'x' }),
+      { timestamp: at(0), type: 'event_msg', payload: 'task_complete' },
+      { timestamp: at(0), type: 'turn_context', payload: { type: 'task_complete', error: 7 } },
+      'event_msg',
+      null,
+    ]) {
+      assert.deepEqual(codexRolloutEvents(other, 9, '/r.jsonl'), [], JSON.stringify(other));
+    }
+  });
 });
 
-test("a poller reads a Claude session's transcript as it is written: each read gives what was appended since its cursor, read whole it is dated by the transcript with each result paired to its call, and a job reads the same", async (t) => {
-  const s = story(t);
-  const sessionId = randomUUID();
-  const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));
+describe("a poller reads a Claude session's transcript as it is written: each read gives what was appended since its cursor, read whole it is dated by the transcript with each result paired to its call, and a job reads the same", () => {
+  let sessionId!: string;
+  let lines!: string[];
+  let first!: Awaited<ReturnType<typeof claudeRead>>;
+  let second!: Awaited<ReturnType<typeof claudeRead>>;
+  let third!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    sessionId = randomUUID();
+    lines = claudeLines(sessionId).map((l) => JSON.stringify(l));
+    return t.end;
+  });
+  const s = story(test);
   const unread = [
     '{"type":"assistant","message":{"content":[{"type":"text","text":7',
     '["assistant"]',
     JSON.stringify({ type: 'file-history-snapshot', timestamp: 'never', snapshot: 7 }),
     JSON.stringify({ type: 'summary', summary: 3, leafUuid: 4 }),
   ];
-  let first: Awaited<ReturnType<typeof claudeRead>>;
-  let second: Awaited<ReturnType<typeof claudeRead>>;
-  await s.test(
+  s.test(
     'what is written so far is read as its events; a torn line, a line that is no JSON object, and a line of a type not read pass unchecked',
     async () => {
       writeClaude(sessionId, `${[...lines.slice(0, 2), ...unread, ...lines.slice(2, 5)].join('\n')}\n`);
@@ -615,26 +624,26 @@ test("a poller reads a Claude session's transcript as it is written: each read g
       assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 3));
     },
   );
-  const third = lines[7];
-  await s.test(
+  s.test(
     'read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read',
     async () => {
+      third = lines[7];
       fs.appendFileSync(claudeFile(sessionId), `${lines[5]}\n${lines[6]}\n${third.slice(0, 40)}`);
       second = await claudeRead(sessionId, first.cursor);
       assert.deepEqual(second.events, CLAUDE_EVENTS.slice(3, 5), 'only the two appended lines; not the half-written one');
     },
   );
-  await s.test('nothing new: nothing, and the same cursor', async () => {
+  s.test('nothing new: nothing, and the same cursor', async () => {
     assert.deepEqual(await claudeRead(sessionId, second.cursor), { events: [], cursor: second.cursor });
   });
-  await s.test('the line once written whole, then the rest', async () => {
+  s.test('the line once written whole, then the rest', async () => {
     fs.appendFileSync(claudeFile(sessionId), `${third.slice(40)}\n`);
     const whole = await claudeRead(sessionId, second.cursor);
     assert.deepEqual(whole.events, CLAUDE_EVENTS.slice(5, 6), 'the line, once written whole');
     fs.appendFileSync(claudeFile(sessionId), `${lines.slice(8).join('\n')}\n`);
     assert.deepEqual((await claudeRead(sessionId, whole.cursor)).events, CLAUDE_EVENTS.slice(6));
   });
-  await s.test(
+  s.test(
     "the Claude runner reads a session's conversation from its transcript: dated by it, each result paired to its call, the closeout a call like any other",
     async () => {
       const { events } = await claudeRead(sessionId);
@@ -657,7 +666,7 @@ test("a poller reads a Claude session's transcript as it is written: each read g
       );
     },
   );
-  await s.test(
+  s.test(
     "a job reads the same transcript by its name, once its run has the session's id; a spec that keeps no record has no transcript",
     async () => {
       const root = tmp('root');
@@ -747,43 +756,40 @@ const transcriptRefused =
     return true;
   };
 
-test('REFUSED: a read of a transcript, each refusal naming what to fix', async (t) => {
-  await t.test(
-    "a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its file, its offset, its field and the fix",
-    async () => {
-      const sessionId = randomUUID();
-      const text = claudeWith(sessionId, 3, { message: { id: 'msg_1', content: [{ type: 'thinking', thinking: 7 }] } });
-      writeClaude(sessionId, text);
-      const offset = Buffer.byteLength(text.split('\n').slice(0, 3).join('\n')) + 1;
-      const names = [
-        `the line at byte ${offset} of the transcript \`${claudeFile(sessionId)}\``,
-        'an `assistant` line',
-        '`message.content.0.thinking` is 7',
-        'Claude Code writes string',
-      ];
-      await assert.rejects(readTranscript(claudeFile(sessionId), undefined, claudeTranscriptEvents), (e: Error) => {
-        assert.ok(e.message.startsWith(names[0]), e.message);
-        for (const name of names) assert.ok(e.message.includes(name), `${name}: ${e.message}`);
-        return true;
-      });
-      await assert.rejects(claudeRead(sessionId), (e: unknown) => {
-        assert.ok(e instanceof RunnerError, String(e));
-        assert.equal(e.verb, 'transcript');
-        assert.ok(e.message.startsWith(`claude: ${names[0]}`), e.message);
-        for (const name of [...names, '`harness/claude/lines.ts`']) assert.ok(e.message.includes(name), `${name}: ${e.message}`);
-        return true;
-      });
+describe('REFUSED: a read of a transcript, each refusal naming what to fix', () => {
+  test("a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its file, its offset, its field and the fix", async () => {
+    const sessionId = randomUUID();
+    const text = claudeWith(sessionId, 3, { message: { id: 'msg_1', content: [{ type: 'thinking', thinking: 7 }] } });
+    writeClaude(sessionId, text);
+    const offset = Buffer.byteLength(text.split('\n').slice(0, 3).join('\n')) + 1;
+    const names = [
+      `the line at byte ${offset} of the transcript \`${claudeFile(sessionId)}\``,
+      'an `assistant` line',
+      '`message.content.0.thinking` is 7',
+      'Claude Code writes string',
+    ];
+    await assert.rejects(readTranscript(claudeFile(sessionId), undefined, claudeTranscriptEvents), (e: Error) => {
+      assert.ok(e.message.startsWith(names[0]), e.message);
+      for (const name of names) assert.ok(e.message.includes(name), `${name}: ${e.message}`);
+      return true;
+    });
+    await assert.rejects(claudeRead(sessionId), (e: unknown) => {
+      assert.ok(e instanceof RunnerError, String(e));
+      assert.equal(e.verb, 'transcript');
+      assert.ok(e.message.startsWith(`claude: ${names[0]}`), e.message);
+      for (const name of [...names, '`harness/claude/lines.ts`']) assert.ok(e.message.includes(name), `${name}: ${e.message}`);
+      return true;
+    });
 
-      const aside = randomUUID();
-      writeClaude(aside, claudeWith(aside, 3, { isSidechain: true, message: { content: [{ type: 'tool_use', id: 7 }] } }));
-      await assert.rejects(
-        claudeRead(aside),
-        (e: Error) => e.message.includes('an `assistant` line whose `message.content.0.id` is 7'),
-        "a subagent's line is decoded before it is left out",
-      );
-    },
-  );
-  await t.test('a cursor no read gave is refused, naming it', async () => {
+    const aside = randomUUID();
+    writeClaude(aside, claudeWith(aside, 3, { isSidechain: true, message: { content: [{ type: 'tool_use', id: 7 }] } }));
+    await assert.rejects(
+      claudeRead(aside),
+      (e: Error) => e.message.includes('an `assistant` line whose `message.content.0.id` is 7'),
+      "a subagent's line is decoded before it is left out",
+    );
+  });
+  test('a cursor no read gave is refused, naming it', async () => {
     const sessionId = randomUUID();
     writeClaude(sessionId, jsonl(claudeLines(sessionId)));
     for (const bad of ['12', 'abc.0123456789abcdef', '-1.0123456789abcdef', '12.xyz']) {
@@ -792,40 +798,37 @@ test('REFUSED: a read of a transcript, each refusal naming what to fix', async (
       );
     }
   });
-  await t.test(
-    "a Codex rollout's record of a kind the runtime reads with a field that is there in another shape refuses the read by its file, its offset, its field and the fix",
-    async () => {
-      const thread = randomUUID();
-      const lines = rolloutLines(thread);
-      lines.splice(2, 0, eventMsg({ type: 'task_complete', turn_id: 't' }));
-      (lines[2] as { timestamp: string }).timestamp = 'yesterday';
-      const text = jsonl(lines);
-      writeRollout(thread, text);
-      const offset = Buffer.byteLength(text.split('\n').slice(0, 2).join('\n')) + 1;
-      await assert.rejects(readTranscript(rolloutFile(thread), undefined, codexRolloutEvents), (e: Error) => {
-        rolloutRefusal(
-          e.message,
-          `the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\``,
-          '`event_msg` `task_complete` record',
-          '`timestamp` is "yesterday"',
-        );
-        return true;
-      });
+  test("a Codex rollout's record of a kind the runtime reads with a field that is there in another shape refuses the read by its file, its offset, its field and the fix", async () => {
+    const thread = randomUUID();
+    const lines = rolloutLines(thread);
+    lines.splice(2, 0, eventMsg({ type: 'task_complete', turn_id: 't' }));
+    (lines[2] as { timestamp: string }).timestamp = 'yesterday';
+    const text = jsonl(lines);
+    writeRollout(thread, text);
+    const offset = Buffer.byteLength(text.split('\n').slice(0, 2).join('\n')) + 1;
+    await assert.rejects(readTranscript(rolloutFile(thread), undefined, codexRolloutEvents), (e: Error) => {
       rolloutRefusal(
-        refusedWith(eventMsg({ type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: 'hello' } })),
-        'the line at byte 9 of the rollout `/r.jsonl`',
-        '`event_msg` `item_completed` record',
-        '`payload.item.content` is "hello"',
-      );
-      rolloutRefusal(
-        refusedWith(eventMsg({ type: 'task_complete', turn_id: 't', error: { message: 7 } })),
-        'the line at byte 9 of the rollout `/r.jsonl`',
+        e.message,
+        `the line at byte ${offset} of the rollout \`${rolloutFile(thread)}\``,
         '`event_msg` `task_complete` record',
-        '`payload.error.message` is 7',
+        '`timestamp` is "yesterday"',
       );
-    },
-  );
-  await t.test('a Codex command whose exit code is no number refuses the `transcript` verb, never reads as a failed command', async () => {
+      return true;
+    });
+    rolloutRefusal(
+      refusedWith(eventMsg({ type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: 'hello' } })),
+      'the line at byte 9 of the rollout `/r.jsonl`',
+      '`event_msg` `item_completed` record',
+      '`payload.item.content` is "hello"',
+    );
+    rolloutRefusal(
+      refusedWith(eventMsg({ type: 'task_complete', turn_id: 't', error: { message: 7 } })),
+      'the line at byte 9 of the rollout `/r.jsonl`',
+      '`event_msg` `task_complete` record',
+      '`payload.error.message` is 7',
+    );
+  });
+  test('a Codex command whose exit code is no number refuses the `transcript` verb, never reads as a failed command', async () => {
     const root = tmp('root');
     const thread = randomUUID();
     const lines = rolloutLines(thread);
@@ -845,31 +848,28 @@ test('REFUSED: a read of a transcript, each refusal naming what to fix', async (
       return true;
     });
   });
-  await t.test(
-    'the engine refuses, each naming what to do: a task it has no record of, and a cursor no read gave on either kind of harness',
-    async () => {
-      {
-        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-        await assert.rejects(
-          Effect.runPromise(engine.transcript('t-nope')),
-          transcriptRefused('`t-nope` is not a task', '`ae ls`', '`list()`'),
-        );
-        const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd') }));
-        await assert.rejects(
-          Effect.runPromise(engine.transcript(id, 'from-the-top')),
-          transcriptRefused('`from-the-top` is not a cursor', '`cursor`'),
-        );
-        assert.deepEqual((await Effect.runPromise(engine.transcript(id))).events, [], 'the same task, asked without one, is read');
-        const codexId = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' }));
-        await assert.rejects(
-          Effect.runPromise(engine.transcript(codexId, 'page-2')),
-          transcriptRefused('`page-2` is not a cursor', '`cursor`'),
-          "a HarnessSpec's reader is the engine's too, and refuses the same",
-        );
-      }
-    },
-  );
-  await t.test('the engine refuses a harness that keeps no conversation, an AsyncRunner or a HarnessSpec, naming `logs`', async () => {
+  test('the engine refuses, each naming what to do: a task it has no record of, and a cursor no read gave on either kind of harness', async () => {
+    {
+      const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+      await assert.rejects(
+        Effect.runPromise(engine.transcript('t-nope')),
+        transcriptRefused('`t-nope` is not a task', '`ae ls`', '`list()`'),
+      );
+      const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd') }));
+      await assert.rejects(
+        Effect.runPromise(engine.transcript(id, 'from-the-top')),
+        transcriptRefused('`from-the-top` is not a cursor', '`cursor`'),
+      );
+      assert.deepEqual((await Effect.runPromise(engine.transcript(id))).events, [], 'the same task, asked without one, is read');
+      const codexId = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' }));
+      await assert.rejects(
+        Effect.runPromise(engine.transcript(codexId, 'page-2')),
+        transcriptRefused('`page-2` is not a cursor', '`cursor`'),
+        "a HarnessSpec's reader is the engine's too, and refuses the same",
+      );
+    }
+  });
+  test('the engine refuses a harness that keeps no conversation, an AsyncRunner or a HarnessSpec, naming `logs`', async () => {
     const sessions = new Map<string, Sighting>();
     const plain: AsyncRunner = {
       async spawn(r) {
@@ -958,199 +958,184 @@ test("a transcript's mtime is its file's, in whole milliseconds, read by a stat;
   assert.equal(await transcriptWrittenAt(randomUUID()), undefined);
 });
 
-test('claudeTranscriptEvents: a line of a Claude transcript as the events it says, each by who spoke', async (t) => {
-  await t.test(
-    'a line of a Claude transcript: the harness speaking is system, a subagent is left to its own, a block not read is named, a line with no time gives nothing',
-    () => {
-      const base = { sessionId: 's', timestamp: at(0) };
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          {
-            ...base,
-            type: 'user',
-            uuid: 'm',
-            isMeta: true,
-            message: { content: [{ type: 'text', text: 'Continue from where you left off.' }] },
-          },
-          0,
-        ),
-        [{ id: 'm:0', at: at(0), role: 'system', kind: 'system', text: 'Continue from where you left off.' }],
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          { ...base, type: 'assistant', uuid: 'x', isSidechain: true, message: { content: [{ type: 'text', text: 'a subagent' }] } },
-          0,
-        ),
-        [],
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          {
-            ...base,
-            type: 'user',
-            uuid: 'i',
-            message: {
-              content: [
-                { type: 'image', source: {} },
-                { type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'shot' }, { type: 'image' }] },
-              ],
-            },
-          },
-          0,
-        ),
-        [
-          { id: 'i:0', at: at(0), role: 'user', kind: 'text', text: '[image]' },
-          { id: 't', at: at(0), role: 'user', kind: 'tool_result', result: { text: 'shot\n[image]', isError: false } },
-        ],
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          { ...base, type: 'assistant', uuid: 'r', message: { content: [{ type: 'thinking', thinking: '', signature: 'sig' }] } },
-          0,
-        ),
-        [{ id: 'r:0', at: at(0), role: 'assistant', kind: 'thinking' }],
-        'thinking written with no text is a thinking event with no text, not an invented one',
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents({ type: 'assistant', uuid: 'n', message: { content: [{ type: 'text', text: 'when?' }] } }, 0),
-        [],
-        'no time, no event',
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120),
-        [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }],
-        'no uuid: its place in the file',
-      );
-    },
-  );
-  await t.test(
-    'words another process sent a working session — a peer, or `say` — are a system event with those words; any other attachment gives nothing',
-    () => {
-      const line = {
-        parentUuid: 'p',
-        isSidechain: false,
-        type: 'attachment',
-        uuid: 'att-peer',
-        timestamp: at(0),
-        sessionId: 's',
-        attachment: {
-          type: 'queued_command',
-          prompt: 'The file to write is SAID-bc11750e.txt',
-          source_uuid: 'src',
-          commandMode: 'prompt',
-          origin: { kind: 'peer', from: 'unknown', verifiedPeerPid: 4165162, verifiedPeerProcStart: '13623112' },
-          timestamp: at(0),
+describe('claudeTranscriptEvents: a line of a Claude transcript as the events it says, each by who spoke', () => {
+  test('a line of a Claude transcript: the harness speaking is system, a subagent is left to its own, a block not read is named, a line with no time gives nothing', () => {
+    const base = { sessionId: 's', timestamp: at(0) };
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        {
+          ...base,
+          type: 'user',
+          uuid: 'm',
           isMeta: true,
+          message: { content: [{ type: 'text', text: 'Continue from where you left off.' }] },
         },
-      };
-      assert.deepEqual(
-        claudeTranscriptEvents(line, 0),
-        [{ id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' }],
-        "a line posted to a `--bg` session's inbox while it works, as Claude Code writes it into the transcript",
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0),
-        [],
-        'a queued command of any other origin is not read as words sent in',
-      );
-      assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { type: 'environment' } }, 0), [], 'nor is any other attachment');
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          {
-            type: 'user',
-            uuid: 'idle',
-            timestamp: at(1),
-            isMeta: true,
-            origin: { kind: 'peer', from: 'unknown' },
-            message: { role: 'user', content: 'Another Claude session sent a message:\nIdle check' },
+        0,
+      ),
+      [{ id: 'm:0', at: at(0), role: 'system', kind: 'system', text: 'Continue from where you left off.' }],
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        { ...base, type: 'assistant', uuid: 'x', isSidechain: true, message: { content: [{ type: 'text', text: 'a subagent' }] } },
+        0,
+      ),
+      [],
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        {
+          ...base,
+          type: 'user',
+          uuid: 'i',
+          message: {
+            content: [
+              { type: 'image', source: {} },
+              { type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'shot' }, { type: 'image' }] },
+            ],
           },
-          0,
-        ),
-        [{ id: 'idle:0', at: at(1), role: 'system', kind: 'system', text: 'Another Claude session sent a message:\nIdle check' }],
-        'arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is',
-      );
-    },
-  );
-  await t.test(
-    "words the session's own user said while it worked — typed into it, or a job's next line on its stdin, which Claude Code writes into a `claude -p --input-format stream-json` job's transcript as a queued command with no origin — are the user's; a notice of a background task is nothing",
-    () => {
-      const line = {
-        parentUuid: 'p',
-        isSidechain: false,
-        type: 'attachment',
-        uuid: 'att-stdin',
-        timestamp: at(0),
-        sessionId: 's',
-        entrypoint: 'sdk-cli',
-        attachment: {
-          type: 'queued_command',
-          prompt: 'The file to write is SAID-fcfc71ec.txt',
-          source_uuid: 'src',
-          commandMode: 'prompt',
-          timestamp: at(0),
         },
-      };
-      const theirs = [{ id: 'att-stdin', at: at(0), role: 'user', kind: 'text', text: 'The file to write is SAID-fcfc71ec.txt' }];
-      assert.deepEqual(claudeTranscriptEvents(line, 0), theirs, "no origin: the job's own user");
-      assert.deepEqual(
-        claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'human' } } }, 0),
-        theirs,
-        'a person typing into it',
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          {
-            ...line,
-            attachment: { ...line.attachment, commandMode: 'task-notification', prompt: '<task-notification>done</task-notification>' },
-          },
-          0,
-        ),
-        [],
-        "Claude Code's notice that a background task ended is not anyone's words",
-      );
-    },
-  );
-  await t.test(
-    "a `user` line's own origin is carried: words a person wrote into the session itself say `human`, and words the host pushed on its input say nothing",
-    () => {
-      const line = (origin?: object) => ({
-        parentUuid: null,
-        isSidechain: false,
-        type: 'user',
-        uuid: 'said',
+        0,
+      ),
+      [
+        { id: 'i:0', at: at(0), role: 'user', kind: 'text', text: '[image]' },
+        { id: 't', at: at(0), role: 'user', kind: 'tool_result', result: { text: 'shot\n[image]', isError: false } },
+      ],
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        { ...base, type: 'assistant', uuid: 'r', message: { content: [{ type: 'thinking', thinking: '', signature: 'sig' }] } },
+        0,
+      ),
+      [{ id: 'r:0', at: at(0), role: 'assistant', kind: 'thinking' }],
+      'thinking written with no text is a thinking event with no text, not an invented one',
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents({ type: 'assistant', uuid: 'n', message: { content: [{ type: 'text', text: 'when?' }] } }, 0),
+      [],
+      'no time, no event',
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120),
+      [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }],
+      'no uuid: its place in the file',
+    );
+  });
+  test('words another process sent a working session — a peer, or `say` — are a system event with those words; any other attachment gives nothing', () => {
+    const line = {
+      parentUuid: 'p',
+      isSidechain: false,
+      type: 'attachment',
+      uuid: 'att-peer',
+      timestamp: at(0),
+      sessionId: 's',
+      attachment: {
+        type: 'queued_command',
+        prompt: 'The file to write is SAID-bc11750e.txt',
+        source_uuid: 'src',
+        commandMode: 'prompt',
+        origin: { kind: 'peer', from: 'unknown', verifiedPeerPid: 4165162, verifiedPeerProcStart: '13623112' },
         timestamp: at(0),
-        sessionId: 's',
-        ...(origin ? { origin } : {}),
-        message: { role: 'user', content: 'what is left to land?' },
-      });
-      assert.deepEqual(claudeTranscriptEvents(line({ kind: 'human', from: 'web' }), 0), [
-        { id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?', origin: { kind: 'human' } },
-      ]);
-      assert.deepEqual(
-        claudeTranscriptEvents(line(), 0),
-        [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?' }],
-        'a line with no origin says none: the host that pushed the words knows it did',
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(
-          { ...line({ kind: 'human' }), message: { role: 'user', content: [{ type: 'text', text: 'and this?' }] } },
-          0,
-        ),
-        [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'and this?', origin: { kind: 'human' } }],
-        'and a line written in blocks carries it onto each',
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents({ ...line({ kind: 'human' }), isMeta: true }, 0).map((e) => e.origin),
-        [undefined],
-        "a line the harness itself put in is the system's, and carries no origin of a person",
-      );
-      assert.deepEqual(
-        claudeTranscriptEvents(line({ kind: 'teleport' }), 0).map((e) => e.origin),
-        [{ kind: 'unknown' }],
-        'an origin the SDK has not named reads as unknown, never as a person',
-      );
-    },
-  );
+        isMeta: true,
+      },
+    };
+    assert.deepEqual(
+      claudeTranscriptEvents(line, 0),
+      [{ id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' }],
+      "a line posted to a `--bg` session's inbox while it works, as Claude Code writes it into the transcript",
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0),
+      [],
+      'a queued command of any other origin is not read as words sent in',
+    );
+    assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { type: 'environment' } }, 0), [], 'nor is any other attachment');
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        {
+          type: 'user',
+          uuid: 'idle',
+          timestamp: at(1),
+          isMeta: true,
+          origin: { kind: 'peer', from: 'unknown' },
+          message: { role: 'user', content: 'Another Claude session sent a message:\nIdle check' },
+        },
+        0,
+      ),
+      [{ id: 'idle:0', at: at(1), role: 'system', kind: 'system', text: 'Another Claude session sent a message:\nIdle check' }],
+      'arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is',
+    );
+  });
+  test("words the session's own user said while it worked — typed into it, or a job's next line on its stdin, which Claude Code writes into a `claude -p --input-format stream-json` job's transcript as a queued command with no origin — are the user's; a notice of a background task is nothing", () => {
+    const line = {
+      parentUuid: 'p',
+      isSidechain: false,
+      type: 'attachment',
+      uuid: 'att-stdin',
+      timestamp: at(0),
+      sessionId: 's',
+      entrypoint: 'sdk-cli',
+      attachment: {
+        type: 'queued_command',
+        prompt: 'The file to write is SAID-fcfc71ec.txt',
+        source_uuid: 'src',
+        commandMode: 'prompt',
+        timestamp: at(0),
+      },
+    };
+    const theirs = [{ id: 'att-stdin', at: at(0), role: 'user', kind: 'text', text: 'The file to write is SAID-fcfc71ec.txt' }];
+    assert.deepEqual(claudeTranscriptEvents(line, 0), theirs, "no origin: the job's own user");
+    assert.deepEqual(
+      claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'human' } } }, 0),
+      theirs,
+      'a person typing into it',
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents(
+        {
+          ...line,
+          attachment: { ...line.attachment, commandMode: 'task-notification', prompt: '<task-notification>done</task-notification>' },
+        },
+        0,
+      ),
+      [],
+      "Claude Code's notice that a background task ended is not anyone's words",
+    );
+  });
+  test("a `user` line's own origin is carried: words a person wrote into the session itself say `human`, and words the host pushed on its input say nothing", () => {
+    const line = (origin?: object) => ({
+      parentUuid: null,
+      isSidechain: false,
+      type: 'user',
+      uuid: 'said',
+      timestamp: at(0),
+      sessionId: 's',
+      ...(origin ? { origin } : {}),
+      message: { role: 'user', content: 'what is left to land?' },
+    });
+    assert.deepEqual(claudeTranscriptEvents(line({ kind: 'human', from: 'web' }), 0), [
+      { id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?', origin: { kind: 'human' } },
+    ]);
+    assert.deepEqual(
+      claudeTranscriptEvents(line(), 0),
+      [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'what is left to land?' }],
+      'a line with no origin says none: the host that pushed the words knows it did',
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents({ ...line({ kind: 'human' }), message: { role: 'user', content: [{ type: 'text', text: 'and this?' }] } }, 0),
+      [{ id: 'said:0', at: at(0), role: 'user', kind: 'text', text: 'and this?', origin: { kind: 'human' } }],
+      'and a line written in blocks carries it onto each',
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents({ ...line({ kind: 'human' }), isMeta: true }, 0).map((e) => e.origin),
+      [undefined],
+      "a line the harness itself put in is the system's, and carries no origin of a person",
+    );
+    assert.deepEqual(
+      claudeTranscriptEvents(line({ kind: 'teleport' }), 0).map((e) => e.origin),
+      [{ kind: 'unknown' }],
+      'an origin the SDK has not named reads as unknown, never as a person',
+    );
+  });
 });
 
 test('a transcript named but not on disk reads as none: no events, and a cursor at the start', async () => {

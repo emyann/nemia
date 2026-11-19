@@ -2,7 +2,7 @@
  * The board's own files hold no raw control character: one in a regular expression's class reads as a blank to a person, and a NUL makes
  * ripgrep take the whole file for binary and search none of it. Name them with escapes. Tab, line feed and carriage return are text.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

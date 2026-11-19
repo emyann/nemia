@@ -3,7 +3,7 @@
  * same text and another for another; a value's the digest of its JSON (`valueVersion`); and the kinds that stamp one take it here — a
  * card's text and a proposal's spec and status.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { cardVersion } from '../card-write/card-write.verb.ts';

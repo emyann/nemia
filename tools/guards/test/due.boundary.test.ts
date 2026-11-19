@@ -2,7 +2,7 @@
  * `due.ts` run as CI runs it: a child process in a scratch git repository with a planted root `package.json`, `turbo.json` and
  * `tools/guards/package.json`, the range given by env, the answer read from the file `GITHUB_OUTPUT` names.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

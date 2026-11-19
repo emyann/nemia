@@ -8,7 +8,8 @@
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
  */
-import { test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -64,15 +65,18 @@ const signedJournal = (): Event[] => [
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
-test('a task held open signs and waits with its session released; answered after a restart, it resumes under the answer; closed, it settles — through the Effect door, and through `ae answer` and `ae close`', async (t) => {
-  const s = story(t);
-  const root = scratch('ae-hold-open-');
-  try {
-    const sessions = new Map<string, Sighting>();
-    const spawned: SpawnRequest[] = [];
-    const released: string[] = [];
-    const ops = testOps({ sessions, spawned });
-    const harness = Runner.layer({
+describe('a task held open signs and waits with its session released; answered after a restart, it resumes under the answer; closed, it settles — through the Effect door, and through `ae answer` and `ae close`', () => {
+  let root!: string;
+  let sessions!: Map<string, Sighting>;
+  let ops!: import('../src/index.ts').RunnerOps;
+  let harness!: Layer.Layer<Runner>;
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    root = scratch('ae-hold-open-');
+    sessions = new Map<string, Sighting>();
+    ops = testOps({ sessions, spawned });
+    harness = Runner.layer({
       ...ops,
       release: (x) =>
         Effect.sync(() => {
@@ -80,114 +84,111 @@ test('a task held open signs and waits with its session released; answered after
           for (const [name, task] of sessions) if (task.sessionId === x.sessionId) sessions.delete(name);
         }),
     });
-    const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
-      Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
-    const phase = async (id: string) =>
-      (await run(Effect.flatMap(Runner, (r) => r.observe).pipe(Effect.flatMap((o) => view(id, o))))).phase;
-    let id = '';
-
-    await s.test('signed, it waits with its session let go, and nothing is started while it waits, pass after pass', async () => {
-      id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
+    return t.end;
+  });
+  const s = story(test);
+  const spawned: SpawnRequest[] = [];
+  const released: string[] = [];
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
+    Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
+  const phase = async (id: string) => (await run(Effect.flatMap(Runner, (r) => r.observe).pipe(Effect.flatMap((o) => view(id, o))))).phase;
+  let id = '';
+  s.test('signed, it waits with its session let go, and nothing is started while it waits, pass after pass', async () => {
+    id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
+    await run(tick());
+    signed(sessions, `ae/${id}/1`, 'a first draft', (await run(view(id, new Map()))).state.attempts[0].startedAt);
+    await run(tick());
+    assert.equal(await phase(id), 'input-required');
+    assert.deepEqual(released, ['fake-1'], 'the signed session is let go: nothing runs while it waits');
+    for (let i = 0; i < 3; i++) await run(tick());
+    assert.equal(spawned.length, 1, 'and nothing is started while it waits, pass after pass');
+    assert.equal(await phase(id), 'input-required');
+  });
+  s.test(
+    "answered, it resumes the session that signed, told the answer, under the answer's budget laid over the filing's configuration",
+    async () => {
+      const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
+      assert.equal(input.text, 'shorter, please');
+      assert.deepEqual(input.config, { budgetUsd: 0.5 });
       await run(tick());
-      signed(sessions, `ae/${id}/1`, 'a first draft', (await run(view(id, new Map()))).state.attempts[0].startedAt);
-      await run(tick());
-      assert.equal(await phase(id), 'input-required');
-      assert.deepEqual(released, ['fake-1'], 'the signed session is let go: nothing runs while it waits');
-      for (let i = 0; i < 3; i++) await run(tick());
-      assert.equal(spawned.length, 1, 'and nothing is started while it waits, pass after pass');
-      assert.equal(await phase(id), 'input-required');
-    });
-
-    await s.test(
-      "answered, it resumes the session that signed, told the answer, under the answer's budget laid over the filing's configuration",
-      async () => {
-        const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
-        assert.equal(input.text, 'shorter, please');
-        assert.deepEqual(input.config, { budgetUsd: 0.5 });
-        await run(tick());
-        assert.equal(spawned.length, 2);
-        assert.equal(spawned[1].name, `ae/${id}/2`);
-        assert.equal(spawned[1].resumeFrom, 'fake-1', 'it continues the session that signed');
-        assert.equal(spawned[1].brief, 'shorter, please', 'told the answer, not the brief again');
-        assert.deepEqual(
-          spawned[1].config,
-          { model: 'opus', budgetUsd: 0.5 },
-          "under the answer's budget, laid over the rest of the filing's configuration",
-        );
-        assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
-        assert.equal(await phase(id), 'working');
-      },
-    );
-
-    await s.test('signed again, it waits again; closed, it settles succeeded, each closeout kept', async () => {
-      signed(sessions, `ae/${id}/2`, 'a shorter draft', (await run(view(id, new Map()))).state.attempts[1].startedAt);
-      await run(tick());
-      assert.equal(await phase(id), 'input-required', 'signed again: it waits again');
-      await run(close(id));
-      await run(tick());
-      const settled = await run(view(id, new Map()));
-      assert.equal(settled.phase, 'succeeded');
-      const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
+      assert.equal(spawned.length, 2);
+      assert.equal(spawned[1].name, `ae/${id}/2`);
+      assert.equal(spawned[1].resumeFrom, 'fake-1', 'it continues the session that signed');
+      assert.equal(spawned[1].brief, 'shorter, please', 'told the answer, not the brief again');
       assert.deepEqual(
-        events.slice(-2).map((e) => (e.kind === 'settled' ? [e.kind, e.outcome, e.note] : [e.kind])),
-        [['closed'], ['settled', 'succeeded', 'closed']],
+        spawned[1].config,
+        { model: 'opus', budgetUsd: 0.5 },
+        "under the answer's budget, laid over the rest of the filing's configuration",
       );
-      assert.deepEqual(
-        settled.state.attempts.map((a) => a.closeout),
-        [
-          { outcome: 'done', summary: 'a first draft' },
-          { outcome: 'done', summary: 'a shorter draft' },
-        ],
-      );
-    });
-
-    const engine = builtEngine(Engine.layer({ root }));
-    const waiting = async () => {
-      const waits = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(waits), e))));
-      return waits;
-    };
-    const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))));
-    const cli = (...args: string[]) =>
-      spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
-    let answered = '';
-
-    await s.test(
-      'ae answer refuses a budget that is not dollars, exit 2 and nothing journalled; then prints the line it journalled, the words being everything after the id but --budget',
-      async () => {
-        answered = await waiting();
-        const bad = cli('answer', answered, 'shorter', '--budget', '$5');
-        assert.equal(bad.status, 2, bad.stderr);
-        assert.match(bad.stderr, /^answer: `--budget \$5` is not an amount of dollars\. Write dollars above 0, digits only/);
-        assert.match(cli('answer', answered, 'shorter', '--budget').stderr, /^answer: `--budget ` is not an amount of dollars/);
-        assert.equal((await journal(answered)).length, 4, 'nothing journalled');
-        const ok = cli('answer', answered, 'shorter,', 'please', '--budget', '0.5');
-        assert.equal(ok.status, 0, ok.stderr);
-        assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
-        const last = (await journal(answered)).at(-1)!;
-        assert.deepEqual(last.kind === 'input' ? [last.text, last.config] : last, ['shorter, please', { budgetUsd: 0.5 }]);
-      },
+      assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
+      assert.equal(await phase(id), 'working');
+    },
+  );
+  s.test('signed again, it waits again; closed, it settles succeeded, each closeout kept', async () => {
+    signed(sessions, `ae/${id}/2`, 'a shorter draft', (await run(view(id, new Map()))).state.attempts[1].startedAt);
+    await run(tick());
+    assert.equal(await phase(id), 'input-required', 'signed again: it waits again');
+    await run(close(id));
+    await run(tick());
+    const settled = await run(view(id, new Map()));
+    assert.equal(settled.phase, 'succeeded');
+    const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
+    assert.deepEqual(
+      events.slice(-2).map((e) => (e.kind === 'settled' ? [e.kind, e.outcome, e.note] : [e.kind])),
+      [['closed'], ['settled', 'succeeded', 'closed']],
     );
-
-    await s.test('ae close of a task answered already, and ae answer with no words, each exit 2', () => {
-      const again = cli('close', answered);
-      assert.equal(again.status, 2);
-      assert.match(again.stderr, /^close: `t-.*` has been answered already/);
-      const empty = cli('answer', answered, '');
-      assert.equal(empty.status, 2);
-      assert.match(empty.stderr, /^answer: `text` is empty/);
-    });
-
-    await s.test('ae close of a task that waits prints that the next tick settles it, and journals the close', async () => {
-      const c = await waiting();
-      const closed = cli('close', c);
-      assert.equal(closed.status, 0, closed.stderr);
-      assert.match(closed.stdout, /closed: the next tick settles it/);
-      assert.equal((await journal(c)).at(-1)!.kind, 'closed');
-    });
-  } finally {
+    assert.deepEqual(
+      settled.state.attempts.map((a) => a.closeout),
+      [
+        { outcome: 'done', summary: 'a first draft' },
+        { outcome: 'done', summary: 'a shorter draft' },
+      ],
+    );
+  });
+  const waiting = async () => {
+    const waits = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
+    await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(waits), e))));
+    return waits;
+  };
+  const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))));
+  const cli = (...args: string[]) =>
+    spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
+  let answered = '';
+  s.test(
+    'ae answer refuses a budget that is not dollars, exit 2 and nothing journalled; then prints the line it journalled, the words being everything after the id but --budget',
+    async () => {
+      engine = builtEngine(Engine.layer({ root }));
+      answered = await waiting();
+      const bad = cli('answer', answered, 'shorter', '--budget', '$5');
+      assert.equal(bad.status, 2, bad.stderr);
+      assert.match(bad.stderr, /^answer: `--budget \$5` is not an amount of dollars\. Write dollars above 0, digits only/);
+      assert.match(cli('answer', answered, 'shorter', '--budget').stderr, /^answer: `--budget ` is not an amount of dollars/);
+      assert.equal((await journal(answered)).length, 4, 'nothing journalled');
+      const ok = cli('answer', answered, 'shorter,', 'please', '--budget', '0.5');
+      assert.equal(ok.status, 0, ok.stderr);
+      assert.match(ok.stdout, /answered\s+shorter, please  \(budget \$0\.5\)\n/);
+      const last = (await journal(answered)).at(-1)!;
+      assert.deepEqual(last.kind === 'input' ? [last.text, last.config] : last, ['shorter, please', { budgetUsd: 0.5 }]);
+    },
+  );
+  s.test('ae close of a task answered already, and ae answer with no words, each exit 2', () => {
+    const again = cli('close', answered);
+    assert.equal(again.status, 2);
+    assert.match(again.stderr, /^close: `t-.*` has been answered already/);
+    const empty = cli('answer', answered, '');
+    assert.equal(empty.status, 2);
+    assert.match(empty.stderr, /^answer: `text` is empty/);
+  });
+  s.test('ae close of a task that waits prints that the next tick settles it, and journals the close', async () => {
+    const c = await waiting();
+    const closed = cli('close', c);
+    assert.equal(closed.status, 0, closed.stderr);
+    assert.match(closed.stdout, /closed: the next tick settles it/);
+    assert.equal((await journal(c)).at(-1)!.kind, 'closed');
+  });
+  afterAll(() => {
     fs.rmSync(root, { recursive: true, force: true });
-  }
+  });
 });
 
 /**
@@ -249,11 +250,16 @@ const refuses = async (b: ReturnType<typeof board>, id: string, fn: () => Promis
   assert.equal(b.tasks.get(id)?.length ?? 0, before, 'nothing journalled');
 };
 
-test('over a store in memory, through the engine: signed, it waits; answered with no configuration, it resumes; signed again and stopped, it settles stopped while it waits', async (t) => {
-  const s = story(t);
-  const b = board();
+describe('over a store in memory, through the engine: signed, it waits; answered with no configuration, it resumes; signed again and stopped, it settles stopped while it waits', () => {
+  let b!: ReturnType<typeof board>;
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  await s.test('signed, it waits, unsettled', async () => {
+  s.test('signed, it waits, unsettled', async () => {
     id = await Effect.runPromise(b.engine.file({ brief: 'draft', cwd: '/r', harness: 'fake', holdOpen: true }));
     await Effect.runPromise(b.engine.tick());
     signed(b.sessions, `ae/${id}/1`, 'drafted', (await Effect.runPromise(b.engine.view(id))).state.attempts[0].startedAt);
@@ -262,14 +268,14 @@ test('over a store in memory, through the engine: signed, it waits; answered wit
     assert.equal(v.phase, 'input-required');
     assert.equal(v.state.settled, null);
   });
-  await s.test('answered with no configuration, none is journalled, and the next pass resumes it', async () => {
+  s.test('answered with no configuration, none is journalled, and the next pass resumes it', async () => {
     const said = await Effect.runPromise(b.engine.answer(id, 'again'));
     assert.deepEqual(Object.keys(said), ['at', 'text'], 'no configuration given, none journalled');
     assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.inputs, [said]);
     await Effect.runPromise(b.engine.tick());
     assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'working');
   });
-  await s.test('signed again, a stop settles it stopped, waiting', async () => {
+  s.test('signed again, a stop settles it stopped, waiting', async () => {
     signed(b.sessions, `ae/${id}/2`, 'again', (await Effect.runPromise(b.engine.view(id))).state.attempts[1].startedAt);
     await Effect.runPromise(b.engine.tick());
     assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'input-required');
@@ -279,56 +285,51 @@ test('over a store in memory, through the engine: signed, it waits; answered wit
   });
 });
 
-test('answer and close: what each refuses — InputRefused, and nothing journalled — of a task that waits for no answer, and of an answer that is none', async (t) => {
-  await t.test(
-    "the engine over the Effect layers: a task not held open, one unknown, empty words, one not started, one whose harness recorded no session, a budget its harness would not keep, a turn's configuration other than its spend cap",
-    async () => {
-      const journal = Journal.test();
-      const layer = Layer.mergeAll(
-        journal,
-        Runner.layer({ ...testOps(), refuses: (t) => (t.config?.budgetUsd !== undefined ? 'keeps no cap' : undefined) }),
-      );
-      const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(Effect.result(e).pipe(Effect.provide(layer)));
-      const refusedWith = async (e: Effect.Effect<unknown, unknown, Journal | Runner>, pattern: RegExp) => {
-        const r = await run(e);
-        assert.equal(r._tag, 'Failure');
-        const err = (r as { failure: unknown }).failure;
-        assert.ok(err instanceof InputRefused, String(err));
-        assert.match(err.message, pattern);
-      };
-      const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
-      await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
-      await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
-      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
-      const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
-      await refusedWith(answer(held, ' '), /^`text` is empty/);
-      await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
-      const count = async (task: string) =>
-        ((await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))))) as { success: Event[] }).success.length;
-      assert.equal(await count(held), 1, 'nothing journalled');
-      const unrecorded = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
-      await run(
-        Effect.flatMap(Journal, (j) =>
-          Effect.forEach(
-            signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)),
-            (e) => j.append(TaskId.read(unrecorded), e),
-          ),
+describe('answer and close: what each refuses — InputRefused, and nothing journalled — of a task that waits for no answer, and of an answer that is none', () => {
+  test("the engine over the Effect layers: a task not held open, one unknown, empty words, one not started, one whose harness recorded no session, a budget its harness would not keep, a turn's configuration other than its spend cap", async () => {
+    const journal = Journal.test();
+    const layer = Layer.mergeAll(
+      journal,
+      Runner.layer({ ...testOps(), refuses: (t) => (t.config?.budgetUsd !== undefined ? 'keeps no cap' : undefined) }),
+    );
+    const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(Effect.result(e).pipe(Effect.provide(layer)));
+    const refusedWith = async (e: Effect.Effect<unknown, unknown, Journal | Runner>, pattern: RegExp) => {
+      const r = await run(e);
+      assert.equal(r._tag, 'Failure');
+      const err = (r as { failure: unknown }).failure;
+      assert.ok(err instanceof InputRefused, String(err));
+      assert.match(err.message, pattern);
+    };
+    const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
+    await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
+    await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
+    await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
+    const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
+    await refusedWith(answer(held, ' '), /^`text` is empty/);
+    await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
+    const count = async (task: string) =>
+      ((await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))))) as { success: Event[] }).success.length;
+    assert.equal(await count(held), 1, 'nothing journalled');
+    const unrecorded = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
+    await run(
+      Effect.flatMap(Journal, (j) =>
+        Effect.forEach(
+          signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)),
+          (e) => j.append(TaskId.read(unrecorded), e),
         ),
-      );
-      await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
-      assert.equal(await count(unrecorded), 4, 'nothing journalled');
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(held), e))));
-      await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
-      await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
-      await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
-      assert.equal(await count(held), 4);
-      assert.equal((await run(answer(held, 'go on')))._tag, 'Success');
-      assert.equal(await count(held), 5);
-    },
-  );
-
+      ),
+    );
+    await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
+    assert.equal(await count(unrecorded), 4, 'nothing journalled');
+    await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(held), e))));
+    await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
+    await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
+    await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
+    assert.equal(await count(held), 4);
+    assert.equal((await run(answer(held, 'go on')))._tag, 'Success');
+    assert.equal(await count(held), 5);
+  });
   const b = board();
-  b.write('t-w', signedJournal());
   const answering: Array<[string, () => Promise<unknown>, RegExp]> = [
     ['empty words', () => Effect.runPromise(b.engine.answer('t-w', '')), /^`text` is empty\. Give the words/],
     ['words that are only whitespace', () => Effect.runPromise(b.engine.answer('t-w', '  \n')), /^`text` is empty/],
@@ -353,8 +354,11 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
       /^`config: "cheap"` is not a turn's configuration/,
     ],
   ];
-  for (const [name, fn, pattern] of answering) await t.test(`answer refuses ${name}`, () => refuses(b, 't-w', fn, pattern));
-
+  for (const [name, fn, pattern] of answering)
+    test(`answer refuses ${name}`, () => {
+      b.write('t-w', signedJournal());
+      return refuses(b, 't-w', fn, pattern);
+    });
   const cases: Array<[string, Event[], Partial<Extract<Event, { kind: 'filed' }>>, RegExp, RegExp]> = [
     [
       't-plain',
@@ -419,36 +423,30 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
     ],
   ];
   for (const [id, events, filed, answeringIt, closing] of cases) {
-    await t.test(`answer and close refuse \`${id}\`, each saying what to do`, async () => {
+    test(`answer and close refuse \`${id}\`, each saying what to do`, async () => {
       b.write(id, events, filed);
       await refuses(b, id, () => Effect.runPromise(b.engine.answer(id, 'go')), new RegExp(`^\`${id}\`.*${answeringIt.source}`));
       await refuses(b, id, () => Effect.runPromise(b.engine.close(id)), new RegExp(`^\`${id}\`.*${closing.source}`));
     });
   }
-
-  await t.test(
-    'answer refuses a signed attempt whose harness recorded no session: no conversation to continue, and `close` closes it',
-    async () => {
-      const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
-      b.write('t-unrecorded', unrecorded);
-      await refuses(
-        b,
-        't-unrecorded',
-        () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
-        /attempt 1 ended, .*recorded no session for it.*`close` it/,
-      );
-      assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
-      await Effect.runPromise(b.engine.close('t-unrecorded'));
-      assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
-    },
-  );
-
-  await t.test('answer and close refuse a task not in this store', async () => {
+  test('answer refuses a signed attempt whose harness recorded no session: no conversation to continue, and `close` closes it', async () => {
+    const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
+    b.write('t-unrecorded', unrecorded);
+    await refuses(
+      b,
+      't-unrecorded',
+      () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
+      /attempt 1 ended, .*recorded no session for it.*`close` it/,
+    );
+    assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
+    await Effect.runPromise(b.engine.close('t-unrecorded'));
+    assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
+  });
+  test('answer and close refuse a task not in this store', async () => {
     await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task in this store/);
     await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task in this store/);
   });
-
-  await t.test('the control: the same board closes a task that waits', async () => {
+  test('the control: the same board closes a task that waits', async () => {
     b.write('t-waits', signedJournal());
     await Effect.runPromise(b.engine.close('t-waits'));
     assert.equal(b.tasks.get('t-waits')!.at(-1)!.kind, 'closed', 'the control: the same board closes a task that waits');

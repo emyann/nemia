@@ -6,7 +6,7 @@
  * them, never by its sentence.
  * `nemia rm` over a store, a place and the engine's stand-in is told in `test/forget.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   branchFates,
@@ -148,8 +148,8 @@ const lacks = (said: string | null | undefined, ...facts: string[]): void => {
   for (const fact of facts) assert.ok(!said?.includes(fact), `${JSON.stringify(said)} names ${JSON.stringify(fact)}`);
 };
 
-test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other one, with the fix it names', async (t) => {
-  await t.test('a run that is over is forgotten: finished, failed, cancelled settled or never filed, its tasks forgotten', () => {
+describe('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other one, with the fix it names', () => {
+  test('a run that is over is forgotten: finished, failed, cancelled settled or never filed, its tasks forgotten', () => {
     assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, [], signedDone, asked), null);
     assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' })), null, 'review is never filed');
     assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'stopped' })), null);
@@ -164,8 +164,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
       'a task the engine has no record of reads unknown: in flight nowhere, and nothing after it is ready',
     );
   });
-
-  await t.test('REFUSED: a task in flight — steps running and queued, a check running — each named; cancelled, wait for them', () => {
+  test('REFUSED: a task in flight — steps running and queued, a check running — each named; cancelled, wait for them', () => {
     const fan = [step('a'), step('b'), step('merge', ['a', 'b'])];
     const both = forgetRefusal(fan, run({ a: 't1', b: 't2', merge: null }), phases({ t1: 'running', t2: 'pending' }));
     inOrder(both, 'a is running', 'b is pending', 'nemia cancel r-1', 'nemia rm r-1', '(nemia ls r-1)');
@@ -175,8 +174,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
     inOrder(cancelled, 'implement is running', '2026-01-02T00:00:00Z', 'nemia rm r-1', '(nemia ls r-1)');
     lacks(cancelled, 'nemia cancel');
   });
-
-  await t.test('REFUSED: anything a pass would file — a step ready, a check, a try or a round due, roots waiting; cancelled, none', () => {
+  test('REFUSED: anything a pass would file — a step ready, a check, a try or a round due, roots waiting; cancelled, none', () => {
     const ready = run({ implement: 't1', review: null });
     const filing = forgetRefusal(STEPS, ready, phases({ t1: 'succeeded' }), [], signedDone, asked);
     inOrder(filing, 'review is ready to be filed', 'nemia cancel r-1', 'nemia rm r-1');
@@ -206,8 +204,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
     assert.equal(forgetRefusal(LOOP, inRound(1, CANCELLED), ALL_SUCCEEDED, [], saidIn(1, true), asked), null);
     assert.equal(forgetRefusal(STEPS, run({ implement: null, review: null }, { after: ['p-1'], ...CANCELLED }), phases({})), null);
   });
-
-  await t.test("REFUSED: a person's ask no pass has spent, filed next or taken back by its file; spent, or cancelled, none", () => {
+  test("REFUSED: a person's ask no pass has spent, filed next or taken back by its file; spent, or cancelled, none", () => {
     const unsigned = run({ implement: 't1', review: null });
     const p = phases({ t1: 'succeeded' });
     inOrder(
@@ -242,28 +239,23 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
       'a cancelled run honours no ask',
     );
   });
-
-  await t.test(
-    'REFUSED: a run others wait on that have not started names them and how to free it; a child started or called off, none',
-    () => {
-      const parent = run({ implement: 't1', review: 't2' });
-      inOrder(
-        forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
-        'c-1 and c-2 wait on it',
-        'waiting on r-1 (no such run)',
-        'nemia decide says r-1 has landed',
-        'nemia cancel c-1, nemia cancel c-2',
-      );
-      names(forgetRefusal(STEPS, parent, DONE, [child('c-1', { after: ['p-0', 'r-1'] })], signedDone, asked), 'c-1 waits on it');
-      const started = run({ implement: 'x1', review: null }, { id: 'c-1', after: ['r-1'] });
-      assert.equal(
-        forgetRefusal(STEPS, parent, DONE, [started, child('c-2', CANCELLED), child('c-3', { after: ['r-9'] })], signedDone, asked),
-        null,
-      );
-    },
-  );
-
-  await t.test('every reason at once; a record whose folder no longer reads is judged on its tasks, its asks and its children', () => {
+  test('REFUSED: a run others wait on that have not started names them and how to free it; a child started or called off, none', () => {
+    const parent = run({ implement: 't1', review: 't2' });
+    inOrder(
+      forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
+      'c-1 and c-2 wait on it',
+      'waiting on r-1 (no such run)',
+      'nemia decide says r-1 has landed',
+      'nemia cancel c-1, nemia cancel c-2',
+    );
+    names(forgetRefusal(STEPS, parent, DONE, [child('c-1', { after: ['p-0', 'r-1'] })], signedDone, asked), 'c-1 waits on it');
+    const started = run({ implement: 'x1', review: null }, { id: 'c-1', after: ['r-1'] });
+    assert.equal(
+      forgetRefusal(STEPS, parent, DONE, [started, child('c-2', CANCELLED), child('c-3', { after: ['r-9'] })], signedDone, asked),
+      null,
+    );
+  });
+  test('every reason at once; a record whose folder no longer reads is judged on its tasks, its asks and its children', () => {
     const both = forgetRefusal(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), [
       run({ implement: null }, { id: 'c-1', after: ['r-1'] }),
     ]);
@@ -284,14 +276,17 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
   });
 });
 
-test('`forgetRefusal` says its reasons in one order — in flight, a merge staged, the gates, what is due, the asks, the runs stranded, the runs held — then each fix in the same order, and each in its plural', async (t) => {
+describe('`forgetRefusal` says its reasons in one order — in flight, a merge staged, the gates, what is due, the asks, the runs stranded, the runs held — then each fix in the same order, and each in its plural', () => {
   const unsigned = run({ implement: 't1', review: null });
-  const signed = phases({ t1: 'succeeded', t2: 'succeeded' });
-  const fan = [step('plan'), step('design'), step('a'), step('b')];
+  let signed!: (id: string) => TaskPhase;
   const gatedRun = run({ plan: 't1', design: 't2', a: null, b: null }, { gates: ['plan', 'design'] });
+  let landed!: (id: string) => TaskPhase;
+  beforeAll(() => {
+    signed = phases({ t1: 'succeeded', t2: 'succeeded' });
+  });
+  const fan = [step('plan'), step('design'), step('a'), step('b')];
   const pair = [step('a'), step('b')];
-
-  await t.test('in flight, an ask, a child and a hold: the reasons, then their four fixes, in that order', () => {
+  test('in flight, an ask, a child and a hold: the reasons, then their four fixes, in that order', () => {
     inOrder(
       forgetRefusal(
         STEPS,
@@ -317,8 +312,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
       'nemia hold h-1 --off',
     );
   });
-
-  await t.test('the gates before what is due, two steps ready said as them; and the prune its fixes end in, as asked', () => {
+  test('the gates before what is due, two steps ready said as them; and the prune its fixes end in, as asked', () => {
     inOrder(
       forgetRefusal(fan, gatedRun, signed, [], signedDone, asked),
       'plan and design wait at their gates',
@@ -348,8 +342,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
     inOrder(pruned, 'a and b are ready to be filed', 'Pruning', 'nemia cancel r-1', 'nemia prune r-1');
     lacks(pruned, 'nemia rm', 'Forgetting');
   });
-
-  await t.test('a run held is read as it will stand once its hold lifts, its gates and what is due each said so', () => {
+  test('a run held is read as it will stand once its hold lifts, its gates and what is due each said so', () => {
     inOrder(
       forgetRefusal(fan, { ...gatedRun, ...until('p-9') }, signed, [], signedDone, asked),
       'plan and design wait at their gates',
@@ -359,8 +352,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
       'nemia rm r-1',
     );
   });
-
-  await t.test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia retry --round`', () => {
+  test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia retry --round`', () => {
     const checked = [step('a'), { ...step('b'), check: 'npm test' }];
     inOrder(forgetRefusal(checked, run({ a: null, b: 't2' }), signed, [], signedDone, asked), 'a is ready to be filed', "b's check is due");
     names(
@@ -369,8 +361,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
       '(nemia retry --round)',
     );
   });
-
-  await t.test('ending gates are filed themselves once approved; beside a gate of a step, each of the two said', () => {
+  test('ending gates are filed themselves once approved; beside a gate of a step, each of the two said', () => {
     const two = [step('implement'), { ...SHIP, after: ['implement'] }, { ...SHIP, name: 'land', after: ['implement'] }];
     const endings = forgetRefusal(
       two,
@@ -390,47 +381,41 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
       'nemia approve r-1 plan, nemia approve r-1 ship',
     );
   });
-
-  await t.test(
-    'in its plural: two asks taken back by one rm, two holds lifted each; cancelled, a hold is lifted and nothing waited for',
-    () => {
-      inOrder(
-        forgetRefusal(
-          STEPS,
-          unsigned,
-          phases({ t1: 'succeeded' }),
-          [],
-          none,
-          asked,
-          undefined,
-          [askFor(2, 'recheck'), askFor(3, 'recheck')],
-          [],
-          undefined,
-          at,
-        ),
-        'try 2 of implement and try 3 of implement are asked for',
-        'those asks',
-        'rm /wf/runs/r-1.asks/retry-implement-2 /wf/runs/r-1.asks/retry-implement-3',
-      );
-      const holders = [heldBy('h-2'), heldBy('h-1')];
-      inOrder(
-        forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, holders, signedDone, asked),
-        'h-1 and h-2 are held until it lands',
-        'nemia decide says r-1 has landed',
-        'nemia hold h-1 --off, nemia hold h-2 --off',
-      );
-      const cancelled = forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), DONE, holders, signedDone, asked);
-      inOrder(cancelled, 'h-1 and h-2 are held until it lands', 'nemia hold h-1 --off, nemia hold h-2 --off');
-      lacks(cancelled, 'nemia decide');
-    },
-  );
-
-  const landed = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded', 't-x': 'succeeded' });
+  test('in its plural: two asks taken back by one rm, two holds lifted each; cancelled, a hold is lifted and nothing waited for', () => {
+    inOrder(
+      forgetRefusal(
+        STEPS,
+        unsigned,
+        phases({ t1: 'succeeded' }),
+        [],
+        none,
+        asked,
+        undefined,
+        [askFor(2, 'recheck'), askFor(3, 'recheck')],
+        [],
+        undefined,
+        at,
+      ),
+      'try 2 of implement and try 3 of implement are asked for',
+      'those asks',
+      'rm /wf/runs/r-1.asks/retry-implement-2 /wf/runs/r-1.asks/retry-implement-3',
+    );
+    const holders = [heldBy('h-2'), heldBy('h-1')];
+    inOrder(
+      forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, holders, signedDone, asked),
+      'h-1 and h-2 are held until it lands',
+      'nemia decide says r-1 has landed',
+      'nemia hold h-1 --off, nemia hold h-2 --off',
+    );
+    const cancelled = forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), DONE, holders, signedDone, asked);
+    inOrder(cancelled, 'h-1 and h-2 are held until it lands', 'nemia hold h-1 --off, nemia hold h-2 --off');
+    lacks(cancelled, 'nemia decide');
+  });
   const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
   const forget = (steps: readonly StepSpec[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
     forgetRefusal(steps, r, landed, others, closeoutOf, () => false, none, asks, [], none, at, [], 'rm', 'ours');
-
-  await t.test('a merge staged and not landed before an ask, a child and a hold, and its fix before theirs', () => {
+  test('a merge staged and not landed before an ask, a child and a hold, and its fix before theirs', () => {
+    landed = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded', 't-x': 'succeeded' });
     inOrder(
       forget(LANDING_STEPS, atLanding(), [child('c-1'), heldBy('h-1')], [askFor(5)]),
       "ship's merge is staged in the repository's checkout (/repo)",
@@ -444,8 +429,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
       'nemia hold h-1 --off',
     );
   });
-
-  await t.test('a merge staged before a gate; a task in flight before a gate; a wait on runs and what is due before an ask', () => {
+  test('a merge staged before a gate; a task in flight before a gate; a wait on runs and what is due before an ask', () => {
     const x: StepSpec = { ...step('x', ['implement']), gate: true };
     const r = atLanding({ gates: ['x'] });
     inOrder(
@@ -513,7 +497,7 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
   });
 });
 
-test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which a removal leaves, and what becomes of each branch", async (t) => {
+describe("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which a removal leaves, and what becomes of each branch", () => {
   const atHeld = (p: string, more: Partial<Held> = {}): Held => ({
     path: p,
     tip: 'def',
@@ -522,48 +506,44 @@ test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which
     onBranch: true,
     ...more,
   });
-  await t.test(
-    "a run's worktrees are those its place lists inside its own directory — never the repository, nor a run's whose id starts with this one's — each with its step",
-    () => {
-      const listed: Held[] = [
-        atHeld('/repo', { branch: 'main' }),
-        atHeld('/wf/worktrees/r-1/implement', { branch: 'wf/r-1/implement' }),
-        atHeld('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', removable: 'held', heldBy: 'a person holds it', clean: null }),
-        atHeld('/wf/worktrees/r-1/lost', { removable: 'gone', onBranch: false, clean: null }),
-        atHeld('/wf/worktrees/r-1-x2/implement', { branch: 'wf/r-1-x2/implement' }),
-      ];
-      const r = run(
-        {},
-        {
-          steps: {
-            implement: { taskId: 't1', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
-            review: { taskId: 't2', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
-            fixup: { taskId: 't3', workspace: '/wf/worktrees/r-1/fixup', branch: 'wf/r-1/fixup' },
-          },
+  test("a run's worktrees are those its place lists inside its own directory — never the repository, nor a run's whose id starts with this one's — each with its step", () => {
+    const listed: Held[] = [
+      atHeld('/repo', { branch: 'main' }),
+      atHeld('/wf/worktrees/r-1/implement', { branch: 'wf/r-1/implement' }),
+      atHeld('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', removable: 'held', heldBy: 'a person holds it', clean: null }),
+      atHeld('/wf/worktrees/r-1/lost', { removable: 'gone', onBranch: false, clean: null }),
+      atHeld('/wf/worktrees/r-1-x2/implement', { branch: 'wf/r-1-x2/implement' }),
+    ];
+    const r = run(
+      {},
+      {
+        steps: {
+          implement: { taskId: 't1', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
+          review: { taskId: 't2', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
+          fixup: { taskId: 't3', workspace: '/wf/worktrees/r-1/fixup', branch: 'wf/r-1/fixup' },
         },
-      );
-      const { worktrees, unlisted } = runWorktrees(r, ['implement', 'review', 'fixup'], '/wf/worktrees/r-1', listed);
-      assert.deepEqual(
-        worktrees.map((w) => [w.path, w.step]),
-        [
-          ['/wf/worktrees/r-1/implement', 'review'],
-          ['/wf/worktrees/r-1/cut', 'cut'],
-          ['/wf/worktrees/r-1/lost', 'lost'],
-        ],
-        "review inherits implement's directory; cut was cut by a pass that died before filing it",
-      );
-      assert.deepEqual(unlisted, ['/wf/worktrees/r-1/fixup']);
-      const direct = run({}, { isolate: false, steps: { implement: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
-      assert.deepEqual(
-        runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, atHeld('/wf/worktrees/r-1')]).worktrees.map((w) => w.path),
-        ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'],
-        "never the repository, nor the run's directory itself",
-      );
-      assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
-    },
-  );
-
-  await t.test('REFUSED: `heldWorktree` leaves a worktree someone holds, and one its place reads off its branch, named by its tip', () => {
+      },
+    );
+    const { worktrees, unlisted } = runWorktrees(r, ['implement', 'review', 'fixup'], '/wf/worktrees/r-1', listed);
+    assert.deepEqual(
+      worktrees.map((w) => [w.path, w.step]),
+      [
+        ['/wf/worktrees/r-1/implement', 'review'],
+        ['/wf/worktrees/r-1/cut', 'cut'],
+        ['/wf/worktrees/r-1/lost', 'lost'],
+      ],
+      "review inherits implement's directory; cut was cut by a pass that died before filing it",
+    );
+    assert.deepEqual(unlisted, ['/wf/worktrees/r-1/fixup']);
+    const direct = run({}, { isolate: false, steps: { implement: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
+    assert.deepEqual(
+      runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, atHeld('/wf/worktrees/r-1')]).worktrees.map((w) => w.path),
+      ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'],
+      "never the repository, nor the run's directory itself",
+    );
+    assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
+  });
+  test('REFUSED: `heldWorktree` leaves a worktree someone holds, and one its place reads off its branch, named by its tip', () => {
     const on: Held = { ...atHeld('/wf/worktrees/r-1/implement'), tip: 'abc', branch: 'wf/r-1/implement', clean: false };
     assert.equal(heldWorktree(on), null, 'what it holds uncommitted is handed off onto its branch');
     assert.deepEqual(heldWorktree({ ...on, removable: 'held', heldBy: '', clean: null }), { heldBy: '' });
@@ -580,56 +560,52 @@ test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which
       'on its branch as its place reads it: nothing a removal loses',
     );
   });
-
-  await t.test(
-    '`branchFates` keeps every branch its place lists for the run unless asked; asked, deletes one merged and keeps one not unless forced — never the base',
-    () => {
-      const listed = ['main', 'wf/r-1/review', 'wf/r-1/implement'];
-      const merged = (b: string) => b !== 'wf/r-1/review';
-      const r = { branch: 'main' };
-      assert.deepEqual(branchFates(r, listed, merged), [
-        { branch: 'wf/r-1/implement', deleted: false, why: 'default' },
-        { branch: 'wf/r-1/review', deleted: false, why: 'default' },
-      ]);
-      assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true }), [
-        { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
-        { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
-      ]);
-      assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true, forceUnmerged: true }), [
-        { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
-        { branch: 'wf/r-1/review', deleted: true, why: 'forced' },
-      ]);
-      assert.deepEqual(
-        branchFates(r, listed, merged, { forceUnmerged: true }).map((b) => b.deleted),
-        [false, false],
-        '--force-unmerged alone deletes nothing',
-      );
-    },
-  );
+  test('`branchFates` keeps every branch its place lists for the run unless asked; asked, deletes one merged and keeps one not unless forced — never the base', () => {
+    const listed = ['main', 'wf/r-1/review', 'wf/r-1/implement'];
+    const merged = (b: string) => b !== 'wf/r-1/review';
+    const r = { branch: 'main' };
+    assert.deepEqual(branchFates(r, listed, merged), [
+      { branch: 'wf/r-1/implement', deleted: false, why: 'default' },
+      { branch: 'wf/r-1/review', deleted: false, why: 'default' },
+    ]);
+    assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true }), [
+      { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
+      { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
+    ]);
+    assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true, forceUnmerged: true }), [
+      { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
+      { branch: 'wf/r-1/review', deleted: true, why: 'forced' },
+    ]);
+    assert.deepEqual(
+      branchFates(r, listed, merged, { forceUnmerged: true }).map((b) => b.deleted),
+      [false, false],
+      '--force-unmerged alone deletes nothing',
+    );
+  });
 });
 
-test("`idRefusal` takes only what `runId` mints — lowercase letters, digits and dashes — and tells an id with a file's suffix the id to give", async (t) => {
-  await t.test('an id `runId` mints is taken', () => {
+describe("`idRefusal` takes only what `runId` mints — lowercase letters, digits and dashes — and tells an id with a file's suffix the id to give", () => {
+  test('an id `runId` mints is taken', () => {
     for (const id of ['add-a-flag-x1y2', 'r-1', '0abc']) assert.equal(idRefusal(id), null, id);
   });
   for (const suffix of ['.json', '.cancelled', '.asks', '.pruned', '.hold'])
-    await t.test(`REFUSED: r-xyz${suffix}, the name of one of its files, is told the id`, () => {
+    test(`REFUSED: r-xyz${suffix}, the name of one of its files, is told the id`, () => {
       const said = idRefusal(`r-xyz${suffix}`);
       names(said, `"r-xyz${suffix}"`, suffix, 'runs/', 'nemia rm r-xyz.');
       lacks(said, 'add-a-flag');
     });
-  await t.test('REFUSED: any other name, a path or a dot among them, is told what an id is made of', () => {
+  test('REFUSED: any other name, a path or a dot among them, is told what an id is made of', () => {
     for (const id of ['..', '.', '', '-r', 'R-XYZ', 'r_xyz', 'r.xyz', 'r xyz', 'runs/r-1', 'r-xyz.json.json'])
       names(idRefusal(id), JSON.stringify(id), 'WF_ROOT', 'nemia rm add-a-flag-x1y2');
   });
-  await t.test('REFUSED: the verb it is asked for is the command it names', () => {
+  test('REFUSED: the verb it is asked for is the command it names', () => {
     for (const id of ['../x', 'r-1.pruned']) names(idRefusal(id, 'prune'), 'nemia prune');
     names(idRefusal('../x', 'hold'), 'nemia hold');
     names(idRefusal('../x', 'read', 'nemia ls'), 'nemia ls');
   });
 });
 
-test('`notForgottenLine` says in one line what kept a run `nemia rm` did not forget: why, and what to do; or that there is no such run', async (t) => {
+describe('`notForgottenLine` says in one line what kept a run `nemia rm` did not forget: why, and what to do; or that there is no such run', () => {
   const run1: Forgot = {
     id: 'r-1',
     kind: 'held',
@@ -646,7 +622,7 @@ test('`notForgottenLine` says in one line what kept a run `nemia rm` did not for
       { branch: 'wf/r-1/review', deleted: false, why: 'default' },
     ],
   };
-  await t.test("not forgotten: a worktree held, one git would not remove, a stray, each with its fix; and the record's fate", () => {
+  test("not forgotten: a worktree held, one git would not remove, a stray, each with its fix; and the record's fate", () => {
     const line = notForgottenLine({
       ...run1,
       kind: 'held',
@@ -679,7 +655,7 @@ test('`notForgottenLine` says in one line what kept a run `nemia rm` did not for
       'nemia rm r-1 again',
     );
   });
-  await t.test('not forgotten: one on no branch at its short commit, a hand-off refused in its words, a handoff unread', () => {
+  test('not forgotten: one on no branch at its short commit, a hand-off refused in its words, a handoff unread', () => {
     const line = notForgottenLine({
       ...run1,
       kind: 'held',
@@ -719,7 +695,7 @@ test('`notForgottenLine` says in one line what kept a run `nemia rm` did not for
     );
     lacks(line, '9d2bd34d');
   });
-  await t.test('not forgotten: refused, in the words of its refusal', () => {
+  test('not forgotten: refused, in the words of its refusal', () => {
     const refusedFor = 'implement is running. Forgetting is not cancelling: …';
     const refused: Forgot = {
       id: 'r-1',
@@ -734,7 +710,7 @@ test('`notForgottenLine` says in one line what kept a run `nemia rm` did not for
     };
     assert.equal(notForgottenLine({ ...refused, kind: 'refused' }), `r-1  not forgotten: ${refusedFor}`);
   });
-  await t.test('no such run: nothing, or what was left under its id removed, or its orphaned worktrees named with what to do', () => {
+  test('no such run: nothing, or what was left under its id removed, or its orphaned worktrees named with what to do', () => {
     const missing: Forgot = { id: 'r-9', kind: 'missing', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
     assert.equal(notForgottenLine({ ...missing, kind: 'missing' }), 'r-9  no such run — nothing to forget');
     inOrder(

@@ -5,7 +5,7 @@
  * pause's file is `pause.store.test.ts`'s.
  */
 import { spawnSync } from 'node:child_process';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { scratch } from 'test-kit/scratch';
@@ -21,9 +21,12 @@ const gonePid = (): number => {
   return pid;
 };
 
-test("a take-over's pause names its process, and the pass lifts it once that process is gone, never a person's", async (t) => {
-  const AT = new Date('2026-11-05T12:30:00.000Z');
-  await t.test('a holder is written to the file and kept off the pause the store serves', () => {
+describe("a take-over's pause names its process, and the pass lifts it once that process is gone, never a person's", () => {
+  let AT!: Date;
+  beforeAll(() => {
+    AT = new Date('2026-11-05T12:30:00.000Z');
+  });
+  test('a holder is written to the file and kept off the pause the store serves', () => {
     const put = putPause(ROOT, { by: 'nemia service restart' }, AT, undefined, thisProcess());
     assert.deepEqual(put, { at: AT.toISOString(), by: 'nemia service restart' });
     assert.deepEqual(readPause(ROOT), put, 'the served pause carries no holder');
@@ -40,7 +43,7 @@ test("a take-over's pause names its process, and the pass lifts it once that pro
     { name: 'a holder that does not read: kept, as a pause that stands', heldBy: { pid: 'twelve' }, lifted: false },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const pause = { at: AT.toISOString(), by: 'nemia service restart' };
       fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify(row.heldBy === undefined ? pause : { ...pause, heldBy: row.heldBy })}\n`);
       const lifted = liftLapsedPause(ROOT, identify);
@@ -48,7 +51,7 @@ test("a take-over's pause names its process, and the pass lifts it once that pro
       assert.equal(readPause(ROOT) === null, row.lifted, 'the file is gone exactly when the pause was lifted');
       if (!row.lifted) resumePause(ROOT);
     });
-  await t.test('a pause put again between the judging and the lift stands', () => {
+  test('a pause put again between the judging and the lift stands', () => {
     putPause(ROOT, { by: 'nemia service restart' }, AT, undefined, { pid: gonePid() });
     const lifted = liftLapsedPause(ROOT, (holder) => {
       fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify({ at: AT.toISOString(), by: 'ann' })}\n`);

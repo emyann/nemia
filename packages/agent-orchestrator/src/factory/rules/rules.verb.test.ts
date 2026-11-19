@@ -6,7 +6,7 @@
  * Rules read, written, printed and cleared through the command are a person's story in `test/factory-rules.test.ts`. The factory is
  * planted through the Factory door's memory layer (`factoryDoorMemory`), which the command is given: nothing here reads the disk.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { RulesInput } from './rules.verb.ts';
@@ -38,7 +38,7 @@ done(door.factories.create(aFactory('acme')));
 /** The command run with `args`, as the CLI and the api run it, over the memory door. */
 const run = (args: RulesInput) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args), memory));
 
-test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
+describe('REFUSED: `nemia factory rules`, nothing written', () => {
   const rows: Array<[string, RulesInput, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [
     ['the default factory, read', { factory: 'default' }, 'Conflict', ['`default`', 'nemia factory rules']],
     ['the default factory, written', { factory: 'default', words: 'Be kind.' }, 'Conflict', ['`default`', 'nemia factory rules']],
@@ -53,7 +53,7 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
     ['blank rules', { factory: 'acme', words: '   ' }, 'Invalid', ['acme']],
   ];
   for (const [row, args, tag, facts] of rows)
-    await t.test(row, async () => {
+    test(row, async () => {
       await assert.rejects(run(args), (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
         names(err.message, ...facts);
@@ -62,10 +62,9 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
       assert.deepEqual(done(door.factories.list()), ['default', 'acme']);
       assert.equal(done(door.rules.read(FactoryName.read('acme'))).words, null);
     });
-  await t.test('--file with --clear, by the check, before anything is read', () =>
-    names(FACTORY_RULES.check?.({ factory: 'acme', file: 'rules.md', clear: true }), 'nemia factory rules', '--file', '--clear'),
-  );
-  await t.test('taken by the check: --file alone, or nothing', () => {
+  test('--file with --clear, by the check, before anything is read', () =>
+    names(FACTORY_RULES.check?.({ factory: 'acme', file: 'rules.md', clear: true }), 'nemia factory rules', '--file', '--clear'));
+  test('taken by the check: --file alone, or nothing', () => {
     assert.equal(FACTORY_RULES.check?.({ factory: 'acme', file: 'rules.md' }), null);
     assert.equal(FACTORY_RULES.check?.({ factory: 'acme' }), null);
   });

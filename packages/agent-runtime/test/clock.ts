@@ -6,7 +6,7 @@
  * it from its parent's (`--bg`: the parent's last call id, `harness/claude/parent.ts`), reports it with no time: its test steps the
  * clock here instead.
  */
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vitest';
 
 /**
  * Step this process's wall clock by `ms` until the test ends: `Date.now()` and an argless `new Date()` read `ms` later, or
@@ -23,7 +23,7 @@ export const stepClock = (t: TestContext, ms: number): void => {
       return Real.now() + ms;
     }
   } as DateConstructor;
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.Date = Real;
   });
 };
@@ -43,6 +43,6 @@ export const stepMono = (t: TestContext, ms: number): (() => void) => {
   const undo = () => {
     if (real) Object.defineProperty(process.hrtime, 'bigint', real);
   };
-  t.after(undo);
+  t.onTestFinished(undo);
   return undo;
 };

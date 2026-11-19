@@ -4,11 +4,11 @@
  * worker that writes the end; in the slice an operator names where one is given. The command goes after its `--`.
  * What is left in a scope, read and ended, is `cgroup.boundary.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { memoryEventsOf, scopeArgv, scopeRefusal } from './cgroup.ts';
 
-test('scopeArgv: the scope a limited task runs in, with and without a slice, and the program a test stands in', async (t) => {
+describe('scopeArgv: the scope a limited task runs in, with and without a slice, and the program a test stands in', () => {
   const ROWS: Array<{ name: string; argv: string[]; is: string[] }> = [
     {
       name: 'in the user manager’s own slice',
@@ -59,7 +59,7 @@ test('scopeArgv: the scope a limited task runs in, with and without a slice, and
     },
     { name: 'by another program', argv: scopeArgv(1024, undefined, 'false').slice(0, 2), is: ['false', '--user'] },
   ];
-  for (const row of ROWS) await t.test(row.name, () => assert.deepEqual(row.argv, row.is));
+  for (const row of ROWS) test(row.name, () => assert.deepEqual(row.argv, row.is));
 });
 
 test('scopeRefusal: a program that makes no scope is refused with words, asked once', () => {
@@ -68,7 +68,7 @@ test('scopeRefusal: a program that makes no scope is refused with words, asked o
   assert.equal(scopeRefusal(undefined, 'false'), words, 'the same answer, cached');
 });
 
-test('memoryEventsOf: the kills of any OOM killer and the times the cgroup’s own limit was reached, read apart', async (t) => {
+describe('memoryEventsOf: the kills of any OOM killer and the times the cgroup’s own limit was reached, read apart', () => {
   const ROWS: Array<{ name: string; text: string; is: { oomKills: number; oom: number } }> = [
     { name: 'a kill at the limit', text: 'low 0\nhigh 0\nmax 3\noom 1\noom_kill 1\noom_group_kill 0\n', is: { oomKills: 1, oom: 1 } },
     { name: 'a kill of the machine’s', text: 'low 0\nhigh 0\nmax 0\noom 0\noom_kill 1\noom_group_kill 0\n', is: { oomKills: 1, oom: 0 } },
@@ -76,5 +76,5 @@ test('memoryEventsOf: the kills of any OOM killer and the times the cgroup’s o
     { name: 'oom_group_kill is not read as oom', text: 'oom_group_kill 3\noom_kill 2\n', is: { oomKills: 2, oom: 0 } },
     { name: 'lines missing read as none', text: '', is: { oomKills: 0, oom: 0 } },
   ];
-  for (const row of ROWS) await t.test(row.name, () => assert.deepEqual(memoryEventsOf(row.text), row.is));
+  for (const row of ROWS) test(row.name, () => assert.deepEqual(memoryEventsOf(row.text), row.is));
 });

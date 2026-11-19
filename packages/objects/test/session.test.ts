@@ -2,7 +2,7 @@
  * The server's version and session answers (`src/server-api.ts`): a version with and without the newest release decodes and encodes
  * back equal, and a session answer says only what it did to the board's cookie, `TOKEN_COOKIE`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { SessionAnswer, TOKEN_COOKIE, VersionAnswer } from 'objects';

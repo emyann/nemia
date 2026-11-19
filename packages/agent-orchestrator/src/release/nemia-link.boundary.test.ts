@@ -3,7 +3,7 @@
  * runs it: it fails, linking nothing, on a store with no pointer, as a checkout's; and on a store whose pointer names a release holding
  * `bin/nemia`, it links the tools folder's `nemia` to the launcher under `releases/current`, which the need's own check then reads met.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

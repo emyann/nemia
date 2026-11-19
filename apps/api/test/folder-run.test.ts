@@ -11,7 +11,7 @@
  */
 import { root } from './harness.ts';
 import { listedIn } from './definitions.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { names } from './named.ts';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -102,14 +102,14 @@ fs.writeFileSync(path.join(wrote, 'given', 'from', 'sketch', 'side.md'), 'what t
 /** A word about git, which a person reading a folder run must not meet: it has no repository, no branch and nothing to merge. */
 const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|repo|git)\b/i;
 
-test("a folder run read on the board: listed by its kind and place, its page with no repository and its step's folder, its decision with nothing about git, its files served by their path", async (t) => {
-  const s = story(t);
-  await s.test('the runs list shows a folder run with no repository, and says its kind', async () => {
+describe("a folder run read on the board: listed by its kind and place, its page with no repository and its step's folder, its decision with nothing about git, its files served by their path", () => {
+  const s = story(test);
+  s.test('the runs list shows a folder run with no repository, and says its kind', async () => {
     const run = await listedOf(app(), 'f-notes');
     assert.equal(run.spec.repo, null);
     assert.equal(run.spec.place, 'folder');
   });
-  await s.test(
+  s.test(
     "the runs list says each run's place in the store's words: a folder run's, and a repository's for a record with no place",
     async () => {
       const record = path.join(root, 'runs', 'r-repo.json');
@@ -144,7 +144,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       }
     },
   );
-  await s.test(
+  s.test(
     "a folder run's detail has no repository, base, branch or isolation — where its work is instead, and its step's folder",
     async () => {
       const object = await objectOf(app(), 'f-notes');
@@ -171,7 +171,7 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       }
     },
   );
-  await s.test("a folder run's decision reads, with nothing to merge and nothing about git", async () => {
+  s.test("a folder run's decision reads, with nothing to merge and nothing about git", async () => {
     const res = await app().request('/api/runs/f-notes/decision');
     assert.equal(res.status, 200);
     const decision = (await res.json()) as {
@@ -196,46 +196,43 @@ test("a folder run read on the board: listed by its kind and place, its page wit
       assert.doesNotMatch(said, GIT_WORD, `a sentence the board shows out of this answer names no git: ${said}`);
     }
   });
-  await s.test(
-    'a folder step carries everything its folder holds: what a name reaches with its size and url, the rest by its path',
-    async () => {
-      const write = stepOf(await objectOf(app(), 'f-notes'), 'write');
-      assert.deepEqual(
-        write.files,
-        [
-          { path: path.join(wrote, '..hidden.md'), relativePath: '..hidden.md' },
-          {
-            path: path.join(wrote, 'bundle.zip'),
-            relativePath: 'bundle.zip',
-            name: 'bundle.zip',
-            url: '/api/runs/f-notes/steps/write/files/bundle.zip',
-            kind: 'other',
-            size: 2,
-          },
-          { path: path.join(wrote, 'link.md'), relativePath: 'link.md' },
-          {
-            path: path.join(wrote, 'note.md'),
-            relativePath: 'note.md',
-            name: 'note.md',
-            url: '/api/runs/f-notes/steps/write/files/note.md',
-            kind: 'text',
-            size: 11,
-          },
-          { path: path.join(wrote, 'scratch'), relativePath: 'scratch' },
-          {
-            path: path.join(wrote, 'sketch.png'),
-            relativePath: 'sketch.png',
-            name: 'sketch.png',
-            url: '/api/runs/f-notes/steps/write/files/sketch.png',
-            kind: 'image',
-            size: PNG.length,
-          },
-        ],
-        "in name order: a directory, a link out of the folder and a name the route refuses carry a path and nothing else, since they are the work too and a board that says an empty list is an empty folder must not say it of a folder holding only scratch/; the run's own given/ is the one thing left out: it is not the step's work, and listed it would stand in the folder of every step of every run started with --input, so no step could ever be read as having made nothing",
-      );
-    },
-  );
-  await s.test('a folder the api cannot read says why, where one not there is an empty list', async () => {
+  s.test('a folder step carries everything its folder holds: what a name reaches with its size and url, the rest by its path', async () => {
+    const write = stepOf(await objectOf(app(), 'f-notes'), 'write');
+    assert.deepEqual(
+      write.files,
+      [
+        { path: path.join(wrote, '..hidden.md'), relativePath: '..hidden.md' },
+        {
+          path: path.join(wrote, 'bundle.zip'),
+          relativePath: 'bundle.zip',
+          name: 'bundle.zip',
+          url: '/api/runs/f-notes/steps/write/files/bundle.zip',
+          kind: 'other',
+          size: 2,
+        },
+        { path: path.join(wrote, 'link.md'), relativePath: 'link.md' },
+        {
+          path: path.join(wrote, 'note.md'),
+          relativePath: 'note.md',
+          name: 'note.md',
+          url: '/api/runs/f-notes/steps/write/files/note.md',
+          kind: 'text',
+          size: 11,
+        },
+        { path: path.join(wrote, 'scratch'), relativePath: 'scratch' },
+        {
+          path: path.join(wrote, 'sketch.png'),
+          relativePath: 'sketch.png',
+          name: 'sketch.png',
+          url: '/api/runs/f-notes/steps/write/files/sketch.png',
+          kind: 'image',
+          size: PNG.length,
+        },
+      ],
+      "in name order: a directory, a link out of the folder and a name the route refuses carry a path and nothing else, since they are the work too and a board that says an empty list is an empty folder must not say it of a folder holding only scratch/; the run's own given/ is the one thing left out: it is not the step's work, and listed it would stand in the folder of every step of every run started with --input, so no step could ever be read as having made nothing",
+    );
+  });
+  s.test('a folder the api cannot read says why, where one not there is an empty list', async () => {
     const notAFolder = path.join(root, 'runs', 'f-gone', 'not-a-folder');
     fs.mkdirSync(path.dirname(notAFolder), { recursive: true });
     fs.writeFileSync(notAFolder, 'a file where a folder should be');
@@ -275,51 +272,48 @@ test("a folder run read on the board: listed by its kind and place, its page wit
     const review = stepOf(run, 'review');
     assert.deepEqual([review.files, review.filesError], [[], null], 'a folder the run has not made yet is empty, and no error');
   });
-  await s.test(
-    "a folder step's file is served by its path, in a folder of it too, and a path out of it, or not in it, is refused",
-    async () => {
-      const base = '/api/runs/f-notes/steps/write/files';
+  s.test("a folder step's file is served by its path, in a folder of it too, and a path out of it, or not in it, is refused", async () => {
+    const base = '/api/runs/f-notes/steps/write/files';
 
-      const note = await app().request(`${base}/note.md`);
-      assert.deepEqual(
-        [
-          note.status,
-          note.headers.get('content-type'),
-          note.headers.get('cache-control'),
-          note.headers.get('x-content-type-options'),
-          await note.text(),
-        ],
-        [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
-      );
-      assert.ok(
-        (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
-        "an agent's text on the board's origin runs no script of its, as a step's named file does not",
-      );
-      assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
+    const note = await app().request(`${base}/note.md`);
+    assert.deepEqual(
+      [
+        note.status,
+        note.headers.get('content-type'),
+        note.headers.get('cache-control'),
+        note.headers.get('x-content-type-options'),
+        await note.text(),
+      ],
+      [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
+    );
+    assert.ok(
+      (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
+      "an agent's text on the board's origin runs no script of its, as a step's named file does not",
+    );
+    assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
 
+    assert.equal(
+      await (await app().request(`${base}/scratch%2Fkept.md`)).text(),
+      'Kept.\n',
+      "a file in a folder of the step's folder is served by its path, encoded whole",
+    );
+
+    for (const name of ['..%2Foutside.md', 'scratch%2F..%2F..%2Foutside.md', 'a%5Cb.md', '..hidden.md']) {
+      const res = await app().request(`${base}/${name}`);
       assert.equal(
-        await (await app().request(`${base}/scratch%2Fkept.md`)).text(),
-        'Kept.\n',
-        "a file in a folder of the step's folder is served by its path, encoded whole",
+        res.status,
+        400,
+        `${name} names a file on disk: only the refusal stands between it and the response (an encoded .. alone is resolved before the route, so the separator is encoded instead)`,
       );
-
-      for (const name of ['..%2Foutside.md', 'scratch%2F..%2F..%2Foutside.md', 'a%5Cb.md', '..hidden.md']) {
-        const res = await app().request(`${base}/${name}`);
-        assert.equal(
-          res.status,
-          400,
-          `${name} names a file on disk: only the refusal stands between it and the response (an encoded .. alone is resolved before the route, so the separator is encoded instead)`,
-        );
-        names(((await res.json()) as { error: string }).error, decodeURIComponent(name), '`/`', '`..`');
-      }
-      for (const name of ['gone.md', 'scratch', 'scratch%2Fnothing.md', 'link.md']) {
-        const res = await app().request(`${base}/${name}`);
-        assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
-        assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
-      }
-    },
-  );
-  await s.test(
+      names(((await res.json()) as { error: string }).error, decodeURIComponent(name), '`/`', '`..`');
+    }
+    for (const name of ['gone.md', 'scratch', 'scratch%2Fnothing.md', 'link.md']) {
+      const res = await app().request(`${base}/${name}`);
+      assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
+      assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
+    }
+  });
+  s.test(
     "a file a step wrote called `given` is its own work, and is listed — only the run's own `given/` directory is left out",
     async () => {
       const folder = path.join(root, 'runs', 'f-given', 'work', 'write');
@@ -373,9 +367,9 @@ const oldCard = (name: string, body: string, repo: string): string => {
   return name;
 };
 
-test('a folder team as the board finds and files for it, the repository a plain directory: listed as one, a card filed without a repository and refused with one, a card started on it says the `repo:` it read none of', async (t) => {
-  const s = story(t);
-  await s.test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
+describe('a folder team as the board finds and files for it, the repository a plain directory: listed as one, a card filed without a repository and refused with one, a card started on it says the `repo:` it read none of', () => {
+  const s = story(test);
+  s.test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
     const listed = await listedIn<{ name: string; from: string; folderTeam: boolean; error: string | null }>(app(), 'workflows');
     const folderTeams = listed.filter((w) => w.folderTeam).map((w) => w.name);
     assert.deepEqual(
@@ -385,7 +379,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
     );
     assert.equal(listed.find((w) => w.name === 'change')?.folderTeam, false, 'a team that works on a repository is not one');
   });
-  await s.test(
+  s.test(
     "REFUSED: POST /api/namespaces/default/cards files a card for a folder team with a repository — filed by the workflow's name without one, refused with one, as for any team",
     async () => {
       const json = { 'content-type': 'application/json' };
@@ -409,7 +403,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
       assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
     },
   );
-  await s.test(
+  s.test(
     'a card started on a folder team carries the `repo:` an old card names and the run read none of — and a card that names none, nothing',
     async () => {
       const json = { 'content-type': 'application/json' };

@@ -10,7 +10,8 @@
  * is imported, and the helpers that import it are imported the same way. The stand-in is started for it by the holder the helpers
  * make (`attached-held.ts`), so this file names nothing that starts a process and takes no boundary name.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -87,29 +88,38 @@ const followable = async (id: string, plan: object = {}) => {
   return { root, dir, h: { ...h, root } };
 };
 
-test(
+describe(
   'an attached session is followed through its turns, by followers that join late and leave, until its holder lets it go',
   WAITED,
-  async (t) => {
-    const s = story(t);
+  () => {
+    let root!: string;
+    let dir!: string;
+    let h!: { root: string; attached: Attached; said: string[]; close: () => Promise<void> };
+    let first!: Fiber.Fiber<void, import('../src/index.ts').RunnerError>;
+    let second!: Fiber.Fiber<void, import('../src/index.ts').RunnerError>;
+    let after!: Fiber.Fiber<void, import('../src/index.ts').RunnerError>;
+    beforeAll(async () => {
+      const t = teardowns();
+      ({ root, dir, h } = await followable(ID));
+      first = following(h.attached, early);
+      second = first;
+      after = first;
+      t.onTestFinished(async () => {
+        fs.writeFileSync(path.join(dir, 'end'), '');
+        for (const f of [first, second, after]) await Effect.runPromise(Fiber.interrupt(f));
+        await h.close();
+      });
+      return t.end;
+    });
+    const s = story(test);
     const ID = 'sid-follow-1';
-    const { root, dir, h } = await followable(ID);
     const say = (words: string) => Effect.runPromise(h.attached.ops.say!({ name: NAME, sessionId: ID }, words));
     const early: Followed[] = [];
-    const first = following(h.attached, early);
     const late: Followed[] = [];
-    let second = first;
     const next: Followed[] = [];
-    let after = first;
-    t.after(async () => {
-      fs.writeFileSync(path.join(dir, 'end'), '');
-      for (const f of [first, second, after]) await Effect.runPromise(Fiber.interrupt(f));
-      await h.close();
-    });
     let cursor = '';
     const lasts = (got: readonly Followed[]) => partials(got).filter((m) => m.kind === 'partial' && m.last).length;
-
-    await s.test('it is followed to its turn’s end: its state, its text as it is written, then its whole events', async (st) => {
+    s.test('it is followed to its turn’s end: its state, its text as it is written, then its whole events', async (st) => {
       await until(st, () => lines(dir, 'argv.jsonl').length > 0, 'the stand-in started', { everyMs: 20 });
       assert.ok(
         (lines(dir, 'argv.jsonl')[0] as string[]).includes('--include-partial-messages'),
@@ -137,29 +147,23 @@ test(
       cursor = events.cursor;
       assert.ok(texts(early).includes(SAID.join('')), 'the event carries the text the pieces spelled');
     });
-
-    await s.test('the cursor a follow speaks is one `transcript` takes, and no cursor it did not give', async () => {
+    s.test('the cursor a follow speaks is one `transcript` takes, and no cursor it did not give', async () => {
       const again = await Effect.runPromise(h.attached.ops.transcript!(NAME, cursor));
       assert.deepEqual(again.events, [], 'the cursor a follow spoke is where `transcript` reads on from: nothing is served twice');
       const byHand = await Effect.runPromise(h.attached.ops.transcript!(NAME, `0.${'0'.repeat(16)}`));
       assert.ok(byHand.events.length > 0, 'a cursor nobody’s read gave reads the file again from the start, never on from the middle');
     });
-
-    await s.test(
-      'at the turn’s end the follower is said the session waits, and the capture kept none of the text in progress',
-      async (st) => {
-        fs.writeFileSync(path.join(dir, 'end'), '');
-        await until(st, () => early.some((m) => m.kind === 'state' && m.state === 'input-required'), 'the turn’s end', { bell: rung });
-        assert.deepEqual(
-          capturedKinds(root),
-          ['system init', 'result success'],
-          'the capture keeps only the kinds its readers read: not one line of the text in progress the follower was handed above',
-        );
-        await until(st, () => run(root)?.state === 'idle', 'the first turn ended', { everyMs: 50 });
-      },
-    );
-
-    await s.test('a follower that joins late is said the open block whole, then what is said from then on', async (st) => {
+    s.test('at the turn’s end the follower is said the session waits, and the capture kept none of the text in progress', async (st) => {
+      fs.writeFileSync(path.join(dir, 'end'), '');
+      await until(st, () => early.some((m) => m.kind === 'state' && m.state === 'input-required'), 'the turn’s end', { bell: rung });
+      assert.deepEqual(
+        capturedKinds(root),
+        ['system init', 'result success'],
+        'the capture keeps only the kinds its readers read: not one line of the text in progress the follower was handed above',
+      );
+      await until(st, () => run(root)?.state === 'idle', 'the first turn ended', { everyMs: 50 });
+    });
+    s.test('a follower that joins late is said the open block whole, then what is said from then on', async (st) => {
       const before = ids(early);
       assert.equal(before.length, 1, 'the first turn left one event in the transcript, written before any late follower joins');
       await say('and again');
@@ -189,8 +193,7 @@ test(
       fs.writeFileSync(path.join(dir, 'end'), '');
       await until(st, () => run(root)?.state === 'idle', 'the second turn ended', { everyMs: 50 });
     });
-
-    await s.test('followers that leave free their places, and the next is said everything all the same', async (st) => {
+    s.test('followers that leave free their places, and the next is said everything all the same', async (st) => {
       assert.equal(h.attached.following(NAME), 2, 'each follow open is one follower of the session');
       await Effect.runPromise(Fiber.interrupt(first));
       await Effect.runPromise(Fiber.interrupt(second));
@@ -201,8 +204,7 @@ test(
       await say('a third time');
       await said(st, next, SAID[0]);
     });
-
-    await s.test('a held session is followed through the harness its name is under, from the fan-out and not the job runner', async () => {
+    s.test('a held session is followed through the harness its name is under, from the fan-out and not the job runner', async () => {
       const got: Followed[] = [];
       const exit = await Effect.runPromiseExit(
         Stream.runForEach(Stream.take(claudeCodeOps({ root: h.root }, h.attached).follow!(NAME), 2), (m) =>
@@ -219,15 +221,13 @@ test(
         'the harness sends an attached name to the attached ops, whose follow says the session’s state and its text as it is written',
       );
     });
-
-    await s.test('the follower that came after the others is said the rest of the turn', async (st) => {
+    s.test('the follower that came after the others is said the rest of the turn', async (st) => {
       fs.writeFileSync(path.join(dir, 'more'), '');
       await said(st, next, SAID[1]);
       fs.writeFileSync(path.join(dir, 'end'), '');
       await until(st, () => run(root)?.state === 'idle', 'the third turn ended', { everyMs: 50 });
     });
-
-    await s.test('a turn cut mid-text closes the block it left open', async (st) => {
+    s.test('a turn cut mid-text closes the block it left open', async (st) => {
       const closed = lasts(next);
       const rest = seen(next, SAID[1]);
       await say('and once more');
@@ -237,8 +237,7 @@ test(
       assert.equal(seen(next, SAID[1]), rest, 'the cut turn wrote no more text: what closes the block is the result, not a block stop');
       assert.equal(run(root)?.state, 'idle', 'the cut turn ended the turn, never the session');
     });
-
-    await s.test('a session this process has let go of ends its follower, rather than leave it waiting', async () => {
+    s.test('a session this process has let go of ends its follower, rather than leave it waiting', async () => {
       await h.close();
       const exit = await Effect.runPromise(Fiber.await(after));
       assert.ok(Exit.isSuccess(exit), 'the follow ends with the holder’s let-go, never failing and never hanging');

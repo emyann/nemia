@@ -4,7 +4,7 @@
  * refused; a step that sets what its agent does not offer refused at load, whether it names its agent or is hired one; an agent with no
  * line offering everything, with a hint at `nemia start`; and a board save that does not send the line keeping it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,12 +48,12 @@ const FLAT =
 const BLOCK =
   '---\nclaude:\n  fence:\n    permissionMode: dontAsk\n    tools: [Read, Bash]\n    allowedTools: Bash(git log:*)\n    disallowedTools: Bash(cd:*)\n---\nYou review.\n';
 
-test("the fence under its harness's block reads as the top-level keys did, which are still read", async (t) => {
-  await t.test('an agent: the same keys either way', () => {
+describe("the fence under its harness's block reads as the top-level keys did, which are still read", () => {
+  test('an agent: the same keys either way', () => {
     assert.deepEqual(parseAgent('reviewer', BLOCK).keys, parseAgent('reviewer', FLAT).keys);
     assert.equal(parseAgent('reviewer', BLOCK).keys.permissionMode, 'dontAsk');
   });
-  await t.test("a step: its block's deny adds to its agent's, as the top-level line did", () => {
+  test("a step: its block's deny adds to its agent's, as the top-level line did", () => {
     const agents = agentsOf({ reviewer: BLOCK });
     const blocked = step('---\nplace: git\nagent: reviewer\nclaude:\n  fence:\n    disallowedTools: Bash(npm test)\n---\n', agents);
     const flat = step('---\nplace: git\nagent: reviewer\ndisallowedTools: Bash(npm test)\n---\n', agents);
@@ -61,11 +61,11 @@ test("the fence under its harness's block reads as the top-level keys did, which
     assert.deepEqual(blocked.disallowedTools, flat.disallowedTools);
     assert.deepEqual(blocked.agent?.keys, flat.agent?.keys, "the step's own keys name the fence key, either way");
   });
-  await t.test("a codex step: its block's sandbox", () => {
+  test("a codex step: its block's sandbox", () => {
     const read = step('---\nplace: git\nharness: codex\ncodex:\n  fence:\n    sandbox: read-only\n---\nReview.\n', new Map());
     assert.equal(read.sandbox, 'read-only');
   });
-  await t.test('`nemia start` names a top-level fence key as the former spelling, and nothing of the block', () => {
+  test('`nemia start` names a top-level fence key as the former spelling, and nothing of the block', () => {
     const dir = path.join(ROOT, 'former');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'review.md'), '---\nplace: git\npermissionMode: plan\n---\nReview.\n');
@@ -74,7 +74,7 @@ test("the fence under its harness's block reads as the top-level keys did, which
   });
 });
 
-test('REFUSED at load: a fence block the file cannot hold', async (t) => {
+describe('REFUSED at load: a fence block the file cannot hold', () => {
   const rows: Array<[string, string, string[]]> = [
     [
       'a claude block on a codex step',
@@ -95,7 +95,7 @@ test('REFUSED at load: a fence block the file cannot hold', async (t) => {
     ],
   ];
   for (const [name, text, named] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       const said = refusal(() => step(text, new Map()));
       for (const word of named) assert.ok(said.includes(`\`${word}`) || said.includes(word), `${name}: names ${word}`);
     });
@@ -107,22 +107,22 @@ const offering = (offers?: string): Map<string, Agent | WorkflowError> =>
     reviewer: `---\n${offers === undefined ? '' : `overridable: ${offers}\n`}model: opus\nclaude:\n  fence:\n    permissionMode: dontAsk\n    allowedTools: Bash(git log:*), Bash(git diff:*)\n---\nYou review.\n`,
   });
 
-test('what a step may override is what its agent offers: anything else is refused at load, naming the key and the agent', async (t) => {
-  await t.test('REFUSED: a model the agent does not offer', () => {
+describe('what a step may override is what its agent offers: anything else is refused at load, naming the key and the agent', () => {
+  test('REFUSED: a model the agent does not offer', () => {
     const said = refusal(() => step('---\nplace: git\nagent: reviewer\nmodel: sonnet\n---\n', offering('skills')));
     assert.ok(said.includes('`model`') && said.includes('reviewer'), said);
   });
-  await t.test('REFUSED: the same, on a step its factory hires the agent into', () => {
+  test('REFUSED: the same, on a step its factory hires the agent into', () => {
     const said = refusal(() => step('---\nplace: git\nmodel: sonnet\n---\nReview.\n', offering('skills'), 'reviewer'));
     assert.ok(said.includes('`model`') && said.includes('reviewer'), said);
   });
-  await t.test('REFUSED: a fence the agent does not offer, even one that only narrows', () => {
+  test('REFUSED: a fence the agent does not offer, even one that only narrows', () => {
     const said = refusal(() =>
       step('---\nplace: git\nagent: reviewer\nclaude:\n  fence:\n    disallowedTools: Bash(git diff:*)\n---\n', offering('skills')),
     );
     assert.ok(said.includes('fence') && said.includes('disallowedTools'), said);
   });
-  await t.test('offered, a fence that narrows loads; one that widens is still refused, as it was', () => {
+  test('offered, a fence that narrows loads; one that widens is still refused, as it was', () => {
     const narrowed = step(
       '---\nplace: git\nagent: reviewer\nclaude:\n  fence:\n    allowedTools: Bash(git log:*)\n---\n',
       offering('skills, fence'),
@@ -133,7 +133,7 @@ test('what a step may override is what its agent offers: anything else is refuse
     );
     assert.ok(said.includes('Bash(npm test)'), said);
   });
-  await t.test('with no line, the agent offers everything, and `nemia start` says to write one', () => {
+  test('with no line, the agent offers everything, and `nemia start` says to write one', () => {
     const loaded = step(
       '---\nplace: git\nagent: reviewer\nmodel: sonnet\nclaude:\n  fence:\n    allowedTools: Bash(git log:*)\n---\n',
       offering(),
@@ -146,7 +146,7 @@ test('what a step may override is what its agent offers: anything else is refuse
     fs.writeFileSync(path.join(root, 'agents', 'reviewer.md'), '---\nmodel: opus\n---\nYou review.\n');
     assert.deepEqual(formerKeyLines(path.join(root, 'dev')), [overridableLine(path.join(root, 'agents', 'reviewer.md'))]);
   });
-  await t.test('REFUSED: a word on `overridable:` that is nothing a step may override', () => {
+  test('REFUSED: a word on `overridable:` that is nothing a step may override', () => {
     const said = refusal(() => parseAgent('reviewer', '---\noverridable: model, check\n---\nYou review.\n'));
     assert.ok(said.includes('`check`'), said);
   });

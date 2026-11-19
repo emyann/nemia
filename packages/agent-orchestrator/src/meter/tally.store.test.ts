@@ -5,7 +5,7 @@
  * A file of its own, since `tick` reads every run of its store: its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full
  * every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -211,11 +211,11 @@ time(
   },
 );
 
-time('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async (t) => {
+time('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async () => {
   emptyStore();
   await started(3);
   let clock = 0;
-  t.mock.method(performance, 'now', () => ++clock);
+  vi.spyOn(performance, 'now').mockImplementation(() => ++clock);
   const { ms, tallies } = await metered(() => runWith(fake({ passMs: 5, observeMs: 2, ioMs: 1 }), tickRun()));
   assert.ok(tallies);
   const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
@@ -521,11 +521,11 @@ writes("a pass's metrics go into the registry of whoever runs it: its time, each
 });
 
 /** A table's rows, each a subtest of `t`. */
-const told = (rows: Rows) => async (t: TestContext) => {
-  for (const [name, claim] of rows) await t.test(name, claim);
+const told = (rows: Rows) => async () => {
+  for (const [name, claim] of rows) test(name, claim);
 };
 
-test("a pass's time is its phases and what measuring took, no more and no less", told(TIME));
-test('a pass counts what it read and observed, and what it saw', told(COUNTS));
-test('a pass writes its cost and its metrics where they are read back', told(WRITES));
-test("a meter counts its own pass's reads alone, and leaves no meter open", told(WHOSE));
+describe("a pass's time is its phases and what measuring took, no more and no less", told(TIME));
+describe('a pass counts what it read and observed, and what it saw', told(COUNTS));
+describe('a pass writes its cost and its metrics where they are read back', told(WRITES));
+describe("a meter counts its own pass's reads alone, and leaves no meter open", told(WHOSE));

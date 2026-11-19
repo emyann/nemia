@@ -27,7 +27,7 @@ its root. A page holds landed material only; a term designed and not built sits 
 
 - `npm run dev` serves the site on :4321, `npm run build` writes `dist/`; `npm run preview` serves the build, for pictures in light and
   dark (the theme select, or `localStorage['starlight-theme']`).
-- `node --test test/<file>.test.ts` from here runs one test file. **No test builds the real site**: `npm run build` runs `astro build`
+- `npx vitest run test/<file>.test.ts` from here runs one test file. **No test builds the real site**: `npm run build` runs `astro build`
   and then `built.ts` over `dist/`, which is where the pages and the one home of each code-drawn machine are asserted.
   `test/build.test.ts` builds this site's own configuration pointed at scratch pages with a broken link (`srcDir`) and nothing else;
   that build is a child process near 1.2 GB, apart from the test's own process. That is the

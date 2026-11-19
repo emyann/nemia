@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { gitPlace } from '../place/git/place.ts';
 import { GIT_ENV, gitWorld } from './git-world.ts';
 import { walksOn } from './place-walks.ts';

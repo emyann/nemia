@@ -3,7 +3,7 @@
  * selector, and the selections a person types — by factory, by workflow in a factory, by step, by agent, by agent on a step, and by an
  * agent across a factory — each failing when one clause of it is dropped.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { names } from '../../test/assessed.ts';
 import { startedLine, upgraded, type FeedLabels, type FeedLine } from '../feed/index.ts';
@@ -123,15 +123,15 @@ const selected = (values: readonly string[]): string[] => {
   );
 };
 
-test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and every malformed selector or reserved label refused by name', async (t) => {
-  await t.test("a selector names a key of a feed line or a person's label, and the message is none of them", () => {
+describe('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and every malformed selector or reserved label refused by name', () => {
+  test("a selector names a key of a feed line or a person's label, and the message is none of them", () => {
     assert.deepEqual([...SELECTABLE_KEYS], [...LABEL_KEYS, ...RESERVED_KEYS]);
     names(selectorsRefusal(['message=hi']), 'message', 'run, factory, workflow, step, agent, kind');
     names(selectorsRefusal(['message']), 'message');
     assert.equal(ADA_IMPLEMENT.message !== undefined, true, 'the line does carry a message');
     assert.equal(selectableOf(ADA_IMPLEMENT).message, undefined, 'and no selector reads it');
   });
-  await t.test('every label a line can carry is a key a selector may name', () => {
+  test('every label a line can carry is a key a selector may name', () => {
     const every: Required<FeedLabels> = { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
     assert.deepEqual([...LABEL_KEYS], Object.keys(every), 'a label the list forgets is no key of a selector, and selects nothing live');
     const carries = upgraded({
@@ -146,7 +146,7 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
     for (const key of Object.keys(every)) assert.equal(on[key], every[key], key);
     for (const key of Object.keys(every)) assert.equal(selectorsRefusal([`${key}=${every[key]}`]), undefined, key);
   });
-  await t.test('a label may not take a reserved name of a line, and the refusal names it', () => {
+  test('a label may not take a reserved name of a line, and the refusal names it', () => {
     assert.equal(labelKeysRefusal(LABEL_KEYS), undefined, 'the labels the feed ships with take none');
     assert.equal(LABEL_KEYS.length, 5, 'and the list it is asked of is every label there is, held above');
     names(
@@ -157,7 +157,7 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
     );
     for (const key of RESERVED_KEYS) assert.match(labelKeysRefusal(['run', key]) ?? '', new RegExp(`^${key} is a reserved key`));
   });
-  await t.test('every malformed selector is refused by name, and says what the grammar takes', () => {
+  test('every malformed selector is refused by name, and says what the grammar takes', () => {
     const refusal = (value: string) => selectorsRefusal([value]) ?? '(taken)';
     assert.match(refusal(''), /^"" is no selector: it holds no clause/);
     assert.match(refusal(','), /^"," is no selector: it holds no clause/);
@@ -194,8 +194,8 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
   });
 });
 
-test('selects and selectableOf: what a signed line offers a selector, and the lines each selection a person types takes', async (t) => {
-  await t.test('a selector reads the keys a signed line carries, and nothing it does not', () => {
+describe('selects and selectableOf: what a signed line offers a selector, and the lines each selection a person types takes', () => {
+  test('a selector reads the keys a signed line carries, and nothing it does not', () => {
     assert.deepEqual(selectableOf(ADA_IMPLEMENT), {
       run: 'r-1',
       factory: 'nemia',
@@ -212,7 +212,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     const gate = step({ run: 'r-9', factory: 'nemia', workflow: 'build', name: 'design', agent: 'seldon' }, 'awaiting approval');
     assert.equal(selectableOf(gate).waits, 'person', 'a line that waits on a person says so under waits');
   });
-  await t.test('`=` and `in` never match a key the line does not carry, and `!=`, `notin` and a bare key tell it from a value', () => {
+  test('`=` and `in` never match a key the line does not carry, and `!=`, `notin` and a bare key tell it from a value', () => {
     assert.deepEqual(selected(['factory=nemia']), ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-7/review', 'r-1/—']);
     assert.deepEqual(
       selected(['factory!=nemia']),
@@ -236,7 +236,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       'a line with another reason, and one with none, are selected',
     );
   });
-  await t.test("kind=Store takes the store's lines alone, and reason=StorePaused its put alone", () => {
+  test("kind=Store takes the store's lines alone, and reason=StorePaused its put alone", () => {
     assert.deepEqual(selected(['kind=Store']), ['store: store paused', 'store: store resumed']);
     assert.equal(
       selected(['kind!=Store']).some((l) => l.startsWith('store')),
@@ -247,7 +247,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.deepEqual(selected(['reason=StorePaused']), ['store: store paused']);
     assert.deepEqual(selected(['source=person,kind=Store']), ['store: store paused', 'store: store resumed']);
   });
-  await t.test("kind=Factory and reason=ConflictsPending take a factory's conflicts line, and kind=Store does not", () => {
+  test("kind=Factory and reason=ConflictsPending take a factory's conflicts line, and kind=Store does not", () => {
     const pending = upgraded({
       at: AT,
       factory: 'acme',
@@ -269,12 +269,12 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     for (const typed of ['kind=Store', 'reason=LevelChanged', 'waits', 'type=Warning'])
       assert.equal(selects(parseSelectors([typed]), pending), false, typed);
   });
-  await t.test('AND within one selector, OR across two', () => {
+  test('AND within one selector, OR across two', () => {
     assert.deepEqual(selected(['factory=nemia,workflow=build,agent=ada,step=implement']), ['r-1/implement']);
     assert.deepEqual(selected(['factory=nemia,agent=iris']), [], 'a clause that holds of no line selects none');
     assert.deepEqual(selected(['agent=iris', 'agent=agora']), ['r-3/implement', 'r-7/review', 'r-4/interview']);
   });
-  await t.test('the selections a person types, each failing when one clause of it is dropped', () => {
+  test('the selections a person types, each failing when one clause of it is dropped', () => {
     const cases: Array<{ typed: string; selects: string[]; drop: string; then: string[] }> = [
       {
         typed: 'factory=nemia',
@@ -318,7 +318,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       if (left) assert.deepEqual(after, c.then, left);
     }
   });
-  await t.test('a step with no agent carries agent: none, which the bare clause takes and agent!=none leaves out', () => {
+  test('a step with no agent carries agent: none, which the bare clause takes and agent!=none leaves out', () => {
     assert.equal(selectableOf(NO_AGENT).agent, 'none', 'the one writer of a step’s labels gives an agentless step the word none');
     assert.equal(selected(['agent']).includes('r-8/file'), true, 'so the bare agent clause takes its line: the key is there');
     assert.equal(selected(['agent!=none']).includes('r-8/file'), false, 'and agent!=none is how a person leaves agentless steps out');
@@ -341,7 +341,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     );
     assert.deepEqual(selected(['agent=none']), ['r-8/file'], 'and agent=none takes the agentless steps alone');
   });
-  await t.test("a person's label on the line's run is a key a selector reads, and one no line carries selects nothing", () => {
+  test("a person's label on the line's run is a key a selector reads, and one no line carries selects nothing", () => {
     const labelled = upgraded({
       at: AT,
       run: 'r-10',
@@ -356,7 +356,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.deepEqual(selected(['team=core']), [], 'and no line that carries no team');
     assert.deepEqual(selected(['nope=1']), [], 'a key no line carries is no refusal, and selects nothing');
   });
-  await t.test('selectsLabels holds each operator of a clause over a flat map', () => {
+  test('selectsLabels holds each operator of a clause over a flat map', () => {
     const map = { team: 'core', workflow: 'build', factory: 'acme' };
     for (const [typed, taken] of [
       ['team=core', true],
@@ -381,7 +381,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.equal(selectsLabels(parseSelectors(['team=web', 'workflow=build']), map), true, 'OR across selectors');
     assert.equal(selectsLabels([], map), true, 'and no selector takes every map');
   });
-  await t.test('no selector at all selects every line', () => {
+  test('no selector at all selects every line', () => {
     assert.deepEqual(parseSelectors([]), []);
     assert.equal(
       EVERY.every((l) => selects([], l)),

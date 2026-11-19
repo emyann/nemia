@@ -4,7 +4,7 @@
  * root. What a read of a folder finds that is no file of a template (a link, a pipe) is `template.store.test.ts`'s and, for the
  * pipe, `test/template-tar.boundary.test.ts`'s, through the lint.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,11 +46,11 @@ test('the default door reads the files where the program was given a store root,
   assert.deepEqual(act(read), { refused: 'Invalid' });
 });
 
-test('a --template is a builtin template where it is a name, and a folder or archive by its whole path where it is not', async (t) => {
-  for (const name of ['team', 'my-team-2']) await t.test(`${name}, a name, is kept as given`, () => assert.equal(sourceGiven(name), name));
+describe('a --template is a builtin template where it is a name, and a folder or archive by its whole path where it is not', () => {
+  for (const name of ['team', 'my-team-2']) test(`${name}, a name, is kept as given`, () => assert.equal(sourceGiven(name), name));
   for (const given of ['./team', '../x/team', '/abs/team', 'team.tgz', 'Team', 'a/b', 'team_x'])
-    await t.test(`${given}, no name, is a path resolved from here`, () => assert.equal(sourceGiven(given), path.resolve(given)));
-  await t.test("a name's folder is the name in the builtin folder, and a path is itself", () => {
+    test(`${given}, no name, is a path resolved from here`, () => assert.equal(sourceGiven(given), path.resolve(given)));
+  test("a name's folder is the name in the builtin folder, and a path is itself", () => {
     assert.equal(builtinPlace('team', '/f'), '/f/team');
     assert.equal(builtinPlace('/abs/x', '/f'), '/abs/x');
   });

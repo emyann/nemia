@@ -8,7 +8,7 @@
  * no record, then each kept); the loop's rest, on a steered clock, stays a test of its own. The kinds, parts and sums as tables are in
  * `disk.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -188,9 +188,9 @@ const filed = async (ids: readonly string[], checks: readonly string[] = []): Pr
   }
 };
 
-test('a disk sweep: a store of known sizes across factories read by part, kind and factory, then runs and records removed, and what the runtime keeps planted on its stand-in', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a disk sweep: a store of known sizes across factories read by part, kind and factory, then runs and records removed, and what the runtime keeps planted on its stand-in', () => {
+  const s = story(test);
+  s.test(
     'a store with files of known sizes is read part by part and factory by factory, and every name of it is in one entry',
     async () => {
       planted();
@@ -260,8 +260,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       assert.deepEqual(Object.keys(DISK_METRICS).sort(), ['bytes', 'free', 'size', 'unread']);
     },
   );
-
-  await s.test(
+  s.test(
     "each kind holds its own names: a file with two names inside once, for one of its kinds, one hardlinked from outside not at all, a link's own blocks",
     async () => {
       planted();
@@ -329,27 +328,18 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       );
     },
   );
-
-  await s.test(
-    'the cost of a sweep is the names of the store and a burst yielded each WALK_BURST of them, whatever the machine',
-    async () => {
-      planted();
-      const files = 2 * WALK_BURST + 30;
-      for (let k = 0; k < files; k++) fs.writeFileSync(path.join(ROOT, 'runs', k % 2 ? 'a' : 'b', `f${k}`), '');
-      const count = (at: string): number =>
-        1 + (fs.lstatSync(at).isDirectory() ? fs.readdirSync(at).reduce((n, name) => n + count(path.join(at, name)), 0) : 0);
-      const { value } = await over(registryOf(), diskOnce(ANSWERS, freshDiskMemory()));
-      assert.equal(
-        value.names,
-        count(ROOT) - 3,
-        'every name once, but the store, runs and worktrees themselves, counted alone when listed',
-      );
-      assert.equal(value.bursts, Math.floor(value.names / WALK_BURST));
-      assert.equal(value.bursts, 2);
-    },
-  );
-
-  await s.test(
+  s.test('the cost of a sweep is the names of the store and a burst yielded each WALK_BURST of them, whatever the machine', async () => {
+    planted();
+    const files = 2 * WALK_BURST + 30;
+    for (let k = 0; k < files; k++) fs.writeFileSync(path.join(ROOT, 'runs', k % 2 ? 'a' : 'b', `f${k}`), '');
+    const count = (at: string): number =>
+      1 + (fs.lstatSync(at).isDirectory() ? fs.readdirSync(at).reduce((n, name) => n + count(path.join(at, name)), 0) : 0);
+    const { value } = await over(registryOf(), diskOnce(ANSWERS, freshDiskMemory()));
+    assert.equal(value.names, count(ROOT) - 3, 'every name once, but the store, runs and worktrees themselves, counted alone when listed');
+    assert.equal(value.bursts, Math.floor(value.names / WALK_BURST));
+    assert.equal(value.bursts, 2);
+  });
+  s.test(
     'REFUSED: a folder gone between the listing and the walk is unread, never zero, in the reading, the series and the gauges',
     async () => {
       planted();
@@ -387,8 +377,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       );
     },
   );
-
-  await s.test('a factory whose runs are gone is said at zero once, and not again', async () => {
+  s.test('a factory whose runs are gone is said at zero once, and not again', async () => {
     planted();
     const registry = registryOf();
     const memory = freshDiskMemory();
@@ -415,8 +404,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
     const again = Object.keys(await gauges(fresh, 'disk.bytes')).filter((labels) => labels.startsWith('factory=pipao'));
     assert.deepEqual(again, [], 'the third sweep does not say it again');
   });
-
-  await s.test(
+  s.test(
     'an engine whose kept fails leaves the engine whole under no factory and the sessions unread with no bytes, the other parts read as before',
     async () => {
       planted();
@@ -438,8 +426,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       assert.equal((await gauges(registry, 'disk.unread'))['part=sessions'], 1);
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED: a runtime that keeps no record of any session leaves the reading, the series and the gauges with no sessions bytes',
     async () => {
       planted();
@@ -463,8 +450,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       );
     },
   );
-
-  await s.test("a factory whose sessions' records are gone on the next sweep is said at zero once, and not again", async () => {
+  s.test("a factory whose sessions' records are gone on the next sweep is said at zero once, and not again", async () => {
     planted();
     await filed(['t-a1']);
     engine().keeps('t-a1', { records: 4096 });
@@ -484,8 +470,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       'the third sweep does not say it again',
     );
   });
-
-  await s.test(
+  s.test(
     'each of the ten largest runs is a span of its own carrying its run, its bytes and its factory, and an eleventh run is none',
     async () => {
       planted();
@@ -520,8 +505,7 @@ test('a disk sweep: a store of known sizes across factories read by part, kind a
       );
     },
   );
-
-  await s.test(
+  s.test(
     "what the runtime keeps by task is said by factory and kind, a check's output apart from a session's, the rest of the engine alone",
     async () => {
       planted();
@@ -610,7 +594,7 @@ test(
         Effect.provide(clock.layer),
       ),
     );
-    t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(loop)));
     const ended = Effect.runPromise(Fiber.join(loop)).then(() => assert.fail('the loop ended'));
     const rested = (times: number) =>
       Promise.race([until(t, () => clock.asked.length === times, `the loop is at rest ${times}`, { bell: clock.bell }), ended]);

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { MACHINE_WORDS, outcomeOf, outcomeWord } from '../src/lib/outcome.ts';
 import type { StepAttempts, StepCloseout } from '../src/lib/api/tries.ts';

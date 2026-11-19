@@ -4,7 +4,7 @@
  * never restarted; a job's route is not this rule's, and a request for the claude.ai bridge does not change it.
  */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { Effect } from 'effect';
 import { attachedLongLived, claudeCodeOps } from './code.ts';
 import type { Attached } from './attached.ts';
@@ -33,17 +33,17 @@ const ROWS: { name: string; run: () => void }[] = [
   },
 ];
 
-test('attachedLongLived: a long-lived request runs attached while a holder holds, and nothing else does', async (t) => {
-  for (const row of ROWS) await t.test(row.name, row.run);
+describe('attachedLongLived: a long-lived request runs attached while a holder holds, and nothing else does', () => {
+  for (const row of ROWS) test(row.name, row.run);
 });
 
-test('REFUSED: a long-lived spawn with nothing holding the attached sessions, refused, and its attempt never restarted', async (t) => {
+describe('REFUSED: a long-lived spawn with nothing holding the attached sessions, refused, and its attempt never restarted', () => {
   const request = { name: 'ae/t1/1', brief: 'stay', cwd: '/r', restartPolicy: 'Always' as const };
-  await t.test('a runner with no attached sessions refuses it, `refused`, before anything runs', async () => {
+  test('a runner with no attached sessions refuses it, `refused`, before anything runs', async () => {
     const err = await Effect.runPromise(Effect.flip(claudeCodeOps({ root: scratch('ae-route-') }).spawn(request)));
     assert.deepEqual([err._tag, err.refused], ['RunnerError', true]);
   });
-  await t.test('an engine whose attached sessions nothing holds ends the attempt `unstartable` and starts no other', async () => {
+  test('an engine whose attached sessions nothing holds ends the attempt `unstartable` and starts no other', async () => {
     const engine = builtEngine(Engine.layer({ root: scratch('ae-route-root-'), harnesses: { claude: 'claude' } }));
     const id = await Effect.runPromise(engine.file({ brief: 'stay', cwd: scratch('ae-route-cwd-'), restartPolicy: 'Always' }));
     for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
@@ -75,18 +75,15 @@ const holding = () => {
   return { attached, spawned };
 };
 
-test('under a holder, a job spawn takes the job road and a long-lived spawn goes attached', async (t) => {
-  await t.test(
-    'a job spawn takes the job road, never the attached one: refused by the job road, which checks its folder first',
-    async () => {
-      const { attached, spawned } = holding();
-      const r = { name: 'ae/j1/1', brief: 'run it', cwd: '/no/such/folder/ae-route' };
-      const err = await Effect.runPromise(Effect.flip(claudeCodeOps({ root: scratch('ae-route-job-') }, attached).spawn(r)));
-      assert.equal(err._tag, 'RunnerError');
-      assert.deepEqual(spawned, [], 'and nothing was spawned attached');
-    },
-  );
-  await t.test('a long-lived spawn goes attached', async () => {
+describe('under a holder, a job spawn takes the job road and a long-lived spawn goes attached', () => {
+  test('a job spawn takes the job road, never the attached one: refused by the job road, which checks its folder first', async () => {
+    const { attached, spawned } = holding();
+    const r = { name: 'ae/j1/1', brief: 'run it', cwd: '/no/such/folder/ae-route' };
+    const err = await Effect.runPromise(Effect.flip(claudeCodeOps({ root: scratch('ae-route-job-') }, attached).spawn(r)));
+    assert.equal(err._tag, 'RunnerError');
+    assert.deepEqual(spawned, [], 'and nothing was spawned attached');
+  });
+  test('a long-lived spawn goes attached', async () => {
     const { attached, spawned } = holding();
     const r = { name: 'ae/l1/1', brief: 'stay', cwd: '/no/such/folder/ae-route', restartPolicy: 'Always' as const };
     await Effect.runPromise(claudeCodeOps({ root: scratch('ae-route-ll-') }, attached).spawn(r));

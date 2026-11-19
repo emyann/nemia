@@ -6,7 +6,7 @@
  * Over the hooks alone, with the store's sessions' drain and the job's hold file written in a scratch folder: no session and no process
  * runs. Whether a hook has answered is read after the turn of the event loop that would have answered a call let through.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import type { HookInput } from '@anthropic-ai/claude-agent-sdk';

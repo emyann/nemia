@@ -8,7 +8,7 @@
  * No container is ever started here: `docker` is a stub first on the `PATH`, which records each call it is given, and the lock is a
  * file of this test's own (`NEMIA_RENDER_LOCK`). The real stack, seed and browser are run by hand, as `tools/observe/README.md` says.
  */
-import { test } from 'node:test';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -71,7 +71,6 @@ const RENDER_TMP = scratch('wf-observe-render-tmp-');
  */
 function ran(file: string, args: string[]): { status: number | null; out: string } {
   const env: NodeJS.ProcessEnv = { ...process.env, TMPDIR: RENDER_TMP };
-  delete env.NODE_TEST_CONTEXT;
   delete env.WF_ARTIFACTS;
   const r = spawnSync(process.execPath, [path.join(RENDER, file), ...args], { env, encoding: 'utf8', timeout: 100_000 });
   return { status: r.status, out: `${r.stdout}${r.stderr}` };
@@ -202,13 +201,13 @@ test("a live holder's lock moved aside is put back, and no container is removed"
   assert.deepEqual(leftBeside(), []);
 });
 
-test('REFUSED: a lock placed while a live one is being put back stays, and the breaker says to run again once both have ended', (t) => {
+test('REFUSED: a lock placed while a live one is being put back stays, and the breaker says to run again once both have ended', () => {
   fresh();
   const live: Lock = { pid: process.pid, name: 'nemia-render-1-live00' };
   const third: Lock = { pid: process.ppid, name: 'nemia-render-2-third0' };
   fs.writeFileSync(lockFile(), JSON.stringify(live));
   const link = fs.linkSync;
-  t.mock.method(fs, 'linkSync', (from: fs.PathLike, to: fs.PathLike) => {
+  vi.spyOn(fs, 'linkSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from).endsWith(`.stale-${process.pid}`) && String(to) === lockFile()) fs.writeFileSync(lockFile(), JSON.stringify(third));
     link(from, to);
   });
@@ -230,21 +229,21 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
   assert.deepEqual(calls(), []);
 });
 
-test('REFUSED: a lock this user cannot move, at the bound, naming its holder and its file', async (t) => {
+test('REFUSED: a lock this user cannot move, at the bound, naming its holder and its file', async () => {
   fresh();
   const dead: Lock = { pid: deadPid(), name: 'nemia-render-9-dead00' };
   fs.writeFileSync(lockFile(), JSON.stringify(dead));
   const rename = fs.renameSync;
-  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+  vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (String(from) !== lockFile()) return rename(from, to);
     throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
   });
   const write = fs.writeFileSync;
   let tries = 0;
-  t.mock.method(fs, 'writeFileSync', (file: fs.PathOrFileDescriptor, data: string) => {
+  vi.spyOn(fs, 'writeFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, data: string) => {
     if (String(file).startsWith(`${lockFile()}.own-`) && ++tries > 3) throw new Error('take looped');
     write(file, data);
-  });
+  }) as never);
   const said = await take('nemia-render-3-third0', 0).then(
     () => 'taken',
     (err: Error & { exitCode?: number }) => `${err.exitCode}: ${err.message}`,
@@ -291,7 +290,6 @@ test('a hold says its container, how to stop it, where Grafana listens, its coll
 /** Start the reaper of the held stack `name` for `seconds`, the lock naming it; the child. */
 function reaping(name: string, seconds: number): ReturnType<typeof spawn> {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  delete env.NODE_TEST_CONTEXT;
   const child = spawn(process.execPath, [path.join(RENDER, 'reap.ts'), name, String(seconds)], { env, stdio: 'ignore' });
   fs.writeFileSync(lockFile(), JSON.stringify({ pid: child.pid ?? 0, name, held: true, until: 'soon' } satisfies Lock));
   return child;

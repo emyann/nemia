@@ -7,7 +7,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`. The file sets what its starts depend on itself: a run on a
  * repository no factory holds goes to the default factory (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

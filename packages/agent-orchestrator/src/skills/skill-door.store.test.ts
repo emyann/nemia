@@ -8,7 +8,7 @@
  * else at its name, and a version read at the folder it points at is not the link's (`skillVersion` digests a link as one), each a
  * `Conflict`; the writer's own refusal of a link, `Invalid`, is `test/skill-life.test.ts`'s.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -10,7 +10,7 @@
  * A store of its own at `ROOT`, given as `ENV`.
  */
 import { type Env, settingsOf } from '../config/config.store.ts';
-import { test, type TestContext } from 'node:test';
+import { describe, test, type TestContext, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { testEngine } from 'agent-runtime/testing';
@@ -136,13 +136,13 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: 'lines go to the file of their UTC day, and a line that does not read is left out, its file said once',
-    check: (t) => {
+    check: () => {
       appendLines(ROOT, 'minute', [line('2026-10-04T23:59:00.000Z', 1), line('2026-10-05T00:00:00.000Z', 2)]);
       assert.deepEqual(days(ROOT, 'minute'), ['2026-10-04', '2026-10-05']);
       fs.appendFileSync(dayFile(ROOT, 'minute', '2026-10-05'), '{"t":"x"}\nnot json\n');
       appendLines(ROOT, 'minute', [line('2026-10-05T00:01:00.000Z', 3)]);
       const said: string[] = [];
-      t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
       assert.deepEqual(
         readDay(ROOT, 'minute', '2026-10-05').map((x) => x.sum),
         [2, 3],
@@ -153,7 +153,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: "a label's word is read in its closed set: a phase stored under its former word reads as today's, and a word of no set is left out",
-    check: (t) => {
+    check: () => {
       const stored = (v: number, l: Record<string, string>) => `${JSON.stringify(line(`2026-10-06T0${v}:00:00.000Z`, v, l))}\n`;
       fs.mkdirSync(tierDir(ROOT, 'hour'), { recursive: true });
       fs.writeFileSync(
@@ -167,7 +167,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
         ].join(''),
       );
       const said: string[] = [];
-      t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+      vi.spyOn(process.stderr, 'write').mockImplementation(((text: string) => said.push(text) > 0) as never);
       assert.deepEqual(
         readDay(ROOT, 'hour', '2026-10-06').map((x) => [x.sum, x.l]),
         [
@@ -193,9 +193,9 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
 ];
 
-test('`appendLines`, `readDay`, `lastLine` and `rangeOf`: what the files of a tier hold, and what they refuse', async (t) => {
+describe('`appendLines`, `readDay`, `lastLine` and `rangeOf`: what the files of a tier hold, and what they refuse', () => {
   for (const row of FILES)
-    await t.test(row.name, async (sub) => {
+    test(row.name, async (sub) => {
       fresh();
       await row.check(sub);
     });
@@ -318,9 +318,9 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
   },
 ];
 
-test('`keepSeries`, `seriesRead` and `seriesHealth`: the series kept on a pass, and read over a range or a period', async (t) => {
+describe('`keepSeries`, `seriesRead` and `seriesHealth`: the series kept on a pass, and read over a range or a period', () => {
   for (const row of KEPT)
-    await t.test(row.name, async (sub) => {
+    test(row.name, async (sub) => {
       fresh();
       await row.check(sub);
     });

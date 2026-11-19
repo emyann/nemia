@@ -3,7 +3,7 @@
  * was asked through, so an app built over a layer of a test's own answers from that layer and the process's app is untouched.
  */
 import { seatPerson } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,8 +22,8 @@ const OPEN = '/api/runs?fieldSelector=status.state!%3Dfinished';
 const yoursOn = async (on: typeof app): Promise<string[]> =>
   (await listedIn<{ from: string; name: string }>(on, 'workflows', 'origin=user')).filter((w) => w.from === 'user').map((w) => w.name);
 
-test("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", async (t) => {
-  await t.test("a mounted router's route reads the engine of the app it was asked through", async () => {
+describe("appOf: a mounted router reads the engine and the store's root of the app it was asked through, and an app keeps its reads of its own", () => {
+  test("a mounted router's route reads the engine of the app it was asked through", async () => {
     const live = engine(process.env);
     let lists = 0;
     const counted: typeof live = {
@@ -40,7 +40,7 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
     assert.equal((await app.request(OPEN)).status, 200);
     assert.equal(lists, before, "the process's app reads through an engine of its own");
   });
-  await t.test("a mounted router's route reads the store's root of the app it was asked through", async () => {
+  test("a mounted router's route reads the store's root of the app it was asked through", async () => {
     const home = scratch('nemia-api-layer-home-');
     seatPerson(home);
     fs.mkdirSync(path.join(home, 'workflows', 'elsewhere'), { recursive: true });
@@ -49,7 +49,7 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
     assert.deepEqual(await yoursOn(own), ['elsewhere'], "yours, read under the layer's root");
     assert.deepEqual(await yoursOn(app), [], "the process's app reads yours under WF_ROOT, which has none");
   });
-  await t.test('an app keeps what its reads keep of its own: one over another engine starts with none', async () => {
+  test('an app keeps what its reads keep of its own: one over another engine starts with none', async () => {
     const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
     assert.equal((await app.request(OPEN)).status, 200);
     const theProcess = await memoOf(runtime);

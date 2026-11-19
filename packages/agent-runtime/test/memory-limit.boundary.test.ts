@@ -7,7 +7,8 @@
  * Skipped, with the probe's words, on a host that cannot make such a scope (`scopeRefusal`): no systemd user manager, cgroup v1, or a
  * systemd older than 253.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { Engine as EngineService } from '../src/index.ts';
@@ -32,14 +33,23 @@ const RUNAWAY = [
 
 const refused = scopeRefusal();
 
-test(
+describe.skipIf(refused)(
   'a runaway child past a task’s memory limit is killed in its scope alone: the attempt carries the limit, the kill and the peak, and a neighbour runs on',
-  { ...WAITED, ...(refused ? { skip: refused } : {}) },
-  async (t) => {
-    const s = story(t);
-    const root = scratch('ae-memory-boundary-');
-    const cwd = scratch('ae-memory-boundary-cwd-');
-    const engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
+  WAITED,
+  () => {
+    let root!: string;
+    let cwd!: string;
+    let engine!: import('../src/index.ts').EngineShape;
+    let ids!: { runaway: string; neighbour: string };
+    beforeAll(async () => {
+      const t = teardowns();
+      root = scratch('ae-memory-boundary-');
+      cwd = scratch('ae-memory-boundary-cwd-');
+      engine = builtEngine(EngineService.layer({ root, harnesses: { command: commandHarness } }));
+      ids = { runaway: await file(RUNAWAY, '256Mi'), neighbour: await file(['sh', '-c', 'sleep 1']) };
+      return t.end;
+    });
+    const s = story(test);
     const file = (command: string[], memory?: string) =>
       Effect.runPromise(
         engine.file({
@@ -50,10 +60,8 @@ test(
           ...(memory ? { resources: { limits: { memory } } } : {}),
         }),
       );
-    const ids = { runaway: await file(RUNAWAY, '256Mi'), neighbour: await file(['sh', '-c', 'sleep 1']) };
     const state = async (id: string) => (await Effect.runPromise(engine.view(id))).state;
-
-    await s.test('both tasks settle', async (sub) => {
+    s.test('both tasks settle', async (sub) => {
       await until(
         sub,
         async () => {
@@ -64,8 +72,7 @@ test(
         { everyMs: 100 },
       );
     });
-
-    await s.test('the runaway task ended by its worker, its attempt carrying the limit, an OOM kill and a peak', async () => {
+    s.test('the runaway task ended by its worker, its attempt carrying the limit, an OOM kill and a peak', async () => {
       const [a] = (await state(ids.runaway)).attempts;
       assert.equal(a?.reason, 'harness', `ended by the worker, not lost: ${a?.reason} ${a?.error ?? ''}`);
       assert.equal(a?.exitCode, 137, `the harness said its child was killed, not itself (-1): ${a?.exitCode} ${JSON.stringify(a?.memory)}`);
@@ -74,8 +81,7 @@ test(
       assert.ok((a?.memory?.oom ?? 0) >= 1, `at the scope's own limit, which memory.events counts as oom: ${JSON.stringify(a?.memory)}`);
       assert.equal(typeof a?.memory?.peakBytes, 'number');
     });
-
-    await s.test('the neighbour with no limit settles succeeded, and carries no memory', async () => {
+    s.test('the neighbour with no limit settles succeeded, and carries no memory', async () => {
       const neighbour = await state(ids.neighbour);
       assert.equal(neighbour.settled, 'succeeded');
       assert.equal(neighbour.attempts[0]?.memory, undefined);

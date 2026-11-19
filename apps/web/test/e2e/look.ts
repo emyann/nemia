@@ -21,8 +21,8 @@ import path from 'node:path';
 import { buildStorybook, LOOK_STORYBOOK } from './stories/built.ts';
 import { REPO, WEB } from './world.ts';
 
-/** The node arguments the look's tests run with, from the web app: node expands the glob itself. */
-export const LOOK_TESTS: readonly string[] = ['--test', '--test-concurrency=2', '--test-timeout=120000', 'test/e2e/*.test.ts'];
+/** The command the look's tests run with, from the web app: the `look` project of its Vitest config, bounded as `npm test` is. */
+export const LOOK_TESTS: readonly string[] = ['vitest', 'run', '--project=look'];
 
 /** One command `--look` runs, from the web app: what it runs (`what`), and how to run it again by hand when it fails (`again`). */
 type LookRun = { what: 'tests' | 'stories'; command: string; args: readonly string[]; said: string; again: string };
@@ -31,10 +31,11 @@ type LookRun = { what: 'tests' | 'stories'; command: string; args: readonly stri
 export const LOOK_RUNS: readonly LookRun[] = [
   {
     what: 'tests',
-    command: process.execPath,
+    command: 'npx',
     args: LOOK_TESTS,
-    said: `the look's tests, two files at a time (node ${LOOK_TESTS.join(' ')})`,
-    again: 'run one again from apps/web, node --test test/e2e/<file>.test.ts, and the whole look with npm run e2e -- --look',
+    said: `the look's tests, two files at a time (npx ${LOOK_TESTS.join(' ')})`,
+    again:
+      'run one again from apps/web, npx vitest run --project=look test/e2e/<file>.test.ts, and the whole look with npm run e2e -- --look',
   },
   {
     what: 'stories',

@@ -4,7 +4,7 @@
  * signed in, a factory filed, a volume that is there and no mount refuses, and a run whose step landed a commit each make theirs done;
  * a volume a mount would refuse does not.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,8 +38,8 @@ const statesOf = (root: string, harness: 'met' | 'missing', runs: readonly Run[]
   return Object.fromEntries(read.milestones.map((m) => [m.name, m.state]));
 };
 
-test('a store meets its milestones in order, each read from what it holds now', async (t) => {
-  await t.test('an empty store has the harness next, the rest later', () => {
+describe('a store meets its milestones in order, each read from what it holds now', () => {
+  test('an empty store has the harness next, the rest later', () => {
     assert.deepEqual(statesOf(scratch('wf-milestones-'), 'missing'), {
       harness: 'next',
       factory: 'later',
@@ -47,7 +47,7 @@ test('a store meets its milestones in order, each read from what it holds now', 
       landed: 'later',
     });
   });
-  await t.test('a harness signed in, a factory filed, a volume mounted and a run landed are each done', () => {
+  test('a harness signed in, a factory filed, a volume mounted and a run landed are each done', () => {
     const root = scratch('wf-milestones-');
     assert.equal(statesOf(root, 'met').harness, 'done');
     assert.equal(statesOf(root, 'met').factory, 'next');
@@ -66,7 +66,7 @@ test('a store meets its milestones in order, each read from what it holds now', 
     const landed: Run = { ...run, steps: { ...run.steps, implement: { taskId: 'r-landed-implement', landed: { commit: 'abc' } } } };
     assert.deepEqual(statesOf(root, 'met', [landed]), { harness: 'done', factory: 'done', volume: 'done', landed: 'done' });
   });
-  await t.test('REFUSED: a volume a mount would refuse is no milestone', () => {
+  test('REFUSED: a volume a mount would refuse is no milestone', () => {
     const root = scratch('wf-milestones-');
     const inStore = path.join(root, 'kept');
     fs.mkdirSync(inStore);

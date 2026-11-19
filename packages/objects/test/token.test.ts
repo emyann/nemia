@@ -3,7 +3,7 @@
  * a mint takes no narrowing but `read` or `act`, an actor written before actors were said (none at all) is still read where it is
  * optional, and `nemia token add` refuses a narrowing that is none, and a factory or a narrowing with no agent, before anything is asked.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { Actor, actorWords, Event, Token, TOKEN_ADD_WORDS, TokenMint } from 'objects';

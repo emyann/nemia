@@ -23,7 +23,7 @@
  * No file of this package's `src`, `bin` or `place` imports the templates workspace (`packages/templates`), by its name or by a path:
  * the builtin templates are found by path (`BuiltinTemplates`, `src/template/door/templates.store.ts`), as its skills and servers are.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

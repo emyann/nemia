@@ -11,7 +11,7 @@
  *
  * Its subject is git and a spawned script: a boundary file.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,6 +19,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { digestOf, modesOf, RELEASED, type Records, templatesIn } from '../released.ts';
 import { TEMPLATES } from './template.ts';
+import { runnerless } from 'test-kit/probe';
 
 /** The workspace's path in the scratch repository, as it is in this one. */
 const WS = 'packages/templates';
@@ -27,8 +28,7 @@ const WS = 'packages/templates';
 const PLACEHOLDER = `sha256:${'0'.repeat(64)}`;
 
 /** An environment where git reads no configuration of the machine's, and no test runner's variable reaches a spawn. */
-const ENV: NodeJS.ProcessEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
-delete ENV.NODE_TEST_CONTEXT;
+const ENV: NodeJS.ProcessEnv = { ...runnerless(process.env), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
 
 /** `git <args>` in `dir` as nobody in particular: its exit and its streams. */
 const git = (dir: string, ...args: string[]): { code: number | null; out: string; err: string } => {

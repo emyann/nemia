@@ -5,7 +5,7 @@
  * by its kind and the facts it names. The terminal's numbering is in `numbered.test.ts`; a run's questions asked and answered at the
  * terminal are told in `test/retry.test.ts` and `test/closeouts.test.ts`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { closeoutSchemaOf, looseAt, parseCloseout } from '../closeout/closeout.ts';
 import {
@@ -56,12 +56,12 @@ const decodeFails = (value: unknown): string => {
   return read.error;
 };
 
-test('questionsOf', async (t) => {
-  await t.test('reads a list of questions as it is, an empty one too', () => {
+describe('questionsOf', () => {
+  test('reads a list of questions as it is, an empty one too', () => {
     assert.deepEqual(questionsOf([cut, where]), [cut, where]);
     assert.deepEqual(questionsOf([]), []);
   });
-  await t.test('reads a question that takes several answers recommending a list of its labels, one label, or none', () => {
+  test('reads a question that takes several answers recommending a list of its labels, one label, or none', () => {
     const many = { ...where, recommended: ['retry', 'gate'] };
     assert.deepEqual(questionsOf([many]), [many]);
     assert.deepEqual(questionsOf([{ ...where, recommended: 'gate' }]), [{ ...where, recommended: 'gate' }]);
@@ -97,7 +97,7 @@ test('questionsOf', async (t) => {
     ['REFUSED: what is not a list', 'Should we? a) yes b) no', ['not a list']],
     ['REFUSED: a key of the wrong type', [{ ...cut, multiple: 'no' }], ["question 1's `multiple`", 'true or false']],
   ];
-  for (const [name, value, facts] of rows) await t.test(name, () => namesFor(name, decodeFails(value), ...facts));
+  for (const [name, value, facts] of rows) test(name, () => namesFor(name, decodeFails(value), ...facts));
 });
 
 /** A step whose `output:` schema holds `properties`, read as the loader reads it. */
@@ -115,35 +115,29 @@ const loaderRefuses = (load: () => unknown, ...facts: string[]) =>
     return true;
   });
 
-test('expandShapes and questionFields: the `x-shape` marker of a step’s `output:`', async (t) => {
-  await t.test('QUESTIONS_SCHEMA is strict, as every schema handed to a harness is', () => {
+describe('expandShapes and questionFields: the `x-shape` marker of a step’s `output:`', () => {
+  test('QUESTIONS_SCHEMA is strict, as every schema handed to a harness is', () => {
     assert.equal(looseAt(QUESTIONS_SCHEMA, ''), undefined);
   });
-  await t.test(
-    'the loader expands a marked field to the strict schema, its description kept; nothing of the marker reaches the harness',
-    () => {
-      const step = stepWith({ open: { 'x-shape': 'questions', description: 'd' }, goal: { type: 'string' } });
-      assert.deepEqual(step.output!.schema.properties.open, { ...QUESTIONS_SCHEMA, description: 'd' });
-      assert.deepEqual(questionFields(step), ['open']);
-      const filed = closeoutSchemaOf(step, [step]);
-      assert.equal(looseAt(filed, ''), undefined);
-      assert.ok(!JSON.stringify(filed).includes('x-shape'), 'the marker never reaches the harness');
-    },
-  );
-  await t.test('REFUSED: a shape it does not know, naming the one there is', () =>
-    loaderRefuses(() => stepWith({ open: { 'x-shape': 'poll' } }), '`open`', '"poll"', '`questions`', '"x-shape": "questions"'),
-  );
-  await t.test('REFUSED: a marker beside a schema key', () =>
-    loaderRefuses(() => stepWith({ open: { 'x-shape': 'questions', items: { type: 'string' } } }), '`open`', '`items`', '`x-shape`'),
-  );
-  await t.test('REFUSED: a marker deeper than a field', () =>
-    loaderRefuses(() => stepWith({ open: { type: 'array', items: { 'x-shape': 'questions' } } }), '`open`', 'holds `x-shape` inside it'),
-  );
-  await t.test('expandShapes leaves a field without the marker as it is, and reports no shape for it', () => {
+  test('the loader expands a marked field to the strict schema, its description kept; nothing of the marker reaches the harness', () => {
+    const step = stepWith({ open: { 'x-shape': 'questions', description: 'd' }, goal: { type: 'string' } });
+    assert.deepEqual(step.output!.schema.properties.open, { ...QUESTIONS_SCHEMA, description: 'd' });
+    assert.deepEqual(questionFields(step), ['open']);
+    const filed = closeoutSchemaOf(step, [step]);
+    assert.equal(looseAt(filed, ''), undefined);
+    assert.ok(!JSON.stringify(filed).includes('x-shape'), 'the marker never reaches the harness');
+  });
+  test('REFUSED: a shape it does not know, naming the one there is', () =>
+    loaderRefuses(() => stepWith({ open: { 'x-shape': 'poll' } }), '`open`', '"poll"', '`questions`', '"x-shape": "questions"'));
+  test('REFUSED: a marker beside a schema key', () =>
+    loaderRefuses(() => stepWith({ open: { 'x-shape': 'questions', items: { type: 'string' } } }), '`open`', '`items`', '`x-shape`'));
+  test('REFUSED: a marker deeper than a field', () =>
+    loaderRefuses(() => stepWith({ open: { type: 'array', items: { 'x-shape': 'questions' } } }), '`open`', 'holds `x-shape` inside it'));
+  test('expandShapes leaves a field without the marker as it is, and reports no shape for it', () => {
     const field = { type: 'array', items: { type: 'string' } };
     assert.deepEqual(expandShapes({ open: field }), { properties: { open: field }, shapes: {} });
   });
-  await t.test('a `link` and a `commit` expand to a nullable string, each reported with its shape', () => {
+  test('a `link` and a `commit` expand to a nullable string, each reported with its shape', () => {
     assert.deepEqual(expandShapes({ u: { 'x-shape': 'link' }, c: { 'x-shape': 'commit', description: 'd' }, n: { type: 'number' } }), {
       properties: { u: { type: ['string', 'null'] }, c: { type: ['string', 'null'], description: 'd' }, n: { type: 'number' } },
       shapes: { u: 'link', c: 'commit' },
@@ -151,10 +145,9 @@ test('expandShapes and questionFields: the `x-shape` marker of a step’s `outpu
     const step = stepWith({ u: { 'x-shape': 'link' }, open: { 'x-shape': 'questions' } });
     assert.deepEqual(step.output!.shapes, { u: 'link', open: 'questions' });
   });
-  await t.test('REFUSED: a `link` with a key beside the marker', () =>
-    loaderRefuses(() => stepWith({ u: { 'x-shape': 'link', format: 'uri' } }), '`u`', '`format`', '`x-shape`'),
-  );
-  await t.test('a field frozen with the schema as it was before a list could be recommended still reads as questions', () => {
+  test('REFUSED: a `link` with a key beside the marker', () =>
+    loaderRefuses(() => stepWith({ u: { 'x-shape': 'link', format: 'uri' } }), '`u`', '`format`', '`x-shape`'));
+  test('a field frozen with the schema as it was before a list could be recommended still reads as questions', () => {
     const items = QUESTIONS_SCHEMA.items;
     const recommended = { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' };
     const former = { ...QUESTIONS_SCHEMA, items: { ...items, properties: { ...items.properties, recommended } } };
@@ -164,15 +157,15 @@ test('expandShapes and questionFields: the `x-shape` marker of a step’s `outpu
     const said = parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'One.', open: [cut] });
     assert.deepEqual(askedQuestions(frozen, said), [{ field: 'open', questions: [cut] }]);
   });
-  await t.test('a question field is known by its schema, never its name', () => {
+  test('a question field is known by its schema, never its name', () => {
     const step = stepWith({ open: { type: 'array', items: { type: 'string' } }, asks: { 'x-shape': 'questions' } });
     assert.deepEqual(questionFields(step), ['asks']);
     assert.deepEqual(questionFields(undefined), []);
   });
 });
 
-test('askedQuestions', async (t) => {
-  await t.test('each question field that decodes and holds a question, in the schema order; none of a field that does not decode', () => {
+describe('askedQuestions', () => {
+  test('each question field that decodes and holds a question, in the schema order; none of a field that does not decode', () => {
     const step = stepWith({ later: { 'x-shape': 'questions' }, open: { 'x-shape': 'questions' }, broken: { 'x-shape': 'questions' } });
     const said = parseCloseout({
       outcome: 'blocked',
@@ -190,7 +183,7 @@ test('askedQuestions', async (t) => {
     assert.deepEqual(askedQuestions(step, parseCloseout({ outcome: 'done', summary: '', artifacts: [], open: [] })), []);
     assert.deepEqual(askedQuestions(step, { error: 'not an object' }), []);
   });
-  await t.test('none of a closeout whose fields ask one title twice: an answer names its question by title alone', () => {
+  test('none of a closeout whose fields ask one title twice: an answer names its question by title alone', () => {
     const step = stepWith({ open: { 'x-shape': 'questions' }, later: { 'x-shape': 'questions' } });
     const said = (later: unknown[]) =>
       parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'Two questions.', open: [cut], later });
@@ -202,31 +195,34 @@ test('askedQuestions', async (t) => {
   });
 });
 
-test('questionRefusals', async (t) => {
-  const step = stepWith({ open: { 'x-shape': 'questions' }, later: { 'x-shape': 'questions' }, goal: { type: 'string' } });
+describe('questionRefusals', () => {
+  let step!: import('../workflow.ts').StepSpec;
+  beforeAll(() => {
+    step = stepWith({ open: { 'x-shape': 'questions' }, later: { 'x-shape': 'questions' }, goal: { type: 'string' } });
+  });
   const said = (fields: Record<string, unknown>) =>
     parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'Questions.', goal: 'g', ...fields });
-  await t.test('none of questions that read, of a field not given, and of a closeout not there or unreadable', () => {
+  test('none of questions that read, of a field not given, and of a closeout not there or unreadable', () => {
     assert.deepEqual(questionRefusals(step, said({ open: [cut], later: [{ ...where, recommended: ['retry', 'gate'] }] })), []);
     assert.deepEqual(questionRefusals(step, said({ open: [] })), []);
     assert.deepEqual(questionRefusals(step, undefined), []);
     assert.deepEqual(questionRefusals(step, { error: 'not an object' }), []);
     assert.deepEqual(questionRefusals(undefined, said({ open: 'words' })), []);
   });
-  await t.test('REFUSED: a field that does not read as questions, naming the field and why', () => {
+  test('REFUSED: a field that does not read as questions, naming the field and why', () => {
     const refused = questionRefusals(step, said({ open: [cut], later: [{ ...where, recommended: 'retry, gate' }] }));
     assert.equal(refused.length, 1);
     names(refused[0], '`later`', 'question 1', '"retry, gate"');
   });
-  await t.test('REFUSED: two fields that ask one title', () => {
+  test('REFUSED: two fields that ask one title', () => {
     const refused = questionRefusals(step, said({ open: [cut], later: [{ ...where, title: cut.title }] }));
     assert.equal(refused.length, 1);
     names(refused[0], JSON.stringify(cut.title));
   });
 });
 
-test('answerRefusal', async (t) => {
-  await t.test('lets through a choice for each question, and words of the person’s own alone', () => {
+describe('answerRefusal', () => {
+  test('lets through a choice for each question, and words of the person’s own alone', () => {
     const through: Answer[][] = [
       [
         { question: cut.title, chose: ['a'] },
@@ -297,11 +293,11 @@ test('answerRefusal', async (t) => {
     ],
   ];
   for (const [name, questions, answers, facts, instead] of rows)
-    await t.test(name, () => namesFor(name, answerRefusal(questions, answers, instead), ...facts));
+    test(name, () => namesFor(name, answerRefusal(questions, answers, instead), ...facts));
 });
 
-test('answerText and approvedAnswerText', async (t) => {
-  await t.test('answerText says each answer in the order asked, the note, and who answered', () => {
+describe('answerText and approvedAnswerText', () => {
+  test('answerText says each answer in the order asked, the note, and who answered', () => {
     const text = answerText(
       [cut, where],
       [
@@ -333,7 +329,7 @@ test('answerText and approvedAnswerText', async (t) => {
       'Answers to your questions:\n\n1. How is the card cut?\n   In my own words: Neither.\n\nAnswered by: the person, on the board',
     );
   });
-  await t.test('approvedAnswerText says whose questions they answer, each in the order asked, the note, and who answered', () => {
+  test('approvedAnswerText says whose questions they answer, each in the order asked, the note, and who answered', () => {
     const text = approvedAnswerText(
       'design',
       [cut, where],
@@ -362,7 +358,7 @@ test('answerText and approvedAnswerText', async (t) => {
     );
     assert.ok(!approvedAnswerText('design', [cut], [{ question: cut.title, chose: ['a'] }]).includes('Answers to your questions'));
   });
-  await t.test('each says where the person answered: at the terminal when it says so, on the board by default', () => {
+  test('each says where the person answered: at the terminal when it says so, on the board by default', () => {
     const answers = [{ question: cut.title, chose: ['a'] }];
     assert.ok(
       answerText([cut], answers, undefined, 'the person, at the terminal').endsWith('\n\nAnswered by: the person, at the terminal'),
@@ -375,7 +371,7 @@ test('answerText and approvedAnswerText', async (t) => {
     assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
     assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
   });
-  await t.test("each says who answered in the actor's words, where they are handed", () => {
+  test("each says who answered in the actor's words, where they are handed", () => {
     const answers = [{ question: cut.title, chose: ['a'] }];
     const actors: Array<[Actor, readonly string[]]> = [
       [{ kind: 'person', token: 'laptop' }, ['laptop']],

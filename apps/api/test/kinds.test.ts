@@ -13,7 +13,7 @@
  * test code, and each holds its own by the forms it must see and the ones it must pass over.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

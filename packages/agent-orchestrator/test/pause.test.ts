@@ -20,7 +20,8 @@
  * instant written as a literal. The store is the file's own, at `ROOT`, given as `ENV`, and the run cap high, so the
  * schedule's fire is held by the pause alone.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,52 +110,63 @@ const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSyn
 /** The runs a schedule started: the fire each was started for. */
 const scheduledDues = (): string[] => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
 
-test("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", async (t) => {
-  const s = story(t);
-  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-04T12:00:00Z') });
-  const parked = new Set<string>();
-  const b = ticking(parked);
+describe("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", () => {
+  let parked!: Set<string>;
+  let b!: Board;
+  let repo!: string;
+  let ONE!: string;
+  let CHECKED!: string;
+  let SHIP!: string;
+  let stopping!: Board['e'];
+  heldDate(Date.parse('2026-10-04T12:00:00Z'));
+  beforeAll(async () => {
+    const t = teardowns();
+    parked = new Set<string>();
+    b = ticking(parked);
+    repo = aRepo();
+    addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
+    attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
+    setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
+    ONE = folder(['work']);
+    CHECKED = folder(['work'], () => 'check: "true"\n');
+    SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
+    stopping = {
+      ...b.e,
+      stop: (taskId: string) =>
+        Effect.suspend(() => {
+          const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
+          stops.push({
+            taskId,
+            askOnDisk:
+              run !== undefined &&
+              asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
+          });
+          if (taskId !== task('ended')) return b.e.stop(taskId);
+          return Effect.promise(async () => {
+            const before = [...b.filings];
+            const asked = Object.values(runs).map((r) => asksOf(r.id));
+            await pass();
+            raced.push({
+              filed: b.filings.length - before.length,
+              asksKept: Object.values(runs).every((r, k) => asked[k].every((f) => asksOf(r.id).includes(f))),
+            });
+            b.settle(taskId, 'succeeded', SIGNED);
+          }).pipe(Effect.andThen(Effect.suspend(() => b.e.stop(taskId))));
+        }),
+    };
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  const repo = aRepo();
-  addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
-  attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
-  setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
-  const ONE = folder(['work']);
-  const CHECKED = folder(['work'], () => 'check: "true"\n');
-  const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
   const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
   const task = (name: keyof typeof runs, step = 'work') => runRecord(ROOT, runs[name].id).steps[step].taskId!;
   const checkOf = (name: keyof typeof runs) => runRecord(ROOT, runs[name].id).steps.work.check!.taskId;
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
-  const stopping = {
-    ...b.e,
-    stop: (taskId: string) =>
-      Effect.suspend(() => {
-        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
-        stops.push({
-          taskId,
-          askOnDisk:
-            run !== undefined && asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
-        });
-        if (taskId !== task('ended')) return b.e.stop(taskId);
-        return Effect.promise(async () => {
-          const before = [...b.filings];
-          const asked = Object.values(runs).map((r) => asksOf(r.id));
-          await pass();
-          raced.push({
-            filed: b.filings.length - before.length,
-            asksKept: Object.values(runs).every((r, k) => asked[k].every((f) => asksOf(r.id).includes(f))),
-          });
-          b.settle(taskId, 'succeeded', SIGNED);
-        }).pipe(Effect.andThen(Effect.suspend(() => b.e.stop(taskId))));
-      }),
-  };
   const raced: { filed: number; asksKept: boolean }[] = [];
   let filings: string[] = [];
-
-  await s.test(
+  s.test(
     'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
     async () => {
       assert.deepEqual([readPause(ROOT), listRuns(ROOT).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
@@ -178,7 +190,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
     },
   );
-  await s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
+  s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
     runs.session = await begun(ONE);
     runs.checking = await begun(CHECKED);
     runs.asked = await begun(ONE);
@@ -205,7 +217,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     markCancelled(ROOT, runs.called.id);
     assert.equal(readPause(ROOT), null);
   });
-  await s.test(
+  s.test(
     '`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing',
     async () => {
       const read = await stage.runWith(b.e, nowRead());
@@ -223,7 +235,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.deepEqual([asksOf(runs.session.id), asksOf(runs.checking.id), stops], [[], [], []]);
     },
   );
-  await s.test(
+  s.test(
     "`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now",
     async () => {
       await stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping);
@@ -236,10 +248,10 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       });
     },
   );
-  await s.test(
+  s.test(
     'a pass under the pause files nothing new — no try asked, no check of a step signed off — and the due schedule starts nothing',
     async () => {
-      t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
+      vi.setSystemTime(Date.parse(MONDAY) + 30_000);
       b.settle(task('session'), 'working');
       filings = [...b.filings];
       const paused = await pass();
@@ -254,7 +266,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
     },
   );
-  await s.test(
+  s.test(
     '`nemia watch --once` opens with the pause as the pass reads it; `nemia start` says nothing of its run is filed until it resumes',
     async () => {
       const standing = pausedWords(await stage.runWith(b.e, pausedRead()));
@@ -266,7 +278,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(pausedWords(started.paused), standing, 'the pause as the pass reads it');
     },
   );
-  await s.test(
+  s.test(
     "`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call",
     async () => {
       const pause = readPause(ROOT);
@@ -301,7 +313,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
     },
   );
-  await s.test(
+  s.test(
     'the pause read names each session parked, finishing nothing, the check it stopped tried again on the resume, and one stopped by another hand promised nothing',
     async () => {
       await Effect.runPromise(b.e.stop(task('asked')));
@@ -319,7 +331,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.deepEqual(of('landing'), { run: runs.landing.id, step: 'ship', kind: 'session' }, "the landing's session finishes, unstopped");
     },
   );
-  await s.test(
+  s.test(
     'the check and the session asked of stopped and the landing ended, a pass under the pause files nothing — nor one a restarted daemon makes — and says Paused, the sessions parked',
     async () => {
       for (const id of [checkOf('checking'), task('asked')]) b.settle(id, 'stopped');
@@ -332,7 +344,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.match(words, /^Paused since /, 'Paused, once nothing outside a landing held is at work');
     },
   );
-  await s.test('`nemia up` says the pause once across passes, again each time its words change, and resumed once', () => {
+  s.test('`nemia up` says the pause once across passes, again each time its words change, and resumed once', () => {
     const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
     const two = {
       pause,
@@ -367,7 +379,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       RESUMED,
     ]);
   });
-  await s.test(
+  s.test(
     "`nemia resume` lifts it and the sessions' drain: each session parked goes on as the same try, each check runs again, the due fire starts — and nothing says a pause",
     async () => {
       const before = task('session');
@@ -396,7 +408,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(started.paused, undefined, 'resumed, the start answers no pause');
     },
   );
-  await s.test('REFUSED: `nemia resume` with no pause standing, naming the verb that puts one', async () => {
+  s.test('REFUSED: `nemia resume` with no pause standing, naming the verb that puts one', async () => {
     await assert.rejects(stage.main(['resume']), (err: Error & { exitCode?: number; _tag?: string }) => {
       assert.deepEqual([err._tag, err.exitCode], ['Missing', 2], err.message);
       names(err.message, 'not paused', 'nemia pause');
@@ -422,7 +434,7 @@ test("a warm read of what a pause at once would stop reads the live runs' record
       }),
     );
   const ids = ['r-live', ...Array.from({ length: 200 }, (_, n) => `fin-${String(n).padStart(3, '0')}`)];
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const id of ids) fs.rmSync(path.join(ROOT, 'runs', `${id}.json`), { force: true });
   });
   write('r-live', 'live-1');
@@ -431,7 +443,7 @@ test("a warm read of what a pause at once would stop reads the live runs' record
   b.settle('live-1', 'working');
   const memo = recordMemo<RunTasks>();
   ENV.WF_VERIFY_REST = '0';
-  t.after(() => {
+  t.onTestFinished(() => {
     ENV.WF_VERIFY_REST = '1';
   });
   await stage.runWith(b.e, nowRead(memo));

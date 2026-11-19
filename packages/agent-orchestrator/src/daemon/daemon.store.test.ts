@@ -10,7 +10,7 @@
  * where `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest`
  * in tick.verb.ts).
  */
-import { after, test, type TestContext } from 'node:test';
+import { afterAll, beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,7 +71,7 @@ const refusedWith =
 
 /** A live process that is not this one, to hold the store: killed when the file's tests are done. */
 const sleeper = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120_000)'], { stdio: 'ignore' });
-after(() => {
+afterAll(() => {
   sleeper.kill();
 });
 const LIVE = sleeper.pid!;
@@ -95,7 +95,7 @@ const monoAgo = (m: number) => ({ boot: BOOT, ms: Number(process.hrtime.bigint()
 const NOW = Date.parse('2026-10-02T12:00:00.000Z');
 
 /** Seeds `Date` at `NOW` for the rest of the test; `t.mock` lets it go when the test ends. */
-const seeded = (t: TestContext) => t.mock.timers.enable({ apis: ['Date'], now: NOW });
+const seeded = () => vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 
 /** `ms` after `NOW`, as the daemon writes a stamp. */
 const at = (ms: number) => new Date(NOW + ms).toISOString();
@@ -193,7 +193,7 @@ const engineOf = (
 /** What a verb printed, line by line, and what it threw: one the client holds on its entry's handler, its lines said (`told`). */
 const typed = async (t: TestContext, argv: string[], e: Engine) => {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.map(String).join(' '));
   });
   let threw: unknown;
@@ -202,7 +202,7 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
   } catch (err) {
     threw = err;
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   return { printed, threw };
 };
@@ -221,7 +221,7 @@ test(
   async (t) => {
     assert.equal(daemonFile(ROOT), FILE);
     clear();
-    seeded(t);
+    seeded();
     const beats: string[] = [];
     const kinds = new Set<string>();
     const e = engineOf(() => {
@@ -236,7 +236,7 @@ test(
           assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
           if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
           kinds.add(daemonStanding(ROOT).kind);
-          t.mock.timers.tick(1);
+          vi.advanceTimersByTime(1);
           return beats.length >= 2;
         },
         "two beats of one pass that awaits them, as an npm ci does: counted, not timed; without the beat's timer none comes",
@@ -253,12 +253,11 @@ test(
   },
 );
 
-test('one daemon per store: taken, beaten, refused to a second, taken over when it stalls or goes, and the api as its holder', async (t) => {
-  const s = story(t);
-
-  await s.test('nobody holds the store: a hand tick never writes the lease, and ls says who ticks, last on every path', async (t) => {
+describe('one daemon per store: taken, beaten, refused to a second, taken over when it stalls or goes, and the api as its holder', () => {
+  const s = story(test);
+  s.test('nobody holds the store: a hand tick never writes the lease, and ls says who ticks, last on every path', async (t) => {
     clear();
-    seeded(t);
+    seeded();
     assert.equal(
       (
         await typed(
@@ -287,66 +286,61 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.match(await lastLine(), new RegExp(`^nemia up: none ticking — pid ${GONE} is gone, its last pass `));
     clear();
   });
-
-  await s.test(
-    'nemia up takes the store: its pid, where and how often it ticks, each pass completed, and lets it go as it stops',
-    async (t) => {
-      clear();
-      seeded(t);
-      const seen: ReturnType<typeof read>[] = [];
-      const e = engineOf((pass) => {
-        seen.push(read());
-        if (pass === 3) throw STOP;
-        t.mock.timers.tick(1000);
-      });
-      const { printed, threw } = await typed(t, ['up', '10'], e);
-      assert.equal(threw, STOP);
-      assert.equal(e.passes, 3);
-      assert.deepEqual(
-        seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]),
-        Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]),
-      );
-      assert.equal(typeof seen[0].procStart, 'number', 'its process named by its start, with /proc on this host');
-      assert.deepEqual(
-        seen.map((f) => [f.startedMono?.boot, f.passedMono?.boot]),
-        [
-          [BOOT, undefined],
-          [BOOT, BOOT],
-          [BOOT, BOOT],
-        ],
-        'each stamp written with its monotonic reading, of this boot',
-      );
-      assert.ok(seen[2].passedMono!.ms >= seen[1].passedMono!.ms && seen[1].passedMono!.ms >= seen[0].startedMono!.ms);
-      assert.deepEqual(
-        seen.map((f) => [f.startedAt, f.passedAt]),
-        [
-          [at(0), null],
-          [at(0), at(1000)],
-          [at(0), at(2000)],
-        ],
-        'started when it took the store, no pass completed before the first, and each pass written down as it completed, before the next',
-      );
-      const stopped = read();
-      assert.equal(stopped.passedAt, seen[2].passedAt, 'the pass that threw completed nothing');
-      assert.equal(stopped.stoppedAt, at(2000), 'let go as it stopped');
-      assert.ok(
-        printed.includes(
-          `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`,
-        ),
-        printed.join('\n'),
-      );
-      assert.ok(!printed.some((l) => l.includes('took ')), 'an empty store is taken over from nobody');
-      assert.deepEqual(
-        fs.readdirSync(ROOT).filter((f) => f.startsWith('.daemon')),
-        [],
-        'no hidden file left behind',
-      );
-    },
-  );
-
-  await s.test('nemia up holds the attached sessions while it holds the store, and lets them go before the store', async (t) => {
+  s.test('nemia up takes the store: its pid, where and how often it ticks, each pass completed, and lets it go as it stops', async (t) => {
     clear();
-    seeded(t);
+    seeded();
+    const seen: ReturnType<typeof read>[] = [];
+    const e = engineOf((pass) => {
+      seen.push(read());
+      if (pass === 3) throw STOP;
+      vi.advanceTimersByTime(1000);
+    });
+    const { printed, threw } = await typed(t, ['up', '10'], e);
+    assert.equal(threw, STOP);
+    assert.equal(e.passes, 3);
+    assert.deepEqual(
+      seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]),
+      Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]),
+    );
+    assert.equal(typeof seen[0].procStart, 'number', 'its process named by its start, with /proc on this host');
+    assert.deepEqual(
+      seen.map((f) => [f.startedMono?.boot, f.passedMono?.boot]),
+      [
+        [BOOT, undefined],
+        [BOOT, BOOT],
+        [BOOT, BOOT],
+      ],
+      'each stamp written with its monotonic reading, of this boot',
+    );
+    assert.ok(seen[2].passedMono!.ms >= seen[1].passedMono!.ms && seen[1].passedMono!.ms >= seen[0].startedMono!.ms);
+    assert.deepEqual(
+      seen.map((f) => [f.startedAt, f.passedAt]),
+      [
+        [at(0), null],
+        [at(0), at(1000)],
+        [at(0), at(2000)],
+      ],
+      'started when it took the store, no pass completed before the first, and each pass written down as it completed, before the next',
+    );
+    const stopped = read();
+    assert.equal(stopped.passedAt, seen[2].passedAt, 'the pass that threw completed nothing');
+    assert.equal(stopped.stoppedAt, at(2000), 'let go as it stopped');
+    assert.ok(
+      printed.includes(
+        `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`,
+      ),
+      printed.join('\n'),
+    );
+    assert.ok(!printed.some((l) => l.includes('took ')), 'an empty store is taken over from nobody');
+    assert.deepEqual(
+      fs.readdirSync(ROOT).filter((f) => f.startsWith('.daemon')),
+      [],
+      'no hidden file left behind',
+    );
+  });
+  s.test('nemia up holds the attached sessions while it holds the store, and lets them go before the store', async (t) => {
+    clear();
+    seeded();
     const held: string[] = [];
     const e = engineOf(() => {
       held.push(`pass, store ${read().stoppedAt ? 'let go' : 'held'}`);
@@ -361,38 +355,33 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.equal(threw, STOP);
     assert.deepEqual(held, ['hold', 'pass, store held', 'let go, store held']);
   });
-
-  await s.test(
-    "its beat writes only its own daemon's file: not over another holder, not after a stop, not a file it did not take",
-    async () => {
-      clear();
-      const self = { pid: process.pid, by: 'up' as const, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
-      fs.writeFileSync(FILE, JSON.stringify(self));
-      const mono = monoAgo(0);
-      beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
-      assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z', beatMono: mono }, 'its own file beats, its last pass kept');
-      beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
-      assert.deepEqual(
-        read(),
-        { ...self, beatAt: '2026-09-22T12:00:04.000Z' },
-        'a beat with no monotonic reading leaves none of an earlier beat beside its own stamp',
-      );
-      for (const [name, over] of [
-        ['another holder', { pid: LIVE }],
-        ['stopped', { stoppedAt: minutesAgo(0.1) }],
-        ['an earlier start of this pid', { startedAt: minutesAgo(5) }],
-      ] as const) {
-        const text = holdBy(process.pid, { ...self, ...over });
-        beat(ROOT, self);
-        assert.equal(fs.readFileSync(FILE, 'utf8'), text, name);
-      }
-      clear();
+  s.test("its beat writes only its own daemon's file: not over another holder, not after a stop, not a file it did not take", async () => {
+    clear();
+    const self = { pid: process.pid, by: 'up' as const, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
+    fs.writeFileSync(FILE, JSON.stringify(self));
+    const mono = monoAgo(0);
+    beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
+    assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z', beatMono: mono }, 'its own file beats, its last pass kept');
+    beat(ROOT, self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
+    assert.deepEqual(
+      read(),
+      { ...self, beatAt: '2026-09-22T12:00:04.000Z' },
+      'a beat with no monotonic reading leaves none of an earlier beat beside its own stamp',
+    );
+    for (const [name, over] of [
+      ['another holder', { pid: LIVE }],
+      ['stopped', { stoppedAt: minutesAgo(0.1) }],
+      ['an earlier start of this pid', { startedAt: minutesAgo(5) }],
+    ] as const) {
+      const text = holdBy(process.pid, { ...self, ...over });
       beat(ROOT, self);
-      assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
-    },
-  );
-
-  await s.test('the lease names the release its daemon runs: as it takes the store, through a pass, a beat and its stop', async () => {
+      assert.equal(fs.readFileSync(FILE, 'utf8'), text, name);
+    }
+    clear();
+    beat(ROOT, self);
+    assert.equal(fs.existsSync(FILE), false, 'no file is not written by a beat');
+  });
+  s.test('the lease names the release its daemon runs: as it takes the store, through a pass, a beat and its stop', async () => {
     clear();
     const release = { kind: 'install', root: path.join(ROOT, 'releases', 'v1'), tag: 'v1', commit: 'abcdef1234567890' } as const;
     const { held } = takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api', release });
@@ -408,11 +397,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.equal('release' in read(), false, 'a daemon given no release writes none');
     clear();
   });
-
-  await s.test(
+  s.test(
     'REFUSED: a second nemia up, and a nemia tick by hand, beside a live daemon that passed recently, the store untouched',
-    async (t) => {
-      seeded(t);
+    async () => {
+      seeded();
       for (const over of [{}, { passedAt: null, startedAt: minutesAgo(0.1) }, { passedAt: minutesAgo(14) }]) {
         const text = holdBy(LIVE, over);
         const e = engineOf();
@@ -444,10 +432,9 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       );
     },
   );
-
-  await s.test('REFUSED: a live daemon is not read stalled when the wall clock steps forward past its window', async (t) => {
+  s.test('REFUSED: a live daemon is not read stalled when the wall clock steps forward past its window', async () => {
     const text = holdBy(LIVE, { startedMono: monoAgo(30), passedMono: monoAgo(0.05), beatMono: monoAgo(0.05) });
-    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 20 * 60_000 });
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 20 * 60_000 });
     const e = engineOf();
     await assert.rejects(main(['up'], e), refusedWith(new RegExp(`^nemia up: ${ROOT} is held by the nemia up of pid ${LIVE}, `)));
     await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^nemia tick: ${ROOT} is held by the nemia up of pid ${LIVE}, `)));
@@ -456,9 +443,8 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.match((await listed(engineOf())).daemon, new RegExp(`^nemia up: ticking, pid ${LIVE}, every 4000ms — `));
     clear();
   });
-
-  await s.test('a daemon silent past its window on the monotonic clock is taken over, though the wall clock reads it fresh', async (t) => {
-    seeded(t);
+  s.test('a daemon silent past its window on the monotonic clock is taken over, though the wall clock reads it fresh', async (t) => {
+    seeded();
     holdBy(LIVE, { startedMono: monoAgo(46), passedMono: monoAgo(16) });
     let during: ReturnType<typeof read> | undefined;
     const up = engineOf(() => {
@@ -472,11 +458,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.ok(took.length === 1 && saysStale(took[0], LIVE, '16m00s'), printed.join('\n'));
     clear();
   });
-
-  await s.test(
+  s.test(
     'a holder stale, gone, stopped or unreadable is taken over by nemia up, and not refused to a nemia tick, which writes nothing',
     async (t) => {
-      seeded(t);
+      seeded();
       const matches = (pattern: RegExp) => (line: string) => pattern.test(line);
       const cases = [
         {
@@ -527,30 +512,25 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       assert.ok(!saysStale(saying('2h00m'), LIVE, '16m00s'), 'refused: a silence longer than the fixture is old');
     },
   );
-
-  await s.test(
-    'a daemon whose store is taken over while it runs stops at its next pass, and writes nothing over the new holder',
-    async (t) => {
-      clear();
-      let theirs = '';
-      const e = engineOf((pass) => {
-        if (pass === 1) theirs = holdBy(LIVE);
-        if (pass > 1) throw STOP;
-      });
-      const { threw } = await typed(t, ['up', '10'], e);
-      assert.ok(threw instanceof Error && threw !== STOP, String(threw));
-      assert.match(
-        threw.message,
-        new RegExp(
-          `^nemia up: ${ROOT} was taken over by the nemia up of pid ${LIVE}, started \\S+ in /elsewhere — this one stops rather than be a second writer\\.$`,
-        ),
-      );
-      assert.equal(e.passes, 1, 'no second pass');
-      assert.equal(fs.readFileSync(FILE, 'utf8'), theirs, 'neither its heartbeat nor its stop written over the holder');
-    },
-  );
-
-  await s.test("a pid alive but another process's, reused after a kill -9, holds nothing and is never named as one to kill", async (t) => {
+  s.test('a daemon whose store is taken over while it runs stops at its next pass, and writes nothing over the new holder', async (t) => {
+    clear();
+    let theirs = '';
+    const e = engineOf((pass) => {
+      if (pass === 1) theirs = holdBy(LIVE);
+      if (pass > 1) throw STOP;
+    });
+    const { threw } = await typed(t, ['up', '10'], e);
+    assert.ok(threw instanceof Error && threw !== STOP, String(threw));
+    assert.match(
+      threw.message,
+      new RegExp(
+        `^nemia up: ${ROOT} was taken over by the nemia up of pid ${LIVE}, started \\S+ in /elsewhere — this one stops rather than be a second writer\\.$`,
+      ),
+    );
+    assert.equal(e.passes, 1, 'no second pass');
+    assert.equal(fs.readFileSync(FILE, 'utf8'), theirs, 'neither its heartbeat nor its stop written over the holder');
+  });
+  s.test("a pid alive but another process's, reused after a kill -9, holds nothing and is never named as one to kill", async (t) => {
     assert.equal(typeof procStartOf(LIVE), 'number', 'this test needs /proc');
     const text = holdBy(LIVE, { procStart: procStartOf(LIVE)! + 1 });
     const kill = new RegExp(`kill ${LIVE}\\b`);
@@ -587,8 +567,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     for (const line of [ls.daemon, JSON.stringify(ls.runs), ...byHand.printed, ...up.printed]) assert.doesNotMatch(line, kill, line);
     clear();
   });
-
-  await s.test(
+  s.test(
     'REFUSED, unconfirmed: a live pid whose start cannot be compared holds the store, and its pid is not handed over bare',
     async () => {
       const text = holdBy(LIVE, { procStart: undefined });
@@ -611,8 +590,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       clear();
     },
   );
-
-  await s.test(
+  s.test(
     'up as the api takes the store as the api, writes where it serves once it listens, and lets it go as its scope closes',
     async () => {
       clear();
@@ -645,11 +623,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       clear();
     },
   );
-
-  await s.test(
+  s.test(
     'REFUSED both ways round: an api holding the store refuses a nemia up and a nemia tick, and a nemia up holding it refuses an api',
-    async (t) => {
-      seeded(t);
+    async () => {
+      seeded();
       const text = holdBy(LIVE, { by: 'api', url: 'http://127.0.0.1:8787' });
       const e = engineOf();
       await assert.rejects(
@@ -679,8 +656,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       clear();
     },
   );
-
-  await s.test('an api whose store is taken over while it runs stops at its next pass, naming the new holder', async () => {
+  s.test('an api whose store is taken over while it runs stops at its next pass, naming the new holder', async () => {
     clear();
     let theirs = '';
     const e = engineOf((n) => {
@@ -703,8 +679,8 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
 /** The cards a holder writes on the lease: opaque to this layer, so a shape the runtime would read is all the fixture needs. */
 const CARDS = { claude: { name: 'claude', supportedInterfaces: [{ url: 'http://127.0.0.1:45671/claude' }] } };
 
-test('what the lease serves: written by its holder alone, read back, and answered only of another live process', async (t) => {
-  await t.test('written by the holding process, and read back key for key through the schema', async () => {
+describe('what the lease serves: written by its holder alone, read back, and answered only of another live process', () => {
+  test('written by the holding process, and read back key for key through the schema', async () => {
     clear();
     const { held } = takeStore(ROOT, { every: 4000, cwd: '/here', by: 'api' });
     assert.equal(heldServes(ROOT, CARDS), true, 'the process that holds the lease writes it');
@@ -723,7 +699,7 @@ test('what the lease serves: written by its holder alone, read back, and answere
     assert.equal('serves' in read(), false, 'a daemon that writes none names none');
     clear();
   });
-  await t.test('a lease written before `up` and `serves` reads as them, and its next beat writes them and no `holder`', async () => {
+  test('a lease written before `up` and `serves` reads as them, and its next beat writes them and no `holder`', async () => {
     for (const over of [{ holder: CARDS }, { by: 'wf up', holder: CARDS }, { by: 'up', serves: CARDS }]) {
       const held = parseDaemonFile(holdBy(process.pid, over));
       assert.deepEqual([held?.by, held?.serves], ['up', CARDS], JSON.stringify(over));
@@ -733,7 +709,7 @@ test('what the lease serves: written by its holder alone, read back, and answere
     }
     clear();
   });
-  await t.test('REFUSED: heldServes writes nothing over another holder, after a stop, or where there is no lease', async () => {
+  test('REFUSED: heldServes writes nothing over another holder, after a stop, or where there is no lease', async () => {
     clear();
     for (const [name, over] of [
       ['another holder', { pid: LIVE }],
@@ -747,7 +723,7 @@ test('what the lease serves: written by its holder alone, read back, and answere
     assert.equal(heldServes(ROOT, CARDS), false, 'no lease is no lease of this process’s');
     assert.equal(fs.existsSync(FILE), false, 'and nothing is written');
   });
-  await t.test('servesOnStore answers another live process alone: never its own, never a lease nobody ticks', async () => {
+  test('servesOnStore answers another live process alone: never its own, never a lease nobody ticks', async () => {
     clear();
     assert.equal(servesOnStore(ROOT), undefined, 'no lease serves nothing');
     holdBy(LIVE, { serves: CARDS });
@@ -768,38 +744,34 @@ test('what the lease serves: written by its holder alone, read back, and answere
   });
 });
 
-test('REFUSED: `nemia up` and `nemia tick` given words they do not take, each named, with no pass run and the lease untouched', async (t) => {
+describe('REFUSED: `nemia up` and `nemia tick` given words they do not take, each named, with no pass run and the lease untouched', () => {
   for (const arg of ['-5', '1e400', '0', 'soon'])
-    await t.test(`nemia up ${arg}: an interval daemon.json cannot hold, refused before the store is taken`, async () => {
+    test(`nemia up ${arg}: an interval daemon.json cannot hold, refused before the store is taken`, async () => {
       clear();
       const e = engineOf();
       await assert.rejects(main(['up', arg], e), refusedWith(/whole milliseconds/, new RegExp(`"${arg}"`)));
       assert.equal(e.passes, 0);
       assert.equal(fs.existsSync(FILE), false, 'the store not taken');
     });
-
-  await t.test("nemia up -5 beside a live daemon: the refusal is the interval's, and the lease is not freed", async () => {
+  test("nemia up -5 beside a live daemon: the refusal is the interval's, and the lease is not freed", async () => {
     const text = holdBy(LIVE);
     await assert.rejects(main(['up', '-5'], engineOf()), refusedWith(/whole milliseconds/));
     assert.equal(fs.readFileSync(FILE, 'utf8'), text);
   });
-
-  await t.test('nemia tick --stats beside a live daemon: pointed at nemia up --stats', async () => {
+  test('nemia tick --stats beside a live daemon: pointed at nemia up --stats', async () => {
     const text = holdBy(LIVE);
     const e = engineOf();
     await assert.rejects(main(['tick', '--stats'], e), refusedWith(new RegExp(`pid ${LIVE}`), /nemia up --stats/));
     assert.equal(e.passes, 0);
     assert.equal(fs.readFileSync(FILE, 'utf8'), text);
   });
-
-  await t.test('nemia tick beside a live daemon: --stats said only to one who asked', async () => {
+  test('nemia tick beside a live daemon: --stats said only to one who asked', async () => {
     holdBy(LIVE);
     await assert.rejects(
       main(['tick'], engineOf()),
       (err: Error & { exitCode?: number }) => err.exitCode === 2 && !err.message.includes('--stats'),
     );
   });
-
   for (const [argv, names] of [
     [['tick', '--bogus'], [/--bogus/]],
     [
@@ -807,7 +779,7 @@ test('REFUSED: `nemia up` and `nemia tick` given words they do not take, each na
       [/--stats/, /takes no 20/],
     ],
   ] as const)
-    await t.test(`nemia ${argv.join(' ')}: the word it does not take named`, async () => {
+    test(`nemia ${argv.join(' ')}: the word it does not take named`, async () => {
       clear();
       const e = engineOf();
       await assert.rejects(main([...argv], e), refusedWith(...names));
@@ -826,11 +798,15 @@ const STOPPING = [
   ['SIGHUP', 129],
 ] as const;
 
-test("`nemia up` stopped by a signal lets the store go on the way out, with the signal's exit code", async (t) => {
-  const cli = new URL('../cli/main.ts', import.meta.url).href;
-  const fake = new URL('../../test/promised.ts', import.meta.url).href;
+describe("`nemia up` stopped by a signal lets the store go on the way out, with the signal's exit code", () => {
+  let cli!: string;
+  let fake!: string;
+  beforeAll(() => {
+    cli = new URL('../cli/main.ts', import.meta.url).href;
+    fake = new URL('../../test/promised.ts', import.meta.url).href;
+  });
   for (const [signal, code] of STOPPING)
-    await t.test(`${signal}: ${code}`, async () => {
+    test(`${signal}: ${code}`, async () => {
       const root = scratch('wf-daemon-signal-');
       const file = path.join(root, 'daemon.json');
       const readIt = () => JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof read>;
@@ -858,13 +834,13 @@ test("`nemia up` stopped by a signal lets the store go on the way out, with the 
 
 test('`nemia up` says what its passes cost once a minute, not once a pass: nine passes twenty seconds apart are two lines, the third minute not yet over', async (t) => {
   clear();
-  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
   const e = engineOf((pass) => {
     if (pass === 10) throw STOP;
-    t.mock.timers.tick(20_000);
+    vi.advanceTimersByTime(20_000);
   });
   const { printed, threw } = await typed(t, ['up', '10'], e);
-  t.mock.timers.reset();
+  vi.useRealTimers();
   assert.equal(threw, STOP);
   const said = printed.filter((l) => /^\d\d:\d\d:\d\d {2}cost: /.test(l));
   assert.equal(said.length, 2, printed.join('\n'));
@@ -967,7 +943,7 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
     return pass({ tasks: 2, unreadable: byPass[e.passes - 1] });
   });
   const errors: string[] = [];
-  t.mock.method(console, 'error', (...args: unknown[]) => {
+  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
     errors.push(args.map(String).join(' '));
   });
   const { threw } = await typed(t, ['up', '1'], e);
@@ -1007,7 +983,7 @@ const COST = passCost({
   load: 0.25,
 });
 
-test('what a pass kept reads back: its cost, the recent passes, the ceilings; REFUSED, read as none, where it does not read', async (t) => {
+describe('what a pass kept reads back: its cost, the recent passes, the ceilings; REFUSED, read as none, where it does not read', () => {
   const text = JSON.stringify(COST);
   const { place: _, ...noPlace } = COST.phases;
   const { rested: _rested, ...unrested } = COST;
@@ -1031,76 +1007,66 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
     ['a reason it could not read a harness that is not words', JSON.stringify({ ...COST, unobserved: [1] })],
     ['those reasons not a list', JSON.stringify({ ...COST, unobserved: 'harness `claude`: down' })],
   ];
-  for (const [name, written] of refused) await t.test(`a cost: ${name}`, () => assert.equal(parsePassCost(written), undefined));
-
-  await t.test('a cost reads back as written, with a key a newer meter writes, what it could not read, or none of what it saw', () => {
+  for (const [name, written] of refused) test(`a cost: ${name}`, () => assert.equal(parsePassCost(written), undefined));
+  test('a cost reads back as written, with a key a newer meter writes, what it could not read, or none of what it saw', () => {
     assert.deepEqual(parsePassCost(text), COST);
     assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, later: 1 })), { ...COST, later: 1 }, 'the file is read whole');
     assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, unobserved })), { ...COST, unobserved });
     const { runs: _runs, tasks: _tasks, queued: _queued, admitted: _admitted, ...older } = COST;
     assert.deepEqual(parsePassCost(JSON.stringify(older)), older, 'a file an older tick wrote');
   });
-
-  await t.test(
-    'the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once',
-    async (t) => {
-      const errors: string[] = [];
-      t.mock.method(process.stderr, 'write', (line: string) => errors.push(line) > 0);
+  test('the recent passes keep the last `keep`, the oldest left out first, and one that does not read left out, the file named once', async () => {
+    const errors: string[] = [];
+    vi.spyOn(process.stderr, 'write').mockImplementation(((line: string) => errors.push(line) > 0) as never);
+    fs.rmSync(recentFile(ROOT), { force: true });
+    try {
+      assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');
+      for (const ms of [1, 2, 3, 4, 5]) recordRecentPass(ROOT, { ...COST, ms }, 3);
+      assert.deepEqual(
+        recentPasses(ROOT).map((r) => r.ms),
+        [3, 4, 5],
+      );
+      assert.equal(recentPasses(ROOT)[0].runs, 40);
+      const kept = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as unknown[];
+      fs.writeFileSync(recentFile(ROOT), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
+      assert.deepEqual(
+        recentPasses(ROOT).map((r) => r.ms),
+        [3, 5],
+      );
+      assert.equal(errors.length, 1, errors.join(''));
+      assert.ok(errors[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors[0]);
+      recordRecentPass(ROOT, { ...COST, ms: 6 }, 3);
+      assert.deepEqual(
+        recentPasses(ROOT).map((r) => r.ms),
+        [3, 5, 6],
+        'the next pass writes the file without them',
+      );
+    } finally {
       fs.rmSync(recentFile(ROOT), { force: true });
-      try {
-        assert.deepEqual(recentPasses(ROOT), [], 'none before any pass kept one');
-        for (const ms of [1, 2, 3, 4, 5]) recordRecentPass(ROOT, { ...COST, ms }, 3);
-        assert.deepEqual(
-          recentPasses(ROOT).map((r) => r.ms),
-          [3, 4, 5],
-        );
-        assert.equal(recentPasses(ROOT)[0].runs, 40);
-        const kept = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as unknown[];
-        fs.writeFileSync(recentFile(ROOT), JSON.stringify([kept[0], { ...(kept[1] as object), ms: 'slow' }, kept[2], 7]));
-        assert.deepEqual(
-          recentPasses(ROOT).map((r) => r.ms),
-          [3, 5],
-        );
-        assert.equal(errors.length, 1, errors.join(''));
-        assert.ok(errors[0].startsWith(`${recentFile(ROOT)}: 2 of its passes`), errors[0]);
-        recordRecentPass(ROOT, { ...COST, ms: 6 }, 3);
-        assert.deepEqual(
-          recentPasses(ROOT).map((r) => r.ms),
-          [3, 5, 6],
-          'the next pass writes the file without them',
-        );
-      } finally {
-        fs.rmSync(recentFile(ROOT), { force: true });
-      }
-    },
-  );
-
-  await t.test(
-    "a recent pass's disk reads with its kinds, and one kept before the kinds without them; REFUSED: a kind no part has",
-    async () => {
-      const disk = (kind?: string) => ({
-        at: '2026-10-15T04:00:00.000Z',
-        free: 70,
-        size: 100,
-        entries: [{ part: 'runs', ...(kind === undefined ? {} : { kind }), factory: 'nemia', bytes: 40, unread: 0 }],
-      });
-      const kept = (kind?: string) => {
-        fs.rmSync(recentFile(ROOT), { force: true });
-        recordRecentPass(ROOT, { ...COST, ms: 1 }, 3);
-        const [pass] = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as object[];
-        return parseRecentPasses(JSON.stringify([{ ...pass, disk: disk(kind) }]));
-      };
-      try {
-        assert.deepEqual(kept('pictures').passes[0].disk, disk('pictures'));
-        assert.deepEqual(kept().passes[0].disk, disk(), 'a pass kept before the kinds');
-        assert.deepEqual([kept('photos').passes.length, kept('photos').unread], [0, 1]);
-      } finally {
-        fs.rmSync(recentFile(ROOT), { force: true });
-      }
-    },
-  );
-
-  await t.test('the ceilings of the last pass read back as written, and REFUSED, read as none, when a count is not one', async () => {
+    }
+  });
+  test("a recent pass's disk reads with its kinds, and one kept before the kinds without them; REFUSED: a kind no part has", async () => {
+    const disk = (kind?: string) => ({
+      at: '2026-10-15T04:00:00.000Z',
+      free: 70,
+      size: 100,
+      entries: [{ part: 'runs', ...(kind === undefined ? {} : { kind }), factory: 'nemia', bytes: 40, unread: 0 }],
+    });
+    const kept = (kind?: string) => {
+      fs.rmSync(recentFile(ROOT), { force: true });
+      recordRecentPass(ROOT, { ...COST, ms: 1 }, 3);
+      const [pass] = JSON.parse(fs.readFileSync(recentFile(ROOT), 'utf8')) as object[];
+      return parseRecentPasses(JSON.stringify([{ ...pass, disk: disk(kind) }]));
+    };
+    try {
+      assert.deepEqual(kept('pictures').passes[0].disk, disk('pictures'));
+      assert.deepEqual(kept().passes[0].disk, disk(), 'a pass kept before the kinds');
+      assert.deepEqual([kept('photos').passes.length, kept('photos').unread], [0, 1]);
+    } finally {
+      fs.rmSync(recentFile(ROOT), { force: true });
+    }
+  });
+  test('the ceilings of the last pass read back as written, and REFUSED, read as none, when a count is not one', async () => {
     const file = path.join(ROOT, 'tick.json');
     try {
       fs.writeFileSync(file, JSON.stringify({ sessions: 4, runs: 2 }));
@@ -1115,24 +1081,20 @@ test('what a pass kept reads back: its cost, the recent passes, the ceilings; RE
       fs.rmSync(file, { force: true });
     }
   });
-
-  await t.test(
-    'a recent pass keeps its quota and checks, a ring an older tick wrote without them reads, and REFUSED: a quota not a number',
-    async () => {
+  test('a recent pass keeps its quota and checks, a ring an older tick wrote without them reads, and REFUSED: a quota not a number', async () => {
+    fs.rmSync(recentFile(ROOT), { force: true });
+    try {
+      const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
+      const { kept } = recordRecentPass(ROOT, COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
+      assert.deepEqual([kept.at(-1)?.quota, kept.at(-1)?.checks], [{ h: { w: 12.5 } }, [check]]);
+      assert.deepEqual(recentPasses(ROOT), kept, 'read back as kept');
+      const { waitMs: _w, load: _l, quota: _q, checks: _c, ...older } = kept[0];
+      fs.writeFileSync(recentFile(ROOT), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
+      assert.deepEqual(recentPasses(ROOT), [older], 'the older reads; the quota that is no number is left out');
+    } finally {
       fs.rmSync(recentFile(ROOT), { force: true });
-      try {
-        const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
-        const { kept } = recordRecentPass(ROOT, COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
-        assert.deepEqual([kept.at(-1)?.quota, kept.at(-1)?.checks], [{ h: { w: 12.5 } }, [check]]);
-        assert.deepEqual(recentPasses(ROOT), kept, 'read back as kept');
-        const { waitMs: _w, load: _l, quota: _q, checks: _c, ...older } = kept[0];
-        fs.writeFileSync(recentFile(ROOT), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
-        assert.deepEqual(recentPasses(ROOT), [older], 'the older reads; the quota that is no number is left out');
-      } finally {
-        fs.rmSync(recentFile(ROOT), { force: true });
-      }
-    },
-  );
+    }
+  });
 });
 
 test('the daemon names on the lease what its hold serves, and names none when it holds nothing', async () => {
@@ -1283,7 +1245,7 @@ test("`up` births the daemon's series and the caller's at zero and exports them 
 });
 
 test("REFUSED: a daemon refused the lease births no series, so the live daemon's are never read as reset", async (t) => {
-  seeded(t);
+  seeded();
   const c = await collector(t);
   holdBy(LIVE);
   const e = engineOf();
@@ -1401,30 +1363,32 @@ test('the daemon delivers the subscriptions: a wake line written to the feed is 
   clear();
 });
 
-test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot hold one takes no store, naming the variable to unset', async (t) => {
-  clear();
+describe('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot hold one takes no store, naming the variable to unset', () => {
+  let e!: import('agent-runtime').EngineShape & { passes: number; setTick: (tick: () => Promise<TickReport>) => void };
+  beforeAll(async () => {
+    clear();
+    e = engineOf(() => {
+      throw STOP;
+    });
+    await assert.rejects(
+      runGiven(() => stand().layer, env)(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', scope: refusing }))),
+      (err: unknown) => {
+        assert.ok(err instanceof Invalid, String(err));
+        assert.equal(err.exitCode, 2);
+        assert.ok(err.message.includes('this host has no systemd user manager.'), "the probe's words");
+        assert.ok(err.message.includes('unset WF_MEMORY_LIMIT'), err.message);
+        return true;
+      },
+    );
+    assert.deepEqual(asked, ['agents.slice'], 'the probe asked once, for the slice the scopes are made in');
+    assert.equal(e.passes, 0, 'no pass ran');
+    assert.equal(fs.existsSync(FILE), false, 'the store was never taken');
+  });
   let env: Env = { ...ENV, WF_MEMORY_LIMIT: '4Gi', WF_CGROUP_PARENT: 'agents.slice' };
   const asked: Array<string | undefined> = [];
   const noted = (parent?: string): void => void asked.push(parent);
   const refusing = (parent?: string) => (noted(parent), 'this host has no systemd user manager.');
-  const e = engineOf(() => {
-    throw STOP;
-  });
-  await assert.rejects(
-    runGiven(() => stand().layer, env)(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', scope: refusing }))),
-    (err: unknown) => {
-      assert.ok(err instanceof Invalid, String(err));
-      assert.equal(err.exitCode, 2);
-      assert.ok(err.message.includes('this host has no systemd user manager.'), "the probe's words");
-      assert.ok(err.message.includes('unset WF_MEMORY_LIMIT'), err.message);
-      return true;
-    },
-  );
-  assert.deepEqual(asked, ['agents.slice'], 'the probe asked once, for the slice the scopes are made in');
-  assert.equal(e.passes, 0, 'no pass ran');
-  assert.equal(fs.existsSync(FILE), false, 'the store was never taken');
-
-  await t.test('a host that holds one starts, and so does any host with WF_MEMORY_LIMIT unset, never probed', async () => {
+  test('a host that holds one starts, and so does any host with WF_MEMORY_LIMIT unset, never probed', async () => {
     const holding = (parent?: string): undefined => {
       noted(parent);
       return undefined;
@@ -1465,8 +1429,7 @@ test('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that cannot 
     assert.deepEqual(asked, ['agents.slice', 'agents.slice'], 'probed with the limit set, and not without it');
     clear();
   });
-
-  await t.test('REFUSED: a WF_MEMORY_LIMIT the runtime does not read, before any probe', async () => {
+  test('REFUSED: a WF_MEMORY_LIMIT the runtime does not read, before any probe', async () => {
     env = { ...env, WF_MEMORY_LIMIT: '8 GB' };
     await assert.rejects(
       runGiven(

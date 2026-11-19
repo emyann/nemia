@@ -11,7 +11,7 @@
  * `CLAUDE_CONFIG_DIR`
 , where Claude Code keeps its sessions and transcripts, is a folder of the test's.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

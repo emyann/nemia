@@ -4,7 +4,7 @@
  * gives one, the cards that follow and those a run keeps — and the import files it on the target, the api's way (`withTemplateTaken`, the
  * template kept where the factory is made): all or nothing, every refusal before a write, and what it wrote taken back on a failure after.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -151,11 +151,15 @@ const held = (dst: Side) => ({
 
 const NOTHING = { factories: [], folder: [], cards: [] };
 
-test('the export reads the source whole and writes nothing of it', async (t) => {
-  const src = side('wf-move-src-');
-  planted(src);
-  const exp = await exported(src);
-  await t.test('the cards that follow are those of the factory no run was started from; one a run keeps is left, with why', () => {
+describe('the export reads the source whole and writes nothing of it', () => {
+  let src!: Side;
+  let exp!: Awaited<ReturnType<typeof exported>>;
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    planted(src);
+    exp = await exported(src);
+  });
+  test('the cards that follow are those of the factory no run was started from; one a run keeps is left, with why', () => {
     assert.deepEqual(
       exp.cards.map((c) => c.name),
       ['add-a-flag-c3d4'],
@@ -166,45 +170,54 @@ test('the export reads the source whole and writes nothing of it', async (t) => 
     );
     assert.equal(exp.left[0]?.why.includes('run-a1b2'), true);
   });
-  await t.test('its folder is packed but its proposals and delegations, which are named as staying', () => {
+  test('its folder is packed but its proposals and delegations, which are named as staying', () => {
     assert.deepEqual(exp.stays, ['proposals', 'delegations']);
     assert.deepEqual(
       unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files.map((f) => f.path),
       ['applied/factory.json', 'level.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
     );
   });
-  await t.test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
+  test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
     assert.equal(exp.template !== undefined && 'archive' in exp.template, true);
     const builtin = side('wf-move-src-');
     planted(builtin, 'shop-template');
     assert.deepEqual((await exported(builtin)).template, { name: 'shop-template' });
   });
-  await t.test('its cards stay where they are told to, none left behind named', async () => {
+  test('its cards stay where they are told to, none left behind named', async () => {
     const kept = await exported(src, 'stay');
     assert.deepEqual([kept.cards, kept.left], [[], []]);
   });
-  await t.test('the file it carries holds no tree, generation counted as read', () => {
+  test('the file it carries holds no tree, generation counted as read', () => {
     const file = JSON.parse(exp.file) as Record<string, unknown>;
     assert.equal('tree' in file || 'name' in file, false);
   });
-  await t.test('nothing of the source is written', () => {
+  test('nothing of the source is written', () => {
     assert.deepEqual(done(src.cards.cards.entries()).length, 3);
     assert.equal(done(src.factories.folder.read(NAME)).stays.length, 2);
   });
-  await t.test('REFUSED: the default factory, which has no folder to move, is a Conflict', async () => {
+  test('REFUSED: the default factory, which has no folder to move, is a Conflict', async () => {
     assert.equal(refusal(await on(src, factoryExported('default', {}))).kind, 'Conflict');
   });
 });
 
-test('the import files the factory on the target, clones its repositories, and trusts none of them', async (t) => {
-  const src = side('wf-move-src-');
-  const { origin } = planted(src);
-  const exp = await exported(src);
-  const dst = side('wf-move-dst-');
-  const answered = answer(await imported(dst, exp));
-  const record = done(dst.factories.factories.read(NAME));
-  if (isDefaultFactory(record)) return assert.fail('read as the default');
-  await t.test('its repository is the target’s clone of its origin, cloned there', () => {
+describe('the import files the factory on the target, clones its repositories, and trusts none of them', () => {
+  let src!: Side;
+  let origin!: string;
+  let exp!: Awaited<ReturnType<typeof exported>>;
+  let dst!: Side;
+  let answered!: import('objects').FactoryImported;
+  let record!: Exclude<import('../factory.model.ts').FactoryRecord, import('../factory.model.ts').DefaultFactory>;
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    ({ origin } = planted(src));
+    exp = await exported(src);
+    dst = side('wf-move-dst-');
+    answered = answer(await imported(dst, exp));
+    const read = done(dst.factories.factories.read(NAME));
+    if (isDefaultFactory(read)) return assert.fail('read as the default');
+    record = read;
+  });
+  test('its repository is the target’s clone of its origin, cloned there', () => {
     assert.deepEqual(
       record.volumes.map((v) => v.path),
       [path.join(dst.root, 'clones', 'localhost', ...new URL(origin).pathname.split('/').filter(Boolean))],
@@ -212,32 +225,32 @@ test('the import files the factory on the target, clones its repositories, and t
     assert.deepEqual(answered.cloned, [origin]);
     assert.equal(fs.existsSync(record.volumes[0]?.path ?? ''), true, 'the place cloned it there');
   });
-  await t.test('its template, version and parameters, the template kept under the target’s store', () => {
+  test('its template, version and parameters, the template kept under the target’s store', () => {
     assert.equal(record.template?.source.startsWith(path.join(dst.root, 'templates-sent')), true);
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
     assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
   });
-  await t.test('its tree’s edits and its level, and none of what stays', () => {
+  test('its tree’s edits and its level, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));
     const implement = files.find((f) => f.path === 'tree/workflows/press/implement.md');
     assert.equal(new TextDecoder().decode(implement?.bytes), '---\n---\nBuild it, edited.\n');
     assert.deepEqual(done(dst.factories.level.read(NAME)), { level: 'auto', since: SINCE });
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
   });
-  await t.test('its places are all untrusted, for the person to trust', () => {
+  test('its places are all untrusted, for the person to trust', () => {
     assert.deepEqual(
       answered.untrusted,
       record.volumes.map((v) => v.path),
     );
   });
-  await t.test('its card is filed under its old name, not queued, and says where it came from', () => {
+  test('its card is filed under its old name, not queued, and says where it came from', () => {
     assert.deepEqual(answered.cards, [{ name: 'add-a-flag-c3d4', was: 'add-a-flag-c3d4' }]);
     const text = done(dst.cards.cards.read(CardName.read('add-a-flag-c3d4'))) ?? '';
     const card = parseInboxCard('add-a-flag-c3d4.md', text);
     assert.deepEqual([card.queued, card.factory], [undefined, 'shop']);
     assert.equal(card.body.includes('laptop'), true);
   });
-  await t.test('a card whose name the target holds is filed under a new one, its old name answered', async () => {
+  test('a card whose name the target holds is filed under a new one, its old name answered', async () => {
     const other = side('wf-move-dst-');
     done(other.cards.cards.add(CardName.read('add-a-flag-c3d4'), aCard('Mine already')));
     const cards = answer(await imported(other, exp)).cards;
@@ -247,49 +260,54 @@ test('the import files the factory on the target, clones its repositories, and t
   });
 });
 
-test('REFUSED: the import refuses before anything is written, and writes nothing', async (t) => {
-  const src = side('wf-move-src-');
-  planted(src);
-  const exp = await exported(src);
-  const local: FactoryExport = {
-    ...exp,
-    file: JSON.stringify({
-      ...(JSON.parse(exp.file) as object),
-      volumes: [
-        { path: '/work/notes', readOnly: false },
-        { path: '/work/data', readOnly: true, name: 'data' },
-      ],
-    }),
-  };
-  await t.test('a name the target holds is a Conflict', async () => {
+describe('REFUSED: the import refuses before anything is written, and writes nothing', () => {
+  let src!: Side;
+  let exp!: Awaited<ReturnType<typeof exported>>;
+  let local!: FactoryExport;
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    planted(src);
+    exp = await exported(src);
+    local = {
+      ...exp,
+      file: JSON.stringify({
+        ...(JSON.parse(exp.file) as object),
+        volumes: [
+          { path: '/work/notes', readOnly: false },
+          { path: '/work/data', readOnly: true, name: 'data' },
+        ],
+      }),
+    };
+  });
+  test('a name the target holds is a Conflict', async () => {
     const dst = side('wf-move-dst-');
     planted(dst);
     const before = held(dst);
     assert.equal(refusal(await imported(dst, exp)).kind, 'Conflict');
     assert.deepEqual(held(dst), before);
   });
-  await t.test('a repository with no origin and nothing typed is Invalid, naming the flag that gives it one', async () => {
+  test('a repository with no origin and nothing typed is Invalid, naming the flag that gives it one', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local, { volumes: { data: scratch('wf-move-volume-') } }));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--repo /work/notes='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-  await t.test('a volume whose path the target refuses is Invalid, naming the flag that gives it another', async () => {
+  test('a volume whose path the target refuses is Invalid, naming the flag that gives it another', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local, { repos: { '/work/notes': scratch('wf-move-notes-') } }));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-  await t.test('both at once, each named in one refusal', async () => {
+  test('both at once, each named in one refusal', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--repo /work/notes=') && refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-  await t.test('a folder sent that does not unpack is Invalid', async () => {
+  test('a folder sent that does not unpack is Invalid', async () => {
     const dst = side('wf-move-dst-');
     assert.equal(refusal(await imported(dst, { ...exp, folder: { archive: 'bm90IGFuIGFyY2hpdmU=' } })).kind, 'Invalid');
     assert.deepEqual(held(dst), NOTHING);

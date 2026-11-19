@@ -3,7 +3,7 @@
  * its rollout written by the test as the worker and Codex write them, and what a follower is handed read back in order. Codex
  * prints each message whole, so a follower is handed its state and the rollout's events, never a piece of text.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +15,7 @@ import type { Followed } from '../src/harness/seam.ts';
 import type { RunnerError } from '../src/harness/error.ts';
 import { scratch } from 'test-kit/scratch';
 import { bell, until, WAITED } from '../src/waits/index.ts';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns } from 'test-kit/checkpoints';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 const line = (o: object) => `${JSON.stringify(o)}\n`;
@@ -80,38 +80,44 @@ const told = (got: Followed[]) =>
     m.kind === 'events' ? `events ${m.events.map((e) => e.text).join(' | ')}` : m.kind === 'state' ? `state ${m.state}` : m.kind,
   );
 
-test(
+describe(
   "a Codex session is followed live: its state, then each of its rollout's messages once and in order as Codex writes them, never a piece of text, and it ends when it settles",
   WAITED,
-  async (t) => {
-    const s = story(t);
+  () => {
+    const outer = outlived();
     const first = message('msg_1', 'Reading the note.');
     const second = message('msg_2', 'It is right.');
     const third = message('msg_3', 'Done.');
-    const c = session('ae/c1/1', STARTED, 'working', THREAD);
+    let c!: ReturnType<typeof session>;
+    let ended!: ReturnType<typeof follow>;
+    beforeAll(() => {
+      const t = teardowns();
+      c = session('ae/c1/1', STARTED, 'working', THREAD);
+      return t.end;
+    });
+    const s = story(test);
     const got: Followed[] = [];
-    let ended: ReturnType<typeof follow>;
-    await s.test('the codex harness follows a session live: its spec keeps its streams, reads its stdout and its rollout', () => {
+    s.test('the codex harness follows a session live: its spec keeps its streams, reads its stdout and its rollout', () => {
       assert.equal(typeof c.ops.follow, 'function');
     });
-    await s.test('a followed Codex session says its state, and waits for its rollout', async () => {
+    s.test('a followed Codex session says its state, and waits for its rollout', async () => {
       c.rollout(first.record);
       ended = follow(c.ops, 'ae/c1/1', got);
       await until(
-        t,
+        outer,
         () => got.length >= 1,
         () => `the state: ${JSON.stringify(got)}`,
         { bell: rung },
       );
       assert.deepEqual(told(got), ['state working']);
     });
-    await s.test('each message it writes is said once and in order; what was written before the follow is not', async () => {
+    s.test('each message it writes is said once and in order; what was written before the follow is not', async () => {
       c.stdout(first.line);
       c.setState('working', THREAD);
       c.stdout(second.line);
       c.rollout(second.record);
       await until(
-        t,
+        outer,
         () => got.some((m) => m.kind === 'events'),
         () => `the second message: ${JSON.stringify(got)}`,
         { bell: rung },
@@ -119,14 +125,14 @@ test(
       c.rollout(third.record);
       c.stdout(third.line + line({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 3 } }));
       await until(
-        t,
+        outer,
         () => told(got).includes('events Done.'),
         () => `the third message: ${JSON.stringify(got)}`,
         { bell: rung },
       );
       assert.deepEqual(told(got), ['state working', 'events It is right.', 'events Done.']);
     });
-    await s.test('it ends when the session settles, having said no piece of text', async () => {
+    s.test('it ends when the session settles, having said no piece of text', async () => {
       c.setState('done', THREAD);
       assert.ok(Exit.isSuccess(await ended), 'ends once the session settles');
       assert.deepEqual(
@@ -138,19 +144,27 @@ test(
   },
 );
 
-test(
+describe(
   'a Codex session that has not named its thread yet says its state and waits, reads its rollout from the start once it names it, and ends when it settles',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const first = message('msg_1', 'Reading the note.');
-    const c = session('ae/c2/1', STARTED, 'working', '');
-    c.rollout(first.record);
+  () => {
+    const outer = outlived();
+    let first!: ReturnType<typeof message>;
+    let c!: ReturnType<typeof session>;
+    let ended!: Promise<Exit.Exit<void, RunnerError>>;
+    beforeAll(() => {
+      const t = teardowns();
+      first = message('msg_1', 'Reading the note.');
+      c = session('ae/c2/1', STARTED, 'working', '');
+      c.rollout(first.record);
+      ended = follow(c.ops, 'ae/c2/1', got);
+      return t.end;
+    });
+    const s = story(test);
     const got: Followed[] = [];
-    const ended = follow(c.ops, 'ae/c2/1', got);
-    await s.test('unnamed, it says its state and nothing of a rollout it cannot know is its own', async () => {
+    s.test('unnamed, it says its state and nothing of a rollout it cannot know is its own', async () => {
       await until(
-        t,
+        outer,
         () => got.length >= 1,
         () => `the state: ${JSON.stringify(got)}`,
         { bell: rung },
@@ -159,17 +173,17 @@ test(
       c.stdout(line({ type: 'turn.completed', usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } }));
       assert.deepEqual(told(got), ['state working']);
     });
-    await s.test('once it names its thread, its rollout is read from the start', async () => {
+    s.test('once it names its thread, its rollout is read from the start', async () => {
       c.setState('working', THREAD);
       await until(
-        t,
+        outer,
         () => got.some((m) => m.kind === 'events'),
         () => `the rollout: ${JSON.stringify(got)}`,
         { bell: rung },
       );
       assert.deepEqual(told(got), ['state working', 'events Reading the note.']);
     });
-    await s.test('it ends when the session settles', async () => {
+    s.test('it ends when the session settles', async () => {
       c.setState('done', THREAD);
       assert.ok(Exit.isSuccess(await ended));
       assert.deepEqual(told(got), ['state working', 'events Reading the note.', 'state completed']);

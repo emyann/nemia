@@ -605,7 +605,7 @@ function walksAll(statement: ts.Statement, told: ts.CallExpression, read: Read):
   const call = body.expression;
   const test = refOf(call.expression, read);
   return (
-    test?.module === 'node:test' &&
+    test?.module === 'vitest' &&
     test.name === 'test' &&
     call.arguments.length === 2 &&
     call.arguments.every((arg, i) => ts.isIdentifier(arg) && arg.text === names[i])

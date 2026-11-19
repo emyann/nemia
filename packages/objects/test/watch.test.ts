@@ -2,7 +2,7 @@
  * A watch's events (`src/watch.ts`): an ADDED of a Card and a BOOKMARK decoded through `watchEventOf(WatchedObject)` and encoded back
  * equal, the object's own keys kept; and a type out of `WATCH_EVENT_TYPES` refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, WatchedObject, watchEventOf } from 'objects';

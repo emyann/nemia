@@ -7,7 +7,7 @@
  * The openers are stand-ins: `open` and `xdg-open` scripts on a `PATH` of the test's, which write the arguments they were given to a file
  * and exit as the folder says. Each refusal asserts its exit code and the command it names, never its sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -20,7 +20,7 @@ import { type Said, servedStore } from './served.ts';
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
 const store = await servedStore('nemia-open-', () => undefined);
-after(store.stop);
+afterAll(store.stop);
 
 /** A folder of stand-in openers, `open` and `xdg-open`, each writing its arguments to `opened` and exiting `code`. */
 function openers(code: number): { bin: string; opened: string } {
@@ -76,7 +76,7 @@ test('`nemia open` with a display hands the opener a link under localhost, and p
   assert.match(said.out, /http:\/\/localhost:\d+/, 'the board it opened is named');
 });
 
-test('`nemia open` on Linux with no display opens nothing and prints the link', { skip: process.platform !== 'linux' }, async () => {
+test.skipIf(process.platform !== 'linux')('`nemia open` on Linux with no display opens nothing and prints the link', async () => {
   const { bin, opened } = openers(0);
   const said = await nemia(['open'], withOpeners(bin, {}));
   assert.equal(said.code, 0, said.err);

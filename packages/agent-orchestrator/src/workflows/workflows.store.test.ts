@@ -3,7 +3,7 @@
  * asked — a folder written byte for byte as today's writer writes it, a former spelling its files still hold read with its hint, the
  * default door's root — and the seam, refused: no code of `src` calls the stores the door is over.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,5 +1,5 @@
 /** `sendHeld`: a send's lease, on the monotonic clock within its boot and on the wall clock from `sentAt` otherwise. */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Instant } from '../core/clock.ts';
 import { sendHeld } from './sending.ts';
@@ -50,6 +50,6 @@ const ROWS: Array<{ name: string; entry: Parameters<typeof sendHeld>[0]; now: In
   { name: 'a send not under way holds no lease', entry: { sentAt: new Date(T0).toISOString() }, now: at(0, 1_000), held: false },
 ];
 
-test('sendHeld: a lease on the monotonic clock within its boot, on the wall clock across one, and none once answered', async (t) => {
-  for (const row of ROWS) await t.test(row.name, () => assert.equal(sendHeld(row.entry, row.now, SEND_MS), row.held));
+describe('sendHeld: a lease on the monotonic clock within its boot, on the wall clock across one, and none once answered', () => {
+  for (const row of ROWS) test(row.name, () => assert.equal(sendHeld(row.entry, row.now, SEND_MS), row.held));
 });

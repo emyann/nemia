@@ -2,11 +2,11 @@
  * A bind's text parsed and told by its kind (`addressParsed`, `kindOfBind`, src/service/address.ts) — the ranges are the contract's,
  * proved by tsverify; this table holds the parse of the texts a person types — and this machine's addresses listed with theirs.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { addressParsed, kindOfBind, machineAddresses } from './address.ts';
 
-test('a bind text is told by its kind, a name or a malformed text the safe side', async (t) => {
+describe('a bind text is told by its kind, a name or a malformed text the safe side', () => {
   const rows: readonly [string, string][] = [
     ['127.0.0.1', 'loopback'],
     ['localhost', 'loopback'],
@@ -27,7 +27,7 @@ test('a bind text is told by its kind, a name or a malformed text the safe side'
     ['256.1.1.1', 'public'],
     ['1::2::3', 'public'],
   ];
-  for (const [text, kind] of rows) await t.test(text, () => assert.equal(kindOfBind(text), kind));
+  for (const [text, kind] of rows) test(text, () => assert.equal(kindOfBind(text), kind));
 });
 
 test('a text that is no address parses to nothing; an IPv6 text to its eight groups', () => {

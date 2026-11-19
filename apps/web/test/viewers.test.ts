@@ -2,7 +2,7 @@
  * What a step's file and field are drawn by (src/lib/viewers.ts, src/lib/fieldWidget.ts), past what their contracts prove: a file's
  * extension read off its name, and a field's schema read into what `widgetOf` decides on.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { extensionOf, viewerOf } from '../src/lib/viewers.ts';
 import { fieldReadOf, widgetOf } from '../src/lib/fieldWidget.ts';

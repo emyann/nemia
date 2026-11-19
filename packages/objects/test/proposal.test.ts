@@ -3,7 +3,7 @@
  * every key kept, one missing every optional key read, and their writes as the Api takes them; and a phase, a verb or a kind outside
  * their closed words refused at decode.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Delegation, Proposal } from 'objects';

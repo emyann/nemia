@@ -2,7 +2,7 @@
  * The run's command lines (`runLines`): the run's own two and each frozen step's three, each built off the table (`COMMANDS`) through
  * `commandLine`, and where the run came from, null for a run started from no card.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { decideLine, refreshLine, runLines } from './lines.verb.ts';
 import { commandLine } from '../command/command.ts';

@@ -8,7 +8,7 @@
  * could not read states of is the thing to hold, and it is held: no `state` on each server, its `status.error` saying why.
  */
 import { root } from '../../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -53,9 +53,9 @@ async function refused(res: () => Response | Promise<Response>, status: number):
   return body.error;
 }
 
-test("A person keeps a factory's MCP servers: none recorded, one recorded and read back with its state unread, each refusal leaving the record, the server removed, and Nemia's builtin servers offered", async (t) => {
-  const s = story(t);
-  await s.test('a factory with no record answers an empty list, and no state is unread: there was nothing to read', async () => {
+describe("A person keeps a factory's MCP servers: none recorded, one recorded and read back with its state unread, each refusal leaving the record, the server removed, and Nemia's builtin servers offered", () => {
+  const s = story(test);
+  s.test('a factory with no record answers an empty list, and no state is unread: there was nothing to read', async () => {
     const read = await answered<McpServerList>(app.request(URL));
     assert.equal(read.kind, 'McpServerList');
     assert.deepEqual(read.items, [], 'no server, no ask, no spawn');
@@ -65,7 +65,7 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
       "and Nemia's builtin servers, offered whatever the record holds",
     );
   });
-  await s.test('a server recorded is read back off the record, with its state null while no state was read', async () => {
+  s.test('a server recorded is read back off the record, with its state null while no state was read', async () => {
     await answered(
       send('PUT', `${URL}/github`, {
         url: 'https://api.githubcopilot.com/mcp/',
@@ -94,7 +94,7 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
     assert.ok(github.status?.error, "and the read says why in the runtime's words");
     assert.deepEqual(await answered<McpServer>(app.request(`${URL}/github`)), github, 'got as it is listed');
   });
-  await s.test('a mask sent back for a header keeps the value stored, and a mask for a header the record has not is refused', async () => {
+  s.test('a mask sent back for a header keeps the value stored, and a mask for a header the record has not is refused', async () => {
     await answered(send('PUT', `${URL}/github`, { url: 'https://api.githubcopilot.com/mcp/', headers: { 'X-MCP-Toolsets': HEADER_MASK } }));
     assert.deepEqual((JSON.parse(held() ?? '{}') as { servers: { github: { headers: Record<string, string> } } }).servers.github.headers, {
       'X-MCP-Toolsets': 'actions,repos',
@@ -104,7 +104,7 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
       422,
     );
   });
-  await s.test("REFUSED: an Authorization header, a local server, a name that is no server's and a name that is no factory's", async () => {
+  s.test("REFUSED: an Authorization header, a local server, a name that is no server's and a name that is no factory's", async () => {
     assert.match(
       await refused(
         () => send('PUT', `${URL}/github`, { url: 'https://api.githubcopilot.com/mcp/', headers: { Authorization: 'Bearer x' } }),
@@ -124,13 +124,13 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
     assert.match(await refused(() => app.request('/api/namespaces/nosuch/mcpservers'), 404), /nosuch/);
     assert.equal((await app.request('/api/factories/mcpmill/servers')).status, 404, 'the retired route answers nothing');
   });
-  await s.test('a server removed leaves the record, and one the factory does not record is 404', async () => {
+  s.test('a server removed leaves the record, and one the factory does not record is 404', async () => {
     assert.match(await refused(() => send('DELETE', `${URL}/nosuch`, {}), 404), /nosuch/);
     assert.equal((await answered<McpServer>(send('DELETE', `${URL}/github`, {}))).metadata.name, 'github', 'answered what it took off');
     assert.equal(held(), null, 'the last server gone, the file is removed rather than left empty');
     assert.deepEqual((await answered<McpServerList>(app.request(URL))).items, []);
   });
-  await s.test('the builtin read answers what the builtin folder holds, a spec each and no namespace', async () => {
+  s.test('the builtin read answers what the builtin folder holds, a spec each and no namespace', async () => {
     const read = await answered<McpServerList>(app.request(BUILTIN));
     assert.equal(read.kind, 'McpServerList');
     assert.deepEqual(

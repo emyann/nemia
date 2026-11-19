@@ -5,7 +5,7 @@
  * is `test/detached.test.ts`'s. What it says of text being written (`codexPartials`) is nothing, its lines decoded as a follow reads
  * them: from where the last read stopped.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { codexEventsOf, codexOutput, codexPartials } from './stream.ts';
 
@@ -152,8 +152,8 @@ const EVENTS_ROWS: Row[] = [
   },
 ];
 
-test('codexEventsOf: a stream decodes into the events the runtime reads, in order, passes every other line, and is refused at its first line that does not decode, by its line, its event, its field and the fix', async (t) => {
-  for (const row of EVENTS_ROWS) await t.test(row.name, row.holds);
+describe('codexEventsOf: a stream decodes into the events the runtime reads, in order, passes every other line, and is refused at its first line that does not decode, by its line, its event, its field and the fix', () => {
+  for (const row of EVENTS_ROWS) test(row.name, row.holds);
 });
 
 const OUTPUT_ROWS: Row[] = [
@@ -199,6 +199,6 @@ const OUTPUT_ROWS: Row[] = [
   },
 ];
 
-test('codexOutput and codexPartials: what a session consumed read off a stream that decodes, nothing marked as being written, and a stream that does not decode refused in codexEventsOf’s words', async (t) => {
-  for (const row of OUTPUT_ROWS) await t.test(row.name, row.holds);
+describe('codexOutput and codexPartials: what a session consumed read off a stream that decodes, nothing marked as being written, and a stream that does not decode refused in codexEventsOf’s words', () => {
+  for (const row of OUTPUT_ROWS) test(row.name, row.holds);
 });

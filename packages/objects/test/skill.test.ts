@@ -3,7 +3,7 @@
  * words; the write the Api takes, a whole spec or `preload` alone; its other text files in its spec (`spec.files`), at any depth; and its
  * files by path.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { API_VERSION, Skill, SkillFile, SkillWrite } from 'objects';

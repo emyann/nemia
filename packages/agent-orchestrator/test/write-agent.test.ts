@@ -7,7 +7,8 @@
  * Its store is its own at `ROOT`, given as `ENV`. With `repo`, a version read one way and checked
  * the other is refused as stale though nothing changed, and an edit of the SKILL.md between the read and the write is a change.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,11 +114,15 @@ const form = (name: string, effort = 'low') => ({
   body: 'Write the notes.',
 });
 
-test("write, rename and remove an agent at its version, as the board's Agents page saves it, its result schema travelling with it", async (t) => {
-  const s = story(t);
-  fresh();
-
-  await s.test("every agent of the tests' team renders to a file that reads back as the same agent, and renders the same twice", () => {
+describe("write, rename and remove an agent at its version, as the board's Agents page saves it, its result schema travelling with it", () => {
+  let repo!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    fresh();
+    return t.end;
+  });
+  const s = story(test);
+  s.test("every agent of the tests' team renders to a file that reads back as the same agent, and renders the same twice", () => {
     const agents = loadAgents(path.join(TEAM, 'agents'));
     assert.ok(agents.size >= 3);
     for (const [name, agent] of agents) {
@@ -127,8 +132,7 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
       assert.equal(renderAgent(draftOf(parseAgent(name, text, agent.read))), text, `${name} renders the same twice`);
     }
   });
-
-  await s.test('a new agent is written, reads back, and changes no workflow beside it, which still loads', () => {
+  s.test('a new agent is written, reads back, and changes no workflow beside it, which still loads', () => {
     const dev = snapshot(path.join(STORE, 'dev'));
     const done = writeAgent(ROOT, AGENTS, scribe, { version: null });
     assert.deepEqual(done.written, ['scribe.md']);
@@ -144,15 +148,13 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
     assert.deepEqual(snapshot(path.join(STORE, 'dev')), dev);
     assert.ok(loadWorkflows(path.join(STORE, 'dev')).length > 0);
   });
-
-  await s.test('a rename writes the new file and removes the old', () => {
+  s.test('a rename writes the new file and removes the old', () => {
     const done = writeAgent(ROOT, AGENTS, { ...scribe, name: 'notary' }, { version: agentVersion(AGENTS, 'scribe')!, from: 'scribe' });
     assert.deepEqual([done.written, done.removed], [['notary.md'], ['scribe.md']]);
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
     assert.equal((loadAgents(AGENTS).get('notary') as Agent).body, scribe.body);
   });
-
-  await s.test("a result schema is written with its agent, and is part of the agent's version", () => {
+  s.test("a result schema is written with its agent, and is part of the agent's version", () => {
     fresh();
     const done = writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA });
     assert.deepEqual(done.written, ['scribe.schema.json', 'scribe.md']);
@@ -160,8 +162,7 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
     fs.writeFileSync(path.join(AGENTS, 'scribe.schema.json'), FIELDS + '\n');
     assert.notEqual(agentVersion(AGENTS, 'scribe'), done.version, 'a change to the schema moves the version');
   });
-
-  await s.test('a schema another agent names too stays when one of them goes, and goes with the last', () => {
+  s.test('a schema another agent names too stays when one of them goes, and goes with the last', () => {
     writeAgent(ROOT, AGENTS, { ...withOutput, name: 'notary' }, { version: null });
     assert.deepEqual(removeAgent(ROOT, AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed, ['scribe.md']);
     assert.deepEqual(removeAgent(ROOT, AGENTS, 'notary', { version: agentVersion(AGENTS, 'notary')! }).removed, [
@@ -169,42 +170,36 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
       'scribe.schema.json',
     ]);
   });
-
-  await s.test(
-    "a key's line taken off, or pointed at another file, leaves the file it named: a save never deletes what a person wrote",
-    () => {
-      fresh();
-      const made = writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA });
-      const bare = writeAgent(ROOT, AGENTS, scribe, { version: made.version });
-      assert.deepEqual(bare.removed, [], 'a field cleared on the board and saved removes nothing');
-      assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.schema.json'), 'utf8'), FIELDS);
-      assert.equal(parseAgent('scribe', fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8')).keys.output, undefined);
-      fresh();
-      writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA });
-      const moved = writeAgent(
-        ROOT,
-        AGENTS,
-        { ...withOutput, keys: { ...withOutput.keys, output: 'scribe.notes.json' } },
-        { version: agentVersion(AGENTS, 'scribe')!, schema: { ...SCHEMA, file: 'scribe.notes.json' } },
-      );
-      assert.deepEqual(moved.removed, []);
-      assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.notes.json')), 'the new one written');
-      assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the one it named before still there');
-      const gone = removeAgent(ROOT, AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
-      assert.deepEqual(gone, ['scribe.md', 'scribe.notes.json'], 'the one it names now goes with it');
-      assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the one it no longer names is not its to take');
-    },
-  );
-
-  await s.test('a write that fails leaves not behind the schema it wrote', () => {
+  s.test("a key's line taken off, or pointed at another file, leaves the file it named: a save never deletes what a person wrote", () => {
+    fresh();
+    const made = writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA });
+    const bare = writeAgent(ROOT, AGENTS, scribe, { version: made.version });
+    assert.deepEqual(bare.removed, [], 'a field cleared on the board and saved removes nothing');
+    assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.schema.json'), 'utf8'), FIELDS);
+    assert.equal(parseAgent('scribe', fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8')).keys.output, undefined);
+    fresh();
+    writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA });
+    const moved = writeAgent(
+      ROOT,
+      AGENTS,
+      { ...withOutput, keys: { ...withOutput.keys, output: 'scribe.notes.json' } },
+      { version: agentVersion(AGENTS, 'scribe')!, schema: { ...SCHEMA, file: 'scribe.notes.json' } },
+    );
+    assert.deepEqual(moved.removed, []);
+    assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.notes.json')), 'the new one written');
+    assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the one it named before still there');
+    const gone = removeAgent(ROOT, AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
+    assert.deepEqual(gone, ['scribe.md', 'scribe.notes.json'], 'the one it names now goes with it');
+    assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the one it no longer names is not its to take');
+  });
+  s.test('a write that fails leaves not behind the schema it wrote', () => {
     fresh();
     fs.mkdirSync(path.join(AGENTS, 'scribe.md'));
     assert.throws(() => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: SCHEMA }));
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), false);
     fs.rmdirSync(path.join(AGENTS, 'scribe.md'));
   });
-
-  await s.test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
+  s.test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
     fresh();
     const repo = scratch('wf-agent-repo-');
     const skill = path.join(repo, '.claude', 'skills', 'pass-a-note');
@@ -237,8 +232,7 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
     const now = agentVersion(AGENTS, 'courier', found())!;
     assert.deepEqual(removeAgent(ROOT, AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
   });
-
-  await s.test("an agent's version counts a link as where it points, not as what it points at", () => {
+  s.test("an agent's version counts a link as where it points, not as what it points at", () => {
     const outside = path.join(ROOT, 'outside-version.md');
     fs.writeFileSync(outside, 'one\n');
     fs.symlinkSync(outside, path.join(AGENTS, 'linked.md'));
@@ -247,14 +241,12 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
     assert.equal(agentVersion(AGENTS, 'linked'), was);
     fs.rmSync(path.join(AGENTS, 'linked.md'));
   });
-
-  const repo = scratch('wf-library-repo-');
   const board = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);
   const read = async (name: string) => (await board(AGENTS_READ.handler({ from: 'user', name, dir: AGENTS, repo }))).agent;
-
-  await s.test(
+  s.test(
     "the board's entries: an agent written from its form reads back for its page, renamed from the name on its path, and removed",
     async () => {
+      repo = scratch('wf-library-repo-');
       const made = await board(AGENTS_WRITE.handler({ from: 'user', repo, draft: form('clerk'), schema: null }));
       assert.deepEqual(made.written, ['clerk.md']);
       assert.equal((await read('clerk'))?.version, made.version);
@@ -268,8 +260,7 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
       assert.equal(fs.existsSync(path.join(AGENTS, 'archivist.md')), false);
     },
   );
-
-  await s.test(
+  s.test(
     "REFUSED: the board's write and removal of an agent changed since it was read, naming both versions, and the agent kept",
     async () => {
       const made = await board(AGENTS_WRITE.handler({ from: 'user', repo, draft: form('archivist'), schema: null }));
@@ -302,11 +293,11 @@ test("write, rename and remove an agent at its version, as the board's Agents pa
   );
 });
 
-test('REFUSED: a write or a removal the store will not make, by its kind and what it names, and the store as it was', async (t) => {
+describe('REFUSED: a write or a removal the store will not make, by its kind and what it names, and the store as it was', () => {
   const v = { version: null };
-  const ok = <T>(name: string, fn: () => T) => t.test(name, () => (fresh(), void fn()));
+  const ok = <T>(name: string, fn: () => T) => test(name, () => (fresh(), void fn()));
 
-  await ok("what the parser refuses, in the parser's words: a context, a schema not there, wiring, `agent:`", () => {
+  ok("what the parser refuses, in the parser's words: a context, a schema not there, wiring, `agent:`", () => {
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { context: 'lots' } }, v),
       'Invalid',
@@ -329,7 +320,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       "`agent` is a step's key",
     );
   });
-  await ok("a name that is no agent's: a file name, a path out of agents/", () => {
+  ok("a name that is no agent's: a file name, a path out of agents/", () => {
     refused(() => writeAgent(ROOT, AGENTS, { ...scribe, name: 'x.md' }, v), 'Invalid', "`x.md` is not an agent's name");
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, name: '../dev/plan' }, v),
@@ -338,7 +329,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       'an agent is a file in agents/',
     );
   });
-  await ok('outside the two places the board lists agents from, and outside a folder of agents; let through `anywhere`', () => {
+  ok('outside the two places the board lists agents from, and outside a folder of agents; let through `anywhere`', () => {
     const elsewhere = path.join(ROOT, 'elsewhere', 'agents');
     fs.mkdirSync(elsewhere, { recursive: true });
     refused(
@@ -355,7 +346,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     assert.ok(fs.existsSync(path.join(elsewhere, 'scribe.md')));
     fs.rmSync(path.join(ROOT, 'elsewhere'), { recursive: true });
   });
-  await ok(
+  ok(
     'at shipped defaults: into the workflows/ of a checkout no factory names; written once one names it, or the caller does as `repo`',
     () => {
       const checkout = scratch('wf-agent-checkout-');
@@ -372,7 +363,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
     },
   );
-  await ok('through a link, a write and a removal, by name', () => {
+  ok('through a link, a write and a removal, by name', () => {
     const outside = path.join(ROOT, 'outside.md');
     fs.writeFileSync(outside, 'mine\n');
     fs.symlinkSync(outside, path.join(AGENTS, 'scribe.md'));
@@ -380,7 +371,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version: 'x' }), 'Invalid', 'scribe.md is a link');
     assert.equal(fs.readFileSync(outside, 'utf8'), 'mine\n');
   });
-  await ok('a result schema through a link, and what the link points at left as it was', () => {
+  ok('a result schema through a link, and what the link points at left as it was', () => {
     const outside = path.join(ROOT, 'outside.schema.json');
     fs.writeFileSync(outside, '{"mine":true}\n');
     fs.symlinkSync(outside, path.join(AGENTS, 'scribe.schema.json'));
@@ -393,7 +384,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     assert.equal(fs.readFileSync(outside, 'utf8'), '{"mine":true}\n');
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
   });
-  await ok('a result schema not its own: another file than its line names, a path, another agent’s, no schema of fields', () => {
+  ok('a result schema not its own: another file than its line names, a path, another agent’s, no schema of fields', () => {
     refused(
       () => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: 'other.schema.json', text: FIELDS } }),
       'Invalid',
@@ -422,7 +413,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       '`output: scribe.schema.json` is not a schema of fields',
     );
   });
-  await ok('at shipped defaults: a card sent with its agent, or sent as an own `undefined`, which is generated from its skills', () => {
+  ok('at shipped defaults: a card sent with its agent, or sent as an own `undefined`, which is generated from its skills', () => {
     const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
     const sent = { version: null, card: { file: 'scribe.skills.json', text } };
     const sentEmpty = { version: null, card: undefined };
@@ -430,7 +421,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
     refused(() => writeAgent(ROOT, AGENTS, scribe, sentEmpty), 'Invalid', '`card` is not written with an agent');
     assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);
   });
-  await ok('a remove or a rename of an agent a step still names, naming the steps — one in a folder that does not load too', () => {
+  ok('a remove or a rename of an agent a step still names, naming the steps — one in a folder that does not load too', () => {
     const reviewer = agentVersion(AGENTS, 'reviewer')!;
     const err = refused(
       () => removeAgent(ROOT, AGENTS, 'reviewer', { version: reviewer }),
@@ -461,7 +452,7 @@ test('REFUSED: a write or a removal the store will not make, by its kind and wha
       'broken/a, dev/review',
     );
   });
-  await ok('a rename onto another agent, and a new agent renamed from another', () => {
+  ok('a rename onto another agent, and a new agent renamed from another', () => {
     const { version } = writeAgent(ROOT, AGENTS, scribe, v);
     refused(
       () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'reviewer' }, { version, from: 'scribe' }),

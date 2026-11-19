@@ -2,7 +2,7 @@
  * What the last pass cost, as the Factory says it beside the cap (`lib/pass.ts`): the line, and the breakdown in its title, worded as
  * `nemia up --stats` words it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,15 +36,15 @@ const PASS: PassCost = {
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0 } },
 };
 
-test('passLine, passTitle and seenWords: what a pass took and saw', async (t) => {
-  await t.test("the line says what a pass takes, in the package's rounding", () => {
+describe('passLine, passTitle and seenWords: what a pass took and saw', () => {
+  test("the line says what a pass takes, in the package's rounding", () => {
     assert.equal(passLine(PASS), 'a pass takes 212 ms');
     assert.equal(passLine({ ms: 38.24 }), 'a pass takes 38.2 ms');
     assert.equal(passLine({ ms: 4.216 }), 'a pass takes 4.22 ms');
     assert.equal(msWord(99.96), '100.0');
     assert.deepEqual([bytesWord(812), bytesWord(14_200), bytesWord(3_100_000)], ['812 B', '14.2 kB', '3.1 MB']);
   });
-  await t.test("the title is the breakdown: the pass, every phase in the package's order, each harness, and what measuring took", () => {
+  test("the title is the breakdown: the pass, every phase in the package's order, each harness, and what measuring took", () => {
     const now = new Date('2026-09-25T10:05:00.000Z');
     const lines = passTitle(PASS, now, 'UTC').split('\n');
     assert.equal(lines[0], "The daemon's last pass, at 10:00 AM: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
@@ -68,7 +68,7 @@ test('passLine, passTitle and seenWords: what a pass took and saw', async (t) =>
       'a pass of another day says its day',
     );
   });
-  await t.test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
+  test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
     const lines = passTitle({ ...PASS, runs: 43, tasks: 3, queued: 1, admitted: 2 }, new Date('2026-09-25T10:05:00.000Z'), 'UTC').split(
       '\n',
     );
@@ -77,7 +77,7 @@ test('passLine, passTitle and seenWords: what a pass took and saw', async (t) =>
       'Measuring it took 0.40 ms.',
     ]);
   });
-  await t.test('what a pass saw is said in words, one run in the singular', () => {
+  test('what a pass saw is said in words, one run in the singular', () => {
     assert.equal(
       seenWords({ runs: 1, tasks: 3, queued: 0, admitted: 2 }),
       '1 run in the store, 3 tasks not settled, 0 queued and 2 admitted',

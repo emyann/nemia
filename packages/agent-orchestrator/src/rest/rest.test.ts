@@ -4,7 +4,7 @@
  * proven on a store in rest-store.test.ts. And the one list of a run's inputs (`RUN_INPUTS`): every file the store names for a run is a
  * stamped input of it (`STAMPED_FILES`), and every stamped input a file the store names.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -69,9 +69,9 @@ const CLAUSES: Array<[string, Partial<RestFacts>, string[]]> = [
   ['REFUSED: every clause, in order', { settled: false, notes: ['said'], inFlight: true }, ['settled', 'notes', 'inFlight']],
 ];
 
-test('the rest clauses: restBlockers names each clause that holds a run out, and none of a run at rest, and atRest agrees', async (t) => {
+describe('the rest clauses: restBlockers names each clause that holds a run out, and none of a run at rest, and atRest agrees', () => {
   for (const [name, change, clauses] of CLAUSES)
-    await t.test(name, () => {
+    test(name, () => {
       const facts = { ...RESTING, ...change };
       assert.deepEqual(restBlockers(facts), clauses);
       assert.equal(atRest(facts), clauses.length === 0);

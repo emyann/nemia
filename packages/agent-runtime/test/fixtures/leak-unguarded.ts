@@ -4,7 +4,7 @@
  * The one test file outside the kit allowed to call `tmpdir()` (`tools/guards/test/test-kit.test.ts`). Its listener exits on its own
  * after two minutes, should the guard's reaping ever fail, so the fixture never leaks for real.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

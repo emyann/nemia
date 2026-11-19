@@ -23,7 +23,7 @@
  *
  * The test reads the api's sources: `turbo.json` makes `apps/*\/src` an input of this package's tests.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,7 +3,7 @@
  * what finishes under it and what a pause at once interrupts, and its words: a table per function. Pure: no disk, no engine. The pause
  * told over a store, put, put at once and resumed, is `test/pause.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { assess } from '../tick/assess.ts';
 import { aRead, names } from '../../test/assessed.ts';
@@ -47,24 +47,21 @@ const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unkno
 const signed = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 const asked = () => true;
 
-test('`assess` under the pause: nothing is due that would start new work, each named in `waitingOnPause`, the rest judged as without it', async (t) => {
-  await t.test(
-    'under the pause a step ready and a check due are not due, and are named in `waitingOnPause`; the rest is judged as without it',
-    () => {
-      const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement']), step('docs')];
-      const r = run({ implement: { taskId: 't1' }, review: { taskId: null }, docs: { taskId: null } });
-      const free = assess(aRead(steps, r, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
-      assert.deepEqual([free.check, free.ready], [['implement'], ['docs']], 'without it, the check and docs are due');
-      const held = assess(aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
-      assert.deepEqual(held, {
-        ...free,
-        ready: [],
-        check: [],
-        waitingOnPause: { steps: ['docs', 'implement'], checks: ['implement'] },
-      });
-    },
-  );
-  await t.test('under the pause a try a person asked for is not due, and the step it asks of is still running', () => {
+describe('`assess` under the pause: nothing is due that would start new work, each named in `waitingOnPause`, the rest judged as without it', () => {
+  test('under the pause a step ready and a check due are not due, and are named in `waitingOnPause`; the rest is judged as without it', () => {
+    const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement']), step('docs')];
+    const r = run({ implement: { taskId: 't1' }, review: { taskId: null }, docs: { taskId: null } });
+    const free = assess(aRead(steps, r, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
+    assert.deepEqual([free.check, free.ready], [['implement'], ['docs']], 'without it, the check and docs are due');
+    const held = assess(aRead(steps, { ...r, pause: PAUSE }, { phaseOf: phases({ t1: 'succeeded' }), signedOff: signed, asked }));
+    assert.deepEqual(held, {
+      ...free,
+      ready: [],
+      check: [],
+      waitingOnPause: { steps: ['docs', 'implement'], checks: ['implement'] },
+    });
+  });
+  test('under the pause a try a person asked for is not due, and the step it asks of is still running', () => {
     const steps = [step('implement'), step('review', ['implement'])];
     const r = run({ implement: { taskId: 't1' }, review: { taskId: null } });
     const ask = { step: 'implement', try: 2, mode: 'fresh' as const, at: '2026-10-04T12:00:00.000Z' };
@@ -74,7 +71,7 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     assert.deepEqual(held, { ...free, retry: [], waitingOnPause: { steps: ['implement'], checks: [] } });
     assert.equal(held.status, 'running', 'a run asked to go on is not failed while it waits for the lift');
   });
-  await t.test('under the pause a round its loop asks for is not due, and the looping step is still running', () => {
+  test('under the pause a round its loop asks for is not due, and the looping step is still running', () => {
     const steps = [step('implement'), step('review', ['implement'], { loop: 'implement', rounds: 3 })];
     const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2' } });
     const again = (name: string) => (name === 'review' ? { ...signed(), output: { again: true } } : signed());
@@ -90,7 +87,7 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     assert.deepEqual(held, { ...free, round: [], waitingOnPause: { steps: ['review'], checks: [] } });
     assert.equal(held.status, 'running', 'a run whose loop goes round again is not over while it waits for the lift');
   });
-  await t.test('a run the pause holds nothing of is judged as without it', () => {
+  test('a run the pause holds nothing of is judged as without it', () => {
     const steps = [step('implement')];
     const r = run({ implement: { taskId: 't1' } });
     assert.deepEqual(
@@ -100,34 +97,31 @@ test('`assess` under the pause: nothing is due that would start new work, each n
   });
 });
 
-test('the pause in words: as put, Pausing while some finish, Paused once none does, and what `nemia pause --now` would stop', async (t) => {
-  await t.test('the pause as put says since when, by whom, why, and how it is resumed', () => {
+describe('the pause in words: as put, Pausing while some finish, Paused once none does, and what `nemia pause --now` would stop', () => {
+  test('the pause as put says since when, by whom, why, and how it is resumed', () => {
     const words = pauseWords(PAUSE);
     assert.match(words, /^the store is paused since 2026-10-04T12:00:00\.000Z/);
     assert.match(words, /by ann: merging by hand — nothing new starts/);
     assert.match(words, /; nemia resume resumes it$/);
   });
-  await t.test(
-    "a pause with a timeout says each session stops at its tool call's end; one put at once, that each is cut at once; one with none, that each runs on",
-    () => {
-      const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
-      const timed = { ...PAUSE, timeoutMs: 600_000 };
-      for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
-        assert.match(words, /current tool call ends, cut once the timeout passes/);
-        assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
-      }
-      const now = { ...PAUSE, timeoutMs: 0 };
-      for (const words of [pauseWords(now), pausedWords({ pause: now, finishing, staged: [], held: [] }) ?? '']) {
-        assert.match(words, /each working session is cut at once/);
-        assert.doesNotMatch(words, /tool call ends|once the timeout passes|runs on to its end/);
-      }
-      for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
-        assert.match(words, /nothing new starts, and each working session runs on/);
-        assert.doesNotMatch(words, /what runs finishes|tool call ends/);
-      }
-    },
-  );
-  await t.test('the pause says Pausing with how many still finish, names each and each check it holds; Paused once none finishes', () => {
+  test("a pause with a timeout says each session stops at its tool call's end; one put at once, that each is cut at once; one with none, that each runs on", () => {
+    const finishing: Finishing[] = [{ run: 'r-1', step: 'implement', kind: 'session' }];
+    const timed = { ...PAUSE, timeoutMs: 600_000 };
+    for (const words of [pauseWords(timed), pausedWords({ pause: timed, finishing, staged: [], held: [] }) ?? '']) {
+      assert.match(words, /current tool call ends, cut once the timeout passes/);
+      assert.doesNotMatch(words, /what runs finishes|runs on to its end/);
+    }
+    const now = { ...PAUSE, timeoutMs: 0 };
+    for (const words of [pauseWords(now), pausedWords({ pause: now, finishing, staged: [], held: [] }) ?? '']) {
+      assert.match(words, /each working session is cut at once/);
+      assert.doesNotMatch(words, /tool call ends|once the timeout passes|runs on to its end/);
+    }
+    for (const words of [pauseWords(PAUSE), pausedWords({ pause: PAUSE, finishing, staged: [], held: [] }) ?? '']) {
+      assert.match(words, /nothing new starts, and each working session runs on/);
+      assert.doesNotMatch(words, /what runs finishes|tool call ends/);
+    }
+  });
+  test('the pause says Pausing with how many still finish, names each and each check it holds; Paused once none finishes', () => {
     const finishing: Finishing[] = [
       { run: 'r-1', step: 'implement', kind: 'session' },
       { run: 'r-2', step: 'review', kind: 'check' },
@@ -156,7 +150,7 @@ test('the pause in words: as put, Pausing while some finish, Paused once none do
     );
     assert.deepEqual(pausedLines({ pause: null, finishing: [], parked: [], staged: [], held: [] }), []);
   });
-  await t.test('the pause once nothing finishes counts each check it holds back, staged or not, and names each', () => {
+  test('the pause once nothing finishes counts each check it holds back, staged or not, and names each', () => {
     assert.deepEqual(pausedLines({ pause: PAUSE, finishing: [], parked: [], staged: [], held: [{ run: 'r-1', step: 'land' }] }), [
       'Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts, 1 check held; nemia resume resumes it',
       "   r-1's land has signed off, and its check waits on nemia resume",
@@ -171,7 +165,7 @@ test('the pause in words: as put, Pausing while some finish, Paused once none do
       / nothing new starts, 2 checks held; /,
     );
   });
-  await t.test('nemia pause --now says each task it would stop, what that costs, and the line that acts', () => {
+  test('nemia pause --now says each task it would stop, what that costs, and the line that acts', () => {
     assert.deepEqual(nowLines([{ run: 'r-1', step: 'implement', kind: 'session', taskId: 't1' }]), [
       'nemia pause --now would pause the store and cut 1 at work, each going on at nemia resume:',
       "   r-1's implement: its session, its call cut, going on as the same try",
@@ -206,8 +200,8 @@ const view = (
   },
 });
 
-test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how each is said', async (t) => {
-  await t.test('what finishes under the pause: a session at work, a check that runs, and an ending’s check as a landing', () => {
+describe('`finishingOf` and `finishingAmong`: what finishes under the pause, and how each is said', () => {
+  test('what finishes under the pause: a session at work, a check that runs, and an ending’s check as a landing', () => {
     const steps = [
       step('implement', [], { check: 'npm test' }),
       step('ship', ['implement'], { gate: true, workspace: 'base', check: 'npm test' }),
@@ -228,7 +222,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
       ],
     );
   });
-  await t.test('nothing finishes of a task queued for a slot, a session waiting on a person, or one settled', () => {
+  test('nothing finishes of a task queued for a slot, a session waiting on a person, or one settled', () => {
     const steps = [step('implement')];
     const r = run({ implement: { taskId: 't1' } });
     const finishing = (v: FinishingView) => finishingOf(r, steps, () => v);
@@ -237,7 +231,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
     assert.deepEqual(finishing(view('needs-human')), [], 'a session waiting on a person holds no slot and does no work');
     assert.deepEqual(finishing(view('succeeded', { settled: 'succeeded' })), [], 'a settled task is done');
   });
-  await t.test('finishingAmong reads the steps of a run only where one of its tasks is at work', () => {
+  test('finishingAmong reads the steps of a run only where one of its tasks is at work', () => {
     const idle = run({ implement: { taskId: 't1' } }, { id: 'r-idle' });
     const live = run({ implement: { taskId: 't2' } }, { id: 'r-live' });
     const read: string[] = [];
@@ -250,7 +244,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
     assert.deepEqual(finishing, [{ run: 'r-live', step: 'implement', kind: 'session' }]);
     assert.deepEqual(read, ['r-live']);
   });
-  await t.test('a task asked to stop that no pause ask names finishes as stopping, and is promised no try on the resume', () => {
+  test('a task asked to stop that no pause ask names finishes as stopping, and is promised no try on the resume', () => {
     const r = run({ implement: { taskId: 't1' } });
     const other = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't0', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [other]);
@@ -259,7 +253,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
       "   r-1's implement is stopping: its session was asked to stop",
     ]);
   });
-  await t.test('a task a pause ask names finishes as stopping and resumed, tried again on nemia resume', () => {
+  test('a task a pause ask names finishes as stopping and resumed, tried again on nemia resume', () => {
     const r = run({ implement: { taskId: 't1' } });
     const ask = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [ask]);
@@ -268,32 +262,29 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
       "   r-1's implement is stopping: its session was asked to stop, and is tried again on nemia resume",
     ]);
   });
-  await t.test(
-    "a session in a tool call finishes naming its call, a check never does, and the daemon's stop waits for the session's alone",
-    () => {
-      const steps = [step('implement', [], { check: 'npm test' })];
-      const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } } });
-      const calling = { tool: 'Bash' };
-      const views: Record<string, FinishingView> = {
-        t1: { ...view('working'), calling },
-        c1: { ...view('working'), calling },
-      };
-      const finishing = finishingOf(r, steps, (id) => views[id]);
-      assert.deepEqual(finishing, [
-        { run: 'r-1', step: 'implement', kind: 'session', calling: 'Bash' },
-        { run: 'r-1', step: 'implement', kind: 'check' },
-      ]);
-      assert.deepEqual(callsOf({ finishing }), [finishing[0]]);
-      assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged: [], held: [] }).slice(1), [
-        "   r-1's implement is finishing: its call to Bash runs",
-        "   r-1's implement is finishing: its check runs",
-      ]);
-    },
-  );
+  test("a session in a tool call finishes naming its call, a check never does, and the daemon's stop waits for the session's alone", () => {
+    const steps = [step('implement', [], { check: 'npm test' })];
+    const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } } });
+    const calling = { tool: 'Bash' };
+    const views: Record<string, FinishingView> = {
+      t1: { ...view('working'), calling },
+      c1: { ...view('working'), calling },
+    };
+    const finishing = finishingOf(r, steps, (id) => views[id]);
+    assert.deepEqual(finishing, [
+      { run: 'r-1', step: 'implement', kind: 'session', calling: 'Bash' },
+      { run: 'r-1', step: 'implement', kind: 'check' },
+    ]);
+    assert.deepEqual(callsOf({ finishing }), [finishing[0]]);
+    assert.deepEqual(pausedLines({ pause: PAUSE, finishing, parked: [], staged: [], held: [] }).slice(1), [
+      "   r-1's implement is finishing: its call to Bash runs",
+      "   r-1's implement is finishing: its check runs",
+    ]);
+  });
 });
 
-test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and what it leaves to finish', async (t) => {
-  await t.test('a pause at once interrupts a session at work and a check that runs, by their task ids', () => {
+describe('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and what it leaves to finish', () => {
+  test('a pause at once interrupts a session at work and a check that runs, by their task ids', () => {
     const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement'], { check: 'npm test' })];
     const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2', check: { taskId: 'c2' } } });
     const views: Record<string, FinishingView> = {
@@ -309,7 +300,7 @@ test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and
       ],
     );
   });
-  await t.test('a pause at once leaves a landing to finish: the session and the check of a step in the own checkout', () => {
+  test('a pause at once leaves a landing to finish: the session and the check of a step in the own checkout', () => {
     const ship = step('ship', [], { gate: true, workspace: 'base', check: 'npm test' });
     const r = run({ ship: { taskId: 't1', check: { taskId: 'c1' } } });
     const working = (id: string) => (id === 't1' || id === 'c1' ? view('working') : undefined);
@@ -320,7 +311,7 @@ test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and
     );
     assert.deepEqual(interruptsOf(r, [ship], working), []);
   });
-  await t.test('a pause at once leaves a task already asked to stop, one queued for a slot, and one waiting on a person', () => {
+  test('a pause at once leaves a task already asked to stop, one queued for a slot, and one waiting on a person', () => {
     const steps = [step('implement')];
     const r = run({ implement: { taskId: 't1' } });
     const interrupted = (v: FinishingView) => interruptsOf(r, steps, () => v);
@@ -329,7 +320,7 @@ test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and
     assert.deepEqual(interrupted(view('pending', { attempts: 0, admission: 'queued' })), [], 'queued for a slot');
     assert.deepEqual(interrupted(view('needs-human')), [], 'waiting on a person');
   });
-  await t.test('interruptsAmong reads the steps of a run only where one of its tasks is at work', () => {
+  test('interruptsAmong reads the steps of a run only where one of its tasks is at work', () => {
     const idle = run({ implement: { taskId: 't1' } }, { id: 'r-idle' });
     const live = run({ implement: { taskId: 't2' } }, { id: 'r-live' });
     const read: string[] = [];
@@ -344,14 +335,14 @@ test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and
   });
 });
 
-test('a parked session under the pause: it finishes nothing, it is named parked, and the pause counts what still finishes a call until it is Paused', async (t) => {
-  const steps = [step('implement'), step('review'), step('docs')];
+describe('a parked session under the pause: it finishes nothing, it is named parked, and the pause counts what still finishes a call until it is Paused', () => {
   const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2' }, docs: { taskId: 't3' } });
+  const steps = [step('implement'), step('review'), step('docs')];
   const held: FinishingView = { ...view('working'), heldBack: { since: '2026-10-04T12:01:00.000Z', after: { tool: 'Read' } } };
   const parked = { ...ATTEMPT, parked: { calling: { tool: 'Bash' } } };
   const cut: FinishingView = { ...view('working'), state: { brief: 'b', settled: null, attempts: [parked] } };
   const views: Record<string, FinishingView> = { t1: held, t2: cut, t3: view('working') };
-  await t.test('finishingOf leaves out a session held at its hook and one whose attempt ended parked', () => {
+  test('finishingOf leaves out a session held at its hook and one whose attempt ended parked', () => {
     assert.deepEqual(
       finishingOf(r, steps, (id) => views[id]),
       [{ run: 'r-1', step: 'docs', kind: 'session' }],
@@ -362,7 +353,7 @@ test('a parked session under the pause: it finishes nothing, it is named parked,
       'nor does a pause at once cut a session parked already',
     );
   });
-  await t.test('parkedAmong names each parked session, with the call it stopped after or the call cut', () => {
+  test('parkedAmong names each parked session, with the call it stopped after or the call cut', () => {
     assert.deepEqual(
       parkedAmong([r], (id) => views[id]),
       [
@@ -375,7 +366,7 @@ test('a parked session under the pause: it finishes nothing, it is named parked,
       ["   r-1's implement is paused after its call to Read", "   r-1's review is paused, its call to Bash cut"],
     );
   });
-  await t.test('a timed pause says how many sessions finish a call and when they are cut, then Paused once none does', () => {
+  test('a timed pause says how many sessions finish a call and when they are cut, then Paused once none does', () => {
     const timed: Pause = { ...PAUSE, timeoutMs: 600_000 };
     const finishing: Finishing[] = [
       { run: 'r-1', step: 'a', kind: 'session', calling: 'Bash' },
@@ -401,7 +392,7 @@ test('a parked session under the pause: it finishes nothing, it is named parked,
     const due = pausedWords({ pause: timed, finishing, staged: [], held: [] }, past) ?? '';
     assert.ok(due.startsWith('Pausing: 2 sessions finishing a tool call, cut now'), due);
   });
-  await t.test('a timeout is digits and one unit, from 1s to 23h', () => {
+  test('a timeout is digits and one unit, from 1s to 23h', () => {
     assert.deepEqual(['90s', '10m', '2h', '23h', '1s'].map(timeoutOf), [90_000, 600_000, 7_200_000, 82_800_000, 1_000]);
     for (const bad of ['0s', '24h', 'ten', '10', '10d', '']) {
       assert.equal(timeoutOf(bad), undefined, bad);

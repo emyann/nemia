@@ -2,7 +2,7 @@
  * What the canvases read of a routed run (src/lib/routing.ts): a step's sentence read for its route or its card, the route each condition
  * took, the graph's conditions and workflow nodes, and a condition's routes.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { nodeKinds, routedOf, routesOf, takenRoutes } from '../src/lib/routing.ts';
 import type { RunGraph } from '../src/lib/api/graph.ts';

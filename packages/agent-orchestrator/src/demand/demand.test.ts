@@ -2,7 +2,7 @@
  * The daemon started on demand, judged: the environment a spawned daemon is given, and its lines. What each way the lease stands
  * starts end to end is `demand.verb.test.ts`'s story; what `demandPlan` decides for each is the table here.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import { DEMAND_OFF, daemonEnv, demandPlan, offLine, otherTookLine, serviceStartedLine, startedLine, unstartedLine } from './demand.ts';
@@ -16,7 +16,7 @@ const standing = (kind: 'ticking' | 'stalled' | 'gone' | 'stopped'): DaemonStand
   identity: 'same',
 });
 
-test('demandPlan: a ticking daemon is left alone; any other lease is no holder; off starts nothing; a service before a spawn', async (t) => {
+describe('demandPlan: a ticking daemon is left alone; any other lease is no holder; off starts nothing; a service before a spawn', () => {
   const NO = () => false;
   const rows: [string, DaemonStanding, () => boolean, Record<string, string>, string][] = [
     ['ticking, the service not looked for', standing('ticking'), () => assert.fail('looked for a service'), {}, 'ticking'],
@@ -30,8 +30,7 @@ test('demandPlan: a ticking daemon is left alone; any other lease is no holder; 
     ['a service installed', { kind: 'none' }, () => true, {}, 'service'],
     ['any value but off still starts', { kind: 'none' }, NO, { [DEMAND_OFF]: 'on' }, 'spawn'],
   ];
-  for (const [name, lease, serviced, env, kind] of rows)
-    await t.test(name, () => assert.deepEqual(demandPlan(lease, serviced, env), { kind }));
+  for (const [name, lease, serviced, env, kind] of rows) test(name, () => assert.deepEqual(demandPlan(lease, serviced, env), { kind }));
 });
 
 test("the daemon's environment is the service's and the login's: nothing else of the command's shell", () => {

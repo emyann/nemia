@@ -1,0 +1,68 @@
+/**
+ * A probe run through Vitest: test files written to a scratch folder and run there by the repository's own Vitest, as a workspace's
+ * config runs its tests, so a test can prove what a seat (a setup file) does to a test file that imports nothing of it. The probe's
+ * files call Vitest's globals (`test`), since a scratch folder resolves no package.
+ *
+ * Every workspace's tests take it from here, `test-kit/probe`.
+ */
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { REPO } from './repo.ts';
+
+/** Vitest's own command, the one every workspace's `test` script runs. */
+const VITEST = path.join(REPO, 'node_modules', 'vitest', 'vitest.mjs');
+
+/** The variables a Vitest worker carries, which a Vitest started inside it would read as its own. */
+const RUNNERS = ['VITEST', 'VITEST_MODE', 'VITEST_POOL_ID', 'VITEST_WORKER_ID', 'TEST', 'NODE_ENV', 'NODE_OPTIONS'];
+
+/**
+ * Runs every `*.test.mjs` file of `dir` through Vitest, each setup file of `setupFiles` loaded before each, under `env` less the
+ * variables of the Vitest this runs in.
+ *
+ * @param dir the scratch folder holding the probe's test files, where its config is written
+ * @param setupFiles the absolute paths of the setup files loaded before each file, in order: a workspace's seat
+ * @param env the environment the probe runs under
+ */
+export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessEnv): SpawnSyncReturns<string> {
+  fs.writeFileSync(
+    path.join(dir, 'vitest.config.mjs'),
+    `export default { test: { include: ['*.test.mjs'], globals: true, pool: 'forks', setupFiles: ${JSON.stringify(setupFiles)} } };\n`,
+  );
+  return spawnSync(process.execPath, [VITEST, 'run', '--root', dir], { cwd: dir, env: runnerless(env), encoding: 'utf8' });
+}
+
+/**
+ * `env` less the variables of the Vitest a test runs in, which a Vitest it starts would read as its own, and with no colour: a test
+ * reads the child's words, which a runner colours where it finds a CI it knows (GitHub Actions) or `FORCE_COLOR`, as it would not by
+ * hand.
+ *
+ * @param env the environment a child Vitest is to run under
+ */
+export function runnerless(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const given = { ...env };
+  for (const name of RUNNERS) delete given[name];
+  delete given.FORCE_COLOR;
+  given.NO_COLOR = '1';
+  return given;
+}
+
+/**
+ * The arguments that run `files` of a workspace through Vitest, in place, as files of their own that its config does not include (a
+ * fixture a test runs to read what the runner says of it): a config naming them alone is written to `configDir`, with the setup files
+ * given. Run by `process.execPath`, under `runnerless`'s environment.
+ *
+ * @param configDir a scratch folder of the caller's, where the config is written
+ * @param root the workspace's folder, which resolves the files' imports
+ * @param files the files to run, from `root`
+ * @param setupFiles the setup files loaded before each, from `root`
+ */
+export function vitestOver(configDir: string, root: string, files: string[], setupFiles: string[] = []): string[] {
+  const config = path.join(configDir, 'vitest.config.mjs');
+  fs.writeFileSync(
+    config,
+    `export default { test: { root: ${JSON.stringify(root)}, include: ${JSON.stringify(files)}, pool: 'forks', ` +
+      `setupFiles: ${JSON.stringify(setupFiles)} } };\n`,
+  );
+  return [VITEST, 'run', '--config', config];
+}

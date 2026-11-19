@@ -5,7 +5,7 @@
  * spawn no process, read no file and ask no harness by its own code. Loading it still loads the runtime: the `Engine` tag it serves
  * sits in the file that builds the real engine. Type-only imports are erased and let through.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

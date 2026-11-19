@@ -1,7 +1,7 @@
 /**
  * The orchestrator's whole diagram: a block for each context's entity, and the runtime's task a node known by its id alone.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { orchestratorModelDiagram } from './diagram.model.ts';
 

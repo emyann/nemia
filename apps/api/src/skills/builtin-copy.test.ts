@@ -4,7 +4,7 @@
  * is the package's own, so its change is stood in for by the digest the copy recorded, which is what the comparison reads.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

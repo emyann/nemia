@@ -7,7 +7,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -280,9 +280,9 @@ test("a step's worktree gets what .worktreeinclude lists from the main checkout 
   assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
 });
 
-test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async (t) => {
+test("a worktree whose main packages could only be linked — its store on another filesystem — says so in the run's notes: a fenced step's reads under them are denied", async () => {
   const run = await isolated(aNodeRepo());
-  t.mock.method(fs, 'linkSync', () => {
+  vi.spyOn(fs, 'linkSync').mockImplementation(() => {
     throw Object.assign(new Error("EXDEV: cross-device link not permitted, link 'a' -> 'b'"), { code: 'EXDEV', syscall: 'link' });
   });
   const { e } = board();
@@ -452,7 +452,7 @@ const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: s
   });
   const PATH = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${PATH}`;
-  t.after(() => {
+  t.onTestFinished(() => {
     process.env.PATH = PATH;
     fs.writeFileSync(let_go, '');
   });
@@ -514,7 +514,7 @@ const failingNpm = (t: TestContext): { calls: string } => {
   fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\necho "$@" >> '${calls}'\necho 'npm error boom' >&2\nexit 1\n`, { mode: 0o755 });
   const PATH = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${PATH}`;
-  t.after(() => {
+  t.onTestFinished(() => {
     process.env.PATH = PATH;
   });
   return { calls };
@@ -525,21 +525,28 @@ const linkedFromCheckout = (wt: string, pkg = 'x'): boolean =>
   !fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')) &&
   fs.realpathSync(path.join(wt, 'node_modules', pkg)) === fs.realpathSync(path.join(wt, 'packages', pkg));
 
-test('a clone nobody installed is installed at its first cut, its worktree hardlinked from it; a later cut installs nothing; a lockfile the clone follows to is installed into it, not into each worktree', async (t) => {
-  const clone = aClone();
-  const first = await isolated(clone);
-  const { e, tasks } = board();
-  const pass = await runWith(e, advanceRun(runRecord(ROOT, first.id)));
-  assert.deepEqual(pass.filed, ['implement']);
-  assert.ok(fs.lstatSync(path.join(clone, 'node_modules')).isDirectory(), 'the clone has a node_modules of its own now');
-  const wt = runRecord(ROOT, first.id).steps.implement.workspace!;
-  assert.ok(linkedFromCheckout(wt), "the worktree's is the clone's, hardlinked: no npm ci of its own");
-  assert.equal(pass.notes.length, 1, String(pass.notes));
-  assert.ok(pass.notes[0].startsWith(`implement: node_modules: ${clone} installed`), pass.notes[0]);
-  assert.doesNotMatch(tasks.get(`${first.id}-implement`)!.spec.brief, /npm ci/, 'the step is told nothing to do');
-  assert.equal(gitOut(clone, 'status', '--porcelain'), '', "npm wrote nothing git tracks: the clone's follow still fast-forwards");
-
-  await t.test('a later cut on the current clone runs no npm', async (st) => {
+describe('a clone nobody installed is installed at its first cut, its worktree hardlinked from it; a later cut installs nothing; a lockfile the clone follows to is installed into it, not into each worktree', () => {
+  let clone!: string;
+  let first!: import('../src/start/start.verb.ts').StartedRun;
+  let e!: import('agent-runtime').EngineShape;
+  let tasks!: ReturnType<typeof board>['tasks'];
+  let pass!: import('../src/runner.ts').Advanced;
+  let wt!: string;
+  beforeAll(async () => {
+    clone = aClone();
+    first = await isolated(clone);
+    ({ e, tasks } = board());
+    pass = await runWith(e, advanceRun(runRecord(ROOT, first.id)));
+    assert.deepEqual(pass.filed, ['implement']);
+    assert.ok(fs.lstatSync(path.join(clone, 'node_modules')).isDirectory(), 'the clone has a node_modules of its own now');
+    wt = runRecord(ROOT, first.id).steps.implement.workspace!;
+    assert.ok(linkedFromCheckout(wt), "the worktree's is the clone's, hardlinked: no npm ci of its own");
+    assert.equal(pass.notes.length, 1, String(pass.notes));
+    assert.ok(pass.notes[0].startsWith(`implement: node_modules: ${clone} installed`), pass.notes[0]);
+    assert.doesNotMatch(tasks.get(`${first.id}-implement`)!.spec.brief, /npm ci/, 'the step is told nothing to do');
+    assert.equal(gitOut(clone, 'status', '--porcelain'), '', "npm wrote nothing git tracks: the clone's follow still fast-forwards");
+  });
+  test('a later cut on the current clone runs no npm', async (st) => {
     const { calls } = failingNpm(st);
     const again = await isolated(clone);
     const later = await runWith(e, advanceRun(runRecord(ROOT, again.id)));
@@ -547,8 +554,7 @@ test('a clone nobody installed is installed at its first cut, its worktree hardl
     assert.deepEqual(later.notes, []);
     assert.ok(linkedFromCheckout(runRecord(ROOT, again.id).steps.implement.workspace!));
   });
-
-  await t.test('a lockfile the clone moved to is installed into the clone, and the worktree hardlinked from it', async () => {
+  test('a lockfile the clone moved to is installed into the clone, and the worktree hardlinked from it', async () => {
     fs.mkdirSync(path.join(clone, 'packages/y'), { recursive: true });
     fs.writeFileSync(path.join(clone, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
     fs.writeFileSync(path.join(clone, 'packages/y/index.js'), "module.exports = 'y';\n");
@@ -623,16 +629,24 @@ const resolvesHere = (wt: string, name: string): boolean => {
   }
 };
 
-test('a worktree whose branch moved to another lockfile is installed from it before its check and its try are filed — and one that cannot be installed files a check that runs no command', async (t) => {
-  const repo = aNodeRepo();
-  const third = path.join(repo, 'node_modules/third/index.js');
-  const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder('check: npm test\nretries: 3') }));
-  const { e, tasks, settle } = board();
-  await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-  const wt = runRecord(ROOT, run.id).steps.implement.workspace!;
-  assert.ok(linkedFromCheckout(wt), 'cut on lockfile A: hardlinked from the checkout');
-
-  await t.test('the check is filed once the tree is installed from lockfile B', async () => {
+describe('a worktree whose branch moved to another lockfile is installed from it before its check and its try are filed — and one that cannot be installed files a check that runs no command', () => {
+  let repo!: string;
+  let third!: string;
+  let run!: import('../src/start/start.verb.ts').StartedRun;
+  let e!: import('agent-runtime').EngineShape;
+  let tasks!: ReturnType<typeof board>['tasks'];
+  let settle!: ReturnType<typeof board>['settle'];
+  let wt!: string;
+  beforeAll(async () => {
+    repo = aNodeRepo();
+    third = path.join(repo, 'node_modules/third/index.js');
+    run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder('check: npm test\nretries: 3') }));
+    ({ e, tasks, settle } = board());
+    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+    wt = runRecord(ROOT, run.id).steps.implement.workspace!;
+    assert.ok(linkedFromCheckout(wt), 'cut on lockfile A: hardlinked from the checkout');
+  });
+  test('the check is filed once the tree is installed from lockfile B', async () => {
     lockfileGains(wt, 'y');
     assert.ok(!resolvesHere(wt, 'y'), 'the tree is still the one cut on lockfile A');
     settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -649,16 +663,14 @@ test('a worktree whose branch moved to another lockfile is installed from it bef
     assert.equal(fs.readFileSync(third, 'utf8'), "module.exports = 'third';\n", "the checkout's files keep their content");
     assert.ok(!fs.existsSync(path.join(repo, 'node_modules/y')), 'and nothing is written under the checkout');
   });
-
-  await t.test('a try is filed on the tree its lockfile names', async () => {
+  test('a try is filed on the tree its lockfile names', async () => {
     settle(`${run.id}-implement-check`, 'failed', undefined, 1);
     lockfileGains(wt, 'z');
     const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
     assert.deepEqual(pass.tried, ['implement']);
     assert.ok(resolvesHere(wt, 'z'), String(pass.notes));
   });
-
-  await t.test("a tree that cannot be installed files a check that runs no command, and says npm's words", async () => {
+  test("a tree that cannot be installed files a check that runs no command, and says npm's words", async () => {
     const tryId = runRecord(ROOT, run.id).steps.implement.taskId!;
     fs.writeFileSync(path.join(wt, 'package-lock.json'), '{ not a lockfile');
     gitIn(wt, 'commit', '-qam', 'a lockfile npm cannot read');
@@ -673,19 +685,15 @@ test('a worktree whose branch moved to another lockfile is installed from it bef
       String(pass.notes),
     );
   });
-
-  await t.test(
-    'the run waits on the person, and the try they ask for is filed all the same, told what npm said and to run npm ci',
-    async () => {
-      settle(runRecord(ROOT, run.id).steps.implement.check!.taskId, 'failed');
-      const waited = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      assert.deepEqual(waited.tried, [], 'no verdict on the work, as an ending whose install failed');
-      await runWith(e, retryRun(run.id, 'implement', { mode: 'continue' }));
-      const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      assert.deepEqual(pass.tried, ['implement']);
-      const brief = tasks.get(runRecord(ROOT, run.id).steps.implement.taskId!)!.spec.brief;
-      const at = brief.indexOf('## Where to look');
-      assert.ok(at >= 0 && brief.indexOf('`npm ci`', at) > at, brief);
-    },
-  );
+  test('the run waits on the person, and the try they ask for is filed all the same, told what npm said and to run npm ci', async () => {
+    settle(runRecord(ROOT, run.id).steps.implement.check!.taskId, 'failed');
+    const waited = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+    assert.deepEqual(waited.tried, [], 'no verdict on the work, as an ending whose install failed');
+    await runWith(e, retryRun(run.id, 'implement', { mode: 'continue' }));
+    const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+    assert.deepEqual(pass.tried, ['implement']);
+    const brief = tasks.get(runRecord(ROOT, run.id).steps.implement.taskId!)!.spec.brief;
+    const at = brief.indexOf('## Where to look');
+    assert.ok(at >= 0 && brief.indexOf('`npm ci`', at) > at, brief);
+  });
 });

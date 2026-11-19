@@ -3,7 +3,7 @@
  * that took the connection and is silent, and none listening; a start's readiness is polled until the daemon answers, bounded, never a
  * read retried after a refused connection; a lease whose port takes no connection, with the start off, is refused naming `nemia up`.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -30,7 +30,7 @@ const answering = http.createServer((_req, res) => {
 });
 const silent = http.createServer(() => {});
 for (const server of [answering, silent]) await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   for (const server of [answering, silent]) {
     server.closeAllConnections();
     server.close();

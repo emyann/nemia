@@ -2,7 +2,7 @@
  * `standing.json` read back (`readStanding`): an answer a former nemia kept, its tips written `heads`, reads as the same answer written
  * `tips`, since the file outlives the rename of the place's words.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

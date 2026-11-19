@@ -2,7 +2,7 @@
  * The order a picker offers its runs in (`pickedOf`, src/lib/pickerRuns.ts, read by `usePickerRuns`): the runs not finished, waiting and
  * in flight together, newest created first, then the finished runs in the list's order, each run once, and none the list could not judge.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { pickedOf } from '../src/lib/pickerRuns.ts';
 import type { FinishedPage, FinishedRun, OpenRuns } from '../src/lib/api/runs.ts';

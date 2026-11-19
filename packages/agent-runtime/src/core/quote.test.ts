@@ -3,7 +3,7 @@
  * past its count names how many more it held; a log's end is kept within its bound under a line that says it was cut. What each
  * caller quotes through it, bounded end to end, is `test/remote-quotes.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { endOf, firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';
 
@@ -40,6 +40,6 @@ const ROWS: Array<{ name: string; got: () => string; want: string }> = [
   { name: 'a log as long as its bound comes back whole', got: () => endOf('a'.repeat(10), 10, 'cut', false), want: 'a'.repeat(10) },
 ];
 
-test('quote, firstOf and endOf: a text cut at its bound and marked, a list cut at its count and counted, a log kept at its end, each whole within it', async (t) => {
-  for (const row of ROWS) await t.test(row.name, () => assert.equal(row.got(), row.want));
+describe('quote, firstOf and endOf: a text cut at its bound and marked, a list cut at its count and counted, a log kept at its end, each whole within it', () => {
+  for (const row of ROWS) test(row.name, () => assert.equal(row.got(), row.want));
 });

@@ -9,7 +9,7 @@
  * and the test place. The server's code is the test's own (`RunningCode`) where the read needs an install to go back from.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,10 +51,10 @@ const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: stri
 const eventsOf = (text: string): string[] => [...text.matchAll(/^event: ?(.*)$/gm)].map((m) => m[1] ?? '');
 
 /** The store's floor, `store.json`, recorded as `tag` for the test, and taken away after it. */
-const floorAt = (t: { after: (fn: () => void) => void }, tag: string) => {
+const floorAt = (t: { onTestFinished: (fn: () => void) => void }, tag: string) => {
   const file = path.join(root, 'store.json');
   fs.writeFileSync(file, JSON.stringify({ readableFrom: tag }));
-  t.after(() => fs.rmSync(file, { force: true }));
+  t.onTestFinished(() => fs.rmSync(file, { force: true }));
 };
 
 test("a start by a token of the person's files the upgrade and answers it pending; its output ends with ended", async () => {
@@ -122,7 +122,7 @@ test('GET /api/upgrades names the release going back goes to, with refused where
     const dir = path.join(root, 'releases', tag);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'release.json'), JSON.stringify({ tag, commit: 'c0ffee', source: 'file:///base', builtAt: '' }));
-    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
   }
   const allowed = await send('GET', '/api/upgrades');
   assert.equal(allowed.status, 200, await allowed.clone().text());

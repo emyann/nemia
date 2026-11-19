@@ -3,7 +3,7 @@
  * machine's own file, read into memory, and must parse equal to it but for the one key. The function is handed text and writes
  * nothing; a machine with no such file skips the walk by name.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

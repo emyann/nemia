@@ -11,7 +11,7 @@
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { files, ours, textOf } from 'test-kit/repo';
 

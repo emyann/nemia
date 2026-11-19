@@ -3,7 +3,7 @@
  * the `continue` token, the base64url of the last name answered, read back to that name, and refused `Invalid` where it does not decode;
  * and where a page starts when the object the token names is gone, the first name after it, so no object is skipped.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Invalid } from '../refusal/refusal.ts';
 import { continueToken, continuedAfter, pageOf, type Paged } from './page.ts';

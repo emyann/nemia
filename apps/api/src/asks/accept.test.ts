@@ -11,7 +11,7 @@
  * under the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -159,8 +159,8 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
   return ((await res.json()) as { error: string }).error;
 };
 
-test('POST …/approve of a loop: what it refuses — a body, a run or step not there, words missing or empty, a loop the package will not end — and nothing written', async (t) => {
-  await t.test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
+describe('POST …/approve of a loop: what it refuses — a body, a run or step not there, words missing or empty, a loop the package will not end — and nothing written', () => {
+  test('a body `RunApprove` does not read is a 400, naming the key it refused', async () => {
     const bodies: Array<[unknown, string]> = [
       ['not json', 'payload'],
       [[WHY], 'payload'],
@@ -176,8 +176,7 @@ test('POST …/approve of a loop: what it refuses — a body, a run or step not 
     }
     nothingWritten('a body that is not an acceptance');
   });
-
-  await t.test('a run or a step that does not exist is a 404, naming it', async () => {
+  test('a run or a step that does not exist is a 404, naming it', async () => {
     assert.match(await refusedWith(await acceptOver('review', { message: WHY }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
     assert.match(
       await refusedWith(await acceptOver('deploy', { message: WHY }), 404, 'no step'),
@@ -185,68 +184,51 @@ test('POST …/approve of a loop: what it refuses — a body, a run or step not 
     );
     nothingWritten('a run or a step not there');
   });
-
-  await t.test(
-    'words left out, empty, or nothing but whitespace are a 422, naming --message, on a loop the package would otherwise accept',
-    async () => {
-      for (const [body, fact] of [
-        [{}, /^--message says why/],
-        [{ message: '' }, /^--message is empty/],
-        [{ message: ' \n ' }, /^--message is empty/],
-      ] as const)
-        assert.match(await refusedWith(await acceptOver('review', body), 422, JSON.stringify(body)), fact);
-      nothingWritten('words missing or empty');
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a round the run files itself, a loop that ended `again: false`, and a run called off are 409s in `acceptAsk`'s words",
-    async () => {
-      const cases: Array<[string, string, RegExp[]]> = [
-        [LEFT, 'review', [/^review asked for another round/, /`rounds: 2` has one left/, /files round 2 itself/]],
-        [ENDED, 'review', [/^review signed off without asking for another round/, /`again: false`/]],
-        [CANCELLED, 'review', [new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}`), /files nothing/]],
-      ];
-      for (const [run, step, facts] of cases) {
-        const error = await refusedWith(await acceptOver(step, { message: WHY }, BOARD, run), 409, `${run} ${step}`);
-        assert.equal(error, await acceptRefuses(step, WHY, run));
-        for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
-        nothingWritten(`${run} ${step}, which the package will not accept`, run);
-      }
-    },
-  );
-
-  await t.test(
-    "REFUSED at shipped defaults: a step with no `loop:` is a 409, read by `nemia approve` as a gate's approval — it names the gate it does not have — and nothing written",
-    async () => {
-      const error = await refusedWith(await acceptOver('implement', { message: WHY }), 409, `${R} implement`);
-      assert.match(error, /^implement has no gate/);
-      nothingWritten(`${R} implement, which closes no loop and waits at no gate`);
-    },
-  );
-
-  await t.test(
-    "a round already asked for, written by the package's own `roundRun` as `nemia retry --round` writes it, is a 409 naming round 3",
-    async () => {
-      const { file } = await runWith(engine(), roundRun(R, 'review'));
-      try {
-        const error = await refusedWith(await acceptOver('review', { message: WHY }), 409, 'a round asked for, which the next tick files');
-        assert.equal(error, await acceptRefuses('review', WHY));
-        assert.match(error, /^round 3 of review's loop is already asked for \(at [^)]+\)/);
-        assert.deepEqual(asked(), [path.basename(file)], 'the round ask alone');
-      } finally {
-        fs.rmSync(path.join(root, 'runs', `${R}.asks`), { recursive: true, force: true });
-      }
-      nothingWritten('a loop about to go round again');
-    },
-  );
+  test('words left out, empty, or nothing but whitespace are a 422, naming --message, on a loop the package would otherwise accept', async () => {
+    for (const [body, fact] of [
+      [{}, /^--message says why/],
+      [{ message: '' }, /^--message is empty/],
+      [{ message: ' \n ' }, /^--message is empty/],
+    ] as const)
+      assert.match(await refusedWith(await acceptOver('review', body), 422, JSON.stringify(body)), fact);
+    nothingWritten('words missing or empty');
+  });
+  test("REFUSED at shipped defaults: a round the run files itself, a loop that ended `again: false`, and a run called off are 409s in `acceptAsk`'s words", async () => {
+    const cases: Array<[string, string, RegExp[]]> = [
+      [LEFT, 'review', [/^review asked for another round/, /`rounds: 2` has one left/, /files round 2 itself/]],
+      [ENDED, 'review', [/^review signed off without asking for another round/, /`again: false`/]],
+      [CANCELLED, 'review', [new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}`), /files nothing/]],
+    ];
+    for (const [run, step, facts] of cases) {
+      const error = await refusedWith(await acceptOver(step, { message: WHY }, BOARD, run), 409, `${run} ${step}`);
+      assert.equal(error, await acceptRefuses(step, WHY, run));
+      for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
+      nothingWritten(`${run} ${step}, which the package will not accept`, run);
+    }
+  });
+  test("REFUSED at shipped defaults: a step with no `loop:` is a 409, read by `nemia approve` as a gate's approval — it names the gate it does not have — and nothing written", async () => {
+    const error = await refusedWith(await acceptOver('implement', { message: WHY }), 409, `${R} implement`);
+    assert.match(error, /^implement has no gate/);
+    nothingWritten(`${R} implement, which closes no loop and waits at no gate`);
+  });
+  test("a round already asked for, written by the package's own `roundRun` as `nemia retry --round` writes it, is a 409 naming round 3", async () => {
+    const { file } = await runWith(engine(), roundRun(R, 'review'));
+    try {
+      const error = await refusedWith(await acceptOver('review', { message: WHY }), 409, 'a round asked for, which the next tick files');
+      assert.equal(error, await acceptRefuses('review', WHY));
+      assert.match(error, /^round 3 of review's loop is already asked for \(at [^)]+\)/);
+      assert.deepEqual(asked(), [path.basename(file)], 'the round ask alone');
+    } finally {
+      fs.rmSync(path.join(root, 'runs', `${R}.asks`), { recursive: true, force: true });
+    }
+    nothingWritten('a loop about to go round again');
+  });
 });
 
-test('a person accepts a loop out of rounds on the board: the acceptance written as `nemia approve` writes it, read under the loop, which waits on nobody and is offered no more', async (t) => {
-  const s = story(t);
-  let took: (Acceptance & { file: string }) | undefined;
-
-  await s.test(
+describe('a person accepts a loop out of rounds on the board: the acceptance written as `nemia approve` writes it, read under the loop, which waits on nobody and is offered no more', () => {
+  let took!: (Acceptance & { file: string }) | undefined;
+  const s = story(test);
+  s.test(
     "an acceptance as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `nemia approve` writes it, the record untouched",
     async () => {
       const res = await acceptOver('review', { message: WHY });
@@ -279,8 +261,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.deepEqual(standIn().stopped, [], 'and stopped nothing');
     },
   );
-
-  await s.test(
+  s.test(
     'the detail reads it under the loop, as `nemia ls` has it, waiting on nobody, and the decision offers accept no more',
     async () => {
       assert.ok(took);
@@ -301,8 +282,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.ok(!commands.some((c) => c.label === 'approve'), `the loop's approve is offered no more: ${JSON.stringify(commands)}`);
     },
   );
-
-  await s.test('a second acceptance is refused (409), naming the try accepted and when, and nothing more is written', async () => {
+  s.test('a second acceptance is refused (409), naming the try accepted and when, and nothing more is written', async () => {
     assert.ok(took);
     const error = await refusedWith(await acceptOver('review', { message: 'Something else.' }), 409, 'accepted once');
     assert.ok(error.startsWith(`try 2 of review is already accepted, at ${took.at}`), error);

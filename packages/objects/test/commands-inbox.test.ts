@@ -3,7 +3,7 @@
  * anything is asked — by its spec, a `CommandRefused`, or by its `check`, the words the client says — each naming the command, the flag
  * or the form to type, never its whole sentence.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   type Args,

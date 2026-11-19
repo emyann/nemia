@@ -11,7 +11,7 @@
  * recorded its tip. A pass has read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { root, SEATED } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -293,9 +293,9 @@ const asked = (id: string): string[] => {
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
 
-test('a person holds a run until another lands: the list, the page and the decision say the hold as `nemia ls` and `nemia decide` do, nothing waits on you, every verb is refused, and it moves while the hold may lift on its own', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a person holds a run until another lands: the list, the page and the decision say the hold as `nemia ls` and `nemia decide` do, nothing waits on you, every verb is refused, and it moves while the hold may lift on its own', () => {
+  const s = story(test);
+  s.test(
     "the list carries each held run's `holdUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same",
     async () => {
       const runs = await listed();
@@ -338,7 +338,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.deepEqual([(await detail('p-live')).holdUntil, (await detail('p-live')).holding], [[], null]);
     },
   );
-  await s.test(
+  s.test(
     'REFUSED while held: no step of a held run waits on you, none is offered an approval or a raise, and nothing is left to decide — where the same run unheld waits on you for each',
     async () => {
       const runs = await listed();
@@ -377,7 +377,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.equal(status.steps[0].message, 'over budget $1.50 of $1');
     },
   );
-  await s.test(
+  s.test(
     "a held run's decision is `holding`, and nothing else: what `nemia decide` prints for it, with no command — where the same run unheld is offered one",
     async () => {
       const runs = await listed();
@@ -415,7 +415,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.ok('holding' in back && back.holding, 'the hold is back');
     },
   );
-  await s.test(
+  s.test(
     'a step over its budget on a held run is offered no raise, and `nemia decide` says nothing waits on you for it — the run is held, not over budget on you',
     async () => {
       const said = await runWith(engine(ENV), decideRun(BUDGET));
@@ -427,7 +427,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.deepEqual(status.waitingOnYou, []);
     },
   );
-  await s.test(
+  s.test(
     'REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409, and nothing is written',
     async () => {
       const cases: Array<[string, string, unknown]> = [
@@ -445,7 +445,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       }
     },
   );
-  await s.test(
+  s.test(
     "a hold that waits on a person says so (`onYou`) — a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still land, or has, or naming no run, the person's word already given, does not",
     async () => {
       const runs = await listed();
@@ -476,7 +476,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       assert.deepEqual(runs.get('h-on-none')!.waitingOnYou, [], 'a hold naming no run asks nothing of anyone');
     },
   );
-  await s.test(
+  s.test(
     'a held run moves as it would unheld while its hold may lift on its own — the tick files what is due once it does — and not once only a person lifts it; nothing is due while it stands',
     async () => {
       const runs = await listed();
@@ -506,7 +506,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       }
     },
   );
-  await s.test('a held run called off reads as called off: no hold, nothing waiting on you, and nothing to decide', async () => {
+  s.test('a held run called off reads as called off: no hold, nothing waiting on you, and nothing to decide', async () => {
     const run = (await listed()).get(CANCELLED)!;
     assert.deepEqual([run.status, run.holdUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
     const status = await detail(CANCELLED);
@@ -514,7 +514,7 @@ test('a person holds a run until another lands: the list, the page and the decis
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
     assert.equal((await runWith(engine(ENV), list(engine(ENV), runsAtOnce(root).runs.read(CANCELLED)))).holding, undefined);
   });
-  await s.test(
+  s.test(
     'a run waiting on runs and held as well is both, as `nemia decide` says both: its decision carries the wait and the hold',
     async () => {
       const run = (await listed()).get(AFTER)!;
@@ -579,9 +579,9 @@ for (const id of ['h-pruned-held', 'h-pruned']) {
   write(path.join(root, 'runs', `${id}.pruned`), JSON.stringify(PRUNED));
 }
 
-test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a hand-written one on a pruned run as well', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a hand-written one on a pruned run as well', () => {
+  const s = story(test);
+  s.test(
     'a hold lifted on the board is lifted as `nemia hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again',
     async () => {
       holdOn(LIFT, ['p-live']);
@@ -603,7 +603,7 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
       assert.equal(((await again.json()) as { error: string }).error, await refusal(() => runWith(engine(ENV), unhold(LIFT))));
     },
   );
-  await s.test(
+  s.test(
     'a hold written by hand on a pruned run is lifted, as `nemia hold --off` lifts it: nothing of the run is filed again either way',
     async () => {
       holdOn('h-pruned-held', ['p-live']);
@@ -616,38 +616,32 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
   );
 });
 
-test('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: a run nobody holds is a 409, a run the store has not a 404', async (t) => {
-  await t.test(
-    'REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `nemia hold --off`, and nothing is written',
-    async () => {
-      for (const id of ['p-live', 'h-pruned']) {
-        const before = filesOf(id);
-        const res = await lift(id);
-        assert.equal(res.status, 409, id);
-        const { error } = (await res.json()) as { error: string };
-        assert.equal(error, await refusal(() => runWith(engine(ENV), unhold(id))), id);
-        assert.match(error, new RegExp(`^${id} is not held, so there is no hold to lift`), id);
-        assert.deepEqual(filesOf(id), before, id);
-      }
-    },
-  );
-  await t.test(
-    'REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written',
-    async () => {
-      write(holdFile('h-removed'), JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
-      for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
-        const before = fs.readdirSync(path.join(root, 'runs')).sort();
-        const res = await lift(id);
-        assert.equal(res.status, 404, id);
-        assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
-        assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
-      }
-      assert.ok(
-        fs.existsSync(holdFile('h-removed')),
-        'the stray hold file, standing where nemia rm took the record, is left for `nemia hold --off` or a person',
-      );
-    },
-  );
+describe('DELETE /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: a run nobody holds is a 409, a run the store has not a 404', () => {
+  test('REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `nemia hold --off`, and nothing is written', async () => {
+    for (const id of ['p-live', 'h-pruned']) {
+      const before = filesOf(id);
+      const res = await lift(id);
+      assert.equal(res.status, 409, id);
+      const { error } = (await res.json()) as { error: string };
+      assert.equal(error, await refusal(() => runWith(engine(ENV), unhold(id))), id);
+      assert.match(error, new RegExp(`^${id} is not held, so there is no hold to lift`), id);
+      assert.deepEqual(filesOf(id), before, id);
+    }
+  });
+  test('REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written', async () => {
+    write(holdFile('h-removed'), JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
+    for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
+      const before = fs.readdirSync(path.join(root, 'runs')).sort();
+      const res = await lift(id);
+      assert.equal(res.status, 404, id);
+      assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
+      assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
+    }
+    assert.ok(
+      fs.existsSync(holdFile('h-removed')),
+      'the stray hold file, standing where nemia rm took the record, is left for `nemia hold --off` or a person',
+    );
+  });
 });
 
 /** `plan → implement`, started `--gate plan`: plan signed off and waiting at its gate, held with a person's words and name. */
@@ -685,9 +679,9 @@ const put = (id: string, body: unknown, headers: Record<string, string> = BOARD)
 /** What the package refuses of `nemia hold <id> --until …`, word for word: `hold`'s own message. */
 const holdRefused = (id: string, until: string[]) => refusal(() => runWith(engine(ENV), hold(id, until)));
 
-test("a hold put on the board is put as `nemia hold --until --why --by` puts it, in the package's words on the list, the page and the gate it holds back, and the lift answers them", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("a hold put on the board is put as `nemia hold --until --why --by` puts it, in the package's words on the list, the page and the gate it holds back, and the lift answers them", () => {
+  const s = story(test);
+  s.test(
     "a hold's why and who put it are in `holding.word` on the list and the detail, and in the note of the gate it holds back — the package's words, never the api's — and a lift answers them",
     async () => {
       holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
@@ -711,7 +705,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       });
     },
   );
-  await s.test(
+  s.test(
     "a hold put on the board is put as `nemia hold --until --why` puts it: its file written with the why and the api's user as `by` beside the caller as its actor, the list and the page say it in `nemia ls`'s words, and the lift takes it back",
     async () => {
       const res = await put(PUT, { until: ['p-live'], why: 'merge conflicts' });
@@ -743,25 +737,22 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       assert.deepEqual(runsAtOnce(root).runs.read(PUT).unheld, { since: answer.hold.at, actor: SEATED }, 'read with the run');
     },
   );
-  await s.test(
-    'a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing',
-    async () => {
-      for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
-        const res = await put(PUT, body);
-        assert.equal(res.status, 200, JSON.stringify(body));
-        assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
-        const row = (await listed()).get(PUT)!;
-        assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
-        assert.equal(row.holding?.waitingOnYou, false);
-        assert.deepEqual(row.holdUntil, []);
-        assert.deepEqual(row.waitingOnYou, []);
-        assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
-        assert.equal((await lift(PUT)).status, 200);
-        assert.equal(fs.existsSync(holdFile(PUT)), false);
-      }
-    },
-  );
-  await s.test('a hold put on the board takes its `by` where the body gives one, as `nemia hold --by` does', async () => {
+  s.test('a hold put with no run to wait on, `{until: []}` or `{}`, holds the run until DELETE lifts it, and asks nothing', async () => {
+    for (const body of [{ until: [] }, { why: 'folded into an intake' }]) {
+      const res = await put(PUT, body);
+      assert.equal(res.status, 200, JSON.stringify(body));
+      assert.deepEqual((JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')) as { until: unknown }).until, []);
+      const row = (await listed()).get(PUT)!;
+      assert.match(row.holding?.word ?? '', /^held until a person lifts it/);
+      assert.equal(row.holding?.waitingOnYou, false);
+      assert.deepEqual(row.holdUntil, []);
+      assert.deepEqual(row.waitingOnYou, []);
+      assert.match((await detail(PUT)).holding?.word ?? '', /^held until a person lifts it/);
+      assert.equal((await lift(PUT)).status, 200);
+      assert.equal(fs.existsSync(holdFile(PUT)), false);
+    }
+  });
+  s.test('a hold put on the board takes its `by` where the body gives one, as `nemia hold --by` does', async () => {
     const res = await put(PUT, { until: ['p-live'], by: 'operator' });
     assert.equal(res.status, 200);
     assert.equal(((await res.json()) as { hold: { by?: string } }).hold.by, 'operator');
@@ -770,71 +761,62 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
   });
 });
 
-test('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409', async (t) => {
-  await t.test(
-    'REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written',
-    async () => {
-      const cases: Array<[unknown, string]> = [
-        [{ until: ['p-live'], why: 'x'.repeat(201) }, '--why'],
-        [{ until: ['p-live'], by: '  ' }, '--by'],
-      ];
-      for (const [body, words] of cases) {
-        const before = filesOf(PUT);
-        const res = await put(PUT, body);
-        assert.equal(res.status, 422, JSON.stringify(body));
-        const { error } = (await res.json()) as { error: string };
-        assert.ok(error.includes(words), error);
-        assert.ok(error.startsWith('nemia hold') || error.startsWith('--'), `the package's words, not the api's: ${error}`);
-        assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
-      }
-    },
-  );
-  await t.test(
-    'REFUSED at shipped defaults: a hold whose body `RunHold` does not read is a 400 naming the key — `until` not a list, `why` not text — and nothing is written; a key it does not hold, `off` among them, is no part of it (run-actions.test.ts)',
-    async () => {
-      const cases: Array<[unknown, string]> = [
-        [{ until: 'p-live' }, 'payload.until'],
-        [{ until: ['p-live'], why: 3 }, 'payload.why'],
-      ];
-      for (const [body, field] of cases) {
-        const before = filesOf(PUT);
-        const res = await put(PUT, body);
-        assert.equal(res.status, 400, JSON.stringify(body));
-        const said = (await res.json()) as { error: string; field: string };
-        assert.ok(said.field.startsWith(field), `${field}: ${JSON.stringify(said)}`);
-        assert.match(said.error, /^POST \/api\/namespaces\/default\/runs\/h-put\/hold /);
-        assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
-      }
-    },
-  );
-  await t.test('REFUSED at shipped defaults: a hold of a run the store does not have is a 404, and nothing is written', async () => {
+describe('POST /api/namespaces/:namespace/runs/:runId/hold refuses, writing nothing: arguments `nemia hold` refuses a 422, a body it does not take a 400, a run the store has not a 404, a hold `hold` refuses a 409', () => {
+  test('REFUSED at shipped defaults: a hold whose arguments `nemia hold` refuses — a why over 200 characters, a blank by — is a 422 in its words, before the run is read, and nothing is written', async () => {
+    const cases: Array<[unknown, string]> = [
+      [{ until: ['p-live'], why: 'x'.repeat(201) }, '--why'],
+      [{ until: ['p-live'], by: '  ' }, '--by'],
+    ];
+    for (const [body, words] of cases) {
+      const before = filesOf(PUT);
+      const res = await put(PUT, body);
+      assert.equal(res.status, 422, JSON.stringify(body));
+      const { error } = (await res.json()) as { error: string };
+      assert.ok(error.includes(words), error);
+      assert.ok(error.startsWith('nemia hold') || error.startsWith('--'), `the package's words, not the api's: ${error}`);
+      assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
+    }
+  });
+  test('REFUSED at shipped defaults: a hold whose body `RunHold` does not read is a 400 naming the key — `until` not a list, `why` not text — and nothing is written; a key it does not hold, `off` among them, is no part of it (run-actions.test.ts)', async () => {
+    const cases: Array<[unknown, string]> = [
+      [{ until: 'p-live' }, 'payload.until'],
+      [{ until: ['p-live'], why: 3 }, 'payload.why'],
+    ];
+    for (const [body, field] of cases) {
+      const before = filesOf(PUT);
+      const res = await put(PUT, body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      const said = (await res.json()) as { error: string; field: string };
+      assert.ok(said.field.startsWith(field), `${field}: ${JSON.stringify(said)}`);
+      assert.match(said.error, /^POST \/api\/namespaces\/default\/runs\/h-put\/hold /);
+      assert.deepEqual(filesOf(PUT), before, JSON.stringify(body));
+    }
+  });
+  test('REFUSED at shipped defaults: a hold of a run the store does not have is a 404, and nothing is written', async () => {
     const before = fs.readdirSync(path.join(root, 'runs')).sort();
     const res = await put('h-nope', { until: ['p-live'] });
     assert.equal(res.status, 404);
     assert.match(((await res.json()) as { error: string }).error, /^No run 'h-nope' in this store/);
     assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before);
   });
-  await t.test(
-    "REFUSED at shipped defaults: a hold `hold` refuses — a run already held, a cancelled run, a run to wait on the store does not have, the run itself, a run that waits on this one — is a 409 in `nemia hold`'s words, and nothing is written",
-    async () => {
-      const cases: Array<[string, string[], string]> = [
-        [GATE, ['p-landed'], 'is already held until p-live lands'],
-        [CANCELLED, ['p-live'], 'was cancelled at'],
-        [PUT, ['p-nope'], 'the store has no run p-nope'],
-        [PUT, [PUT], 'that is h-put itself'],
-        ['h-circle-b', ['h-circle-a'], 'h-circle-a'],
-      ];
-      for (const [id, until, words] of cases) {
-        const before = filesOf(id);
-        const res = await put(id, { until });
-        assert.equal(res.status, 409, `${id} until ${until}`);
-        const { error } = (await res.json()) as { error: string };
-        assert.equal(error, await holdRefused(id, until), `${id}: nemia hold's words, unchanged`);
-        assert.ok(error.includes(words), error);
-        assert.deepEqual(filesOf(id), before, id);
-      }
-    },
-  );
+  test("REFUSED at shipped defaults: a hold `hold` refuses — a run already held, a cancelled run, a run to wait on the store does not have, the run itself, a run that waits on this one — is a 409 in `nemia hold`'s words, and nothing is written", async () => {
+    const cases: Array<[string, string[], string]> = [
+      [GATE, ['p-landed'], 'is already held until p-live lands'],
+      [CANCELLED, ['p-live'], 'was cancelled at'],
+      [PUT, ['p-nope'], 'the store has no run p-nope'],
+      [PUT, [PUT], 'that is h-put itself'],
+      ['h-circle-b', ['h-circle-a'], 'h-circle-a'],
+    ];
+    for (const [id, until, words] of cases) {
+      const before = filesOf(id);
+      const res = await put(id, { until });
+      assert.equal(res.status, 409, `${id} until ${until}`);
+      const { error } = (await res.json()) as { error: string };
+      assert.equal(error, await holdRefused(id, until), `${id}: nemia hold's words, unchanged`);
+      assert.ok(error.includes(words), error);
+      assert.deepEqual(filesOf(id), before, id);
+    }
+  });
 });
 
 test('a lift sent with `{}`, as the board sends it, is still the DELETE it was: the put reads its body strictly, and the lift reads none', async () => {

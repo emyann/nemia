@@ -3,7 +3,7 @@
  * `fixtures/run.encoded.json` is what the orchestrator's own `Run` encoded `fixtures/run.json` to before the Schemas moved here, so a field
  * reordered, renamed or retyped in the move is seen. A state not among its words, or another kind, is refused at decode.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

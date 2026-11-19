@@ -2,7 +2,7 @@
  * `nemia ls`'s reading of a run (`list`, over `listReading`) says why the runtime holds a step's task queued, off the task's view: a run
  * started and ticked once, its root filed `queued` on the engine's stand-in, a wait planted on that task, and its row's note read.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

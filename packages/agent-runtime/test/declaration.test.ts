@@ -3,7 +3,7 @@
  * declares what it does, and the default harness is the first of each list. And a spec says what it takes in `can` alone: a spec that
  * still carries a boolean `can` replaced is refused by name at `Engine.layer`, rather than its word read as nothing.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { Engine, codex, commandHarness, type HarnessSpec } from '../src/index.ts';
@@ -26,11 +26,14 @@ const VERB_OPS: readonly [Capability, keyof RunnerOps][] = [
   ['quota', 'quota'],
 ];
 
-test('each shipped harness declares what its driver does, and no more', async (t) => {
-  const root = scratch('declaration-');
-  const runners = runnersOf(DEFAULT_HARNESSES, { root, attached: attachedSessions(root) });
-
-  await t.test('a verb declared ⇔ its runner has the op that answers it', () => {
+describe('each shipped harness declares what its driver does, and no more', () => {
+  let root!: string;
+  let runners!: Record<string, RunnerOps>;
+  beforeAll(() => {
+    root = scratch('declaration-');
+    runners = runnersOf(DEFAULT_HARNESSES, { root, attached: attachedSessions(root) });
+  });
+  test('a verb declared ⇔ its runner has the op that answers it', () => {
     for (const [name, h] of Object.entries(DEFAULT_HARNESSES)) {
       const runner = runners[name];
       assert.ok(runner !== undefined, `\`${name}\` has a runner`);
@@ -39,8 +42,7 @@ test('each shipped harness declares what its driver does, and no more', async (t
       }
     }
   });
-
-  await t.test('`hold` declared ⇔ a holder holds the harness: the verbs with no op of a runner (mcp, hold, drain) are the held', () => {
+  test('`hold` declared ⇔ a holder holds the harness: the verbs with no op of a runner (mcp, hold, drain) are the held', () => {
     const held = heldHarnessesOf(DEFAULT_HARNESSES);
     for (const [name, h] of Object.entries(DEFAULT_HARNESSES)) {
       for (const verb of ['hold', 'mcp', 'drain'] as const) {
@@ -48,31 +50,28 @@ test('each shipped harness declares what its driver does, and no more', async (t
       }
     }
   });
-
-  await t.test('each spec declares its harness’s `can`, word for word', () => {
+  test('each spec declares its harness’s `can`, word for word', () => {
     assert.deepEqual(claudeJobSpec().can, CLAUDE_DECLARATION.can, 'a Claude Code job');
     assert.deepEqual(codex.can, CODEX_DECLARATION.can, 'Codex');
     assert.deepEqual(commandHarness.can, COMMAND_DECLARATION.can, 'the command harness');
   });
-
-  await t.test('declarationOf: the literal, a spec’s own, a remote agent’s, and none for a runner of the consumer’s', () => {
+  test('declarationOf: the literal, a spec’s own, a remote agent’s, and none for a runner of the consumer’s', () => {
     assert.equal(declarationOf('claude'), CLAUDE_DECLARATION);
     assert.deepEqual(declarationOf(codex)?.can, CODEX_DECLARATION.can);
     assert.equal(declarationOf({ url: 'https://a.example' }), REMOTE_DECLARATION);
     assert.equal(declarationOf(testOps({ sessions: new Map() })), undefined);
   });
-
-  await t.test('the default harness is the first declared and the first configured', () => {
+  test('the default harness is the first declared and the first configured', () => {
     assert.equal(Object.keys(HARNESS_DECLARATIONS)[0], DEFAULT_HARNESS);
     assert.equal(Object.keys(DEFAULT_HARNESSES)[0], DEFAULT_HARNESS);
     assert.deepEqual(Object.keys(DEFAULT_HARNESSES), Object.keys(HARNESS_DECLARATIONS), 'one harness configured for each declared');
   });
 });
 
-test('a spec that still carries a boolean `can` replaced is refused by name at `Engine.layer`', async (t) => {
+describe('a spec that still carries a boolean `can` replaced is refused by name at `Engine.layer`', () => {
   const RETIRED = ['claudeFlags', 'codexArgs', 'commandArgs', 'env', 'projectMcp', 'enabledSkills', 'mounts', 'callAdmission'];
   for (const field of RETIRED) {
-    await t.test(field, () => {
+    test(field, () => {
       const spec = { ...commandHarness, [field]: field === 'mounts' ? { readOnly: true } : true };
       const said = optionsRefusalOf({ harnesses: { made: spec } });
       assert.ok(said?.includes(`\`${field}\``) && said.includes('`can`'), `names the field and \`can\`: ${said}`);
@@ -82,19 +81,19 @@ test('a spec that still carries a boolean `can` replaced is refused by name at `
       );
     });
   }
-  await t.test('a `can` that is no list of capability words', () => {
+  test('a `can` that is no list of capability words', () => {
     for (const can of [undefined, 'env', ['env', 'teleport']]) {
       const said = optionsRefusalOf({ harnesses: { made: { ...commandHarness, can } as HarnessSpec } });
       assert.ok(said?.includes('`can`'), `refused, naming \`can\`: ${JSON.stringify(can)} → ${said}`);
     }
   });
-  await t.test('a range of windows with no `contextTokens` declared, and one declared with no range', () => {
+  test('a range of windows with no `contextTokens` declared, and one declared with no range', () => {
     const ranged = optionsRefusalOf({ harnesses: { made: { ...commandHarness, contextTokens: { least: 1, most: 2 } } } });
     assert.ok(ranged?.includes('`contextTokens`'), String(ranged));
     const unranged = optionsRefusalOf({ harnesses: { made: { ...commandHarness, can: ['contextTokens'] } } });
     assert.ok(unranged?.includes('`contextTokens`'), String(unranged));
   });
-  await t.test('the shipped specs build', () => {
+  test('the shipped specs build', () => {
     assert.equal(optionsRefusalOf({ harnesses: DEFAULT_HARNESSES }), undefined);
   });
 });

@@ -4,7 +4,8 @@
  * hers is drawn and what is left of one, which of her messages are new, and a message the api would not take, kept in this browser and
  * sent once. Each rule with a fixture that breaks it.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { story } from 'test-kit/checkpoints';
 import {
@@ -108,23 +109,20 @@ function followed() {
   return { stream, now: () => state, stop };
 }
 
-test('mergeChatEvents and changedChat: an event of her chat is replaced by its id alone, and a change is taken one at a time', async (t) => {
-  await t.test(
-    'an event of her chat is replaced by its id alone: the same id twice is one event, the same words under two ids are two',
-    () => {
-      const first = mergeChatEvents([], [call('t:1:a', 1, 'running'), message('m:1:b', 2, 'agent', 'One.')]);
-      const moved = mergeChatEvents(first, [call('t:1:a', 1, 'done')]);
-      assert.deepEqual(
-        moved.map((e) => e.id),
-        ['t:1:a', 'm:1:b'],
-        'the call is replaced where it stands, never drawn twice',
-      );
-      assert.equal((moved[0] as ChatCall).state, 'done', 'with its later state');
-      const twice = mergeChatEvents([], [message('k:1:x', 3, 'keeper', 'Same words'), message('p:1:y', 4, 'person', 'Same words')]);
-      assert.equal(twice.length, 2, 'the same words under two ids are two events');
-    },
-  );
-  await t.test('REFUSED: a merge keyed by the kind beside the id, as a step transcript is, draws a call whose state moved twice', () => {
+describe('mergeChatEvents and changedChat: an event of her chat is replaced by its id alone, and a change is taken one at a time', () => {
+  test('an event of her chat is replaced by its id alone: the same id twice is one event, the same words under two ids are two', () => {
+    const first = mergeChatEvents([], [call('t:1:a', 1, 'running'), message('m:1:b', 2, 'agent', 'One.')]);
+    const moved = mergeChatEvents(first, [call('t:1:a', 1, 'done')]);
+    assert.deepEqual(
+      moved.map((e) => e.id),
+      ['t:1:a', 'm:1:b'],
+      'the call is replaced where it stands, never drawn twice',
+    );
+    assert.equal((moved[0] as ChatCall).state, 'done', 'with its later state');
+    const twice = mergeChatEvents([], [message('k:1:x', 3, 'keeper', 'Same words'), message('p:1:y', 4, 'person', 'Same words')]);
+    assert.equal(twice.length, 2, 'the same words under two ids are two events');
+  });
+  test('REFUSED: a merge keyed by the kind beside the id, as a step transcript is, draws a call whose state moved twice', () => {
     const keyed = (known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] => {
       const merged = [...known];
       const where = new Map(merged.map((e, i) => [`${e.kind}:${e.id}:${JSON.stringify(e)}`, i]));
@@ -140,7 +138,7 @@ test('mergeChatEvents and changedChat: an event of her chat is replaced by its i
     assert.equal(keyed(known, [call('t:1:a', 1, 'done')]).length, 2, 'the mutant draws the call twice');
     assert.equal(mergeChatEvents(known, [call('t:1:a', 1, 'done')]).length, 1, 'the rule draws it once');
   });
-  await t.test('a change is taken one at a time: the presence of the later frame wins, and the events of both are held', () => {
+  test('a change is taken one at a time: the presence of the later frame wins, and the events of both are held', () => {
     const held = [
       { kind: 'presence' as const, presence: up },
       { kind: 'events' as const, events: [message('m:1', 1, 'agent', 'One.')] },
@@ -165,8 +163,8 @@ function storage(refuses = false): { held: Map<string, string> } {
   return { held };
 }
 
-test('chatOutbox: a message the api would not take is kept in this browser, and sent once', async (t) => {
-  await t.test('a message the api would not take is kept in this browser, read back, changed and forgotten', () => {
+describe('chatOutbox: a message the api would not take is kept in this browser, and sent once', () => {
+  test('a message the api would not take is kept in this browser, read back, changed and forgotten', () => {
     const { held } = storage();
     assert.equal(readKept(), null);
     keepUnsent('Approve the land', at(0));
@@ -177,7 +175,7 @@ test('chatOutbox: a message the api would not take is kept in this browser, and 
     forgetKept();
     assert.equal(readKept(), null);
   });
-  await t.test('REFUSED: a storage that throws on every call, and words that are no kept message, keep nothing and say so', () => {
+  test('REFUSED: a storage that throws on every call, and words that are no kept message, keep nothing and say so', () => {
     storage(true);
     keepUnsent('Approve the land', at(0));
     assert.equal(readKept(), null, 'a refused storage is swallowed, and keeps nothing');
@@ -189,106 +187,100 @@ test('chatOutbox: a message the api would not take is kept in this browser, and 
     assert.deepEqual(parseKept('{"text":"x","at":"y","more":1}'), { text: 'x', at: 'y' });
     assert.deepEqual(parseKept('{"text":"x","at":"y","refused":""}'), { text: 'x', at: 'y' }, 'a refusal with no words is none');
   });
-  await t.test('a refused message keeps the api’s words through a change of its own and a reload', () => {
+  test('a refused message keeps the api’s words through a change of its own and a reload', () => {
     storage();
     keepUnsent('Approve the land', at(0), 'Say who you are first.');
     editKept('Approve the land of the runs page');
     assert.deepEqual(readKept(), { text: 'Approve the land of the runs page', at: at(0), refused: 'Say who you are first.' });
     forgetKept();
   });
-  await t.test(
-    'a message the api refused says why and is not sent again; one nothing answered, or a 5xx, is lost and tried again',
-    async () => {
-      await import('./tsx.ts');
-      const { createElement } = await import('react');
-      const { renderToStaticMarkup } = await import('react-dom/server');
-      const { ChatKeptMessage } = await import('../src/components/nemia/chat/ChatKept.tsx');
-      const draw = (kept: ChatKept) =>
-        renderToStaticMarkup(
-          createElement(ChatKeptMessage, { kept, onAgain: () => undefined, onEdit: () => undefined, onDiscard: () => undefined }),
-        );
-      const WHY = 'The words came with no token: sign in on the token page.';
-      const before = globalThis.fetch;
-      let requests = 0;
-      let answer: () => Promise<Response> = async () => new Response(null, { status: 204 });
-      let counted: (() => void) | undefined;
-      globalThis.fetch = async () => {
-        requests += 1;
-        counted?.();
-        return answer();
-      };
-      const json = { 'content-type': 'application/json' };
-      const failureOf = (text: string) =>
-        sendChat(text).then(
-          () => assert.fail('the api took it'),
-          (failure: unknown) => failure,
-        );
-      const aBeatPastTheBound = 30;
-      const retried = (text: string, until: number) =>
-        new Promise<{ requests: number; refused: unknown }>((resolve) => {
-          requests = 0;
-          let stop = () => undefined as void;
-          const done = (refused: unknown) => {
-            stop();
-            counted = undefined;
-            setTimeout(() => resolve({ requests, refused }), aBeatPastTheBound);
-          };
-          counted = () => {
-            if (requests >= until) done(undefined);
-          };
-          stop = retryKept(() => sendChat(text), 2, done);
-        });
-      try {
-        answer = async () => new Response(JSON.stringify({ error: WHY }), { status: 422, headers: json });
-        const refused = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
-        assert.deepEqual(refused, { text: 'Approve the land', at: at(0), refused: WHY }, 'a 4xx is a refusal, in the api’s words');
-        const html = draw(refused);
-        assert.match(html, new RegExp(`data-chat-kept-why="refused"[^>]*>${WHY}<`), 'its line is the api’s own words');
-        assert.doesNotMatch(html, /lost the daemon/);
-        for (const button of ['Send again', 'Edit', 'Discard']) assert.match(html, new RegExp(`>${button}<`), button);
-        const once = await retried('Approve the land', 2);
-        assert.equal(once.requests, 1, 'a refused message is never sent again on its own');
-        assert.ok(once.refused !== undefined, 'and its refusal is handed back');
+  test('a message the api refused says why and is not sent again; one nothing answered, or a 5xx, is lost and tried again', async () => {
+    await import('./tsx.ts');
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { ChatKeptMessage } = await import('../src/components/nemia/chat/ChatKept.tsx');
+    const draw = (kept: ChatKept) =>
+      renderToStaticMarkup(
+        createElement(ChatKeptMessage, { kept, onAgain: () => undefined, onEdit: () => undefined, onDiscard: () => undefined }),
+      );
+    const WHY = 'The words came with no token: sign in on the token page.';
+    const before = globalThis.fetch;
+    let requests = 0;
+    let answer: () => Promise<Response> = async () => new Response(null, { status: 204 });
+    let counted: (() => void) | undefined;
+    globalThis.fetch = async () => {
+      requests += 1;
+      counted?.();
+      return answer();
+    };
+    const json = { 'content-type': 'application/json' };
+    const failureOf = (text: string) =>
+      sendChat(text).then(
+        () => assert.fail('the api took it'),
+        (failure: unknown) => failure,
+      );
+    const aBeatPastTheBound = 30;
+    const retried = (text: string, until: number) =>
+      new Promise<{ requests: number; refused: unknown }>((resolve) => {
+        requests = 0;
+        let stop = () => undefined as void;
+        const done = (refused: unknown) => {
+          stop();
+          counted = undefined;
+          setTimeout(() => resolve({ requests, refused }), aBeatPastTheBound);
+        };
+        counted = () => {
+          if (requests >= until) done(undefined);
+        };
+        stop = retryKept(() => sendChat(text), 2, done);
+      });
+    try {
+      answer = async () => new Response(JSON.stringify({ error: WHY }), { status: 422, headers: json });
+      const refused = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
+      assert.deepEqual(refused, { text: 'Approve the land', at: at(0), refused: WHY }, 'a 4xx is a refusal, in the api’s words');
+      const html = draw(refused);
+      assert.match(html, new RegExp(`data-chat-kept-why="refused"[^>]*>${WHY}<`), 'its line is the api’s own words');
+      assert.doesNotMatch(html, /lost the daemon/);
+      for (const button of ['Send again', 'Edit', 'Discard']) assert.match(html, new RegExp(`>${button}<`), button);
+      const once = await retried('Approve the land', 2);
+      assert.equal(once.requests, 1, 'a refused message is never sent again on its own');
+      assert.ok(once.refused !== undefined, 'and its refusal is handed back');
 
-        for (const [why, lost] of [
-          ['nothing answered', async () => Promise.reject(new TypeError('Failed to fetch'))],
-          ['a 5xx', async () => new Response(JSON.stringify({ error: 'The store is busy.' }), { status: 503, headers: json })],
-        ] as const) {
-          answer = lost;
-          const kept = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
-          assert.deepEqual(kept, { text: 'Approve the land', at: at(0) }, `${why}: the board lost the daemon`);
-          assert.match(draw(kept), /data-chat-kept-why="lost"[^>]*>The board lost the daemon/, `${why}: today’s words`);
-          const again = await retried('Approve the land', 3);
-          assert.ok(again.requests >= 3, `${why}: it is tried again on its own`);
-          assert.equal(again.refused, undefined);
-        }
-      } finally {
-        globalThis.fetch = before;
-        counted = undefined;
+      for (const [why, lost] of [
+        ['nothing answered', async () => Promise.reject(new TypeError('Failed to fetch'))],
+        ['a 5xx', async () => new Response(JSON.stringify({ error: 'The store is busy.' }), { status: 503, headers: json })],
+      ] as const) {
+        answer = lost;
+        const kept = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
+        assert.deepEqual(kept, { text: 'Approve the land', at: at(0) }, `${why}: the board lost the daemon`);
+        assert.match(draw(kept), /data-chat-kept-why="lost"[^>]*>The board lost the daemon/, `${why}: today’s words`);
+        const again = await retried('Approve the land', 3);
+        assert.ok(again.requests >= 3, `${why}: it is tried again on its own`);
+        assert.equal(again.refused, undefined);
       }
-    },
-  );
-  await t.test(
-    'a kept message reaches her once: a second try while the first is in flight is the first, and the next call tries again',
-    async () => {
-      let calls = 0;
-      let settle: (() => void) | undefined;
-      const send = () => {
-        calls += 1;
-        return new Promise<string>((resolve) => {
-          settle = () => resolve('sent');
-        });
-      };
-      const first = sendingOnce(send);
-      const second = sendingOnce(send);
-      assert.equal(calls, 1, 'the api coming back, the stream opening and the pace all try it: it is sent once');
-      settle!();
-      assert.deepEqual(await Promise.all([first, second]), ['sent', 'sent']);
-      await sendingOnce(() => Promise.resolve('again'));
-      assert.equal(calls, 1, 'and once the flight is over the next call runs its own send');
-    },
-  );
-  await t.test('REFUSED: a send with no guard sends a kept message twice', async () => {
+    } finally {
+      globalThis.fetch = before;
+      counted = undefined;
+    }
+  });
+  test('a kept message reaches her once: a second try while the first is in flight is the first, and the next call tries again', async () => {
+    let calls = 0;
+    let settle: (() => void) | undefined;
+    const send = () => {
+      calls += 1;
+      return new Promise<string>((resolve) => {
+        settle = () => resolve('sent');
+      });
+    };
+    const first = sendingOnce(send);
+    const second = sendingOnce(send);
+    assert.equal(calls, 1, 'the api coming back, the stream opening and the pace all try it: it is sent once');
+    settle!();
+    assert.deepEqual(await Promise.all([first, second]), ['sent', 'sent']);
+    await sendingOnce(() => Promise.resolve('again'));
+    assert.equal(calls, 1, 'and once the flight is over the next call runs its own send');
+  });
+  test('REFUSED: a send with no guard sends a kept message twice', async () => {
     let calls = 0;
     const send = () => {
       calls += 1;
@@ -335,8 +327,8 @@ const asked = (kind: 'question' | 'proposal', questions: readonly AskQuestion[],
   ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
 });
 
-test('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answered, left open, and answered in words', async (t) => {
-  await t.test('an ask is drawn by what its choices carry: the actions of a proposal, one question’s form, or the flow of several', () => {
+describe('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answered, left open, and answered in words', () => {
+  test('an ask is drawn by what its choices carry: the actions of a proposal, one question’s form, or the flow of several', () => {
     assert.equal(drawnAsk([PLAIN]), 'actions');
     assert.equal(drawnAsk([EXPLAINED]), 'form', 'a choice that explains itself is a row of the form, never a button');
     assert.equal(drawnAsk([PLAIN, PLAIN]), 'many', 'several questions take the flow whatever their choices carry');
@@ -344,7 +336,7 @@ test('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answ
     assert.equal(drawnAsk([{ ...PLAIN, options: [...PLAIN.options, EXPLAINED.options[0]] }]), 'form', 'one explained choice is enough');
     assert.equal(drawnAsk([]), 'actions', 'a question with no choice at all is nothing to form');
   });
-  await t.test('a question is answered by a choice or by words with something in them, and what is left is said in the recap', () => {
+  test('a question is answered by a choice or by words with something in them, and what is left is said in the recap', () => {
     const question = EXPLAINED.question;
     assert.equal(askAnswered({ question, labels: ['Cut it on read'] }), true);
     assert.equal(askAnswered({ question, labels: [] }), false, 'nothing chosen');
@@ -359,7 +351,7 @@ test('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answ
     assert.equal(askLeft(2), '2 not answered');
     assert.equal(askLeft(0), 'All answered');
   });
-  await t.test('the asks waiting on the person are those with no choice on them: one answered waits on nobody', () => {
+  test('the asks waiting on the person are those with no choice on them: one answered waits on nobody', () => {
     const open = asked('question', [EXPLAINED]);
     const done = asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' });
     assert.deepEqual(
@@ -371,7 +363,7 @@ test('drawnAsk, askAnswered, asksOpen and askInWords: an ask of hers drawn, answ
     assert.deepEqual(asksOpen([cut]), [], 'her call was cut with nothing answered: nothing of hers is held open for it');
     assert.equal(askInWords([cut]), undefined, 'so the composer is what it always is, and what they write is said to her');
   });
-  await t.test('the composer\u2019s own words answer one question drawn as the form, and no proposal, no flow and no two at once', () => {
+  test('the composer\u2019s own words answer one question drawn as the form, and no proposal, no flow and no two at once', () => {
     const form = asked('question', [EXPLAINED]);
     const proposal = asked('proposal', [PLAIN]);
     const many = { ...asked('question', [EXPLAINED, EXPLAINED]), id: 'q:many', call: 'many' };
@@ -421,8 +413,8 @@ const permission = (facts: PermissionFacts = FACTS, chose?: Record<string, strin
   ...(chose === undefined ? {} : { chose, choseAt: at(3) }),
 });
 
-test('a permission of hers is an ask: waiting, drawn as the form, answered in words, and tagged by what it asks', async (t) => {
-  await t.test('it is an ask that waits on the person until they answer it, drawn as one question’s form', () => {
+describe('a permission of hers is an ask: waiting, drawn as the form, answered in words, and tagged by what it asks', () => {
+  test('it is an ask that waits on the person until they answer it, drawn as one question’s form', () => {
     const open = permission();
     assert.equal(drawnAsk(open.questions), 'form', 'its choices explain themselves: the form, never a proposal’s buttons');
     assert.deepEqual(
@@ -432,7 +424,7 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
     assert.equal(asksOpen([permission(FACTS, { [PERMISSION_QUESTION.question]: 'Deny' })]).length, 0, 'answered: it waits on nobody');
     assert.equal(asksOpen([{ ...open, cutAt: at(4) }]).length, 0, 'its call cut: nothing is held open for it');
   });
-  await t.test('the composer’s words answer it, and the words are the answer filed', () => {
+  test('the composer’s words answer it, and the words are the answer filed', () => {
     const open = permission();
     assert.equal(askInWords([open])?.kind, 'permission');
     assert.deepEqual(wordsAnswer(open, 'Not in dist, use out/'), [
@@ -440,18 +432,18 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
     ]);
     assert.equal(askInWords([open, asked('question', [EXPLAINED])]), undefined, 'beside a question of hers, the words would name neither');
   });
-  await t.test('her adapter hands it to her talk as her own, carrying its facts', () => {
+  test('her adapter hands it to her talk as her own, carrying its facts', () => {
     const [own] = chatItems([permission()]);
     if (own?.kind !== 'own') throw new Error('a permission of hers is her own to draw');
     assert.equal(own.own.kind === 'permission' ? own.own.permission.command : undefined, FACTS.command);
   });
-  await t.test('its tag says it asks to run while it waits, and that it was answered once chosen', async () => {
+  test('its tag says it asks to run while it waits, and that it was answered once chosen', async () => {
     await import('./tsx.ts');
     const { askTag } = await import('../src/components/nemia/chat/ChatAsk.tsx');
     assert.deepEqual(askTag(permission()), { words: 'Asks to run', hue: 'yours' });
     assert.deepEqual(askTag(permission(FACTS, { [PERMISSION_QUESTION.question]: 'Allow once' })), { words: 'Answered', hue: 'grey' });
   });
-  await t.test('drawn, it shows what the SDK handed over and the command as typed, Deny picked where the SDK leans to no', async () => {
+  test('drawn, it shows what the SDK handed over and the command as typed, Deny picked where the SDK leans to no', async () => {
     await import('./tsx.ts');
     const { createElement } = await import('react');
     const { renderToStaticMarkup } = await import('react-dom/server');
@@ -478,11 +470,17 @@ test('a permission of hers is an ask: waiting, drawn as the form, answered in wo
   });
 });
 
-test('her chat followed on one stream: what it does not read is said and the stream goes on, where she is replaced, her events merged and her asks read whole, then a notice, and the end', async (t) => {
-  const s = story(t);
-  const { stream, now, stop } = followed();
-
-  await s.test('REFUSED: data of a shape her chat does not send changes nothing, and is said, naming its key, as a notice', () => {
+describe('her chat followed on one stream: what it does not read is said and the stream goes on, where she is replaced, her events merged and her asks read whole, then a notice, and the end', () => {
+  let stream!: Stream;
+  let now!: () => ChatFollowed;
+  let stop!: () => void;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ stream, now, stop } = followed());
+    return t.end;
+  });
+  const s = story(test);
+  s.test('REFUSED: data of a shape her chat does not send changes nothing, and is said, naming its key, as a notice', () => {
     stream.send('chat', { kind: 'message', id: 'm:1', at: at(1) });
     stream.send('presence', { up: 'yes' });
     assert.deepEqual(now().events, []);
@@ -491,31 +489,25 @@ test('her chat followed on one stream: what it does not read is said and the str
     assert.deepEqual([now().error, now().live, stream.readyState], [null, true, 1], 'a notice, not an end: the stream goes on');
     stream.fire('open');
   });
-
-  await s.test(
-    "her stream's frames reach the page: presence replaces where she is, a chat event merges by its id, and the cursor moves",
-    () => {
-      assert.deepEqual(now().presence, CHAT_DOWN);
-      stream.send('presence', up, '1.0.0.0.0');
-      assert.deepEqual(now().presence, up);
-      assert.equal(now().cursor, '1.0.0.0.0');
-      stream.send('chat', call('t:1:a', 1, 'running'), '1.1.0.0.0');
-      stream.send('chat', call('t:1:a', 1, 'done'), '1.2.0.0.0');
-      assert.equal(now().events.length, 1, 'the call is one event, its state moved');
-      assert.equal((now().events[0] as ChatCall).state, 'done');
-      assert.equal(now().cursor, '1.2.0.0.0');
-    },
-  );
-
-  await s.test('REFUSED: an ask whose questions are of another shape changes nothing', () => {
+  s.test("her stream's frames reach the page: presence replaces where she is, a chat event merges by its id, and the cursor moves", () => {
+    assert.deepEqual(now().presence, CHAT_DOWN);
+    stream.send('presence', up, '1.0.0.0.0');
+    assert.deepEqual(now().presence, up);
+    assert.equal(now().cursor, '1.0.0.0.0');
+    stream.send('chat', call('t:1:a', 1, 'running'), '1.1.0.0.0');
+    stream.send('chat', call('t:1:a', 1, 'done'), '1.2.0.0.0');
+    assert.equal(now().events.length, 1, 'the call is one event, its state moved');
+    assert.equal((now().events[0] as ChatCall).state, 'done');
+    assert.equal(now().cursor, '1.2.0.0.0');
+  });
+  s.test('REFUSED: an ask whose questions are of another shape changes nothing', () => {
     const before = now().events;
     stream.send('chat', { ...asked('question', []), questions: [{ question: 'Which?', header: 'H', options: [{ label: 'One' }] }] });
     stream.send('chat', { ...asked('proposal', []), questions: 'none' });
     assert.deepEqual(now().events, before);
     assert.equal(now().events.length, 1, 'the call alone');
   });
-
-  await s.test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {
+  s.test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {
     stream.send('chat', { ...asked('question', [EXPLAINED]), cutAt: at(4) });
     stream.send('chat', asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' }));
     const events = now().events;
@@ -529,8 +521,7 @@ test('her chat followed on one stream: what it does not read is said and the str
     assert.deepEqual(two?.kind === 'proposal' ? two.chose : undefined, { [PLAIN.question]: 'Cut it on read' });
     assert.equal(two?.kind === 'proposal' ? two.choseAt : undefined, at(3));
   });
-
-  await s.test('a read the api makes again is a notice the next connection clears, and one it will not make again is the end', () => {
+  s.test('a read the api makes again is a notice the next connection clears, and one it will not make again is the end', () => {
     stream.send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
     assert.deepEqual(
       [now().retrying, now().error, now().live],
@@ -550,15 +541,15 @@ test('her chat followed on one stream: what it does not read is said and the str
   });
 });
 
-test("presenceOf: the runs that wait on the person are the run list's count, whatever the api's presence adds up", async (t) => {
+describe("presenceOf: the runs that wait on the person are the run list's count, whatever the api's presence adds up", () => {
   const stale: ChatPresence = { ...up, waitsOnYou: 4 };
-  await t.test('a run list of none waiting, beside a presence that still says four, says no run waits', () => {
+  test('a run list of none waiting, beside a presence that still says four, says no run waits', () => {
     const presence = presenceOf(stale, false, 0, []);
     assert.equal(presence.runsWaiting, 0);
     assert.deepEqual(cuesOf(presence), [], 'no cue claims what the Runs page does not');
     assert.equal(faceOf(presence), 'idle');
   });
-  await t.test('two waiting on the run list say two, whatever the presence says', () => {
+  test('two waiting on the run list say two, whatever the presence says', () => {
     for (const said of [0, 2, 4])
       assert.equal(presenceOf({ ...up, waitsOnYou: said }, false, 2, []).runsWaiting, 2, `the presence said ${said}`);
     assert.deepEqual(
@@ -566,7 +557,7 @@ test("presenceOf: the runs that wait on the person are the run list's count, wha
       ['2 wait on you'],
     );
   });
-  await t.test('her asks unanswered are counted from her chat and said apart, never added into the runs', () => {
+  test('her asks unanswered are counted from her chat and said apart, never added into the runs', () => {
     const open = asked('question', [EXPLAINED]);
     const done = asked('proposal', [PLAIN], { [PLAIN.question]: 'Cut it on read' });
     const presence = presenceOf(stale, false, 2, [open, done]);
@@ -584,57 +575,51 @@ test("presenceOf: the runs that wait on the person are the run list's count, wha
   });
 });
 
-test('presenceOf, composerWords and composerButton: where she is, and what the composer offers for it', async (t) => {
-  await t.test(
-    "her presence is the api's and this browser's kept message — resting where her session is not up and a message wakes her, down where none can",
-    () => {
-      assert.deepEqual(presenceOf(up, false, 0, []), {
-        runsWaiting: 0,
-        asksWaiting: 0,
-        notSent: false,
-        down: false,
-        resting: false,
-        answering: false,
-        unread: 0,
-      });
-      const resting = presenceOf({ ...up, up: false }, false, 0, []);
-      assert.deepEqual([resting.down, resting.resting], [false, true], 'not up, and a message wakes her: resting');
-      assert.equal(faceOf(resting), 'sleepy');
-      const down = presenceOf({ ...up, up: false, wakes: false }, false, 0, []);
-      assert.deepEqual([down.down, down.resting], [true, false], 'not up, and nothing can wake her: down');
-      assert.equal(presenceOf(up, true, 0, []).notSent, true, 'a message this browser kept is hers to say');
-      assert.equal(faceOf(presenceOf(up, true, 0, [])), 'unsure');
-      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3, wakes: true }, true, 2, []);
-      assert.deepEqual(every, {
-        runsWaiting: 2,
-        asksWaiting: 0,
-        notSent: true,
-        down: false,
-        resting: false,
-        answering: true,
-        unread: 3,
-      });
-      assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
-    },
-  );
-  await t.test(
-    'a store at Manual with one factory raised above it keeps her up: her face reads her session, never the store’s level',
-    () => {
-      const raised: FactoryLevel = {
-        factory: 'tsverify',
-        level: 'auto',
-        default: 'manual',
-        own: null,
-        raise: { level: 'auto', until: '2026-11-05T04:00:00.000Z' },
-      };
-      const kept = { level: 'manual' as const, factories: [raised] };
-      assert.equal(anyAbove(kept), true, 'the raise keeps her above Manual, though the store reads Manual');
-      assert.equal(presenceOf(up, false, 0, []).down, false, 'her session is up, so she is');
-      assert.equal(faceOf(presenceOf(up, false, 0, [])), 'idle');
-      assert.equal(anyAbove({ level: 'manual', factories: [{ ...raised, level: 'manual', raise: null }] }), false, 'Manual everywhere');
-    },
-  );
-  await t.test('the composer invites what where she is asks for, and offers the stop while she answers', () => {
+describe('presenceOf, composerWords and composerButton: where she is, and what the composer offers for it', () => {
+  test("her presence is the api's and this browser's kept message — resting where her session is not up and a message wakes her, down where none can", () => {
+    assert.deepEqual(presenceOf(up, false, 0, []), {
+      runsWaiting: 0,
+      asksWaiting: 0,
+      notSent: false,
+      down: false,
+      resting: false,
+      answering: false,
+      unread: 0,
+    });
+    const resting = presenceOf({ ...up, up: false }, false, 0, []);
+    assert.deepEqual([resting.down, resting.resting], [false, true], 'not up, and a message wakes her: resting');
+    assert.equal(faceOf(resting), 'sleepy');
+    const down = presenceOf({ ...up, up: false, wakes: false }, false, 0, []);
+    assert.deepEqual([down.down, down.resting], [true, false], 'not up, and nothing can wake her: down');
+    assert.equal(presenceOf(up, true, 0, []).notSent, true, 'a message this browser kept is hers to say');
+    assert.equal(faceOf(presenceOf(up, true, 0, [])), 'unsure');
+    const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3, wakes: true }, true, 2, []);
+    assert.deepEqual(every, {
+      runsWaiting: 2,
+      asksWaiting: 0,
+      notSent: true,
+      down: false,
+      resting: false,
+      answering: true,
+      unread: 3,
+    });
+    assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
+  });
+  test('a store at Manual with one factory raised above it keeps her up: her face reads her session, never the store’s level', () => {
+    const raised: FactoryLevel = {
+      factory: 'tsverify',
+      level: 'auto',
+      default: 'manual',
+      own: null,
+      raise: { level: 'auto', until: '2026-11-05T04:00:00.000Z' },
+    };
+    const kept = { level: 'manual' as const, factories: [raised] };
+    assert.equal(anyAbove(kept), true, 'the raise keeps her above Manual, though the store reads Manual');
+    assert.equal(presenceOf(up, false, 0, []).down, false, 'her session is up, so she is');
+    assert.equal(faceOf(presenceOf(up, false, 0, [])), 'idle');
+    assert.equal(anyAbove({ level: 'manual', factories: [{ ...raised, level: 'manual', raise: null }] }), false, 'Manual everywhere');
+  });
+  test('the composer invites what where she is asks for, and offers the stop while she answers', () => {
     assert.equal(composerWords(UP), 'Tell Nemia what to do, or ask');
     assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one, or stop her');
     assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
@@ -651,7 +636,7 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
     assert.equal(composerWords({ ...UP, answering: true }, true), 'Or answer in your own words', 'her turn is held by the question');
     assert.equal(composerWords({ ...UP, down: true }, true), 'Write now; she reads it when she is up', 'no session holds the question');
   });
-  await t.test("the composer's button is the stop while she answers, and the send every other time", () => {
+  test("the composer's button is the stop while she answers, and the send every other time", () => {
     assert.equal(composerButton({ ...UP, answering: true }), 'stop');
     assert.equal(composerButton(UP), 'send', 'no turn of hers to end');
     assert.equal(composerButton({ ...UP, down: true }), 'send');
@@ -664,41 +649,38 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
   });
 });
 
-test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page draws them', async (t) => {
-  await t.test(
-    'her consecutive calls fold into one turn, in the order they came, and a turn with a call at work or waiting is running',
-    () => {
-      const folded = foldChat([
-        message('p:1', 1, 'person', 'What is waiting on me?'),
-        call('t:1:a', 2, 'done', 'Read the inbox'),
-        call('t:1:b', 3, 'done', 'Read the factories'),
-        call('t:1:c', 136, 'done', 'Read the runs that wait'),
-        message('m:1:d', 140, 'agent', 'Two gates.'),
-      ]);
-      assert.deepEqual(
-        folded.map((item) => item.kind),
-        ['event', 'turn', 'event'],
-      );
-      const turn = folded[1] as Extract<ChatItem, { kind: 'turn' }>;
-      assert.deepEqual(
-        turn.calls.map((c) => c.sentence),
-        ['Read the inbox', 'Read the factories', 'Read the runs that wait'],
-        'the turn keeps the order they came in',
-      );
-      assert.equal(turn.running, false);
-      assert.equal(turnWords(turn.ms, turn.calls.length, 'call'), 'Worked for 2m 14s · 3 calls');
-      const live = foldChat([call('t:1:a', 2, 'done'), call('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
-      assert.equal(live.running, true, 'a turn whose call is at work is still running');
-      assert.equal(
-        (foldChat([call('t:1:a', 2, 'waits')])[0] as Extract<ChatItem, { kind: 'turn' }>).running,
-        true,
-        'and one whose call waits on a person',
-      );
-      const apart = foldChat([call('t:1:a', 2, 'done'), message('m:1:b', 3, 'agent', 'Done.'), call('t:1:c', 4, 'done')]);
-      assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'calls either side of her words are two turns');
-    },
-  );
-  await t.test('the line that says what is new is drawn over the first of her messages the person has not read', () => {
+describe('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page draws them', () => {
+  test('her consecutive calls fold into one turn, in the order they came, and a turn with a call at work or waiting is running', () => {
+    const folded = foldChat([
+      message('p:1', 1, 'person', 'What is waiting on me?'),
+      call('t:1:a', 2, 'done', 'Read the inbox'),
+      call('t:1:b', 3, 'done', 'Read the factories'),
+      call('t:1:c', 136, 'done', 'Read the runs that wait'),
+      message('m:1:d', 140, 'agent', 'Two gates.'),
+    ]);
+    assert.deepEqual(
+      folded.map((item) => item.kind),
+      ['event', 'turn', 'event'],
+    );
+    const turn = folded[1] as Extract<ChatItem, { kind: 'turn' }>;
+    assert.deepEqual(
+      turn.calls.map((c) => c.sentence),
+      ['Read the inbox', 'Read the factories', 'Read the runs that wait'],
+      'the turn keeps the order they came in',
+    );
+    assert.equal(turn.running, false);
+    assert.equal(turnWords(turn.ms, turn.calls.length, 'call'), 'Worked for 2m 14s · 3 calls');
+    const live = foldChat([call('t:1:a', 2, 'done'), call('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
+    assert.equal(live.running, true, 'a turn whose call is at work is still running');
+    assert.equal(
+      (foldChat([call('t:1:a', 2, 'waits')])[0] as Extract<ChatItem, { kind: 'turn' }>).running,
+      true,
+      'and one whose call waits on a person',
+    );
+    const apart = foldChat([call('t:1:a', 2, 'done'), message('m:1:b', 3, 'agent', 'Done.'), call('t:1:c', 4, 'done')]);
+    assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'calls either side of her words are two turns');
+  });
+  test('the line that says what is new is drawn over the first of her messages the person has not read', () => {
     const events = [
       message('m:1:a', 1, 'agent', 'One.'),
       message('p:1:b', 2, 'person', 'Mine.'),
@@ -711,28 +693,25 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
     assert.equal(readableFrom(events), 'm:1:d', 'the mark is posted through her latest');
     assert.equal(readableFrom([message('p:1:b', 2, 'person', 'Mine.')]), null, 'and through nothing where she has said nothing');
   });
-  await t.test(
-    'a link of hers to a page of the board is taken out of the sentence and named beside it; one that leaves the board stays in it',
-    () => {
-      const read = linksOf('Two gates. [Read the review](/runs/r-1) and [Read the design](/runs/r-2).');
-      assert.equal(read.text, 'Two gates. Read the review and Read the design.', 'the sentence reads plain');
-      assert.deepEqual(read.links, [
-        { words: 'Read the review', href: '/runs/r-1' },
-        { words: 'Read the design', href: '/runs/r-2' },
-      ]);
-      const away = linksOf('[Open the pull request](https://example.test/pr/25)');
-      assert.deepEqual(away.links, [], 'a button through the router leads to a route, and that is none');
-      assert.equal(away.text, '[Open the pull request](https://example.test/pr/25)', 'so it is left for Markdown to draw');
-      const refused = linksOf('[Run it](javascript:doIt)');
-      assert.deepEqual(refused.links, []);
-      assert.equal(refused.text, '[Run it](javascript:doIt)', 'and so is one whose address Markdown empties');
-      const relative = linksOf('[Open it](//evil.test/x)');
-      assert.deepEqual(relative.links, [], 'a protocol-relative address is no route of this board, whatever its first character');
-      assert.equal(relative.text, '[Open it](//evil.test/x)', 'so it too is left in her words');
-      assert.deepEqual(linksOf('Nothing to open here.'), { text: 'Nothing to open here.', links: [] });
-    },
-  );
-  await t.test("only an outbox entry is drawn as the person's bubble: the keeper's words are a quiet marker, and hers are hers", () => {
+  test('a link of hers to a page of the board is taken out of the sentence and named beside it; one that leaves the board stays in it', () => {
+    const read = linksOf('Two gates. [Read the review](/runs/r-1) and [Read the design](/runs/r-2).');
+    assert.equal(read.text, 'Two gates. Read the review and Read the design.', 'the sentence reads plain');
+    assert.deepEqual(read.links, [
+      { words: 'Read the review', href: '/runs/r-1' },
+      { words: 'Read the design', href: '/runs/r-2' },
+    ]);
+    const away = linksOf('[Open the pull request](https://example.test/pr/25)');
+    assert.deepEqual(away.links, [], 'a button through the router leads to a route, and that is none');
+    assert.equal(away.text, '[Open the pull request](https://example.test/pr/25)', 'so it is left for Markdown to draw');
+    const refused = linksOf('[Run it](javascript:doIt)');
+    assert.deepEqual(refused.links, []);
+    assert.equal(refused.text, '[Run it](javascript:doIt)', 'and so is one whose address Markdown empties');
+    const relative = linksOf('[Open it](//evil.test/x)');
+    assert.deepEqual(relative.links, [], 'a protocol-relative address is no route of this board, whatever its first character');
+    assert.equal(relative.text, '[Open it](//evil.test/x)', 'so it too is left in her words');
+    assert.deepEqual(linksOf('Nothing to open here.'), { text: 'Nothing to open here.', links: [] });
+  });
+  test("only an outbox entry is drawn as the person's bubble: the keeper's words are a quiet marker, and hers are hers", () => {
     assert.equal(drawnAs(message('k:1:x', 1, 'keeper', 'The person writes from the board: hi')), 'marker');
     assert.equal(drawnAs(message('p:1:y', 2, 'person', 'hi')), 'person');
     assert.equal(drawnAs(message('m:1:z', 3, 'agent', 'Two gates.')), 'agent');
@@ -742,7 +721,7 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
       "a keeper's words drawn as the person's would put the framing sentence in their mouth",
     );
   });
-  await t.test("another agent's words are drawn as that agent's, never as the person's, and go unread by nothing", () => {
+  test("another agent's words are drawn as that agent's, never as the person's, and go unread by nothing", () => {
     const peer: ChatMessage = { ...message('o:1:p', 4, 'peer', 'Seen from the operator: the gate holds.'), name: 'operator' };
     assert.equal(drawnAs(peer), 'peer');
     assert.notEqual(drawnAs(peer), 'person', "an agent's words drawn as the person's would put them in their mouth");
@@ -757,93 +736,90 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
     assert.equal(newFrom(events, 1), 'm:1:a', "a peer's words are never counted among hers unread");
     assert.equal(readableFrom(events), 'm:1:a', 'and the read mark is never posted through them');
   });
-  await t.test(
-    'her adapter maps her events onto the one shape the family draws: each kind, in the order they came, with what it carries',
-    () => {
-      const items = chatItems([
-        call('t:1:a', 2, 'done', 'Read the inbox'),
-        call('t:1:b', 136, 'waits', 'Waits for your approval'),
-        message('m:1:c', 140, 'agent', 'Two gates: [the run](/runs/r-1) and [the card](/inbox/c-2).'),
-        message('p:1:d', 141, 'person', 'Land the first.'),
-        message('k:1:e', 142, 'keeper', 'She was told what you wrote.'),
-        { kind: 'session', id: 's:1:f', at: at(143), attempt: 4 },
-        asked('question', [EXPLAINED]),
-      ]);
-      assert.deepEqual(
-        items.map((item) => [item.kind, item.id]),
-        [
-          ['work', 't:1:a'],
-          ['said', 'm:1:c'],
-          ['said', 'p:1:d'],
-          ['note', 'k:1:e'],
-          ['note', 's:1:f'],
-          ['own', 'q:question'],
-        ],
-        'the ids her events carry, in the order they came',
-      );
-      const work = items[0];
-      if (work.kind !== 'work') throw new Error('her consecutive calls are one turn');
-      assert.deepEqual(
-        work.lines.map((line) => [line.id, line.tool, line.sentence, line.state]),
-        [
-          ['t:1:a', 'Read', 'Read the inbox', 'done'],
-          ['t:1:b', 'Read', 'Waits for your approval', 'waits'],
-        ],
-      );
-      assert.equal(work.running, true, 'a turn whose line waits on a person is still at work');
-      assert.equal(work.ms, 134_000);
-      assert.equal(
-        work.lines.every((line) => line.input === undefined && line.result === undefined),
-        true,
-        'her calls open on nothing',
-      );
+  test('her adapter maps her events onto the one shape the family draws: each kind, in the order they came, with what it carries', () => {
+    const items = chatItems([
+      call('t:1:a', 2, 'done', 'Read the inbox'),
+      call('t:1:b', 136, 'waits', 'Waits for your approval'),
+      message('m:1:c', 140, 'agent', 'Two gates: [the run](/runs/r-1) and [the card](/inbox/c-2).'),
+      message('p:1:d', 141, 'person', 'Land the first.'),
+      message('k:1:e', 142, 'keeper', 'She was told what you wrote.'),
+      { kind: 'session', id: 's:1:f', at: at(143), attempt: 4 },
+      asked('question', [EXPLAINED]),
+    ]);
+    assert.deepEqual(
+      items.map((item) => [item.kind, item.id]),
+      [
+        ['work', 't:1:a'],
+        ['said', 'm:1:c'],
+        ['said', 'p:1:d'],
+        ['note', 'k:1:e'],
+        ['note', 's:1:f'],
+        ['own', 'q:question'],
+      ],
+      'the ids her events carry, in the order they came',
+    );
+    const work = items[0];
+    if (work.kind !== 'work') throw new Error('her consecutive calls are one turn');
+    assert.deepEqual(
+      work.lines.map((line) => [line.id, line.tool, line.sentence, line.state]),
+      [
+        ['t:1:a', 'Read', 'Read the inbox', 'done'],
+        ['t:1:b', 'Read', 'Waits for your approval', 'waits'],
+      ],
+    );
+    assert.equal(work.running, true, 'a turn whose line waits on a person is still at work');
+    assert.equal(work.ms, 134_000);
+    assert.equal(
+      work.lines.every((line) => line.input === undefined && line.result === undefined),
+      true,
+      'her calls open on nothing',
+    );
 
-      const hers = items[1];
-      if (hers.kind !== 'said') throw new Error('her words are said');
-      assert.deepEqual(
-        { who: hers.who, yours: hers.yours, markdown: hers.markdown, text: hers.text },
-        { who: 'Nemia', yours: false, markdown: true, text: 'Two gates: the run and the card.' },
-        'her links are taken out of the sentence, which reads plain',
-      );
-      assert.deepEqual(hers.links, [
-        { words: 'the run', href: '/runs/r-1' },
-        { words: 'the card', href: '/inbox/c-2' },
-      ]);
+    const hers = items[1];
+    if (hers.kind !== 'said') throw new Error('her words are said');
+    assert.deepEqual(
+      { who: hers.who, yours: hers.yours, markdown: hers.markdown, text: hers.text },
+      { who: 'Nemia', yours: false, markdown: true, text: 'Two gates: the run and the card.' },
+      'her links are taken out of the sentence, which reads plain',
+    );
+    assert.deepEqual(hers.links, [
+      { words: 'the run', href: '/runs/r-1' },
+      { words: 'the card', href: '/inbox/c-2' },
+    ]);
 
-      const theirs = items[2];
-      if (theirs.kind !== 'said') throw new Error("the person's words are said");
-      assert.deepEqual(
-        { who: theirs.who, yours: theirs.yours, markdown: theirs.markdown, text: theirs.text, links: theirs.links },
-        {
-          who: 'You',
-          yours: true,
-          markdown: false,
-          text: 'Land the first.',
-          links: [],
-        },
-      );
+    const theirs = items[2];
+    if (theirs.kind !== 'said') throw new Error("the person's words are said");
+    assert.deepEqual(
+      { who: theirs.who, yours: theirs.yours, markdown: theirs.markdown, text: theirs.text, links: theirs.links },
+      {
+        who: 'You',
+        yours: true,
+        markdown: false,
+        text: 'Land the first.',
+        links: [],
+      },
+    );
 
-      assert.deepEqual(
-        items.slice(3, 5).map((item) => (item.kind === 'note' ? [item.what, item.words] : null)),
-        [
-          ['keeper', 'She was told what you wrote.'],
-          ['session', 'A session of hers began — her 4'],
-        ],
-        "the keeper's framing and the rule between two of her sessions are quiet lines",
-      );
+    assert.deepEqual(
+      items.slice(3, 5).map((item) => (item.kind === 'note' ? [item.what, item.words] : null)),
+      [
+        ['keeper', 'She was told what you wrote.'],
+        ['session', 'A session of hers began — her 4'],
+      ],
+      "the keeper's framing and the rule between two of her sessions are quiet lines",
+    );
 
-      const own = items[5];
-      if (own.kind !== 'own') throw new Error('an ask of hers is her own to draw');
-      assert.equal(own.own.kind, 'question', 'carrying the event, which her talk draws itself');
-      assert.equal(own.own.questions[0], EXPLAINED);
+    const own = items[5];
+    if (own.kind !== 'own') throw new Error('an ask of hers is her own to draw');
+    assert.equal(own.own.kind, 'question', 'carrying the event, which her talk draws itself');
+    assert.equal(own.own.questions[0], EXPLAINED);
 
-      assert.deepEqual(chatItems([]), [], 'nothing said is nothing drawn');
-    },
-  );
+    assert.deepEqual(chatItems([]), [], 'nothing said is nothing drawn');
+  });
 });
 
-test('broughtOf and chatItems: a step her words link to is brought, drawn under her words as its own item', async (t) => {
-  await t.test('a link to a step of a run names the run and the step, and every other address names none', () => {
+describe('broughtOf and chatItems: a step her words link to is brought, drawn under her words as its own item', () => {
+  test('a link to a step of a run names the run and the step, and every other address names none', () => {
     const rows: Array<[string, { run: string; step: string } | undefined]> = [
       ['/runs/r-1?step=design', { run: 'r-1', step: 'design' }],
       ['/runs/r-1?step=plan%2Fv2', { run: 'r-1', step: 'plan/v2' }],
@@ -860,87 +836,89 @@ test('broughtOf and chatItems: a step her words link to is brought, drawn under 
     ];
     for (const [href, named] of rows) assert.deepEqual(broughtOf(href), named, href);
   });
-  await t.test(
-    'her message brings each step it links once, after her words and in her order; a person who writes the same brings none',
-    () => {
-      const items = chatItems([
-        message(
-          'm:1:a',
-          1,
-          'agent',
-          'Two wait. [design of r-1](/runs/r-1?step=design), [review of r-2](/runs/r-2?step=review), [design again](/runs/r-1?step=design), [the run](/runs/r-3).',
-        ),
-        message('p:1:b', 2, 'person', 'See [design of r-1](/runs/r-1?step=design).'),
-      ]);
-      assert.deepEqual(
-        items.map((item) => [item.kind, item.id]),
-        [
-          ['said', 'm:1:a'],
-          ['own', 'm:1:a:brought:r-1/design'],
-          ['own', 'm:1:a:brought:r-2/review'],
-          ['said', 'p:1:b'],
-        ],
-      );
-      const own = items[1];
-      if (own.kind !== 'own') throw new Error('a brought step is her own item');
-      assert.deepEqual(own.own, { kind: 'brought', run: 'r-1', step: 'design' });
-      const said = items[0];
-      if (said.kind !== 'said') throw new Error('her words are said');
-      assert.deepEqual(
-        said.links.map((link) => link.href),
-        ['/runs/r-1?step=design', '/runs/r-2?step=review', '/runs/r-1?step=design', '/runs/r-3'],
-        'every link stays a button beside what it brings',
-      );
-    },
-  );
-  await t.test(
-    'her message brings each proposal it links once, beside the steps, in her order; a person who writes the same brings none',
-    () => {
-      const items = chatItems([
-        message(
-          'm:2:a',
-          1,
-          'agent',
-          'I proposed [the hire](/factories/acme/proposals/nemia-ab12c) for [design of r-1](/runs/r-1?step=design); [again](/factories/acme/proposals/nemia-ab12c).',
-        ),
-        message('p:2:b', 2, 'person', 'Is [the hire](/factories/acme/proposals/nemia-ab12c) right?'),
-      ]);
-      assert.deepEqual(
-        items.map((item) => [item.kind, item.id]),
-        [
-          ['said', 'm:2:a'],
-          ['own', 'm:2:a:brought-proposal:acme/nemia-ab12c'],
-          ['own', 'm:2:a:brought:r-1/design'],
-          ['said', 'p:2:b'],
-        ],
-      );
-      const own = items[1];
-      if (own.kind !== 'own') throw new Error('a brought proposal is her own item');
-      assert.deepEqual(own.own, { kind: 'brought-proposal', factory: 'acme', name: 'nemia-ab12c' });
-    },
-  );
+  test('her message brings each step it links once, after her words and in her order; a person who writes the same brings none', () => {
+    const items = chatItems([
+      message(
+        'm:1:a',
+        1,
+        'agent',
+        'Two wait. [design of r-1](/runs/r-1?step=design), [review of r-2](/runs/r-2?step=review), [design again](/runs/r-1?step=design), [the run](/runs/r-3).',
+      ),
+      message('p:1:b', 2, 'person', 'See [design of r-1](/runs/r-1?step=design).'),
+    ]);
+    assert.deepEqual(
+      items.map((item) => [item.kind, item.id]),
+      [
+        ['said', 'm:1:a'],
+        ['own', 'm:1:a:brought:r-1/design'],
+        ['own', 'm:1:a:brought:r-2/review'],
+        ['said', 'p:1:b'],
+      ],
+    );
+    const own = items[1];
+    if (own.kind !== 'own') throw new Error('a brought step is her own item');
+    assert.deepEqual(own.own, { kind: 'brought', run: 'r-1', step: 'design' });
+    const said = items[0];
+    if (said.kind !== 'said') throw new Error('her words are said');
+    assert.deepEqual(
+      said.links.map((link) => link.href),
+      ['/runs/r-1?step=design', '/runs/r-2?step=review', '/runs/r-1?step=design', '/runs/r-3'],
+      'every link stays a button beside what it brings',
+    );
+  });
+  test('her message brings each proposal it links once, beside the steps, in her order; a person who writes the same brings none', () => {
+    const items = chatItems([
+      message(
+        'm:2:a',
+        1,
+        'agent',
+        'I proposed [the hire](/factories/acme/proposals/nemia-ab12c) for [design of r-1](/runs/r-1?step=design); [again](/factories/acme/proposals/nemia-ab12c).',
+      ),
+      message('p:2:b', 2, 'person', 'Is [the hire](/factories/acme/proposals/nemia-ab12c) right?'),
+    ]);
+    assert.deepEqual(
+      items.map((item) => [item.kind, item.id]),
+      [
+        ['said', 'm:2:a'],
+        ['own', 'm:2:a:brought-proposal:acme/nemia-ab12c'],
+        ['own', 'm:2:a:brought:r-1/design'],
+        ['said', 'p:2:b'],
+      ],
+    );
+    const own = items[1];
+    if (own.kind !== 'own') throw new Error('a brought proposal is her own item');
+    assert.deepEqual(own.own, { kind: 'brought-proposal', factory: 'acme', name: 'nemia-ab12c' });
+  });
 });
 
-test('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', async (t) => {
-  const { reading } = await import('../src/lib/useNemiaChat.ts');
-  const fetchBefore = globalThis.fetch;
-  const sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
+describe('reading her chat: one stream opened after the first read, from its cursor, and a read made again that fails is the end', () => {
+  let reading!: (typeof import('../src/lib/useNemiaChat.ts'))['reading'];
+  let fetchBefore!: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  let sourceBefore!: unknown;
+  let state!: ChatFollowed;
+  beforeAll(async () => {
+    const t = teardowns();
+    ({ reading } = await import('../src/lib/useNemiaChat.ts'));
+    fetchBefore = globalThis.fetch;
+    sourceBefore = (globalThis as { EventSource?: unknown }).EventSource;
+    Object.assign(globalThis, {
+      EventSource: class extends Stream {
+        constructor(url: string) {
+          super();
+          streams.push(this);
+          urls.push(url);
+        }
+      },
+    });
+    t.onTestFinished(() => {
+      globalThis.fetch = fetchBefore;
+      Object.assign(globalThis, { EventSource: sourceBefore });
+    });
+    state = unreadChat(true);
+    return t.end;
+  });
   const streams: Stream[] = [];
   const urls: string[] = [];
-  Object.assign(globalThis, {
-    EventSource: class extends Stream {
-      constructor(url: string) {
-        super();
-        streams.push(this);
-        urls.push(url);
-      }
-    },
-  });
-  t.after(() => {
-    globalThis.fetch = fetchBefore;
-    Object.assign(globalThis, { EventSource: sourceBefore });
-  });
-  let state: ChatFollowed = unreadChat(true);
   const setState = (next: ChatFollowed | ((s: ChatFollowed) => ChatFollowed)) => {
     state = typeof next === 'function' ? next(state) : next;
   };
@@ -948,10 +926,9 @@ test('reading her chat: one stream opened after the first read, from its cursor,
     for (let i = 0; i < 200 && !done(); i++) await new Promise((r) => setImmediate(r));
     assert.ok(done(), 'the read answers');
   };
-  const told = story(t);
+  const told = story(test);
   let open = () => {};
-
-  await told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
+  told.test('the first read answered, one stream is opened from its cursor, whoever reads her', async () => {
     globalThis.fetch = async () =>
       new Response(JSON.stringify({ events: [], before: null, cursor: 'c:1', presence: up }), {
         status: 200,
@@ -962,11 +939,11 @@ test('reading her chat: one stream opened after the first read, from its cursor,
     for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
     assert.deepEqual(urls, ['/api/nemia/chat/stream?after=c%3A1'], 'one stream, from the cursor the read answered, and no beat of reads');
   });
-  await told.test('the stream says the api reads her again', () => {
+  told.test('the stream says the api reads her again', () => {
     streams[0]?.send('unreadable', { error: 'Her chat is unreadable.', retrying: true });
     assert.equal(state.retrying, 'Her chat is unreadable.');
   });
-  await told.test('a read made again that fails is the end, and leaves no retrying notice beside its error', async () => {
+  told.test('a read made again that fails is the end, and leaves no retrying notice beside its error', async () => {
     open();
     assert.equal(streams[0]?.readyState, 2, 'what stops the reading closes its stream');
     globalThis.fetch = async () => {
@@ -979,13 +956,19 @@ test('reading her chat: one stream opened after the first read, from its cursor,
   });
 });
 
-test('NemiaChatProvider: one holder of her chat for the frame, read by every consumer under it, and refused outside one', async (t) => {
-  await import('./tsx.ts');
-  const { createElement } = await import('react');
-  const { renderToStaticMarkup } = await import('react-dom/server');
-  const { NemiaChatProvider, useNemiaChat } = await import('../src/lib/useNemiaChat.ts');
+describe('NemiaChatProvider: one holder of her chat for the frame, read by every consumer under it, and refused outside one', () => {
+  let createElement!: (typeof import('react'))['createElement'];
+  let renderToStaticMarkup!: (element: import('react').ReactNode, options?: import('react-dom/server').ServerOptions) => string;
+  let NemiaChatProvider!: (typeof import('../src/lib/useNemiaChat.ts'))['NemiaChatProvider'];
+  let useNemiaChat!: () => import('../src/lib/useNemiaChat.ts').NemiaChat;
+  beforeAll(async () => {
+    await import('./tsx.ts');
+    ({ createElement } = await import('react'));
+    ({ renderToStaticMarkup } = await import('react-dom/server'));
+    ({ NemiaChatProvider, useNemiaChat } = await import('../src/lib/useNemiaChat.ts'));
+  });
   type Held = ReturnType<typeof useNemiaChat>;
-  await t.test('the dock and the chat page under one provider read the same chat', () => {
+  test('the dock and the chat page under one provider read the same chat', () => {
     const seen: Held[] = [];
     const Consumer = () => {
       seen.push(useNemiaChat());
@@ -995,7 +978,7 @@ test('NemiaChatProvider: one holder of her chat for the frame, read by every con
     assert.equal(seen.length, 2);
     assert.equal(seen[0], seen[1], 'one holder, so one reader and one stream, serves both');
   });
-  await t.test('a consumer with no provider over it is refused', () => {
+  test('a consumer with no provider over it is refused', () => {
     const Consumer = () => {
       useNemiaChat();
       return null;

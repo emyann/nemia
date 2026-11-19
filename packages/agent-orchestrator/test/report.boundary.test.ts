@@ -4,7 +4,7 @@
  * text of a path at the base, a branch git does not have left out of every answer, and its refusals, never an empty list. Git runs with no
  * user or system configuration and a fixed identity.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

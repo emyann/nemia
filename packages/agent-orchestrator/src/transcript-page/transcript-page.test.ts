@@ -4,7 +4,7 @@
  * 0 refused; the kinds asked, an unknown one refused; and a page read with `kinds` whose cursor still counts every event, so a read without
  * `kinds` from it misses none. Kinds of refusal are asserted, never sentences.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { SaidAfter } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';

@@ -2,7 +2,7 @@
  * A factory's volumes as objects (volume.verb.ts): named as the file keeps them or reads them, a gone folder not present and refused in
  * `volumeRefusal`'s words, and the runs in play whose record mounts the path, an ended one not among them.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { Volume } from 'objects';

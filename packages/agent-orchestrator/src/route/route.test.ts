@@ -2,7 +2,7 @@
  * What load refuses of a workflow's routing (`routeRefusal`, called by `validate`), one row per refusal of the design's §1, each a
  * `WorkflowError` (an `Invalid`, exit code 2) — never its sentence; then the shapes of `route:` a step file reads (`parseWorkflow`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { validate } from '../workflow/validate.ts';
 import { parseWorkflow, renderStep } from '../workflow/step-file.ts';
@@ -49,7 +49,7 @@ const refusedAtLoad = (steps: StepSpec[]): void => {
   );
 };
 
-test('load refuses a workflow whose routes do not close', async (t) => {
+describe('load refuses a workflow whose routes do not close', () => {
   const rows: Array<[string, StepSpec[]]> = [
     ['a judge whose agent runs in a mode that writes', judged({ permissionMode: 'acceptEdits' })],
     ['a judge whose agent writes with its tools, unasked', judged({ permissionMode: 'auto', tools: ['Read', 'Edit'] })],
@@ -146,10 +146,10 @@ test('load refuses a workflow whose routes do not close', async (t) => {
       ],
     ],
   ];
-  for (const [name, steps] of rows) await t.test(`REFUSED: ${name}`, () => refusedAtLoad(steps));
+  for (const [name, steps] of rows) test(`REFUSED: ${name}`, () => refusedAtLoad(steps));
 });
 
-test('load takes a workflow whose routes close', async (t) => {
+describe('load takes a workflow whose routes close', () => {
   const rows: Array<[string, StepSpec[]]> = [
     ['the triage workflow', TRIAGE()],
     ['a node after a condition with no when:, on every route', changed('log', (s) => ({ ...s, after: ['triage'] }))],
@@ -168,14 +168,14 @@ test('load takes a workflow whose routes close', async (t) => {
     ['a workflow node on a route', changed('build-backend', (s) => ({ ...s, workflow: 'build' }))],
     ['a workflow without the routing keys', [step('implement'), step('review', ['implement'])]],
   ];
-  for (const [name, steps] of rows) await t.test(name, () => validate(steps));
+  for (const [name, steps] of rows) test(name, () => validate(steps));
 });
 
 /** A step file with `keys` in its frontmatter. */
 const file = (keys: string): string => `---\nplace: git\n${keys}\n---\nroute the change\n`;
 
-test('a step file reads route: in its three shapes, and refuses any other', async (t) => {
-  await t.test('a table', () => {
+describe('a step file reads route: in its three shapes, and refuses any other', () => {
+  test('a table', () => {
     const s = parseWorkflow(
       'triage',
       file('after: plan\nroutes: [web, docs]\nroute: { from: plan.surface, table: { web: web, docs: docs } }'),
@@ -183,14 +183,14 @@ test('a step file reads route: in its three shapes, and refuses any other', asyn
     assert.deepEqual(s.route, { kind: 'table', from: 'plan.surface', table: { web: 'web', docs: 'docs' } });
     assert.deepEqual(s.routes, ['web', 'docs']);
   });
-  await t.test('a script', () => {
+  test('a script', () => {
     const s = parseWorkflow('triage', file('routes: [web, docs]\nroute: { script: routes/pick.ts }'));
     assert.deepEqual(s.route, { kind: 'script', script: 'routes/pick.ts' });
   });
-  await t.test('a judge', () => {
+  test('a judge', () => {
     assert.deepEqual(parseWorkflow('triage', file('routes: [web, docs]\nroute: judge')).route, { kind: 'judge' });
   });
-  await t.test('when:, ends: and workflow:', () => {
+  test('when:, ends: and workflow:', () => {
     const s = parseWorkflow('w', file('after: triage\nwhen: [web, docs]\nworkflow: build'));
     assert.deepEqual([s.when, s.workflow], [['web', 'docs'], 'build']);
     const c = parseWorkflow('triage', file('routes: [web, docs]\nroute: judge\nends: [docs]'));
@@ -210,23 +210,22 @@ test('a step file reads route: in its three shapes, and refuses any other', asyn
     ['a workflow: that is no name', 'workflow: ../build'],
   ];
   for (const [name, keys] of refused) {
-    await t.test(`REFUSED: ${name}`, () =>
+    test(`REFUSED: ${name}`, () =>
       assert.throws(
         () => parseWorkflow('triage', file(keys)),
         (e: unknown) => e instanceof WorkflowError && e.exitCode === 2,
-      ),
-    );
+      ));
   }
 });
 
-test('a step file with the routing keys renders to a file that reads back as the same step', async (t) => {
+describe('a step file with the routing keys renders to a file that reads back as the same step', () => {
   for (const keys of [
     'after: plan\nroutes: [web, docs]\nroute: { from: plan.surface, table: { web: web, docs: docs } }\nends: [docs]',
     'routes: [web, docs]\nroute: { script: routes/pick.ts }',
     'routes: [web, docs]\nroute: judge',
     'after: triage\nwhen: [web]\nworkflow: build',
   ]) {
-    await t.test(keys.split('\n').join('; '), () => {
+    test(keys.split('\n').join('; '), () => {
       const read = parseWorkflow('triage', file(keys));
       assert.deepEqual(parseWorkflow('triage', renderStep(read)), read);
     });

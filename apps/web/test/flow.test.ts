@@ -1,7 +1,7 @@
 /**
  * A run's steps laid out (src/lib/flow.ts): its graph drawn small, folded around its live column (`graphOf`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { EdgeStep } from '../src/lib/canvas.ts';
@@ -33,8 +33,8 @@ const buildGraph: RunGraph = {
 const buildAt = (states: Record<string, StepState>, notes: Record<string, string> = {}) =>
   graphOf(build, buildGraph, stepsOf(states, notes), ['design', 'land'], false);
 
-test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, folded around the live column", async (t) => {
-  await t.test("a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering's order", () => {
+describe("graphOf and windowOf: a run's steps as its workflow's graph drawn small, folded around the live column", () => {
+  test("a chain of four is a row of points across 188 pixels, on one line, 24 high, in the layering's order", () => {
     const g = buildAt({ design: 'verified', implement: 'working', review: 'waiting', land: 'waiting' });
     assert.deepEqual(readGraph(g), [['design'], ['implement'], ['review'], ['land']]);
     assert.deepEqual(
@@ -56,7 +56,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
       'at work a size larger',
     );
   });
-  await t.test('a loop runs under the row at right angles, its head under the step it runs again, taken only past its first round', () => {
+  test('a loop runs under the row at right angles, its head under the step it runs again, taken only past its first round', () => {
     const first = buildAt({ design: 'verified', implement: 'working', review: 'waiting', land: 'waiting' });
     const back = first.lines.find((l) => l.loop)!;
     const m = /^M([\d.]+),([\d.]+) V([\d.]+) H([\d.]+) V([\d.]+)$/.exec(back.path);
@@ -75,7 +75,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     const again = buildAt({ design: 'verified', implement: 'working', review: 'verified', land: 'waiting' }, { implement: 'round 2 of 3' });
     assert.equal(again.lines.find((l) => l.loop)!.taken, true);
   });
-  await t.test('two loops get two depths under the row, and the graph grows to hold the deeper', () => {
+  test('two loops get two depths under the row, and the graph grows to hold the deeper', () => {
     const g = graphOf(
       ['a', 'b', 'c'],
       graphOfEdges(after('a', 'b'), after('b', 'c'), loop('b', 'a'), loop('c', 'a')),
@@ -87,14 +87,14 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.equal(new Set(bottoms).size, 2, bottoms.join());
     assert.ok(g.height >= Math.max(...bottoms));
   });
-  await t.test('a gate is a tick 12 pixels before each gated step drawn', () => {
+  test('a gate is a tick 12 pixels before each gated step drawn', () => {
     const g = buildAt({ design: 'verified', implement: 'working', review: 'waiting', land: 'waiting' });
     assert.deepEqual(g.gates, [
       { step: 'design', x: 2, y: 8 },
       { step: 'land', x: 162, y: 8 },
     ]);
   });
-  await t.test("a route's fork is two lanes in one column, the condition a dot, the route not taken untaken", () => {
+  test("a route's fork is two lanes in one column, the condition a dot, the route not taken untaken", () => {
     const names = ['intake', 'next', 'to-build', 'to-quick'];
     const graph: RunGraph = {
       roots: ['intake'],
@@ -128,7 +128,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.equal(g.lines.find((l) => l.to === 'step:to-build')!.untaken, false);
     assert.equal(g.height, 24, 'two lanes fit the row');
   });
-  await t.test('nine steps fold to at most six points around the live column, a fold counting the rest', () => {
+  test('nine steps fold to at most six points around the live column, a fold counting the rest', () => {
     const chain = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
     const graph = graphOfEdges(...chain.slice(1).map((name, i) => after(chain[i], name)));
     const g = graphOf(
@@ -143,7 +143,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.deepEqual(g.points[0].names, ['a', 'b', 'c', 'd']);
     assert.equal(g.points[0].kind, 'fold');
   });
-  await t.test('a column of five shows two and a point counting the rest, the live step never among them', () => {
+  test('a column of five shows two and a point counting the rest, the live step never among them', () => {
     const lanes = ['l1', 'l2', 'l3', 'l4', 'l5'];
     const graph = graphOfEdges(...lanes.map((l) => after('plan', l)), ...lanes.map((l) => after(l, 'merge')));
     const states = {
@@ -159,7 +159,7 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
     assert.deepEqual(readGraph(g), [['plan'], ['l1', 'l4', '+3'], ['merge']]);
     assert.equal(g.height, 24 + 13, 'a lane past two takes 13 pixels more');
   });
-  await t.test('a run listed without its graph, by an api older than the board: its steps in its order, no lines, and what to do', () => {
+  test('a run listed without its graph, by an api older than the board: its steps in its order, no lines, and what to do', () => {
     const g = graphOf(
       ['implement', 'review'],
       undefined as unknown as RunGraph,
@@ -175,19 +175,19 @@ test("graphOf and windowOf: a run's steps as its workflow's graph drawn small, f
       UNGRAPHED,
     );
   });
-  await t.test("a cycle in the steps' after is the run's order, no lines, and says why", () => {
+  test("a cycle in the steps' after is the run's order, no lines, and says why", () => {
     const g = graphOf(['a', 'b'], graphOfEdges(after('a', 'b'), after('b', 'a')), stepsOf({ a: 'waiting', b: 'waiting' }), [], false);
     assert.deepEqual(readGraph(g), [['a'], ['b']]);
     assert.equal(g.lines.length, 0);
     assert.match(g.error ?? '', /cycle among a, b/);
   });
-  await t.test('a run called off has nothing live', () => {
+  test('a run called off has nothing live', () => {
     const g = buildAt({ design: 'verified', implement: 'cancelled', review: 'cancelled', land: 'cancelled' });
     const off = graphOf(build, buildGraph, stepsOf({ design: 'verified', implement: 'working' }), [], true);
     assert.ok(off.points.every((p) => !p.live));
     assert.ok(g.points.every((p) => !p.live));
   });
-  await t.test('the window: six slots around the live column, the rest folded into a point that counts them', () => {
+  test('the window: six slots around the live column, the rest folded into a point that counts them', () => {
     assert.deepEqual(windowOf(5, 2), { start: 0, end: 4 });
     assert.deepEqual(windowOf(9, 5), { start: 4, end: 8 });
     assert.deepEqual(windowOf(6, 3, 4), { start: 2, end: 3 });

@@ -4,7 +4,7 @@
  * prints, where a table breaks its rules (one table, `BREAKS`), and what each command of the CLI refuses
  * of its command line before anything is read (one table, `REFUSALS`), matched by the command, flag and fix each names.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { COMMAND_WORDS, CommandRefused, dollarsOf as dollarsOfObjects, parseArgv as parseArgvOf } from 'objects';
@@ -423,9 +423,9 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], Readonly
   ],
 ];
 
-test('a table breaks its rules, each break named with its fix, and a table that keeps them breaks none', async (t) => {
+describe('a table breaks its rules, each break named with its fix, and a table that keeps them breaks none', () => {
   for (const [row, table, runners, broken] of BREAKS)
-    await t.test(row, () => {
+    test(row, () => {
       const breaks = commandBreaks(table, runners);
       assert.equal(breaks.length, broken.length, breaks.join('\n'));
       broken.forEach((fixes, i) => names(breaks[i], ...fixes));
@@ -488,9 +488,9 @@ const REFUSALS: readonly Refused[] = [
   ['up, an interval', 'up', ['10'], null],
 ];
 
-test('REFUSED at shipped defaults: what each command refuses of its command line, before anything is read, Invalid with exit 2', async (t) => {
+describe('REFUSED at shipped defaults: what each command refuses of its command line, before anything is read, Invalid with exit 2', () => {
   for (const [row, command, argv, said, not = []] of REFUSALS)
-    await t.test(row, () => {
+    test(row, () => {
       const words = refusedBy(entry(command), argv);
       if (said === null) return assert.equal(words, null);
       names(words, ...said);
@@ -498,7 +498,7 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
     });
 });
 
-test('a former word or flag is run as what it became, with a hint, and a line in the new words is left as given', async (t) => {
+describe('a former word or flag is run as what it became, with a hint, and a line in the new words is left as given', () => {
   const rows: Array<[string, readonly string[], readonly string[] | undefined]> = [
     ['a group renamed', ['auto', 'show', 'grace'], ['policy', 'show', 'grace']],
     [
@@ -522,18 +522,18 @@ test('a former word or flag is run as what it became, with a hint, and a line in
     ['--nudge on another command is not renamed', ['say', 'r1', 's', '--nudge'], undefined],
   ];
   for (const [name, typed, now] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       const renamed = renamedIn(typed);
       assert.deepEqual(renamed.words, now ?? typed);
       assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former spelling was typed');
       if (now !== undefined) assert.ok(renamed.hint!.includes(['nemia', ...now].join(' ')), 'the hint names the line to type now');
     });
-  await t.test('the hint of a line renamed twice names what was typed', () => {
+  test('the hint of a line renamed twice names what was typed', () => {
     assert.ok(renamedIn(['auto', 'drop', 'r1', '3']).hint!.includes('nemia auto drop'));
   });
 });
 
-test("a body's former value is read as what it became, with a hint naming what to send now, and a body in the new words is left as given", async (t) => {
+describe("a body's former value is read as what it became, with a hint naming what to send now, and a body in the new words is left as given", () => {
   const rows: Array<[string, string, unknown, unknown]> = [
     ["retry's mode nudge, now continue", 'retry', { mode: 'nudge', message: 'go' }, { mode: 'continue', message: 'go' }],
     ['a mode in the new words', 'retry', { mode: 'continue' }, undefined],
@@ -541,7 +541,7 @@ test("a body's former value is read as what it became, with a hint naming what t
     ['a body that is no object is left for its schema', 'retry', ['nudge'], undefined],
   ];
   for (const [name, command, body, now] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       const renamed = renamedValues(command, body);
       assert.deepEqual(renamed.body, now ?? body);
       assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former value was sent');

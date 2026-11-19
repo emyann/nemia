@@ -2,7 +2,7 @@
  * The board's reads of a run's steps as entries of the table, served on the api alone: a step's file, read off the run the store lists,
  * and none for an id it does not have. On a store of its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

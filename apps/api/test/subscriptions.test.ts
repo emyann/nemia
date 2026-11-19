@@ -9,7 +9,7 @@
  * At shipped defaults, over the harness's scratch store (`root`), and an engine of the test's whose `view` answers its tasks.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -49,9 +49,9 @@ async function asked(method: string, name: string, body?: unknown, headers: Reco
 
 const file = (name: string): string => path.join(root, 'subscriptions', `${name}.json`);
 
-test('A person subscribes a long-lived task: given by its words or the defaults, an empty selectors list as the default, each refusal writing nothing, and a floor stored with the level it takes', async (t) => {
-  const s = story(t);
-  await s.test(
+describe('A person subscribes a long-lived task: given by its words or the defaults, an empty selectors list as the default, each refusal writing nothing, and a floor stored with the level it takes', () => {
+  const s = story(test);
+  s.test(
     'a long-lived task is given a subscription, 201, by its words or the defaults; a name taken is a 409; it is taken away, then a 404',
     async () => {
       const put = await asked('POST', 'watch', { task: 'nemia' });
@@ -73,14 +73,14 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
       assert.deepEqual((await asked('DELETE', 'own')).status, 200);
     },
   );
-  await s.test('a selectors list sent empty comes to the default: nothing is stored with a filter that takes every line', async () => {
+  s.test('a selectors list sent empty comes to the default: nothing is stored with a filter that takes every line', async () => {
     const blank = await asked('POST', 'blank', { task: 'nemia', selectors: [] });
     assert.equal(blank.status, 201);
     assert.deepEqual((blank.body.subscription as { selectors: string[] }).selectors, [...DEFAULT_SELECTORS]);
     assert.deepEqual(JSON.parse(fs.readFileSync(file('blank'), 'utf8')).selectors, [...DEFAULT_SELECTORS], "the store's file holds it");
     assert.equal((await asked('DELETE', 'blank')).status, 200);
   });
-  await s.test(
+  s.test(
     'REFUSED: a task never filed is a 404, one not long-lived, a selector refused and minutes not above zero a 422, each before anything is written',
     async () => {
       const nowhere = await asked('POST', 'a', { task: 'nowhere' });
@@ -98,7 +98,7 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
       assert.equal(fs.existsSync(file('a')), false, 'nothing written');
     },
   );
-  await s.test('REFUSED: a body that is not a subscription, and a name that names no file, 400 before anything is written', async () => {
+  s.test('REFUSED: a body that is not a subscription, and a name that names no file, 400 before anything is written', async () => {
     const refusedAt = async (body: unknown, field: string) => {
       const answer = await asked('POST', 'b', body);
       assert.equal(answer.status, 400);
@@ -115,7 +115,7 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
     assert.equal((await asked('DELETE', '..up')).status, 400);
     assert.equal(fs.existsSync(file('b')), false, 'nothing written');
   });
-  await s.test(
+  s.test(
     "a subscription is stored with the floor its runs' factories must be at, and takes the level the package knows alone",
     async () => {
       const put = await asked('POST', 'floored', { task: 'nemia', atLeast: 'auto' });
@@ -142,7 +142,7 @@ test('A person subscribes a long-lived task: given by its words or the defaults,
       assert.equal((await asked('DELETE', 'open')).status, 200);
     },
   );
-  await s.test(
+  s.test(
     "REFUSED: a floor that is no level is a 422 in the package's words, naming --at-least and the levels; one of the wrong type a 400 naming the key",
     async () => {
       const nonsense = await asked('POST', 'd', { task: 'nemia', atLeast: 'nonsense' });

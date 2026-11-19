@@ -11,7 +11,7 @@
  * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
  * functions from `record.store.ts`, or through `runner.ts`, is refused. The store is the file's own, at `ROOT`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,25 +90,22 @@ test('a record of an older shape reads through the door as the one Run type, and
   assert.equal(written.keyNobodyNames, 'kept as it was');
 });
 
-test('a record in the store, read and written back through the door: what it holds is what it held', async (t) => {
-  await t.test(
-    'a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)',
-    () => {
-      const id = 'Old_Id';
-      fs.mkdirSync(runsDir(ROOT), { recursive: true });
-      fs.writeFileSync(runFile(ROOT, id), JSON.stringify(aRun(id), null, 2));
-      const read = act(door.runs.read(RunId.read(id)));
-      assert.ok(!('refused' in read), 'a stored id is read as it is');
-      assert.equal(act(door.runs.rewrite(read)), true);
-    },
-  );
-  await t.test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
+describe('a record in the store, read and written back through the door: what it holds is what it held', () => {
+  test('a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)', () => {
+    const id = 'Old_Id';
+    fs.mkdirSync(runsDir(ROOT), { recursive: true });
+    fs.writeFileSync(runFile(ROOT, id), JSON.stringify(aRun(id), null, 2));
+    const read = act(door.runs.read(RunId.read(id)));
+    assert.ok(!('refused' in read), 'a stored id is read as it is');
+    assert.equal(act(door.runs.rewrite(read)), true);
+  });
+  test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
     const run = made('r-exclusive');
     const text = fs.readFileSync(runFile(ROOT, run.id), 'utf8');
     assert.deepEqual(act(door.runs.create({ ...run, brief: 'another' })), { refused: 'Conflict' });
     assert.equal(fs.readFileSync(runFile(ROOT, run.id), 'utf8'), text);
   });
-  await t.test('a record read and written back moves no byte, a key no nemia writes included', () => {
+  test('a record read and written back moves no byte, a key no nemia writes included', () => {
     const id = 'r-bytes';
     const text = JSON.stringify({ ...aRun(id), laterKey: { kept: [1, 2] } }, null, 2);
     fs.mkdirSync(runsDir(ROOT), { recursive: true });
@@ -116,7 +113,7 @@ test('a record in the store, read and written back through the door: what it hol
     assert.equal(filesStore.runs.rewrite(filesStore.runs.read(id)), true);
     assert.equal(fs.readFileSync(runFile(ROOT, id), 'utf8'), text);
   });
-  await t.test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
+  test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
     made('r-listed');
     fs.writeFileSync(runFile(ROOT, 'r-not-json'), '{ not json');
     const said: string[] = [];
@@ -132,8 +129,8 @@ test('a record in the store, read and written back through the door: what it hol
   });
 });
 
-test('whether a person called a run off: a pause, a hold and a record gone, as the store and the tick each read it', async (t) => {
-  await t.test('every run is called off while the store is paused, and none once the pause is lifted', () => {
+describe('whether a person called a run off: a pause, a hold and a record gone, as the store and the tick each read it', () => {
+  test('every run is called off while the store is paused, and none once the pause is lifted', () => {
     const run = made('r-paused');
     putPause(ROOT, { by: 'ann' });
     try {
@@ -143,7 +140,7 @@ test('whether a person called a run off: a pause, a hold and a record gone, as t
     }
     assert.equal(filesStore.runs.calledOff(run.id), false);
   });
-  await t.test("the store's pause is composed onto every run read and listed, and written back into none", () => {
+  test("the store's pause is composed onto every run read and listed, and written back into none", () => {
     const run = made('r-pause-read');
     const pause = putPause(ROOT, { why: 'merging by hand', by: 'ann' });
     try {
@@ -162,7 +159,7 @@ test('whether a person called a run off: a pause, a hold and a record gone, as t
     }
     assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
   });
-  await t.test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
+  test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
     const run = made('r-may-file');
     const mayFile = mayFileOf(ROOT, run);
     assert.equal(mayFile(), true);
@@ -173,7 +170,7 @@ test('whether a person called a run off: a pause, a hold and a record gone, as t
     assert.equal(mayFile(), false);
     assert.equal(mayFileOf(ROOT, run)(), true);
   });
-  await t.test('a pass files nothing for a run whose record is gone', () => {
+  test('a pass files nothing for a run whose record is gone', () => {
     const run = made('r-may-file-gone');
     fs.rmSync(runFile(ROOT, run.id));
     assert.equal(mayFileOf(ROOT, run)(), false);
@@ -352,8 +349,8 @@ function refusals(sources: Record<string, string>): string[] {
   return out;
 }
 
-test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", async (t) => {
-  await t.test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
+describe("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", () => {
+  test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
     const listed = (): string[] => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-'));
     made('r-ids-read');
     fs.writeFileSync(runFile(ROOT, 'r-ids-torn'), '{ "id": ');
@@ -363,7 +360,7 @@ test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run'
     assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
     assert.ok(!filesStore.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
   });
-  await t.test('no run id is listed with no runs folder', () => {
+  test('no run id is listed with no runs folder', () => {
     const away = path.join(scratch('wf-run-store-ids-'), 'runs');
     fs.renameSync(runsDir(ROOT), away);
     try {
@@ -372,7 +369,7 @@ test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run'
       fs.renameSync(away, runsDir(ROOT));
     }
   });
-  await t.test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
+  test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
     const files = (id: string): string => path.join(runsDir(ROOT), id, 'artifacts');
     fs.mkdirSync(files('r-files-there'), { recursive: true });
     assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
@@ -381,7 +378,7 @@ test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run'
     fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
     assert.equal(filesStore.runs.filesAt('r-files-linked'), undefined);
   });
-  await t.test("a run's files directory dropped is gone, and one never there drops as gone", () => {
+  test("a run's files directory dropped is gone, and one never there drops as gone", () => {
     const files = path.join(runsDir(ROOT), 'r-drop-files', 'artifacts');
     fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
     fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
@@ -390,13 +387,13 @@ test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run'
     assert.equal(fs.existsSync(path.join(runsDir(ROOT), 'r-drop-files')), true, 'the run keeps its own directory');
     assert.equal(filesStore.runs.dropFiles('r-drop-never'), null);
   });
-  await t.test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (c) => {
+  test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (c) => {
     if (process.getuid?.() === 0) return c.skip('root removes what a mode forbids');
     const files = path.join(runsDir(ROOT), 'r-drop-stuck', 'artifacts');
     fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
     fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
     fs.chmodSync(path.join(files, 'implement'), 0o555);
-    c.after(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
+    c.onTestFinished(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
     const why = filesStore.runs.dropFiles('r-drop-stuck');
     assert.match(why ?? '', /EACCES/);
     assert.ok(!why?.includes('\n'), why ?? '');

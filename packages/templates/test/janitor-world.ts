@@ -3,7 +3,7 @@
  * the api, `--no-tick`, with `nemia` first on the PATH as a factory has it, the client asking that api, and the factories a card is filed
  * in. Shared by both, so the world is set up one way.
  */
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -41,7 +41,7 @@ async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
-  t.after(async () => {
+  t.onTestFinished(async () => {
     child.kill();
     await ended;
   });

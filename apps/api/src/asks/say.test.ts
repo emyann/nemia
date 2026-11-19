@@ -12,7 +12,8 @@
  * a standing token the person minted for it, the person by theirs, and the refusal of words that say they are from an agent.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -125,10 +126,12 @@ const refusedWith = async (res: Response, status: number, said: string): Promise
   return ((await res.json()) as { error: string }).error;
 };
 
-test('POST …/say: what it refuses — JSON that is not the words, words the package will not hand on, a run or step not there — nothing said, nothing written', async (t) => {
-  const before = written();
-
-  await t.test('REFUSED at shipped defaults: a body `RunSay` does not read is a 400, naming `text`', async () => {
+describe('POST …/say: what it refuses — JSON that is not the words, words the package will not hand on, a run or step not there — nothing said, nothing written', () => {
+  let before!: { files: { [k: string]: string }; said: { taskId: string; text: string }[] };
+  beforeAll(() => {
+    before = written();
+  });
+  test('REFUSED at shipped defaults: a body `RunSay` does not read is a 400, naming `text`', async () => {
     const bodies: Array<[unknown, string]> = [
       ['Widen the scope to apps/api too.', 'payload'],
       [['Widen the scope'], 'payload'],
@@ -144,31 +147,26 @@ test('POST …/say: what it refuses — JSON that is not the words, words the pa
     }
     assert.deepEqual(written(), before, 'nothing written');
   });
-
-  await t.test(
-    "REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them",
-    async () => {
-      const cases: Array<[string, string, string, RegExp[]]> = [
-        [R, 'implement', '', [/^say: `text` is empty\./]],
-        [R, 'implement', ' \n\t', [/^say: `text` is empty\./]],
-        [
-          R,
-          'settled',
-          'Widen the scope.',
-          [/^settled is not running: try 1's task settled `succeeded`/, /: nemia retry r-say settled --message "<words>"\.$/],
-        ],
-        [C, 'implement', 'Widen the scope.', [/^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z/, /not steered/]],
-      ];
-      for (const [run, step, text, facts] of cases) {
-        const error = await refusedWith(await sayTo(step, { text }, BOARD, run), 409, `${run} ${step} ${JSON.stringify(text)}`);
-        for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
-        assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `nemia say` prints them");
-      }
-      assert.deepEqual(written(), before, 'nothing written');
-    },
-  );
-
-  await t.test('no such run or step is a 404, naming it', async () => {
+  test("REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them", async () => {
+    const cases: Array<[string, string, string, RegExp[]]> = [
+      [R, 'implement', '', [/^say: `text` is empty\./]],
+      [R, 'implement', ' \n\t', [/^say: `text` is empty\./]],
+      [
+        R,
+        'settled',
+        'Widen the scope.',
+        [/^settled is not running: try 1's task settled `succeeded`/, /: nemia retry r-say settled --message "<words>"\.$/],
+      ],
+      [C, 'implement', 'Widen the scope.', [/^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z/, /not steered/]],
+    ];
+    for (const [run, step, text, facts] of cases) {
+      const error = await refusedWith(await sayTo(step, { text }, BOARD, run), 409, `${run} ${step} ${JSON.stringify(text)}`);
+      for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
+      assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `nemia say` prints them");
+    }
+    assert.deepEqual(written(), before, 'nothing written');
+  });
+  test('no such run or step is a 404, naming it', async () => {
     assert.match(
       await refusedWith(await sayTo('implement', { text: 'Widen the scope.' }, BOARD, 'r-nope'), 404, 'no run'),
       /^No run 'r-nope'/,
@@ -178,13 +176,12 @@ test('POST …/say: what it refuses — JSON that is not the words, words the pa
   });
 });
 
-test("a person's words to a working session: the package's `sayRun` hands them to the engine as given, and the step reads them on its detail, its note and the list, as `nemia ls` words it", async (t) => {
-  const s = story(t);
+describe("a person's words to a working session: the package's `sayRun` hands them to the engine as given, and the step reads them on its detail, its note and the list, as `nemia ls` words it", () => {
+  let said!: Said | undefined;
+  const s = story(test);
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
   let records: Record<string, string> = {};
-  let said: Said | undefined;
-
-  await s.test(
+  s.test(
     "words as the board sends them are a 202 with the engine's entry — `at`, `attempt`, `text`, `after` — handed to the engine as given, once, and on the task",
     async () => {
       records = written().files;
@@ -205,8 +202,7 @@ test("a person's words to a working session: the package's `sayRun` hands them t
       assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's record of the task");
     },
   );
-
-  await s.test(
+  s.test(
     "the entry is on the step's detail and in its note, `said to 1×`, as `nemia ls` and the list word it; nothing else written",
     async () => {
       assert.ok(said);
@@ -227,31 +223,38 @@ test("a person's words to a working session: the package's `sayRun` hands them t
   );
 });
 
-test("who says words to a step: a session by its token as its agent, framed; an agent by a standing token as its agent, framed; the person's token as ever", async (t) => {
-  const s = story(t);
-  const token = Effect.runSync(
-    Effect.gen(function* () {
-      return yield* (yield* TokenDoor).tokens.mint({
-        agent: 'implementer',
-        factory: null,
-        run: R,
-        step: 'implement',
-        attempt: 1,
-        task: 't-implement',
-      });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
-  );
-  const asSession = { ...BOARD, authorization: `Bearer ${token}` };
+describe("who says words to a step: a session by its token as its agent, framed; an agent by a standing token as its agent, framed; the person's token as ever", () => {
+  let token!: string;
+  let asSession!: { authorization: string; 'content-type': string; 'sec-fetch-site': string; origin: string; host: string };
+  let ops!: string;
+  let asOperator!: { authorization: string; 'content-type': string; 'sec-fetch-site': string; origin: string; host: string };
+  beforeAll(() => {
+    const t = teardowns();
+    token = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* TokenDoor).tokens.mint({
+          agent: 'implementer',
+          factory: null,
+          run: R,
+          step: 'implement',
+          attempt: 1,
+          task: 't-implement',
+        });
+      }).pipe(Effect.provide(tokenDoorFiles(root))),
+    );
+    asSession = { ...BOARD, authorization: `Bearer ${token}` };
+    ops = Effect.runSync(
+      Effect.gen(function* () {
+        return yield* (yield* TokenDoor).persons.mint('say-ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
+      }).pipe(Effect.provide(tokenDoorFiles(root))),
+    );
+    asOperator = { ...BOARD, authorization: `Bearer ${ops}` };
+    storeAtSemiAuto();
+    return t.end;
+  });
+  const s = story(test);
   const operator = { kind: 'agent', name: 'operator' } as const;
-  const ops = Effect.runSync(
-    Effect.gen(function* () {
-      return yield* (yield* TokenDoor).persons.mint('say-ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
-    }).pipe(Effect.provide(tokenDoorFiles(root))),
-  );
-  const asOperator = { ...BOARD, authorization: `Bearer ${ops}` };
-  storeAtSemiAuto();
-
-  await s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {
+  s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {
     const res = await sayTo('implement', { text: 'Start with the parser.' }, asSession);
     assert.equal(res.status, 202, await res.clone().text());
     const said = (await res.json()) as Said & { from?: unknown; words?: string };
@@ -265,8 +268,7 @@ test("who says words to a step: a session by its token as its agent, framed; an 
       [[{ kind: 'agent', name: 'implementer' }, 'Start with the parser.']],
     );
   });
-
-  await s.test(
+  s.test(
     'REFUSED: words that say they are from an agent are a 422 — from the person, a session or that agent itself; nothing said',
     async () => {
       await refusedWith(await sayTo('implement', { text: 'Cut it.', from: operator }), 422, 'the person naming operator');
@@ -275,8 +277,7 @@ test("who says words to a step: a session by its token as its agent, framed; an 
       assert.equal(standIn().said.length, 1, 'nothing said');
     },
   );
-
-  await s.test(
+  s.test(
     "an agent's standing token is its own, under its name; the person's words stay as they were, a `from` naming them read no further",
     async () => {
       assert.equal((await sayTo('implement', { text: 'Cut it.' }, asOperator)).status, 202);

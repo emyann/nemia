@@ -7,7 +7,7 @@
  * test (`upgrade.archive.boundary.test.ts`): the job runs the package's own CLI, which reads an archive install only where the code runs
  * from one, and this test's code is the checkout.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

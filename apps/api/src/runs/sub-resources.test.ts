@@ -5,7 +5,7 @@
  * On the stand-ins: the runtime's test engine, its task filed and settled by hand, and the test place, under the record this file seeds.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,8 +51,8 @@ const get = async (url: string) => {
 };
 const at = `/api/runs/${R}/steps/implement`;
 
-test("a run's step answers its tries, one try, that try's closeout and what it was told, each on its own route", async (t) => {
-  await t.test('the tries: the one try the step ran', async () => {
+describe("a run's step answers its tries, one try, that try's closeout and what it was told, each on its own route", () => {
+  test('the tries: the one try the step ran', async () => {
     const { status, body } = await get(`${at}/tries`);
     assert.equal(status, 200);
     assert.deepEqual(
@@ -61,7 +61,7 @@ test("a run's step answers its tries, one try, that try's closeout and what it w
       'one try',
     );
   });
-  await t.test("the closeout's route answers the closeout the try carries", async () => {
+  test("the closeout's route answers the closeout the try carries", async () => {
     const one = await get(`${at}/tries/1`);
     const closeout = await get(`${at}/tries/1/closeout`);
     assert.equal(one.status, 200);
@@ -73,10 +73,10 @@ test("a run's step answers its tries, one try, that try's closeout and what it w
     );
     assert.equal((closeout.body as { closeout: { summary: string } }).closeout.summary, 'Built it.', 'the step signed off with it');
   });
-  await t.test('the told layers answer', async () => {
+  test('the told layers answer', async () => {
     assert.equal((await get(`${at}/told`)).status, 200);
   });
-  await t.test('REFUSED: a try or a step the run does not have is a 404', async () => {
+  test('REFUSED: a try or a step the run does not have is a 404', async () => {
     assert.equal((await get(`${at}/tries/7/closeout`)).status, 404, 'no try 7');
     assert.equal((await get(`/api/runs/${R}/steps/gone/tries`)).status, 404, 'no step gone');
   });

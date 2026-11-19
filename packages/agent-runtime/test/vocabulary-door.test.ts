@@ -4,7 +4,7 @@
  * and `core/own.ts` alone, and none imports Effect or a module of node's. A caller that only judges words loads it without loading a
  * runner. Type-only imports are erased and let through.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

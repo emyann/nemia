@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { scratch } from 'test-kit/scratch';
 import { alive, servedIn, startHolder } from './e2e/serve.ts';
 

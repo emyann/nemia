@@ -5,7 +5,7 @@
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

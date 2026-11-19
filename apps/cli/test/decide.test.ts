@@ -5,7 +5,7 @@
  * whole (`?diffs=*`). `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit
  * 2, before any read.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -81,7 +81,7 @@ const stub = http.createServer((req, res) => {
   res.end(JSON.stringify(body ?? { error: `no run ${id}: list the runs with nemia ls` }));
 });
 await new Promise<void>((resolve) => stub.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   stub.closeAllConnections();
   stub.close();
 });

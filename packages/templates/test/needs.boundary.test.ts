@@ -7,7 +7,7 @@
  * is driven in a stand-in repository, its `playwright-core` (under `@playwright/mcp` or at its root) a stand-in that names a build under
  * a stand-in `PLAYWRIGHT_BROWSERS_PATH`, and whose installer records how it was run and puts the build there.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -130,9 +130,8 @@ async function releaseServer(sum?: string): Promise<{ url: string; close: () => 
   return { url: `http://127.0.0.1:${port}/latest`, close: () => new Promise((resolve) => server.close(() => resolve())) };
 }
 
-test(
+test.skipIf(process.platform !== 'linux')(
   'install-gh puts the release for this machine into the tools folder and links its gh into tools/bin',
-  { skip: process.platform !== 'linux' },
   async () => {
     const server = await releaseServer();
     try {
@@ -150,9 +149,8 @@ test(
   },
 );
 
-test(
+test.skipIf(process.platform !== 'linux')(
   'REFUSED: install-gh where the tarball is not the one the checksums name, and nothing is linked',
-  { skip: process.platform !== 'linux' },
   async () => {
     const server = await releaseServer('f'.repeat(64));
     try {

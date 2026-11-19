@@ -8,7 +8,7 @@
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,20 +74,18 @@ const tokenFiles = (): Array<{ name: string; text: string }> => {
   return fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => ({ name, text: fs.readFileSync(path.join(dir, name), 'utf8') })) : [];
 };
 
-test('a step is filed a session token, which names its agent while its try is live and is refused once it ends', async (t) => {
-  const s = story(t);
+describe('a step is filed a session token, which names its agent while its try is live and is refused once it ends', () => {
+  const s = story(test);
   let id = '';
   let token = '';
-
-  await s.test("the filed session's environment carries a token of its own, 32 bytes in base64url", async () => {
+  s.test("the filed session's environment carries a token of its own, 32 bytes in base64url", async () => {
     const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder() }));
     id = run.id;
     assert.deepEqual((await pass(id)).filed, ['implement']);
     token = tokenOf(`${id}-implement`) ?? '';
     assert.match(token, /^[A-Za-z0-9_-]{43}$/);
   });
-
-  await s.test('the store keeps only the record its digest names, never the token in the clear', () => {
+  s.test('the store keeps only the record its digest names, never the token in the clear', () => {
     const files = tokenFiles();
     const mine = files.filter((f) => f.name === `${tokenDigest(token)}.json`);
     assert.equal(mine.length, 1);
@@ -104,8 +102,7 @@ test('a step is filed a session token, which names its agent while its try is li
       'no file holds the token itself',
     );
   });
-
-  await s.test('a request presenting it is the agent of its step, in its factory and run', async () => {
+  s.test('a request presenting it is the agent of its step, in its factory and run', async () => {
     assert.deepEqual(await callerBy(token), {
       kind: 'agent',
       agent: 'implement',
@@ -116,17 +113,14 @@ test('a step is filed a session token, which names its agent while its try is li
       narrowed: null,
     });
   });
-
-  await s.test('a program presenting none, to what needs none, is the person under no token', async () => {
+  s.test('a program presenting none, to what needs none, is the person under no token', async () => {
     assert.deepEqual(await callerBy(undefined), { kind: 'person', token: null });
   });
-
-  await s.test('once its try settled, the token is refused session-ended', async () => {
+  s.test('once its try settled, the token is refused session-ended', async () => {
     stage.board().settle(`${id}-implement`, 'failed', { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: null });
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
-
-  await s.test('a later try is filed a new token, live, while the first stays refused', async () => {
+  s.test('a later try is filed a new token, live, while the first stays refused', async () => {
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' }));
     await pass(id);
     const second = tokenOf(`${id}-implement-try2`) ?? '';
@@ -135,15 +129,14 @@ test('a step is filed a session token, which names its agent while its try is li
     assert.equal((await callerBy(second)).kind, 'agent');
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
-
-  await s.test('a token whose record the store does not hold is refused unknown-token', async () => {
+  s.test('a token whose record the store does not hold is refused unknown-token', async () => {
     fs.rmSync(path.join(tokensDir(ROOT), `${tokenDigest(token)}.json`));
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'unknown-token' });
   });
 });
 
-test("a session that is no run's is live while its task has not settled, in no factory", async (t) => {
-  await t.test('live while filed and unsettled, ended once settled', async () => {
+describe("a session that is no run's is live while its task has not settled, in no factory", () => {
+  test('live while filed and unsettled, ended once settled', async () => {
     const task = 'nemia-session-token';
     const token = mintToken(ROOT, { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
@@ -162,14 +155,13 @@ test("a session that is no run's is live while its task has not settled, in no f
   });
 });
 
-test('a standing token is its holder whatever the route needs, until retired by name; none is refused where a route needs one', async (t) => {
-  await t.test('no token: the person where the route needs none, refused token-required where it needs any', async () => {
+describe('a standing token is its holder whatever the route needs, until retired by name; none is refused where a route needs one', () => {
+  test('no token: the person where the route needs none, refused token-required where it needs any', async () => {
     assert.deepEqual(await callerBy(undefined, 'none'), { kind: 'person', token: null });
     for (const need of ['token', 'standing'] as const)
       assert.deepEqual(await callerBy(undefined, need), { kind: 'refused', reason: 'token-required' }, need);
   });
-
-  await t.test("a person's token is the person under its name, on a route that needs none, any token, or a standing one", async () => {
+  test("a person's token is the person under its name, on a route that needs none, any token, or a standing one", async () => {
     const token = mintPersonToken(ROOT, 'laptop');
     for (const need of ['none', 'token', 'standing'] as const)
       assert.deepEqual(await callerBy(token, need), { kind: 'person', token: 'laptop' }, need);
@@ -177,29 +169,23 @@ test('a standing token is its holder whatever the route needs, until retired by 
     for (const need of ['none', 'token', 'standing'] as const)
       assert.deepEqual(await callerBy(token, need), { kind: 'refused', reason: 'unknown-token' }, `${need}, once removed`);
   });
-
-  await t.test('a token minted before holders were said, a record with no holder, is the person under its name', async () => {
+  test('a token minted before holders were said, a record with no holder, is the person under its name', async () => {
     const token = mintPersonToken(ROOT, 'old-laptop');
     const file = path.join(personTokensDir(ROOT), `${tokenDigest(token)}.json`);
     assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')) as object).sort(), ['createdAt', 'name']);
     fs.writeFileSync(file, `${JSON.stringify({ name: 'old-laptop', createdAt: '2026-01-01T00:00:00.000Z' })}\n`);
     assert.deepEqual(await callerBy(token, 'standing'), { kind: 'person', token: 'old-laptop' });
   });
-
-  await t.test(
-    "an agent's token is its agent under the token's name, in the factory it is bound to, with its narrowing, in no run",
-    async () => {
-      const token = mintPersonToken(ROOT, 'ops', new Date(), { kind: 'agent', agent: 'operator', factory: 'a', narrowed: 'act' });
-      for (const need of ['token', 'standing'] as const)
-        assert.deepEqual(
-          await callerBy(token, need),
-          { kind: 'agent', agent: 'operator', factory: 'a', run: null, step: null, token: 'ops', narrowed: 'act' },
-          need,
-        );
-    },
-  );
-
-  await t.test("a live session's token is refused person-token-required where the route needs a standing one", async () => {
+  test("an agent's token is its agent under the token's name, in the factory it is bound to, with its narrowing, in no run", async () => {
+    const token = mintPersonToken(ROOT, 'ops', new Date(), { kind: 'agent', agent: 'operator', factory: 'a', narrowed: 'act' });
+    for (const need of ['token', 'standing'] as const)
+      assert.deepEqual(
+        await callerBy(token, need),
+        { kind: 'agent', agent: 'operator', factory: 'a', run: null, step: null, token: 'ops', narrowed: 'act' },
+        need,
+      );
+  });
+  test("a live session's token is refused person-token-required where the route needs a standing one", async () => {
     const task = 'nemia-person-need';
     const token = mintToken(ROOT, { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
     await Effect.runPromise(stage.board().e.file({ id: task, brief: 'be on', cwd: ROOT, restartPolicy: 'Always' }));
@@ -251,8 +237,8 @@ const sayAs = async (runId: string, token: string, ...words: string[]) => {
   return stage.runWith(stage.board().e, SAY.handler({ runId, step: 'implement', text: words.join(' '), caller }));
 };
 
-test("`nemia say` from a step's session says its words as its agent's, by the token in its environment; an ended one is refused", async (t) => {
-  const s = story(t);
+describe("`nemia say` from a step's session says its words as its agent's, by the token in its environment; an ended one is refused", () => {
+  const s = story(test);
   let id = '';
   let token = '';
   const heard = () =>
@@ -260,8 +246,7 @@ test("`nemia say` from a step's session says its words as its agent's, by the to
       .board()
       .tasks.get(`${id}-implement`)
       ?.said.map((x) => x.text) ?? [];
-
-  await s.test("a live step's token frames the words under its agent", async () => {
+  s.test("a live step's token frames the words under its agent", async () => {
     const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder() }));
     id = run.id;
     await pass(id);
@@ -270,16 +255,14 @@ test("`nemia say` from a step's session says its words as its agent's, by the to
     await sayAs(id, token, 'Start', 'with', 'the', 'parser.');
     assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.']);
   });
-
-  await s.test("an agent's standing token frames them under its agent; the person's token says them as ever", async () => {
+  s.test("an agent's standing token frames them under its agent; the person's token says them as ever", async () => {
     const ops = mintPersonToken(ROOT, 'say-ops', new Date(), { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
     const laptop = mintPersonToken(ROOT, 'say-laptop');
     await sayAs(id, ops, 'Cut', 'it.');
     await sayAs(id, laptop, 'Widen', 'it.');
     assert.deepEqual(heard().slice(1), ['The agent operator writes, not the person: Cut it.', 'Widen it.']);
   });
-
-  await s.test('REFUSED: a token whose try ended is a Conflict, never taken as the person, and nothing is said', async () => {
+  s.test('REFUSED: a token whose try ended is a Conflict, never taken as the person, and nothing is said', async () => {
     stage.board().settle(`${id}-implement`, 'failed', { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: null });
     await assert.rejects(sayAs(id, token, 'hello'), (err: Error & { exitCode?: number }) => {
       assert.equal(err.name, 'Conflict');

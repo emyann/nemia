@@ -5,7 +5,7 @@
  * `e2e/visit.test.ts` runs a page that fails so through the runner, and reads the lines at the end of both streams.
  */
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { headlineOf } from './e2e/visit.ts';
 
 const PICTURE = '  what it looked like: /tmp/out/factory-gate-light-failed.png';

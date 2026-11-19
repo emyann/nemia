@@ -5,7 +5,7 @@
  * Which harnesses are carried is `upgradeCarries`' contract; this is its reading of the disk and its running. What a deactivation leaves is
  * run through a real shell in `carry.boundary.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,9 +53,9 @@ const ROWS: readonly Row[] = [
   },
 ];
 
-test('carryHarnesses reads what the store holds and the tree carries, and installs each at its pin', async (t) => {
+describe('carryHarnesses reads what the store holds and the tree carries, and installs each at its pin', () => {
   for (const row of ROWS)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       const home = scratch('wf-carry-');
       const tree = scratch('wf-carry-tree-');
       const stubs = scratch('wf-carry-stubs-');

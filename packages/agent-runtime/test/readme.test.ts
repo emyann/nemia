@@ -6,7 +6,7 @@
  * or lines is a false claim, not a stale one. Each check below is first made to refuse a README that
  * says such a thing, then run against the real one.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

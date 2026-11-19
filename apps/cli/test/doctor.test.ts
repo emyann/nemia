@@ -5,7 +5,7 @@
  * followed to its end, the code it declares shown again, and the exit is its phase's. A met piece shows the fix that removes it, a typed
  * fix the command to type; the verb it replaced, `readiness`, is refused with exit 2.
  */
-import { after, test } from 'node:test';
+import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
@@ -114,7 +114,7 @@ const stub = http.createServer((req, res) => {
   });
 });
 await new Promise<void>((resolve) => stub.listen(0, '127.0.0.1', resolve));
-after(() => {
+afterAll(() => {
   stub.closeAllConnections();
   stub.close();
 });
@@ -260,19 +260,19 @@ test('REFUSED: an ask with no `--answer` and no terminal to ask it on is a usage
   assert.equal(started.length, from, 'no fix started');
 });
 
-test('`nemia doctor`\'s last line says what the missing pieces cost, never "not ready", and "first run" only where none ran', async (t) => {
+describe('`nemia doctor`\'s last line says what the missing pieces cost, never "not ready", and "first run" only where none ran', () => {
   const linger = { name: 'linger', area: 'service', state: 'missing', message: 'stops at log out', fixes: [], cost: 'server' } as const;
   const token = { name: 'claude-token', area: 'harness', state: 'missing', message: 'no token', fixes: [], cost: 'run' } as const;
   const last = (read: Parameters<typeof doctorLines>[0]) => doctorLines(read).at(-1) ?? '';
-  await t.test('a server whose factories have run, missing only linger: no run waits on it', () => {
+  test('a server whose factories have run, missing only linger: no run waits on it', () => {
     const said = last({ ready: false, ran: true, pieces: [linger] });
     assert.match(said, /no run waits on/);
     assert.doesNotMatch(said, /not ready|first run/);
   });
-  await t.test('a server that never ran, missing a piece a run waits on: before its first run', () => {
+  test('a server that never ran, missing a piece a run waits on: before its first run', () => {
     assert.match(last({ ready: false, ran: false, pieces: [token] }), /first run/);
   });
-  await t.test('every piece in place: ready', () => {
+  test('every piece in place: ready', () => {
     assert.equal(last({ ready: true, ran: true, pieces: [{ ...linger, state: 'met' }] }), 'ready');
   });
 });

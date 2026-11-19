@@ -4,7 +4,7 @@
  * card's focused title, which the kit's `ContextMenu` opens on. A play function's keys are a script's, which the browser makes nothing of
  * (`menuKey`, `.storybook/play.ts`), so this is read here. `npm run e2e -- --look` runs this; it needs Chromium.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from 'test-kit/scratch';
@@ -13,11 +13,11 @@ import { openStory, serveBuilt, storybookFor } from './stories/built.ts';
 
 let browser: Browser;
 let served: { at: string; close: () => void };
-before(async () => {
+beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-menu-key-storybook-')));
   browser = await chromium.launch();
-}, WAITED);
-after(async () => {
+}, WAITED.timeout);
+afterAll(async () => {
   await browser?.close();
   served?.close();
 });

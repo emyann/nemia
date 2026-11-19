@@ -5,7 +5,7 @@
  * the runtime's default (`fenceReach`) and the flags it renders (`renderedFlags`). How those flags reach Claude Code is the runtime's,
  * pinned in its `test/claude-code.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,8 +53,8 @@ const widens = (agents: Agents, agent: string, line: string, added: string) =>
     agent,
   );
 
-test("a step may narrow its agent's fence and never widen it, key by key, as a file, a hire and a write read it", async (t) => {
-  await t.test('REFUSED: `tools:` naming a tool its agent does not have, naming only what it adds; a narrower list loads', () => {
+describe("a step may narrow its agent's fence and never widen it, key by key, as a file, a hire and a write read it", () => {
+  test('REFUSED: `tools:` naming a tool its agent does not have, naming only what it adds; a narrower list loads', () => {
     const agents = agentsOf({ builder: '---\ntools: Read, Grep, Skill\n---\nWork.\n', open: '---\n---\nWork.\n' });
     const said = refusal(() => stepOf(agents, 'agent: builder\ntools: Read, Bash'));
     holds(said, 'tools: Read, Bash', '`Bash`', 'builder');
@@ -62,32 +62,27 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     assert.deepEqual(stepOf(agents, 'agent: builder\ntools: Read').tools, ['Read'], 'a narrower list loads');
     assert.deepEqual(stepOf(agents, 'agent: open\ntools: Read, Bash').tools, ['Read', 'Bash'], 'an agent with no list has every tool');
   });
-
-  await t.test(
-    'REFUSED: `allowedTools:` allowing what its agent does not; a prefix covers one command, never a longer word or a chain',
-    () => {
-      const agents = agentsOf({ builder: '---\nallowedTools: Bash(npm:*)\n---\nWork.\n', bare: '---\n---\nWork.\n' });
-      const said = refusal(() => stepOf(agents, 'agent: builder\nallowedTools: Bash(npm test), Bash(git push)'));
-      holds(said, 'allowedTools: Bash(npm test), Bash(git push)', '`Bash(git push)`', 'builder');
-      assert.equal(said.includes('`Bash(npm test)`'), false, 'names only what it adds');
-      assert.deepEqual(stepOf(agents, 'agent: builder\nallowedTools: Bash(npm run lint)').allowedTools, ['Bash(npm run lint)'], 'covered');
-      for (const rule of [
-        'Bash(npmx)',
-        'Bash(npm test && git push)',
-        'Bash(npm test; curl x)',
-        'Bash(npm test | sh)',
-        'Bash(npm test > /etc/x)',
-        'Bash(npm $(x))',
-      ])
-        names(
-          refusal(() => stepOf(agents, `agent: builder\nallowedTools: ${rule}`)),
-          `\`${rule}\``,
-        );
-      widens(agents, 'bare', 'allowedTools: Agent', '`Agent`');
-    },
-  );
-
-  await t.test('REFUSED: a path rule outside the one its agent allows, by `..` or an anchor elsewhere; a path under it loads', () => {
+  test('REFUSED: `allowedTools:` allowing what its agent does not; a prefix covers one command, never a longer word or a chain', () => {
+    const agents = agentsOf({ builder: '---\nallowedTools: Bash(npm:*)\n---\nWork.\n', bare: '---\n---\nWork.\n' });
+    const said = refusal(() => stepOf(agents, 'agent: builder\nallowedTools: Bash(npm test), Bash(git push)'));
+    holds(said, 'allowedTools: Bash(npm test), Bash(git push)', '`Bash(git push)`', 'builder');
+    assert.equal(said.includes('`Bash(npm test)`'), false, 'names only what it adds');
+    assert.deepEqual(stepOf(agents, 'agent: builder\nallowedTools: Bash(npm run lint)').allowedTools, ['Bash(npm run lint)'], 'covered');
+    for (const rule of [
+      'Bash(npmx)',
+      'Bash(npm test && git push)',
+      'Bash(npm test; curl x)',
+      'Bash(npm test | sh)',
+      'Bash(npm test > /etc/x)',
+      'Bash(npm $(x))',
+    ])
+      names(
+        refusal(() => stepOf(agents, `agent: builder\nallowedTools: ${rule}`)),
+        `\`${rule}\``,
+      );
+    widens(agents, 'bare', 'allowedTools: Agent', '`Agent`');
+  });
+  test('REFUSED: a path rule outside the one its agent allows, by `..` or an anchor elsewhere; a path under it loads', () => {
     const agents = agentsOf({ editor: '---\nallowedTools: Edit(**), Read(docs/**)\n---\nWork.\n' });
     assert.deepEqual(stepOf(agents, 'agent: editor\nallowedTools: Edit(notes/**), Read(docs/a.md)').allowedTools, [
       'Edit(notes/**)',
@@ -96,8 +91,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     for (const rule of ['Edit(/etc/**)', 'Edit(~/x)', 'Edit(notes/../../x)', 'Read(src/**)', 'Read(docs/../x)'])
       widens(agents, 'editor', `allowedTools: ${rule}`, `\`${rule}\``);
   });
-
-  await t.test('REFUSED: an `Edit` allow over an agent whose mode asks first, which a mode that edits unasked already grants', () => {
+  test('REFUSED: an `Edit` allow over an agent whose mode asks first, which a mode that edits unasked already grants', () => {
     const agents = agentsOf({
       asks: '---\npermissionMode: dontAsk\n---\nWork.\n',
       edits: '---\npermissionMode: acceptEdits\n---\nWork.\n',
@@ -114,8 +108,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     widens(agents, 'edits', 'allowedTools: Edit(/etc/**)', '`Edit(/etc/**)`');
     assert.deepEqual(stepOf(agents, 'agent: bypass\nallowedTools: Bash(git push)').allowedTools, ['Bash(git push)'], 'asks about nothing');
   });
-
-  await t.test("a step's `disallowedTools:` adds to its agent's: its own rules, then each of the agent's they do not cover", () => {
+  test("a step's `disallowedTools:` adds to its agent's: its own rules, then each of the agent's they do not cover", () => {
     const agents = agentsOf({ builder: '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n' });
     const step = stepOf(agents, 'agent: builder\ndisallowedTools: Bash(npm run build)');
     assert.deepEqual(step.disallowedTools, ['Bash(npm run build)', 'Bash(git push)', 'Bash(git push:*)']);
@@ -128,8 +121,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     assert.deepEqual(stepOf(agents, 'agent: builder\ndisallowedTools: Bash').disallowedTools, ['Bash'], 'a bare tool covers its rules');
     assert.deepEqual(stepOf(agents, 'agent: builder').disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], "no line is the agent's");
   });
-
-  await t.test("REFUSED: `permissionMode:` wider than its agent's, or than the runtime's default when it names none", () => {
+  test("REFUSED: `permissionMode:` wider than its agent's, or than the runtime's default when it names none", () => {
     const agents = agentsOf({ builder: '---\npermissionMode: dontAsk\n---\nWork.\n', open: '---\n---\nWork.\n' });
     widens(agents, 'builder', 'permissionMode: acceptEdits', 'dontAsk');
     assert.equal(stepOf(agents, 'agent: builder\npermissionMode: plan').permissionMode, 'plan');
@@ -137,8 +129,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     widens(agents, 'open', 'permissionMode: bypassPermissions', fenceReach('claude')!.given);
     assert.equal(stepOf(agents, 'agent: open\npermissionMode: auto').permissionMode, 'auto');
   });
-
-  await t.test("REFUSED: `sandbox:` wider than its agent's, under either name, or than codex's default when it names none", () => {
+  test("REFUSED: `sandbox:` wider than its agent's, under either name, or than codex's default when it names none", () => {
     const agents = agentsOf({
       reviewer: '---\nharness: codex\nsandbox: read-only\n---\nReview.\n',
       coder: '---\nharness: codex\n---\nCode.\n',
@@ -151,8 +142,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     widens(agents, 'coder', 'sandbox: danger-full-access', 'workspace-write');
     assert.equal(stepOf(agents, 'agent: coder\nsandbox: read-only').sandbox, 'read-only');
   });
-
-  await t.test('REFUSED: a step that runs a fenced agent on the other harness; an unfenced agent moves', () => {
+  test('REFUSED: a step that runs a fenced agent on the other harness; an unfenced agent moves', () => {
     const agents = agentsOf({
       implementer: '---\nharness: claude\npermissionMode: dontAsk\n---\nImplement.\n',
       reviewer: '---\nharness: codex\nsandbox: read-only\n---\nReview.\n',
@@ -166,8 +156,7 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     );
     assert.equal(stepOf(agents, 'agent: open\nharness: codex\nsandbox: read-only').sandbox, 'read-only');
   });
-
-  await t.test('REFUSED: the same widening on an agent a factory hires, and through writeWorkflow, which writes nothing', () => {
+  test('REFUSED: the same widening on an agent a factory hires, and through writeWorkflow, which writes nothing', () => {
     const agents = agentsOf({ builder: '---\ntools: Read, Grep\n---\nWork.\n' });
     const hired = refusal(() =>
       parseWorkflow('build', '---\nplace: git\ntools: Read, Bash\n---\nDo it.\n', undefined, agents, undefined, {
@@ -192,7 +181,6 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     );
     assert.equal(fs.readFileSync(file, 'utf8'), '---\nplace: git\nagent: builder\n---\n', 'nothing written');
   });
-
   const cases: [string | undefined, string | undefined, ReturnType<typeof directoryFence>][] = [
     [undefined, 'Bash', { permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] }],
     ['acceptEdits', undefined, { permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] }],
@@ -207,45 +195,38 @@ test("a step may narrow its agent's fence and never widen it, key by key, as a f
     ['manual', 'Read', undefined],
   ];
   for (const [mode, allows, fence] of cases)
-    await t.test(
-      `${fence ? '' : 'REFUSED: '}directoryFence: the fence held to the directory, over ${mode ?? 'no mode'} allowing ${allows ?? 'nothing'}`,
-      () => {
-        assert.deepEqual(directoryFence(mode, allows), fence);
-        if (fence === undefined) return;
-        const agent = [
-          '---',
-          ...(mode ? [`permissionMode: ${mode}`] : []),
-          ...(allows ? [`allowedTools: ${allows}`] : []),
-          '---',
-          'Work.',
-          '',
-        ];
-        const lines = [
-          `permissionMode: ${fence.permissionMode}`,
-          ...(fence.allowedTools.length ? [`allowedTools: ${fence.allowedTools.join(', ')}`] : []),
-        ];
-        const step = stepOf(agentsOf({ tried: agent.join('\n') }), ['agent: tried', ...lines].join('\n'));
-        assert.equal(step.permissionMode, fence.permissionMode, 'the fence given loads over its agent');
-      },
+    test(`${fence ? '' : 'REFUSED: '}directoryFence: the fence held to the directory, over ${mode ?? 'no mode'} allowing ${allows ?? 'nothing'}`, () => {
+      assert.deepEqual(directoryFence(mode, allows), fence);
+      if (fence === undefined) return;
+      const agent = [
+        '---',
+        ...(mode ? [`permissionMode: ${mode}`] : []),
+        ...(allows ? [`allowedTools: ${allows}`] : []),
+        '---',
+        'Work.',
+        '',
+      ];
+      const lines = [
+        `permissionMode: ${fence.permissionMode}`,
+        ...(fence.allowedTools.length ? [`allowedTools: ${fence.allowedTools.join(', ')}`] : []),
+      ];
+      const step = stepOf(agentsOf({ tried: agent.join('\n') }), ['agent: tried', ...lines].join('\n'));
+      assert.equal(step.permissionMode, fence.permissionMode, 'the fence given loads over its agent');
+    });
+  test('a step that names no mode is filed none, the runtime giving its default; its instructions, skills and harnessPrompt render three flags', () => {
+    const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
+    const step = parseWorkflow('write', '---\nplace: git\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
+    assert.equal(step.permissionMode, undefined);
+    const agents = path.join(scratch('wf-fence-auto-'), 'agents', 'write');
+    fs.mkdirSync(path.join(agents, 'nemia-scribe'), { recursive: true });
+    fs.writeFileSync(path.join(agents, 'prompt.md'), 'You write.\n');
+    const claude = renderedFlags(step, agents);
+    assert.deepEqual(
+      Object.keys(claude ?? {}).sort(),
+      ['appendSystemPromptFile', 'pluginDir', 'settings'],
+      'every flag but systemPromptFile',
     );
-
-  await t.test(
-    'a step that names no mode is filed none, the runtime giving its default; its instructions, skills and harnessPrompt render three flags',
-    () => {
-      const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
-      const step = parseWorkflow('write', '---\nplace: git\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
-      assert.equal(step.permissionMode, undefined);
-      const agents = path.join(scratch('wf-fence-auto-'), 'agents', 'write');
-      fs.mkdirSync(path.join(agents, 'nemia-scribe'), { recursive: true });
-      fs.writeFileSync(path.join(agents, 'prompt.md'), 'You write.\n');
-      const claude = renderedFlags(step, agents);
-      assert.deepEqual(
-        Object.keys(claude ?? {}).sort(),
-        ['appendSystemPromptFile', 'pluginDir', 'settings'],
-        'every flag but systemPromptFile',
-      );
-      assert.deepEqual(claude?.pluginDir, [path.join(agents, 'nemia-scribe')]);
-      assert.equal(claude?.settings, '{"outputStyle":"nemia-scribe:no-coding"}', 'the runtime adds its own keys');
-    },
-  );
+    assert.deepEqual(claude?.pluginDir, [path.join(agents, 'nemia-scribe')]);
+    assert.equal(claude?.settings, '{"outputStyle":"nemia-scribe:no-coding"}', 'the runtime adds its own keys');
+  });
 });

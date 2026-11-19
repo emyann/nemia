@@ -5,7 +5,7 @@
  * routes these retire answering 404 — in a scratch store and a scratch repository.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

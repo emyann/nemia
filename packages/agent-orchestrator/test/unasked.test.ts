@@ -1,5 +1,5 @@
 /** The check of an engine no command is to ask (`unasked`): it refuses each of the four writes, and lets a read through. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { Engine } from 'agent-runtime';

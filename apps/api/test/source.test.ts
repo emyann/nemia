@@ -4,7 +4,7 @@
  * them with escapes. Tab, line feed and carriage return are text.
  */
 import './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -4,7 +4,7 @@
  * secondary meter's indicator each take the colour of `--md-sys-color-secondary`, in light and dark, and not shadcn's quiet surface.
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
 import { scratch } from 'test-kit/scratch';
@@ -13,11 +13,11 @@ import { openStory, serveBuilt, storybookFor } from './stories/built.ts';
 
 let browser: Browser;
 let served: { at: string; close: () => void };
-before(async () => {
+beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-secondary-storybook-')));
   browser = await chromium.launch();
-}, WAITED);
-after(async () => {
+}, WAITED.timeout);
+afterAll(async () => {
   await browser?.close();
   served?.close();
 });

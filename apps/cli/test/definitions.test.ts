@@ -6,7 +6,7 @@
  * its files or through the api), and the lines it prints. A refusal asserts its exit code and the command or file it names, never its
  * sentence.
  */
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -35,7 +35,7 @@ const seed = (root: string): void => {
 };
 
 const store = await servedStore('nemia-definitions-', seed);
-after(store.stop);
+afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, `stdin` its input, typed in the folder `cwd` (this test's own where none is named), waited on for its end. */
 function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = '', cwd?: string): Promise<Said> {
@@ -194,7 +194,7 @@ test('`nemia workflows rm` removes a folder of yours at its version, printing th
 
 test('under a remote context pointed at the served store: the same verbs land there, a path typed as the daemon reads it', async () => {
   const exposed = await servedStore('nemia-definitions-remote-', seed, { WF_EXPOSED: '1' });
-  after(exposed.stop);
+  afterAll(exposed.stop);
   const minted = await nemia(['token', 'add', 'laptop'], exposed.env);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

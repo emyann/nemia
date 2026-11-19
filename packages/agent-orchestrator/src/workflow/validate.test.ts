@@ -3,7 +3,7 @@
  * the rules that need a step's file (a schema beside it, a key read on its own). One table of structure rules, a row each, then the
  * focused cases of `orderSteps`, `terminalSteps`, `fansOut` and `loopSpan`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { fansOut, isFolderTeam, loopSpan, orderSteps, terminalSteps, validate } from './validate.ts';
 import { parseWorkflow } from './step-file.ts';
@@ -430,9 +430,9 @@ const ROWS: Row[] = [
   },
 ];
 
-test('the structure of a workflow: what loads, and what is refused naming the step and its fix', async (t) => {
+describe('the structure of a workflow: what loads, and what is refused naming the step and its fix', () => {
   for (const { row, run, naming } of ROWS)
-    await t.test(row, () => {
+    test(row, () => {
       if (!naming) return void run();
       const [at, ...named] = naming;
       assert.throws(run, (e: unknown) => {

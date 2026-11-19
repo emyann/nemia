@@ -25,7 +25,7 @@
  * - `<folder>/given` is the run's to empty and write each time the step is filed: a link there is never followed, or the filing would
  *   remove and write wherever it points.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

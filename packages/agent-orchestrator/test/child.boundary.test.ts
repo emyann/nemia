@@ -3,7 +3,7 @@
  * at once with what the child said — never on a length of time. And a child is bound by its parent: the end of its stdin ends it, while a
  * program that returns still ends on its own.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { nodeChild } from './child.ts';
 

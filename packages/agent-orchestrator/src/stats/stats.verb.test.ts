@@ -2,7 +2,7 @@
  * What one run gives the stats (`factsRead`, `stats.verb.ts`) where its unfrozen workflow folder does not load: nothing, and why, said
  * as a record that does not read is said. Over a store of its own at `ROOT`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect } from 'effect';

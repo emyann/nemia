@@ -5,7 +5,7 @@
  * drawn where the window was. A page that fits is taken without a resize.
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,10 +14,10 @@ import { scratch } from 'test-kit/scratch';
 import { photograph } from './board.ts';
 
 let browser: Browser;
-before(async () => {
+beforeAll(async () => {
   browser = await chromium.launch();
 });
-after(async () => {
+afterAll(async () => {
   await browser?.close();
 });
 

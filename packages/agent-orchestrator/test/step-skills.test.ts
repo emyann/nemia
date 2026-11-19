@@ -12,7 +12,8 @@
  * by name, with no run left. The link rule itself is held beside its code (`src/skills/read.store.test.ts`), the shipped build
  * folder's kit skills in `skill-folders.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -116,28 +117,34 @@ const teamBody = (name: string): string => {
   return splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body;
 };
 
-test('a step given skills from four places: frozen as files under bare names, named, given alone, and moved by no later edit', async (t) => {
-  const s = story(t);
-  const repo = repository({
-    'skills/x/SKILL.md': skill('x', 'The linked one.'),
-    'skills/x/notes.md': 'Notes.\n',
-    '.claude/skills/y/SKILL.md': skill('y', 'The root one.'),
-    'app/.claude/skills/y/SKILL.md': skill('y', 'The nested one.'),
-    'app/.claude/skills/y/notes.md': 'Nested notes.\n',
-    'apps/web/.claude/skills/z/SKILL.md': skill('z'),
+describe('a step given skills from four places: frozen as files under bare names, named, given alone, and moved by no later edit', () => {
+  let repo!: string;
+  let dev!: string;
+  let review!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = repository({
+      'skills/x/SKILL.md': skill('x', 'The linked one.'),
+      'skills/x/notes.md': 'Notes.\n',
+      '.claude/skills/y/SKILL.md': skill('y', 'The root one.'),
+      'app/.claude/skills/y/SKILL.md': skill('y', 'The nested one.'),
+      'app/.claude/skills/y/notes.md': 'Nested notes.\n',
+      'apps/web/.claude/skills/z/SKILL.md': skill('z'),
+    });
+    fs.symlinkSync('../../skills/x', nested(repo, '.', 'x'));
+    dev = teamWith({
+      'agents/implementer.md': implementerGiving('implement-a-change, apps/web:z'),
+      'dev/implement.md': implementAdding('review-a-change, app:y, x'),
+    });
+    review = fs.readFileSync(path.join(dev, 'review.md'), 'utf8');
+    fs.writeFileSync(path.join(dev, 'review.md'), review.replace('agent: reviewer\n', 'agent: reviewer\nskills: y\n'));
+    return t.end;
   });
-  fs.symlinkSync('../../skills/x', nested(repo, '.', 'x'));
-  const dev = teamWith({
-    'agents/implementer.md': implementerGiving('implement-a-change, apps/web:z'),
-    'dev/implement.md': implementAdding('review-a-change, app:y, x'),
-  });
-  const review = fs.readFileSync(path.join(dev, 'review.md'), 'utf8');
-  fs.writeFileSync(path.join(dev, 'review.md'), review.replace('agent: reviewer\n', 'agent: reviewer\nskills: y\n'));
+  const s = story(test);
   let run: { id: string } = { id: '' };
   let record: readonly StepSpec[] = [];
   let files: Record<string, string> = {};
-
-  await s.test("the folder's check gives implement its agent's skills, then its step's, each once, the step's own line kept apart", () => {
+  s.test("the folder's check gives implement its agent's skills, then its step's, each once, the step's own line kept apart", () => {
     const steps = loadWorkflows(dev, { repo });
     const implement = stepNamed(steps, 'implement');
     assert.deepEqual(implement.agent?.skills, ['implement-a-change', 'apps/web:z', 'review-a-change', 'app:y', 'x']);
@@ -145,8 +152,7 @@ test('a step given skills from four places: frozen as files under bare names, na
     assert.deepEqual(implement.agent?.addedSkills, ['review-a-change', 'app:y', 'x']);
     assert.deepEqual(stepNamed(steps, 'review').agent?.skills, ['review-a-change', 'ask-for-another-round', 'y']);
   });
-
-  await s.test('`nemia start` freezes each skill as files under its bare name, never a link, and nothing named for the line', async () => {
+  s.test('`nemia start` freezes each skill as files under its bare name, never a link, and nothing named for the line', async () => {
     run = await runPlaced(startRun({ brief: 'skills from four places', repo, workflowDir: dev }));
     const at = frozen(run, 'implement', 'implementer');
     assert.deepEqual(fs.readdirSync(at).sort(), ['implement-a-change', 'review-a-change', 'x', 'y', 'z']);
@@ -163,8 +169,7 @@ test('a step given skills from four places: frozen as files under bare names, na
     }
     files = entriesOf(agentFilesDir(ROOT, run, 'implement'));
   });
-
-  await s.test('the record says each skill as its line writes it, at the version of the folder it was read from', () => {
+  s.test('the record says each skill as its line writes it, at the version of the folder it was read from', () => {
     record = runRecord(ROOT, run.id).workflow ?? [];
     const implement = stepNamed(record, 'implement');
     assert.deepEqual(implement.skills, ['review-a-change', 'app:y', 'x']);
@@ -176,39 +181,34 @@ test('a step given skills from four places: frozen as files under bare names, na
     assert.equal(versions.get('x'), skillVersion(nested(repo, '.', 'x')));
     assert.equal(versions.has('y'), false, 'never under its bare name');
   });
-
-  await s.test(
-    "each prompt names its skills under the plugin by their bare names, a preloaded one told whole, each the source's copy",
-    () => {
-      for (const name of ['implement', 'review', 'ship']) {
-        const step = stepNamed(record, name);
-        const agent = step.agent!;
-        const plugin = pluginOf(agent.name);
-        const prompt = fs.readFileSync(path.join(agentFilesDir(ROOT, run, name), 'prompt.md'), 'utf8');
-        assert.ok(prompt.startsWith(headedLayers([['instructions', agent.instructions!]])), `${name}: the instructions first`);
-        const loaded = agent.skills!.map((given) => given.slice(given.lastIndexOf(':') + 1)).filter((bare) => bare !== PRELOADED);
-        const listed = `${loaded.map((bare) => `\`${plugin}:${bare}\``).join(', ')}.`;
-        if (loaded.length) assert.ok(prompt.includes(listed), `${name}: the skills to load listed in order\n\n${prompt}`);
-        const preloaded = `\`${plugin}:${PRELOADED}\``;
-        assert.ok(![`${preloaded}.`, `${preloaded},`].some((at) => prompt.includes(at)), `${name}: one told whole is not listed`);
-        for (const given of agent.skills!) {
-          const bare = given.slice(given.lastIndexOf(':') + 1);
-          assert.ok(prompt.includes(`\`${plugin}:${bare}\``), `${name}: ${given} named\n\n${prompt}`);
-          if (!fs.existsSync(path.join(TEAM, 'skills', given))) continue;
-          assert.equal(
-            fs.readFileSync(path.join(frozen(run, name, agent.name), given, 'SKILL.md'), 'utf8'),
-            fs.readFileSync(path.join(TEAM, 'skills', given, 'SKILL.md'), 'utf8'),
-            `${name}: ${given} is the team's copy`,
-          );
-          const whole = prompt.includes(`## Skill \`${plugin}:${given}\`\n\n${teamBody(given)}`);
-          assert.equal(whole, given === PRELOADED, `${name}: ${given} told whole only when it preloads`);
-        }
-        assert.ok(!prompt.includes('app:y') && !prompt.includes('apps/web:'), `${name}: no line's spelling`);
+  s.test("each prompt names its skills under the plugin by their bare names, a preloaded one told whole, each the source's copy", () => {
+    for (const name of ['implement', 'review', 'ship']) {
+      const step = stepNamed(record, name);
+      const agent = step.agent!;
+      const plugin = pluginOf(agent.name);
+      const prompt = fs.readFileSync(path.join(agentFilesDir(ROOT, run, name), 'prompt.md'), 'utf8');
+      assert.ok(prompt.startsWith(headedLayers([['instructions', agent.instructions!]])), `${name}: the instructions first`);
+      const loaded = agent.skills!.map((given) => given.slice(given.lastIndexOf(':') + 1)).filter((bare) => bare !== PRELOADED);
+      const listed = `${loaded.map((bare) => `\`${plugin}:${bare}\``).join(', ')}.`;
+      if (loaded.length) assert.ok(prompt.includes(listed), `${name}: the skills to load listed in order\n\n${prompt}`);
+      const preloaded = `\`${plugin}:${PRELOADED}\``;
+      assert.ok(![`${preloaded}.`, `${preloaded},`].some((at) => prompt.includes(at)), `${name}: one told whole is not listed`);
+      for (const given of agent.skills!) {
+        const bare = given.slice(given.lastIndexOf(':') + 1);
+        assert.ok(prompt.includes(`\`${plugin}:${bare}\``), `${name}: ${given} named\n\n${prompt}`);
+        if (!fs.existsSync(path.join(TEAM, 'skills', given))) continue;
+        assert.equal(
+          fs.readFileSync(path.join(frozen(run, name, agent.name), given, 'SKILL.md'), 'utf8'),
+          fs.readFileSync(path.join(TEAM, 'skills', given, 'SKILL.md'), 'utf8'),
+          `${name}: ${given} is the team's copy`,
+        );
+        const whole = prompt.includes(`## Skill \`${plugin}:${given}\`\n\n${teamBody(given)}`);
+        assert.equal(whole, given === PRELOADED, `${name}: ${given} told whole only when it preloads`);
       }
-    },
-  );
-
-  await s.test("each session is given its plugin's copies and no other: review's `y` is the repository's own, never implement's", () => {
+      assert.ok(!prompt.includes('app:y') && !prompt.includes('apps/web:'), `${name}: no line's spelling`);
+    }
+  });
+  s.test("each session is given its plugin's copies and no other: review's `y` is the repository's own, never implement's", () => {
     assert.deepEqual(enabledSkillsOf(stepNamed(record, 'implement')), [
       'nemia-implementer:implement-a-change',
       'nemia-implementer:z',
@@ -223,8 +223,7 @@ test('a step given skills from four places: frozen as files under bare names, na
     ]);
     assert.equal(fs.readFileSync(path.join(frozen(run, 'review', 'reviewer'), 'y', 'SKILL.md'), 'utf8'), skill('y', 'The root one.'));
   });
-
-  await s.test('a step whose rendered folder is gone is told every skill whole in its brief, under the name its line writes', () => {
+  s.test('a step whose rendered folder is gone is told every skill whole in its brief, under the name its line writes', () => {
     const found = skillsFor(dev, { repo });
     const gone = { ...runRecord(ROOT, run.id), id: 'told-gone-files' };
     for (const step of record.filter((s) => s.agent?.skills?.length)) {
@@ -242,8 +241,7 @@ test('a step given skills from four places: frozen as files under bare names, na
     const ship = stepNamed(record, 'ship');
     assert.ok(!briefBody(unrendered(ship)).includes(teamBody(PRELOADED).trim()), 'with none read, none told');
   });
-
-  await s.test("the tick tells a step whose rendered folder is gone its skills as the Skill door holds them, not the disk's", () => {
+  s.test("the tick tells a step whose rendered folder is gone its skills as the Skill door holds them, not the disk's", () => {
     const implement = stepNamed(record, 'implement');
     const step = { ...implement, agent: { ...implement.agent!, skills: ['tidy-notes'] } };
     const gone = { ...runRecord(ROOT, run.id), id: 'told-gone', workflowDir: `${MEMORY_ROOT}/workflows/dev` };
@@ -258,25 +256,20 @@ test('a step given skills from four places: frozen as files under bare names, na
     const brief = briefBody(told.step);
     assert.ok(brief.includes(`## Skill \`tidy-notes\`\n\n${aSkill().body}`), `the memory's skill told whole\n\n${brief}`);
   });
-
-  await s.test(
-    "the folder's version moves with every file a skill reads: the team's, a nested folder's, and the linked one's real file",
-    () => {
-      for (const file of [
-        path.join(path.dirname(dev), 'skills', 'review-a-change', 'SKILL.md'),
-        path.join(nested(repo, 'app', 'y'), 'SKILL.md'),
-        path.join(nested(repo, 'apps/web', 'z'), 'SKILL.md'),
-        path.join(repo, 'skills', 'x', 'notes.md'),
-      ]) {
-        const before = versionOf(dev, { repo });
-        assert.equal(versionOf(dev, { repo }), before);
-        fs.appendFileSync(file, 'Edited.\n');
-        assert.notEqual(versionOf(dev, { repo }), before, file);
-      }
-    },
-  );
-
-  await s.test('a later edit of the step and of its skills changes nothing the run froze', () => {
+  s.test("the folder's version moves with every file a skill reads: the team's, a nested folder's, and the linked one's real file", () => {
+    for (const file of [
+      path.join(path.dirname(dev), 'skills', 'review-a-change', 'SKILL.md'),
+      path.join(nested(repo, 'app', 'y'), 'SKILL.md'),
+      path.join(nested(repo, 'apps/web', 'z'), 'SKILL.md'),
+      path.join(repo, 'skills', 'x', 'notes.md'),
+    ]) {
+      const before = versionOf(dev, { repo });
+      assert.equal(versionOf(dev, { repo }), before);
+      fs.appendFileSync(file, 'Edited.\n');
+      assert.notEqual(versionOf(dev, { repo }), before, file);
+    }
+  });
+  s.test('a later edit of the step and of its skills changes nothing the run froze', () => {
     fs.writeFileSync(path.join(dev, 'implement.md'), '---\nplace: git\nagent: implementer\n---\n');
     assert.deepEqual(runRecord(ROOT, run.id).workflow, record);
     assert.deepEqual(entriesOf(agentFilesDir(ROOT, run, 'implement')), files);
@@ -321,8 +314,8 @@ const hire = (agent: string) => ({ agent, factory: 'acme', step: 'dev/build' });
 const fenced = (said: string, agent: string): void =>
   names(said, 'build', '`skills: look`', `agents/${agent}.md`, "take `look` off this step's `skills:`");
 
-test("a step's own `skills:` line, read beside its agent's: what it adds, what it writes back, and its refusals at shipped defaults", async (t) => {
-  await t.test("the session is given the agent's skills, then the step's, each once; a step never takes one away", () => {
+describe("a step's own `skills:` line, read beside its agent's: what it adds, what it writes back, and its refusals at shipped defaults", () => {
+  test("the session is given the agent's skills, then the step's, each once; a step never takes one away", () => {
     const step = stepOf(AGENTS, 'agent: writer\nskills: beta, gamma');
     assert.deepEqual(step.agent?.skills, ['alpha', 'beta', 'gamma']);
     assert.deepEqual(step.skills, ['beta', 'gamma']);
@@ -330,23 +323,20 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     assert.deepEqual(stepOf(AGENTS, 'agent: bare\nskills: gamma').agent?.skills, ['gamma'], 'an agent with none is given the step’s');
     assert.equal(stepOf(AGENTS, 'agent: bare').agent?.skills, undefined, 'none from either, none at all');
   });
-
-  await t.test('the skills a line adds beyond its agent’s are frozen apart, in its order; a step with no line freezes none', () => {
+  test('the skills a line adds beyond its agent’s are frozen apart, in its order; a step with no line freezes none', () => {
     assert.deepEqual(stepOf(AGENTS, 'agent: writer\nskills: beta, gamma').agent?.addedSkills, ['gamma']);
     assert.deepEqual(stepOf(AGENTS, 'agent: writer\nskills: beta, alpha').agent?.addedSkills, [], 'only the agent’s adds none');
     assert.deepEqual(stepOf(AGENTS, 'agent: bare\nskills: gamma, delta').agent?.addedSkills, ['gamma', 'delta']);
     assert.equal(stepOf(AGENTS, 'agent: writer').agent?.addedSkills, undefined, 'no line, no key');
   });
-
-  await t.test("a step is written back with its own line, never its agent's, and reads back as the same step", () => {
+  test("a step is written back with its own line, never its agent's, and reads back as the same step", () => {
     const step = stepOf(AGENTS, 'agent: writer\nskills: beta, gamma');
     const text = renderStep(step);
     assert.equal(text, '---\nplace: git\nagent: writer\nskills: beta, gamma\n---\nDo it.\n');
     assert.ok(isDeepStrictEqual(parseWorkflow('build', text, undefined, AGENTS), step), text);
     assert.equal(renderStep(stepOf(AGENTS, 'agent: writer')), '---\nplace: git\nagent: writer\n---\nDo it.\n', 'none added, no line');
   });
-
-  await t.test('a frozen step with its own line reads back by the schema, an older one without too; a line not a list is refused', () => {
+  test('a frozen step with its own line reads back by the schema, an older one without too; a line not a list is refused', () => {
     const step = stepOf(AGENTS, 'agent: writer\nskills: beta, gamma');
     const decode = Schema.decodeUnknownResult(FrozenStepSchema);
     for (const frozen of [step, stepOf(AGENTS, 'agent: writer')].map((s) => JSON.parse(JSON.stringify(s)) as unknown)) {
@@ -358,8 +348,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     assert.ok(Result.isFailure(decode({ ...plain, skills: 'beta' })), 'a line that is not a list');
     assert.ok(Result.isFailure(decode({ ...plain, agent: { ...plain.agent, addedSkills: 'gamma' } })), 'added skills not a list');
   });
-
-  await t.test('REFUSED: a skill added to an agent whose fence keeps the session from loading it, by `tools:` or a deny', () => {
+  test('REFUSED: a skill added to an agent whose fence keeps the session from loading it, by `tools:` or a deny', () => {
     const tooled = refusal(() => stepOf(AGENTS, 'agent: tooled\nskills: look'));
     fenced(tooled, 'tooled');
     names(tooled, '`tools: Read, Bash`', 'Give tooled `Skill`');
@@ -373,8 +362,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     assert.deepEqual(stepOf(AGENTS, 'agent: other\nskills: look').agent?.skills, ['look'], 'a deny of another skill');
     assert.deepEqual(stepOf(AGENTS, 'agent: able\nskills: look').agent?.skills, ['look'], 'an agent with `Skill`');
   });
-
-  await t.test('REFUSED: the same skill added over a factory hire, and through writeWorkflow, which writes nothing', () => {
+  test('REFUSED: the same skill added over a factory hire, and through writeWorkflow, which writes nothing', () => {
     fenced(
       refusal(() => parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n', undefined, AGENTS, undefined, hire('tooled'))),
       'tooled',
@@ -391,8 +379,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     );
     assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: tooled\n---\n', 'nothing written');
   });
-
-  await t.test('REFUSED: `skills:` on a step with no agent, naming the fix; the same file over a factory hire loads', () => {
+  test('REFUSED: `skills:` on a step with no agent, naming the fix; the same file over a factory hire loads', () => {
     names(
       refusal(() => parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n')),
       'build',
@@ -402,14 +389,13 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     const hired = parseWorkflow('build', '---\nplace: git\nskills: look\n---\nDo it.\n', undefined, AGENTS, undefined, hire('writer'));
     assert.deepEqual(hired.agent?.skills, ['alpha', 'beta', 'look']);
   });
-
   for (const [what, lines, fact] of [
     ['codex', 'agent: bare\nharness: codex\nskills: look', 'codex'],
     ['a remote A2A agent', 'agent: bare\nharness: a2a:reviewer\nskills: look', 'A2A'],
     ['`resume:`', 'agent: bare\nresume: plan\nskills: look', '`resume: plan`'],
     ["the step's own `tools:`", 'agent: able\ntools: Read\nskills: look', 'Add `Skill` to `tools:`'],
   ] as const)
-    await t.test(`REFUSED: a skill the step adds that ${what} cannot load, named for the step`, () => {
+    test(`REFUSED: a skill the step adds that ${what} cannot load, named for the step`, () => {
       names(
         refusal(() => stepOf(AGENTS, lines)),
         'build',
@@ -417,8 +403,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
         fact,
       );
     });
-
-  await t.test('REFUSED: a line naming one skill twice, or a name that is neither a skill’s nor folder:name, saying both forms', () => {
+  test('REFUSED: a line naming one skill twice, or a name that is neither a skill’s nor folder:name, saying both forms', () => {
     names(
       refusal(() => stepOf(AGENTS, 'agent: writer\nskills: a, a')),
       '`skills: a, a`',
@@ -433,8 +418,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
       );
     assert.deepEqual(stepOf(AGENTS, 'agent: writer\nskills: x, apps/web:y').agent?.skills, ['alpha', 'beta', 'x', 'apps/web:y']);
   });
-
-  await t.test('REFUSED: two skills of one bare name in one step, on one line or across the agent’s and the step’s, naming both', () => {
+  test('REFUSED: two skills of one bare name in one step, on one line or across the agent’s and the step’s, naming both', () => {
     names(
       refusal(() => stepOf(AGENTS, 'agent: writer\nskills: x, app:x')),
       '`skills: x, app:x`',
@@ -453,8 +437,7 @@ test("a step's own `skills:` line, read beside its agent's: what it adds, what i
     );
     assert.deepEqual(stepOf(AGENTS, 'agent: nested\nskills: a:x, b:y').agent?.skills, ['a:x', 'b:y'], 'the agent’s own again');
   });
-
-  await t.test('REFUSED: a skill named with its folder added past an agent’s deny of its bare name, as a session calls it', () => {
+  test('REFUSED: a skill named with its folder added past an agent’s deny of its bare name, as a session calls it', () => {
     names(
       refusal(() => stepOf(AGENTS, 'agent: folded\nskills: app:y')),
       '`skills: app:y`',
@@ -480,18 +463,20 @@ async function startRefused(ran: () => Promise<unknown>): Promise<string> {
   return said!;
 }
 
-test('REFUSED at a start and at the folder’s check: a skill no session can be given, by name, and no run is left', async (t) => {
-  const outside = written(scratch('wf-step-skills-outside-'), { 'x/SKILL.md': skill('x'), 'secret.md': 'Not the skill.\n' });
+describe('REFUSED at a start and at the folder’s check: a skill no session can be given, by name, and no run is left', () => {
+  let outside!: string;
+  beforeAll(() => {
+    outside = written(scratch('wf-step-skills-outside-'), { 'x/SKILL.md': skill('x'), 'secret.md': 'Not the skill.\n' });
+  });
   const checkout = (): string =>
     repository({ 'skills/x/SKILL.md': skill('x'), 'skills/x/notes.md': 'Notes.\n', 'app/.claude/skills/y/SKILL.md': skill('y') });
-
   for (const [what, line, place, facts] of [
     ['a skill of .claude/skills/ linked outside the checkout', 'x', 'step', (_repo: string) => ['x is a link']],
     ['a skill linked inside that holds a link out', 'x', 'agent', (_repo: string) => ['x/far.md is a link']],
     ['a folder that holds no such skill', 'app:nope', 'step', (repo: string) => [path.join(nested(repo, 'app', 'nope'), 'SKILL.md')]],
     ['a nested folder that holds no such skill', 'app:nope', 'agent', (repo: string) => [nested(repo, 'app', 'nope')]],
   ] as const)
-    await t.test(`REFUSED: ${what}, by the ${place}'s line`, async () => {
+    test(`REFUSED: ${what}, by the ${place}'s line`, async () => {
       const repo = checkout();
       if (what.includes('outside')) fs.symlinkSync(path.join(outside, 'x'), nested(repo, '.', 'x'));
       if (what.includes('link out')) {
@@ -511,24 +496,19 @@ test('REFUSED at a start and at the folder’s check: a skill no session can be 
         'the check refuses as the start does',
       );
     });
-
-  await t.test(
-    "REFUSED at a start: a skill of the store's library that is a link, even one that points inside the repository",
-    async () => {
-      const repo = checkout();
-      const library = path.join(ROOT, 'workflows', 'skills');
-      fs.mkdirSync(library, { recursive: true });
-      fs.symlinkSync(path.join(repo, 'skills', 'x'), path.join(library, 'x'));
-      try {
-        const dev = teamWith({ 'dev/implement.md': implementAdding('x') });
-        names(await startRefused(() => runPlaced(startRun({ brief: 'x', repo, workflowDir: dev }))), '`skills: x`', 'x is a link');
-      } finally {
-        fs.rmSync(path.join(library, 'x'));
-      }
-    },
-  );
-
-  await t.test('REFUSED: a skill named with its folder read with no repository, naming the start on one', () => {
+  test("REFUSED at a start: a skill of the store's library that is a link, even one that points inside the repository", async () => {
+    const repo = checkout();
+    const library = path.join(ROOT, 'workflows', 'skills');
+    fs.mkdirSync(library, { recursive: true });
+    fs.symlinkSync(path.join(repo, 'skills', 'x'), path.join(library, 'x'));
+    try {
+      const dev = teamWith({ 'dev/implement.md': implementAdding('x') });
+      names(await startRefused(() => runPlaced(startRun({ brief: 'x', repo, workflowDir: dev }))), '`skills: x`', 'x is a link');
+    } finally {
+      fs.rmSync(path.join(library, 'x'));
+    }
+  });
+  test('REFUSED: a skill named with its folder read with no repository, naming the start on one', () => {
     names(
       refusal(() => loadWorkflows(teamWith({ 'dev/implement.md': implementAdding('app:y') }))),
       '`skills: app:y`',
@@ -536,8 +516,7 @@ test('REFUSED at a start and at the folder’s check: a skill no session can be 
       'Start the run on that repository',
     );
   });
-
-  await t.test('REFUSED at a start: two skills of one bare name in one step, the agent’s and the step’s, naming both', async () => {
+  test('REFUSED at a start: two skills of one bare name in one step, the agent’s and the step’s, naming both', async () => {
     const repo = repository({ 'app/.claude/skills/implement-a-change/SKILL.md': skill('implement-a-change') });
     fs.mkdirSync(nested(repo, '.', 'implement-a-change'));
     const dev = teamWith({ 'dev/implement.md': implementAdding('app:implement-a-change') });
@@ -547,16 +526,14 @@ test('REFUSED at a start and at the folder’s check: a skill no session can be 
       "`app:implement-a-change`, on this step's `skills:`",
     );
   });
-
-  await t.test('REFUSED: a skill the step adds that no place has, naming every place looked in and the fix; one the team has loads', () => {
+  test('REFUSED: a skill the step adds that no place has, naming every place looked in and the fix; one the team has loads', () => {
     const dev = teamWith({ 'dev/implement.md': implementAdding('no-such-skill') });
     const said = refusal(() => loadWorkflows(dev));
     names(said, '`skills: no-such-skill`', "take `no-such-skill` off this step's `skills:`", ...skillsFor(dev).looked);
     const found = stepNamed(loadWorkflows(teamWith({ 'dev/implement.md': implementAdding('review-a-change') })), 'implement');
     assert.deepEqual(found.agent?.skills, ['implement-a-change', 'review-a-change']);
   });
-
-  await t.test('REFUSED: the freeze of a skill linked outside the checkout, whatever the load found, and nothing of it is frozen', () => {
+  test('REFUSED: the freeze of a skill linked outside the checkout, whatever the load found, and nothing of it is frozen', () => {
     const repo = checkout();
     fs.symlinkSync(path.join(outside, 'x'), nested(repo, '.', 'x'));
     const dev = teamWith({});

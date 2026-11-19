@@ -4,7 +4,7 @@
  * harnesses declares it as none — each in the verb's own error, nothing asked of any harness. The stand-in is held to the same rows in
  * `engine-contract.test.ts`; the two drains ask no harness (`test/drain-harness.test.ts`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { commandHarness, Engine, testOps, type EngineShape } from '../src/index.ts';

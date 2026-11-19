@@ -4,7 +4,7 @@
  * a SKILL.md that does not read is refused naming the file, and one that names no skill with no name sent is refused.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

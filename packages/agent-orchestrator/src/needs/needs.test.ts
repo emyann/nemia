@@ -7,7 +7,7 @@
  * none (`ownCheckOf`, `workflowCheckOf`). The laws of `needStateOf`, `needsHolding` and `fixRefusal` are proved by
  * `contracts/needs.contract.ts`.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,20 +40,20 @@ const ROOT = scratch('wf-needs-read-');
 const stateOf = (check: string, ms = 2_000, shell?: string) =>
   Effect.runPromise(checkRan(ROOT, { check }, { ms, ...(shell === undefined ? {} : { shell }) })).then(needStateOf);
 
-test('a check reads met on exit 0, missing on any other exit, and unknown past its time or with no shell, holding nothing', async (t) => {
-  await t.test('exit 0 is met, exit 1 missing', async () => {
+describe('a check reads met on exit 0, missing on any other exit, and unknown past its time or with no shell, holding nothing', () => {
+  test('exit 0 is met, exit 1 missing', async () => {
     assert.equal(await stateOf('exit 0'), 'met');
     assert.equal(await stateOf('exit 1'), 'missing');
   });
-  await t.test('a check past its bound is stopped and reads unknown, which holds no fresh run', async () => {
+  test('a check past its bound is stopped and reads unknown, which holds no fresh run', async () => {
     const state = await stateOf('sleep 30', 100);
     assert.equal(state, 'unknown');
     assert.deepEqual(needsHolding(false, [{ name: 'slow', state }]), []);
   });
-  await t.test('a check whose shell cannot start reads unknown', async () => {
+  test('a check whose shell cannot start reads unknown', async () => {
     assert.equal(await stateOf('exit 1', 2_000, path.join(ROOT, 'no-such-shell')), 'unknown');
   });
-  await t.test('a check runs with the tools folder first on its PATH and named as NEMIA_TOOLS', async () => {
+  test('a check runs with the tools folder first on its PATH and named as NEMIA_TOOLS', async () => {
     const env = needsEnv(ROOT, { PATH: '/usr/bin:/bin' });
     assert.equal(env.PATH.split(path.delimiter)[0], path.join(toolsDir(ROOT), 'bin'));
     assert.equal(env.NEMIA_TOOLS, toolsDir(ROOT));
@@ -72,18 +72,18 @@ const withReadme = (readme: string): string => {
   return dir;
 };
 
-test("a workflow's needs are its README's frontmatter, which its instruction leaves out", async (t) => {
-  await t.test('the needs read, and the README text without the frontmatter', () => {
+describe("a workflow's needs are its README's frontmatter, which its instruction leaves out", () => {
+  test('the needs read, and the README text without the frontmatter', () => {
     const dir = withReadme('---\nneeds:\n  - name: tool\n    message: the tool\n    check: command -v tool\n---\n# Build\n\nBuilds it.\n');
     assert.deepEqual(workflowNeeds(dir), [{ name: 'tool', message: 'the tool', check: 'command -v tool' }]);
     assert.equal(workflowReadme(dir), '# Build\n\nBuilds it.\n');
   });
-  await t.test('a README with no frontmatter declares none, and reads whole', () => {
+  test('a README with no frontmatter declares none, and reads whole', () => {
     const dir = withReadme('# Build\n');
     assert.deepEqual(workflowNeeds(dir), []);
     assert.equal(workflowReadme(dir), '# Build\n');
   });
-  await t.test('needs that do not read are none, and say why', () => {
+  test('needs that do not read are none, and say why', () => {
     const read = workflowNeedsRead(withReadme('---\nneeds:\n  - name: tool\n---\n'));
     assert.deepEqual(read.needs, []);
     assert.equal(typeof read.error, 'string');

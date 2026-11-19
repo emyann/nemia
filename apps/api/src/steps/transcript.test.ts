@@ -7,7 +7,7 @@
  * leaves, are `following.test.ts`'s.
  */
 import { config, root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -160,8 +160,8 @@ const blocks = (text: string): Block[] =>
     );
 const eventsIn = (said: Block[]) => said.filter((b) => b.event === 'transcript').map((b) => JSON.parse(b.data!));
 
-test("REFUSED: a step's conversation, read or streamed — a cursor no read gave, a run, step or task there is not, a conversation or a journal the engine cannot read", async (t) => {
-  await t.test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {
+describe("REFUSED: a step's conversation, read or streamed — a cursor no read gave, a run, step or task there is not, a conversation or a journal the engine cannot read", () => {
+  test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {
     for (const [route, headers] of [
       [url('implement', '?after=page-2'), {}],
       [streamUrl('implement', '?after=page-2'), {}],
@@ -178,32 +178,29 @@ test("REFUSED: a step's conversation, read or streamed — a cursor no read gave
     assert.equal(fromStart.status, 200, 'an empty `after` is none: read from the start');
     assert.equal(((await fromStart.json()) as StepTranscript).events.length, 8);
   });
-  await t.test(
-    'a run or a step that does not exist is a 404, worded as the log route words it; a task the engine lost is a 404 that names it',
-    async () => {
-      const log = await (await app.request(`/api/runs/${RUN}/steps/nope/log`)).json();
-      for (const route of [url('nope'), streamUrl('nope')]) {
-        const res = await app.request(route);
-        assert.equal(res.status, 404, route);
-        assert.deepEqual(await res.json(), log, route);
-      }
-      for (const route of [`/api/runs/r-nope/steps/implement/transcript`, `/api/runs/r-nope/steps/implement/transcript/stream`]) {
-        const res = await app.request(route);
-        assert.equal(res.status, 404, route);
-        assert.match(((await res.json()) as { error: string }).error, /^No run 'r-nope' in this store\./, route);
-      }
-      for (const route of [url('lost'), streamUrl('lost')]) {
-        const res = await app.request(route);
-        assert.equal(res.status, 404, route);
-        assert.match(
-          ((await res.json()) as { error: string }).error,
-          /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
-          route,
-        );
-      }
-    },
-  );
-  await t.test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
+  test('a run or a step that does not exist is a 404, worded as the log route words it; a task the engine lost is a 404 that names it', async () => {
+    const log = await (await app.request(`/api/runs/${RUN}/steps/nope/log`)).json();
+    for (const route of [url('nope'), streamUrl('nope')]) {
+      const res = await app.request(route);
+      assert.equal(res.status, 404, route);
+      assert.deepEqual(await res.json(), log, route);
+    }
+    for (const route of [`/api/runs/r-nope/steps/implement/transcript`, `/api/runs/r-nope/steps/implement/transcript/stream`]) {
+      const res = await app.request(route);
+      assert.equal(res.status, 404, route);
+      assert.match(((await res.json()) as { error: string }).error, /^No run 'r-nope' in this store\./, route);
+    }
+    for (const route of [url('lost'), streamUrl('lost')]) {
+      const res = await app.request(route);
+      assert.equal(res.status, 404, route);
+      assert.match(
+        ((await res.json()) as { error: string }).error,
+        /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
+        route,
+      );
+    }
+  });
+  test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
     const sessionId = settledTask('t-broken');
     fs.rmSync(transcriptFile(sessionId));
     fs.mkdirSync(transcriptFile(sessionId));
@@ -213,27 +210,24 @@ test("REFUSED: a step's conversation, read or streamed — a cursor no read gave
     assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
     assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
   });
-  await t.test(
-    'a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read',
-    async () => {
-      runningTask('t-unread');
-      fs.rmSync(journalFile('t-unread'));
-      fs.mkdirSync(journalFile('t-unread'));
-      for (const route of [url('unread'), streamUrl('unread')]) {
-        const res = await app.request(route);
-        assert.equal(res.status, 502, `${route}: a directory where the journal should be, read before any stream opens`);
-        assert.match(
-          ((await res.json()) as { error: string }).error,
-          /^Could not read task t-unread of step 'unread': .*`nemia ls` reads the same record/,
-        );
-      }
-    },
-  );
+  test('a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read', async () => {
+    runningTask('t-unread');
+    fs.rmSync(journalFile('t-unread'));
+    fs.mkdirSync(journalFile('t-unread'));
+    for (const route of [url('unread'), streamUrl('unread')]) {
+      const res = await app.request(route);
+      assert.equal(res.status, 502, `${route}: a directory where the journal should be, read before any stream opens`);
+      assert.match(
+        ((await res.json()) as { error: string }).error,
+        /^Could not read task t-unread of step 'unread': .*`nemia ls` reads the same record/,
+      );
+    }
+  });
 });
 
-test("A person reads a step's conversation through its task's life: nothing before it is filed, the engine's read once it is, a held step waiting on them, live again once answered", async (t) => {
-  const s = story(t);
-  await s.test('a step not filed yet has no conversation and nothing to follow: neither live nor open', async () => {
+describe("A person reads a step's conversation through its task's life: nothing before it is filed, the engine's read once it is, a held step waiting on them, live again once answered", () => {
+  const s = story(test);
+  s.test('a step not filed yet has no conversation and nothing to follow: neither live nor open', async () => {
     const res = await app.request(url('review'));
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { events: [], cursor: null, live: false, open: false });
@@ -244,7 +238,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
       /^Step 'review' of run 'r-talk' is not filed yet, so it has no session to follow\./,
     );
   });
-  await s.test(
+  s.test(
     "a step's transcript is the engine's read of its task's session — its events and cursor — neither live nor open once the task settled",
     async () => {
       const res = await app.request(url('implement'));
@@ -267,7 +261,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
       );
     },
   );
-  await s.test(
+  s.test(
     'a held step that signed waits on a person, and nothing of it runs: its conversation is read, not live but open — and its stream, followed for its next turn, sends it and stays open',
     async () => {
       assert.equal(
@@ -293,7 +287,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
       }
     },
   );
-  await s.test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
+  s.test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
     assert.equal((await Effect.runPromise(engine(process.env).view('t-answered'))).phase, 'between-attempts');
     const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
     assert.equal(body.live, true);
@@ -301,12 +295,12 @@ test("A person reads a step's conversation through its task's life: nothing befo
   });
 });
 
-test(
+describe(
   "A board follows a settled step's conversation: its task's events then `settled`, and a reconnect from Last-Event-ID",
   { timeout: 30_000 },
-  async (t) => {
-    const s = story(t);
-    await s.test(
+  () => {
+    const s = story(test);
+    s.test(
       "the stream of a settled task sends each event, the read's cursor as the id of the last, then `settled` — and closes",
       async () => {
         const engines = await Effect.runPromise(engine(process.env).transcript('t-implement'));
@@ -325,7 +319,7 @@ test(
         assert.equal(said.length, engines.events.length + 1, 'nothing else is sent');
       },
     );
-    await s.test('a stream from the cursor a paged read answered sends only the events after it', async () => {
+    s.test('a stream from the cursor a paged read answered sends only the events after it', async () => {
       const engines = await Effect.runPromise(engine(process.env).transcript('t-implement'));
       const paged = (await (await app.request(url('implement', '?limit=2'))).json()) as { cursor: string; more?: boolean };
       assert.equal(paged.more, true, 'the conversation is longer than the page');
@@ -335,7 +329,7 @@ test(
       const badCount = await app.request(streamUrl('implement', `?after=${encodeURIComponent(`${engines.cursor}~x`)}`));
       assert.equal(badCount.status, 422, 'a cursor whose count is no whole number, as the read takes none');
     });
-    await s.test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
+    s.test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
       const sessionId = randomUUID();
       const lines = conversation(sessionId);
       journal('t-resumed', [...started, ...ending('t-resumed', sessionId)]);

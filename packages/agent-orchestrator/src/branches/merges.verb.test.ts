@@ -2,7 +2,7 @@
  * The merge check (`mergesOf`), against a run on a real repository and the git place's trial merges: a branch that merges cleanly, one
  * that conflicts, and one git does not have; and a run the store does not have, refused.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

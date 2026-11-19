@@ -8,7 +8,8 @@
  * A story shares one agent across its checkpoints, so what it counts of the agent's traffic is counted from where the checkpoint
  * began; a table's rows each start their own.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,9 +30,9 @@ import { instantNow } from '../src/core/engine/now.ts';
 const BINDINGS: Binding[] = ['JSONRPC', 'HTTP+JSON'];
 
 /** A test agent that streams unless `o` says otherwise, closed once the test `t` ends. */
-const serve = async (t: TestContext, o: ServerOptions = {}) => {
+const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, o: ServerOptions = {}) => {
   const s = await remoteServer({ streaming: true, script: () => [{ state: 'working' }], ...o });
-  t.after(() => s.close());
+  t.onTestFinished(() => s.close());
   return s;
 };
 
@@ -156,14 +157,18 @@ const lapseSend = (root: string, name: string): void => {
 };
 
 for (const binding of BINDINGS)
-  test(
+  describe(
     `${binding}: an agent that streams is followed through the engine, each moment once, and its subscription outlives the request bound`,
     WAITED,
-    async (t) => {
-      const s = await serve(t, { bindings: [binding] });
-      const c = story(t);
-
-      await c.test(
+    () => {
+      let s!: RemoteServer;
+      beforeAll(async () => {
+        const t = teardowns();
+        s = await serve(t, { bindings: [binding] });
+        return t.end;
+      });
+      const c = story(test);
+      c.test(
         "its own stream is relayed through the engine's follow, each moment once and in order, and the transcript holds each event under its id",
         async (t: TestContext) => {
           const { e, id, taskId } = await runningOn(t, s);
@@ -207,8 +212,7 @@ for (const binding of BINDINGS)
           assert.deepEqual((await Effect.runPromise(e.transcript(id, read.cursor))).events, [], 'nothing after the cursor the read gave');
         },
       );
-
-      await c.test('a subscription outlives the request bound: its headers alone are bounded', async (t: TestContext) => {
+      c.test('a subscription outlives the request bound: its headers alone are bounded', async (t: TestContext) => {
         const ops = await opsOn(s, 'ae/long/1', {}, 100);
         const taskId = s.tasks().at(-1)!;
         const got: Followed[] = [];
@@ -238,8 +242,7 @@ for (const binding of BINDINGS)
         assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
         assert.ok(subscribedOn(s, binding), `subscribed on ${binding}: ${s.paths.join(', ')}`);
       });
-
-      await c.test('REFUSED: a Task held without its headers past the request bound is late, six reads in a row', async () => {
+      c.test('REFUSED: a Task held without its headers past the request bound is late, six reads in a row', async () => {
         const held = await opsOn(s, 'ae/held/1', { readEveryMs: 1 }, 100);
         s.hanging.a2a = true;
         const err = failure(await drained(held.follow!('ae/held/1'), []));
@@ -252,11 +255,15 @@ for (const binding of BINDINGS)
     },
   );
 
-test('a streaming agent followed through drops: subscribed again, read whole, left for reads, each event once', WAITED, async (t) => {
-  const s = await serve(t);
-  const c = story(t);
-
-  await c.test(
+describe('a streaming agent followed through drops: subscribed again, read whole, left for reads, each event once', WAITED, () => {
+  let s!: RemoteServer;
+  beforeAll(async () => {
+    const t = teardowns();
+    s = await serve(t);
+    return t.end;
+  });
+  const c = story(test);
+  c.test(
     'a stream cut mid-turn is subscribed to again, and the Task read whole gives what the cut missed: no event lost, none given twice',
     async (t: TestContext) => {
       const { e, id, taskId } = await runningOn(t, s);
@@ -284,15 +291,16 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
     },
   );
-
-  await c.test(
+  c.test(
     `a stream refused ${RESUBSCRIBES} times again in a row is left: the Task is read whole every so often instead, to its end`,
     async (t: TestContext) => {
       const ops = await opsOn(s, 'ae/drops/1', { readEveryMs: 10 });
       const taskId = s.tasks().at(-1)!;
       const before = resubscribes(s);
       s.subscriptions.refuse = true;
-      t.after(() => (s.subscriptions.refuse = false));
+      t.onTestFinished(() => {
+        s.subscriptions.refuse = false;
+      });
       const got: Followed[] = [];
       const ended = drained(ops.follow!('ae/drops/1'), got);
       await until(t, () => resubscribes(s) - before === RESUBSCRIBES + 1, 'every subscription refused', { everyMs: 20 });
@@ -306,8 +314,7 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
     },
   );
-
-  await c.test(
+  c.test(
     `a stream cut ${RESUBSCRIBES + 1} times, each subscription giving something new before its cut, is followed to its end: only drops in a row count`,
     async (t: TestContext) => {
       const ops = await opsOn(s, 'ae/cuts/1');
@@ -335,8 +342,7 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       assert.deepEqual(ids(got), [...new Set(ids(got))], 'each event once');
     },
   );
-
-  await c.test(
+  c.test(
     'a stream cut as its Task ends is read whole, which gives the end the cut missed, and is not subscribed to again',
     async (t: TestContext) => {
       const ops = await opsOn(s, 'ae/ends/1', { resubscribeMs: 200 });
@@ -346,7 +352,9 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       const ended = drained(ops.follow!('ae/ends/1'), got);
       await holds(t, got, 1);
       s.subscriptions.refuse = true;
-      t.after(() => (s.subscriptions.refuse = false));
+      t.onTestFinished(() => {
+        s.subscriptions.refuse = false;
+      });
       assert.equal(s.cut(), 1, 'the one subscription cut');
       s.move(taskId, { state: 'completed', words: 'done' });
       const exit = await ended;
@@ -355,15 +363,16 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       assert.equal(resubscribes(s) - before, 1, 'a Task that has ended is not subscribed to');
     },
   );
-
-  await c.test(
+  c.test(
     'a stream that says nothing is read whole after the quiet bound and subscribed to again: what it kept back is given',
     async (t: TestContext) => {
       const ops = await opsOn(s, 'ae/quiet/1', { quietMs: 100 });
       const taskId = s.tasks().at(-1)!;
       s.subscriptions.mute = true;
-      t.after(() => (s.subscriptions.mute = false));
-      const made = t.mock.method(globalThis, 'fetch');
+      t.onTestFinished(() => {
+        s.subscriptions.mute = false;
+      });
+      const made = vi.spyOn(globalThis, 'fetch');
       const got: Followed[] = [];
       const ended = drained(ops.follow!('ae/quiet/1'), got);
       await holds(t, got, 1);
@@ -372,11 +381,10 @@ test('a streaming agent followed through drops: subscribed again, read whole, le
       s.move(taskId, { state: 'completed', words: 'done' });
       assert.ok(Exit.isSuccess(await ended), 'silence is no drop: the follow ends as the session does');
       assert.deepEqual(shown(got), ['state working', 'events assistant "reading"', 'events assistant "done"', 'state completed']);
-      assert.ok(made.mock.calls.filter((call) => subscribes(call.arguments)).length >= 2, 'subscribed again after each silence');
+      assert.ok(made.mock.calls.filter((call) => subscribes(call)).length >= 2, 'subscribed again after each silence');
     },
   );
-
-  await c.test(
+  c.test(
     'a Task the agent no longer has ends the follow: not read again where it was never subscribed to, and not subscribed to again once read',
     async (t: TestContext) => {
       const ops = await opsOn(s, 'ae/forgotten/1');
@@ -546,10 +554,10 @@ const UNSTREAMED: Array<[string, (t: TestContext) => Promise<void>]> = [
   ],
 ];
 
-test(
+describe(
   'follow with no stream to take: an agent that does not stream is read whole, and a session ended, being sent or not there says so',
   WAITED,
-  async (t) => {
-    for (const [name, run] of UNSTREAMED) await t.test(name, run);
+  () => {
+    for (const [name, run] of UNSTREAMED) test(name, run);
   },
 );

@@ -2,7 +2,7 @@
  * The MCP servers a run is handed (`recordedServers`, `told.verb.ts`): the factory's own record beside the library servers it has added,
  * its own winning a name they share.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { scratch } from 'test-kit/scratch';
 import { recordedServers } from './told.verb.ts';

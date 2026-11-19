@@ -8,7 +8,7 @@
  * and the keyboard. What a person does to a part that needs neither is its story's play function (`npm run stories`).
  * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -22,11 +22,11 @@ import { openStory, serveBuilt, storybookFor, type Look } from './stories/built.
 const pictures = scratch('nemia-cuts-');
 let browser: Browser;
 let served: { at: string; close: () => void };
-before(async () => {
+beforeAll(async () => {
   served = await serveBuilt(await storybookFor(scratch('nemia-cuts-storybook-')));
   browser = await chromium.launch();
-}, WAITED);
-after(async () => {
+}, WAITED.timeout);
+afterAll(async () => {
   await browser?.close();
   served?.close();
 });

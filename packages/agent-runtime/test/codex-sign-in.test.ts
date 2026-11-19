@@ -3,7 +3,7 @@
  * signed in, any other exit signed out with the last line Codex printed, an answer past the bound and a `codex` that is not there
  * unknown. The bound is shortened here (the shipped one is `CODEX_SIGN_IN_MS`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

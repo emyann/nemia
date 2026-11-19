@@ -4,7 +4,7 @@
  * fixture hands the runtime a huge value where one is quoted, and reads the words an attempt or a verb ends in: the value's first
  * characters, the cut marked `…`, the runtime's own advice whole after it, and the whole sentence bounded.
  */
-import { test, type TestContext } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/index.ts';
@@ -15,9 +15,9 @@ import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 
 /** A test agent for the row `t`, closed once the row ends. */
-const serve = async (t: TestContext, o: ServerOptions = {}) => {
+const serve = async (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, o: ServerOptions = {}) => {
   const s = await remoteServer(o);
-  t.after(() => s.close());
+  t.onTestFinished(() => s.close());
   return s;
 };
 
@@ -62,7 +62,7 @@ const urlOf = (input: string | URL | Request): string => (input instanceof Reque
  * `fetch`. The test context restores it.
  */
 const stubFetch = (t: TestContext, answer: (url: string, init: RequestInit | undefined) => Response | undefined) =>
-  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
     const r = answer(urlOf(input), init);
     return r ?? realFetch(input, init);
   });
@@ -206,7 +206,7 @@ const ROWS: Array<[string, (t: TestContext) => Promise<void>]> = [
         const stub = stubFetch(t, (url) => (url === card ? answer() : undefined));
         const ops = remoteOps('remote', { url: s.url }, scratch('ae-quote-'));
         const e = await failed(ops.spawn({ name: 'ae/card/1', brief: 'b', cwd: '/w' }));
-        stub.mock.restore();
+        stub.mockRestore();
         assert.equal(e.refused, true);
         assert.ok(e.message.length < BOUND, `${e.message.length} characters`);
         quotesCut(e.message, value, 200);
@@ -245,7 +245,7 @@ const ROWS: Array<[string, (t: TestContext) => Promise<void>]> = [
       for (const [code, verb, end] of cases) {
         const stub = stubFetch(t, (url, init) => (url.includes('/a2a/') ? rpcError(init, code, said) : undefined));
         const e = await verb(remoteOps('remote', { url: s.url }, scratch('ae-quote-')));
-        stub.mock.restore();
+        stub.mockRestore();
         assert.ok(e.message.length < BOUND, `${code}: ${e.message.length} characters`);
         quotesCut(e.message, said, 200);
         assert.ok(e.message.endsWith(`${said.slice(0, 200)}${end}`), e.message.slice(-300));
@@ -255,6 +255,6 @@ const ROWS: Array<[string, (t: TestContext) => Promise<void>]> = [
   ],
 ];
 
-test("a remote agent's refusals: whatever another party sent is quoted cut at its bound and marked, and the advice after it is whole", async (t) => {
-  for (const [name, run] of ROWS) await t.test(name, run);
+describe("a remote agent's refusals: whatever another party sent is quoted cut at its bound and marked, and the advice after it is whole", () => {
+  for (const [name, run] of ROWS) test(name, run);
 });

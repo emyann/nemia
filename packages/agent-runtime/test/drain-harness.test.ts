@@ -3,7 +3,7 @@
  * task): a job parked on Claude Code waits while it stands, and one on a harness that declares no drain is continued on its back-off,
  * its deadline counted on. `decide` is unchanged: the pass hands it, task by task, whether the drain holds that task.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';

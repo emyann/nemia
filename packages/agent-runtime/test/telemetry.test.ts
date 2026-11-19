@@ -4,7 +4,7 @@
  * engine's own telemetry, so a command exports nothing. Against the real worker, a scratch collector and a stub `claude` on PATH that posts
  * what a session would; no real session runs.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -20,7 +20,7 @@ import { STAND_IN } from './attached-held.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
 import { scratch } from 'test-kit/scratch';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns, type Finishes } from 'test-kit/checkpoints';
 import { builtEngine } from './engine.ts';
 
 type Engine = ReturnType<typeof builtEngine>;
@@ -41,10 +41,10 @@ const told: SpawnRequest = {
 };
 
 /** Sets `vars` in this process's environment for the rest of test `t`. */
-const withEnv = (t: TestContext, vars: Record<string, string>) => {
+const withEnv = (t: { onTestFinished: (fn: () => void | Promise<void>) => void }, vars: Record<string, string>) => {
   const before = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
   Object.assign(process.env, vars);
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const [k, v] of Object.entries(before)) {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
@@ -125,7 +125,7 @@ const settled = async (e: Engine, id: string): Promise<TaskView> => {
 };
 
 /** A collector on a free port of this machine, keeping the body of every request posted to it; closed when test `t` ends. */
-const collector = async (t: TestContext) => {
+const collector = async (t: Finishes) => {
   const posts: { path: string; body: unknown }[] = [];
   const server = http.createServer((req, res) => {
     let body = '';
@@ -136,7 +136,9 @@ const collector = async (t: TestContext) => {
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => server.close());
+  t.onTestFinished(() => {
+    server.close();
+  });
   const { port } = server.address() as { port: number };
   return { endpoint: `http://127.0.0.1:${port}`, posts };
 };
@@ -164,58 +166,45 @@ const standInClaude = () => {
   };
 };
 
-test('telemetry handed to each spawn: what a session is told to export, by runner, and what no child inherits', async (t) => {
-  await t.test(
-    "a child's environment is the engine's less its telemetry: OpenTelemetry's variables, trace context and Claude Code's switches",
-    () => {
-      assert.deepEqual(withoutTelemetry({ PATH: '/bin', HOME: '/h', OTELX: 'kept', ...ENGINE_OWN }), {
-        PATH: '/bin',
-        HOME: '/h',
-        OTELX: 'kept',
-      });
-    },
-  );
-
-  await t.test(
-    "a Claude Code session told where to export is handed every signal over OTLP/HTTP JSON, its labels and the filing's trace",
-    () => {
-      assert.deepEqual(claudeTelemetryEnv(told), {
-        CLAUDE_CODE_ENABLE_TELEMETRY: '1',
-        CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
-        OTEL_METRICS_EXPORTER: 'otlp',
-        OTEL_LOGS_EXPORTER: 'otlp',
-        OTEL_TRACES_EXPORTER: 'otlp',
-        OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
-        OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT,
-        OTEL_RESOURCE_ATTRIBUTES: 'run=r%2C1,step=implement,task=t-1',
-        TRACEPARENT: TRACE,
-      });
-      assert.deepEqual(claudeTelemetryEnv({ ...told, telemetry: undefined }), {}, 'told nowhere, it is handed nothing');
-    },
-  );
-
-  await t.test(
-    "a job is handed its telemetry in its session's environment beside the job's own, and nothing more when told nowhere",
-    (t) => {
-      const laid = (r: SpawnRequest) => {
-        const env = attachedOptions(r).env!;
-        return Object.fromEntries(Object.entries({ ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }).map(([k]) => [k, env[k]]));
-      };
-      assert.deepEqual(laid(told), { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }, 'laid on `Options.env` by the job’s own process');
-      withEnv(t, ENGINE_OWN);
-      const nowhere = attachedOptions({ ...told, telemetry: undefined }).env!;
-      assert.deepEqual(telemetryIn(nowhere), {}, 'told nowhere, the session is handed none of it');
-      assert.equal(claudeJob.command(told, { requestFile: '/r.json' }).env, undefined, 'and nothing of it is on the engine’s own child');
-    },
-  );
-
-  await t.test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
+describe('telemetry handed to each spawn: what a session is told to export, by runner, and what no child inherits', () => {
+  test("a child's environment is the engine's less its telemetry: OpenTelemetry's variables, trace context and Claude Code's switches", () => {
+    assert.deepEqual(withoutTelemetry({ PATH: '/bin', HOME: '/h', OTELX: 'kept', ...ENGINE_OWN }), {
+      PATH: '/bin',
+      HOME: '/h',
+      OTELX: 'kept',
+    });
+  });
+  test("a Claude Code session told where to export is handed every signal over OTLP/HTTP JSON, its labels and the filing's trace", () => {
+    assert.deepEqual(claudeTelemetryEnv(told), {
+      CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+      CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
+      OTEL_METRICS_EXPORTER: 'otlp',
+      OTEL_LOGS_EXPORTER: 'otlp',
+      OTEL_TRACES_EXPORTER: 'otlp',
+      OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
+      OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT,
+      OTEL_RESOURCE_ATTRIBUTES: 'run=r%2C1,step=implement,task=t-1',
+      TRACEPARENT: TRACE,
+    });
+    assert.deepEqual(claudeTelemetryEnv({ ...told, telemetry: undefined }), {}, 'told nowhere, it is handed nothing');
+  });
+  test("a job is handed its telemetry in its session's environment beside the job's own, and nothing more when told nowhere", (t) => {
+    const laid = (r: SpawnRequest) => {
+      const env = attachedOptions(r).env!;
+      return Object.fromEntries(Object.entries({ ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }).map(([k]) => [k, env[k]]));
+    };
+    assert.deepEqual(laid(told), { ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(told) }, 'laid on `Options.env` by the job’s own process');
+    withEnv(t, ENGINE_OWN);
+    const nowhere = attachedOptions({ ...told, telemetry: undefined }).env!;
+    assert.deepEqual(telemetryIn(nowhere), {}, 'told nowhere, the session is handed none of it');
+    assert.equal(claudeJob.command(told, { requestFile: '/r.json' }).env, undefined, 'and nothing of it is on the engine’s own child');
+  });
+  test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
     assert.deepEqual(claudeTelemetryEnv(detailed), { ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
     assert.equal(Object.keys(claudeTelemetryEnv(detailed)).length, Object.keys(claudeTelemetryEnv(told)).length + 1);
     assert.equal(attachedOptions(detailed).env?.OTEL_LOG_TOOL_DETAILS, '1', "a job's session is handed it too");
   });
-
-  await t.test("a span's trace context is W3C's, and a span whose ids are not trace context's has none", () => {
+  test("a span's trace context is W3C's, and a span whose ids are not trace context's has none", () => {
     const ids = { traceId: '0af7651916cd43dd8448eb211c80319c', spanId: 'b7ad6b7169203331' };
     assert.equal(traceparentOf({ ...ids, sampled: true }), TRACE);
     assert.equal(traceparentOf({ ...ids, sampled: false }), TRACE.replace(/01$/, '00'));
@@ -224,11 +213,15 @@ test('telemetry handed to each spawn: what a session is told to export, by runne
   });
 });
 
-test("an engine told a collector: each spawn is handed it, a job exports to it labelled in the filing's trace, and no other child exports as the engine", async (t) => {
-  withEnv(t, ENGINE_OWN);
-  const s = story(t);
-
-  await s.test(
+describe("an engine told a collector: each spawn is handed it, a job exports to it labelled in the filing's trace, and no other child exports as the engine", () => {
+  const outer = outlived();
+  beforeAll(() => {
+    const t = teardowns();
+    withEnv(t, ENGINE_OWN);
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     "an engine given a collector hands each spawn it, the task's labels with its id, and a trace context in the filing's trace",
     async () => {
       const { engine, spawns } = recording({ endpoint: ENDPOINT });
@@ -246,17 +239,15 @@ test("an engine told a collector: each spawn is handed it, a job exports to it l
       assert.equal(view.state.traceparent, spawn.traceparent);
     },
   );
-
-  await s.test("an engine given a collector that asks for its tools' details hands each spawn both", async () => {
+  s.test("an engine given a collector that asks for its tools' details hands each spawn both", async () => {
     const { engine, spawns } = recording({ endpoint: ENDPOINT, toolDetails: true });
     await filedUnder(engine);
     assert.deepEqual(spawns[0].telemetry, { endpoint: ENDPOINT, toolDetails: true });
   });
-
-  await s.test(
+  s.test(
     "a job exports to the engine's collector, tagged with its labels and task, in the filing's trace — never as the engine",
     async () => {
-      const { endpoint, posts } = await collector(t);
+      const { endpoint, posts } = await collector(outer);
       const claude = standInClaude();
       const engine = builtEngine(
         EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness }, telemetry: { endpoint } }),
@@ -300,8 +291,7 @@ test("an engine told a collector: each spawn is handed it, a job exports to it l
       assert.equal(seen.TRACESTATE, undefined);
     },
   );
-
-  await s.test(
+  s.test(
     "a command of an engine given a collector is handed no telemetry, the engine's own included; its own env still reaches it",
     async () => {
       const engine = builtEngine(
@@ -327,25 +317,25 @@ test("an engine told a collector: each spawn is handed it, a job exports to it l
   );
 });
 
-test("an engine told nowhere: a spawn is handed no collector, a job no telemetry, and a task's own env still reaches its claude", async (t) => {
-  withEnv(t, ENGINE_OWN);
-  const s = story(t);
-
-  await s.test(
-    'an engine given no collector hands a spawn none and journals no trace context, the task id still its resource',
-    async () => {
-      const { engine, spawns } = recording();
-      const { view, id } = await filedUnder(engine);
-      assert.equal(spawns[0].telemetry, undefined);
-      assert.equal(spawns[0].traceparent, undefined);
-      assert.deepEqual(spawns[0].resource, { task: id });
-      assert.equal(view.state.traceparent, undefined);
-      assert.equal(view.state.labels, undefined);
-    },
-  );
-
-  await s.test("a job of an engine given no collector is handed no telemetry, the engine's own included, and posts nothing", async () => {
-    const { posts } = await collector(t);
+describe("an engine told nowhere: a spawn is handed no collector, a job no telemetry, and a task's own env still reaches its claude", () => {
+  const outer = outlived();
+  beforeAll(() => {
+    const t = teardowns();
+    withEnv(t, ENGINE_OWN);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('an engine given no collector hands a spawn none and journals no trace context, the task id still its resource', async () => {
+    const { engine, spawns } = recording();
+    const { view, id } = await filedUnder(engine);
+    assert.equal(spawns[0].telemetry, undefined);
+    assert.equal(spawns[0].traceparent, undefined);
+    assert.deepEqual(spawns[0].resource, { task: id });
+    assert.equal(view.state.traceparent, undefined);
+    assert.equal(view.state.labels, undefined);
+  });
+  s.test("a job of an engine given no collector is handed no telemetry, the engine's own included, and posts nothing", async () => {
+    const { posts } = await collector(outer);
     const claude = standInClaude();
     const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));
     const id = await Effect.runPromise(
@@ -355,8 +345,7 @@ test("an engine told nowhere: a spawn is handed no collector, a job no telemetry
     assert.deepEqual(claude.saw(), { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' });
     assert.deepEqual(posts, []);
   });
-
-  await s.test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async () => {
+  s.test("a job's own env reaches its claude, laid under the job's: a task cannot turn background tasks back on", async () => {
     const claude = standInClaude();
     const files = scratch('ae-telemetry-files-');
     const engine = builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), harnesses: { job: claude.harness } }));
@@ -376,7 +365,11 @@ test("an engine told nowhere: a spawn is handed no collector, a job no telemetry
 /** The tag a refusal is thrown or failed with, or the class of an error that has none. */
 const tagOf = (err: unknown): string => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
 
-test('REFUSED: labels no session could say, and a collector that is none, each refused naming the fix and nothing filed or built', async (t) => {
+describe('REFUSED: labels no session could say, and a collector that is none, each refused naming the fix and nothing filed or built', () => {
+  let engine!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    ({ engine } = recording());
+  });
   const LABELS: readonly { name: string; labels: unknown; names: readonly string[] }[] = [
     { name: 'labels that are no object', labels: 'run', names: ['`labels: "run"` is not a set of labels'] },
     { name: "the runtime's own label", labels: { task: 't' }, names: ['the label `task`', 'give the label another name'] },
@@ -394,9 +387,8 @@ test('REFUSED: labels no session could say, and a collector that is none, each r
       names: ['`labels` has 17 entries', 'at most 16'],
     },
   ];
-  const { engine } = recording();
   for (const row of LABELS)
-    await t.test(`labels: ${row.name}`, async () => {
+    test(`labels: ${row.name}`, async () => {
       await assert.rejects(
         Effect.runPromise(engine.file({ brief: 'b', cwd: '/', harness: 'rec', labels: row.labels as never })),
         (err: Error) => {
@@ -407,7 +399,6 @@ test('REFUSED: labels no session could say, and a collector that is none, each r
       );
       assert.deepEqual((await Effect.runPromise(engine.list())).views, [], 'nothing filed');
     });
-
   const COLLECTORS: readonly { name: string; telemetry: unknown; names: readonly string[] }[] = [
     ...[{ endpoint: 'localhost:14998' }, { endpoint: '' }, { endpoint: 'file:///tmp/x' }, 'http://localhost:14998'].map((telemetry) => ({
       name: `a collector that is no absolute http(s) URL: ${JSON.stringify(telemetry)}`,
@@ -421,7 +412,7 @@ test('REFUSED: labels no session could say, and a collector that is none, each r
     })),
   ];
   for (const row of COLLECTORS)
-    await t.test(`before the engine is built: ${row.name}`, () => {
+    test(`before the engine is built: ${row.name}`, () => {
       assert.throws(
         () => builtEngine(EngineService.layer({ root: scratch('ae-telemetry-'), telemetry: row.telemetry as never })),
         (err: Error) => {

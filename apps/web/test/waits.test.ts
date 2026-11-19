@@ -8,7 +8,7 @@
  * bound, under `test/`: each left is the reaper's bound or an e2e assertion's timeout, never a test's wait, and a count only shrinks
  * (`deadlineBreaks`). A change that takes one out lowers its count in the same commit.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,37 +17,32 @@ import { WAITED } from './waits.ts';
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
 
-/** The default timeout a script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
-const defaultTimeout = (script: string): number | null => {
-  const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
-  return word ? Number(word.slice('--test-timeout='.length)) : null;
+/** The default timeout the `node` project of the board's Vitest config gives every test (`testTimeout: <ms>`), or null for none. */
+const defaultTimeout = (config: string): number | null => {
+  const at = config.indexOf("name: 'node'");
+  const m = at < 0 ? null : /\btestTimeout:\s*([1-9][\d_]*)/.exec(config.slice(at));
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**
- * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a script whose default timeout is
- * not `WAITED`'s, since node's is none.
+ * What leaves a wait unbounded in a test given no `WAITED`: a `node` project whose default timeout is not `WAITED`'s, since Vitest's is
+ * 5 s. The look's tests are bounded in `e2e-look.test.ts`.
  *
- * @param name the script's name in package.json
- * @param script what it runs
- * @returns one line per break, empty when every test it runs is bounded at `WAITED`'s timeout
+ * @param config the text of the board's `vitest.config.ts`
  */
-const timeoutBreaks = (name: string, script: string): string[] =>
-  defaultTimeout(script) === WAITED.timeout
+const timeoutBreaks = (config: string): string[] =>
+  defaultTimeout(config) === WAITED.timeout
     ? []
-    : [`the ${name} script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
+    : [`the node project gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
 
-test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
-  assert.deepEqual(timeoutBreaks('test', scripts.test), [], "npm test; the look's browser tests are bounded in e2e-look.test.ts");
+test("the package's Vitest config bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  assert.deepEqual(timeoutBreaks(fs.readFileSync(path.join(PACKAGE, 'vitest.config.ts'), 'utf8')), []);
 });
 
-test("REFUSED: a script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
-  const refused = [
-    `the e2e script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
-  ];
-  assert.deepEqual(timeoutBreaks('e2e', 'node --test test/e2e/*.test.ts && node test/e2e/run.ts'), refused, 'none');
-  assert.deepEqual(timeoutBreaks('e2e', 'node --test --test-timeout=600000 test/e2e/*.test.ts'), refused, 'a longer one');
-  assert.deepEqual(timeoutBreaks('e2e', `node --test --test-timeout=${WAITED.timeout} test/e2e/*.test.ts`), [], 'its own');
+test("REFUSED: a node project with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
+  assert.equal(timeoutBreaks("{ name: 'node', maxWorkers: 2 }").length, 1, 'none');
+  assert.equal(timeoutBreaks("{ name: 'node', testTimeout: 600_000 }").length, 1, 'a longer one');
+  assert.deepEqual(timeoutBreaks(`{ name: 'node', testTimeout: ${WAITED.timeout} }`), [], 'its own');
 });
 
 /** What a count is held to: how many a file has, and why each is no wait. */

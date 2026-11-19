@@ -1,5 +1,5 @@
 /** `headline`: a body's first line, its leading heading mark taken off and nothing else changed. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { headline } from 'objects';
 

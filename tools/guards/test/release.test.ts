@@ -4,7 +4,7 @@
  * the verbs that read git and GitHub on a scratch repository and a stub `gh`. And the version nemia prints, held to the file the release
  * bump writes.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

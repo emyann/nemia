@@ -2,7 +2,7 @@
  * A scratch OTLP collector on loopback for a test that exports (`collector`), and what a body posted to its `/v1/metrics` says of the
  * series it names (`seriesOf`).
  */
-import type { TestContext } from 'node:test';
+import type { Finishes } from 'test-kit/checkpoints';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
  * A collector that answers every post with `{}` and keeps it, by path (`posts`), closed after the test: its address (`url`), and a wait
  * for the first post to `path` whose body has `word` (`posted`).
  */
-export async function collector(t: TestContext) {
+export async function collector(t: Finishes) {
   const posts: { path: string; body: string }[] = [];
   const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
   const server = http.createServer((req, res) => {
@@ -23,7 +23,7 @@ export async function collector(t: TestContext) {
     });
   });
   await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
-  t.after(() => new Promise<void>((closed) => server.close(() => closed())));
+  t.onTestFinished(() => new Promise<void>((closed) => server.close(() => closed())));
   const posted = (path: string, word: string) =>
     new Promise<string>((found) => {
       const had = posts.find((p) => p.path === path && p.body.includes(word));

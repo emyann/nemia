@@ -24,7 +24,8 @@
  * Codex does with a resume is M13 (`live.test.ts`); here the fake prints the thread it was given by construction, so this
  * proves the plumbing, not Codex.
  */
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -124,7 +125,7 @@ wait();
 
 let bin: string;
 const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
-before(() => {
+beforeAll(() => {
   bin = scratch('ae-codex-agent-bin-');
   fs.writeFileSync(path.join(bin, 'fake-codex.cjs'), FAKE);
   fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, 'fake-codex.cjs')}" "$@"\n`, {
@@ -133,7 +134,7 @@ before(() => {
   process.env.PATH = `${bin}:${prev.PATH}`;
   process.env.CODEX_HOME = scratch('ae-codex-agent-home-');
 });
-after(() => {
+afterAll(() => {
   process.env.PATH = prev.PATH;
   if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = prev.CODEX_HOME;
@@ -219,12 +220,12 @@ const ran = async (t: Waiter, client: Client, r: SpawnRequest): Promise<Task> =>
   return get(client, r.name);
 };
 
-test(
+describe(
   'a Codex session through the seam: its thread is its context, its statement its one Artifact, a cancel ends what it started, and it takes no words while it runs but streams',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    await s.test("a Codex Task's context is its thread: empty until Codex prints it, the thread after — and listed by it", async (t) => {
+  () => {
+    const s = story(test);
+    s.test("a Codex Task's context is its thread: empty until Codex prints it, the thread after — and listed by it", async (t) => {
       const root = tmp('store');
       const cwd = workdir({ gate: 'go' });
       const client = agent(root);
@@ -245,8 +246,7 @@ test(
       );
       assert.deepEqual((await list(client, { contextId: 'another-thread' })).tasks, []);
     });
-
-    await s.test(
+    s.test(
       "a Codex session's closing statement is its Task's one Artifact: JSON off `-o` as data, prose as text/plain — and a listing carries it only when asked",
       async (t) => {
         const root = tmp('store');
@@ -293,8 +293,7 @@ test(
         assert.deepEqual(unasked.artifacts, [], 'and no Artifact');
       },
     );
-
-    await s.test(
+    s.test(
       'cancelTask ends a working Codex session and what it started, answers CANCELED again once stopped, and refuses a session that finished on its own',
       async (t) => {
         const root = tmp('store');
@@ -335,8 +334,7 @@ test(
         assert.ok(!(started > 0 && alive(started)), 'and no harness is left running');
       },
     );
-
-    await s.test(
+    s.test(
       'what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it',
       async (t) => {
         const root = tmp('store');
@@ -536,12 +534,17 @@ test(
   },
 );
 
-test(
+describe(
   'a Codex step does not start while `codex` is signed out: its spawn is refused before anything runs, in words naming `codex login --device-auth`; signed in it runs, and a sign-in check that never answers refuses nothing',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const shipped = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex } }));
+  () => {
+    let shipped!: import('../src/index.ts').EngineShape;
+    beforeAll(() => {
+      const t = teardowns();
+      shipped = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex } }));
+      return t.end;
+    });
+    const s = story(test);
     const settled = async (t: Waiter, id: string, on: typeof shipped = shipped) => {
       await holds(
         t,
@@ -553,8 +556,7 @@ test(
       );
       return (await Effect.runPromise(on.view(id))).state;
     };
-
-    await s.test('signed out, the attempt ends unstartable, in words naming the sign-in, and nothing is run', async (t) => {
+    s.test('signed out, the attempt ends unstartable, in words naming the sign-in, and nothing is run', async (t) => {
       const cwd = workdir({ login: 'out' });
       const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
       const state = await settled(t, id);
@@ -566,16 +568,14 @@ test(
       assert.deepEqual(loginsOf(cwd), [['login', 'status']], 'Codex was asked whether it is signed in');
       assert.deepEqual(argvOf(cwd), [], 'and no `exec` ran');
     });
-
-    await s.test('signed in, the step tried again runs as before', async (t) => {
+    s.test('signed in, the step tried again runs as before', async (t) => {
       const cwd = workdir();
       const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
       assert.equal((await settled(t, id)).settled, 'succeeded');
       assert.deepEqual(loginsOf(cwd), [['login', 'status']]);
       assert.equal(argvOf(cwd)[0]?.[0], 'exec');
     });
-
-    await s.test('a sign-in check that runs past its bound is no answer, and refuses nothing: the session runs', async (t) => {
+    s.test('a sign-in check that runs past its bound is no answer, and refuses nothing: the session runs', async (t) => {
       const shortened = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex: codexHarness({ signInMs: 300 }) } }));
       const cwd = workdir({ login: 'hang' });
       const id = await Effect.runPromise(shortened.file({ brief: 'the brief', cwd, harness: 'codex' }));

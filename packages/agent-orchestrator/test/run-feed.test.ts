@@ -14,7 +14,8 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { test } from 'node:test';
+import { beforeAll, beforeEach, describe, test, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -191,28 +192,29 @@ const refusedNaming =
 /** The reads the engine's stand-in was asked so far. */
 const reads = async (): Promise<number> => (await Effect.runPromise(stage.board().e.io())).reads;
 
-test(
+describe(
   'a gated run through its gate, its approval and its end: a line per transition, read by nemia watch and across a restart',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    emptyStore();
-    let run: Run;
-    await s.test(
-      'the first pass says the run running and each step its first word, once; filed, it is still pending, then quiet',
-      async () => {
-        run = await started('the gate');
-        await tick();
-        assert.deepEqual(words(run.id), ['running'], 'the run says it is running, once');
-        assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
-        await ticks(3);
-        assert.deepEqual(words(run.id, 'plan'), ['pending'], 'filed and not started is still pending: no line');
-        const quiet = size();
-        await tick();
-        assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
-      },
-    );
-    await s.test(
+  () => {
+    let run!: Run;
+    beforeAll(() => {
+      const t = teardowns();
+      emptyStore();
+      return t.end;
+    });
+    const s = story(test);
+    s.test('the first pass says the run running and each step its first word, once; filed, it is still pending, then quiet', async () => {
+      run = await started('the gate');
+      await tick();
+      assert.deepEqual(words(run.id), ['running'], 'the run says it is running, once');
+      assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
+      await ticks(3);
+      assert.deepEqual(words(run.id, 'plan'), ['pending'], 'filed and not started is still pending: no line');
+      const quiet = size();
+      await tick();
+      assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
+    });
+    s.test(
       'the feed asks the engine nothing of its own: a pass reads each task as many times with the feed as the judgement did',
       async () => {
         const before = await reads();
@@ -225,7 +227,7 @@ test(
         assert.equal(feedFile(ROOT), FEED);
       },
     );
-    await s.test("a step's live word moving writes nothing: the feed says running, once", async () => {
+    s.test("a step's live word moving writes nothing: the feed says running, once", async () => {
       settle(task(run, 'plan'), 'working');
       await tick();
       const once = size();
@@ -243,7 +245,7 @@ test(
       );
       assert.equal(words(run.id, 'plan').at(-1), 'running');
     });
-    await s.test(
+    s.test(
       'nothing is written when nothing changed, across a restart: a daemon with no fold reads the feed, and says nothing again',
       async () => {
         const pass = await tick();
@@ -256,45 +258,39 @@ test(
         assert.equal(fs.readFileSync(FEED, 'utf8'), before);
       },
     );
-    await s.test(
-      'the gate reached is one line over four passes, and the run says once, in its own word, that it waits on a person',
-      async () => {
-        settle(task(run, 'plan'), 'succeeded', SIGNED);
-        const before = size();
-        const moved = await tick();
-        const after = size();
-        assert.ok(after > before, 'the pass wrote the gate');
-        assert.deepEqual(
-          recordFeed(ROOT, judged(moved), { memo: freshFeedMemo() }).lines,
-          [],
-          'the same after the world did change, then was written: the new process said what changed, once, and a second new one nothing',
-        );
-        assert.equal(size(), after);
-        await ticks(3);
-        assert.deepEqual(
-          words(run.id, 'plan').filter((w) => w === 'awaiting approval'),
-          ['awaiting approval'],
-          'the gate reached is one line over four passes',
-        );
-        const onYou = lines().filter((l) => l.run === run.id && l.step === undefined && l.note);
-        assert.deepEqual(
-          onYou.map((l) => [l.note, l.word]),
-          [['waiting on you: approve plan', 'awaiting approval']],
-          'at its gate, in the word nemia decide says it in: nothing failed',
-        );
-      },
-    );
-    await s.test(
-      'a fold that is no feed says every word again: what makes the restart quiet is reading the feed, not the memo',
-      async () => {
-        const pass = await tick();
-        const kept = fs.readFileSync(FEED);
-        fs.rmSync(FEED);
-        assert.ok(recordFeed(ROOT, judged(pass), { memo: freshFeedMemo() }).lines.length > 0);
-        fs.writeFileSync(FEED, kept);
-      },
-    );
-    await s.test('a read of the feed from 0 answers each line and the cursor to read on from; from the end, the cursor alone', async () => {
+    s.test('the gate reached is one line over four passes, and the run says once, in its own word, that it waits on a person', async () => {
+      settle(task(run, 'plan'), 'succeeded', SIGNED);
+      const before = size();
+      const moved = await tick();
+      const after = size();
+      assert.ok(after > before, 'the pass wrote the gate');
+      assert.deepEqual(
+        recordFeed(ROOT, judged(moved), { memo: freshFeedMemo() }).lines,
+        [],
+        'the same after the world did change, then was written: the new process said what changed, once, and a second new one nothing',
+      );
+      assert.equal(size(), after);
+      await ticks(3);
+      assert.deepEqual(
+        words(run.id, 'plan').filter((w) => w === 'awaiting approval'),
+        ['awaiting approval'],
+        'the gate reached is one line over four passes',
+      );
+      const onYou = lines().filter((l) => l.run === run.id && l.step === undefined && l.note);
+      assert.deepEqual(
+        onYou.map((l) => [l.note, l.word]),
+        [['waiting on you: approve plan', 'awaiting approval']],
+        'at its gate, in the word nemia decide says it in: nothing failed',
+      );
+    });
+    s.test('a fold that is no feed says every word again: what makes the restart quiet is reading the feed, not the memo', async () => {
+      const pass = await tick();
+      const kept = fs.readFileSync(FEED);
+      fs.rmSync(FEED);
+      assert.ok(recordFeed(ROOT, judged(pass), { memo: freshFeedMemo() }).lines.length > 0);
+      fs.writeFileSync(FEED, kept);
+    });
+    s.test('a read of the feed from 0 answers each line and the cursor to read on from; from the end, the cursor alone', async () => {
       const read = readFeed(ROOT, 0);
       assert.equal(read.cursor, size());
       assert.ok(
@@ -303,7 +299,7 @@ test(
       );
       assert.deepEqual(readFeed(ROOT, size()), { lines: [], cursor: size() }, 'from the end, nothing but the cursor');
     });
-    await s.test('-l waits=person takes only the lines that wait on a person; -l given again takes a line either takes', async () => {
+    s.test('-l waits=person takes only the lines that wait on a person; -l given again takes a line either takes', async () => {
       const waiting = taken(0, 'waits=person');
       assert.ok(waiting.length >= 2, 'the gate wrote the run’s line and the step’s, each waiting on a person');
       for (const l of waiting) assert.equal(l.word, 'awaiting approval', JSON.stringify(l));
@@ -318,14 +314,14 @@ test(
       );
       assert.deepEqual(taken(0, 'factory=nowhere'), [], 'a selector that takes nothing takes no line');
     });
-    await s.test("each line's end is a cursor the feed takes: what a watch in JSON hands on beside the line", async () => {
+    s.test("each line's end is a cursor the feed takes: what a watch in JSON hands on beside the line", async () => {
       const { lines: read, ends } = readFeedEnds(ROOT, 0);
       const steps = read.flatMap((l, i) => (isRunLine(l) && l.run === run.id && l.step !== undefined ? [{ l, end: ends[i] }] : []));
       assert.ok(steps.length > 0);
       for (const { l, end } of steps)
         assert.equal(feedCursorRefusal(ROOT, end ?? -1), undefined, `${l.step} ${l.word}: its end is a cursor`);
     });
-    await s.test('the approval is a file of its own, and the next pass says what it changed: no word twice in a row', async () => {
+    s.test('the approval is a file of its own, and the next pass says what it changed: no word twice in a row', async () => {
       const at = size();
       await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
       await ticks(3);
@@ -344,13 +340,10 @@ test(
       assert.ok(since.lines.length > 0, 'a read from where a watch was takes the lines since');
       assert.equal(since.cursor, size());
     });
-    await s.test(
-      'a cursor past the feed’s end is one the feed refuses: what a watch reading a stale cursor file starts over from',
-      async () => {
-        names(feedCursorRefusal(ROOT, size() + 900) ?? '', String(size() + 900));
-      },
-    );
-    await s.test('REFUSED: a cursor inside a line, past the end or not a number, by the read and by a watch', async () => {
+    s.test('a cursor past the feed’s end is one the feed refuses: what a watch reading a stale cursor file starts over from', async () => {
+      names(feedCursorRefusal(ROOT, size() + 900) ?? '', String(size() + 900));
+    });
+    s.test('REFUSED: a cursor inside a line, past the end or not a number, by the read and by a watch', async () => {
       const { cursor } = readFeed(ROOT, 0);
       assert.equal(cursor, size());
       const inside = cursor - 2;
@@ -371,7 +364,7 @@ test(
       }
       assert.equal(at, cursor);
     });
-    await s.test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
+    s.test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
       const good = lines().length;
       fs.appendFileSync(FEED, '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo');
       settle(task(run, 'implement'), 'working');
@@ -391,7 +384,7 @@ test(
         assert.equal(new Set(said).size, said.length, `nothing after it is said twice: ${step} ${said.join(' → ')}`);
       }
     });
-    await s.test('a watch follows the lines as they are written, in order, until stopped, and delivers nothing after', async (sub) => {
+    s.test('a watch follows the lines as they are written, in order, until stopped, and delivers nothing after', async (sub) => {
       const got: FeedLine[] = [];
       const arrived = bell();
       const from = size();
@@ -435,7 +428,7 @@ test(
       }
       assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
     });
-    await s.test('the run done is one line, and every line carries its time, its run and its word', async () => {
+    s.test('the run done is one line, and every line carries its time, its run and its word', async () => {
       await ticks(2);
       assert.deepEqual(
         words(run.id).filter((w) => w === 'succeeded'),
@@ -446,58 +439,57 @@ test(
       for (const l of lines())
         assert.ok(typeof l.at === 'string' && l.run && l.word, `every line carries its time, its run, and its word: ${JSON.stringify(l)}`);
     });
-    await s.test('a feed not written yet reads as nothing, at 0', () => {
+    s.test('a feed not written yet reads as nothing, at 0', () => {
       emptyStore();
       assert.deepEqual(readFeed(ROOT, 0), { lines: [], cursor: 0 });
     });
   },
 );
 
-test("a person's acts and the runtime's faults on a run, each said once off the store the pass already read, and a run gone said once", async (t) => {
-  const s = story(t);
-  emptyStore();
-  const repo = aRepo();
+describe("a person's acts and the runtime's faults on a run, each said once off the store the pass already read, and a run gone said once", () => {
+  let repo!: string;
+  let other!: Run;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    repo = aRepo();
+    return t.end;
+  });
+  const s = story(test);
   const inRepo = (brief: string, isolate: boolean) => stage.runPlaced(startRun({ brief, repo, workflowDir: GATED, isolate }));
-  let other: Run;
-  let run: Run;
-  await s.test(
-    'each attempt the runtime ended unstarted or lost is one line, in the workflow layer’s own word, of the runtime',
-    async () => {
-      other = await inRepo('the run it waits on', true);
-      run = await inRepo('the acts', false);
-      await tick();
-      ended(task(run, 'plan'), ['unstartable', 'lost', 'lost']);
-      await ticks(3);
-      assert.deepEqual(
-        [...said(run.id, 'SpawnFailed'), ...said(run.id, 'SessionLost')].map((l) => [l.step, l.word, l.note, l.source, l.type]),
-        [
-          ['plan', 'nothing started', 'try 1', 'runtime', 'Warning'],
-          ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
-          ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
-        ],
-        "faultsOf reads the attempts the pass already read and translates each once, in the workflow layer's own words",
+  s.test('each attempt the runtime ended unstarted or lost is one line, in the workflow layer’s own word, of the runtime', async () => {
+    other = await inRepo('the run it waits on', true);
+    run = await inRepo('the acts', false);
+    await tick();
+    ended(task(run, 'plan'), ['unstartable', 'lost', 'lost']);
+    await ticks(3);
+    assert.deepEqual(
+      [...said(run.id, 'SpawnFailed'), ...said(run.id, 'SessionLost')].map((l) => [l.step, l.word, l.note, l.source, l.type]),
+      [
+        ['plan', 'nothing started', 'try 1', 'runtime', 'Warning'],
+        ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
+        ['plan', 'session lost', 'try 1', 'runtime', 'Warning'],
+      ],
+      "faultsOf reads the attempts the pass already read and translates each once, in the workflow layer's own words",
+    );
+  });
+  s.test("REFUSED: no runtime word crosses into a signal — one site of the feed's code names it, the table that translates it", () => {
+    for (const line of lines())
+      assert.equal(
+        JSON.stringify(line).includes('unstartable'),
+        false,
+        `a runtime end reason reached a line of the feed: ${JSON.stringify(line)}`,
       );
-    },
-  );
-  await s.test(
-    "REFUSED: no runtime word crosses into a signal — one site of the feed's code names it, the table that translates it",
-    () => {
-      for (const line of lines())
-        assert.equal(
-          JSON.stringify(line).includes('unstartable'),
-          false,
-          `a runtime end reason reached a line of the feed: ${JSON.stringify(line)}`,
-        );
-      const here = path.join(import.meta.dirname, '..', 'src', 'feed');
-      const naming = fs
-        .readdirSync(here)
-        .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-        .filter((f) => fs.readFileSync(path.join(here, f), 'utf8').includes('unstartable'));
-      assert.deepEqual(naming, ['word-feed.verb.ts']);
-    },
-  );
+    const here = path.join(import.meta.dirname, '..', 'src', 'feed');
+    const naming = fs
+      .readdirSync(here)
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .filter((f) => fs.readFileSync(path.join(here, f), 'utf8').includes('unstartable'));
+    assert.deepEqual(naming, ['word-feed.verb.ts']);
+  });
   let put = '';
-  await s.test("the hold a person put is read off the record's own composed fact, once, as the person's deed", async () => {
+  s.test("the hold a person put is read off the record's own composed fact, once, as the person's deed", async () => {
     await stage.runWith(stage.board().e, hold(run.id, [other.id], { why: 'it waits on the other run', by: 'operator' }));
     await ticks(3);
     put = runRecord(ROOT, run.id).hold!.at;
@@ -506,32 +498,26 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       [['hold put', `since ${put}`, 'person']],
     );
   });
-  await s.test(
-    'and the hold taken off by hand, which leaves only an absence on disk, is said once off the put the feed holds',
-    async () => {
-      await stage.runWith(stage.board().e, unhold(run.id));
-      await ticks(3);
-      assert.deepEqual(
-        said(run.id, 'HoldLifted').map((l) => [l.word, l.note, l.source]),
-        [['hold lifted', `since ${put}`, 'person']],
-      );
-    },
-  );
-  await s.test(
-    "the approval a person wrote at the gate is a line of its own, beside the state line the gate's own word wrote",
-    async () => {
-      settle(task(run, 'plan'), 'succeeded', SIGNED);
-      await ticks(3);
-      await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
-      await ticks(3);
-      const approval = runRecord(ROOT, run.id).approvals![0];
-      assert.deepEqual(
-        said(run.id, 'Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
-        [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
-      );
-    },
-  );
-  await s.test('a person calling the run off is one act and one state line', async () => {
+  s.test('and the hold taken off by hand, which leaves only an absence on disk, is said once off the put the feed holds', async () => {
+    await stage.runWith(stage.board().e, unhold(run.id));
+    await ticks(3);
+    assert.deepEqual(
+      said(run.id, 'HoldLifted').map((l) => [l.word, l.note, l.source]),
+      [['hold lifted', `since ${put}`, 'person']],
+    );
+  });
+  s.test("the approval a person wrote at the gate is a line of its own, beside the state line the gate's own word wrote", async () => {
+    settle(task(run, 'plan'), 'succeeded', SIGNED);
+    await ticks(3);
+    await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
+    await ticks(3);
+    const approval = runRecord(ROOT, run.id).approvals![0];
+    assert.deepEqual(
+      said(run.id, 'Approved').map((l) => [l.step, l.word, l.note, l.try, l.source]),
+      [['plan', 'approved', `try ${approval.try} · at ${approval.at}`, approval.try, 'person']],
+    );
+  });
+  s.test('a person calling the run off is one act and one state line', async () => {
     await stage.runWith(stage.board().e, cancelRun(run.id));
     await ticks(3);
     assert.deepEqual(
@@ -549,7 +535,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
         `${reason} wakes nobody on its own`,
       );
   });
-  await s.test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
+  s.test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
     fs.writeFileSync(path.join(RUNS, `${other.id}.pruned`), JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
     await ticks(3);
     assert.equal(runRecord(ROOT, other.id).pruned !== undefined, true);
@@ -558,7 +544,7 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       ['running (pruned)'],
     );
   });
-  await s.test('a run gone from the store writes one `removed`, with no line for its steps, then nothing, a restart included', async () => {
+  s.test('a run gone from the store writes one `removed`, with no line for its steps, then nothing, a restart included', async () => {
     fs.rmSync(path.join(RUNS, `${other.id}.json`));
     fs.rmSync(path.join(RUNS, `${other.id}.pruned`), { force: true });
     const before = lines().length;
@@ -574,20 +560,26 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
   });
 });
 
-test('a pinned run whose files moved past its pins says `revisions behind` once per drift, the kinds in its note; a following run never', async (t) => {
-  const s = story(t);
-  emptyStore();
+describe('a pinned run whose files moved past its pins says `revisions behind` once per drift, the kinds in its note; a following run never', () => {
+  let dir!: string;
+  let step!: string;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    dir = path.join(ROOT, 'workflows', name);
+    step = path.join(dir, 'plan.md');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'planner.md'), '---\ndescription: plans\n---\nYou plan.\n');
+    fs.writeFileSync(step, first);
+    return t.end;
+  });
+  const s = story(test);
   const name = 'behind';
-  const dir = path.join(ROOT, 'workflows', name);
-  const step = path.join(dir, 'plan.md');
   const first = '---\nplace: git\nagent: planner\n---\nplan it\n';
-  fs.mkdirSync(dir, { recursive: true });
-  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'planner.md'), '---\ndescription: plans\n---\nYou plan.\n');
-  fs.writeFileSync(step, first);
   const behind = (run: Run) => said(run.id, 'RevisionsBehind');
-  let run: Run;
-  await s.test('a filed run whose step file is edited raises one Warning line about the run, which waits on nobody', async () => {
+  s.test('a filed run whose step file is edited raises one Warning line about the run, which waits on nobody', async () => {
     run = await started('behind', dir);
     await tick();
     assert.deepEqual(behind(run), [], 'nothing is behind before an edit');
@@ -603,22 +595,19 @@ test('a pinned run whose files moved past its pins says `revisions behind` once 
       'the kind behind, in the note',
     );
   });
-  await s.test(
-    'a second pass adds nothing; a new edit is a new drift and one more line; the files back on the pins raise none',
-    async () => {
-      await ticks(2);
-      assert.equal(behind(run).length, 1, 'the drift is said once');
-      fs.writeFileSync(step, `${first}Another edit.\n`);
-      await ticks(2);
-      fs.writeFileSync(step, first);
-      await ticks(2);
-      const notes = behind(run).map((l) => l.note ?? '');
-      assert.equal(notes.length, 2, notes.join(' | '));
-      assert.notEqual(notes[0], notes[1], 'two edits nobody resolved read as one number, and the digest tells them apart');
-      assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev 1, now 2 (`)));
-    },
-  );
-  await s.test('a succeeded run, which files nothing again, never raises it', async () => {
+  s.test('a second pass adds nothing; a new edit is a new drift and one more line; the files back on the pins raise none', async () => {
+    await ticks(2);
+    assert.equal(behind(run).length, 1, 'the drift is said once');
+    fs.writeFileSync(step, `${first}Another edit.\n`);
+    await ticks(2);
+    fs.writeFileSync(step, first);
+    await ticks(2);
+    const notes = behind(run).map((l) => l.note ?? '');
+    assert.equal(notes.length, 2, notes.join(' | '));
+    assert.notEqual(notes[0], notes[1], 'two edits nobody resolved read as one number, and the digest tells them apart');
+    assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev 1, now 2 (`)));
+  });
+  s.test('a succeeded run, which files nothing again, never raises it', async () => {
     const done = await started('done', dir);
     await tick();
     settle(task(done, 'plan'), 'succeeded', SIGNED);
@@ -632,7 +621,7 @@ test('a pinned run whose files moved past its pins says `revisions behind` once 
     assert.deepEqual(behind(done), []);
     fs.writeFileSync(step, first);
   });
-  await s.test('a run in a factory that follows revisions never raises it', async () => {
+  s.test('a run in a factory that follows revisions never raises it', async () => {
     const repo = aRepo();
     const factory = 'follows';
     addFactoryAt(ROOT, { name: factory, volumes: [repo].map((r) => `${r}:rw`) });
@@ -647,11 +636,15 @@ test('a pinned run whose files moved past its pins says `revisions behind` once 
   });
 });
 
-test("a step's denials, each a one-shot of the runtime counted by its step and the try its task was filed for, never in a note", async (t) => {
-  const s = story(t);
-  emptyStore();
+describe("a step's denials, each a one-shot of the runtime counted by its step and the try its task was filed for, never in a note", () => {
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    return t.end;
+  });
+  const s = story(test);
   const denied = (run: Run, step = 'plan') => lines().filter((l) => l.run === run.id && l.step === step && l.reason === 'ToolDenied');
-  await s.test(
+  s.test(
     'a step denied a call twice writes two one-shots over three passes, each with the step’s labels, and no note says it',
     async () => {
       const run = await started('the denial');
@@ -683,7 +676,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       );
     },
   );
-  await s.test('a line’s labels are the ones stepLabels and runLabels give, so no second writer decides what a label is', async () => {
+  s.test('a line’s labels are the ones stepLabels and runLabels give, so no second writer decides what a label is', async () => {
     const run = await started('the labels');
     await tick();
     settle(task(run, 'plan'), 'working');
@@ -709,7 +702,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     assert.ok(ofRun.length > 0, 'the run said a word of its own');
     for (const l of ofRun) assert.deepEqual(l.labels, runLabels(record), `${l.word} carries the labels the run is known by`);
   });
-  await s.test(
+  s.test(
     'a run a person labelled stamps its labels on every line beside the closed five, and a relabel only the lines after it',
     async () => {
       const run = await started('the person labels');
@@ -743,7 +736,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       for (const l of before) assert.equal(l.labels?.team, 'core', `${l.word} written before keeps the old one`);
     },
   );
-  await s.test('REFUSED: a recheck says no denial again — a one-shot is counted by the try its task was filed for', async () => {
+  s.test('REFUSED: a recheck says no denial again — a one-shot is counted by the try its task was filed for', async () => {
     const run = await started('the recheck');
     await tick();
     settle(task(run, 'plan'), 'working');
@@ -768,7 +761,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       'and the recheck says it neither again nor under a try the runtime never journalled it on',
     );
   });
-  await s.test('a step at work denied a call says it while its word stands at running, on a pass that reads no rest', async () => {
+  s.test('a step at work denied a call says it while its word stands at running, on a pass that reads no rest', async () => {
     const run = await started('the live denial');
     await tick();
     settle(task(run, 'plan'), 'working');
@@ -788,7 +781,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       'and the step’s own word is said once, not again beside the denial',
     );
   });
-  await s.test(
+  s.test(
     'a running step’s every denial is a one-shot of its own, said while the attempt runs: a call denied twice is two lines',
     async () => {
       const run = await started('the live denials');
@@ -824,7 +817,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       );
     },
   );
-  await s.test('a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes', async () => {
+  s.test('a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes', async () => {
     const run = await started('the late denial', UNGATED);
     await tick();
     settle(task(run, 'plan'), 'succeeded', SIGNED);
@@ -847,7 +840,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     );
     assert.equal(words(run.id).at(-1), 'succeeded', 'and the run says it finished');
   });
-  await s.test('REFUSED: finished runs write no state line for a denial read late — the one-shot alone, once, judged at rest', async () => {
+  s.test('REFUSED: finished runs write no state line for a denial read late — the one-shot alone, once, judged at rest', async () => {
     emptyStore();
     const runs = await Promise.all(['one', 'two', 'three'].map((brief) => started(brief, UNGATED)));
     await tick();
@@ -888,13 +881,18 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   });
 });
 
-test('a step whose session was killed at its memory limit says so in its note, read off its attempt each pass', async (t) => {
-  const s = story(t);
-  emptyStore();
-  const GI = 1024 ** 3;
+describe('a step whose session was killed at its memory limit says so in its note, read off its attempt each pass', () => {
+  let GI!: number;
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    GI = 1024 ** 3;
+    return t.end;
+  });
+  const s = story(test);
   const noted = (run: Run) => lines().filter((l) => l.run === run.id && l.note?.includes('out of memory'));
-  let run: Run;
-  await s.test('its failed attempt carries a kill: its feed line says out of memory, the limit and the knob, once', async () => {
+  s.test('its failed attempt carries a kill: its feed line says out of memory, the limit and the knob, once', async () => {
     run = await started('the memory');
     await tick();
     settle(task(run, 'plan'), 'failed');
@@ -908,7 +906,7 @@ test('a step whose session was killed at its memory limit says so in its note, r
     );
     for (const fact of ['4Gi', 'WF_MEMORY_LIMIT']) assert.ok(said[0].note?.includes(fact), fact);
   });
-  await s.test('more passes and a restarted daemon write no further line for it: a level read, never a transition', async () => {
+  s.test('more passes and a restarted daemon write no further line for it: a level read, never a transition', async () => {
     const before = size();
     const pass = await tick();
     await ticks(2);
@@ -918,13 +916,17 @@ test('a step whose session was killed at its memory limit says so in its note, r
   });
 });
 
-test("a step's closeout read is a one-shot `closed out` of its step and try, said once across passes and a restart, and never written whole", async (t) => {
-  const s = story(t);
-  emptyStore();
+describe("a step's closeout read is a one-shot `closed out` of its step and try, said once across passes and a restart, and never written whole", () => {
+  let run!: Run;
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    return t.end;
+  });
+  const s = story(test);
   const closed = (run: Run) => said(run.id, 'ClosedOut').map((l) => [l.step, l.word, l.note, l.try, l.type]);
   const SAID = { ...SIGNED, summary: 'summary-only-in-the-log-record' };
-  let run: Run;
-  await s.test('a step that signed off is one `closed out` line over three passes, with its labels and its try', async () => {
+  s.test('a step that signed off is one `closed out` line over three passes, with its labels and its try', async () => {
     run = await started('the closeout');
     await tick();
     settle(task(run, 'plan'), 'succeeded', SAID);
@@ -940,7 +942,7 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
       ),
     );
   });
-  await s.test('REFUSED: the closeout itself is never in the feed — the pass reads it, and the line carries its try alone', async () => {
+  s.test('REFUSED: the closeout itself is never in the feed — the pass reads it, and the line carries its try alone', async () => {
     const pass = await tick();
     const told = judged(pass).get(run.id)!.closeouts!;
     assert.deepEqual(
@@ -950,13 +952,13 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
     );
     assert.equal(fs.readFileSync(FEED, 'utf8').includes(SAID.summary), false, "the feed's file never holds it");
   });
-  await s.test('a restarted daemon, folding the feed afresh, writes no closeout again', async () => {
+  s.test('a restarted daemon, folding the feed afresh, writes no closeout again', async () => {
     assert.deepEqual(
       recordFeed(ROOT, judged(await tick()), { memo: freshFeedMemo() }).lines.filter((l) => l.reason === 'ClosedOut'),
       [],
     );
   });
-  await s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
+  s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
     const before = runRecord(ROOT, run.id);
     const plan = before.steps.plan;
     rewriteRun(ROOT, {
@@ -967,7 +969,7 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
   });
-  await s.test('a closeout signed off blocked, and one the run cannot read, are each one line too', async () => {
+  s.test('a closeout signed off blocked, and one the run cannot read, are each one line too', async () => {
     const blocked = await started('the blocked closeout');
     const unread = await started('the unreadable closeout');
     await tick();
@@ -985,10 +987,14 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
   });
 });
 
-test('a run waiting on a person says what it waits on, never failed: an ending at its gate, and a step that signed off blocked', async (t) => {
-  const s = story(t);
-  emptyStore();
-  await s.test("a run waiting at its ending's gate reads `awaiting approval` in the feed, as nemia decide says it", async () => {
+describe('a run waiting on a person says what it waits on, never failed: an ending at its gate, and a step that signed off blocked', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    emptyStore();
+    return t.end;
+  });
+  const s = story(test);
+  s.test("a run waiting at its ending's gate reads `awaiting approval` in the feed, as nemia decide says it", async () => {
     const repo = aRepo();
     const run = await stage.runPlaced(startRun({ brief: 'the ship gate', repo, workflowDir: ENDING }));
     await tick();
@@ -1007,38 +1013,35 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
     assert.deepEqual(decision.awaitingApproval, ['ship'], 'the decision says the same run awaits approval');
     assert.deepEqual([decision.outcome, decision.failed], ['waiting', []], 'and that nothing failed');
   });
-  await s.test('a run whose step broke says failed, gate or not', async () => {
+  s.test('a run whose step broke says failed, gate or not', async () => {
     const broke = await stage.runPlaced(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ENDING }));
     await tick();
     settle(task(broke, 'implement'), 'failed');
     await ticks(2);
     assert.equal(words(broke.id).at(-1), 'failed');
   });
-  await s.test(
-    'a step that signed off blocked says what it needs on its line, made one line, beside BLOCKED; the run says blocked',
-    async () => {
-      const run = await started('the question');
-      await tick();
-      const needs = 'Which colour —\n  red, or\tblue?\n\nThe brief says both.';
-      settle(task(run, 'plan'), 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs });
-      await ticks(3);
-      const plan = lines()
-        .filter((l) => l.run === run.id && l.step === 'plan' && l.reason !== 'ClosedOut')
-        .at(-1)!;
-      assert.match(plan.word, /BLOCKED/);
-      assert.equal(plan.note, 'needs: Which colour — red, or blue? The brief says both.');
-      assert.equal(
-        lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('needs:')).length,
-        1,
-        'said once, over three passes',
-      );
-      const runLine = lines()
-        .filter((l) => l.run === run.id && l.step === undefined)
-        .at(-1)!;
-      assert.deepEqual({ word: runLine.word, note: runLine.note }, { word: 'waiting', note: 'waiting on you: plan' });
-    },
-  );
-  await s.test('a long need is clipped, nemia decide having it whole; a step that signed off done says nothing it needs', async () => {
+  s.test('a step that signed off blocked says what it needs on its line, made one line, beside BLOCKED; the run says blocked', async () => {
+    const run = await started('the question');
+    await tick();
+    const needs = 'Which colour —\n  red, or\tblue?\n\nThe brief says both.';
+    settle(task(run, 'plan'), 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs });
+    await ticks(3);
+    const plan = lines()
+      .filter((l) => l.run === run.id && l.step === 'plan' && l.reason !== 'ClosedOut')
+      .at(-1)!;
+    assert.match(plan.word, /BLOCKED/);
+    assert.equal(plan.note, 'needs: Which colour — red, or blue? The brief says both.');
+    assert.equal(
+      lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('needs:')).length,
+      1,
+      'said once, over three passes',
+    );
+    const runLine = lines()
+      .filter((l) => l.run === run.id && l.step === undefined)
+      .at(-1)!;
+    assert.deepEqual({ word: runLine.word, note: runLine.note }, { word: 'waiting', note: 'waiting on you: plan' });
+  });
+  s.test('a long need is clipped, nemia decide having it whole; a step that signed off done says nothing it needs', async () => {
     const long = await started('the long question');
     const other = await started('the done');
     await tick();
@@ -1057,7 +1060,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
       false,
     );
   });
-  await s.test("a session its harness blocked is a person's to answer: its word is not folded into running", async () => {
+  s.test("a session its harness blocked is a person's to answer: its word is not folded into running", async () => {
     const run = await started('the flicker');
     await tick();
     settle(task(run, 'plan'), 'needs-human');
@@ -1066,100 +1069,113 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
   });
 });
 
-test(
-  'a feed cut under a watch — truncated, deleted, replaced — is said once each, and the next transition delivered',
-  WAITED,
-  async (t) => {
-    const s = story(t);
+describe('a feed cut under a watch — truncated, deleted, replaced — is said once each, and the next transition delivered', WAITED, () => {
+  let spoke!: import('agent-runtime/testing').Bell;
+  let run!: Run;
+  let watch!: ReturnType<typeof watchFeed> | undefined;
+  beforeAll(() => {
+    const t = teardowns();
     emptyStore();
-    const got: FeedLine[] = [];
-    const cut: string[] = [];
-    const failed: string[] = [];
-    const spoke = bell();
-    const heard = (ok: () => boolean, what: string) => until(t, ok, what, { bell: spoke, everyMs: 20 });
-    const said = (from: number, ok: (l: RunLine) => boolean) => got.slice(from).some((l) => isRunLine(l) && ok(l));
-    let run: Run;
-    let watch: ReturnType<typeof watchFeed> | undefined;
-    t.after(() => watch?.stop());
-    await s.test('a watch from the feed’s end, its engine asked nothing', async () => {
-      run = await started('the cut');
-      await tick();
-      watch = watchFeed(ROOT, {
-        from: size(),
-        intervalMs: 20,
-        onLine: (line) => {
-          got.push(line);
-          spoke.ring();
-        },
-        onCut: (words) => {
-          cut.push(words);
-          spoke.ring();
-        },
-        onError: (err) => {
-          failed.push((err as Error).message);
-          spoke.ring();
-        },
-      });
-      assert.deepEqual(got, []);
+    spoke = bell();
+    t.onTestFinished(() => {
+      watch?.stop();
     });
-    await s.test('truncated to nothing: said once, and the gate reached after the cut delivered', async () => {
-      fs.truncateSync(FEED, 0);
-      await heard(() => cut.length >= 1, 'the truncation said');
-      assert.equal(cut.length, 1, 'the truncation is said once');
-      names(cut[0] ?? '', 'truncated under this watch', 'is 0 bytes now', 'from its start');
-      settle(task(run, 'plan'), 'succeeded', SIGNED);
-      await ticks(2);
-      await heard(
-        () => said(0, (l) => l.step === 'plan' && l.word === 'awaiting approval'),
-        'the feed the tick writes again, read from its start',
-      );
+    return t.end;
+  });
+  const s = story(test);
+  const got: FeedLine[] = [];
+  const cut: string[] = [];
+  const failed: string[] = [];
+  let current!: TestContext;
+  beforeEach((ctx) => {
+    current = ctx;
+  });
+  const heard = (ok: () => boolean, what: string) => until(current, ok, what, { bell: spoke, everyMs: 20 });
+  const said = (from: number, ok: (l: RunLine) => boolean) => got.slice(from).some((l) => isRunLine(l) && ok(l));
+  s.test('a watch from the feed’s end, its engine asked nothing', async () => {
+    run = await started('the cut');
+    await tick();
+    watch = watchFeed(ROOT, {
+      from: size(),
+      intervalMs: 20,
+      onLine: (line) => {
+        got.push(line);
+        spoke.ring();
+      },
+      onCut: (words) => {
+        cut.push(words);
+        spoke.ring();
+      },
+      onError: (err) => {
+        failed.push((err as Error).message);
+        spoke.ring();
+      },
     });
-    await s.test('deleted: the same, said once, and the approval after it delivered', async () => {
-      const before = got.length;
-      fs.rmSync(FEED);
-      await heard(() => cut.length >= 2, 'the deletion said');
-      assert.equal(cut.length, 2, 'the deletion is said once');
-      names(cut[1] ?? '', 'deleted under this watch');
-      await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
-      await ticks(2);
-      await heard(() => said(before, (l) => l.step === 'plan' && l.word !== 'awaiting approval'), 'the approval after the deletion');
-    });
-    await s.test('replaced by another file of the same bytes and more: its inode tells, not its size; said once, and read', async () => {
-      const at = got.length;
-      const next = `${FEED}.next`;
-      fs.writeFileSync(
-        next,
-        `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`,
-      );
-      fs.renameSync(next, FEED);
-      await heard(() => cut.length >= 3 && said(at, (l) => l.run === 'r-new'), 'the replacement said, and read');
-      assert.equal(cut.length, 3, 'the replacement is said once');
-      names(cut[2] ?? '', 'replaced under this watch');
-    });
-    await s.test('each cut said once: every beat after reads on, the line after is delivered, and no cursor is refused, ever', async () => {
-      const quiet = [...cut];
-      fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
-      await heard(() => said(0, (l) => l.run === 'r-last'), 'the line after delivered');
-      assert.deepEqual(cut, quiet, 'nothing more said');
-      assert.deepEqual(failed, [], 'no cursor refused');
-      assert.equal(stage.board().said.length + stage.board().stopped.length, 0, 'the engine asked nothing by the watch');
-    });
-  },
-);
+    assert.deepEqual(got, []);
+  });
+  s.test('truncated to nothing: said once, and the gate reached after the cut delivered', async () => {
+    fs.truncateSync(FEED, 0);
+    await heard(() => cut.length >= 1, 'the truncation said');
+    assert.equal(cut.length, 1, 'the truncation is said once');
+    names(cut[0] ?? '', 'truncated under this watch', 'is 0 bytes now', 'from its start');
+    settle(task(run, 'plan'), 'succeeded', SIGNED);
+    await ticks(2);
+    await heard(
+      () => said(0, (l) => l.step === 'plan' && l.word === 'awaiting approval'),
+      'the feed the tick writes again, read from its start',
+    );
+  });
+  s.test('deleted: the same, said once, and the approval after it delivered', async () => {
+    const before = got.length;
+    fs.rmSync(FEED);
+    await heard(() => cut.length >= 2, 'the deletion said');
+    assert.equal(cut.length, 2, 'the deletion is said once');
+    names(cut[1] ?? '', 'deleted under this watch');
+    await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
+    await ticks(2);
+    await heard(() => said(before, (l) => l.step === 'plan' && l.word !== 'awaiting approval'), 'the approval after the deletion');
+  });
+  s.test('replaced by another file of the same bytes and more: its inode tells, not its size; said once, and read', async () => {
+    const at = got.length;
+    const next = `${FEED}.next`;
+    fs.writeFileSync(
+      next,
+      `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`,
+    );
+    fs.renameSync(next, FEED);
+    await heard(() => cut.length >= 3 && said(at, (l) => l.run === 'r-new'), 'the replacement said, and read');
+    assert.equal(cut.length, 3, 'the replacement is said once');
+    names(cut[2] ?? '', 'replaced under this watch');
+  });
+  s.test('each cut said once: every beat after reads on, the line after is delivered, and no cursor is refused, ever', async () => {
+    const quiet = [...cut];
+    fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
+    await heard(() => said(0, (l) => l.run === 'r-last'), 'the line after delivered');
+    assert.deepEqual(cut, quiet, 'nothing more said');
+    assert.deepEqual(failed, [], 'no cursor refused');
+    assert.equal(stage.board().said.length + stage.board().stopped.length, 0, 'the engine asked nothing by the watch');
+  });
+});
 
-test("the store's pause and resume, each one line of the store's, said once by the pass off the pause file it reads, whatever reads the store", async (t) => {
-  const s = story(t);
-  emptyStore();
-  const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
-  fs.rmSync(pauseFile(ROOT), { force: true });
-  t.after(() => fs.rmSync(pauseFile(ROOT), { force: true }));
+describe("the store's pause and resume, each one line of the store's, said once by the pass off the pause file it reads, whatever reads the store", () => {
+  let pauseFile!: (home: string) => string;
+  let readPause!: (home: string) => import('../src/run.ts').Pause | null;
+  beforeAll(async () => {
+    const t = teardowns();
+    emptyStore();
+    ({ pauseFile, readPause } = await import('../src/pause/pause.store.ts'));
+    fs.rmSync(pauseFile(ROOT), { force: true });
+    t.onTestFinished(() => fs.rmSync(pauseFile(ROOT), { force: true }));
+    return t.end;
+  });
+  const s = story(test);
   const storeSaid = () =>
     readFeed(ROOT, 0)
       .lines.filter((l) => 'store' in l)
       .map((l) => [l.involved, l.reason, l.word, l.note, l.source]);
   const STORE = { kind: 'Store', name: 'store' };
   let at = '';
-  await s.test('nemia pause, then passes, is one `store paused` of the store, a person’s deed', async () => {
+  s.test('nemia pause, then passes, is one `store paused` of the store, a person’s deed', async () => {
     await handedTo('pause', '--why', 'a rebase');
     at = readPause(ROOT)!.at;
     await ticks(3);
@@ -1173,15 +1189,15 @@ test("the store's pause and resume, each one line of the store's, said once by t
     );
     assert.ok(put?.message?.includes(by) && put.message.includes('a rebase'), put?.message);
   });
-  await s.test('nemia pause --now --yes on the pause that stands keeps its moment, and writes no second put', async () => {
+  s.test('nemia pause --now --yes on the pause that stands keeps its moment, and writes no second put', async () => {
     await handedTo('pause', '--now', '--yes');
     await ticks(2);
     assert.equal(storeSaid().length, 1);
   });
-  await s.test('a second daemon, with no fold of its own, reading the same store writes the put neither again nor never', async () => {
+  s.test('a second daemon, with no fold of its own, reading the same store writes the put neither again nor never', async () => {
     assert.deepEqual(recordFeed(ROOT, judged(await tick()), { memo: freshFeedMemo(), pause: readPause(ROOT) }).lines, []);
   });
-  await s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
+  s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
     await handedTo('resume');
     await ticks(3);
     assert.deepEqual(storeSaid(), [
@@ -1194,7 +1210,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
       'and a restart none',
     );
   });
-  await s.test('-l kind=Store takes the two lines of the store and no other', async () => {
+  s.test('-l kind=Store takes the two lines of the store and no other', async () => {
     const store = taken(0, 'kind=Store');
     assert.deepEqual(
       store.map((l) => l.word),

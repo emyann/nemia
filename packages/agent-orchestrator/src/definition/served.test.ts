@@ -3,7 +3,7 @@
  * up to a size: each of two names at each of the four origins, every order of up to four of those, and every origin asked or none. The
  * per-name decider (`definitionServed`) and the lookup order (`heldOrigins`) are proved, in `contracts/definition-served.contract.ts`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { definitionsServed, type DefinitionFound, type DefinitionListed, type DefinitionOrigin } from './served.ts';
 

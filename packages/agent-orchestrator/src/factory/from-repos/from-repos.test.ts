@@ -2,13 +2,13 @@
  * `volumesFromRepos`' laws that tsverify leaves `bounded` (`contracts/volumes-from-repos.contract.ts`), held here: a row per law, each
  * input the shape a factory's file had before one list, or after it.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { volumesFromRepos, type FormerKeys } from './from-repos.ts';
 
 const URL = 'https://example.com/o/app.git';
 
-test('a file written before one list is read into one list, and one written after is answered as it is', async (t) => {
+describe('a file written before one list is read into one list, and one written after is answered as it is', () => {
   const rows: { name: string; file: FormerKeys; want: readonly unknown[] }[] = [
     {
       name: 'each repository leads, writable, in the order it was filed, its URL its origin',
@@ -55,7 +55,7 @@ test('a file written before one list is read into one list, and one written afte
     { name: 'a file with neither is a factory with no volume', file: {}, want: [] },
   ];
   for (const row of rows)
-    await t.test(row.name, () => {
+    test(row.name, () => {
       assert.deepEqual(JSON.parse(JSON.stringify(volumesFromRepos(row.file))), row.want);
     });
 });

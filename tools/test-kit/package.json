@@ -2,7 +2,7 @@
   "name": "test-kit",
   "version": "1.0.0",
   "private": true,
-  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement, the door-debt counter and the names a piece of code has. Never shipped.",
+  "description": "The mechanics every workspace's tests share: scratch roots, story checkpoints, the repository's files, the import scanners, the folder rule's judgement, the door-debt counter, the names a piece of code has, and the seat every test file runs in. Never shipped.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -14,13 +14,16 @@
     "./debt": "./debt.ts",
     "./words": "./words.ts",
     "./fence": "./fence.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./seat": "./seat.ts",
+    "./probe": "./probe.ts"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts'",
+    "test": "vitest run",
     "typecheck": "tsrs --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^24.19.2"
+    "@types/node": "^24.19.2",
+    "vitest": "5.1.0"
   }
 }

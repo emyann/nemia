@@ -1,5 +1,5 @@
 /** `agentSpecOf`: an agent as it parses read as the spec an Agent carries, its result schema beside it where one is given. */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { agentSpecOf } from './agent-spec.ts';
 import { parseAgent } from '../agents/agents.ts';

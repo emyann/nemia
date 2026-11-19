@@ -5,7 +5,7 @@
  * what it was asked, in order, which the take-over's tests read.
  */
 import { configGiven } from '../../test/config-given.ts';
-import { beforeEach, test } from 'node:test';
+import { beforeAll, beforeEach, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,7 @@ import { testEngine, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { steeredClock, type Steered } from '../../test/steered.ts';
-import { story } from 'test-kit/checkpoints';
+import { outlived, story, teardowns } from 'test-kit/checkpoints';
 import {
   attachedCalls,
   timeoutGiven,
@@ -232,12 +232,17 @@ const restart = (args: Args, host: ServiceHost) => runWith(engineOf(engine().lay
 
 const status = (host: ServiceHost) => runWith(engineOf(engine().layer), serviceStatus({}, host));
 
-test('a hand daemon handed to the service: install, --take-over <pid>, restarts, uninstall, and install where nothing ticks', async (t) => {
-  const s = story(t);
-  telling = true;
-  t.after(() => (telling = false));
-
-  await s.test(
+describe('a hand daemon handed to the service: install, --take-over <pid>, restarts, uninstall, and install where nothing ticks', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    telling = true;
+    t.onTestFinished(() => {
+      telling = false;
+    });
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'beside a daemon started by hand, install writes and enables the unit, starts nothing, and names the --take-over line',
     async () => {
       const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
@@ -257,8 +262,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
       );
     },
   );
-
-  await s.test('--take-over pauses, stops the confirmed pid at once, starts the service, and resumes once it passed', async () => {
+  s.test('--take-over pauses, stops the confirmed pid at once, starts the service, and resumes once it passed', async () => {
     const world: World = { lease: lease(OLD), unitPid: null };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
     world.onStart = () => passing(world, NEW);
@@ -280,8 +284,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
       done.lines.join('\n'),
     );
   });
-
-  await s.test("status reads the unit back: what it runs, that the service's own process holds the store, and lingering", async () => {
+  s.test("status reads the unit back: what it runs, that the service's own process holds the store, and lingering", async () => {
     const after = await status(hostOf({ lease: lease(NEW), unitPid: NEW }).host);
     assert.equal(after.service.unit?.entry, '/srv/nemia/apps/api/src/main.ts');
     assert.equal(after.service.unit?.node, '/usr/bin/node');
@@ -291,14 +294,12 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     );
     assert.ok(after.lines.some((l) => l.startsWith('lingering: on')));
   });
-
-  await s.test("install again where the service's own process holds the store restarts it on the unit just written", async () => {
+  s.test("install again where the service's own process holds the store restarts it on the unit just written", async () => {
     const { host, events } = hostOf({ lease: lease(NEW), unitPid: NEW });
     assert.equal((await install({}, host)).did, 'restarted');
     assert.equal(events.at(-1), 'systemctl --user restart nemia.service');
   });
-
-  await s.test("restart stops the service's daemon at once, starts the unit, and resumes after the first pass", async () => {
+  s.test("restart stops the service's daemon at once, starts the unit, and resumes after the first pass", async () => {
     const world: World = { lease: lease(OLD), unitPid: OLD };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
     world.onStart = () => passing(world, NEW);
@@ -311,8 +312,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(readPause(ROOT), null);
     assert.match(done.lines[0], new RegExp(`pid ${OLD} stopped, and pid ${NEW} ticks the store`));
   });
-
-  await s.test('a restart whose daemon lets the store go before it exits starts the unit only once the unit has ended it', async () => {
+  s.test('a restart whose daemon lets the store go before it exits starts the unit only once the unit has ended it', async () => {
     const world: World = { lease: lease(OLD), unitPid: OLD, lingers: 2 };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
     world.onStart = () => passing(world, NEW);
@@ -328,8 +328,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(done.did, 'restarted');
     assert.equal(done.pid, NEW);
   });
-
-  await s.test("a restart where the stopped daemon is still the unit's process waits for the unit to end it, then starts it", async () => {
+  s.test("a restart where the stopped daemon is still the unit's process waits for the unit to end it, then starts it", async () => {
     const world: World = { lease: lease(OLD, 'stopped'), unitPid: OLD, lingers: 1, exiting: 1 };
     world.onStart = () => passing(world, NEW);
     const { host, events } = hostOf(world);
@@ -340,8 +339,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(done.did, 'started');
     assert.equal(done.pid, NEW);
   });
-
-  await s.test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
+  s.test('a restart where nothing ticks starts the unit and waits for its first pass, signalling and pausing nothing', async () => {
     const world: World = { lease: lease(OLD, 'stopped'), unitPid: null };
     world.onStart = () => passing(world, NEW);
     const { host, events } = hostOf(world);
@@ -351,31 +349,26 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.equal(done.did, 'started');
     assert.equal(done.pid, NEW);
   });
-
-  await s.test(
-    'a pause a person put stands through a restart, and through one where nothing ticks: neither put again nor lifted',
-    async () => {
-      putPause(ROOT, { by: 'ann', why: 'reading the night' });
-      for (const ticking of [true, false]) {
-        const world: World = ticking ? { lease: lease(OLD), unitPid: OLD } : { lease: lease(OLD, 'stopped'), unitPid: null };
-        world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-        world.onStart = () => passing(world, NEW);
-        const { host, events } = hostOf(world);
-        const done = await restart({}, host);
-        assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
-        assert.equal(readPause(ROOT)?.by, 'ann');
-        assert.equal(done.did, ticking ? 'restarted' : 'started');
-        assert.equal(done.paused, true);
-        assert.ok(
-          done.lines.some((l) => l.includes('the pause that stood is left as it was')),
-          done.lines.join('\n'),
-        );
-      }
-      resumePause(ROOT);
-    },
-  );
-
-  await s.test('uninstall stops, disables and removes the unit, then says how the lease stands; once more it is Missing', async () => {
+  s.test('a pause a person put stands through a restart, and through one where nothing ticks: neither put again nor lifted', async () => {
+    putPause(ROOT, { by: 'ann', why: 'reading the night' });
+    for (const ticking of [true, false]) {
+      const world: World = ticking ? { lease: lease(OLD), unitPid: OLD } : { lease: lease(OLD, 'stopped'), unitPid: null };
+      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+      world.onStart = () => passing(world, NEW);
+      const { host, events } = hostOf(world);
+      const done = await restart({}, host);
+      assert.ok(!events.includes('pause') && !events.includes('resume'), events.join('\n'));
+      assert.equal(readPause(ROOT)?.by, 'ann');
+      assert.equal(done.did, ticking ? 'restarted' : 'started');
+      assert.equal(done.paused, true);
+      assert.ok(
+        done.lines.some((l) => l.includes('the pause that stood is left as it was')),
+        done.lines.join('\n'),
+      );
+    }
+    resumePause(ROOT);
+  });
+  s.test('uninstall stops, disables and removes the unit, then says how the lease stands; once more it is Missing', async () => {
     const { host, events } = hostOf({ lease: lease(NEW, 'stopped'), unitPid: null });
     const done = await runWith(engineOf(engine().layer), uninstallService({}, host));
     assert.deepEqual(events, ['systemctl --user disable --now nemia.service', 'systemctl --user daemon-reload']);
@@ -383,8 +376,7 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
     assert.match(done.lines[1], new RegExp(`pid ${NEW} stopped`));
     await assert.rejects(runWith(engineOf(engine().layer), uninstallService({}, host)), refusedWith('Missing', /no service nemia/));
   });
-
-  await s.test('install on a store nothing ticks writes the unit whole, enables it at login and starts it', async () => {
+  s.test('install on a store nothing ticks writes the unit whole, enables it at login and starts it', async () => {
     const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null });
     const done = await install({ env: ['PORT=8790'] }, host);
     assert.equal(done.did, 'started');
@@ -404,13 +396,12 @@ test('a hand daemon handed to the service: install, --take-over <pid>, restarts,
   });
 });
 
-test('REFUSED: install, --take-over and restart, each by its kind and naming its fix, with nothing signalled or written it should not be', async (t) => {
+describe('REFUSED: install, --take-over and restart, each by its kind and naming its fix, with nothing signalled or written it should not be', () => {
   const nothingWritten = (events: string[]) => {
     assert.deepEqual(events, []);
     assert.equal(fs.existsSync(path.join(HOME, '.config')), false);
   };
-
-  await t.test('install on WSL without systemd: Invalid, naming how to turn it on', async () => {
+  test('install on WSL without systemd: Invalid, naming how to turn it on', async () => {
     const { host, events } = hostOf({
       lease: { kind: 'none' },
       unitPid: null,
@@ -419,49 +410,41 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     await assert.rejects(install({}, host), refusedWith('Invalid', /\/etc\/wsl\.conf/, /\[boot\]/, /systemd=true/, /wsl --shutdown/));
     nothingWritten(events);
   });
-
   for (const [name, args, names] of [
     ['a store not the default with no name', {}, /--name <name>/],
     ['a store not the default named nemia', { name: 'nemia' }, /the name nemia is the default store's/],
     ['an --env install writes itself', { name: 'nemia-trial', env: ['WF_ROOT=/x'] }, /--env WF_ROOT is written/],
     ['a --take-over that names no pid', { name: 'nemia-trial', takeOver: 'abc' }, /--take-over takes the pid/],
   ] as const)
-    await t.test(`install with ${name}: Invalid, before anything is written`, async () => {
+    test(`install with ${name}: Invalid, before anything is written`, async () => {
       const { host, events } = hostOf({ lease: { kind: 'none' }, unitPid: null, root: '/srv/trial-store' });
       await assert.rejects(install(args, host), refusedWith('Invalid', names));
       nothingWritten(events);
     });
-
-  await t.test('--take-over of a pid the lease does not name: Conflict, before the unit is written', async () => {
+  test('--take-over of a pid the lease does not name: Conflict, before the unit is written', async () => {
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(install({ takeOver: '999' }, host), refusedWith('Conflict', new RegExp(`held by pid ${OLD}, not 999`)));
     nothingWritten(events);
   });
-
-  await t.test('--take-over of a pid the lease names but cannot confirm: Conflict, before the unit is written', async () => {
+  test('--take-over of a pid the lease names but cannot confirm: Conflict, before the unit is written', async () => {
     const { host, events } = hostOf({ lease: lease(OLD, 'ticking', 'unknown'), unitPid: null });
     await assert.rejects(install({ takeOver: String(OLD) }, host), refusedWith('Conflict', /could not be confirmed/));
     nothingWritten(events);
   });
-
-  await t.test(
-    '--take-over where the service never ticks: Conflict naming nemia service status and nemia resume, the store left paused',
-    async () => {
-      const world: World = { lease: lease(OLD), unitPid: null };
-      world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-      const { host, events } = hostOf(world);
-      await assert.rejects(
-        install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
-        (err: Error) =>
-          refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
-          !/was started/.test(err.message),
-      );
-      assert.ok(readPause(ROOT) !== null);
-      assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
-    },
-  );
-
-  await t.test('--take-over whose started unit runs a process that never ticks: Conflict saying it was started', async () => {
+  test('--take-over where the service never ticks: Conflict naming nemia service status and nemia resume, the store left paused', async () => {
+    const world: World = { lease: lease(OLD), unitPid: null };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    const { host, events } = hostOf(world);
+    await assert.rejects(
+      install({ takeOver: String(OLD) }, { ...host, waitMs: 30 }),
+      (err: Error) =>
+        refusedWith('Conflict', /nemia service status/, /nemia resume/, /systemctl --user start nemia\.service/)(err) &&
+        !/was started/.test(err.message),
+    );
+    assert.ok(readPause(ROOT) !== null);
+    assert.ok(events.includes('systemctl --user start nemia.service') && !events.includes('resume'), events.join('\n'));
+  });
+  test('--take-over whose started unit runs a process that never ticks: Conflict saying it was started', async () => {
     const world: World = { lease: lease(OLD), unitPid: null };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
     world.onStart = () => (world.unitPid = NEW);
@@ -471,8 +454,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       refusedWith('Conflict', /was started/, /nemia service status/, /nemia resume/),
     );
   });
-
-  await t.test('restart whose unit still runs the stopped daemon past the stop wait: Conflict naming ps -p, never started', async () => {
+  test('restart whose unit still runs the stopped daemon past the stop wait: Conflict naming ps -p, never started', async () => {
     await installed();
     const world: World = { lease: lease(OLD), unitPid: OLD, lingers: 1_000_000 };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
@@ -484,8 +466,7 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
     assert.ok(readPause(ROOT) !== null, 'the store stays paused');
   });
-
-  await t.test('restart whose start the system refuses: Conflict carrying its line, the start line and the log', async () => {
+  test('restart whose start the system refuses: Conflict carrying its line, the start line and the log', async () => {
     await installed();
     const world: World = { lease: lease(OLD), unitPid: OLD };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
@@ -503,49 +484,39 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
       ),
     );
   });
-
-  await t.test('--take-over where the stopped daemon still holds the store: Conflict naming ps -p, the service not started', async () => {
+  test('--take-over where the stopped daemon still holds the store: Conflict naming ps -p, the service not started', async () => {
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(install({ takeOver: String(OLD) }, { ...host, stopMs: 30 }), refusedWith('Conflict', new RegExp(`ps -p ${OLD}`)));
     assert.ok(!events.includes('systemctl --user start nemia.service'), events.join('\n'));
     assert.ok(readPause(ROOT) !== null);
   });
-
   for (const ended of ['stopped', 'gone'] as const)
-    await t.test(
-      `--take-over whose new daemon is ${ended} before its first pass: Conflict naming its log and nemia resume, no resume`,
-      async () => {
-        const world: World = { lease: lease(OLD), unitPid: null };
-        world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-        world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, ended)]));
-        const { host, events } = hostOf(world);
-        await assert.rejects(
-          install({ takeOver: String(OLD) }, host),
-          refusedWith(
-            'Conflict',
-            new RegExp(`pid ${NEW} ended`),
-            /journalctl --user -u nemia\.service/,
-            /nemia service status/,
-            /nemia resume/,
-          ),
-        );
-        assert.ok(!events.includes('resume'), events.join('\n'));
-        assert.ok(readPause(ROOT) !== null, 'the store stays paused');
-      },
-    );
-
-  await t.test(
-    "--take-over whose new daemon's place another pid takes before its first pass: Conflict, the one waited on ended",
-    async () => {
+    test(`--take-over whose new daemon is ${ended} before its first pass: Conflict naming its log and nemia resume, no resume`, async () => {
       const world: World = { lease: lease(OLD), unitPid: null };
       world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
-      world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW + 1, 'ticking', 'same', true)]));
-      const { host } = hostOf(world);
-      await assert.rejects(install({ takeOver: String(OLD) }, host), refusedWith('Conflict', new RegExp(`pid ${NEW} ended`)));
-    },
-  );
-
-  await t.test("restart whose new daemon's first pass fails: Conflict naming its log and nemia resume, the store left paused", async () => {
+      world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW, ended)]));
+      const { host, events } = hostOf(world);
+      await assert.rejects(
+        install({ takeOver: String(OLD) }, host),
+        refusedWith(
+          'Conflict',
+          new RegExp(`pid ${NEW} ended`),
+          /journalctl --user -u nemia\.service/,
+          /nemia service status/,
+          /nemia resume/,
+        ),
+      );
+      assert.ok(!events.includes('resume'), events.join('\n'));
+      assert.ok(readPause(ROOT) !== null, 'the store stays paused');
+    });
+  test("--take-over whose new daemon's place another pid takes before its first pass: Conflict, the one waited on ended", async () => {
+    const world: World = { lease: lease(OLD), unitPid: null };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW), lease(NEW + 1, 'ticking', 'same', true)]));
+    const { host } = hostOf(world);
+    await assert.rejects(install({ takeOver: String(OLD) }, host), refusedWith('Conflict', new RegExp(`pid ${NEW} ended`)));
+  });
+  test("restart whose new daemon's first pass fails: Conflict naming its log and nemia resume, the store left paused", async () => {
     await installed();
     const world: World = { lease: lease(OLD), unitPid: OLD };
     world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
@@ -558,30 +529,26 @@ test('REFUSED: install, --take-over and restart, each by its kind and naming its
     assert.ok(!events.includes('resume'), events.join('\n'));
     assert.match(readPause(ROOT)?.why ?? '', new RegExp(`pid ${OLD}`));
   });
-
-  await t.test('restart beside a daemon started by hand: Conflict naming its --take-over line, nothing signalled', async () => {
+  test('restart beside a daemon started by hand: Conflict naming its --take-over line, nothing signalled', async () => {
     await installed();
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`nemia service install --take-over ${OLD}`)));
     assert.deepEqual(events, []);
     assert.equal(readPause(ROOT), null);
   });
-
-  await t.test('restart with no service installed: Missing, naming nemia service install', async () => {
+  test('restart with no service installed: Missing, naming nemia service install', async () => {
     const { host, events } = hostOf({ lease: lease(OLD, 'stopped'), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Missing', /no service nemia/, /nemia service install/));
     nothingWritten(events);
     assert.equal(readPause(ROOT), null);
   });
-
-  await t.test('restart with no service installed beside a daemon: Missing, naming its --take-over line', async () => {
+  test('restart with no service installed beside a daemon: Missing, naming its --take-over line', async () => {
     const { host, events } = hostOf({ lease: lease(OLD), unitPid: null });
     await assert.rejects(restart({}, host), refusedWith('Missing', new RegExp(`nemia service install --take-over ${OLD}`)));
     nothingWritten(events);
     assert.equal(readPause(ROOT), null);
   });
-
-  await t.test('restart while the holder is stalled: Conflict naming it, nothing signalled', async () => {
+  test('restart while the holder is stalled: Conflict naming it, nothing signalled', async () => {
     await installed();
     const { host, events } = hostOf({ lease: lease(OLD, 'stalled'), unitPid: OLD });
     await assert.rejects(restart({}, host), refusedWith('Conflict', new RegExp(`stalled, pid ${OLD}`)));
@@ -596,7 +563,7 @@ test('a take-over drains the daemon and waits for each call in flight, naming it
   const { host, events } = hostOf(world);
   const clock = steeredClock();
   const fiber = taking(host, clock);
-  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
   assert.deepEqual(clock.asked.slice(0, 2), [host.pollMs, host.timeoutMs], 'it rests at the host’s pace, under the host’s timeout');
   await stepped(t, clock, fiber, host.pollMs);
@@ -621,7 +588,7 @@ test('a take-over gives up on a call that never ends, says which, and goes on to
   const bound = { ...host, timeoutMs: 30 };
   const clock = steeredClock();
   const fiber = taking(bound, clock);
-  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
   const gaveUp = () => events.find((e) => e.startsWith("say giving up on r2's implement") && e.includes('Bash'));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
   assert.equal(gaveUp(), undefined, 'a clock nothing moved is a timeout nothing reached: it waits');
@@ -642,7 +609,7 @@ test('a take-over whose daemon takes its own let-go to stop is not refused: the 
   const clock = steeredClock();
   const bound = { ...host, timeoutMs: 20 };
   const fiber = taking(bound, clock);
-  t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+  t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
   await until(t, () => clock.asked.length >= 2, 'the call read, its rest and the bound of the wait asked', { bell: clock.bell });
   await clock.adjust(bound.timeoutMs);
   await until(t, () => events.some((e) => e.startsWith("say giving up on r2's implement")), 'the call it gave up on named first', {
@@ -719,7 +686,7 @@ test(
     const host = { ...callsOver(fake, events, list), pollMs: 30_000, timeoutMs: 150_000, waitMs: 1_000_000 };
     const clock = steeredClock();
     const fiber = taking(host, clock);
-    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
     const said = () => events.filter((e) => e.startsWith('say '));
     for (let read = 1; read <= 4; read++) {
       await until(t, () => resting(clock, host.pollMs), `rest ${read} of the poll asked`, { bell: clock.bell });
@@ -745,19 +712,22 @@ test(
   },
 );
 
-test('the take-over’s timeout: --timeout where given, else the store’s; a timeout that does not read is Invalid', async (t) => {
-  const home = scratch('wf-service-timeout-');
-  await t.test('nothing set: the store’s default, ten minutes', async () => {
+describe('the take-over’s timeout: --timeout where given, else the store’s; a timeout that does not read is Invalid', () => {
+  let home!: string;
+  beforeAll(() => {
+    home = scratch('wf-service-timeout-');
+  });
+  test('nothing set: the store’s default, ten minutes', async () => {
     assert.equal(await Effect.runPromise(timeoutGiven({}, home, 'nemia service restart')), 600_000);
   });
-  await t.test('the store’s timeout, where one is set', async () => {
+  test('the store’s timeout, where one is set', async () => {
     fs.writeFileSync(path.join(home, 'pause-timeout.json'), `${JSON.stringify({ timeout: '15m' })}\n`);
     assert.equal(await Effect.runPromise(timeoutGiven({}, home, 'nemia service restart')), 900_000);
   });
-  await t.test('--timeout over it', async () => {
+  test('--timeout over it', async () => {
     assert.equal(await Effect.runPromise(timeoutGiven({ timeout: '90s' }, home, 'nemia upgrade')), 90_000);
   });
-  await t.test('--timeout that does not read: Invalid, naming the flag', async () => {
+  test('--timeout that does not read: Invalid, naming the flag', async () => {
     await assert.rejects(
       Effect.runPromise(timeoutGiven({ timeout: 'soon' }, home, 'nemia upgrade')),
       refusedWith('Invalid', /--timeout\b/),
@@ -818,7 +788,7 @@ test(
     );
     const clock = steeredClock();
     const fiber = taking(shipped, clock);
-    t.after(() => Effect.runPromise(Fiber.interrupt(fiber)));
+    t.onTestFinished(() => Effect.runPromise(Fiber.interrupt(fiber)));
     const refused = Effect.runPromise(Fiber.join(fiber));
     refused.catch(() => undefined);
     await until(t, () => clock.asked.length === 2, 'the wait and its first rest asked', { bell: clock.bell });
@@ -880,8 +850,9 @@ test('--size auto on a 16 GiB, 8 CPU machine writes five sessions asking 2.5 GiB
   );
 });
 
-test('--size auto keeps what --env gives, and on launchd writes no memory limit or request and says so', async (t) => {
-  await t.test('a variable --env gives is written once, as given', async () => {
+describe('--size auto keeps what --env gives, and on launchd writes no memory limit or request and says so', () => {
+  const outer = outlived();
+  test('a variable --env gives is written once, as given', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
     await install({ size: 'auto', env: ['WF_MAX_CONCURRENT=3'] }, host);
     const env = unitRead(fs.readFileSync(UNIT, 'utf8')).env;
@@ -891,23 +862,18 @@ test('--size auto keeps what --env gives, and on launchd writes no memory limit 
     );
     assert.equal(new Map(env).get('WF_MEMORY_LIMIT'), '8192Mi');
   });
-
-  await t.test(
-    'a WF_MEMORY_LIMIT --env gives under the sized request leaves no request written, which the daemon would refuse',
-    async () => {
-      const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
-      await install({ size: 'auto', env: ['WF_MEMORY_LIMIT=2Gi'] }, host);
-      const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
-      assert.equal(env.get('WF_MEMORY_LIMIT'), '2Gi');
-      assert.equal(env.has('WF_MEMORY_REQUEST'), false);
-    },
-  );
-
-  await t.test('launchd: the sessions sized, no memory limit or request written, and a line saying none applies', async () => {
+  test('a WF_MEMORY_LIMIT --env gives under the sized request leaves no request written, which the daemon would refuse', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
+    await install({ size: 'auto', env: ['WF_MEMORY_LIMIT=2Gi'] }, host);
+    const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
+    assert.equal(env.get('WF_MEMORY_LIMIT'), '2Gi');
+    assert.equal(env.has('WF_MEMORY_REQUEST'), false);
+  });
+  test('launchd: the sessions sized, no memory limit or request written, and a line saying none applies', async () => {
     const machine = { platform: 'darwin', wsl: false, systemd: false };
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: { memoryMiB: 16384, cpus: 8 } });
     const done = await install({ size: 'auto' }, host);
-    t.after(() => fs.rmSync(done.file, { force: true }));
+    outer.onTestFinished(() => fs.rmSync(done.file, { force: true }));
     const env = new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env);
     assert.equal(env.get('WF_MAX_CONCURRENT'), '5');
     assert.equal(env.has('WF_MEMORY_LIMIT'), false);
@@ -946,8 +912,8 @@ test('REFUSED: a public or wildcard --bind without --public, and --public with n
   }
 });
 
-test('--bind 0.0.0.0 --public writes the acknowledgement beside the address; a private network address needs none', async (t) => {
-  await t.test('--public: NEMIA_BIND_PUBLIC=1 written with NEMIA_BIND and WF_EXPOSED', async () => {
+describe('--bind 0.0.0.0 --public writes the acknowledgement beside the address; a private network address needs none', () => {
+  test('--public: NEMIA_BIND_PUBLIC=1 written with NEMIA_BIND and WF_EXPOSED', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null });
     await install({ bind: '0.0.0.0', public: true }, host);
     const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
@@ -955,8 +921,7 @@ test('--bind 0.0.0.0 --public writes the acknowledgement beside the address; a p
     assert.equal(env.get('WF_EXPOSED'), '1');
     assert.equal(env.get('NEMIA_BIND_PUBLIC'), '1');
   });
-
-  await t.test('--bind 100.100.1.2, a shared network (Tailscale), with no flag: listened on, no acknowledgement written', async () => {
+  test('--bind 100.100.1.2, a shared network (Tailscale), with no flag: listened on, no acknowledgement written', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null });
     await install({ bind: '100.100.1.2' }, host);
     const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
@@ -998,9 +963,10 @@ const reloadedOf = (world: World) => {
   return { host: { ...host, call }, seen };
 };
 
-test('--size auto caps the sessions together: a slice at what the machine allocates, written before the reload, the unit pointed at it, and uninstall takes it away', async (t) => {
+describe('--size auto caps the sessions together: a slice at what the machine allocates, written before the reload, the unit pointed at it, and uninstall takes it away', () => {
+  const outer = outlived();
   const GIB16 = { memoryMiB: 16384, cpus: 8 };
-  await t.test('16 GiB less the 2 GiB kept: MemoryMax 14336 MiB, in bytes, and WF_CGROUP_PARENT names the slice', async () => {
+  test('16 GiB less the 2 GiB kept: MemoryMax 14336 MiB, in bytes, and WF_CGROUP_PARENT names the slice', async () => {
     const { host, seen } = reloadedOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
     const done = await install({ size: 'auto' }, host);
     const slice = fs.readFileSync(SLICE, 'utf8');
@@ -1013,24 +979,19 @@ test('--size auto caps the sessions together: a slice at what the machine alloca
       done.lines.join('\n'),
     );
   });
-
-  await t.test(
-    'a floor --env gives sets the ceiling; one at or above the machine, or one that does not read, is refused with nothing written',
-    async () => {
-      const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
-      await install({ size: 'auto', env: ['WF_MEMORY_RESERVED=4Gi'] }, host);
-      assert.match(fs.readFileSync(SLICE, 'utf8'), /^MemoryMax=12884901888$/m);
-      for (const floor of ['20Gi', '16Gi', 'half']) {
-        fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
-        const { host: again } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
-        await assert.rejects(install({ size: 'auto', env: [`WF_MEMORY_RESERVED=${floor}`] }, again), refusedWith('Invalid'), floor);
-        assert.equal(fs.existsSync(UNIT), false, floor);
-        assert.equal(fs.existsSync(SLICE), false, floor);
-      }
-    },
-  );
-
-  await t.test('a slice --env names is the person’s: no file written, the unit names it once, and a line names set-property', async () => {
+  test('a floor --env gives sets the ceiling; one at or above the machine, or one that does not read, is refused with nothing written', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+    await install({ size: 'auto', env: ['WF_MEMORY_RESERVED=4Gi'] }, host);
+    assert.match(fs.readFileSync(SLICE, 'utf8'), /^MemoryMax=12884901888$/m);
+    for (const floor of ['20Gi', '16Gi', 'half']) {
+      fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
+      const { host: again } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+      await assert.rejects(install({ size: 'auto', env: [`WF_MEMORY_RESERVED=${floor}`] }, again), refusedWith('Invalid'), floor);
+      assert.equal(fs.existsSync(UNIT), false, floor);
+      assert.equal(fs.existsSync(SLICE), false, floor);
+    }
+  });
+  test('a slice --env names is the person’s: no file written, the unit names it once, and a line names set-property', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
     const done = await install({ size: 'auto', env: ['WF_CGROUP_PARENT=sessions.slice'] }, host);
     assert.equal(fs.existsSync(SLICE), false);
@@ -1043,8 +1004,7 @@ test('--size auto caps the sessions together: a slice at what the machine alloca
       done.lines.join('\n'),
     );
   });
-
-  await t.test('no --size, and launchd, write no slice and no WF_CGROUP_PARENT', async () => {
+  test('no --size, and launchd, write no slice and no WF_CGROUP_PARENT', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
     await install({}, host);
     assert.equal(fs.existsSync(SLICE), false);
@@ -1052,12 +1012,11 @@ test('--size auto caps the sessions together: a slice at what the machine alloca
     const machine = { platform: 'darwin', wsl: false, systemd: false };
     const { host: mac } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: GIB16 });
     const done = await install({ size: 'auto' }, mac);
-    t.after(() => fs.rmSync(done.file, { force: true }));
+    outer.onTestFinished(() => fs.rmSync(done.file, { force: true }));
     assert.equal(new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env).has('WF_CGROUP_PARENT'), false);
     assert.equal(fs.existsSync(SLICE), false);
   });
-
-  await t.test('a store of its own, named nemia-trial, gets nemia-trial-sessions.slice', async () => {
+  test('a store of its own, named nemia-trial, gets nemia-trial-sessions.slice', async () => {
     const root = scratch('wf-service-trial-');
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16, root });
     const done = await install({ size: 'auto', name: 'nemia-trial' }, host);
@@ -1065,8 +1024,7 @@ test('--size auto caps the sessions together: a slice at what the machine alloca
     assert.match(fs.readFileSync(trial, 'utf8'), /^MemoryMax=15032385536$/m);
     assert.equal(new Map(unitRead(fs.readFileSync(done.file, 'utf8')).env).get('WF_CGROUP_PARENT'), 'nemia-trial-sessions.slice');
   });
-
-  await t.test('uninstall removes the slice with the unit, and succeeds where there is none', async () => {
+  test('uninstall removes the slice with the unit, and succeeds where there is none', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
     await install({ size: 'auto' }, host);
     const done = await runWith(engineOf(engine().layer), uninstallService({}, host));

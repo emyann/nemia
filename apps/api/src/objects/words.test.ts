@@ -6,7 +6,7 @@
  * before. And the inbox's routes the Card's verbs replaced answer 404, so a client still reading them fails.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

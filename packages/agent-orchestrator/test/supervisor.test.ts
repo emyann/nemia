@@ -5,7 +5,7 @@
  * is here; and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts, which is the cap's story in
  * `queue-store.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -4,7 +4,7 @@
  * `limit`, is refused by name. A closeout and a decision answer their summary unless their parts are asked (`closeoutNarrowed`,
  * `decisionNarrowed`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';

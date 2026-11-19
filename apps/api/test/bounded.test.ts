@@ -8,7 +8,7 @@
  * are whole numbers, refused 422 otherwise, a count past its most answered.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

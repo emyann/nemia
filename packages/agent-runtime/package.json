@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts' 'src/**/*.test.ts'",
+    "test": "vitest run",
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"
   },
   "keywords": [],
@@ -26,7 +26,8 @@
     "express": "^5.2.1",
     "test-kit": "*",
     "tsx": "^4.23.13",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   },
   "bin": {
     "ae": "bin/ae.ts"

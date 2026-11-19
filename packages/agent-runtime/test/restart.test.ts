@@ -5,7 +5,8 @@
  * Two engines on one journal and one fake harness stand for a runtime before and after a restart; a client built fresh
  * over the same two stands for anyone asking the restarted one's agent, with nothing in its memory.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
@@ -89,20 +90,25 @@ const listing = {
   includeArtifacts: false,
 };
 
-test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async (t) => {
-  const s = story(t);
-  const w = world();
-  const a = w.runtime();
+describe('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', () => {
+  let w!: ReturnType<typeof world>;
+  let a!: import('../src/index.ts').EngineShape;
+  let b!: import('../src/index.ts').EngineShape;
+  beforeAll(() => {
+    const t = teardowns();
+    w = world();
+    a = w.runtime();
+    b = a;
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  let b = a;
-
-  await s.test('the first runtime files the task and spawns its session', async () => {
+  s.test('the first runtime files the task and spawns its session', async () => {
     id = await Effect.runPromise(a.file(filing));
     await Effect.runPromise(a.tick());
     assert.deepEqual(w.sessions.get('ae/t-r/1'), { sessionId: 's-1', state: 'working', busy: true, nativeId: 's-1' });
   });
-
-  await s.test(
+  s.test(
     'the first runtime gone, the second not yet ticked: an agent that holds nothing answers off the harness, by id and by its context',
     async () => {
       b = w.runtime();
@@ -117,8 +123,7 @@ test('a restarted runtime answers for a session it never started, then stops it 
       );
     },
   );
-
-  await s.test(
+  s.test(
     "asked to stop, the second runtime's pass observes, finds the session through its agent and stops it on the harness; the next settles it",
     async () => {
       await Effect.runPromise(b.stop(id));
@@ -138,8 +143,7 @@ test('a restarted runtime answers for a session it never started, then stops it 
       assert.equal((await Effect.runPromise(b.view(id))).phase, 'stopped');
     },
   );
-
-  await s.test('the harness let the session go: the journal answers for it, canceled by the operator', async () => {
+  s.test('the harness let the session go: the journal answers for it, canceled by the operator', async () => {
     w.sessions.delete('ae/t-r/1');
     const after = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
     assert.equal(after.status!.state, TaskState.TASK_STATE_CANCELED);

@@ -2,7 +2,7 @@
  * The filter over the whole lists (src/lib/listFilter.ts): what the address keeps of it, `?q=`, and which things it keeps — those whose
  * name or one-line description holds what was typed, in any case.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { filterOf, matches } from '../src/lib/listFilter.ts';
 

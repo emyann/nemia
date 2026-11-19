@@ -4,7 +4,7 @@
  * nobody put is a 404; `DELETE /api/subscriptions/:name`, the api's own route, still answers `{ name }`.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

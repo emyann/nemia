@@ -8,7 +8,7 @@
  * it is carried on the record. Codex's arguments (`config.codex`) on a harness that is not Codex, and a long-lived task
  * on a harness that ends its session with its turn, are refused by the `Engine` service, which has harnesses to ask.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
@@ -256,11 +256,15 @@ const nameOf = (bad: object) =>
     .map(([k, v]) => `${k}: ${typeof v === 'number' ? v : JSON.stringify(v)}`)
     .join(', ');
 
-test('file: every harness-agnostic refusal, in the core and through the engine at shipped defaults, in one sentence — FileRefused, and nothing journalled at either door', async (t) => {
-  const effect = coreDoor();
-  const door = engineDoor();
+describe('file: every harness-agnostic refusal, in the core and through the engine at shipped defaults, in one sentence — FileRefused, and nothing journalled at either door', () => {
+  let effect!: { run: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Promise<A>; listed: () => Promise<TaskId[]> };
+  let door!: { engine: import('../src/index.ts').EngineShape; listed: () => Promise<string[]> };
+  beforeAll(() => {
+    effect = coreDoor();
+    door = engineDoor();
+  });
   for (const [bad, says] of REFUSALS) {
-    await t.test(nameOf(bad), async () => {
+    test(nameOf(bad), async () => {
       const spec = { ...ok, ...bad };
       const err = await effect.run(Effect.flip(file(spec)));
       assert.equal(err._tag, 'FileRefused', `failed with ${err._tag}: ${err.message}`);
@@ -470,10 +474,13 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
   },
 ];
 
-test("file: what only an engine refuses, in its harness's words or a brought harness's own — FileRefused, and nothing journalled", async (t) => {
-  const doors = harnessDoors();
+describe("file: what only an engine refuses, in its harness's words or a brought harness's own — FileRefused, and nothing journalled", () => {
+  let doors!: ReturnType<typeof harnessDoors>;
+  beforeAll(() => {
+    doors = harnessDoors();
+  });
   for (const row of HARNESS_REFUSALS) {
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const { engine, journal } = doors[row.door];
       const before = await journal.list();
       const err = await Effect.runPromise(Effect.flip(engine.file({ ...ok, ...row.spec })));
@@ -484,13 +491,13 @@ test("file: what only an engine refuses, in its harness's words or a brought har
   }
 });
 
-test("file: an id the Task door refuses — one no file can be named by, or one already filed — is the caller's refusal: FileRefused, exit 2, and nothing more journalled", async (t) => {
+describe("file: an id the Task door refuses — one no file can be named by, or one already filed — is the caller's refusal: FileRefused, exit 2, and nothing more journalled", () => {
   const ROWS = [
     { name: 'an id that holds a `/`', id: 'a/b', first: false },
     { name: 'an id already filed', id: 'twice', first: true },
   ];
   for (const row of ROWS) {
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const { engine, journal } = harnessDoors().shipped;
       if (row.first) await Effect.runPromise(engine.file({ ...ok, id: row.id }));
       const before = await journal.list();
@@ -681,16 +688,19 @@ const TAKEN: Array<{
   },
 ];
 
-test('file journals what it takes: on the record for the runner, under config and nowhere else, read back by view', async (t) => {
-  const doors = harnessDoors();
+describe('file journals what it takes: on the record for the runner, under config and nowhere else, read back by view', () => {
+  let doors!: ReturnType<typeof harnessDoors>;
+  beforeAll(() => {
+    doors = harnessDoors();
+  });
   for (const row of TAKEN) {
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const { engine, journal } = doors[row.door];
       const id = await Effect.runPromise(engine.file({ ...ok, ...row.spec }));
       row.holds(await filedOf(journal, id), await Effect.runPromise(engine.view(id)));
     });
   }
-  await t.test('the core `file` journals a filing that refuses nothing, with every checked key set', async () => {
+  test('the core `file` journals a filing that refuses nothing, with every checked key set', async () => {
     const effect = coreDoor();
     const full: Filing = {
       ...ok,
@@ -712,7 +722,7 @@ test('file journals what it takes: on the record for the runner, under config an
     const id = await effect.run(file(full));
     assert.deepEqual(await effect.listed(), [id]);
   });
-  await t.test('the core `file` journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
+  test('the core `file` journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
     const effect = coreDoor();
     const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true }));
     const job = await effect.run(file(ok));
@@ -721,7 +731,7 @@ test('file journals what it takes: on the record for the runner, under config an
     assert.equal(filed.kind === 'filed' && filed.restartPolicy, 'Always');
     assert.equal(Object.hasOwn(await filedIn(job), 'restartPolicy'), false, 'a job journals no restart policy');
   });
-  await t.test("the core `file` journals a harness's own words it cannot check: it has no harness to ask", async () => {
+  test("the core `file` journals a harness's own words it cannot check: it has no harness to ask", async () => {
     const effect = coreDoor();
     await effect.run(file({ ...ok, harness: 'banana', config: { permissionMode: 'yolo' } }));
     assert.equal(

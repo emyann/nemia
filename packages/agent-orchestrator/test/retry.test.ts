@@ -10,7 +10,8 @@
  * The store is the file's own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` on it: its runs start
  * in repositories no factory holds.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test, vi, type TestContext } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,14 +101,14 @@ const refusedAs =
     return true;
   };
 
-test('a person tries a failed step again, fresh, on another model', async (t) => {
-  const s = story(t);
+describe('a person tries a failed step again, fresh, on another model', () => {
+  const s = story(test);
   let id = '';
-  await s.test('implement, on Claude Code at the model opus, is filed and fails', async () => {
+  s.test('implement, on Claude Code at the model opus, is filed and fails', async () => {
     id = await startedOn(implementOnly(['model: opus']), 'the flag');
     stage.board().settle(`${id}-implement`, 'failed');
   });
-  await s.test('REFUSED: a fresh try on a model its harness refuses, named by the flag as typed, and no ask written', async () => {
+  s.test('REFUSED: a fresh try on a model its harness refuses, named by the flag as typed, and no ask written', async () => {
     const harnessSaid = configRefusal('claude', { model: '' });
     assert.equal(typeof harnessSaid, 'string', 'the fixture: the harness refuses an empty model');
     await assert.rejects(
@@ -116,11 +117,11 @@ test('a person tries a failed step again, fresh, on another model', async (t) =>
     );
     assert.deepEqual(filesStore.asks.read(id).asks, [], 'nothing written');
   });
-  await s.test('a fresh try on a model its harness takes is asked for', async () => {
+  s.test('a fresh try on a model its harness takes is asked for', async () => {
     const { ask } = await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', model: 'sonnet' }));
     assert.deepEqual([ask.try, ask.mode, ask.model], [2, 'fresh', 'sonnet']);
   });
-  await s.test('the next tick files try 2, fresh on that model, the first behind it', async () => {
+  s.test('the next tick files try 2, fresh on that model, the first behind it', async () => {
     await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
     const record = runRecord(ROOT, id).steps.implement;
     assert.equal(record.taskId, `${id}-implement-try2`);
@@ -140,16 +141,16 @@ const pauseAskOf = (id: string) => {
 };
 const onDisk = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-test("a retry over a void pause ask waits for the pass that sets it aside, then is written at the ask's name", async (t) => {
-  const s = story(t);
+describe("a retry over a void pause ask waits for the pass that sets it aside, then is written at the ask's name", () => {
+  let pauseAsk!: unknown;
+  const s = story(test);
   let id = '';
-  let pauseAsk: unknown;
-  await s.test('implement is filed and fails on its own, with the ask a pause at once wrote for its next try on disk', async () => {
+  s.test('implement is filed and fails on its own, with the ask a pause at once wrote for its next try on disk', async () => {
     id = await startedOn(implementOnly(), 'the pause');
     stage.board().settle(`${id}-implement`, 'failed');
     pauseAsk = pauseAskOf(id);
   });
-  await s.test('REFUSED: the retry, held by the void ask, which the verb leaves for the tick', async () => {
+  s.test('REFUSED: the retry, held by the void ask, which the verb leaves for the tick', async () => {
     await assert.rejects(
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })),
       refusedAs('Conflict', 'try 2 of implement is held by the ask ', 'nemia pause --now', `nemia retry ${id} implement`),
@@ -157,26 +158,26 @@ test("a retry over a void pause ask waits for the pass that sets it aside, then 
     assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), pauseAsk);
     assert.equal(fs.existsSync(path.join(asksDir(ROOT, id), 'done')), false, 'the verb moves no file the tick reads');
   });
-  await s.test('a pass sets the void ask aside into done/', async () => {
+  s.test('a pass sets the void ask aside into done/', async () => {
     await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
     assert.deepEqual(onDisk(path.join(asksDir(ROOT, id), 'done', 'retry-implement-2')), pauseAsk);
   });
-  await s.test("the retry is then written at the ask's name", async () => {
+  s.test("the retry is then written at the ask's name", async () => {
     const { ask } = await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' }));
     assert.deepEqual(onDisk(askFile(ROOT, id, 'implement', 2)), ask);
   });
 });
 
-test('a pause ask still due holds a retry of its try, and is left as it is', async (t) => {
-  const s = story(t);
+describe('a pause ask still due holds a retry of its try, and is left as it is', () => {
+  let pauseAsk!: unknown;
+  const s = story(test);
   let id = '';
-  let pauseAsk: unknown;
-  await s.test('implement is filed and stopped by the pause, which wrote the ask of its next try', async () => {
+  s.test('implement is filed and stopped by the pause, which wrote the ask of its next try', async () => {
     id = await startedOn(implementOnly(), 'the pause');
     stage.board().settle(`${id}-implement`, 'stopped');
     pauseAsk = pauseAskOf(id);
   });
-  await s.test('REFUSED: the retry, the try asked by nemia pause --now; the ask left, nothing set aside', async () => {
+  s.test('REFUSED: the retry, the try asked by nemia pause --now; the ask left, nothing set aside', async () => {
     await assert.rejects(
       stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'fresh' })),
       refusedAs('Conflict', 'try 2 of implement is asked by nemia pause --now'),
@@ -240,11 +241,11 @@ const asking = async ({ gate = false, open = [cut, where] as unknown[] } = {}): 
 /** What `nemia` printed, line by line, over the stage's engine. */
 const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => void printed.push(args.join(' ')));
+  const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void printed.push(args.join(' ')));
   try {
     await stage.main(argv, e);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   return printed.join('\n').split('\n');
 };
@@ -257,13 +258,13 @@ const planOf = async (id: string) => stepRow(listedRow((await stage.main(['ls'])
 /** A step's row as `nemia ls` words it: its word, its cost, its branch and its note. */
 const wordsOf = (row: Listing['steps'][number]) => [shownStatus(row), row.cost, row.branch, shownNote(row)];
 
-test('a planner blocked on two questions is answered at the terminal', async (t) => {
-  const s = story(t);
+describe('a planner blocked on two questions is answered at the terminal', () => {
+  const s = story(test);
   let id = '';
-  await s.test('plan signs off blocked, asking two questions', async () => {
+  s.test('plan signs off blocked, asking two questions', async () => {
     id = await asking();
   });
-  await s.test(
+  s.test(
     "the decision's closeout numbers them, each option lettered, the recommended marked, and its reading says the `--answer` to give",
     async () => {
       const screen = await questionsSaid(id);
@@ -290,12 +291,12 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
       );
     },
   );
-  await s.test('`nemia ls` counts the questions in the note of the step waiting on you', async () => {
+  s.test('`nemia ls` counts the questions in the note of the step waiting on you', async () => {
     const plan = await planOf(id);
     assert.equal(plan.asks, 2, JSON.stringify(plan));
     assert.deepEqual(wordsOf(plan), ['succeeded · BLOCKED', undefined, 'main', 'asks 2 questions']);
   });
-  await s.test("`nemia retry --answer` files a try whose message is the board's words for the answers, given at the terminal", async () => {
+  s.test("`nemia retry --answer` files a try whose message is the board's words for the answers, given at the terminal", async () => {
     const asked = (await stage.main(['retry', id, 'plan', '--answer', '1=b', '--answer', '2=A,b: both'])) as { try?: number };
     const [ask] = asksOf(id);
     const expected = answerText(
@@ -310,7 +311,7 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
     assert.equal(askRead(id, ask).message, expected);
     assert.equal(asked.try, 2, 'the answers ask for try 2 of plan');
   });
-  await s.test('another run answered in its own words, `--message` the note', async () => {
+  s.test('another run answered in its own words, `--message` the note', async () => {
     const noted = await asking();
     await stage.main(['retry', noted, 'plan', '--answer', '1: neither', '--answer', '2=a', '--message', 'thanks']);
     const message = askRead(noted, asksOf(noted)[0]).message as string;
@@ -319,22 +320,22 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
   });
 });
 
-test("a gated planner's questions are answered with its approval", async (t) => {
-  const s = story(t);
+describe("a gated planner's questions are answered with its approval", () => {
+  const s = story(test);
   let id = '';
-  await s.test('plan signs off done at its gate, asking two questions', async () => {
+  s.test('plan signs off done at its gate, asking two questions', async () => {
     id = await asking({ gate: true });
   });
-  await s.test("the decision says its gate's approval with an `--answer` for each", async () => {
+  s.test("the decision says its gate's approval with an `--answer` for each", async () => {
     const gate = (await decidedOn(stage, id)).gates.plan;
     const form = '--answer 1=<letter> --answer 2=<letter> [--message "<note>"]';
     assert.ok(gate?.startsWith(`awaiting approval:  nemia approve ${id} plan ${form}  — or send it back:`), gate);
   });
-  await s.test('`nemia ls` counts the questions asked at the gate', async () => {
+  s.test('`nemia ls` counts the questions asked at the gate', async () => {
     const plan = await planOf(id);
     assert.equal(plan.asks, 2, JSON.stringify(plan));
   });
-  await s.test("`nemia approve --answer` approves with the board's words for the answers, given at the terminal", async () => {
+  s.test("`nemia approve --answer` approves with the board's words for the answers, given at the terminal", async () => {
     const approved = (await stage.main(['approve', id, 'plan', '--answer', '1=a', '--answer', '2=b', '--message', 'go'])) as {
       step: string;
       try: number;
@@ -352,26 +353,26 @@ test("a gated planner's questions are answered with its approval", async (t) => 
     assert.equal(askRead(id, 'approve-plan-1').message, expected);
     assert.deepEqual([approved.step, approved.try], ['plan', 1]);
   });
-  await s.test('approved, it waits on no one: `nemia ls` says nothing of its questions', async () => {
+  s.test('approved, it waits on no one: `nemia ls` says nothing of its questions', async () => {
     const plan = await planOf(id);
     assert.equal(plan.asks, undefined, JSON.stringify(plan));
     assert.doesNotMatch(wordsOf(plan).join(' '), /asks/);
   });
 });
 
-test('what the decision and `nemia ls` say of a step asking no question, or one that does not decode', async (t) => {
-  await t.test('`nemia ls` says nothing of questions for a blocked step that asks none', async () => {
+describe('what the decision and `nemia ls` say of a step asking no question, or one that does not decode', () => {
+  test('`nemia ls` says nothing of questions for a blocked step that asks none', async () => {
     const bare = await asking({ open: [] });
     const plan = await planOf(bare);
     assert.equal(plan.asks, undefined, JSON.stringify(plan));
     assert.deepEqual(wordsOf(plan), ['succeeded · BLOCKED', undefined, 'main', undefined]);
   });
-  await t.test('a gate whose step asks none is approved with `--message`', async () => {
+  test('a gate whose step asks none is approved with `--message`', async () => {
     const bare = await asking({ gate: true, open: [] });
     const gate = (await decidedOn(stage, bare)).gates.plan;
     assert.ok(gate?.startsWith(`awaiting approval:  nemia approve ${bare} plan [--message "<words>"]  — or send it back:`), gate);
   });
-  await t.test('a question field that does not decode is refused back once, then read as a field, saying why', async () => {
+  test('a question field that does not decode is refused back once, then read as a field, saying why', async () => {
     const open = [{ title: 'Half a question' }];
     const half = await asking({ open });
     assert.equal(runRecord(ROOT, half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
@@ -395,30 +396,39 @@ test('what the decision and `nemia ls` say of a step asking no question, or one 
   });
 });
 
-test('REFUSED: `nemia retry --answer` that does not fit the questions the step asks now — exit 2, by name, nothing written', async (t) => {
-  const id = await asking();
-  const none = await asking({ open: [] });
+describe('REFUSED: `nemia retry --answer` that does not fit the questions the step asks now — exit 2, by name, nothing written', () => {
+  let id!: string;
+  let none!: string;
+  beforeAll(async () => {
+    id = await asking();
+    none = await asking({ open: [] });
+  });
   const retry = (run: string, ...answers: string[]) => stage.main(['retry', run, 'plan', ...answers.flatMap((a) => ['--answer', a])]);
-  const rows: Array<[string, () => Promise<unknown>, string[]]> = [
-    ['a number past them', () => retry(id, '1=a', '3=a'), ['--answer 3=a', 'question 3', '2', `nemia decide ${id}`]],
-    ['a letter not offered', () => retry(id, '1=d', '2=a'), ['--answer 1=d', 'How is the card cut?', 'a (one card)']],
-    ['a question answered twice', () => retry(id, '1=a', '1=b', '2=a'), ['"How is the card cut?"', 'twice']],
-    ['a question left out', () => retry(id, '1=a'), ['"Where do the answers go?"', 'not answered']],
-    ['two options where one is taken', () => retry(id, '1=a,b', '2=a'), ['"How is the card cut?"', 'one option']],
-    ['no answer at all', () => retry(id, 'one=a'), ['--answer one=a']],
+  const rows: Array<[string, () => [() => Promise<unknown>, string[]]]> = [
+    ['a number past them', () => [() => retry(id, '1=a', '3=a'), ['--answer 3=a', 'question 3', '2', `nemia decide ${id}`]]],
+    ['a letter not offered', () => [() => retry(id, '1=d', '2=a'), ['--answer 1=d', 'How is the card cut?', 'a (one card)']]],
+    ['a question answered twice', () => [() => retry(id, '1=a', '1=b', '2=a'), ['"How is the card cut?"', 'twice']]],
+    ['a question left out', () => [() => retry(id, '1=a'), ['"Where do the answers go?"', 'not answered']]],
+    ['two options where one is taken', () => [() => retry(id, '1=a,b', '2=a'), ['"How is the card cut?"', 'one option']]],
+    ['no answer at all', () => [() => retry(id, 'one=a'), ['--answer one=a']]],
     [
       'a step that asks no questions, naming --message instead',
-      () => retry(none, '1=a'),
-      ['asks no questions', '--message "<words>", without --answer'],
+      () => [() => retry(none, '1=a'), ['asks no questions', '--message "<words>", without --answer']],
     ],
     [
       '--answer with --recheck, before a run is read',
-      () => stage.main(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a']),
-      ['--answer', '--recheck', '--answer <n>=<letter>'],
+      () => [
+        () => stage.main(['retry', 'no-such-run-zz9z', 'plan', '--recheck', '--answer', '1=a']),
+        ['--answer', '--recheck', '--answer <n>=<letter>'],
+      ],
     ],
   ];
-  for (const [name, typed, facts] of rows) await t.test(name, () => assert.rejects(typed(), refusedAs('Invalid', ...facts)));
-  await t.test('nothing written', () => {
+  for (const [name, later] of rows)
+    test(name, () => {
+      const [typed, facts] = later();
+      return assert.rejects(typed(), refusedAs('Invalid', ...facts));
+    });
+  test('nothing written', () => {
     assert.deepEqual(asksOf(id), []);
     assert.deepEqual(asksOf(none), []);
   });
@@ -504,34 +514,40 @@ const DECLARED = {
   additionalProperties: false,
 };
 
-test("a checked step, from its check's filing to `retries:` spent and the run waiting on you", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  const dir = implementThenReview([
-    'output: implement.schema.json',
-    'check: npm test && npm run typecheck',
-    'retries: 1',
-    'memory: 4Gi',
-    'checkMemory: 64Mi',
-  ]);
-  fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
-  let run: RepositoryRun;
+describe("a checked step, from its check's filing to `retries:` spent and the run waiting on you", () => {
+  let b!: import('./story.ts').Board;
+  let dir!: string;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    dir = implementThenReview([
+      'output: implement.schema.json',
+      'check: npm test && npm run typecheck',
+      'retries: 1',
+      'memory: 4Gi',
+      'checkMemory: 64Mi',
+    ]);
+    fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(DECLARED));
+    return t.end;
+  });
+  const s = story(test);
   const id = () => run.id;
   const check1 = () => `${id()}-implement-check`;
   const try2 = () => `${id()}-implement-try2`;
   const check2 = () => `${id()}-implement-try2-check`;
-  await s.test('implement is filed, and a `check:` planted in the folder afterwards is planted after the run froze it', async () => {
+  s.test('implement is filed, and a `check:` planted in the folder afterwards is planted after the run froze it', async () => {
     run = await startedRun(dir, ['work=fix']);
     await tick(id());
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
   });
-  await s.test("implement's session is told the run's labels as its check will be, by the pass that filed it", () => {
+  s.test("implement's session is told the run's labels as its check will be, by the pass that filed it", () => {
     assert.equal(b.tasks.get(`${id()}-implement`)?.spec.config?.env?.WF_LABELS, '{"work":"fix"}');
   });
-  await s.test("implement's session is filed under the step's `memory:`, a container's limit", () => {
+  s.test("implement's session is filed under the step's `memory:`, a container's limit", () => {
     assert.deepEqual(b.tasks.get(`${id()}-implement`)?.spec.resources, { limits: { memory: '4Gi' } });
   });
-  await s.test(
+  s.test(
     'implement signs off, and the run files its check itself: the frozen command, in its workspace, on the check harness, the follower unfiled',
     async () => {
       ended(`${id()}-implement`, 'succeeded', { closeout: { ...SIGNED, notes: [], noNotes: 'a doc only' } });
@@ -582,7 +598,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       assert.ok(fs.statSync(path.join(ROOT, 'runs', id(), 'artifacts', 'implement')).isDirectory(), 'its files have somewhere to go');
     },
   );
-  await s.test("the check is handed the step's closeout as a file, flat, a declared field at the top level beside the four", () => {
+  s.test("the check is handed the step's closeout as a file, flat, a declared field at the top level beside the four", () => {
     const file = b.tasks.get(check1())!.spec.config?.env?.WF_CLOSEOUT ?? '';
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
       outcome: 'done',
@@ -592,11 +608,11 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       noNotes: 'a doc only',
     });
   });
-  await s.test('the check is filed once, however many passes', async () => {
+  s.test('the check is filed once, however many passes', async () => {
     await tick(id());
     assert.equal(b.filings.filter((f) => f === check1()).length, 1);
   });
-  await s.test(
+  s.test(
     '`retries: 1` re-files implement its check refused, continuing its session, told the command, the exit and both tails',
     async () => {
       ended(check1(), 'failed', {
@@ -627,11 +643,11 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       assert.match(spec.brief, /Do not weaken the check to pass it/, 'and not to weaken the check');
     },
   );
-  await s.test('try 2 is filed once, however many passes', async () => {
+  s.test('try 2 is filed once, however many passes', async () => {
     await tick(id());
     assert.equal(b.filings.filter((f) => f === try2()).length, 1);
   });
-  await s.test(
+  s.test(
     'try 2 signs off and is checked under an id of its own; refused too, past `retries: 1` nothing is filed, pass after pass, and the run failed',
     async () => {
       ended(try2(), 'succeeded', { closeout: { ...SIGNED, notes: [], noNotes: null } });
@@ -651,7 +667,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       assert.deepEqual(b.filings, [`${id()}-implement`, check1(), try2(), check2()], 'past `retries: 1`, nothing more');
     },
   );
-  await s.test('`nemia ls` and `nemia decide` read the refused check from the streams the runtime kept, and it waits on you', async () => {
+  s.test('`nemia ls` and `nemia decide` read the refused check from the streams the runtime kept, and it waits on you', async () => {
     const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, id())));
     assert.deepEqual(
       l.steps.map((x) => x.message),
@@ -670,31 +686,38 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
   });
 });
 
-test('a check that refuses once, at length, is tried with no ask, its brief carrying all of it, and a pass hands on', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('a check that refuses once, at length, is tried with no ask, its brief carrying all of it, and a pass hands on', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  let stderr!: string;
+  let stdout!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    stderr = Array.from({ length: 150 }, (_, i) => `err ${i + 1}`).join('\n');
+    stdout = Array.from({ length: 40 }, (_, i) => `out ${i + 1}`).join('\n');
+    return t.end;
+  });
+  const s = story(test);
   const id = () => run.id;
   const try2 = () => `${id()}-implement-try2`;
-  const stderr = Array.from({ length: 150 }, (_, i) => `err ${i + 1}`).join('\n');
-  const stdout = Array.from({ length: 40 }, (_, i) => `out ${i + 1}`).join('\n');
-  await s.test('implement signs off, and its check refuses at length', async () => {
+  s.test('implement signs off, and its check refuses at length', async () => {
     run = await throughCheck(['check: npm test', 'retries: 2'], 'failed', {
       exitCode: 1,
       printed: { stdout: `${stdout}\n`, stderr: `${stderr}\n` },
     });
   });
-  await s.test('one pass tries implement again, continuing its session, with no ask written', async () => {
+  s.test('one pass tries implement again, continuing its session, with no ask written', async () => {
     const pass = await tick(id());
     assert.deepEqual([pass.tried, pass.status], [['implement'], 'running']);
     assert.equal(b.tasks.get(try2())?.spec.resumeFrom, `native-${id()}-implement`);
     assert.deepEqual(retryAsks(id()), [], 'nobody asked for the try');
   });
-  await s.test("the try's brief carries every line the check printed, not only the last 20", () => {
+  s.test("the try's brief carries every line the check printed, not only the last 20", () => {
     const brief = b.tasks.get(try2())!.spec.brief;
     assert.deepEqual(JSON.parse(/\n```json\n([\s\S]*?)\n```/.exec(brief)![1]), { command: 'npm test', exit: 1, stdout, stderr });
   });
-  await s.test('try 2 signs off, its check passes, review is filed, and nothing waits on you', async () => {
+  s.test('try 2 signs off, its check passes, review is filed, and nothing waits on you', async () => {
     ended(try2(), 'succeeded', { closeout: SIGNED });
     assert.deepEqual((await tick(id())).checked, ['implement']);
     ended(`${try2()}-check`, 'succeeded', { exitCode: 0 });
@@ -722,11 +745,16 @@ const PICTURES = [
   '',
 ].join('\n');
 
-test('the step after a checked step is handed what the check said, and one after a step with no `check:` none', async (t) => {
-  const s = story(t);
-  const b = stage.board();
+describe('the step after a checked step is handed what the check said, and one after a step with no `check:` none', () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  await s.test("review is handed its exit, the tails, and every `wf <name>:` line of the check's whole stdout, in its brief", async () => {
+  s.test("review is handed its exit, the tails, and every `wf <name>:` line of the check's whole stdout, in its brief", async () => {
     id = (
       await throughCheck(['check: npm test'], 'succeeded', {
         exitCode: 0,
@@ -755,41 +783,43 @@ test('the step after a checked step is handed what the check said, and one after
       reported: said.reported,
     });
   });
-  await s.test("review, failed and tried afresh, is handed that check in its try's brief too", async () => {
+  s.test("review, failed and tried afresh, is handed that check in its try's brief too", async () => {
     ended(`${id}-review`, 'failed', { exitCode: 1 });
     await stage.runWith(b.e, retryRun(id, 'review', { mode: 'fresh' }));
     assert.deepEqual((await tick(id)).tried, ['review']);
     const said = dataUnder(b.tasks.get(`${id}-review-try2`)!.spec.brief, CHECK_SAID) as { reported: string[] };
     assert.ok(said.reported.includes(`wf pictures: named ${NAMED_1}`), said.reported.join('\n'));
   });
-  await s.test(
-    "another run's implement, with no `check:`, signs off: review is filed, and no check, and is handed no check's word",
-    async () => {
-      const plain = await startedRun(implementThenReview());
-      await tick(plain.id);
-      ended(`${plain.id}-implement`, 'succeeded', { closeout: SIGNED });
-      assert.deepEqual((await tick(plain.id)).filed, ['review']);
-      assert.ok(!b.tasks.get(`${plain.id}-review`)!.spec.brief.includes(CHECK_SAID));
-      ended(`${plain.id}-review`, 'succeeded', { closeout: SIGNED });
-      const last = await tick(plain.id);
-      assert.deepEqual(
-        b.filings.filter((f) => f.startsWith(plain.id)),
-        [`${plain.id}-implement`, `${plain.id}-review`],
-        'never a check task, from the first pass to the last',
-      );
-      assert.equal(last.status, 'succeeded');
-      assert.equal(runRecord(ROOT, plain.id).steps.implement?.check, undefined);
-    },
-  );
+  s.test("another run's implement, with no `check:`, signs off: review is filed, and no check, and is handed no check's word", async () => {
+    const plain = await startedRun(implementThenReview());
+    await tick(plain.id);
+    ended(`${plain.id}-implement`, 'succeeded', { closeout: SIGNED });
+    assert.deepEqual((await tick(plain.id)).filed, ['review']);
+    assert.ok(!b.tasks.get(`${plain.id}-review`)!.spec.brief.includes(CHECK_SAID));
+    ended(`${plain.id}-review`, 'succeeded', { closeout: SIGNED });
+    const last = await tick(plain.id);
+    assert.deepEqual(
+      b.filings.filter((f) => f.startsWith(plain.id)),
+      [`${plain.id}-implement`, `${plain.id}-review`],
+      'never a check task, from the first pass to the last',
+    );
+    assert.equal(last.status, 'succeeded');
+    assert.equal(runRecord(ROOT, plain.id).steps.implement?.check, undefined);
+  });
 });
 
-test('a check that ended stopped spends no retry, and `nemia retry --recheck` runs it again, and nothing else', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('a check that ended stopped spends no retry, and `nemia retry --recheck` runs it again, and nothing else', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const check1 = () => `${run.id}-implement-check`;
   const check2 = () => `${run.id}-implement-try2-check`;
-  await s.test('implement, with `retries: 2`, signs off and its check is stopped: pass after pass, no try is spent', async () => {
+  s.test('implement, with `retries: 2`, signs off and its check is stopped: pass after pass, no try is spent', async () => {
     run = await throughCheck(['check: npm test', 'retries: 2'], 'stopped');
     for (let pass = 1; pass <= 2; pass++) {
       const after = await tick(run.id);
@@ -797,7 +827,7 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     }
     assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'no try spent');
   });
-  await s.test('it waits on you, and `nemia decide` says its check did not finish and offers --recheck', async () => {
+  s.test('it waits on you, and `nemia decide` says its check did not finish and offers --recheck', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).waitingOnYou, ['implement']);
     const { decision: d, offers } = await stage.runWith(b.e, decideRun(run.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck], [[], ['implement']]);
@@ -805,7 +835,7 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
       `implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  nemia retry ${run.id} implement --recheck`,
     ]);
   });
-  await s.test('`--recheck` files a check, and no step', async () => {
+  s.test('`--recheck` files a check, and no step', async () => {
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck' }));
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
@@ -821,16 +851,21 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
       tries: rechecked,
     });
   });
-  await s.test('the check exits 0: the work passed as it stood, and the follower is filed', async () => {
+  s.test('the check exits 0: the work passed as it stood, and the follower is filed', async () => {
     ended(check2(), 'succeeded', { exitCode: 0 });
     assert.deepEqual((await tick(run.id)).filed, ['review']);
   });
 });
 
-test('a session cut off at its budget before its check ran: `nemia retry --recheck` runs the check alone, no session', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('a session cut off at its budget before its check ran: `nemia retry --recheck` runs the check alone, no session', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const session = () => `${run.id}-implement`;
   const check2 = () => `${run.id}-implement-try2-check`;
   const cutOff = async (checked = true): Promise<RepositoryRun> => {
@@ -840,14 +875,14 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
     await tick(started.id);
     return started;
   };
-  await s.test('implement is budget exhausted, its check never run; `nemia decide` offers the recheck beside the raise', async () => {
+  s.test('implement is budget exhausted, its check never run; `nemia decide` offers the recheck beside the raise', async () => {
     run = await cutOff();
     assert.deepEqual(b.filings, [session()], 'no check was filed for a session cut off');
     const { decision: d, offers } = await stage.runWith(b.e, decideRun(run.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.budgetExhausted, d.failedCheck], [['implement'], []]);
     names(offers.join('\n'), `nemia retry ${run.id} implement --budget <amount>`, '--recheck');
   });
-  await s.test('`--recheck` files its check alone, on the same task, and no session', async () => {
+  s.test('`--recheck` files its check alone, on the same task, and no session', async () => {
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck' }));
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
@@ -861,12 +896,12 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
       tries: [{ taskId: session(), cause: 'recheck' }],
     });
   });
-  await s.test('the check exits 0: implement is verified as if its session had signed off, and review is filed', async () => {
+  s.test('the check exits 0: implement is verified as if its session had signed off, and review is filed', async () => {
     ended(check2(), 'succeeded', { exitCode: 0 });
     assert.deepEqual((await tick(run.id)).filed, ['review']);
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).waitingOnYou, []);
   });
-  await s.test('a recheck that refuses waits on you as a failed check does, the budget stop still said', async () => {
+  s.test('a recheck that refuses waits on you as a failed check does, the budget stop still said', async () => {
     const refused = await cutOff();
     await stage.runWith(b.e, retryRun(refused.id, 'implement', { mode: 'recheck' }));
     await tick(refused.id);
@@ -877,7 +912,7 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
     const { decision: d } = await stage.runWith(b.e, decideRun(refused.id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failedCheck, d.budgetExhausted], ['failed', ['implement'], ['implement']]);
   });
-  await s.test('a step with no check is refused the recheck, and told the session retry with --budget', async () => {
+  s.test('a step with no check is refused the recheck, and told the session retry with --budget', async () => {
     const unchecked = await cutOff(false);
     await assert.rejects(
       stage.runWith(b.e, retryRun(unchecked.id, 'implement', { mode: 'recheck' })),
@@ -887,54 +922,53 @@ test('a session cut off at its budget before its check ran: `nemia retry --reche
   });
 });
 
-test("`nemia retry` writes a person's ask, and the tick honours it once, consuming it whole", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe("`nemia retry` writes a person's ask, and the tick honours it once, consuming it whole", () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   let file = '';
   let written = '';
   const try2 = () => `${run.id}-implement-try2`;
-  await s.test(
-    'implement is refused by its check; `nemia retry --model opus` writes the ask beside the record, and no record',
-    async () => {
-      run = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
-      const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh', model: 'opus' }));
-      file = asked.file;
-      assert.equal(file, path.join(asksDir(ROOT, run.id), 'retry-implement-2'));
-      written = fs.readFileSync(file, 'utf8');
-      assert.deepEqual(JSON.parse(written), asked.ask);
-      assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'the verb writes no record');
-      assert.match((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
-    },
-  );
-  await s.test('the next pass files try 2, a new session on the model asked, told everything a step starting cold is', async () => {
+  s.test('implement is refused by its check; `nemia retry --model opus` writes the ask beside the record, and no record', async () => {
+    run = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
+    const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh', model: 'opus' }));
+    file = asked.file;
+    assert.equal(file, path.join(asksDir(ROOT, run.id), 'retry-implement-2'));
+    written = fs.readFileSync(file, 'utf8');
+    assert.deepEqual(JSON.parse(written), asked.ask);
+    assert.equal(runRecord(ROOT, run.id).steps.implement?.tries, undefined, 'the verb writes no record');
+    assert.match((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note ?? '', /^try 2 asked \(--model opus\)/);
+  });
+  s.test('the next pass files try 2, a new session on the model asked, told everything a step starting cold is', async () => {
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     const spec = b.tasks.get(try2())!.spec;
     assert.deepEqual({ model: spec.config?.model, resumeFrom: spec.resumeFrom }, { model: 'opus', resumeFrom: undefined });
     assert.match(spec.brief, /## What was asked for\n\nadd a flag/);
   });
-  await s.test('the ask is consumed, moved whole into done/, and a second pass files nothing', async () => {
+  s.test('the ask is consumed, moved whole into done/, and a second pass files nothing', async () => {
     assert.deepEqual(retryAsks(run.id), []);
     assert.equal(fs.readFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), 'utf8'), written);
     const second = await tick(run.id);
     assert.deepEqual([second.tried, second.filed, second.checked], [[], [], []]);
   });
-  await s.test(
-    'the ask put back, as a pass that filed the try and died before consuming it leaves it: spent, it files nothing',
-    async () => {
-      fs.copyFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), file);
-      const third = await tick(run.id);
-      assert.deepEqual([third.tried, retryAsks(run.id)], [[], []]);
-      assert.equal(b.filings.filter((f) => f === try2()).length, 1);
-      assert.deepEqual(
-        runRecord(ROOT, run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
-        [['fresh', 'opus']],
-      );
-    },
-  );
+  s.test('the ask put back, as a pass that filed the try and died before consuming it leaves it: spent, it files nothing', async () => {
+    fs.copyFileSync(path.join(asksDir(ROOT, run.id), 'done', 'retry-implement-2'), file);
+    const third = await tick(run.id);
+    assert.deepEqual([third.tried, retryAsks(run.id)], [[], []]);
+    assert.equal(b.filings.filter((f) => f === try2()).length, 1);
+    assert.deepEqual(
+      runRecord(ROOT, run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
+      [['fresh', 'opus']],
+    );
+  });
 });
 
-test('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', async (t) => {
+describe('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that drops it refused, by name, writing no ask; anything that keeps the step as it asked is asked', () => {
   const refusedModel = async (lines: string[], model: string, ...facts: string[]) => {
     const run = await throughCheck(['check: npm test', ...lines], 'failed', { exitCode: 1 });
     await assert.rejects(
@@ -952,140 +986,161 @@ test('`nemia retry --model` on a Claude Code step in `auto` (F21): a model that 
     assert.equal((await stage.runWith(stage.board().e, retryRun(run.id, 'implement', { mode: 'fresh', model }))).ask.model, model);
   };
   for (const model of ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'])
-    await t.test(`REFUSED ${model} on a step that names no mode, filed in \`auto\` by default`, () =>
-      refusedModel([], model, 'implement names no `permissionMode:`', '`auto`', 'a job denies every call `default` would ask about'),
-    );
-  await t.test('REFUSED claude-haiku-4-5 on a step that says `permissionMode: auto`', () =>
-    refusedModel(['permissionMode: auto'], 'claude-haiku-4-5', 'implement says `permissionMode: auto`'),
-  );
-  await t.test('sonnet, which keeps the mode, is asked', () => askedModel([], 'sonnet'));
-  await t.test('haiku, whose alias keeps the mode, is asked on a step that says `permissionMode: auto`', () =>
-    askedModel(['permissionMode: auto'], 'haiku'),
-  );
-  await t.test('claude-haiku-4-5 on a step in `dontAsk` is asked', () => askedModel(['permissionMode: dontAsk'], 'claude-haiku-4-5'));
-  await t.test('claude-haiku-4-5 on a codex step is asked', () => askedModel(['harness: codex'], 'claude-haiku-4-5'));
+    test(`REFUSED ${model} on a step that names no mode, filed in \`auto\` by default`, () =>
+      refusedModel([], model, 'implement names no `permissionMode:`', '`auto`', 'a job denies every call `default` would ask about'));
+  test('REFUSED claude-haiku-4-5 on a step that says `permissionMode: auto`', () =>
+    refusedModel(['permissionMode: auto'], 'claude-haiku-4-5', 'implement says `permissionMode: auto`'));
+  test('sonnet, which keeps the mode, is asked', () => askedModel([], 'sonnet'));
+  test('haiku, whose alias keeps the mode, is asked on a step that says `permissionMode: auto`', () =>
+    askedModel(['permissionMode: auto'], 'haiku'));
+  test('claude-haiku-4-5 on a step in `dontAsk` is asked', () => askedModel(['permissionMode: dontAsk'], 'claude-haiku-4-5'));
+  test('claude-haiku-4-5 on a codex step is asked', () => askedModel(['harness: codex'], 'claude-haiku-4-5'));
 });
 
-test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', async (t) => {
-  const b = stage.board();
+describe('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(async () => {
+    b = stage.board();
+  });
   const settledAs = async (lines: string[], phase: EnginePhase, end: TestEnd = {}) => {
     const run = await startedRun(implementThenReview(lines));
     await tick(run.id);
     ended(`${run.id}-implement`, phase, end);
     return run.id;
   };
-  const rows: Array<[string, () => Promise<{ id: string; refused: () => Promise<unknown>; facts: string[] }>]> = [
+  const rows: Array<[string, () => [() => Promise<{ id: string; refused: () => Promise<unknown>; facts: string[] }>]]> = [
     [
       'a running step, asked through the API',
-      async () => {
-        const id = await settledAs(['check: npm test'], 'working');
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
-          facts: ['implement is still running'],
-        };
-      },
+      () => [
+        async () => {
+          const id = await settledAs(['check: npm test'], 'working');
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
+            facts: ['implement is still running'],
+          };
+        },
+      ],
     ],
     [
       'a running step, as typed, naming how to read it and how to call it off',
-      async () => {
-        const id = await settledAs([], 'working');
-        return {
-          id,
-          refused: () => stage.main(['retry', id, 'implement']),
-          facts: ['implement is still running', `nemia ls ${id}`, `nemia cancel ${id}`],
-        };
-      },
+      () => [
+        async () => {
+          const id = await settledAs([], 'working');
+          return {
+            id,
+            refused: () => stage.main(['retry', id, 'implement']),
+            facts: ['implement is still running', `nemia ls ${id}`, `nemia cancel ${id}`],
+          };
+        },
+      ],
     ],
     [
       'a running step, typed with --fresh',
-      async () => {
-        const id = await settledAs([], 'working');
-        return { id, refused: () => stage.main(['retry', id, 'implement', '--fresh']), facts: ['implement is still running'] };
-      },
+      () => [
+        async () => {
+          const id = await settledAs([], 'working');
+          return { id, refused: () => stage.main(['retry', id, 'implement', '--fresh']), facts: ['implement is still running'] };
+        },
+      ],
     ],
     [
       'a session its harness blocked, asked through the API without stopping it first',
-      async () => {
-        const id = await settledAs([], 'needs-human');
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
-          facts: ['implement is still running'],
-        };
-      },
+      () => [
+        async () => {
+          const id = await settledAs([], 'needs-human');
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
+            facts: ['implement is still running'],
+          };
+        },
+      ],
     ],
     [
       '--recheck of a session its harness blocked: no check of it failed',
-      async () => {
-        const id = await settledAs([], 'needs-human');
-        return {
-          id,
-          refused: () => stage.main(['retry', id, 'implement', '--recheck']),
-          facts: ['implement is running', 'no check of it failed', `nemia retry ${id} implement`, '--fresh'],
-        };
-      },
+      () => [
+        async () => {
+          const id = await settledAs([], 'needs-human');
+          return {
+            id,
+            refused: () => stage.main(['retry', id, 'implement', '--recheck']),
+            facts: ['implement is running', 'no check of it failed', `nemia retry ${id} implement`, '--fresh'],
+          };
+        },
+      ],
     ],
     [
       'a step that signed off and runs on',
-      async () => {
-        const id = await settledAs([], 'needs-human', { closeout: SIGNED });
-        return { id, refused: () => stage.main(['retry', id, 'implement']), facts: ['implement is still running'] };
-      },
+      () => [
+        async () => {
+          const id = await settledAs([], 'needs-human', { closeout: SIGNED });
+          return { id, refused: () => stage.main(['retry', id, 'implement']), facts: ['implement is still running'] };
+        },
+      ],
     ],
     [
       'a cancelled run',
-      async () => {
-        const { id } = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
-        markCancelled(ROOT, id);
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
-          facts: ['was cancelled at ', 'never be honoured'],
-        };
-      },
+      () => [
+        async () => {
+          const { id } = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
+          markCancelled(ROOT, id);
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
+            facts: ['was cancelled at ', 'never be honoured'],
+          };
+        },
+      ],
     ],
     [
       'a step the run tries again itself',
-      async () => {
-        const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1 });
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
-          facts: ['the run tries implement again itself'],
-        };
-      },
+      () => [
+        async () => {
+          const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1 });
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })),
+            facts: ['the run tries implement again itself'],
+          };
+        },
+      ],
     ],
     [
       'an empty --message',
-      async () => {
-        const { id } = await throughCheck(['check: npm test'], 'stopped');
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue', message: ' \n' })),
-          facts: ['--message is empty'],
-        };
-      },
+      () => [
+        async () => {
+          const { id } = await throughCheck(['check: npm test'], 'stopped');
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue', message: ' \n' })),
+            facts: ['--message is empty'],
+          };
+        },
+      ],
     ],
     [
       '--message on --recheck, naming the recheck and the answer to give instead',
-      async () => {
-        const { id } = await throughCheck(['check: npm test'], 'stopped');
-        return {
-          id,
-          refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'recheck', message: 'the suite is fixed' })),
-          facts: [`nemia retry ${id} implement --recheck`, `nemia retry ${id} implement --message "<answer>"`],
-        };
-      },
+      () => [
+        async () => {
+          const { id } = await throughCheck(['check: npm test'], 'stopped');
+          return {
+            id,
+            refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'recheck', message: 'the suite is fixed' })),
+            facts: [`nemia retry ${id} implement --recheck`, `nemia retry ${id} implement --message "<answer>"`],
+          };
+        },
+      ],
     ],
   ];
-  for (const [name, made] of rows)
-    await t.test(name, async () => {
+  for (const [name, later] of rows)
+    test(name, async () => {
+      const [made] = later();
       const { id, refused, facts } = await made();
       await assert.rejects(refused(), refusedAs('Conflict', ...facts));
       assert.deepEqual([retryAsks(id), b.stopped], [[], []], 'no ask written, nothing stopped');
     });
-  await t.test('a second ask for the same try, the first standing', async () => {
+  test('a second ask for the same try, the first standing', async () => {
     const { id } = await throughCheck(['check: npm test'], 'failed', { exitCode: 1 });
     await stage.runWith(b.e, retryRun(id, 'implement', { mode: 'continue' }));
     await assert.rejects(
@@ -1095,14 +1150,14 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
     assert.deepEqual(retryAsks(id), ['retry-implement-2']);
     assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), 'retry-implement-2'), 'utf8')).mode, 'continue');
   });
-  await t.test('a message to a step whose check did not finish is no refusal: a person may have something to say', async () => {
+  test('a message to a step whose check did not finish is no refusal: a person may have something to say', async () => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
     await stage.runWith(b.e, retryRun(id, 'implement', { mode: 'fresh', message: 'main has the fix for the flake' }));
     assert.deepEqual(retryAsks(id), ['retry-implement-2']);
   });
 });
 
-test('REFUSED: `nemia retry` as typed, before a run is read — exit 2, by name', async (t) => {
+describe('REFUSED: `nemia retry` as typed, before a run is read — exit 2, by name', () => {
   const typed = (...flags: string[]) => stage.main(['retry', 'no-such-run', 'implement', ...flags]);
   const rows: Array<[string, string[], string[]]> = [
     ['two ways to try', ['--fresh', '--recheck'], ['pick one of --continue, --fresh, --model <m>, --recheck']],
@@ -1135,17 +1190,16 @@ test('REFUSED: `nemia retry` as typed, before a run is read — exit 2, by name'
       ['--recheck', 'nemia retry no-such-run implement --recheck', 'nemia retry no-such-run implement --budget <amount>'],
     ],
   ];
-  for (const [name, flags, facts] of rows) await t.test(name, () => assert.rejects(typed(...flags), refusedAs('Invalid', ...facts)));
-  await t.test('`--budget=<amount>` is read, and the run looked for: Missing', () =>
+  for (const [name, flags, facts] of rows) test(name, () => assert.rejects(typed(...flags), refusedAs('Invalid', ...facts)));
+  test('`--budget=<amount>` is read, and the run looked for: Missing', () =>
     assert.rejects(typed('--budget=5'), (err: Error & { exitCode?: number }) => {
       assert.ok(err instanceof Missing, err.message);
       names(err.message, 'no such run: no-such-run', 'nemia ls');
       return true;
-    }),
-  );
+    }));
 });
 
-test('`nemia retry --message` takes the next argument as the answer whatever it starts with, and `--message=<answer>` too', async (t) => {
+describe('`nemia retry --message` takes the next argument as the answer whatever it starts with, and `--message=<answer>` too', () => {
   const asked = async (sub: TestContext, ...flags: string[]) => {
     const { id } = await throughCheck(['check: npm test'], 'stopped');
     await printedBy(sub, ['retry', id, 'implement', ...flags]);
@@ -1162,15 +1216,20 @@ test('`nemia retry --message` takes the next argument as the answer whatever it 
     ["a flag's name, as the whole answer", ['--message=--fresh'], { mode: 'continue', message: '--fresh' }],
     ['beside --model', ['--message=keep --flag=on', '--model', 'opus'], { mode: 'fresh', model: 'opus', message: 'keep --flag=on' }],
   ];
-  for (const [name, flags, how] of rows) await t.test(name, async (sub) => assert.deepEqual(await asked(sub, ...flags), how));
+  for (const [name, flags, how] of rows) test(name, async (sub) => assert.deepEqual(await asked(sub, ...flags), how));
 });
 
-test('a step blocked after its check failed, nothing committed since: `nemia decide` offers --recheck, and says a needs-named one refused once its branch moved', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('a step blocked after its check failed, nothing committed since: `nemia decide` offers --recheck, and says a needs-named one refused once its branch moved', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const try2 = () => `${run.id}-implement-try2`;
-  await s.test('its check refuses, retries: continues it, and the session signs off blocked asking for the check again', async () => {
+  s.test('its check refuses, retries: continues it, and the session signs off blocked asking for the check again', async () => {
     run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1 });
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     ended(try2(), 'succeeded', {
@@ -1184,14 +1243,14 @@ test('a step blocked after its check failed, nothing committed since: `nemia dec
     await tick(run.id);
     assert.equal(runRecord(ROOT, run.id).steps.implement?.handedOff, try2(), 'handed off');
   });
-  await s.test('nemia decide offers --recheck first, and says no refusal beside the answer', async () => {
+  s.test('nemia decide offers --recheck first, and says no refusal beside the answer', async () => {
     await standingPass();
     const decided = await stage.runWith(b.e, decideRun(run.id));
     assert.ok(decided.offers[0]?.includes(`nemia retry ${run.id} implement --recheck`), decided.offers[0]);
     names(decided.answering.implement, `nemia retry ${run.id} implement --message`);
     assert.doesNotMatch(decided.answering.implement ?? '', /refused/);
   });
-  await s.test('its branch moves: the answer carries the refusal of the recheck its needs names, and nemia retry refuses it', async () => {
+  s.test('its branch moves: the answer carries the refusal of the recheck its needs names, and nemia retry refuses it', async () => {
     const moved = stage.place().world.branch(run.repo, run.branch, { 'moved.txt': 'by hand' });
     await standingPass();
     const decided = await stage.runWith(b.e, decideRun(run.id));
@@ -1204,14 +1263,19 @@ test('a step blocked after its check failed, nothing committed since: `nemia dec
   });
 });
 
-test('a blocked step answered with `nemia retry --message`', async (t) => {
-  const s = story(t);
-  const b = stage.board();
+describe('a blocked step answered with `nemia retry --message`', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  let ask!: { at: string };
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const answer = 'Keep it.\nThe flag is public: say so in the README.';
-  let run: RepositoryRun;
-  let ask: { at: string };
   const try2 = () => `${run.id}-implement-try2`;
-  await s.test('implement signs off blocked, asking', async () => {
+  s.test('implement signs off blocked, asking', async () => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(`${run.id}-implement`, 'succeeded', {
@@ -1219,7 +1283,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     });
     await tick(run.id);
   });
-  await s.test("the answer is written on the person's ask and nothing else; `nemia ls` says the try is asked with it", async () => {
+  s.test("the answer is written on the person's ask and nothing else; `nemia ls` says the try is asked with it", async () => {
     const record = recordText(run.id);
     const asked = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', message: answer }));
     ask = asked.ask;
@@ -1236,7 +1300,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
       'try 2 asked (--continue, with your answer) — the next tick files it',
     );
   });
-  await s.test("the tick carries it into the try's brief as `## Your answer`, and the record keeps no message", async () => {
+  s.test("the tick carries it into the try's brief as `## Your answer`, and the record keeps no message", async () => {
     const pass = await tick(run.id);
     assert.deepEqual(pass.tried, ['implement']);
     assert.ok(pass.notes.includes('implement: try 2 — nemia retry --continue, with your answer'), pass.notes.join('\n'));
@@ -1247,7 +1311,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     assert.ok(!recordText(run.id).includes('say so in the README'), 'the record keeps no message');
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
   });
-  await s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
+  s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
     ended(try2(), 'working');
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'try 2, continued on your word, answered');
     assert.deepEqual(readAnswers(ROOT, run.id), [{ ...ask }]);
@@ -1256,13 +1320,18 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
   });
 });
 
-test('`nemia retry` on a step whose session its harness blocked: the tick stops the session, files nothing while it stops, and once it has, a nudge that continues it', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('`nemia retry` on a step whose session its harness blocked: the tick stops the session, files nothing while it stops, and once it has, a nudge that continues it', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const taskId = () => `${run.id}-implement`;
   const try2 = () => `${run.id}-implement-try2`;
-  await s.test('`nemia retry`, as a person types it, asks for try 2, and says the tick stops the session first', async () => {
+  s.test('`nemia retry`, as a person types it, asks for try 2, and says the tick stops the session first', async () => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(taskId(), 'needs-human');
@@ -1270,7 +1339,7 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2']);
     assert.deepEqual([asked.try, asked.stopFirst], [2, true], 'try 2, its blocked session stopped first');
   });
-  await s.test('`nemia ls` says the phase alone, and the try asked', async () => {
+  s.test('`nemia ls` says the phase alone, and the try asked', async () => {
     const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0];
     assert.deepEqual(row, {
       name: 'implement',
@@ -1282,7 +1351,7 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     });
     assert.equal(note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
   });
-  await s.test('the next pass asks the engine to stop the session, files nothing, and writes no record', async () => {
+  s.test('the next pass asks the engine to stop the session, files nothing, and writes no record', async () => {
     const record = recordText(run.id);
     const first = await tick(run.id);
     assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId()], [], [], 'running']);
@@ -1295,13 +1364,13 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     assert.equal(recordText(run.id), record, 'the record untouched');
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2'], 'the ask waits for its try');
   });
-  await s.test('passes while the engine stops it carry nothing: no second stop, nothing filed', async () => {
+  s.test('passes while the engine stops it carry nothing: no second stop, nothing filed', async () => {
     for (let pass = 1; pass <= 2; pass++) {
       const again = await tick(run.id);
       assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId()], [], [], []], `pass ${pass}`);
     }
   });
-  await s.test('settled stopped, the next pass files try 2 as a nudge that continues the blocked session, once', async () => {
+  s.test('settled stopped, the next pass files try 2 as a nudge that continues the blocked session, once', async () => {
     ended(taskId(), 'stopped');
     const filed = await tick(run.id);
     assert.deepEqual([filed.tried, b.filings], [['implement'], [taskId(), try2()]]);
@@ -1318,12 +1387,17 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
   });
 });
 
-test('`nemia retry` on a blocked session that works again before any tick: stopped once, then its try filed', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('`nemia retry` on a blocked session that works again before any tick: stopped once, then its try filed', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const taskId = () => `${run.id}-implement`;
-  await s.test('asked while its harness blocked it, the session works again: `nemia ls` says it is stopping it', async (sub) => {
+  s.test('asked while its harness blocked it, the session works again: `nemia ls` says it is stopping it', async (sub) => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(taskId(), 'needs-human');
@@ -1334,7 +1408,7 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
     assert.deepEqual(row, { name: 'implement', message: 'working', reason: 'Running', phase: 'running', branch: run.branch });
     assert.equal(note, 'try 2 asked (--continue) — stopping its session, then the tick files it');
   });
-  await s.test('the next pass asks the engine to stop it and files nothing; passes after it stop nothing more', async () => {
+  s.test('the next pass asks the engine to stop it and files nothing; passes after it stop nothing more', async () => {
     const record = recordText(run.id);
     const first = await tick(run.id);
     assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId()], [], [], 'running']);
@@ -1350,7 +1424,7 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
       assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId()], [], [], []], `pass ${pass}`);
     }
   });
-  await s.test('settled stopped, try 2 is filed once, continuing the session', async () => {
+  s.test('settled stopped, try 2 is filed once, continuing the session', async () => {
     ended(taskId(), 'stopped');
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     assert.equal(b.tasks.get(`${taskId()}-try2`)!.spec.resumeFrom, `native-${taskId()}`);
@@ -1360,12 +1434,17 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
   });
 });
 
-test('a step that says `denials: fail`, denied a call, is stopped until a fresh try is told what was denied', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('a step that says `denials: fail`, denied a call, is stopped until a fresh try is told what was denied', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const taskId = () => `${run.id}-implement`;
-  await s.test('implement signs off denied a call: nothing after it is filed, however many passes', async () => {
+  s.test('implement signs off denied a call: nothing after it is filed, however many passes', async () => {
     run = await startedRun(implementThenReview(['denials: fail']));
     await tick(run.id);
     ended(taskId(), 'succeeded', { closeout: SIGNED, denials: [{ tool: 'Write', what: '/tmp/w/notes.md' }] });
@@ -1373,14 +1452,14 @@ test('a step that says `denials: fail`, denied a call, is stopped until a fresh 
     await tick(run.id);
     assert.deepEqual(b.filings, [taskId()]);
   });
-  await s.test('`nemia ls` reads it denied, with the call, and waiting on you', async () => {
+  s.test('`nemia ls` reads it denied, with the call, and waiting on you', async () => {
     const listed = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual(
       [listed.steps[0].message, shownNote(listed.steps[0]), listed.waitingOnYou],
       ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']],
     );
   });
-  await s.test('the decision names the rule for `allowedTools:` and offers `--fresh`', async () => {
+  s.test('the decision names the rule for `allowedTools:` and offers `--fresh`', async () => {
     const reading = await decidedOn(stage, run.id);
     assert.ok(reading.decision.kind === 'awaiting', JSON.stringify(reading.decision));
     assert.deepEqual(reading.decision.denied, ['implement']);
@@ -1392,7 +1471,7 @@ test('a step that says `denials: fail`, denied a call, is stopped until a fresh 
       ),
     );
   });
-  await s.test('the fresh try is a new task, told what was denied', async (sub) => {
+  s.test('the fresh try is a new task, told what was denied', async (sub) => {
     await printedBy(sub, ['retry', run.id, 'implement', '--fresh']);
     await tick(run.id);
     const again = b.filings.at(-1)!;
@@ -1401,22 +1480,27 @@ test('a step that says `denials: fail`, denied a call, is stopped until a fresh 
     assert.match(brief, /## What your session was denied\n\n```text\nWrite\(\/tmp\/w\/notes\.md\)\n```/);
     assert.match(brief, /the same call will be denied again/);
   });
-  await s.test('denied nothing, it hands on', async () => {
+  s.test('denied nothing, it hands on', async () => {
     ended(b.filings.at(-1)!, 'succeeded', { closeout: SIGNED });
     await tick(run.id);
     assert.equal(b.filings.at(-1), `${run.id}-review`);
   });
 });
 
-test('telling a running step something with `nemia say`, and the try that continues its session handed it', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe('telling a running step something with `nemia say`, and the try that continues its session handed it', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const taskId = () => `${run.id}-implement`;
   const saidTo = () => b.tasks.get(taskId())!.said;
   let record = '';
   let beside: string[] = [];
-  await s.test("`nemia say` hands the words to the step's task through the engine's `say`, and answers what it journalled", async () => {
+  s.test("`nemia say` hands the words to the step's task through the engine's `say`, and answers what it journalled", async () => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(taskId(), 'working');
@@ -1430,11 +1514,11 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual([first.attempt, first.text], [1, 'Widen the scope to apps/api too.']);
     assert.deepEqual([told.try, told.taskId, told.at, told.text], [1, taskId(), first.at, first.text], 'what nemia say prints of it');
   });
-  await s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
+  s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
     assert.equal(recordText(run.id), record);
     assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'the engine journal is the record');
   });
-  await s.test('`nemia ls` notes the step said to, once and then twice', async () => {
+  s.test('`nemia ls` notes the step said to, once and then twice', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0], {
       name: 'implement',
       message: 'working',
@@ -1448,7 +1532,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual([told.taskId, told.try, told.said], [taskId(), 1, saidTo()[1]]);
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'said to 2×');
   });
-  await s.test("signed off blocked, the decision's reading holds each thing said to the step, by its try and time", async () => {
+  s.test("signed off blocked, the decision's reading holds each thing said to the step, by its try and time", async () => {
     ended(taskId(), 'succeeded', {
       closeout: { outcome: 'blocked', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: 'Rename --flag?' },
     });
@@ -1465,7 +1549,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.ok(c && !('error' in c) && c.summary === 'IMPLEMENTER-SUMMARY', "beside the closeout, the step's own account of it");
     assert.equal(recordText(run.id), record, 'and still nothing written');
   });
-  await s.test(
+  s.test(
     'a nudge with an answer is handed what was said, as `## Said to your session` inside `## Try 2`, each message with its time, fenced',
     async () => {
       await tick(run.id);
@@ -1486,7 +1570,7 @@ test('telling a running step something with `nemia say`, and the try that contin
       );
     },
   );
-  await s.test('a fresh try of another run told the same is handed none of it', async () => {
+  s.test('a fresh try of another run told the same is handed none of it', async () => {
     const other = await startedRun(implementThenReview());
     await tick(other.id);
     ended(`${other.id}-implement`, 'working');
@@ -1497,7 +1581,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual((await tick(other.id)).tried, ['implement']);
     assert.doesNotMatch(b.tasks.get(`${other.id}-implement-try2`)!.spec.brief, /Said to your session|Widen the scope/);
   });
-  await s.test("`retries:`, the run's own nudge, hands it on too, before what the check said", async () => {
+  s.test("`retries:`, the run's own nudge, hands it on too, before what the check said", async () => {
     const checked = await startedRun(implementThenReview(['check: npm test', 'retries: 1']));
     await tick(checked.id);
     ended(`${checked.id}-implement`, 'working');
@@ -1512,7 +1596,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.ok(retried.includes(`At ${said.at}:\n\n\`\`\`text\nRun the parser tests too.\n\`\`\``), retried);
     assert.ok(retried.indexOf('## Said to your session') < retried.indexOf('## What the check said'), 'before the evidence');
   });
-  await s.test('a session its harness blocked, told something, stopped by `nemia retry` and continued, is handed it', async () => {
+  s.test('a session its harness blocked, told something, stopped by `nemia retry` and continued, is handed it', async () => {
     const blocked = await startedRun(implementThenReview());
     const id = `${blocked.id}-implement`;
     await tick(blocked.id);
@@ -1532,53 +1616,57 @@ test('telling a running step something with `nemia say`, and the try that contin
   });
 });
 
-test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and nothing written', async (t) => {
-  const b = stage.board();
-  const run = await startedRun(implementThenReview());
-  const taskId = `${run.id}-implement`;
-  await tick(run.id);
-  const record = recordText(run.id);
+describe('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and nothing written', () => {
+  let b!: import('./story.ts').Board;
+  let run!: Awaited<ReturnType<typeof startedRun>>;
+  let taskId!: string;
+  let record!: string;
+  let e!: import('./story.ts').Board['e'];
+  beforeAll(async () => {
+    b = stage.board();
+    run = await startedRun(implementThenReview());
+    taskId = `${run.id}-implement`;
+    await tick(run.id);
+    record = recordText(run.id);
+    e = {
+      ...b.e,
+      say: (id: string, text: string) => {
+        asked.push(id);
+        return b.e.say(id, text);
+      },
+    };
+  });
   const asked: string[] = [];
-  const e = {
-    ...b.e,
-    say: (id: string, text: string) => {
-      asked.push(id);
-      return b.e.say(id, text);
-    },
-  };
   const saying = (step: string, words = 'Widen the scope.') => stage.runWith(e, sayRun(run.id, step, words, { caller: PERSON }));
-  await t.test('by the engine, in its words: a task filed with no attempt started', () =>
-    assert.rejects(saying('implement'), refusedAs('Conflict', taskId, 'has not started an attempt')),
-  );
+  test('by the engine, in its words: a task filed with no attempt started', () =>
+    assert.rejects(saying('implement'), refusedAs('Conflict', taskId, 'has not started an attempt')));
   for (const words of [[''], [' \n '], []])
-    await t.test(`by the engine, in its words: empty words, typed ${JSON.stringify(words)}`, async () => {
+    test(`by the engine, in its words: empty words, typed ${JSON.stringify(words)}`, async () => {
       ended(taskId, 'working');
       await assert.rejects(saying('implement', words.join(' ')), refusedAs('Conflict', '`text` is empty', 'Give the words'));
     });
-  await t.test("each of those was the engine's to answer: it was asked once for each", () => {
+  test("each of those was the engine's to answer: it was asked once for each", () => {
     assert.deepEqual(asked, [taskId, taskId, taskId, taskId]);
     asked.length = 0;
   });
-  await t.test('by the package, before the engine is asked: a step the run does not have', () =>
-    assert.rejects(saying('deploy'), refusedAs('Conflict', `${run.id} has no step "deploy"`, 'implement, review')),
-  );
-  await t.test('by the package: empty words for a step not filed yet, refused as the engine refuses them, and nothing kept', () =>
-    assert.rejects(saying('review', ' \n '), refusedAs('Conflict', '`text` is empty', 'Give the words')),
-  );
+  test('by the package, before the engine is asked: a step the run does not have', () =>
+    assert.rejects(saying('deploy'), refusedAs('Conflict', `${run.id} has no step "deploy"`, 'implement, review')));
+  test('by the package: empty words for a step not filed yet, refused as the engine refuses them, and nothing kept', () =>
+    assert.rejects(saying('review', ' \n '), refusedAs('Conflict', '`text` is empty', 'Give the words')));
   for (const phase of ['succeeded', 'failed', 'stopped'] as const)
-    await t.test(`by the package: a task settled \`${phase}\`, offering the retry with words`, async () => {
+    test(`by the package: a task settled \`${phase}\`, offering the retry with words`, async () => {
       ended(taskId, phase);
       await assert.rejects(
         saying('implement'),
         refusedAs('Conflict', 'implement is not running', `settled \`${phase}\``, `nemia retry ${run.id} implement --message "<words>"`),
       );
     });
-  await t.test('by the package: a cancelled run, its task still running', async () => {
+  test('by the package: a cancelled run, its task still running', async () => {
     ended(taskId, 'working');
     markCancelled(ROOT, run.id);
     await assert.rejects(saying('implement'), refusedAs('Conflict', `${run.id} was cancelled at `, 'not steered'));
   });
-  await t.test('the engine was never asked by any of the package refusals; nothing said, nothing written', () => {
+  test('the engine was never asked by any of the package refusals; nothing said, nothing written', () => {
     assert.deepEqual(asked, [], 'the engine was never asked');
     assert.deepEqual(b.said, []);
     assert.equal(recordText(run.id), record);
@@ -1586,13 +1674,18 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   });
 });
 
-test("a claude step over its `budget:`, its cap raised by a person's `--budget`", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe("a claude step over its `budget:`, its cap raised by a person's `--budget`", () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const implement = () => `${run.id}-implement`;
   const try2 = () => `${implement()}-try2`;
-  await s.test("the step's `budget:` is frozen on the run: the folder edited afterwards never raises it, nor takes it off", async () => {
+  s.test("the step's `budget:` is frozen on the run: the folder edited afterwards never raises it, nor takes it off", async () => {
     const dir = implementThenReview(['budget: 2.50']);
     const frozen = await startedRun(dir);
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nbudget: 500\n---\nimplement it\n');
@@ -1604,7 +1697,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       ],
     );
   });
-  await s.test(
+  s.test(
     'implement, filed with its cap whole, costs $4.25 of $3 and its check refuses: `retries: 2` files nothing past the cap',
     async () => {
       run = await throughCheck(
@@ -1629,7 +1722,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       );
     },
   );
-  await s.test('`nemia ls` says over budget with the amounts, waiting on you; `nemia decide` offers `--budget`', async () => {
+  s.test('`nemia ls` says over budget with the amounts, waiting on you; `nemia decide` offers `--budget`', async () => {
     const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['over budget $4.25 of $3', ['implement']]);
     const { offers, decision: d } = await stage.runWith(b.e, decideRun(run.id));
@@ -1641,7 +1734,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       ),
     );
   });
-  await s.test('REFUSED: `nemia retry` without `--budget`, or with one not above what it spent; no ask written', async () => {
+  s.test('REFUSED: `nemia retry` without `--budget`, or with one not above what it spent; no ask written', async () => {
     await assert.rejects(
       stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue' })),
       refusedAs('Conflict', 'implement is over budget', '$4.25 of its $3 budget', `nemia retry ${run.id} implement --budget <amount>`),
@@ -1652,7 +1745,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     );
     assert.deepEqual(retryAsks(run.id), []);
   });
-  await s.test('`--budget 10` is asked, and files the try continuing the job with what is left of $10, the cap on the record', async () => {
+  s.test('`--budget 10` is asked, and files the try continuing the job with what is left of $10, the cap on the record', async () => {
     const { ask } = await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', budget: 10 }));
     assert.equal(ask.budget, 10);
     assert.match(
@@ -1673,7 +1766,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       /^## Try 2\n\nAfter the last try signed off, the run executed this step's check, and it did not pass\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\n/,
     );
   });
-  await s.test('try 2 costs $6 more and its check refuses: over again, and `retries:` files nothing on its own', async () => {
+  s.test('try 2 costs $6 more and its check refuses: over again, and `retries:` files nothing on its own', async () => {
     ended(try2(), 'succeeded', { closeout: SIGNED, usage: { costUsd: 6 } });
     assert.deepEqual((await tick(run.id)).checked, ['implement']);
     ended(`${try2()}-check`, 'failed', { exitCode: 1 });
@@ -1684,7 +1777,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       ['over budget $10.25 of $10', 'try 2, continued on your word, budget $10'],
     );
   });
-  await s.test(
+  s.test(
     'a nudge past a budget of a step that ended without its closeout is told why, beside the budget raised, not in its place',
     async () => {
       const unsigned = await startedRun(implementThenReview(['budget: 3']));
@@ -1704,10 +1797,15 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
   );
 });
 
-test("a claude job's cap, shared by its tries and raised by a person", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  await s.test(
+describe("a claude job's cap, shared by its tries and raised by a person", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'its `budget:` goes to the engine as `budgetUsd`; `retries:` files the next try with what is left of it — at the cap, none',
     async () => {
       const run = await throughCheck(
@@ -1735,7 +1833,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
   );
   let id = '';
   const implement = () => `${id}-implement`;
-  await s.test('a session its harness ended at the cap reads budget exhausted, and is not tried by `retries:`', async () => {
+  s.test('a session its harness ended at the cap reads budget exhausted, and is not tried by `retries:`', async () => {
     const run = await startedRun(implementThenReview(['harness: claude', 'check: npm test', 'retries: 2', 'budget: 3']));
     id = run.id;
     await tick(id);
@@ -1755,7 +1853,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
     const l = await stage.runWith(b.e, list(b.e, runRecord(ROOT, id)));
     assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
   });
-  await s.test('`nemia decide` offers `--budget`, and the retry is refused without one above what it spent', async () => {
+  s.test('`nemia decide` offers `--budget`, and the retry is refused without one above what it spent', async () => {
     const { offers, decision: d } = await stage.runWith(b.e, decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(offers, [
@@ -1775,14 +1873,14 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
       refusedAs('Conflict', '--budget 2 is not above $3.02', `nemia retry ${id} implement --budget <amount>`),
     );
   });
-  await s.test('a try with a larger one carries what is left of it, told why the last ended', async () => {
+  s.test('a try with a larger one carries what is left of it, told why the last ended', async () => {
     await stage.runWith(b.e, retryRun(id, 'implement', { mode: 'fresh', budget: 8 }));
     assert.deepEqual((await tick(id)).tried, ['implement']);
     const spec = b.tasks.get(`${implement()}-try2`)!.spec;
     assert.deepEqual([spec.harness, spec.config?.budgetUsd, spec.resumeFrom], ['claude', 4.98, undefined]);
     assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
   });
-  await s.test('a step blocked under its cap, asking for more, takes a `--budget` above the cap and not one at or under it', async () => {
+  s.test('a step blocked under its cap, asking for more, takes a `--budget` above the cap and not one at or under it', async () => {
     const run = await startedRun(implementThenReview(['harness: claude', 'budget: 20']));
     const blocked = `${run.id}-implement`;
     await tick(run.id);
@@ -1826,8 +1924,11 @@ const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
   return views;
 };
 
-test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` with none or cut at its deadline — the word `nemia ls` says — and no retry is spent on one unfinished", async (t) => {
-  const b = stage.board();
+describe("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` with none or cut at its deadline — the word `nemia ls` says — and no retry is spent on one unfinished", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    b = stage.board();
+  });
   const rows: Array<[string, TestEnd, ReturnType<ReturnType<typeof exitVerdicts>>, string[]]> = [
     ['refused, exit 1: `retries:` tries it', { exitCode: 1 }, 1, ['implement']],
     ['killed at its deadline, settled `failed` with no exit code: unfinished', {}, 'unfinished', []],
@@ -1839,7 +1940,7 @@ test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` w
     ],
   ];
   for (const [name, end, verdict, tried] of rows)
-    await t.test(name, async () => {
+    test(name, async () => {
       const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
       const run = runRecord(ROOT, id);
       const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
@@ -1850,42 +1951,53 @@ test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` w
     });
 });
 
-test('a check killed at its memory limit is told to the step tried again, outside the data, naming WF_MEMORY_LIMIT', async (t) => {
-  const b = stage.board();
-  const GI = 1024 ** 3;
+describe('a check killed at its memory limit is told to the step tried again, outside the data, naming WF_MEMORY_LIMIT', () => {
+  let b!: import('./story.ts').Board;
+  let GI!: number;
+  beforeAll(() => {
+    b = stage.board();
+    GI = 1024 ** 3;
+  });
   const toldAfter = async (end: TestEnd): Promise<string> => {
     const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
     assert.deepEqual((await tick(id)).tried, ['implement']);
     const brief = b.tasks.get(`${id}-implement-try2`)!.spec.brief;
     return brief.slice(brief.indexOf('## What the check said'));
   };
-  await t.test('killed: the kill and the knob, before the fenced output', async () => {
+  test('killed: the kill and the knob, before the fenced output', async () => {
     const said = await toldAfter({ exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 6 * GI, oomKills: 1 } });
     for (const fact of ['check out of memory', '6Gi', 'WF_MEMORY_LIMIT']) assert.ok(said.includes(fact), fact);
     assert.ok(said.indexOf('out of memory') < said.search(/`{3,}json/));
   });
-  await t.test('killed with its own limit reached (oom): the same kill and knob', async () => {
+  test('killed with its own limit reached (oom): the same kill and knob', async () => {
     const said = await toldAfter({ exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 6 * GI, oomKills: 1, oom: 1 } });
     for (const fact of ['check out of memory', '6Gi', 'WF_MEMORY_LIMIT']) assert.ok(said.includes(fact), fact);
   });
-  await t.test('a record with no kill, or none: nothing of memory', async () => {
+  test('a record with no kill, or none: nothing of memory', async () => {
     assert.doesNotMatch(await toldAfter({ exitCode: 1, memory: { limitBytes: 6 * GI, peakBytes: GI, oomKills: 0 } }), /out of memory/);
     assert.doesNotMatch(await toldAfter({ exitCode: 1 }), /out of memory/);
   });
 });
 
-test('a check the machine killed under its own limit is run again by `retries:`, as its check, and then waits on you offered --recheck', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  const GI = 1024 ** 3;
-  const squeezed = { exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 3 * GI, oomKills: 1, oom: 0 } };
-  let run: RepositoryRun;
+describe('a check the machine killed under its own limit is run again by `retries:`, as its check, and then waits on you offered --recheck', () => {
+  let b!: import('./story.ts').Board;
+  let GI!: number;
+  let squeezed!: { exitCode: number; memory: { limitBytes: number; peakBytes: number; oomKills: number; oom: number } };
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    GI = 1024 ** 3;
+    squeezed = { exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 3 * GI, oomKills: 1, oom: 0 } };
+    return t.end;
+  });
+  const s = story(test);
   const check1 = () => `${run.id}-implement-check`;
   const check2 = () => `${run.id}-implement-try2-check`;
-  await s.test('implement, with `retries: 1`, signs off and the machine kills a process of its check', async () => {
+  s.test('implement, with `retries: 1`, signs off and the machine kills a process of its check', async () => {
     run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', squeezed);
   });
-  await s.test('one pass runs its check again, and files no session', async () => {
+  s.test('one pass runs its check again, and files no session', async () => {
     const before = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
     const pass = await tick(run.id);
     assert.deepEqual([pass.tried, pass.checked], [['implement'], ['implement']]);
@@ -1897,7 +2009,7 @@ test('a check the machine killed under its own limit is run again by `retries:`,
     assert.deepEqual(retryAsks(run.id), [], 'nobody asked for it');
     fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), before);
   });
-  await s.test('the pass that filed it died before writing the run down: the recheck is adopted, never filed twice', async () => {
+  s.test('the pass that filed it died before writing the run down: the recheck is adopted, never filed twice', async () => {
     const again = await tick(run.id);
     assert.deepEqual(again.tried, [], 'adopted before the pass assessed anything, nothing left to file');
     assert.equal(b.filings.filter((f) => f === check2()).length, 1);
@@ -1911,7 +2023,7 @@ test('a check the machine killed under its own limit is run again by `retries:`,
       'an adopted check keeps no commit: the pass that filed it read it, and died before writing it down',
     );
   });
-  await s.test('the machine kills it again: its retries spent, it waits on you, and `nemia decide` offers --recheck first', async () => {
+  s.test('the machine kills it again: its retries spent, it waits on you, and `nemia decide` offers --recheck first', async () => {
     ended(check2(), 'failed', squeezed);
     const pass = await tick(run.id);
     assert.deepEqual(pass.tried, []);
@@ -1923,8 +2035,11 @@ test('a check the machine killed under its own limit is run again by `retries:`,
   });
 });
 
-test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nemia decide` and the next try's brief", async (t) => {
-  const b = stage.board();
+describe("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nemia decide` and the next try's brief", () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    b = stage.board();
+  });
   const endOf = (word: string): TestEnd =>
     (word === 'unsigned' ? { reason: 'harness', closedOut: false, former: 'unsigned' } : { reason: word }) as TestEnd;
   const wordOf = (a: { reason: string | null; former?: string }) => a.former ?? a.reason;
@@ -1947,7 +2062,7 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
     },
   ] as const;
   for (const { reasons, asked, word, outcome, onYou, told } of rows)
-    await t.test(`attempt 1 ${reasons[0]}, attempt 2 ${reasons[1]}: reads ${word}`, async () => {
+    test(`attempt 1 ${reasons[0]}, attempt 2 ${reasons[1]}: reads ${word}`, async () => {
       const run = await startedRun(implementThenReview());
       const taskId = `${run.id}-implement`;
       await tick(run.id);
@@ -1977,11 +2092,16 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
     });
 });
 
-test('a run frozen with a step of `maxAttempts: 2`, a key no step has now, still loads, lists and files — with no count, which the runtime would refuse', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
-  await s.test('the key is on the frozen step, read as a key the type does not know', async () => {
+describe('a run frozen with a step of `maxAttempts: 2`, a key no step has now, still loads, lists and files — with no count, which the runtime would refuse', () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
+  s.test('the key is on the frozen step, read as a key the type does not know', async () => {
     run = await startedRun(implementThenReview());
     const file = path.join(ROOT, 'runs', `${run.id}.json`);
     const record = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -1990,26 +2110,31 @@ test('a run frozen with a step of `maxAttempts: 2`, a key no step has now, still
     const frozen: Record<string, unknown> = runRecord(ROOT, run.id).workflow!.find((x) => x.name === 'implement')!;
     assert.equal(frozen.maxAttempts, 2);
   });
-  await s.test('implement is filed without it, and lists pending, then failed', async () => {
+  s.test('implement is filed without it, and lists pending, then failed', async () => {
     assert.deepEqual((await tick(run.id)).filed, ['implement']);
     assert.equal('maxAttempts' in b.tasks.get(`${run.id}-implement`)!.spec, false);
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].message, 'pending');
     ended(`${run.id}-implement`, 'failed');
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].message, 'failed');
   });
-  await s.test('a try of it is filed as any is, without it', async () => {
+  s.test('a try of it is filed as any is, without it', async () => {
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }));
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     assert.equal('maxAttempts' in b.tasks.get(`${run.id}-implement-try2`)!.spec, false);
   });
 });
 
-test("a `--continue` of a try whose session could not start continues the session that try was filed to continue (open issue 5, the orchestrator's now)", async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
+describe("a `--continue` of a try whose session could not start continues the session that try was filed to continue (open issue 5, the orchestrator's now)", () => {
+  let b!: import('./story.ts').Board;
+  let run!: RepositoryRun;
+  beforeAll(() => {
+    const t = teardowns();
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const first = () => `native-${run.id}-implement`;
-  await s.test('implement fails; a nudge files try 2 continuing its session', async () => {
+  s.test('implement fails; a nudge files try 2 continuing its session', async () => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(`${run.id}-implement`, 'failed');
@@ -2017,7 +2142,7 @@ test("a `--continue` of a try whose session could not start continues the sessio
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.resumeFrom, first());
   });
-  await s.test(
+  s.test(
     "try 2's resume is refused before a session ran: a nudge files try 3 continuing the chain try 2 was filed to, not a new session",
     async () => {
       ended(`${run.id}-implement-try2`, 'failed', { reason: 'unstartable', nativeId: null, resumeFrom: first() });
@@ -2028,7 +2153,7 @@ test("a `--continue` of a try whose session could not start continues the sessio
   );
 });
 
-test("REFUSED at `nemia start`: a step named for what a run cuts under a step's name — its check, its try, the run's own line — exit 2, by name, no run written", async (t) => {
+describe("REFUSED at `nemia start`: a step named for what a run cuts under a step's name — its check, its try, the run's own line — exit 2, by name, no run written", () => {
   const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   const rows: Array<[string, () => string, string[]]> = [
     [
@@ -2061,7 +2186,7 @@ test("REFUSED at `nemia start`: a step named for what a run cuts under a step's 
     ],
   ];
   for (const [name, folder, facts] of rows)
-    await t.test(name, async () => {
+    test(name, async () => {
       const before = runsWritten();
       await assert.rejects(
         stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder() })),
@@ -2071,15 +2196,18 @@ test("REFUSED at `nemia start`: a step named for what a run cuts under a step's 
     });
 });
 
-test('what the run files held open: a Claude Code job, and never a codex step or a check', async (t) => {
-  const b = stage.board();
+describe('what the run files held open: a Claude Code job, and never a codex step or a check', () => {
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    b = stage.board();
+  });
   const filedOf = (id: string) => b.specs.find((x) => x.id === id)!;
-  await t.test('a Claude Code job is filed held open, and its check is not', async () => {
+  test('a Claude Code job is filed held open, and its check is not', async () => {
     const run = await throughCheck(['check: true'], 'working');
     assert.equal(filedOf(`${run.id}-implement`).holdOpen, true);
     assert.equal(Object.hasOwn(filedOf(`${run.id}-implement-check`), 'holdOpen'), false, "a check is the run's own, never held open");
   });
-  await t.test('harness: codex: not held open', async () => {
+  test('harness: codex: not held open', async () => {
     const run = await startedRun(implementThenReview(['harness: codex']));
     assert.deepEqual((await tick(run.id)).filed, ['implement']);
     assert.equal(Object.hasOwn(filedOf(`${run.id}-implement`), 'holdOpen'), false);

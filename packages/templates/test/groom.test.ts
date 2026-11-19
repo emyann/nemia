@@ -3,7 +3,7 @@
  * one row per refusal and per accepting case. Facts apply in order, each `was` found exactly once in the body as the facts before it
  * left it and replaced by its `now`; a fact it cannot place exactly once is refused by its index, so no amendment is a guess.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { amendment } from '../sdlc/workflows/janitor/groom.ts';
 

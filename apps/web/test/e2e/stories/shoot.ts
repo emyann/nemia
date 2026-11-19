@@ -35,6 +35,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Browser } from 'playwright';
@@ -287,8 +288,21 @@ async function differ(browser: Browser, before: string, after: string): Promise<
   }
 }
 
-/** A scratch folder of the kit's (`test-kit/scratch`), taken only when pictures are, so `--list` loads none of node:test's hooks. */
-const scratch = async (prefix: string): Promise<string> => (await import('test-kit/scratch')).scratch(prefix);
+/** The scratch folders this script made, each removed as it exits. */
+const made: string[] = [];
+process.on('exit', () => {
+  for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/**
+ * A scratch folder of its own under the machine's temp directory, removed as the script exits: a script run by hand, not a test, so no
+ * runner's hooks take the kit's roots away (`test-kit/scratch` registers Vitest's, which throw outside a run).
+ */
+const scratch = async (prefix: string): Promise<string> => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  made.push(dir);
+  return dir;
+};
 
 /** Extracts the board at `commit` into a scratch folder over the checkout's `node_modules`; the board's folder there. */
 async function boardAt(root: string, commit: string): Promise<string> {

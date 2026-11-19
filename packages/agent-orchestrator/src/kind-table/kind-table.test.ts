@@ -4,7 +4,7 @@
  * server never read — every cell one line, each row's object the item's metadata alone, and the page's `continue` carried. Cells are
  * asserted as the values an object gives them.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Agent, Factory, McpServer, Skill, Table } from 'objects';
 import {

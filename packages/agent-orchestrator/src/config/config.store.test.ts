@@ -4,7 +4,7 @@
  * Every reader but one row's is handed the environment it is judged on, never the process's, so what the shell running the suite sets
  * changes nothing here. What the tick and `nemia up` make of a refused ceiling is `test/queue-store.test.ts`'s.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,7 +33,7 @@ import { names } from '../../test/assessed.ts';
 /** A reader, the variable it reads, the values it refuses, and the value its refusal names as the fix. */
 type Refused = [reader: (env: Env) => unknown, variable: string, values: readonly string[], fix: string];
 
-test('REFUSED at shipped defaults: each WF_ variable set to what it does not take, by name, exit 2, naming the fix', async (t) => {
+describe('REFUSED at shipped defaults: each WF_ variable set to what it does not take, by name, exit 2, naming the fix', () => {
   const rows: Record<string, Refused> = {
     'WF_ROOT not an absolute path — relative, dotted, or empty': [wfRoot, 'WF_ROOT', ['relative/store', './x', ''], 'WF_ROOT=/srv/wf'],
     'WF_MAX_CONCURRENT not a whole number from 1 — negative, zero, a fraction, a word, hex, an exponent': [
@@ -100,7 +100,7 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
     'NEMIA_RELEASE_CHECK neither on nor off': [releaseCheck, 'NEMIA_RELEASE_CHECK', ['0', 'no', 'OFF', ' off'], 'NEMIA_RELEASE_CHECK=off'],
   };
   for (const [name, [read, variable, values, fix]] of Object.entries(rows))
-    await t.test(name, () => {
+    test(name, () => {
       for (const value of values)
         assert.throws(
           () => read({ [variable]: value }),
@@ -132,7 +132,7 @@ test('REFUSED: WF_MEMORY_REQUEST above WF_MEMORY_LIMIT, which no session could b
     );
 });
 
-test('each WF_ variable reads its default unset, empty or blank, and the values it takes', async (t) => {
+describe('each WF_ variable reads its default unset, empty or blank, and the values it takes', () => {
   const home = path.join(os.homedir(), '.agent-workflows');
   const rows: Array<[string, () => unknown, unknown]> = [
     [
@@ -275,11 +275,10 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       ['sessions.slice', 'agents.slice', 'a-b.slice'],
     ],
   ];
-  for (const [name, got, want] of rows) await t.test(name, () => assert.deepEqual(got(), want));
-
-  await t.test('a reader given nothing reads the process environment when it is called, not when the module loaded', (sub) => {
+  for (const [name, got, want] of rows) test(name, () => assert.deepEqual(got(), want));
+  test('a reader given nothing reads the process environment when it is called, not when the module loaded', (sub) => {
     const was = process.env.WF_MAX_CONCURRENT;
-    sub.after(() => {
+    sub.onTestFinished(() => {
       if (was === undefined) delete process.env.WF_MAX_CONCURRENT;
       else process.env.WF_MAX_CONCURRENT = was;
     });

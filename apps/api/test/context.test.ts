@@ -5,7 +5,7 @@
  * (`root`), on the stand-ins: the runtime's test engine and the test place.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -54,9 +54,9 @@ const queuedTask = (taskId: string, brief: string) =>
 const section = (run: string, asked: string) =>
   ['', `## From run ${run}`, '', `Words about ${run}.`, '', 'What it was asked, the first line:', '```', asked, '```'].join('\n');
 
-test("context without a wait: a run's concluded section read, a card's from: set and taken off, and a step's From run sections labelled by how each was handed", async (t) => {
-  const s = story(t);
-  await s.test(
+describe("context without a wait: a run's concluded section read, a card's from: set and taken off, and a step's From run sections labelled by how each was handed", () => {
+  const s = story(test);
+  s.test(
     'GET /api/runs/:runId/concluded answers the run, whether it landed and its section in context words; an unknown run is a 404',
     async () => {
       writeRun({ id: 'source-c1' });
@@ -73,7 +73,7 @@ test("context without a wait: a run's concluded section read, a card's from: set
       assert.match(((await missing.json()) as { error: string }).error, /the store has no run nobody-z9/);
     },
   );
-  await s.test(
+  s.test(
     'GET /api/runs/:runId/concluded refuses an id that is not a name, never reading the record a path names — REFUSED: `..%2Fescape`',
     async () => {
       writeRun({ id: '../escape' });
@@ -84,7 +84,7 @@ test("context without a wait: a run's concluded section read, a card's from: set
       assert.doesNotMatch(error, /The brief of/);
     },
   );
-  await s.test(
+  s.test(
     "PUT /api/namespaces/default/cards/:name sets a card's spec.from, and a write without it takes it off — REFUSED: a run the store does not have is a 404, nothing written",
     async () => {
       writeRun({ id: 'source-f1' });
@@ -116,7 +116,7 @@ test("context without a wait: a run's concluded section read, a card's from: set
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^from:/m);
     },
   );
-  await s.test(
+  s.test(
     "a step's taskParts label each From run section by how its run was handed it: waited on for --after, read for --from",
     async () => {
       const brief = ['Do the work.', section('waited-a1', 'Build the cache.'), section('read-b2', 'Measure the cache.'), ''].join('\n');

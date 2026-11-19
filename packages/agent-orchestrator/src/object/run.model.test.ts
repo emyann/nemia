@@ -2,7 +2,7 @@
  * The run as one object (`Run`): a hand-built run decodes through it, its status carries the list's judged fields by the very types the
  * list's row has (`judgedFields`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import {

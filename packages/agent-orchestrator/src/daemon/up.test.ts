@@ -4,7 +4,7 @@
  * first on its own PATH as it starts, with its place's tools after it (`toolsOnPath`); that a check finds a tool installed there is
  * `src/needs/needs.test.ts`'s; and the harness a release carries adopted into the tools folder before the first pass (`adoptedAtStart`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

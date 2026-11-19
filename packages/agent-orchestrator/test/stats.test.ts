@@ -11,7 +11,9 @@
  * `src/stats/stats-memo.test.ts`; the words the client prints of them, `apps/cli`'s `rest-lines.test.ts`. Its store is its own at `ROOT`,
  * given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import type { Finishes } from 'test-kit/checkpoints';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -97,8 +99,8 @@ const agent = (name: string) => ({ name, keys: [], body: '', given: {} });
 const planted: string[] = [];
 
 /** Takes out, once the story `t` ends, every run it planted: the next story reads a store with none of them. */
-const plantedFor = (t: TestContext) =>
-  t.after(() => {
+const plantedFor = (t: Finishes) =>
+  t.onTestFinished(() => {
     for (const file of planted.splice(0)) fs.rmSync(file, { recursive: true, force: true });
   });
 
@@ -226,16 +228,19 @@ function aTouchedRun() {
     rendered('touched', 'design', 'planner', name, { applies });
 }
 
-test('`nemia stats` over a store: the numbers it answers and the words it prints, each read off the runs and the engine', async (t) => {
-  const s = story(t);
-  plantedFor(t);
-  aLanding();
-  aCheckedRun();
-  aLandingCheck('s-old', 1033, 1200);
-  aLandingCheck('s-new', 1033, 2700);
-  aTouchedRun();
-
-  await s.test(
+describe('`nemia stats` over a store: the numbers it answers and the words it prints, each read off the runs and the engine', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    plantedFor(t);
+    aLanding();
+    aCheckedRun();
+    aLandingCheck('s-old', 1033, 1200);
+    aLandingCheck('s-new', 1033, 2700);
+    aTouchedRun();
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     '--json answers a landing on its first try, its cost and rounds, and each check by its verdict; a run whose check did not finish has not finished',
     async () => {
       const all = await answered(['--from', DAY, '--to', DAY]);
@@ -258,8 +263,7 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
       assert.deepEqual(all.unreadable, []);
     },
   );
-
-  await s.test('--by factory answers a group per factory, and --factory keeps one', async () => {
+  s.test('--by factory answers a group per factory, and --factory keeps one', async () => {
     assert.deepEqual(
       (await answered(['--by', 'factory'])).groups.map((g) => [g.key, g.total.tries]),
       [
@@ -271,8 +275,7 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
     );
     assert.equal((await answered(['--factory', 'other'])).all.total.tries, 2);
   });
-
-  await s.test("the tiles span the last 14 days and the 14 before; the day's row is what it landed, and no change is marked", async () => {
+  s.test("the tiles span the last 14 days and the 14 before; the day's row is what it landed, and no change is marked", async () => {
     const { all } = await answered(['--from', DAY, '--to', DAY]);
     assert.ok(all.tiles.before.to < all.tiles.last.from, 'the 14 days before end before the last 14 begin');
     const day = all.days.find((d) => d.day === DAY);
@@ -282,16 +285,14 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
     );
     assert.deepEqual(all.marks, [], 'no run changed what it froze');
   });
-
-  await s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async () => {
+  s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async () => {
     for (const argv of [
       ['--by', 'colour'],
       ['--from', '2026-13-40'],
     ])
       await assert.rejects(stage.main(['stats', ...argv]), (err: unknown) => err instanceof Invalid && err.exitCode === 2, argv.join(' '));
   });
-
-  await s.test('a landing check is judged against the deadline its task was filed with, read off the engine', async () => {
+  s.test('a landing check is judged against the deadline its task was filed with, read off the engine', async () => {
     assert.deepEqual(
       (await answered(['--factory', 'landings'])).all.slowLandings.map((x) => [
         x.run,
@@ -304,22 +305,18 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
       'the same 1033 s is over half of 1200 and under half of 2700',
     );
   });
-
-  await s.test(
-    "the tries that touched a frozen skill's paths, and how many of them loaded it, are read off the sessions' ends",
-    async () => {
-      const range = ['--factory', 'touched', '--from', TOUCHED_DAY, '--to', TOUCHED_DAY];
-      assert.deepEqual(
-        (await answered(range)).all.steps.find((r) => r.step === 'design')?.skills,
-        [
-          { skill: 'app:y', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
-          { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
-          { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
-        ],
-        'both tries touched apps/web and one loaded change-the-board; shadcn declares no path; a skill named with its folder, frozen and loaded as `y`, is counted as its line writes it',
-      );
-    },
-  );
+  s.test("the tries that touched a frozen skill's paths, and how many of them loaded it, are read off the sessions' ends", async () => {
+    const range = ['--factory', 'touched', '--from', TOUCHED_DAY, '--to', TOUCHED_DAY];
+    assert.deepEqual(
+      (await answered(range)).all.steps.find((r) => r.step === 'design')?.skills,
+      [
+        { skill: 'app:y', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
+        { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
+        { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+      ],
+      'both tries touched apps/web and one loaded change-the-board; shadcn declares no path; a skill named with its folder, frozen and loaded as `y`, is counted as its line writes it',
+    );
+  });
 });
 
 const DENIED_DAY = '2026-09-26';
@@ -444,15 +441,18 @@ function tallyRuns() {
     );
 }
 
-test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try reads — and is left out of every mean', async (t) => {
-  const s = story(t);
-  plantedFor(t);
-  aDeniedRun();
-  aSkillsRun();
-  tallyRuns();
+describe('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try reads — and is left out of every mean', () => {
+  beforeAll(() => {
+    const t = teardowns();
+    plantedFor(t);
+    aDeniedRun();
+    aSkillsRun();
+    tallyRuns();
+    return t.end;
+  });
+  const s = story(test);
   const denials = ['--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY];
-
-  await s.test(
+  s.test(
     'each call a session was refused counts per measured try; a codex, background, recheck or pre-jobs try is unmeasured',
     async () => {
       const all = (await answered(denials)).all;
@@ -474,8 +474,7 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
       }
     },
   );
-
-  await s.test('null where nothing was measured, 0 a try where nothing was refused', async () => {
+  s.test('null where nothing was measured, 0 a try where nothing was refused', async () => {
     const { all } = await answered(denials);
     const day = (d: string) => all.days.find((x) => x.day === d);
     assert.deepEqual(
@@ -491,26 +490,21 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
     const write = all.steps.find((row) => row.step === 'write');
     assert.deepEqual([write?.skillLoads, write?.skillTries], [null, 0]);
   });
-
-  await s.test(
-    "each rule a step's frozen skills declare is kept or broken per measured try; rules that do not read count none",
-    async () => {
-      const all = (await answered(denials)).all;
-      assert.deepEqual(
-        all.steps.find((row) => row.step === 'write')?.rules,
-        [
-          { skill: RULED, rule: 'no-rm', says: 'Never remove', kept: 1, broken: 1 },
-          { skill: RULED, rule: 'no-write', says: 'Write nothing at the root', kept: 1, broken: 1 },
-          { skill: 'app:y', rule: 'no-wget', says: 'Never download', kept: 2, broken: 0 },
-          { skill: RULED, rule: 'no-curl', says: 'Never fetch', kept: 2, broken: 0 },
-        ],
-        "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read; a skill named with its folder, frozen as `y`, has its rules said as its line writes it",
-      );
-      assert.deepEqual(all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
-    },
-  );
-
-  await s.test('each skill a session loaded counts per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async () => {
+  s.test("each rule a step's frozen skills declare is kept or broken per measured try; rules that do not read count none", async () => {
+    const all = (await answered(denials)).all;
+    assert.deepEqual(
+      all.steps.find((row) => row.step === 'write')?.rules,
+      [
+        { skill: RULED, rule: 'no-rm', says: 'Never remove', kept: 1, broken: 1 },
+        { skill: RULED, rule: 'no-write', says: 'Write nothing at the root', kept: 1, broken: 1 },
+        { skill: 'app:y', rule: 'no-wget', says: 'Never download', kept: 2, broken: 0 },
+        { skill: RULED, rule: 'no-curl', says: 'Never fetch', kept: 2, broken: 0 },
+      ],
+      "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read; a skill named with its folder, frozen as `y`, has its rules said as its line writes it",
+    );
+    assert.deepEqual(all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
+  });
+  s.test('each skill a session loaded counts per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async () => {
     const range = ['--factory', 'skills', '--from', SKILLS_DAY, '--to', UNSAID_DAY];
     const all = (await answered(range)).all;
     assert.deepEqual(
@@ -528,37 +522,33 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
     assert.deepEqual([row('quiet')?.skillLoads, row('quiet')?.skillTries, row('quiet')?.skills], [0, 1, []], 'a measured empty list');
     assert.deepEqual([row('old')?.skillLoads, row('old')?.skillTries, row('old')?.skills], [null, 0, []], 'an end that does not say');
   });
-
-  await s.test(
-    "each tally a step froze totals over its closeouts, per day and over the range; a day with no closeout's value is —",
-    async () => {
-      const range = ['--factory', 'tallies', '--from', TALLY_DAY, '--to', UNTALLIED_DAY];
-      assert.deepEqual(
-        (await answered(range)).all.tallies.map((row) => [row.step, row.tally, row.total, row.days]),
+  s.test("each tally a step froze totals over its closeouts, per day and over the range; a day with no closeout's value is —", async () => {
+    const range = ['--factory', 'tallies', '--from', TALLY_DAY, '--to', UNTALLIED_DAY];
+    assert.deepEqual(
+      (await answered(range)).all.tallies.map((row) => [row.step, row.tally, row.total, row.days]),
+      [
         [
+          'triage',
+          'issues',
+          { sum: 2, tries: 1 },
           [
-            'triage',
-            'issues',
-            { sum: 2, tries: 1 },
-            [
-              { day: TALLY_DAY, sum: 2, tries: 1 },
-              { day: UNTALLIED_DAY, sum: null, tries: 0 },
-            ],
-          ],
-          [
-            'triage',
-            'issues.open',
-            { sum: 1, tries: 1 },
-            [
-              { day: TALLY_DAY, sum: 1, tries: 1 },
-              { day: UNTALLIED_DAY, sum: null, tries: 0 },
-            ],
+            { day: TALLY_DAY, sum: 2, tries: 1 },
+            { day: UNTALLIED_DAY, sum: null, tries: 0 },
           ],
         ],
-        'the session that signed no issues measured none',
-      );
-    },
-  );
+        [
+          'triage',
+          'issues.open',
+          { sum: 1, tries: 1 },
+          [
+            { day: TALLY_DAY, sum: 1, tries: 1 },
+            { day: UNTALLIED_DAY, sum: null, tries: 0 },
+          ],
+        ],
+      ],
+      'the session that signed no issues measured none',
+    );
+  });
 });
 
 const REVIEWED = '/repos/one/workflows/review';
@@ -585,13 +575,16 @@ function reviewRun(id: string, day: string, step: object, text?: string, more: {
   if (text !== undefined) rendered(id, 'review', (step as { agent: { name: string } }).agent.name, SKILL, { text });
 }
 
-test("A change is marked once: a skill copy, a hire and an agent's instructions, each on the later run of its workflow and factory", async (t) => {
-  const s = story(t);
-  plantedFor(t);
+describe("A change is marked once: a skill copy, a hire and an agent's instructions, each on the later run of its workflow and factory", () => {
+  beforeAll(() => {
+    const t = teardowns();
+    plantedFor(t);
+    return t.end;
+  });
+  const s = story(test);
   const before = 'Read the diff.';
   const after = 'Read the diff, then run the suite.';
-
-  await s.test(
+  s.test(
     'a skill whose rendered copy changed is marked once, on the later run, since the run before; the same copy again is not',
     async () => {
       ran('marks-2-review', { from: 9, to: 10, day: '2026-09-21' });
@@ -615,8 +608,7 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
       ]);
     },
   );
-
-  await s.test("an agent's instructions changed are marked once, on the agent; a hire changed once, on the step", async () => {
+  s.test("an agent's instructions changed are marked once, on the agent; a hire changed once, on the step", async () => {
     reviewRun('marks-5', '2026-09-23', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
     reviewRun('marks-6', '2026-09-24', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
     reviewRun('marks-7', '2026-09-25', reviewBy('intaker', 'You are Intaker.'), after);
@@ -631,8 +623,7 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
       'intaker appears in marks-7: her first instructions have nothing to compare with',
     );
   });
-
-  await s.test('a run of another factory, between them in the same folder, is compared within its own factory alone', async () => {
+  s.test('a run of another factory, between them in the same folder, is compared within its own factory alone', async () => {
     reviewRun('pipao-1', '2026-09-22', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
     reviewRun('pipao-2', '2026-09-24', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
     const marks = (await answered(['--workflow', 'review'])).all.marks;
@@ -642,8 +633,7 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
     );
     assert.deepEqual((await answered(['--workflow', 'review', '--factory', 'pipao'])).all.marks, []);
   });
-
-  await s.test('each mark says its day, what changed, its run and the run it is compared with', async () => {
+  s.test('each mark says its day, what changed, its run and the run it is compared with', async () => {
     assert.deepEqual(
       (await answered(['--workflow', 'review'])).all.marks.map((m) => [m.day, `${m.kind} ${m.name}`, m.run, m.since]),
       [

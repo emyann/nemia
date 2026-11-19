@@ -2,7 +2,7 @@
  * The skills on the board (src/lib/skills.ts): the places and a turn's cost, the skills an agent gives and where each is found, what the
  * picker offers, and a skill's form filled, sent and followed.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { GivenSkill } from '../src/lib/api/library.ts';
 import type { SkillDetail, SkillPlace, SkillRow } from '../src/lib/api/skills.ts';
@@ -56,91 +56,82 @@ const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
   ...fields,
 });
 
-test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, and what a change reaches', async (t) => {
-  await t.test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {
+describe('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, and what a change reaches', () => {
+  test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {
     assert.equal(
       costWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }),
       'named — about 12 tokens a turn, and about 1,500 more in a turn that loads it',
     );
     assert.equal(costWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), 'loaded every turn — about 1,512 tokens (cached)');
   });
-  await t.test(
-    'a skill named with its folder, which no place lists, keeps its read row whole: where it was found, and never said missing',
-    () => {
-      const read: GivenSkill[] = [
-        {
-          name: 'apps/site:lay-out',
-          from: null,
-          foundIn: 'apps/site/.claude/skills/lay-out',
-          entry: null,
-          error: null,
-          preload: false,
-          cost: null,
-        },
-      ];
-      const rows = givenRows(['write-a-note', 'apps/site:lay-out'], read, places([row()]));
-      assert.deepEqual(
-        rows.map((r) => [r.name, r.from, r.foundIn, r.error]),
-        [
-          ['write-a-note', 'user', null, null],
-          ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', null],
-        ],
-      );
-    },
-  );
-  await t.test(
-    'a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read',
-    () => {
-      const read: GivenSkill[] = [{ name: 'old', from: 'repo', foundIn: null, entry: null, error: 'as read', preload: false, cost: null }];
-      const builtin = row({ name: 'ship-it', from: 'builtin' });
-      const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [builtin]));
-      assert.deepEqual(
-        rows.map((r) => [r.name, r.from]),
-        [
-          ['write-a-note', 'user'],
-          ['old', 'repo'],
-          ['ship-it', null],
-        ],
-        'a builtin skill is not found by an agent of yours',
-      );
-      assert.equal(rows[1].error, 'as read');
-      assert.match(rows[2].error!, /^Neither your library nor this repository has `ship-it`/);
-      const copied = givenRows(
-        ['gone'],
-        [{ name: 'gone', from: null, foundIn: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
-        places([row({ name: 'gone' })]),
-      );
-      assert.deepEqual(
-        [copied[0].from, copied[0].error],
-        ['user', null],
-        'the list read again after a copy has the skill in your library: what it says now wins over the agent that was read missing it',
-      );
-      assert.deepEqual(
-        givenRows(['typed'], [], undefined).map((r) => [r.from, r.error]),
-        [[null, null]],
-        'before the list is read a new name is not called missing',
-      );
-    },
-  );
-  await t.test('the picker offers Add for a skill of yours or the repository, and copy-and-add for a builtin one found nowhere', () => {
+  test('a skill named with its folder, which no place lists, keeps its read row whole: where it was found, and never said missing', () => {
+    const read: GivenSkill[] = [
+      {
+        name: 'apps/site:lay-out',
+        from: null,
+        foundIn: 'apps/site/.claude/skills/lay-out',
+        entry: null,
+        error: null,
+        preload: false,
+        cost: null,
+      },
+    ];
+    const rows = givenRows(['write-a-note', 'apps/site:lay-out'], read, places([row()]));
+    assert.deepEqual(
+      rows.map((r) => [r.name, r.from, r.foundIn, r.error]),
+      [
+        ['write-a-note', 'user', null, null],
+        ['apps/site:lay-out', null, 'apps/site/.claude/skills/lay-out', null],
+      ],
+    );
+  });
+  test('a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read', () => {
+    const read: GivenSkill[] = [{ name: 'old', from: 'repo', foundIn: null, entry: null, error: 'as read', preload: false, cost: null }];
+    const builtin = row({ name: 'ship-it', from: 'builtin' });
+    const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [builtin]));
+    assert.deepEqual(
+      rows.map((r) => [r.name, r.from]),
+      [
+        ['write-a-note', 'user'],
+        ['old', 'repo'],
+        ['ship-it', null],
+      ],
+      'a builtin skill is not found by an agent of yours',
+    );
+    assert.equal(rows[1].error, 'as read');
+    assert.match(rows[2].error!, /^Neither your library nor this repository has `ship-it`/);
+    const copied = givenRows(
+      ['gone'],
+      [{ name: 'gone', from: null, foundIn: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
+      places([row({ name: 'gone' })]),
+    );
+    assert.deepEqual(
+      [copied[0].from, copied[0].error],
+      ['user', null],
+      'the list read again after a copy has the skill in your library: what it says now wins over the agent that was read missing it',
+    );
+    assert.deepEqual(
+      givenRows(['typed'], [], undefined).map((r) => [r.from, r.error]),
+      [[null, null]],
+      'before the list is read a new name is not called missing',
+    );
+  });
+  test('the picker offers Add for a skill of yours or the repository, and copy-and-add for a builtin one found nowhere', () => {
     assert.deepEqual(offerOf(row(), []), { kind: 'add' });
     assert.deepEqual(offerOf(row({ from: 'repo' }), []), { kind: 'add' });
     assert.deepEqual(offerOf(row(), ['write-a-note']), { kind: 'given' });
     assert.deepEqual(offerOf(row({ from: 'builtin' }), []), { kind: 'copy' });
   });
-  await t.test(
-    "REFUSED: no offer for a skill that does not read, and no copy of a builtin name an agent of yours already finds — it would write over yours or hide the repository's",
-    () => {
-      assert.deepEqual(offerOf(row({ entry: null, error: 'SKILL.md has no frontmatter' }), []), {
-        kind: 'refused',
-        why: 'SKILL.md has no frontmatter',
-      });
-      assert.deepEqual(offerOf(row({ from: 'builtin', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
-      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'user' }), []), { kind: 'found', where: 'user' });
-      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'repo' }), []), { kind: 'found', where: 'repo' });
-    },
-  );
-  await t.test('a change is said to reach every agent that gives the skill, by name, or none', () => {
+  test("REFUSED: no offer for a skill that does not read, and no copy of a builtin name an agent of yours already finds — it would write over yours or hide the repository's", () => {
+    assert.deepEqual(offerOf(row({ entry: null, error: 'SKILL.md has no frontmatter' }), []), {
+      kind: 'refused',
+      why: 'SKILL.md has no frontmatter',
+    });
+    assert.deepEqual(offerOf(row({ from: 'builtin', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
+    assert.deepEqual(offerOf(row({ from: 'builtin', found: 'user' }), []), { kind: 'found', where: 'user' });
+    assert.deepEqual(offerOf(row({ from: 'builtin', found: 'repo' }), []), { kind: 'found', where: 'repo' });
+  });
+  test('a change is said to reach every agent that gives the skill, by name, or none', () => {
     assert.equal(reachWords([]), 'No agent gives it yet: a change reaches none.');
     assert.equal(
       reachWords([
@@ -152,8 +143,8 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
   });
 });
 
-test("skillFormOf, draftOfForm, skillEdited, preloadWords, drawnSkill: a skill's form, filled, sent and followed", async (t) => {
-  await t.test("a skill's form is filled from its draft as written, and a skill that does not read keeps its name and instructions", () => {
+describe("skillFormOf, draftOfForm, skillEdited, preloadWords, drawnSkill: a skill's form, filled, sent and followed", () => {
+  test("a skill's form is filled from its draft as written, and a skill that does not read keeps its name and instructions", () => {
     assert.deepEqual(skillFormOf(detail()), {
       name: 'write-a-note',
       title: 'Write a note',
@@ -168,7 +159,7 @@ test("skillFormOf, draftOfForm, skillEdited, preloadWords, drawnSkill: a skill's
       body: 'Mend me.\n',
     });
   });
-  await t.test('the form sends a blank title, tags or examples as none, one tag a line, and leaves the switch to the switch', () => {
+  test('the form sends a blank title, tags or examples as none, one tag a line, and leaves the switch to the switch', () => {
     const draft = draftOfForm({
       name: ' a-skill ',
       title: '  ',
@@ -187,13 +178,13 @@ test("skillFormOf, draftOfForm, skillEdited, preloadWords, drawnSkill: a skill's
     });
     assert.equal('preload' in draft, false);
   });
-  await t.test('a form is edited when what it would write differs, not when only its blank lines do', () => {
+  test('a form is edited when what it would write differs, not when only its blank lines do', () => {
     const was = skillFormOf(detail());
     assert.equal(skillEdited({ ...was, tags: 'note\n\ndocs\n' }, was), false);
     assert.equal(skillEdited({ ...was, tags: 'note' }, was), true);
     assert.equal(skillEdited({ ...was, body: 'Write it well.\n' }, was), true);
   });
-  await t.test('the switch says what the other position would carry: on, the body every turn at four characters a token, cached', () => {
+  test('the switch says what the other position would carry: on, the body every turn at four characters a token, cached', () => {
     assert.equal(
       preloadWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }),
       'On, its instructions are loaded every turn too — about 1,500 tokens more a turn, cached.',
@@ -203,17 +194,14 @@ test("skillFormOf, draftOfForm, skillEdited, preloadWords, drawnSkill: a skill's
       'Off, a session is told only its name and what it does, and loads it when it needs it.',
     );
   });
-  await t.test(
-    'the form follows the file read again while it holds nothing unsaved, and holds what it was drawn from while it does',
-    () => {
-      const was = detail();
-      const now = detail({ version: 'v2', body: 'Changed by hand.\n' });
-      assert.equal(drawnSkill(was, now, false), now, 'nothing unsaved: the form is drawn again from the file');
-      assert.equal(drawnSkill(was, now, true), was, 'unsaved words: the form keeps them, and the page says the file moved');
-      const same = detail();
-      assert.equal(drawnSkill(was, same, true), same, 'the same version read again is the read, unsaved words or not');
-      const other = detail({ skill: row({ name: 'other', dir: '/store/workflows/skills/other' }), version: 'v9' });
-      assert.equal(drawnSkill(was, other, true), other, 'another skill is never held for this one');
-    },
-  );
+  test('the form follows the file read again while it holds nothing unsaved, and holds what it was drawn from while it does', () => {
+    const was = detail();
+    const now = detail({ version: 'v2', body: 'Changed by hand.\n' });
+    assert.equal(drawnSkill(was, now, false), now, 'nothing unsaved: the form is drawn again from the file');
+    assert.equal(drawnSkill(was, now, true), was, 'unsaved words: the form keeps them, and the page says the file moved');
+    const same = detail();
+    assert.equal(drawnSkill(was, same, true), same, 'the same version read again is the read, unsaved words or not');
+    const other = detail({ skill: row({ name: 'other', dir: '/store/workflows/skills/other' }), version: 'v9' });
+    assert.equal(drawnSkill(was, other, true), other, 'another skill is never held for this one');
+  });
 });

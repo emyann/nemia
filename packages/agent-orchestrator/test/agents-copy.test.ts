@@ -8,7 +8,8 @@
  * The test's store is its own, at `ROOT`, given to every program as `ENV`.
 
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -104,16 +105,23 @@ const NOTHING = { agents: {}, skills: {}, records: {} };
 /** The reviewer's parts, as a copy of it lists them. */
 const PARTS = (agent: string) => [`agents/${agent}.md`, 'ask-for-another-round', 'review-a-change', 'review.schema.json'];
 
-test('copy an agent into the library: hired and run under its new name, copied again as it is or once its source moved, and said where it came from', async (t) => {
-  const s = story(t);
-  const team = teamCopy();
-  const file = path.join(team, 'agents', 'reviewer.md');
-  const record = path.join(libraryOf(ROOT).records, 'critic.json');
-  const none = scratch('wf-agents-copy-none-');
+describe('copy an agent into the library: hired and run under its new name, copied again as it is or once its source moved, and said where it came from', () => {
+  let team!: string;
+  let file!: string;
+  let record!: string;
+  let none!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    team = teamCopy();
+    file = path.join(team, 'agents', 'reviewer.md');
+    record = path.join(libraryOf(ROOT).records, 'critic.json');
+    none = scratch('wf-agents-copy-none-');
+    return t.end;
+  });
+  const s = story(test);
   const reading = () => agentsRead({ repo: none, home: ROOT }).agents.find((a) => a.name === 'critic')?.copied;
   let version = '';
-
-  await s.test(
+  s.test(
     'copied under --as with its schema and its skills, a record of where from, and the folder copied from left as it was',
     async () => {
       const before = snapshot(team);
@@ -134,8 +142,7 @@ test('copy an agent into the library: hired and run under its new name, copied a
       assert.deepEqual(snapshot(team), before);
     },
   );
-
-  await s.test('hired into a step, it runs as its new name on the frozen run', async () => {
+  s.test('hired into a step, it runs as its new name on the frozen run', async () => {
     const build = path.join(team, 'build');
     fs.mkdirSync(build);
     fs.writeFileSync(path.join(build, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
@@ -151,8 +158,7 @@ test('copy an agent into the library: hired and run under its new name, copied a
     const run = await stage.runPlaced(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'acme' }));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.agent?.name, 'critic');
   });
-
-  await s.test('a second copy of the same agent reuses every part, and writes nothing', async () => {
+  s.test('a second copy of the same agent reuses every part, and writes nothing', async () => {
     backdated(ROOT);
     const before = written(ROOT);
     const again = await copy({ file, as: 'critic' }, ROOT);
@@ -160,38 +166,36 @@ test('copy an agent into the library: hired and run under its new name, copied a
     assert.deepEqual(again.reused.sort(), PARTS('critic'));
     assert.deepEqual(written(ROOT), before);
   });
-
-  await s.test('nemia agents says where it came from, at the version it was copied at', () => {
+  s.test('nemia agents says where it came from, at the version it was copied at', () => {
     assert.deepEqual(reading(), { source: file, version, now: 'same' });
   });
-
-  await s.test(
-    'its source changed: said so, a copy refused naming --keep, and the copy kept moving the record to the version now',
-    async () => {
-      fs.appendFileSync(path.join(team, 'skills', 'review-a-change', 'SKILL.md'), 'Read the tests first.\n');
-      assert.deepEqual(reading(), { source: file, version, now: 'changed' });
-      await assert.rejects(copy({ file, as: 'critic' }, ROOT), refusedWith('Conflict', '--keep review-a-change'));
-      await copy({ file, as: 'critic', keep: ['review-a-change'] }, ROOT);
-      const now = JSON.parse(fs.readFileSync(record, 'utf8'));
-      assert.equal(now.source, file);
-      assert.notEqual(now.version, version, 'the version moved');
-      version = now.version;
-      assert.deepEqual(reading(), { source: file, version, now: 'same' });
-    },
-  );
-
-  await s.test('its source gone: said so', () => {
+  s.test('its source changed: said so, a copy refused naming --keep, and the copy kept moving the record to the version now', async () => {
+    fs.appendFileSync(path.join(team, 'skills', 'review-a-change', 'SKILL.md'), 'Read the tests first.\n');
+    assert.deepEqual(reading(), { source: file, version, now: 'changed' });
+    await assert.rejects(copy({ file, as: 'critic' }, ROOT), refusedWith('Conflict', '--keep review-a-change'));
+    await copy({ file, as: 'critic', keep: ['review-a-change'] }, ROOT);
+    const now = JSON.parse(fs.readFileSync(record, 'utf8'));
+    assert.equal(now.source, file);
+    assert.notEqual(now.version, version, 'the version moved');
+    version = now.version;
+    assert.deepEqual(reading(), { source: file, version, now: 'same' });
+  });
+  s.test('its source gone: said so', () => {
     fs.rmSync(file);
     assert.deepEqual(reading(), { source: file, version, now: 'gone' });
   });
 });
 
-test('copy from a repository: its places listed by nemia agents sources, each agent copied with the skills a start would find', async (t) => {
-  const s = story(t);
-  const repo = scratch('wf-agents-copy-known-');
-  fs.cpSync(FIXTURE, repo, { recursive: true });
-
-  await s.test(
+describe('copy from a repository: its places listed by nemia agents sources, each agent copied with the skills a start would find', () => {
+  let repo!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    repo = scratch('wf-agents-copy-known-');
+    fs.cpSync(FIXTURE, repo, { recursive: true });
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
     'nemia agents sources lists each repository the store knows, workflows/agents then .claude/agents, then yours, then --path',
     async () => {
       const home = scratch('wf-agents-copy-home-');
@@ -227,8 +231,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       await assert.rejects(sourcesAt({ at: path.join(home, 'none'), home }), refusedWith('Missing', 'none is not a folder'));
     },
   );
-
-  await s.test('nemia agents sources lists the agents a harness keeps for its user, and a folder named from ~ under the home', async () => {
+  s.test('nemia agents sources lists the agents a harness keeps for its user, and a folder named from ~ under the home', async () => {
     assert.notEqual(os.homedir(), REAL_HOME, "the test's home is a throwaway, never the person's");
     const home = scratch('wf-agents-copy-harness-');
     const [kept] = userAgentFolders();
@@ -249,8 +252,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       [['scout', tilde]],
     );
   });
-
-  await s.test('nemia agents sources reads each folder through the Agent door: an agent only its memory holds is listed', async () => {
+  s.test('nemia agents sources reads each folder through the Agent door: an agent only its memory holds is listed', async () => {
     const home = scratch('wf-agents-copy-home-');
     const at = { dir: libraryOf(home).agents, anywhere: true };
     const { sources } = await stage.runWith(
@@ -265,8 +267,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
     assert.deepEqual([scribe?.place, scribe?.file, scribe?.error], ['library', path.join(at.dir, 'scribe.md'), null]);
     assert.match(scribe?.version ?? '', /^[0-9a-f]{16}$/);
   });
-
-  await s.test('an agent never copied, and every agent of a repository, has no record', () => {
+  s.test('an agent never copied, and every agent of a repository, has no record', () => {
     const home = scratch('wf-agents-copy-home-');
     const only = scratch('wf-agents-copy-repo-');
     fs.cpSync(path.join(FIXTURE, 'workflows'), path.join(only, 'workflows'), { recursive: true });
@@ -277,16 +278,14 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       [['repo', 'planner', null]],
     );
   });
-
-  await s.test('a scout from .claude/ brings its skill from the repository, and reads as the store would run it', async () => {
+  s.test('a scout from .claude/ brings its skill from the repository, and reads as the store would run it', async () => {
     const home = scratch('wf-agents-copy-home-');
     const copied = await copy({ file: path.join(repo, '.claude', 'agents', 'scout.md') }, home);
     assert.deepEqual(copied.copied.sort(), ['agents/scout.md', 'scouting']);
     assert.ok(fs.existsSync(path.join(libraryOf(home).skills, 'scouting', 'SKILL.md')));
     assert.doesNotMatch(fs.readFileSync(path.join(libraryOf(home).agents, 'scout.md'), 'utf8'), /^(name|color):/m);
   });
-
-  await s.test("an agent of the repository's workflows/agents brings a skill only its other place holds, as a start finds it", async () => {
+  s.test("an agent of the repository's workflows/agents brings a skill only its other place holds, as a start finds it", async () => {
     const home = scratch('wf-agents-copy-home-');
     const surveyor = path.join(repo, 'workflows', 'agents', 'surveyor.md');
     fs.writeFileSync(surveyor, '---\ndescription: Surveys the ground.\nskills: scouting\n---\nSurvey it.\n');
@@ -294,8 +293,7 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
     assert.deepEqual(copied.copied.sort(), ['agents/surveyor.md', 'scouting']);
     assert.ok(fs.existsSync(path.join(libraryOf(home).skills, 'scouting', 'SKILL.md')));
   });
-
-  await s.test(
+  s.test(
     'the place skill and a builtin skill Nemia ships, and a skill named with its folder, are not copied: the agent keeps the name, the library holds none',
     async () => {
       for (const line of ['git', 'grilling', 'app:y']) {
@@ -315,10 +313,9 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
   );
 });
 
-test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 naming the fix, and nothing written; one failing part-way takes back only its own writes', async (t) => {
+describe('REFUSED: a copy the library or its source cannot take, by kind and exit 2 naming the fix, and nothing written; one failing part-way takes back only its own writes', () => {
   const reviewer = (team: string) => path.join(team, 'agents', 'reviewer.md');
-
-  await t.test('a skill the library holds otherwise, naming --keep; kept, the library keeps its own', async () => {
+  test('a skill the library holds otherwise, naming --keep; kept, the library keeps its own', async () => {
     const home = scratch('wf-agents-copy-home-');
     const team = teamCopy();
     const ours = path.join(libraryOf(home).skills, 'review-a-change');
@@ -335,8 +332,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     assert.ok(!kept.copied.includes('review-a-change'));
     assert.match(fs.readFileSync(path.join(ours, 'SKILL.md'), 'utf8'), /Our own way\./);
   });
-
-  await t.test("a skill the library holds otherwise only in the Skill door's memory is judged differing, naming --keep", async () => {
+  test("a skill the library holds otherwise only in the Skill door's memory is judged differing, naming --keep", async () => {
     const home = scratch('wf-agents-copy-home-');
     const team = teamCopy();
     const program = Effect.gen(function* () {
@@ -354,8 +350,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     );
     assert.deepEqual(written(home), NOTHING);
   });
-
-  await t.test('another agent of the same name in the library, naming --as; copied under another name, it is written', async () => {
+  test('another agent of the same name in the library, naming --as; copied under another name, it is written', async () => {
     const home = scratch('wf-agents-copy-home-');
     const team = teamCopy();
     fs.mkdirSync(libraryOf(home).agents, { recursive: true });
@@ -369,8 +364,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     assert.ok((await copy({ file: reviewer(team), as: 'second' }, home)).copied.includes('agents/second.md'));
     assert.match(fs.readFileSync(path.join(libraryOf(home).agents, 'reviewer.md'), 'utf8'), /Our reviewer\./);
   });
-
-  await t.test('a result schema the library holds otherwise, naming --keep', async () => {
+  test('a result schema the library holds otherwise, naming --keep', async () => {
     const home = scratch('wf-agents-copy-home-');
     fs.mkdirSync(libraryOf(home).agents, { recursive: true });
     fs.writeFileSync(path.join(libraryOf(home).agents, 'review.schema.json'), '{"type":"object"}\n');
@@ -381,8 +375,7 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     );
     assert.deepEqual(written(home), before);
   });
-
-  await t.test('a Claude Code key the run refuses, naming the key and the copy to make without it', async () => {
+  test('a Claude Code key the run refuses, naming the key and the copy to make without it', async () => {
     const home = scratch('wf-agents-copy-home-');
     await assert.rejects(
       copy({ file: path.join(FIXTURE, '.claude', 'agents', 'counted.md') }, home),
@@ -390,15 +383,13 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     );
     assert.deepEqual(written(home), NOTHING);
   });
-
-  await t.test('an agent file not there, naming it and nemia agents sources', async () => {
+  test('an agent file not there, naming it and nemia agents sources', async () => {
     const home = scratch('wf-agents-copy-home-');
     const file = path.join(home, 'nowhere', 'ghost.md');
     await assert.rejects(copy({ file }, home), refusedWith('Missing', `${file} is not there`, 'nemia agents sources'));
     assert.deepEqual(written(home), NOTHING);
   });
-
-  await t.test('a --keep naming no part of the copy', async () => {
+  test('a --keep naming no part of the copy', async () => {
     const home = scratch('wf-agents-copy-home-');
     await assert.rejects(
       copy({ file: reviewer(teamCopy()), keep: ['nothing-of-it'] }, home),
@@ -406,34 +397,29 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     );
     assert.deepEqual(written(home), NOTHING);
   });
-
-  await t.test(
-    'a link where the schema would be, dangling or not, beside the agent it holds or none, and nothing written through it',
-    async () => {
-      const home = scratch('wf-agents-copy-home-');
-      const file = reviewer(teamCopy());
-      const { agents } = libraryOf(home);
-      const schema = path.join(agents, 'review.schema.json');
-      const outside = scratch('wf-agents-copy-outside-');
-      fs.mkdirSync(agents, { recursive: true });
-      fs.symlinkSync(path.join(outside, 'x.json'), schema);
-      const before = written(home);
-      const link = refusedWith('Invalid', `${schema} is a link, and an agent's result schema is its own`);
-      await assert.rejects(copy({ file }, home), link);
-      assert.deepEqual(written(home), before, 'no skill copied before the refusal');
-      fs.rmSync(schema);
-      await copy({ file }, home);
-      fs.rmSync(schema);
-      fs.symlinkSync(path.join(outside, 'x.json'), schema);
-      backdated(home);
-      const held = written(home);
-      await assert.rejects(copy({ file }, home), link);
-      assert.deepEqual(written(home), held, 'the library as it was');
-      assert.deepEqual(fs.readdirSync(outside), [], 'nothing written through the link, outside the library');
-    },
-  );
-
-  await t.test('a write that fails after the skills are copied removes the skills this copy wrote, and no other', async (sub) => {
+  test('a link where the schema would be, dangling or not, beside the agent it holds or none, and nothing written through it', async () => {
+    const home = scratch('wf-agents-copy-home-');
+    const file = reviewer(teamCopy());
+    const { agents } = libraryOf(home);
+    const schema = path.join(agents, 'review.schema.json');
+    const outside = scratch('wf-agents-copy-outside-');
+    fs.mkdirSync(agents, { recursive: true });
+    fs.symlinkSync(path.join(outside, 'x.json'), schema);
+    const before = written(home);
+    const link = refusedWith('Invalid', `${schema} is a link, and an agent's result schema is its own`);
+    await assert.rejects(copy({ file }, home), link);
+    assert.deepEqual(written(home), before, 'no skill copied before the refusal');
+    fs.rmSync(schema);
+    await copy({ file }, home);
+    fs.rmSync(schema);
+    fs.symlinkSync(path.join(outside, 'x.json'), schema);
+    backdated(home);
+    const held = written(home);
+    await assert.rejects(copy({ file }, home), link);
+    assert.deepEqual(written(home), held, 'the library as it was');
+    assert.deepEqual(fs.readdirSync(outside), [], 'nothing written through the link, outside the library');
+  });
+  test('a write that fails after the skills are copied removes the skills this copy wrote, and no other', async (sub) => {
     const home = scratch('wf-agents-copy-home-');
     const team = teamCopy();
     const { agents, skills } = libraryOf(home);
@@ -441,25 +427,21 @@ test('REFUSED: a copy the library or its source cannot take, by kind and exit 2 
     fs.cpSync(path.join(team, 'skills', 'review-a-change'), path.join(skills, 'review-a-change'), { recursive: true });
     fs.mkdirSync(agents, { recursive: true });
     fs.chmodSync(agents, 0o555);
-    sub.after(() => fs.chmodSync(agents, 0o755));
+    sub.onTestFinished(() => fs.chmodSync(agents, 0o755));
     await assert.rejects(copy({ file: reviewer(team) }, home), /EACCES/);
     assert.deepEqual(fs.readdirSync(skills), ['review-a-change']);
     assert.deepEqual(fs.readdirSync(agents), []);
     assert.ok(!fs.existsSync(path.join(home, 'agent-sources')));
   });
-
-  await t.test(
-    "a record that cannot be written removes the skills, the schema and the agent this copy wrote, and the library's own stay",
-    async () => {
-      const home = scratch('wf-agents-copy-home-');
-      const team = teamCopy();
-      const { agents, skills } = libraryOf(home);
-      fs.mkdirSync(path.join(skills, 'review-a-change'), { recursive: true });
-      fs.cpSync(path.join(team, 'skills', 'review-a-change'), path.join(skills, 'review-a-change'), { recursive: true });
-      fs.writeFileSync(path.join(home, 'agent-sources'), 'not a folder\n');
-      await assert.rejects(copy({ file: reviewer(team) }, home), /EEXIST|ENOTDIR/);
-      assert.deepEqual(fs.readdirSync(skills), ['review-a-change'], "the library's own skill stays, the one this copy wrote goes");
-      assert.deepEqual(fs.readdirSync(agents), [], 'neither the agent nor its schema stays');
-    },
-  );
+  test("a record that cannot be written removes the skills, the schema and the agent this copy wrote, and the library's own stay", async () => {
+    const home = scratch('wf-agents-copy-home-');
+    const team = teamCopy();
+    const { agents, skills } = libraryOf(home);
+    fs.mkdirSync(path.join(skills, 'review-a-change'), { recursive: true });
+    fs.cpSync(path.join(team, 'skills', 'review-a-change'), path.join(skills, 'review-a-change'), { recursive: true });
+    fs.writeFileSync(path.join(home, 'agent-sources'), 'not a folder\n');
+    await assert.rejects(copy({ file: reviewer(team) }, home), /EEXIST|ENOTDIR/);
+    assert.deepEqual(fs.readdirSync(skills), ['review-a-change'], "the library's own skill stays, the one this copy wrote goes");
+    assert.deepEqual(fs.readdirSync(agents), [], 'neither the agent nor its schema stays');
+  });
 });

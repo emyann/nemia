@@ -4,7 +4,7 @@
  * proposed and one confirmed; a workflow attached that does not load; a run's own gates, a gate added at its start among them, with what
  * keeps a rule now; and what the verb refuses. What reach decides off a step is `reach.test.ts`'s, and its laws its contract's.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,14 +57,16 @@ const refusedKind = async (args: Record<string, unknown>): Promise<string> => {
   return assert.fail('no refusal');
 };
 
-test('`nemia policy reach`: which steps at their gate her rules can approve in a factory and a run, why not, and what would', async (t) => {
-  const repo = repoWithWorkflows();
-  createFactoryAt(ROOT, { name: 'f', volumes: [{ path: repo, readOnly: false }], workflows: [], hires: {}, schedules: {} });
-  for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
-  writeFactoryLevel(ROOT, 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
-
+describe('`nemia policy reach`: which steps at their gate her rules can approve in a factory and a run, why not, and what would', () => {
+  let repo!: string;
+  beforeAll(() => {
+    repo = repoWithWorkflows();
+    createFactoryAt(ROOT, { name: 'f', volumes: [{ path: repo, readOnly: false }], workflows: [], hires: {}, schedules: {} });
+    for (const workflow of ['dev', 'plain']) attachWorkflowAt(ROOT, { factory: 'f', workflow });
+    writeFactoryLevel(ROOT, 'f', { level: 'auto', since: '2026-11-05T00:00:00.000Z' });
+  });
   let suggested: WordedRule[] = [];
-  await t.test('nothing confirmed: the default reaches neither step, each said why, and a rule suggested for each', async () => {
+  test('nothing confirmed: the default reaches neither step, each said why, and a rule suggested for each', async () => {
     const read = await reach({ factory: 'f' });
     assert.equal(read.level, 'auto');
     assert.equal(read.reach, 'none');
@@ -82,8 +84,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     for (const s of read.suggested) assert.equal(s.words, ruleWords(s), 'its words are the words a confirm checks');
     suggested = read.suggested;
   });
-
-  await t.test('the proposal it gives keeps what was proposed, rules and guidance, with the suggestions added', async () => {
+  test('the proposal it gives keeps what was proposed, rules and guidance, with the suggestions added', async () => {
     const tries = { id: 'tries', answer: 'retry' as const, steps: ['implement'], when: ['checked' as const] };
     writeProposed(ROOT, 'nemia', { at: '2026-11-05T00:00:00.000Z', rules: [tries], guidance: ['be kind'], digest: null });
     const read = await reach({ factory: 'f' });
@@ -92,8 +93,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     assert.deepEqual(after?.rules.map((r) => r.id).sort(), ['approve-draft', 'approve-ship', 'tries']);
     assert.deepEqual(after?.guidance, ['be kind']);
   });
-
-  await t.test('a suggestion proposed shows on the row it would reach; once confirmed, it reaches it and the reach is some', async () => {
+  test('a suggestion proposed shows on the row it would reach; once confirmed, it reaches it and the reach is some', async () => {
     const ship = suggested.find((s) => s.id === 'approve-ship');
     assert.ok(ship);
     const { words, ...rule } = ship;
@@ -109,8 +109,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
       ['approve-draft'],
     );
   });
-
-  await t.test('a workflow attached that does not load is said, and the read still answers', async () => {
+  test('a workflow attached that does not load is said, and the read still answers', async () => {
     attachWorkflowAt(ROOT, { factory: 'f', workflow: 'gone' });
     const read = await reach({ factory: 'f' });
     assert.deepEqual(
@@ -119,8 +118,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     );
     assert.equal(read.gates.length, 2);
   });
-
-  await t.test("a run's own gates, one added at its start among them, with what keeps a rule that reaches one now", async () => {
+  test("a run's own gates, one added at its start among them, with what keeps a rule that reaches one now", async () => {
     const workflow = [
       { name: 'build', after: [], body: 'Build it.', harness: 'codex', check: 'true' },
       { name: 'ship', after: ['build'], body: 'Ship it.', harness: 'codex', workspace: 'base', gate: true },
@@ -153,15 +151,13 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
       'its check has not run, so it does not hold now',
     );
   });
-
-  await t.test('refused: neither flag, both, and a factory the store does not have', async () => {
+  test('refused: neither flag, both, and a factory the store does not have', async () => {
     assert.ok(POLICY_REACH.check?.({ name: 'nemia' }), 'neither flag');
     assert.ok(POLICY_REACH.check?.({ name: 'nemia', factory: 'f', runId: 'r-1' }), 'both');
     assert.equal(POLICY_REACH.check?.({ name: 'nemia', factory: 'f' }), null);
     assert.equal(await refusedKind({ factory: 'nope' }), 'Missing');
   });
-
-  await t.test('a read: an agent runs it unasked, bare and with any words', () => {
+  test('a read: an agent runs it unasked, bare and with any words', () => {
     const fence = nemiaFence(TABLE);
     assert.ok(fence.allow.includes('Bash(nemia policy reach:*)'), fence.allow.join('\n'));
     const named = (rule: string) => rule.startsWith('Bash(nemia policy reach');

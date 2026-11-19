@@ -2,7 +2,7 @@
  * The floor's Getting started list (`lib/gettingStarted.ts`): shown while the change milestone is not done, and never again in this
  * browser once dismissed, the dismissal read back as the floor draws the list again.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { MilestoneRead } from 'objects';
 import { keepStarterDismissed, readStarterDismissed, starterShown } from '../src/lib/gettingStarted.ts';
@@ -15,8 +15,8 @@ const read = (landed: MilestoneRead['state']): MilestoneRead[] => [
   { name: 'landed', state: landed, message: '' },
 ];
 
-test('Getting started: shown until a change is merged, or the person dismisses it', async (t) => {
-  await t.test('each row: whether the list is shown', async (t) => {
+describe('Getting started: shown until a change is merged, or the person dismisses it', () => {
+  describe('each row: whether the list is shown', () => {
     const rows: [MilestoneRead['state'], boolean, boolean][] = [
       ['next', false, true],
       ['later', false, true],
@@ -25,12 +25,10 @@ test('Getting started: shown until a change is merged, or the person dismisses i
       ['done', true, false],
     ];
     for (const [landed, dismissed, shown] of rows)
-      await t.test(`the change ${landed}, dismissed ${dismissed}: ${shown ? 'shown' : 'hidden'}`, () =>
-        assert.equal(starterShown(read(landed), dismissed), shown),
-      );
+      test(`the change ${landed}, dismissed ${dismissed}: ${shown ? 'shown' : 'hidden'}`, () =>
+        assert.equal(starterShown(read(landed), dismissed), shown));
   });
-
-  await t.test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
+  test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
     const kept = new Map<string, string>();
     const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     Object.defineProperty(globalThis, 'localStorage', {
@@ -42,7 +40,7 @@ test('Getting started: shown until a change is merged, or the person dismisses i
       configurable: true,
       writable: true,
     });
-    t.after(() => {
+    t.onTestFinished(() => {
       if (before) Object.defineProperty(globalThis, 'localStorage', before);
       else Reflect.deleteProperty(globalThis, 'localStorage');
     });

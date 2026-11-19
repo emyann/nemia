@@ -5,7 +5,7 @@
  * a denied call, and her settings turning the daemon's start off. The keeper acting on the table, on the engine's stand-in, is told in
  * `test/nemia-keeper.test.ts`.
  */
-import { test } from 'node:test';
+import { afterAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { DEFAULT_SELECTORS } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
@@ -25,24 +25,24 @@ import {
   trustRefused,
 } from './nemia.ts';
 
-test('`customChanged` and `toldCustom`: her custom words changed are those she was not last filed or told with, and are told whole', async (t) => {
+describe('`customChanged` and `toldCustom`: her custom words changed are those she was not last filed or told with, and are told whole', () => {
   const FILED = 'Her shipped instruction.\n\nAnswer in French.\n';
-  await t.test('her shipped instruction is never compared: the same words under another instruction are no change', () => {
+  test('her shipped instruction is never compared: the same words under another instruction are no change', () => {
     assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);
     assert.equal(customChanged({}, undefined, 'Another instruction.\n\nOnce a paragraph of hers.\n'), false);
   });
-  await t.test('a record of what she was told: other words, words removed and words added are each a change', () => {
+  test('a record of what she was told: other words, words removed and words added are each a change', () => {
     assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in Dutch.', FILED), true);
     assert.equal(customChanged({ words: 'Answer in French.' }, undefined, FILED), true, 'removed: told');
     assert.equal(customChanged({}, 'Answer in French.', FILED), true, 'added: told');
   });
-  await t.test('no record: judged by the words her instruction ends with, and never a removal', () => {
+  test('no record: judged by the words her instruction ends with, and never a removal', () => {
     assert.equal(customChanged(undefined, 'Answer in French.', FILED), false, 'no record: her instruction ends with them');
     assert.equal(customChanged(undefined, 'Answer in Dutch.', FILED), true, 'no record: it ends with others');
     assert.equal(customChanged(undefined, 'Answer in Dutch.', undefined), true, 'no record and no instruction');
     assert.equal(customChanged(undefined, undefined, FILED), false, 'no record: whether she had words is unknown, so no removal');
   });
-  await t.test("the words that tell her carry the person's new words whole, or say she has none", () => {
+  test("the words that tell her carry the person's new words whole, or say she has none", () => {
     const told = toldCustom('Answer in French.\nTimes in Montreal.');
     assert.ok(told.includes('Answer in French.\nTimes in Montreal.'), told);
     assert.match(told, /replac/);
@@ -52,12 +52,12 @@ test('`customChanged` and `toldCustom`: her custom words changed are those she w
   });
 });
 
-test('`levelRefusal`: manual, semi-auto and auto are levels; a word that is none is refused, naming the command', async (t) => {
+describe('`levelRefusal`: manual, semi-auto and auto are levels; a word that is none is refused, naming the command', () => {
   for (const level of ['manual', 'semi-auto', 'auto'])
-    await t.test(`${level} is a level`, () => {
+    test(`${level} is a level`, () => {
       assert.equal(levelRefusal(level), undefined);
     });
-  await t.test('REFUSED: "on" is no level', () => {
+  test('REFUSED: "on" is no level', () => {
     names(levelRefusal('on'), '"on"', 'nemia level [manual|semi-auto|auto]', '--factory <name>', '--for <duration>', '--end');
   });
 });
@@ -160,7 +160,7 @@ test('a nemia she types starts no daemon beside the one that keeps her, with a b
   });
 });
 
-test("`trustRefused` and `folderUnmade`: each refusal of her folder's trust names what to mend, and offers no command to run the harness by hand", async (t) => {
+describe("`trustRefused` and `folderUnmade`: each refusal of her folder's trust names what to mend, and offers no command to run the harness by hand", () => {
   const not = { harness: 'Claude Code', folder: '/store/nemia', file: '/home/me/.claude.json', never: null, refused: null };
   const hand = 'run Claude Code in /store/nemia once and accept its prompt';
   const rows: [string, string][] = [
@@ -185,18 +185,20 @@ test("`trustRefused` and `folderUnmade`: each refusal of her folder's trust name
     ['her folder that could not be made', folderUnmade('/store/nemia', 'EACCES: permission denied, mkdir')],
   ];
   for (const [row, words] of rows)
-    await t.test(row, () => {
+    test(row, () => {
       assert.ok(words.includes('/store/nemia'), 'her folder named');
       assert.doesNotMatch(words, /&&|\bcd |mkdir -p|accept its prompt|in a terminal/, 'no command to run by hand');
     });
-  assert.ok(rows[0]?.[1].includes('it is not JSON'), "the runtime's reason carried");
-  assert.ok(rows[1]?.[1].includes('`projects` is no object'), 'a file that parses but whose entry is no object says so');
-  assert.ok(rows[2]?.[1].includes('changed under each of 5 writes'), 'a file that changed under every write says so');
-  assert.ok(
-    rows.slice(0, 5).every(([, words]) => words.includes(not.file)),
-    "the harness's file named where it is what to mend",
-  );
-  assert.ok(rows[4]?.[1].includes('EACCES'), 'what the write threw said');
-  assert.ok(rows[5]?.[1].includes('WF_ROOT'), 'the store moved, where her folder is the home directory');
-  assert.ok(!rows[6]?.[1].includes(not.file), "her folder unmade sends no one to the harness's file");
+  afterAll(() => {
+    assert.ok(rows[0]?.[1].includes('it is not JSON'), "the runtime's reason carried");
+    assert.ok(rows[1]?.[1].includes('`projects` is no object'), 'a file that parses but whose entry is no object says so');
+    assert.ok(rows[2]?.[1].includes('changed under each of 5 writes'), 'a file that changed under every write says so');
+    assert.ok(
+      rows.slice(0, 5).every(([, words]) => words.includes(not.file)),
+      "the harness's file named where it is what to mend",
+    );
+    assert.ok(rows[4]?.[1].includes('EACCES'), 'what the write threw said');
+    assert.ok(rows[5]?.[1].includes('WF_ROOT'), 'the store moved, where her folder is the home directory');
+    assert.ok(!rows[6]?.[1].includes(not.file), "her folder unmade sends no one to the harness's file");
+  });
 });

@@ -27,7 +27,7 @@
  * it, says `'default'` for a factory or a namespace, or converts null to that name or back but `src/lib/api/namespace.ts`, its two
  * converters, which `src/lib/factories.ts` re-exports (`defaultFactoryBreaks`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';

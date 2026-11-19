@@ -4,7 +4,7 @@
  * a step file whose frontmatter does not read is refused with the file named, and a folder sent with no name is refused.
  */
 import { root } from '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

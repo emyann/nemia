@@ -9,7 +9,7 @@
     "wf": "bin/wf.ts"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=2 --test-timeout=120000 'test/*.test.ts' 'src/**/*.test.ts'",
+    "test": "vitest run",
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
     "@types/node": "^24.19.2",
     "api": "*",
     "test-kit": "*",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   }
 }

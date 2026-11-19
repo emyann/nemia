@@ -5,7 +5,7 @@
  * own into that line and that sentence, by hand, conflicts on both; a factory that set its own check by the `implementCheck` parameter,
  * and changed only a line of its own elsewhere, merges with no conflict.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

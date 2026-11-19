@@ -4,7 +4,7 @@
  * each request through the page; and it loads its script from itself.
  */
 import '../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { browseApp } from './browse.ts';
 import { OPENAPI_PATH, REFERENCE_PATH, REFERENCE_SCRIPT_PATH } from './index.ts';

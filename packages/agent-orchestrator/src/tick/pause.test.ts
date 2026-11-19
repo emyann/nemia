@@ -15,7 +15,7 @@
 import { type Env, settingsOf, type StoreConfig } from '../config/config.store.ts';
 import { storeGiven } from '../../test/config-given.ts';
 import type { StoreRoot } from '../config/root.store.ts';
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,7 +3,7 @@
  * link. A table the fence omits, an id of the fence no table has, and a type its workspace does not export are each refused, naming
  * the context and the type; the repository's own tables and page hold none of them.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

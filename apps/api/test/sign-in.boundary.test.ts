@@ -6,7 +6,7 @@
  * the builtin list, is searched for its value — and the fixture that breaks the search is a body that holds it.
  */
 import { root } from './harness.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -147,46 +147,43 @@ test('REFUSED: a server the factory does not record (404), a port another sign-i
   assert.equal((await asked(app, 'POST', `${URL}/docs/sign-in`)).status, 422, 'a server with no OAuth client signs in to nothing');
 });
 
-test('a pasted callback completes a waiting sign-in: answered its state, refused by kind, the address in no answer', async (t) => {
-  const { app, stand } = appWith();
-  await recorded(app, 'github', GITHUB);
+describe('a pasted callback completes a waiting sign-in: answered its state, refused by kind, the address in no answer', () => {
+  let app!: import('hono').Hono<import('../src/layer.ts').ApiEnv, import('hono/types').BlankSchema, '/'>;
+  let stand!: import('agent-runtime/testing').TestEngine;
+  beforeAll(async () => {
+    ({ app, stand } = appWith());
+    await recorded(app, 'github', GITHUB);
+  });
   const CALLBACK = `${URL}/github/sign-in/callback`;
   const PASTED = 'http://localhost:8791/callback?code=a-code-of-the-sign-in&state=a-state';
   const paste = (url: unknown, at = CALLBACK) => asked(app, 'POST', at, BOARD, JSON.stringify({ url }));
-
-  await t.test('REFUSED: a callback where no sign-in waits is a 409, a server the factory does not record a 404', async () => {
+  test('REFUSED: a callback where no sign-in waits is a 409, a server the factory does not record a 404', async () => {
     const none = await paste(PASTED);
     assert.equal(none.status, 409, none.text);
     assert.equal(none.text.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no answer');
     assert.equal((await paste(PASTED, `${URL}/gitlab/sign-in/callback`)).status, 404);
   });
-
-  await t.test('REFUSED: a body with no url, or not a string, is a 400 naming the field', async () => {
+  test('REFUSED: a body with no url, or not a string, is a 400 naming the field', async () => {
     for (const body of ['{}', JSON.stringify({ url: 3 })]) {
       const res = await asked(app, 'POST', CALLBACK, BOARD, body);
       assert.equal(res.status, 400, res.text);
       assert.match((JSON.parse(res.text) as { field?: string }).field ?? '', /url/, res.text);
     }
   });
-
-  await t.test("REFUSED: an address that is not the sign-in's redirect is a 422, and nothing is handed on", async () => {
+  test("REFUSED: an address that is not the sign-in's redirect is a 422, and nothing is handed on", async () => {
     assert.equal((await asked(app, 'POST', `${URL}/github/sign-in`)).status, 200);
     const wrong = await paste('http://localhost:9999/callback?code=a-code-of-the-sign-in&state=a-state');
     assert.equal(wrong.status, 422, wrong.text);
     assert.equal(wrong.text.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no answer');
     assert.deepEqual(stand.callbacks, []);
   });
-
-  await t.test(
-    'the redirect with a code and a state is handed on and answers the SignInState, which reads connected once it settles',
-    async () => {
-      const handed = await paste(PASTED);
-      assert.equal(handed.status, 200, handed.text);
-      assert.equal((JSON.parse(handed.text) as { state: string }).state, 'waiting');
-      assert.equal(handed.text.includes('a-code-of-the-sign-in'), false, 'the answer carries no part of the address');
-      assert.deepEqual(stand.callbacks, [{ name: 'github', url: PASTED }]);
-      stand.settleSignIn('github', { state: 'connected' });
-      assert.deepEqual(JSON.parse((await asked(app, 'GET', `${URL}/github/sign-in`)).text), { state: 'connected' });
-    },
-  );
+  test('the redirect with a code and a state is handed on and answers the SignInState, which reads connected once it settles', async () => {
+    const handed = await paste(PASTED);
+    assert.equal(handed.status, 200, handed.text);
+    assert.equal((JSON.parse(handed.text) as { state: string }).state, 'waiting');
+    assert.equal(handed.text.includes('a-code-of-the-sign-in'), false, 'the answer carries no part of the address');
+    assert.deepEqual(stand.callbacks, [{ name: 'github', url: PASTED }]);
+    stand.settleSignIn('github', { state: 'connected' });
+    assert.deepEqual(JSON.parse((await asked(app, 'GET', `${URL}/github/sign-in`)).text), { state: 'connected' });
+  });
 });

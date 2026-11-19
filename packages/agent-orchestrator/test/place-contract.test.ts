@@ -4,7 +4,7 @@
  * test place that lies about one verb fails a walk of that verb, for every verb, and a verb with no walk is named. And that the contract
  * speaks the place's words: no name it exports, and no property of a type it exports, says one of git's (`REFUSED_WORDS`).
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

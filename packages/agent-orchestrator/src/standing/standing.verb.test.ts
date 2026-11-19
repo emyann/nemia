@@ -3,7 +3,7 @@
  * load names no branch to ask, and a reader over the reading says why of each branch of it (`unloaded`, `UnloadedFolder`'s own words),
  * never that it was not asked; the pass goes on for every other run.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';

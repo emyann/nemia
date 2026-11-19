@@ -3,7 +3,7 @@
  * covering another, a server's tool refused by a deny, deny then ask then allow, the modes a job was measured denying what asks in, and
  * the measured sets held to their date, their version and the ledger that records them.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +33,7 @@ test("Claude Code's declaration carries its rules, and no other harness's declar
   );
 });
 
-test("a Bash rule covers another as Claude Code matches them: `*` any text, spaces included; `:*` a trailing ` *`, which matches the bare command too; no `*`, one command — the permissions docs' own examples, a colon anywhere but the end a colon, and a rule against a rule covering every command of the inner one", async (t) => {
+describe("a Bash rule covers another as Claude Code matches them: `*` any text, spaces included; `:*` a trailing ` *`, which matches the bare command too; no `*`, one command — the permissions docs' own examples, a colon anywhere but the end a colon, and a rule against a rule covering every command of the inner one", () => {
   const cases: Array<[outer: string, inner: string, covers: boolean]> = [
     ['ls *', 'ls -la', true],
     ['ls *', 'ls', true],
@@ -59,7 +59,7 @@ test("a Bash rule covers another as Claude Code matches them: `*` any text, spac
     ['git log *', 'git *', false],
   ];
   for (const [outer, inner, covers] of cases)
-    await t.test(`${outer} covers ${inner}: ${covers}`, () => assert.equal(bashCovers(outer, inner), covers));
+    test(`${outer} covers ${inner}: ${covers}`, () => assert.equal(bashCovers(outer, inner), covers));
 });
 
 test("a deny rule refuses a server's tool by the tool's name, the server's, or every tool of the server — and by nothing else", () => {
@@ -80,7 +80,7 @@ test("a deny rule refuses a server's tool by the tool's name, the server's, or e
   }
 });
 
-test('a deny takes back an allow it matches the whole of, whatever either is scoped to; a narrower one is an exception to it', async (t) => {
+describe('a deny takes back an allow it matches the whole of, whatever either is scoped to; a narrower one is an exception to it', () => {
   const over = (...rules: string[]) => rules.map((rule) => ({ rule, source: 'settings' }));
   const rows: Array<[allow: string, deny: string, takes: boolean, narrower: boolean]> = [
     ['Bash(git diff:*)', 'Bash(git:*)', true, false],
@@ -96,13 +96,13 @@ test('a deny takes back an allow it matches the whole of, whatever either is sco
     ['mcp__fixture', 'mcp__other', false, false],
   ];
   for (const [allow, deny, takes, narrower] of rows)
-    await t.test(`${allow} under ${deny}`, () => {
+    test(`${allow} under ${deny}`, () => {
       assert.equal(takenBackBy(allow, over(deny))?.rule, takes ? deny : undefined);
       if (!takes) assert.deepEqual(narrowerRules(allow, over(deny)), narrower ? [deny] : [], 'asked only of an allow that stands');
     });
 });
 
-test('a job denies what asks in each mode it was measured in, none given among them, and is claimed neither way in bypassPermissions', async (t) => {
+describe('a job denies what asks in each mode it was measured in, none given among them, and is claimed neither way in bypassPermissions', () => {
   const rows: Array<[mode: string | null, denies: boolean]> = [
     ['dontAsk', true],
     [null, true],
@@ -112,7 +112,7 @@ test('a job denies what asks in each mode it was measured in, none given among t
     ['bypassPermissions', false],
     ['plan', false],
   ];
-  for (const [mode, denies] of rows) await t.test(String(mode), () => assert.equal(jobDeniesAsksIn(mode), denies));
+  for (const [mode, denies] of rows) test(String(mode), () => assert.equal(jobDeniesAsksIn(mode), denies));
 });
 
 /** The `names` the ledger's `bullet` does not write as a tool of its own, in backticks of their own. */

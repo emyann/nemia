@@ -2,7 +2,7 @@
  * The lists of workflows as the pages keep them, by place (src/lib/placed.ts): what a page loads before it lists the workflows of the
  * address's place, and what a write of a folder of yours reads again.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import type { Factory } from 'objects';
@@ -17,7 +17,7 @@ const factory = (name: string, repos: string[]) =>
  * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, a namespace's workflows with
  * none; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
  */
-function answering(t: { after: (fn: () => void) => void }, factories: Factory[]): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]): string[] {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -35,7 +35,7 @@ function answering(t: { after: (fn: () => void) => void }, factories: Factory[])
     if (workflows || (!url.startsWith('/api/factories/') && !url.startsWith('/api/namespaces/'))) asked.push(url);
     return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     globalThis.fetch = before;
   });
   return asked;

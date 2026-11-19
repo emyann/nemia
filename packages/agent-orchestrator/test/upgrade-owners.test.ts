@@ -4,7 +4,7 @@
  * then merged with each owner's files taken from the tree. And a choice that removes a Skill, which no proposal removes, refused with the
  * choice kept. The Factory's own conflict, its rules, is told in `upgrade-conflict.test.ts`'s story and in `upgrade.verb.test.ts`.
  */
-import { test } from 'node:test';
+import { describe, test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,13 +58,13 @@ const written = (folder: string, file: string, text: string): void => {
 };
 
 /** What `argv` printed, line by line. */
-async function printedBy(t: { mock: { method: Function } }, ...argv: string[]): Promise<string[]> {
+async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
   const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
   try {
     await stage.main(argv);
   } finally {
-    log.mock.restore();
+    log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));
 }
@@ -91,11 +91,7 @@ const recordedFor = (factory: string, owner: string): string => readResolutions(
  * person's change and the template's 0.2.0 each made by `change` to the tree and to the template, the upgrade filed: its conflicts'
  * addresses.
  */
-async function upgraded(
-  t: { mock: { method: Function } },
-  name: string,
-  change: (tree: string, template: string) => void,
-): Promise<string[]> {
+async function upgraded(t: TestContext, name: string, change: (tree: string, template: string) => void): Promise<string[]> {
   const repo = scratch(`wf-upgrade-owners-${name}-repo-`);
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stage.place().world.repository(repo, {});
@@ -114,14 +110,13 @@ async function upgraded(
   return (reconciled(factory(name)).upgrade?.conflicts ?? []).map((c) => c.at);
 }
 
-test("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by its proposal, and a carried file's by a choice", async (t) => {
-  const s = story(t);
+describe("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by its proposal, and a carried file's by a choice", () => {
+  const s = story(test);
   const tree = () => treeDir(ROOT, 'owners');
   let conflicts: string[] = [];
   const proposed: Record<string, string> = {};
   const at = (prefix: string) => conflicts.find((c) => c.startsWith(prefix)) ?? prefix;
-
-  await s.test(
+  s.test(
     "the person and the template change one line of the reviewer, of its skill's note and of the carried script, and its hire",
     async (t) => {
       conflicts = await upgraded(t, 'owners', (mine, theirs) => {
@@ -145,14 +140,12 @@ test("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by i
         );
     },
   );
-
-  await s.test('a carried file, which no object holds, is resolved by the choice alone: nothing is proposed', async (t) => {
+  s.test('a carried file, which no object holds, is resolved by the choice alone: nothing is proposed', async (t) => {
     await printedBy(t, 'factory', 'resolve', 'owners', at(LAND), '--theirs');
     assert.deepEqual(proposalsOf('owners'), []);
     assert.equal(readResolutions(ROOT, 'owners')?.choices[at(LAND)], 'theirs');
   });
-
-  await s.test("the reviewer's conflict proposes the Agent, its result schema beside its file", async (t) => {
+  s.test("the reviewer's conflict proposes the Agent, its result schema beside its file", async (t) => {
     await printedBy(t, 'factory', 'resolve', 'owners', at(AGENT), '--theirs');
     proposed.agent = recordedFor('owners', 'Agent/reviewer');
     const [object] = proposalIn('owners', proposed.agent).spec.objects;
@@ -161,16 +154,14 @@ test("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by i
     assert.equal(object.spec.output?.file, 'reviewer.schema.json');
     assert.equal(object.spec.output?.text, textIn(tree(), 'workflows/agents/reviewer.schema.json'));
   });
-
-  await s.test("the skill's nested note proposes the Skill, its other files whole", async (t) => {
+  s.test("the skill's nested note proposes the Skill, its other files whole", async (t) => {
     await printedBy(t, 'factory', 'resolve', 'owners', at(HOW), '--ours');
     proposed.skill = recordedFor('owners', 'Skill/review-a-change');
     const [object] = proposalIn('owners', proposed.skill).spec.objects;
     assert.equal(object.kind, 'Skill');
     assert.deepEqual(object.spec.files, [{ path: 'notes/how.md', text: 'Name the file and line.\n' }]);
   });
-
-  await s.test("the step's hire proposes the Hire, named <workflow>.<step>", async (t) => {
+  s.test("the step's hire proposes the Hire, named <workflow>.<step>", async (t) => {
     await printedBy(t, 'factory', 'resolve', 'owners', HIRE, '--theirs');
     proposed.hire = recordedFor('owners', 'Hire/dev.review');
     const [object] = proposalIn('owners', proposed.hire).spec.objects;
@@ -179,38 +170,32 @@ test("an upgrade's conflicts in an Agent, a Skill and a Hire, each resolved by i
       ['Hire', 'dev.review', { workflow: 'dev', step: 'review', agent: 'implementer' }],
     );
   });
-
-  await s.test('while they wait the status names each conflict’s proposal; the carried file’s choice has settled it', () => {
+  s.test('while they wait the status names each conflict’s proposal; the carried file’s choice has settled it', () => {
     const waiting = reconciled(factory('owners'));
     assert.equal(waiting.version, '0.1.0');
     const kept = Object.fromEntries((waiting.upgrade?.conflicts ?? []).map((c) => [c.at, c.proposal?.name]));
     assert.deepEqual(kept, { [at(AGENT)]: proposed.agent, [at(HOW)]: proposed.skill, [HIRE]: proposed.hire });
   });
-
-  await s.test(
-    'each is approved in turn, a pass between, and applies; then the controller merges, each owner taken from the tree',
-    async () => {
-      for (const name of [proposed.hire, proposed.agent, proposed.skill]) {
-        const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'owners', name ?? '', PLACE));
-        assert.equal(applied.status.phase, 'applied', name);
-        reconciled(factory('owners'));
-      }
-      const merged = reconciled(factory('owners'));
-      assert.equal(merged.version, '0.2.0');
-      assert.equal(merged.upgrade, undefined);
-      assert.match(textIn(tree(), AGENT), /Write nothing into it, not a byte\./);
-      assert.equal(textIn(tree(), HOW), 'Name the file and line.\n');
-      assert.equal(textIn(tree(), LAND), 'export const land = 3;\n');
-      assert.equal(JSON.parse(textIn(tree(), 'factory.json')).hires['dev/review'], 'implementer');
-    },
-  );
+  s.test('each is approved in turn, a pass between, and applies; then the controller merges, each owner taken from the tree', async () => {
+    for (const name of [proposed.hire, proposed.agent, proposed.skill]) {
+      const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'owners', name ?? '', PLACE));
+      assert.equal(applied.status.phase, 'applied', name);
+      reconciled(factory('owners'));
+    }
+    const merged = reconciled(factory('owners'));
+    assert.equal(merged.version, '0.2.0');
+    assert.equal(merged.upgrade, undefined);
+    assert.match(textIn(tree(), AGENT), /Write nothing into it, not a byte\./);
+    assert.equal(textIn(tree(), HOW), 'Name the file and line.\n');
+    assert.equal(textIn(tree(), LAND), 'export const land = 3;\n');
+    assert.equal(JSON.parse(textIn(tree(), 'factory.json')).hires['dev/review'], 'implementer');
+  });
 });
 
-test('a choice that removes a Skill, which no proposal removes, is refused Invalid, nothing proposed, and the choice kept', async (t) => {
-  const s = story(t);
+describe('a choice that removes a Skill, which no proposal removes, is refused Invalid, nothing proposed, and the choice kept', () => {
+  const s = story(test);
   let conflicts: string[] = [];
-
-  await s.test('the person changes a line of the skill the template drops', async (t) => {
+  s.test('the person changes a line of the skill the template drops', async (t) => {
     conflicts = await upgraded(t, 'dropped', (mine, theirs) => {
       rewrite(mine, SKILL, 'Read the diff against the base.', 'Read the diff against its base.');
       fs.rmSync(path.join(theirs, 'skills/review-a-change'), { recursive: true });
@@ -223,8 +208,7 @@ test('a choice that removes a Skill, which no proposal removes, is refused Inval
       conflicts.join(', '),
     );
   });
-
-  await s.test('--theirs, which removes it, is refused; --ours proposes the Skill as the tree holds it', async (t) => {
+  s.test('--theirs, which removes it, is refused; --ours proposes the Skill as the tree holds it', async (t) => {
     const removal = conflicts.find((c) => c.startsWith(SKILL)) ?? SKILL;
     await assert.rejects(
       stage.main(['factory', 'resolve', 'dropped', removal, '--theirs']),

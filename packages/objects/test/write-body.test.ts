@@ -2,7 +2,7 @@
  * A write sent as JSON (`jsonBodied`): a write with no body is given `{}` as `content-type: application/json`, as the api's write guard
  * takes it; a read, and a write with a body of its own, go as they are.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { HttpClientRequest } from 'effect/http';
 import { jsonBodied } from 'objects';

@@ -3,14 +3,14 @@
  * and these cases hold on the real function too, the 30 days' edge, and `leftoverLines`, matched on the names they carry, never a whole
  * sentence.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { LOGS_KEPT_MS, leftoverLines, leftovers } from './leftovers.ts';
 
 const NOW = 1_800_000_000_000;
 
-test('leftovers removes every entry whose process is gone and every log older than 30 days, and nothing else', async (t) => {
-  await t.test('every dead entry goes, every live one stays', () => {
+describe('leftovers removes every entry whose process is gone and every log older than 30 days, and nothing else', () => {
+  test('every dead entry goes, every live one stays', () => {
     const entries = [
       { name: '.building-v1-11', live: false },
       { name: '.building-v2-12', live: true },
@@ -19,13 +19,13 @@ test('leftovers removes every entry whose process is gone and every log older th
     ];
     assert.deepEqual(leftovers(entries, [], NOW).entries, ['.building-v1-11', '.current-13']);
   });
-  await t.test('a log 30 days and 1 ms old goes', () => {
+  test('a log 30 days and 1 ms old goes', () => {
     assert.deepEqual(leftovers([], [{ name: 'a.log', modifiedMs: NOW - LOGS_KEPT_MS - 1 }], NOW).logs, ['a.log']);
   });
-  await t.test('a log exactly 30 days old stays', () => {
+  test('a log exactly 30 days old stays', () => {
     assert.deepEqual(leftovers([], [{ name: 'a.log', modifiedMs: NOW - LOGS_KEPT_MS }], NOW).logs, []);
   });
-  await t.test('every old log goes, whatever its place among fresh ones', () => {
+  test('every old log goes, whatever its place among fresh ones', () => {
     const logs = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, modifiedMs: i % 2 === 0 ? 0 : NOW }));
     assert.deepEqual(leftovers([], logs, NOW).logs, ['a', 'c']);
   });

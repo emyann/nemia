@@ -5,11 +5,11 @@
  * No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
-import { after, test } from 'node:test';
+import { afterAll, test } from 'vitest';
 import { photographCard } from './e2e/canvas.ts';
 import { setPhotographing } from './e2e/world.ts';
 
-after(() => setPhotographing(false));
+afterAll(() => setPhotographing(false));
 
 /** A fake that records each property read of it in `reads`, then throws `touched`. */
 const recording = (reads: string[], touched: Error): object =>

@@ -8,7 +8,8 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -103,12 +104,12 @@ const placeAnswering = <V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOut
   return { layer: PlaceService.layer(placeOver(stage.place().place, { [verb]: answer })), asked: () => asked };
 };
 
-test('a chain runs to success: plan → implement → review, on one line of work', async (t) => {
-  const s = story(t);
+describe('a chain runs to success: plan → implement → review, on one line of work', () => {
+  const s = story(test);
   let id = '';
   let line = '';
   const ORDER = ['plan', 'implement', 'review'];
-  await s.test('`nemia start` says the steps in the order they run, and keys the record so, whose files sort another way', async () => {
+  s.test('`nemia start` says the steps in the order they run, and keys the record so, whose files sort another way', async () => {
     const dir = folderOf({ implement: ['after: plan'], plan: [], review: ['after: implement', 'check: npm test'] });
     const started = (await stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', aRepo()])) as StartedAnswer;
     id = started.id;
@@ -116,7 +117,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     const run = runRecord(ROOT, id);
     assert.deepEqual([Object.keys(run.steps), run.workflow?.map((x) => x.name)], [ORDER, ORDER]);
   });
-  await s.test("the first pass files only the root, cut under the run's own name, told its prose and the request", async () => {
+  s.test("the first pass files only the root, cut under the run's own name, told its prose and the request", async () => {
     const pass = await tick(id);
     assert.deepEqual([pass.filed, pass.status], [['plan'], 'running']);
     const plan = runRecord(ROOT, id).steps.plan;
@@ -128,12 +129,12 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.match(brief, /plan the flag/, 'the request travels to every step');
     assert.doesNotMatch(brief, /Where to look/, 'nothing is said of a workspace nobody has touched');
   });
-  await s.test('while the root works, a pass files nothing, however many times it looks', async () => {
+  s.test('while the root works, a pass files nothing, however many times it looks', async () => {
     stage.board().settle(`${id}-plan`, 'working');
     for (const _ of [1, 2]) assert.deepEqual([(await tick(id)).filed, (await tick(id)).status], [[], 'running']);
     assert.deepEqual(stage.board().filings, [`${id}-plan`]);
   });
-  await s.test('the root signs off: its work is handed off, and the next step filed on its line, pointed at the work', async () => {
+  s.test('the root signs off: its work is handed off, and the next step filed on its line, pointed at the work', async () => {
     fs.writeFileSync(path.join(line, 'plan.txt'), 'the plan\n');
     stage.board().settle(`${id}-plan`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).filed, ['implement'], 'filed once the step before it SUCCEEDED');
@@ -146,19 +147,16 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.match(brief, /plan/, 'told who was here before it');
     assert.match(brief, /not an account of it/, 'and that it judges the change, not a claim');
   });
-  await s.test(
-    "implement signs off: handed off, review filed in the same checkout, and review's work in progress is review's",
-    async () => {
-      fs.writeFileSync(path.join(line, 'feature.txt'), 'work\n');
-      stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
-      assert.deepEqual((await tick(id)).filed, ['review']);
-      assert.match(subjects(line)[0], /^implement: hand off/);
-      fs.writeFileSync(path.join(line, 'half-reviewed.txt'), 'wip\n');
-      await tick(id);
-      assert.match(uncommitted(line), /half-reviewed\.txt/, "not committed under implement's name");
-    },
-  );
-  await s.test("review signs off: handed off, then its check filed — the suite's litter stays off the branch, by either step", async () => {
+  s.test("implement signs off: handed off, review filed in the same checkout, and review's work in progress is review's", async () => {
+    fs.writeFileSync(path.join(line, 'feature.txt'), 'work\n');
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    assert.deepEqual((await tick(id)).filed, ['review']);
+    assert.match(subjects(line)[0], /^implement: hand off/);
+    fs.writeFileSync(path.join(line, 'half-reviewed.txt'), 'wip\n');
+    await tick(id);
+    assert.match(uncommitted(line), /half-reviewed\.txt/, "not committed under implement's name");
+  });
+  s.test("review signs off: handed off, then its check filed — the suite's litter stays off the branch, by either step", async () => {
     stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).checked, ['review']);
     assert.match(subjects(line)[0], /^review: hand off/, 'the pass hands review off, then files its check on that tree');
@@ -169,10 +167,10 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     await tick(id);
     assert.match(uncommitted(line), /coverage\.out/, 'left untracked');
   });
-  await s.test('`nemia ls` names the steps in the order they run', async () => {
+  s.test('`nemia ls` names the steps in the order they run', async () => {
     assert.deepEqual(await lsNames(id), ORDER);
   });
-  await s.test('the check passes: the run succeeded, each step handed off once, and `nemia decide` reads in order', async () => {
+  s.test('the check passes: the run succeeded, each step handed off once, and `nemia decide` reads in order', async () => {
     stage.board().settle(`${id}-review-check`, 'succeeded', undefined, 0);
     const last = await tick(id);
     assert.equal(last.status, 'succeeded');
@@ -184,7 +182,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed], ['succeeded', []]);
     assert.deepEqual(await decideNames(id, ORDER), ORDER);
   });
-  await s.test(
+  s.test(
     "a record keyed in the folder's order, its workflow frozen so or not at all, reads, lists and decides in the steps' order",
     async () => {
       const folderOrder = ['implement', 'plan', 'review'];
@@ -220,10 +218,10 @@ test('a chain runs to success: plan → implement → review, on one line of wor
   );
 });
 
-test('a diamond fans out and in: two roots side by side, and a step after both that holds their merged work', async (t) => {
-  const s = story(t);
+describe('a diamond fans out and in: two roots side by side, and a step after both that holds their merged work', () => {
+  const s = story(test);
   let id = '';
-  await s.test('the two roots are filed together, each in a directory of its own', async () => {
+  s.test('the two roots are filed together, each in a directory of its own', async () => {
     const dir = folderOf({ a: [], b: [], join: ['after: a, b'] });
     id = (await stage.runPlaced(startRun({ brief: 'split the work', repo: aRepo(), workflowDir: dir }))).id;
     assert.deepEqual([...(await tick(id)).filed].sort(), ['a', 'b'], 'a DAG, not a queue');
@@ -234,7 +232,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
       "the first root is the run's line; the second another line, under its own step name: two sessions never share a directory",
     );
   });
-  await s.test('the fan-in waits while one root still works', async () => {
+  s.test('the fan-in waits while one root still works', async () => {
     const { a, b } = runRecord(ROOT, id).steps;
     fs.writeFileSync(path.join(a.workspace!, 'shared.txt'), 'from a\n');
     fs.writeFileSync(path.join(b.workspace!, 'shared.txt'), 'from b\n');
@@ -243,7 +241,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     stage.board().settle(`${id}-b`, 'working');
     assert.deepEqual((await tick(id)).filed, [], 'join waits for BOTH');
   });
-  await s.test(
+  s.test(
     "both done: the fan-in is cut on its own, merging both, and told the merged work and the conflicts in the place's words",
     async () => {
       stage.board().settle(`${id}-b`, 'succeeded', SIGNED);
@@ -259,7 +257,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
       assert.ok(brief.includes(stage.place().place.declared.say.conflicts), "the place's words for seeing them");
     },
   );
-  await s.test('REFUSED at shipped defaults: a make that answers a workspace other than the one asked is read as not heard', async () => {
+  s.test('REFUSED at shipped defaults: a make that answers a workspace other than the one asked is read as not heard', async () => {
     const elsewhere = scratch('wf-lifecycle-elsewhere-');
     const run = await stage.runPlaced(startRun({ brief: 'split the work', repo: aRepo(), workflowDir: folderOf({ a: [] }) }));
     const place = placeAnswering('make', { answer: { workspace: elsewhere, branch: 'b', conflicts: [], notes: [] } });
@@ -275,7 +273,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     assert.deepEqual((await tick(run.id)).filed, ['a'], 'a place that answers where it was asked files the step');
     assert.equal(runRecord(ROOT, run.id).steps.a.workspace, at);
   });
-  await s.test(
+  s.test(
     'REFUSED by the place: a make it refuses, or that is not heard, files nothing and leaves no workspace or branch on the record',
     async () => {
       const run = await stage.runPlaced(startRun({ brief: 'split the work', repo: aRepo(), workflowDir: folderOf({ a: [] }) }));
@@ -298,14 +296,21 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
   );
 });
 
-test("a run on a clone works from its remote's base: the checkout is brought up to it before each step, and left when it cannot be", async (t) => {
-  const s = story(t);
-  const origin = aRepo();
-  const clone = path.join(ROOT, `clone-${path.basename(origin)}`);
-  const cloned = stage.place().place.askNow('clone', { url: `file://${origin}`, into: clone });
-  assert.ok('answer' in cloned, JSON.stringify(cloned));
+describe("a run on a clone works from its remote's base: the checkout is brought up to it before each step, and left when it cannot be", () => {
+  let origin!: string;
+  let clone!: string;
+  let cloned!: PlaceOutcome<'clone'>;
+  beforeAll(() => {
+    const t = teardowns();
+    origin = aRepo();
+    clone = path.join(ROOT, `clone-${path.basename(origin)}`);
+    cloned = stage.place().place.askNow('clone', { url: `file://${origin}`, into: clone });
+    assert.ok('answer' in cloned, JSON.stringify(cloned));
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
-  await s.test('someone else lands on the remote before the first step: its pass fast-forwards the checkout, and says so', async () => {
+  s.test('someone else lands on the remote before the first step: its pass fast-forwards the checkout, and says so', async () => {
     const run = await stage.runPlaced(startRun({ brief: 'follow', repo: clone, workflowDir: folderOf({ a: [], b: ['after: a'] }) }));
     id = run.id;
     const from = world().head(clone);
@@ -323,7 +328,7 @@ test("a run on a clone works from its remote's base: the checkout is brought up 
       'origin/main',
     );
   });
-  await s.test(
+  s.test(
     'a checkout with a change not committed is left as it is when the remote moves again, and the step is cut all the same',
     async () => {
       const at = world().head(clone);
@@ -344,11 +349,11 @@ test("a run on a clone works from its remote's base: the checkout is brought up 
   );
 });
 
-test('a failed step, then a cancelled run', async (t) => {
-  const s = story(t);
+describe('a failed step, then a cancelled run', () => {
+  const s = story(test);
   let failed = '';
   let workspace = '';
-  await s.test('implement fails, leaving work in its checkout', async () => {
+  s.test('implement fails, leaving work in its checkout', async () => {
     const dir = folderOf({ implement: [], review: ['after: implement'] });
     const run = await stage.runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false }));
     failed = run.id;
@@ -357,21 +362,18 @@ test('a failed step, then a cancelled run', async (t) => {
     fs.writeFileSync(path.join(workspace, 'half-done.txt'), 'work\n');
     stage.board().settle(`${failed}-implement`, 'failed');
   });
-  await s.test(
-    'REFUSED by the place: a hand-off it refuses is not marked done — the notes say why, and the next pass asks again',
-    async () => {
-      const place = placeAnswering('handoff', { refused: 'a hook said no' });
-      for (const pass of [1, 2]) {
-        const ticked = await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, failed)).pipe(Effect.provide(place.layer)));
-        assert.equal(ticked.notes.length, 1);
-        namesFor(`pass ${pass}`, ticked.notes[0], 'implement: not handed off', 'a hook said no', 'asked again on the next pass');
-        assert.equal(runRecord(ROOT, failed).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
-        assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
-      }
-      assert.match(uncommitted(workspace), /half-done\.txt/, 'the work is where the step left it');
-    },
-  );
-  await s.test('the failed step is handed off, and blocks what waits on it: the run failed, and `nemia decide` names it', async () => {
+  s.test('REFUSED by the place: a hand-off it refuses is not marked done — the notes say why, and the next pass asks again', async () => {
+    const place = placeAnswering('handoff', { refused: 'a hook said no' });
+    for (const pass of [1, 2]) {
+      const ticked = await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, failed)).pipe(Effect.provide(place.layer)));
+      assert.equal(ticked.notes.length, 1);
+      namesFor(`pass ${pass}`, ticked.notes[0], 'implement: not handed off', 'a hook said no', 'asked again on the next pass');
+      assert.equal(runRecord(ROOT, failed).steps.implement.handedOff, undefined, `pass ${pass}: not marked`);
+      assert.equal(place.asked(), pass, `pass ${pass}: the place was asked`);
+    }
+    assert.match(uncommitted(workspace), /half-done\.txt/, 'the work is where the step left it');
+  });
+  s.test('the failed step is handed off, and blocks what waits on it: the run failed, and `nemia decide` names it', async () => {
     const pass = await tick(failed);
     assert.deepEqual([pass.filed, pass.status], [[], 'failed']);
     assert.equal(runRecord(ROOT, failed).steps.implement.handedOff, `${failed}-implement`);
@@ -380,15 +382,14 @@ test('a failed step, then a cancelled run', async (t) => {
     const { decision: d } = await stage.runWith(stage.board().e, decideRun(failed));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed], ['failed', ['implement']]);
   });
-  await s.test('cancelling the failed run is no error, and does not relabel it', async () => {
+  s.test('cancelling the failed run is no error, and does not relabel it', async () => {
     const { plan } = await stage.runWith(stage.board().e, cancelRun(failed));
     assert.deepEqual(plan, { kind: 'finished', status: 'failed' });
     assert.equal(runRecord(ROOT, failed).cancelledAt, undefined, 'nothing is written');
   });
-
   let id = '';
   let check = '';
-  await s.test('a second run: one root signs off and its check runs, the other still queued', async () => {
+  s.test('a second run: one root signs off and its check runs, the other still queued', async () => {
     const dir = folderOf({ a: ['check: npm test'], b: [], join: ['after: a, b'] });
     id = (await stage.runPlaced(startRun({ brief: 'call it off', repo: aRepo(), workflowDir: dir }))).id;
     await tick(id);
@@ -397,7 +398,7 @@ test('a failed step, then a cancelled run', async (t) => {
     check = `${id}-a-check`;
     stage.board().settle(check, 'working');
   });
-  await s.test("`nemia cancel` stops both — the running check and the queued step — and the mark outlives the pass's write", async () => {
+  s.test("`nemia cancel` stops both — the running check and the queued step — and the mark outlives the pass's write", async () => {
     const file = path.join(ROOT, 'runs', `${id}.json`);
     const before = fs.readFileSync(file, 'utf8');
     const { plan } = await stage.runWith(stage.board().e, cancelRun(id));
@@ -412,12 +413,12 @@ test('a failed step, then a cancelled run', async (t) => {
     fs.writeFileSync(file, before);
     assert.ok(runRecord(ROOT, id).cancelledAt, 'the daemon wrote back the copy it read before the cancel, and the mark is in its own file');
   });
-  await s.test('the next pass files nothing, and asks the engine to stop nothing it was asked to stop already', async () => {
+  s.test('the next pass files nothing, and asks the engine to stop nothing it was asked to stop already', async () => {
     const pass = await tick(id);
     assert.deepEqual([pass.filed, pass.checked, pass.status], [[], [], 'cancelled']);
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`], "the engine's record says the stop request is already on each task");
   });
-  await s.test('cancelling again keeps the first time, and asks the engine nothing again', async () => {
+  s.test('cancelling again keeps the first time, and asks the engine nothing again', async () => {
     const first = runRecord(ROOT, id).cancelledAt;
     const { plan } = await stage.runWith(stage.board().e, cancelRun(id));
     assert.deepEqual(plan, {
@@ -431,7 +432,7 @@ test('a failed step, then a cancelled run', async (t) => {
     assert.equal(runRecord(ROOT, id).cancelledAt, first);
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`], 'the engine would refuse the second ask');
   });
-  await s.test('a step whose task the engine no longer has is unknown, not queued: cancelling stops nobody', async () => {
+  s.test('a step whose task the engine no longer has is unknown, not queued: cancelling stops nobody', async () => {
     const amnesia: Run = {
       ...runRecord(ROOT, failed),
       id: `${failed}-amnesia`,

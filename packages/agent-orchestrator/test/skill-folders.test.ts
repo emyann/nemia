@@ -5,7 +5,7 @@
  * skill named with its folder at a start, of any folder, is told in the story of `step-skills.test.ts`; the reader's rule beside its code
  * (`src/skills/read.store.test.ts`). Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

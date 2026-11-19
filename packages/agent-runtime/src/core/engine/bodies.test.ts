@@ -6,7 +6,8 @@
  * then tables of what keeps no body, of `split`, of a body harmed and of a removal refused; the races between a put and a removal,
  * and a put that fails, stay focused.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import fs from 'node:fs';
@@ -89,45 +90,50 @@ const forget = (dir: string, taskId: string) => {
   fs.writeFileSync(feedFile, kept.map((line) => `${line}\n`).join(''));
 };
 
-test('a long brief is kept once by the tasks that share it, read back key for key, and swept once nothing names it', async (t) => {
-  const s = story(t);
-  const dir = root();
-  const layer = Journal.files(dir);
+describe('a long brief is kept once by the tasks that share it, read back key for key, and swept once nothing names it', () => {
+  let dir!: string;
+  let layer!: Layer.Layer<Journal>;
+  let ref!: string;
+  let schemaRef!: string;
+  let orphan!: string;
+  let young!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    dir = root();
+    layer = Journal.files(dir);
+    ref = refOf(SHARED);
+    schemaRef = refOf(JSON.stringify(SCHEMA));
+    [orphan, , young] = other;
+    return t.end;
+  });
+  const s = story(test);
   const bodies = () => fs.readdirSync(path.join(dir, 'bodies')).sort();
-  const ref = refOf(SHARED);
-  const schemaRef = refOf(JSON.stringify(SCHEMA));
   const other = [`# Another task\n\n${long('another ask', 1500)}`, SHARED, long('a young orphan')];
-  const [orphan, , young] = other;
+  s.test('a brief whose parts a second task shares keeps that part once: the second journal grows by its reference alone', async () => {
+    await run(layer, append('t1', filed(BRIEF), BRIEF_PARTS));
+    assert.deepEqual(
+      bodies(),
+      [refOf(BRIEF_PARTS[0]), ref, schemaRef].sort(),
+      'the parts of a length, and the schema; the short part stays',
+    );
+    const feedBefore = fs.statSync(path.join(dir, 'feed.jsonl')).size;
+    await run(layer, append('t2', filed(other.join('')), other));
 
-  await s.test(
-    'a brief whose parts a second task shares keeps that part once: the second journal grows by its reference alone',
-    async () => {
-      await run(layer, append('t1', filed(BRIEF), BRIEF_PARTS));
-      assert.deepEqual(
-        bodies(),
-        [refOf(BRIEF_PARTS[0]), ref, schemaRef].sort(),
-        'the parts of a length, and the schema; the short part stays',
-      );
-      const feedBefore = fs.statSync(path.join(dir, 'feed.jsonl')).size;
-      await run(layer, append('t2', filed(other.join('')), other));
+    assert.deepEqual(lines(dir, 't1')[0].briefParts, [{ body: refOf(BRIEF_PARTS[0]) }, { body: ref }, BRIEF_PARTS[2]]);
+    assert.deepEqual(lines(dir, 't2')[0].briefParts, [{ body: refOf(orphan) }, { body: ref }, { body: refOf(young) }]);
+    assert.deepEqual(
+      bodies(),
+      [refOf(BRIEF_PARTS[0]), ref, schemaRef, refOf(orphan), refOf(young)].sort(),
+      'the second task added only its own parts',
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'bodies', ref), 'utf8'), SHARED);
+    assert.ok(!fs.readFileSync(path.join(dir, 'tasks', 't2.jsonl'), 'utf8').includes('the design'), 'no copy of the shared part');
 
-      assert.deepEqual(lines(dir, 't1')[0].briefParts, [{ body: refOf(BRIEF_PARTS[0]) }, { body: ref }, BRIEF_PARTS[2]]);
-      assert.deepEqual(lines(dir, 't2')[0].briefParts, [{ body: refOf(orphan) }, { body: ref }, { body: refOf(young) }]);
-      assert.deepEqual(
-        bodies(),
-        [refOf(BRIEF_PARTS[0]), ref, schemaRef, refOf(orphan), refOf(young)].sort(),
-        'the second task added only its own parts',
-      );
-      assert.equal(fs.readFileSync(path.join(dir, 'bodies', ref), 'utf8'), SHARED);
-      assert.ok(!fs.readFileSync(path.join(dir, 'tasks', 't2.jsonl'), 'utf8').includes('the design'), 'no copy of the shared part');
-
-      const grown = fs.statSync(path.join(dir, 'tasks', 't2.jsonl')).size + fs.statSync(path.join(dir, 'feed.jsonl')).size - feedBefore;
-      const copied = Buffer.byteLength(JSON.stringify(filed(other.join(''))));
-      assert.ok(grown < copied, `the journal and the feed grew by ${grown} bytes, where a copy in each is ${copied} twice`);
-    },
-  );
-
-  await s.test('a schema an end is held to, filed again by another task, is one body both name', async () => {
+    const grown = fs.statSync(path.join(dir, 'tasks', 't2.jsonl')).size + fs.statSync(path.join(dir, 'feed.jsonl')).size - feedBefore;
+    const copied = Buffer.byteLength(JSON.stringify(filed(other.join(''))));
+    assert.ok(grown < copied, `the journal and the feed grew by ${grown} bytes, where a copy in each is ${copied} twice`);
+  });
+  s.test('a schema an end is held to, filed again by another task, is one body both name', async () => {
     const before = bodies();
     await run(layer, append('t3', filed('a')));
     for (const id of ['t1', 't2', 't3']) assert.equal(lines(dir, id)[0].closeoutSchemaBody, schemaRef, id);
@@ -138,8 +144,7 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
       'in its place',
     );
   });
-
-  await s.test('a cold read of a task that names a body counts the body read; a second read reads nothing', async () => {
+  s.test('a cold read of a task that names a body counts the body read; a second read reads nothing', async () => {
     const reading = Effect.flatMap(Journal, (j) =>
       Effect.gen(function* () {
         const before = ioCounts();
@@ -153,8 +158,7 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
     assert.equal(cold, 1 + 3, 'the journal and its three bodies: two parts and the schema');
     assert.equal(warm, 0);
   });
-
-  await s.test('a nudge that repeats the answer beside it is one body, named by both lines', async () => {
+  s.test('a nudge that repeats the answer beside it is one body, named by both lines', async () => {
     await run(
       layer,
       Effect.forEach(EVENTS.slice(1), (event) => append('t1', event), { discard: true }),
@@ -166,8 +170,7 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
     assert.equal(short.nudge, 'short', 'a text under the size stays in its line');
     assert.equal(bodies().filter((r) => r === refOf(NUDGE)).length, 1);
   });
-
-  await s.test('every event read back is the event appended, key for key under JSON, from the journal and the feed alike', async () => {
+  s.test('every event read back is the event appended, key for key under JSON, from the journal and the feed alike', async () => {
     const fresh = Journal.files(dir);
     const events = await run(fresh, read('t1'));
     assert.equal(JSON.stringify(events), JSON.stringify(EVENTS), 'read');
@@ -176,8 +179,7 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
     assert.equal(JSON.stringify(entries.find((e) => e.taskId === 't2')?.event), JSON.stringify(filed(other.join(''))), 'the other task');
     assert.deepEqual(Object.keys((events[0] as { config: { claude: object } }).config.claude), Object.keys(CLAUDE), 'flag order');
   });
-
-  await s.test('removing a body a journal names is refused, naming the task, and the body stays', async () => {
+  s.test('removing a body a journal names is refused, naming the task, and the body stays', async () => {
     forget(dir, 't2');
     forget(dir, 't3');
     for (const text of [orphan, SHARED]) age(dir, text, BODY_GRACE_MS + 60_000);
@@ -186,15 +188,13 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
     naming(error.message, ref, "task t1's journal");
     assert.ok(fs.existsSync(path.join(dir, 'bodies', ref)));
   });
-
-  await s.test('a body put within the grace is not removed, and the refusal says when it may be', async () => {
+  s.test('a body put within the grace is not removed, and the refusal says when it may be', async () => {
     const error = await failure(layer, removeBody(refOf(young)));
     assert.equal(error._tag, 'BodyRefused');
     naming(error.message, `Body ${refOf(young)} was put at `, 'within the grace', 'remove it after ');
     assert.ok(fs.existsSync(path.join(dir, 'bodies', refOf(young))));
   });
-
-  await s.test(
+  s.test(
     'sweep removes only a body nothing names put before the grace: a young one and a named old one are kept, and without yes nothing goes',
     async () => {
       const all = bodies();
@@ -212,8 +212,7 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
       assert.equal(JSON.stringify(await run(Journal.files(dir), read('t1'))), JSON.stringify(EVENTS), 'and every named one still reads');
     },
   );
-
-  await s.test('once no journal and no feed entry names a body past the grace, removing it goes through', async () => {
+  s.test('once no journal and no feed entry names a body past the grace, removing it goes through', async () => {
     fs.rmSync(path.join(dir, 'tasks', 't1.jsonl'));
     const byFeed = await failure(layer, removeBody(ref));
     assert.equal(byFeed._tag, 'BodyRefused');
@@ -263,28 +262,23 @@ const appendAll = (layer: Layer.Layer<Journal>) =>
   );
 const NO_SWEEP = { removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 };
 
-test('a store with bodies in memory, one with none, and a journal from before them each read back the event appended', async (t) => {
-  await t.test(
-    'the memory store reads back every event appended, key for key under JSON, from the journal and the feed alike',
-    async () => {
-      const layer = Journal.test();
-      await appendAll(layer);
-      const events = await run(layer, read('t1'));
-      assert.equal(JSON.stringify(events), JSON.stringify(EVENTS), 'read');
-      const { entries } = await run(layer, feed());
-      assert.equal(JSON.stringify(entries.map((e) => e.event)), JSON.stringify(EVENTS), 'feed');
-      assert.deepEqual(Object.keys((events[0] as { config: { claude: object } }).config.claude), Object.keys(CLAUDE), 'flag order');
-    },
-  );
-
-  await t.test('the memory store without bodies appends each event whole, and its sweep finds nothing', async () => {
+describe('a store with bodies in memory, one with none, and a journal from before them each read back the event appended', () => {
+  test('the memory store reads back every event appended, key for key under JSON, from the journal and the feed alike', async () => {
+    const layer = Journal.test();
+    await appendAll(layer);
+    const events = await run(layer, read('t1'));
+    assert.equal(JSON.stringify(events), JSON.stringify(EVENTS), 'read');
+    const { entries } = await run(layer, feed());
+    assert.equal(JSON.stringify(entries.map((e) => e.event)), JSON.stringify(EVENTS), 'feed');
+    assert.deepEqual(Object.keys((events[0] as { config: { claude: object } }).config.claude), Object.keys(CLAUDE), 'flag order');
+  });
+  test('the memory store without bodies appends each event whole, and its sweep finds nothing', async () => {
     const layer = Journal.test({ bodies: false });
     await appendAll(layer);
     assert.equal(JSON.stringify(await run(layer, read('t1'))), JSON.stringify(EVENTS));
     assert.deepEqual(await run(layer, sweep(true)), NO_SWEEP);
   });
-
-  await t.test("an implementor's own store that keeps no bodies is handed each event whole, no reference in them", async () => {
+  test("an implementor's own store that keeps no bodies is handed each event whole, no reference in them", async () => {
     const kept: unknown[] = [];
     const own: JournalOps = {
       append: (_taskId, event) => Effect.sync(() => void kept.push(event)),
@@ -298,57 +292,50 @@ test('a store with bodies in memory, one with none, and a journal from before th
     assert.deepEqual(await run(layer, sweep(true)), NO_SWEEP);
     assert.equal(JSON.stringify(kept), JSON.stringify(EVENTS), 'whole, no reference in them');
   });
+  test('a journal from before bodies reads as it read, beside a task filed with them, in the order of the feed, and no byte on disk changes', async () => {
+    const dir = root();
+    fs.mkdirSync(path.join(dir, 'tasks'));
+    fs.writeFileSync(path.join(dir, 'tasks', 't-old.jsonl'), OLD.map((l) => JSON.stringify(l) + '\n').join(''));
+    fs.writeFileSync(path.join(dir, 'feed.jsonl'), OLD.map((event) => JSON.stringify({ taskId: 't-old', event }) + '\n').join(''));
+    const before = fs.readFileSync(path.join(dir, 'tasks', 't-old.jsonl'), 'utf8');
+    const layer = Journal.files(dir);
+    await run(layer, append('t-new', EVENTS[0], BRIEF_PARTS));
 
-  await t.test(
-    'a journal from before bodies reads as it read, beside a task filed with them, in the order of the feed, and no byte on disk changes',
-    async () => {
-      const dir = root();
-      fs.mkdirSync(path.join(dir, 'tasks'));
-      fs.writeFileSync(path.join(dir, 'tasks', 't-old.jsonl'), OLD.map((l) => JSON.stringify(l) + '\n').join(''));
-      fs.writeFileSync(path.join(dir, 'feed.jsonl'), OLD.map((event) => JSON.stringify({ taskId: 't-old', event }) + '\n').join(''));
-      const before = fs.readFileSync(path.join(dir, 'tasks', 't-old.jsonl'), 'utf8');
-      const layer = Journal.files(dir);
-      await run(layer, append('t-new', EVENTS[0], BRIEF_PARTS));
-
-      assert.equal(JSON.stringify(await run(layer, read('t-old'))), JSON.stringify(OLD_READ));
-      const { entries } = await run(layer, feed());
-      assert.deepEqual(
-        entries.map((e) => e.taskId),
-        ['t-old', 't-old', 't-old', 't-new'],
-      );
-      assert.equal(JSON.stringify(entries.map((e) => e.event)), JSON.stringify([...OLD_READ, EVENTS[0]]));
-      assert.equal(fs.readFileSync(path.join(dir, 'tasks', 't-old.jsonl'), 'utf8'), before);
-    },
-  );
+    assert.equal(JSON.stringify(await run(layer, read('t-old'))), JSON.stringify(OLD_READ));
+    const { entries } = await run(layer, feed());
+    assert.deepEqual(
+      entries.map((e) => e.taskId),
+      ['t-old', 't-old', 't-old', 't-new'],
+    );
+    assert.equal(JSON.stringify(entries.map((e) => e.event)), JSON.stringify([...OLD_READ, EVENTS[0]]));
+    assert.equal(fs.readFileSync(path.join(dir, 'tasks', 't-old.jsonl'), 'utf8'), before);
+  });
 });
 
-test('split: a text under the size, or no well-formed UTF-16, stays in its line; one at the size is a body; parts that do not join are one', async (t) => {
-  await t.test('a text under the size stays in its line', () => {
+describe('split: a text under the size, or no well-formed UTF-16, stays in its line; one at the size is a body; parts that do not join are one', () => {
+  test('a text under the size stays in its line', () => {
     const text = 'y'.repeat(BODY_MIN_BYTES - 1);
     const { entry, bodies } = split({ kind: 'input', at: 'now', text });
     assert.deepEqual([entry, bodies.size], [{ kind: 'input', at: 'now', text }, 0]);
   });
-
-  await t.test('a text that is no well-formed UTF-16 stays in its line', () => {
+  test('a text that is no well-formed UTF-16 stays in its line', () => {
     const text = `${'z'.repeat(BODY_MIN_BYTES)}${String.fromCharCode(0xd800)}`;
     const { entry, bodies } = split({ kind: 'input', at: 'now', text });
     assert.deepEqual([entry, bodies.size], [{ kind: 'input', at: 'now', text }, 0]);
   });
-
-  await t.test('a text at the size is a body', () => {
+  test('a text at the size is a body', () => {
     const at = { kind: 'input', at: 'now', text: 'y'.repeat(BODY_MIN_BYTES) } as const;
     assert.deepEqual(split(at).entry, { kind: 'input', at: 'now', textBody: refOf(at.text) });
   });
-
-  await t.test("parts that do not join into the brief are not the brief's: it is kept as one part", () => {
+  test("parts that do not join into the brief are not the brief's: it is kept as one part", () => {
     const { entry } = split(filed(BRIEF, { closeoutSchema: undefined }), ['not', 'it']);
     assert.deepEqual((entry as { briefParts: unknown }).briefParts, [{ body: refOf(BRIEF) }]);
   });
 });
 
-test("a body missing or altered fails its task's read naming the body's file and saying to restore it, and its feed entry is skipped and said, the cursor past it", async (t) => {
+describe("a body missing or altered fails its task's read naming the body's file and saying to restore it, and its feed entry is skipped and said, the cursor past it", () => {
   for (const harm of ['missing', 'altered'] as const)
-    await t.test(`a body ${harm}`, async () => {
+    test(`a body ${harm}`, async () => {
       const dir = root();
       const layer = Journal.files(dir);
       await run(layer, Effect.all([append('t1', EVENTS[0], BRIEF_PARTS), append('t2', filed('fine', { closeoutSchema: undefined }))]));
@@ -374,20 +361,18 @@ test("a body missing or altered fails its task's read naming the body's file and
     });
 });
 
-test('removeBody: what is no body, or a store that keeps none, is refused, saying so', async (t) => {
-  await t.test('a reference that is no sha256', async () => {
+describe('removeBody: what is no body, or a store that keeps none, is refused, saying so', () => {
+  test('a reference that is no sha256', async () => {
     const error = await failure(Journal.files(root()), removeBody('nope'));
     assert.equal(error._tag, 'BodyRefused');
     naming(error.message, '"nope"', 'sha256', '64 lowercase hex digits');
   });
-
-  await t.test('a body this store does not have', async () => {
+  test('a body this store does not have', async () => {
     const error = await failure(Journal.files(root()), removeBody(refOf('x')));
     assert.equal(error._tag, 'BodyRefused');
     naming(error.message, `no body ${refOf('x')} in this store`);
   });
-
-  await t.test('a store that keeps no bodies', async () => {
+  test('a store that keeps no bodies', async () => {
     const error = await failure(Journal.test({ bodies: false }), removeBody(refOf('x')));
     assert.equal(error._tag, 'BodyRefused');
     naming(error.message, 'keeps no bodies', refOf('x'));

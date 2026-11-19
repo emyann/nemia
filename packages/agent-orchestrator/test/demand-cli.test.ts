@@ -3,7 +3,7 @@
  * holds, asks the host `main` is handed to start one, once, before it runs; no read does; and the store keeps no `daemon.log` and no lease,
  * since the host's spawn starts nothing. A start that went around the host would leave both, or the reaper's process, and fail here.
  */
-import { test, type TestContext } from 'node:test';
+import { test, vi, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,14 +68,14 @@ function hostOf(): { host: () => DemandHost; spawns: string[] } {
 
 /** `nemia <argv>` over `host`, its lines kept off the test's output and any refusal it ends with swallowed. */
 async function typed(t: TestContext, argv: string[], host: () => DemandHost): Promise<void> {
-  t.mock.method(console, 'log', () => undefined);
-  t.mock.method(console, 'error', () => undefined);
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
   try {
     await main(argv, noEngine(), host, undefined, ENV);
   } catch {
     return;
   } finally {
-    t.mock.restoreAll();
+    vi.restoreAllMocks();
   }
 }
 

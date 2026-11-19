@@ -12,7 +12,7 @@
  * A remote A2A agent is no driver behind `HarnessHandler`: its verbs are A2A calls over HTTP to another party's agent, and
  * `remote-agent.test.ts` proves each one reaches it by that agent's own count of the methods it answered.
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { rmSync } from 'node:fs';
@@ -125,8 +125,8 @@ test('the engine reaches a harness through the A2A seam for every verb it asks, 
   assert.deepEqual(s.direct, [], 'none asked outside the seam, and every one asked, so none passed by being skipped');
 });
 
-test('REFUSED: a verb asked beside the seam is named, whichever shape bypasses it', async (t) => {
-  await t.test("REFUSED: a driver asked directly, its own verbs spread beside the seam's three, is named for each verb", async () => {
+describe('REFUSED: a verb asked beside the seam is named, whichever shape bypasses it', () => {
+  test("REFUSED: a driver asked directly, its own verbs spread beside the seam's three, is named for each verb", async () => {
     const s = spy();
     const direct = asyncOps(s.runner);
     const seam = a2aOps('fake', direct, async () => []);
@@ -142,20 +142,16 @@ test('REFUSED: a verb asked beside the seam is named, whichever shape bypasses i
     assert.deepEqual(s.direct, ['find', 'logs', 'release', 'say'], 'every verb that bypassed the seam, and the observe that did not');
     assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
   });
-
-  await t.test(
-    'REFUSED: the transcript read directly, spread from the driver beside every other verb through the seam, is named',
-    async () => {
-      const s = spy();
-      const direct = asyncOps(s.runner);
-      const transcriptBeside = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
-      await marked(async () => {
-        s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
-        await Effect.runPromise(transcriptBeside.transcript('s-9'));
-        await Effect.runPromise(transcriptBeside.logs('s-9'));
-      });
-      assert.deepEqual(s.direct, ['transcript'], 'the transcript bypassed the seam, and the logs did not');
-      assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
-    },
-  );
+  test('REFUSED: the transcript read directly, spread from the driver beside every other verb through the seam, is named', async () => {
+    const s = spy();
+    const direct = asyncOps(s.runner);
+    const transcriptBeside = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
+    await marked(async () => {
+      s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
+      await Effect.runPromise(transcriptBeside.transcript('s-9'));
+      await Effect.runPromise(transcriptBeside.logs('s-9'));
+    });
+    assert.deepEqual(s.direct, ['transcript'], 'the transcript bypassed the seam, and the logs did not');
+    assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
+  });
 });

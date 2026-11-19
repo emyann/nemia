@@ -7,7 +7,7 @@
  * `Missing`, a callback port another sign-in waits on is `Conflict`, as is a callback pasted where none waits, and a pasted address that
  * is not the sign-in's redirect is `Invalid`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import type {} from 'vitest/globals';
 import assert from 'node:assert/strict';
 import { sign } from '../src/one.ts';
 

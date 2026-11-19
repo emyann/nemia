@@ -4,7 +4,8 @@
  * one, and each pool by a fixture that shares or splits it.
  */
 import { Effect, Layer } from 'effect';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import type { Event, FeedEntry, HarnessConfig, Sighting, SpawnRequest, TaskPhase, TaskView } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
@@ -94,15 +95,20 @@ const fileAt = (journal: AsyncJournal, id: string, at: string, harness = 'a', pr
 
 const started = (sessions: Map<string, Sighting>) => [...sessions.keys()].sort();
 
-test('under a ceiling of 1, the queue drains by priority, then by filing, against the order the store lists it in, two harnesses sharing one pool — read off the journal by an engine that never saw the filings', async (t) => {
-  const s = story(t);
-  const journal = memoryJournal();
-  await fileAt(journal, 'x', '2026-10-04T09:00:02.000Z', 'a', 0);
-  await fileAt(journal, 'y', '2026-10-04T09:00:03.000Z', 'a', 1);
-  await fileAt(journal, 'z', '2026-10-04T09:00:01.000Z', 'a', 0);
-  const b = board(1, { a: 'x', b: 'x' }, journal);
-
-  await s.test('the queued task of the highest priority is admitted, wherever it is listed and whenever filed', async () => {
+describe('under a ceiling of 1, the queue drains by priority, then by filing, against the order the store lists it in, two harnesses sharing one pool — read off the journal by an engine that never saw the filings', () => {
+  let journal!: AsyncJournal;
+  let b!: { engine: import('../src/index.ts').EngineShape; sessions: Map<string, Sighting>; journal: AsyncJournal };
+  beforeAll(async () => {
+    const t = teardowns();
+    journal = memoryJournal();
+    await fileAt(journal, 'x', '2026-10-04T09:00:02.000Z', 'a', 0);
+    await fileAt(journal, 'y', '2026-10-04T09:00:03.000Z', 'a', 1);
+    await fileAt(journal, 'z', '2026-10-04T09:00:01.000Z', 'a', 0);
+    b = board(1, { a: 'x', b: 'x' }, journal);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('the queued task of the highest priority is admitted, wherever it is listed and whenever filed', async () => {
     const first = await Effect.runPromise(b.engine.tick());
     assert.deepEqual(
       first.views.map((v) => [v.id, v.admission]),
@@ -115,19 +121,16 @@ test('under a ceiling of 1, the queue drains by priority, then by filing, agains
     );
     assert.equal(b.sessions.size, 0, 'admitted on this pass, started on none');
   });
-
-  await s.test('the next pass starts it', async () => {
+  s.test('the next pass starts it', async () => {
     await Effect.runPromise(b.engine.tick());
     assert.deepEqual(started(b.sessions), [nameFor('y', 1)], 'the next pass starts it');
   });
-
-  await s.test("a harness sharing the pool is held back by the one at work: its pool's one slot is held", async () => {
+  s.test("a harness sharing the pool is held back by the one at work: its pool's one slot is held", async () => {
     await fileAt(b.journal, 'on-b', '2026-10-04T09:00:00.000Z', 'b');
     const held = await Effect.runPromise(b.engine.tick());
     assert.equal(held.views.find((v) => v.id === 'on-b')?.admission, 'queued', "`on-b` waits: its pool's one slot is held");
   });
-
-  await s.test('the slot let go, the earliest filed of one priority is admitted, whichever harness of the pool it is on', async () => {
+  s.test('the slot let go, the earliest filed of one priority is admitted, whichever harness of the pool it is on', async () => {
     b.sessions.set(nameFor('y', 1), { ...b.sessions.get(nameFor('y', 1))!, state: 'completed' });
     await Effect.runPromise(b.engine.tick());
     await Effect.runPromise(b.engine.tick());
@@ -137,8 +140,7 @@ test('under a ceiling of 1, the queue drains by priority, then by filing, agains
       '`on-b`, filed first of priority 0 and listed first, is admitted',
     );
   });
-
-  await s.test('and after it the earliest filed of the rest, against the order the store lists them in', async () => {
+  s.test('and after it the earliest filed of the rest, against the order the store lists them in', async () => {
     b.sessions.set(nameFor('on-b', 1), { ...b.sessions.get(nameFor('on-b', 1))!, state: 'completed' });
     await Effect.runPromise(b.engine.tick());
     await Effect.runPromise(b.engine.tick());
@@ -150,8 +152,8 @@ test('under a ceiling of 1, the queue drains by priority, then by filing, agains
   });
 });
 
-test('the engine admits by its ceiling and pools alone: a pool its own admits apart, no ceiling admits nothing, and an engine unschedulable admits nothing while it says so', async (t) => {
-  await t.test("with `b`'s pool its own, a task on `a` is admitted while `b` is at work", async () => {
+describe('the engine admits by its ceiling and pools alone: a pool its own admits apart, no ceiling admits nothing, and an engine unschedulable admits nothing while it says so', () => {
+  test("with `b`'s pool its own, a task on `a` is admitted while `b` is at work", async () => {
     const apart = board(1, { a: 'x' });
     await fileAt(apart.journal, 'on-b', '2026-10-04T09:00:00.000Z', 'b');
     await Effect.runPromise(apart.engine.tick());
@@ -160,8 +162,7 @@ test('the engine admits by its ceiling and pools alone: a pool its own admits ap
     const admitted = await Effect.runPromise(apart.engine.tick());
     assert.equal(admitted.views.find((v) => v.id === 'on-a')?.admission, 'admitted', "with `b`'s pool its own, `on-a` is admitted");
   });
-
-  await t.test('with no ceiling the pass admits nothing: a queued task waits for `admit`, as ever', async () => {
+  test('with no ceiling the pass admits nothing: a queued task waits for `admit`, as ever', async () => {
     const b = board(undefined);
     await fileAt(b.journal, 'q', '2026-10-04T09:00:00.000Z');
     for (let i = 0; i < 3; i++) await Effect.runPromise(b.engine.tick());
@@ -171,41 +172,37 @@ test('the engine admits by its ceiling and pools alone: a pool its own admits ap
     await Effect.runPromise(b.engine.tick());
     assert.deepEqual(started(b.sessions), [nameFor('q', 1)]);
   });
-
-  await t.test(
-    'an engine unschedulable admits no queued task on any pass while it says so; what works goes on, and `admit` still admits',
-    async () => {
-      const journal = memoryJournal();
-      const sessions = new Map<string, Sighting>();
-      let unschedulable = false;
-      const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(sessions)) };
-      const engine = builtEngine(
-        Engine.layer({
-          root: scratch('ae-admission-root-'),
-          journal: asyncStore(journal),
-          harnesses,
-          defaultHarness: 'a',
-          maxConcurrent: 3,
-          unschedulable: () => unschedulable,
-        }),
-      );
-      await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
-      await Effect.runPromise(engine.tick());
-      unschedulable = true;
-      await fileAt(journal, 'held', '2026-10-04T09:00:01.000Z');
-      for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-      assert.deepEqual(started(sessions), [nameFor('before', 1)], 'admitted before, it starts; filed after, it waits');
-      assert.equal((await Effect.runPromise(engine.view('held'))).admission, 'queued');
-      await fileAt(journal, 'named', '2026-10-04T09:00:02.000Z');
-      await Effect.runPromise(engine.admit(['named']));
-      await Effect.runPromise(engine.tick());
-      assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('named', 1)], 'a task `admit` names starts all the same');
-      unschedulable = false;
-      await Effect.runPromise(engine.tick());
-      await Effect.runPromise(engine.tick());
-      assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('held', 1), nameFor('named', 1)], 'the flag down, it is admitted');
-    },
-  );
+  test('an engine unschedulable admits no queued task on any pass while it says so; what works goes on, and `admit` still admits', async () => {
+    const journal = memoryJournal();
+    const sessions = new Map<string, Sighting>();
+    let unschedulable = false;
+    const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(sessions)) };
+    const engine = builtEngine(
+      Engine.layer({
+        root: scratch('ae-admission-root-'),
+        journal: asyncStore(journal),
+        harnesses,
+        defaultHarness: 'a',
+        maxConcurrent: 3,
+        unschedulable: () => unschedulable,
+      }),
+    );
+    await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
+    await Effect.runPromise(engine.tick());
+    unschedulable = true;
+    await fileAt(journal, 'held', '2026-10-04T09:00:01.000Z');
+    for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+    assert.deepEqual(started(sessions), [nameFor('before', 1)], 'admitted before, it starts; filed after, it waits');
+    assert.equal((await Effect.runPromise(engine.view('held'))).admission, 'queued');
+    await fileAt(journal, 'named', '2026-10-04T09:00:02.000Z');
+    await Effect.runPromise(engine.admit(['named']));
+    await Effect.runPromise(engine.tick());
+    assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('named', 1)], 'a task `admit` names starts all the same');
+    unschedulable = false;
+    await Effect.runPromise(engine.tick());
+    await Effect.runPromise(engine.tick());
+    assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('held', 1), nameFor('named', 1)], 'the flag down, it is admitted');
+  });
 });
 
 const GI = 2 ** 30;
@@ -257,43 +254,40 @@ const fileLimited = (journal: AsyncJournal, id: string, filed: number, harness: 
 /** The admission each view says, by id. */
 const admissions = (views: readonly TaskView[]) => Object.fromEntries(views.map((v) => [v.id, v.admission]));
 
-test("admission by the machine's memory: on 11Gi available, 1Gi kept, tasks of a 3Gi limit across a session's pool and the checks' are admitted floor(10 / 3) = 3, the fourth's view says it waits for memory, and once the three run and the machine has room it is admitted", async (t) => {
-  const s = story(t);
+describe("admission by the machine's memory: on 11Gi available, 1Gi kept, tasks of a 3Gi limit across a session's pool and the checks' are admitted floor(10 / 3) = 3, the fourth's view says it waits for memory, and once the three run and the machine has room it is admitted", () => {
+  let b!: { engine: import('../src/index.ts').EngineShape; sessions: Map<string, Sighting>; journal: AsyncJournal };
+  beforeAll(async () => {
+    const t = teardowns();
+    b = machineBoard('1Gi', machine);
+    await fileLimited(b.journal, 'one', 1, 'a', '3Gi');
+    await fileLimited(b.journal, 'two', 2, 'checks', '3Gi');
+    await fileLimited(b.journal, 'three', 3, 'a', '3Gi');
+    await fileLimited(b.journal, 'four', 4, 'checks', '3Gi');
+    return t.end;
+  });
+  const s = story(test);
   const machine = { totalBytes: 16 * GI, availableBytes: 11 * GI };
-  const b = machineBoard('1Gi', machine);
-  await fileLimited(b.journal, 'one', 1, 'a', '3Gi');
-  await fileLimited(b.journal, 'two', 2, 'checks', '3Gi');
-  await fileLimited(b.journal, 'three', 3, 'a', '3Gi');
-  await fileLimited(b.journal, 'four', 4, 'checks', '3Gi');
-
-  await s.test('one pass admits three, in turn, across both pools: the ceiling of 6 had room for all four', async () => {
+  s.test('one pass admits three, in turn, across both pools: the ceiling of 6 had room for all four', async () => {
     const pass = await Effect.runPromise(b.engine.tick());
     assert.deepEqual(admissions(pass.views), { one: 'admitted', two: 'admitted', three: 'admitted', four: 'queued' });
   });
-
-  await s.test("the fourth's view says it waits for memory: its need, 3Gi, and the room left, 1Gi", async () => {
+  s.test("the fourth's view says it waits for memory: its need, 3Gi, and the room left, 1Gi", async () => {
     const view = await Effect.runPromise(b.engine.view('four'));
     assert.deepEqual(view.waits, { for: 'memory', needBytes: 3 * GI, roomBytes: GI });
     for (const id of ['one', 'two', 'three']) assert.equal((await Effect.runPromise(b.engine.view(id))).waits, undefined, id);
   });
-
-  await s.test('the next pass starts the three, and still has no room: what they asked is not yet in what the kernel shows', async () => {
+  s.test('the next pass starts the three, and still has no room: what they asked is not yet in what the kernel shows', async () => {
     const pass = await Effect.runPromise(b.engine.tick());
     assert.deepEqual(started(b.sessions), [nameFor('one', 1), nameFor('three', 1), nameFor('two', 1)]);
     assert.equal(pass.views.find((v) => v.id === 'four')?.admission, 'queued');
   });
-
-  await s.test(
-    'the three at work on a machine with 3Gi available now: the live reading keeps the fourth waiting, its room 2Gi',
-    async () => {
-      machine.availableBytes = 3 * GI;
-      const pass = await Effect.runPromise(b.engine.tick());
-      assert.deepEqual(pass.views.find((v) => v.id === 'four')?.waits, { for: 'memory', needBytes: 3 * GI, roomBytes: 2 * GI });
-      assert.deepEqual((await Effect.runPromise(b.engine.view('four'))).waits, { for: 'memory', needBytes: 3 * GI, roomBytes: 2 * GI });
-    },
-  );
-
-  await s.test(
+  s.test('the three at work on a machine with 3Gi available now: the live reading keeps the fourth waiting, its room 2Gi', async () => {
+    machine.availableBytes = 3 * GI;
+    const pass = await Effect.runPromise(b.engine.tick());
+    assert.deepEqual(pass.views.find((v) => v.id === 'four')?.waits, { for: 'memory', needBytes: 3 * GI, roomBytes: 2 * GI });
+    assert.deepEqual((await Effect.runPromise(b.engine.view('four'))).waits, { for: 'memory', needBytes: 3 * GI, roomBytes: 2 * GI });
+  });
+  s.test(
     'with 8Gi available, the requests fit the total (9Gi + 3Gi of 15Gi) and the newcomer what is free: it is admitted, its wait gone',
     async () => {
       machine.availableBytes = 8 * GI;
@@ -306,28 +300,23 @@ test("admission by the machine's memory: on 11Gi available, 1Gi kept, tasks of a
   );
 });
 
-test("admission with no reserve given reads no machine: the ceiling alone admits, and a task its pool's ceiling holds says it waits for a slot", async (t) => {
-  await t.test('no reserve: all four of a 3Gi limit are admitted on a machine of 11Gi available', async () => {
+describe("admission with no reserve given reads no machine: the ceiling alone admits, and a task its pool's ceiling holds says it waits for a slot", () => {
+  test('no reserve: all four of a 3Gi limit are admitted on a machine of 11Gi available', async () => {
     const b = machineBoard(undefined, { totalBytes: 16 * GI, availableBytes: 11 * GI });
     for (const [i, id] of ['one', 'two', 'three', 'four'].entries()) await fileLimited(b.journal, id, i, i % 2 ? 'checks' : 'a', '3Gi');
     const pass = await Effect.runPromise(b.engine.tick());
     assert.deepEqual(admissions(pass.views), { one: 'admitted', two: 'admitted', three: 'admitted', four: 'admitted' });
   });
-
-  await t.test(
-    "a ceiling of 1: the second of a pool waits for a slot, naming its pool and the ceiling, the other pool's admitted",
-    async () => {
-      const b = machineBoard('1Gi', { totalBytes: 16 * GI, availableBytes: 11 * GI }, 1);
-      await fileLimited(b.journal, 'first', 1, 'a', '1Gi');
-      await fileLimited(b.journal, 'second', 2, 'a', '1Gi');
-      await fileLimited(b.journal, 'check', 3, 'checks', '1Gi');
-      const pass = await Effect.runPromise(b.engine.tick());
-      assert.deepEqual(admissions(pass.views), { first: 'admitted', second: 'queued', check: 'admitted' });
-      assert.deepEqual((await Effect.runPromise(b.engine.view('second'))).waits, { for: 'slot', pool: 'claude', ceiling: 1 });
-    },
-  );
-
-  await t.test('a machine that answers no reading admits by the ceiling alone, that pass', async () => {
+  test("a ceiling of 1: the second of a pool waits for a slot, naming its pool and the ceiling, the other pool's admitted", async () => {
+    const b = machineBoard('1Gi', { totalBytes: 16 * GI, availableBytes: 11 * GI }, 1);
+    await fileLimited(b.journal, 'first', 1, 'a', '1Gi');
+    await fileLimited(b.journal, 'second', 2, 'a', '1Gi');
+    await fileLimited(b.journal, 'check', 3, 'checks', '1Gi');
+    const pass = await Effect.runPromise(b.engine.tick());
+    assert.deepEqual(admissions(pass.views), { first: 'admitted', second: 'queued', check: 'admitted' });
+    assert.deepEqual((await Effect.runPromise(b.engine.view('second'))).waits, { for: 'slot', pool: 'claude', ceiling: 1 });
+  });
+  test('a machine that answers no reading admits by the ceiling alone, that pass', async () => {
     const journal = memoryJournal();
     const sessions = new Map<string, Sighting>();
     const engine = builtEngine(
@@ -437,52 +426,50 @@ const resizedBoard = (
   return { engine, asked };
 };
 
-test("a task queued under one default and admitted under a smaller one counts at the smaller: the engine's defaults land on a task with none of its own as its attempt starts, as a LimitRange's on a Pod when it is created, and a session already started keeps its own", async (t) => {
-  const s = story(t);
-  const journal = memoryJournal();
-  const sessions = new Map<string, Sighting>();
+describe("a task queued under one default and admitted under a smaller one counts at the smaller: the engine's defaults land on a task with none of its own as its attempt starts, as a LimitRange's on a Pod when it is created, and a session already started keeps its own", () => {
+  let journal!: AsyncJournal;
+  let sessions!: Map<string, Sighting>;
+  let before!: { engine: import('../src/index.ts').EngineShape; asked: SpawnRequest[] };
+  let after!: { engine: import('../src/index.ts').EngineShape; asked: SpawnRequest[] };
+  let id!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    journal = memoryJournal();
+    sessions = new Map<string, Sighting>();
+    before = resizedBoard(journal, sessions, machine, { limit: '8Gi' });
+    after = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
+    id = await Effect.runPromise(before.engine.file({ brief: 'land', cwd: '/r', queued: true }));
+    return t.end;
+  });
+  const s = story(test);
   const machine = { totalBytes: 16 * GI, availableBytes: 6 * GI };
-  const before = resizedBoard(journal, sessions, machine, { limit: '8Gi' });
-  const after = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
-  const id = await Effect.runPromise(before.engine.file({ brief: 'land', cwd: '/r', queued: true }));
-
-  await s.test(
-    'filed under an 8Gi default and no request, it waits for memory counted at 8Gi, and its filing carries no resources',
-    async () => {
-      const pass = await Effect.runPromise(before.engine.tick());
-      assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 8 * GI, roomBytes: 5 * GI });
-      assert.equal((await journal.read(id)).find((e) => e.kind === 'filed')?.resources, undefined);
-      assert.equal((await Effect.runPromise(before.engine.view(id))).state.resources, undefined);
-    },
-  );
-
-  await s.test('the engine resized to a 2560Mi default request: the same queued task now says it needs 2560Mi', async () => {
+  s.test('filed under an 8Gi default and no request, it waits for memory counted at 8Gi, and its filing carries no resources', async () => {
+    const pass = await Effect.runPromise(before.engine.tick());
+    assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 8 * GI, roomBytes: 5 * GI });
+    assert.equal((await journal.read(id)).find((e) => e.kind === 'filed')?.resources, undefined);
+    assert.equal((await Effect.runPromise(before.engine.view(id))).state.resources, undefined);
+  });
+  s.test('the engine resized to a 2560Mi default request: the same queued task now says it needs 2560Mi', async () => {
     machine.availableBytes = 3 * GI;
     const pass = await Effect.runPromise(after.engine.tick());
     assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 2560 * MI, roomBytes: 2 * GI });
   });
-
-  await s.test('with the room an 8Gi count never had, it is admitted at 2560Mi', async () => {
+  s.test('with the room an 8Gi count never had, it is admitted at 2560Mi', async () => {
     machine.availableBytes = 6 * GI;
     const pass = await Effect.runPromise(after.engine.tick());
     assert.equal(pass.views.find((v) => v.id === id)?.admission, 'admitted');
   });
-
-  await s.test(
-    'it starts under the defaults in force then: its `starting` entry, its attempt and its spawn request say the same',
-    async () => {
-      await Effect.runPromise(after.engine.tick());
-      const resized = { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } };
-      assert.deepEqual((await journal.read(id)).find((e) => e.kind === 'starting')?.resources, resized);
-      assert.deepEqual((await Effect.runPromise(after.engine.view(id))).state.attempts[0]?.resources, resized);
-      assert.deepEqual(
-        after.asked.map((r) => r.resources),
-        [resized],
-      );
-    },
-  );
-
-  await s.test(
+  s.test('it starts under the defaults in force then: its `starting` entry, its attempt and its spawn request say the same', async () => {
+    await Effect.runPromise(after.engine.tick());
+    const resized = { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } };
+    assert.deepEqual((await journal.read(id)).find((e) => e.kind === 'starting')?.resources, resized);
+    assert.deepEqual((await Effect.runPromise(after.engine.view(id))).state.attempts[0]?.resources, resized);
+    assert.deepEqual(
+      after.asked.map((r) => r.resources),
+      [resized],
+    );
+  });
+  s.test(
     'resized again to a 6Gi request, the running session is still counted at the 2560Mi it started under: a 10Gi task of its own fits the 12.5Gi that leaves, where 9Gi would not hold it',
     async () => {
       machine.availableBytes = 14 * GI;
@@ -497,18 +484,26 @@ test("a task queued under one default and admitted under a smaller one counts at
   );
 });
 
-test("a task that asks 64Mi is admitted while the room is under the engine's default request, one with none of its own waits for memory, judged after it in id order within the millisecond, and the small one starts under its request and the engine's default limit, as a LimitRange's default limit lands on a container that names a request alone", async (t) => {
-  const s = story(t);
-  const journal = memoryJournal();
-  const sessions = new Map<string, Sighting>();
+describe("a task that asks 64Mi is admitted while the room is under the engine's default request, one with none of its own waits for memory, judged after it in id order within the millisecond, and the small one starts under its request and the engine's default limit, as a LimitRange's default limit lands on a container that names a request alone", () => {
+  let journal!: AsyncJournal;
+  let sessions!: Map<string, Sighting>;
+  let b!: { engine: import('../src/index.ts').EngineShape; asked: SpawnRequest[] };
+  let small!: string;
+  let plain!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    journal = memoryJournal();
+    sessions = new Map<string, Sighting>();
+    b = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
+    small = await Effect.runPromise(
+      b.engine.file({ id: 'a-receipt', brief: 'receipt', cwd: '/r', queued: true, resources: { requests: { memory: '64Mi' } } }),
+    );
+    plain = await Effect.runPromise(b.engine.file({ id: 'b-session', brief: 'session', cwd: '/r', queued: true }));
+    return t.end;
+  });
+  const s = story(test);
   const machine = { totalBytes: 16 * GI, availableBytes: 2 * GI };
-  const b = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
-  const small = await Effect.runPromise(
-    b.engine.file({ id: 'a-receipt', brief: 'receipt', cwd: '/r', queued: true, resources: { requests: { memory: '64Mi' } } }),
-  );
-  const plain = await Effect.runPromise(b.engine.file({ id: 'b-session', brief: 'session', cwd: '/r', queued: true }));
-
-  await s.test(
+  s.test(
     'on 1Gi of room, the one asking 64Mi is admitted, and the one with none waits for memory, told 2560Mi on the 960Mi the small one leaves',
     async () => {
       const pass = await Effect.runPromise(b.engine.tick());
@@ -516,8 +511,7 @@ test("a task that asks 64Mi is admitted while the room is under the engine's def
       assert.deepEqual(pass.views.find((v) => v.id === plain)?.waits, { for: 'memory', needBytes: 2560 * MI, roomBytes: GI - 64 * MI });
     },
   );
-
-  await s.test("it starts under its own request and the engine's default limit beside it", async () => {
+  s.test("it starts under its own request and the engine's default limit beside it", async () => {
     await Effect.runPromise(b.engine.tick());
     const under = { limits: { memory: '8Gi' }, requests: { memory: '64Mi' } };
     assert.deepEqual((await journal.read(small)).find((e) => e.kind === 'starting')?.resources, under);
@@ -528,21 +522,23 @@ test("a task that asks 64Mi is admitted while the room is under the engine's def
   });
 });
 
-test("the engine's defaults, as its admission holds them: a harness that runs a process here takes them, a remote agent's task and a harness the engine does not have none, and an engine with none gives none", async (t) => {
+describe("the engine's defaults, as its admission holds them: a harness that runs a process here takes them, a remote agent's task and a harness the engine does not have none, and an engine with none gives none", () => {
+  let sized!: ((harness: string | undefined) => import('../src/core/state.ts').TaskResources | undefined) | undefined;
+  beforeAll(() => {
+    sized = defaultsOf({ defaultLimits: { memory: '8Gi' }, defaultRequests: { memory: '2560Mi' } });
+  });
   const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(new Map())), remote: { url: 'https://a.example' } };
   const defaultsOf = (options: Pick<EngineOptions, 'defaultLimits' | 'defaultRequests'>) =>
     Effect.runSync(Effect.provide(Effect.service(Admission), admissionOf({ root: '/r', ...options }, harnesses))).defaultsOf;
-  const sized = defaultsOf({ defaultLimits: { memory: '8Gi' }, defaultRequests: { memory: '2560Mi' } });
-  await t.test('a harness here', () => assert.deepEqual(sized?.('a'), { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } }));
-  await t.test('a request alone', () =>
-    assert.deepEqual(defaultsOf({ defaultRequests: { memory: '1Gi' } })?.('a'), { requests: { memory: '1Gi' } }),
-  );
-  await t.test("a remote agent's", () => assert.equal(sized?.('remote'), undefined));
-  await t.test('a harness it does not have, and none', () => {
+  test('a harness here', () => assert.deepEqual(sized?.('a'), { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } }));
+  test('a request alone', () =>
+    assert.deepEqual(defaultsOf({ defaultRequests: { memory: '1Gi' } })?.('a'), { requests: { memory: '1Gi' } }));
+  test("a remote agent's", () => assert.equal(sized?.('remote'), undefined));
+  test('a harness it does not have, and none', () => {
     assert.equal(sized?.('gone'), undefined);
     assert.equal(sized?.(undefined), undefined);
   });
-  await t.test('no defaults', () => assert.equal(defaultsOf({}), undefined));
+  test('no defaults', () => assert.equal(defaultsOf({}), undefined));
 });
 
 const T0 = Date.parse('2026-10-04T10:00:00.000Z');
@@ -559,70 +555,61 @@ const under = (ceiling: number, poolOf = ownPool) => ({ ceiling, poolOf });
 const admittedIds = (views: readonly AdmissionView[], rule: AdmissionRule) => toAdmit(views, rule).admit;
 const sharing = (harness: string | undefined) => (harness === 'b' ? 'a' : ownPool(harness));
 
-test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by priority, filing and id, counted at once — and which views hold a slot', async (t) => {
-  await t.test(
-    'holdsSlot: a session at work or quiescent, one starting, and one admitted and not yet started hold a slot; one waiting on a person, held, idle, restarting, between attempts, ending or settled none',
-    () => {
-      for (const phase of ['working', 'quiescent', 'starting'] as const) assert.equal(holdsSlot({ phase }), true, phase);
-      assert.equal(holdsSlot({ phase: 'pending', admission: 'admitted' }), true);
-      assert.equal(holdsSlot({ phase: 'pending', admission: 'queued' }), false);
-      assert.equal(holdsSlot({ phase: 'pending' }), false);
-      for (const phase of [
-        'needs-human',
-        'input-required',
-        'idle',
-        'restarting',
-        'between-attempts',
-        'ending',
-        'succeeded',
-        'failed',
-        'stopped',
-      ] as const)
-        assert.equal(holdsSlot({ phase }), false, phase);
-    },
-  );
-  await t.test(
-    'a task counts at what it runs under: one with none of its own at the defaults the rule holds now, one with its own at them whatever the defaults, a started attempt at what it recorded, and an attempt an older runtime started at its filing',
-    () => {
-      const room = { totalBytes: 16 * GI, availableBytes: 16 * GI, reservedBytes: 15 * GI };
-      const rule: AdmissionRule = {
-        ceiling: 5,
-        poolOf: ownPool,
-        machine: () => room,
-        defaultsOf: () => ({ limits: { memory: '4Gi' }, requests: { memory: '2Gi' } }),
-      };
-      const waitOf = (view: AdmissionView, holders: AdmissionView[] = []) =>
-        toAdmit([...holders, view], rule).waits.find((w) => w.id === view.id)?.wait;
-      assert.deepEqual(waitOf(queued('bare', 1)), { for: 'memory', needBytes: 2 * GI, roomBytes: GI });
-      const own = queued('own', 1);
-      assert.deepEqual(waitOf({ ...own, state: { ...own.state, resources: { limits: { memory: '3Gi' } } } }), {
-        for: 'memory',
-        needBytes: 3 * GI,
-        roomBytes: GI,
-      });
-      const started = (resources?: { limits: { memory: string } }): AdmissionView => ({
-        ...live('held', 'starting'),
-        state: {
-          harness: 'a',
-          resources: { limits: { memory: '512Mi' } },
-          attempts: [{ ended: null, ...(resources ? { resources } : {}) }],
-        },
-      });
-      const small = { ...queued('small', 2), state: { ...queued('small', 2).state, resources: { limits: { memory: '256Mi' } } } };
-      assert.deepEqual(waitOf(small, [started({ limits: { memory: '1Gi' } })]), { for: 'memory', needBytes: GI / 4, roomBytes: 0 });
-      assert.equal(waitOf(small, [started()]), undefined, 'counted at its filed 512Mi: 768Mi of 1Gi');
-    },
-  );
-  await t.test(
-    'toAdmit: a harness that shares a pool counts against its ceiling, listed first so a pool by harness name alone reads two',
-    () => {
-      const views = [live('b-1', 'working', 'b'), live('a-1', 'working'), queued('a-2', 1), queued('b-2', 2, 'b')];
-      assert.deepEqual(admittedIds(views, under(2, sharing)), []);
-      assert.deepEqual(admittedIds(views, under(3, sharing)), ['a-2']);
-      assert.deepEqual(admittedIds(views, under(2)), ['a-2', 'b-2'], 'each its own pool');
-    },
-  );
-  await t.test('toAdmit: the ceiling is counted per pool, and a task with no harness counts in `default`', () => {
+describe('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by priority, filing and id, counted at once — and which views hold a slot', () => {
+  test('holdsSlot: a session at work or quiescent, one starting, and one admitted and not yet started hold a slot; one waiting on a person, held, idle, restarting, between attempts, ending or settled none', () => {
+    for (const phase of ['working', 'quiescent', 'starting'] as const) assert.equal(holdsSlot({ phase }), true, phase);
+    assert.equal(holdsSlot({ phase: 'pending', admission: 'admitted' }), true);
+    assert.equal(holdsSlot({ phase: 'pending', admission: 'queued' }), false);
+    assert.equal(holdsSlot({ phase: 'pending' }), false);
+    for (const phase of [
+      'needs-human',
+      'input-required',
+      'idle',
+      'restarting',
+      'between-attempts',
+      'ending',
+      'succeeded',
+      'failed',
+      'stopped',
+    ] as const)
+      assert.equal(holdsSlot({ phase }), false, phase);
+  });
+  test('a task counts at what it runs under: one with none of its own at the defaults the rule holds now, one with its own at them whatever the defaults, a started attempt at what it recorded, and an attempt an older runtime started at its filing', () => {
+    const room = { totalBytes: 16 * GI, availableBytes: 16 * GI, reservedBytes: 15 * GI };
+    const rule: AdmissionRule = {
+      ceiling: 5,
+      poolOf: ownPool,
+      machine: () => room,
+      defaultsOf: () => ({ limits: { memory: '4Gi' }, requests: { memory: '2Gi' } }),
+    };
+    const waitOf = (view: AdmissionView, holders: AdmissionView[] = []) =>
+      toAdmit([...holders, view], rule).waits.find((w) => w.id === view.id)?.wait;
+    assert.deepEqual(waitOf(queued('bare', 1)), { for: 'memory', needBytes: 2 * GI, roomBytes: GI });
+    const own = queued('own', 1);
+    assert.deepEqual(waitOf({ ...own, state: { ...own.state, resources: { limits: { memory: '3Gi' } } } }), {
+      for: 'memory',
+      needBytes: 3 * GI,
+      roomBytes: GI,
+    });
+    const started = (resources?: { limits: { memory: string } }): AdmissionView => ({
+      ...live('held', 'starting'),
+      state: {
+        harness: 'a',
+        resources: { limits: { memory: '512Mi' } },
+        attempts: [{ ended: null, ...(resources ? { resources } : {}) }],
+      },
+    });
+    const small = { ...queued('small', 2), state: { ...queued('small', 2).state, resources: { limits: { memory: '256Mi' } } } };
+    assert.deepEqual(waitOf(small, [started({ limits: { memory: '1Gi' } })]), { for: 'memory', needBytes: GI / 4, roomBytes: 0 });
+    assert.equal(waitOf(small, [started()]), undefined, 'counted at its filed 512Mi: 768Mi of 1Gi');
+  });
+  test('toAdmit: a harness that shares a pool counts against its ceiling, listed first so a pool by harness name alone reads two', () => {
+    const views = [live('b-1', 'working', 'b'), live('a-1', 'working'), queued('a-2', 1), queued('b-2', 2, 'b')];
+    assert.deepEqual(admittedIds(views, under(2, sharing)), []);
+    assert.deepEqual(admittedIds(views, under(3, sharing)), ['a-2']);
+    assert.deepEqual(admittedIds(views, under(2)), ['a-2', 'b-2'], 'each its own pool');
+  });
+  test('toAdmit: the ceiling is counted per pool, and a task with no harness counts in `default`', () => {
     const views = [
       live('x-1', 'working', 'x'),
       live('x-2', 'working', 'x'),
@@ -643,35 +630,32 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
     assert.deepEqual(admittedIds([bare('d-1'), bare('d-2', 'queued'), queued('def', 1, 'default')], under(1)), [], '`default` is full');
     assert.deepEqual(admittedIds([bare('d-1'), queued('a-1', 1)], under(1)), ['a-1']);
   });
-  await t.test('toAdmit: each task admitted is counted at once, a full pool admits nothing more, and it drains one for one', () => {
+  test('toAdmit: each task admitted is counted at once, a full pool admits nothing more, and it drains one for one', () => {
     const waiting = [queued('a-1', 1), queued('a-2', 2), queued('a-3', 3)];
     assert.deepEqual(admittedIds(waiting, under(2)), ['a-1', 'a-2']);
     const next = [{ ...waiting[0], admission: 'admitted' as const }, { ...waiting[1], admission: 'admitted' as const }, waiting[2]];
     assert.deepEqual(admittedIds(next, under(2)), [], 'the pass after: those two hold their slots');
     assert.deepEqual(admittedIds([next[0], next[2]], under(2)), ['a-3'], 'one ended: exactly one more');
   });
-  await t.test('toAdmit: a session blocked on a person holds no slot, and counts again once it works again', () => {
+  test('toAdmit: a session blocked on a person holds no slot, and counts again once it works again', () => {
     assert.deepEqual(admittedIds([live('a-1', 'needs-human'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), ['a-3']);
     assert.deepEqual(admittedIds([live('a-1', 'working'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), []);
   });
-  await t.test(
-    'toAdmit: the higher priority first, then the earlier filing, then the lower id, each against the order it is given in',
-    () => {
-      assert.deepEqual(
-        admittedIds([queued('first', 1, 'a', 0), queued('after', 9, 'a', 1)], under(1)),
-        ['after'],
-        'priority over the filing',
-      );
-      assert.deepEqual(admittedIds([queued('first', 1), queued('after', 9)], under(1)), ['first'], 'with none, filing order');
-      assert.deepEqual(admittedIds([queued('low', 1, 'a', -1), queued('none', 2)], under(1)), ['none'], 'no priority is 0, above -1');
-      assert.deepEqual(admittedIds([queued('a-a', 20), queued('a-b', 10)], under(1)), ['a-b'], 'the later id filed first');
-      assert.deepEqual(admittedIds([queued('a-b', 5), queued('a-a', 5)], under(1)), ['a-a']);
-      assert.deepEqual(admittedIds([queued('a-a', 5), queued('a-b', 5)], under(1)), ['a-a']);
-      const garbled = { ...queued('a-a', 0), state: { harness: 'a', filedAt: 'garbage' } };
-      assert.deepEqual(admittedIds([garbled, queued('a-b', 50)], under(1)), ['a-b'], 'a time that does not parse goes last');
-    },
-  );
-  await t.test('toAdmit: no ceiling admits nothing, and a task admitted or not queued is never admitted again', () => {
+  test('toAdmit: the higher priority first, then the earlier filing, then the lower id, each against the order it is given in', () => {
+    assert.deepEqual(
+      admittedIds([queued('first', 1, 'a', 0), queued('after', 9, 'a', 1)], under(1)),
+      ['after'],
+      'priority over the filing',
+    );
+    assert.deepEqual(admittedIds([queued('first', 1), queued('after', 9)], under(1)), ['first'], 'with none, filing order');
+    assert.deepEqual(admittedIds([queued('low', 1, 'a', -1), queued('none', 2)], under(1)), ['none'], 'no priority is 0, above -1');
+    assert.deepEqual(admittedIds([queued('a-a', 20), queued('a-b', 10)], under(1)), ['a-b'], 'the later id filed first');
+    assert.deepEqual(admittedIds([queued('a-b', 5), queued('a-a', 5)], under(1)), ['a-a']);
+    assert.deepEqual(admittedIds([queued('a-a', 5), queued('a-b', 5)], under(1)), ['a-a']);
+    const garbled = { ...queued('a-a', 0), state: { harness: 'a', filedAt: 'garbage' } };
+    assert.deepEqual(admittedIds([garbled, queued('a-b', 50)], under(1)), ['a-b'], 'a time that does not parse goes last');
+  });
+  test('toAdmit: no ceiling admits nothing, and a task admitted or not queued is never admitted again', () => {
     assert.deepEqual(admittedIds([queued('w', 1)], { poolOf: ownPool }), []);
     assert.deepEqual(
       admittedIds(
@@ -684,7 +668,7 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
       [],
     );
   });
-  await t.test('toAdmit: a rule unschedulable admits nothing while it says so, and admits again once it does not, asked each time', () => {
+  test('toAdmit: a rule unschedulable admits nothing while it says so, and admits again once it does not, asked each time', () => {
     const waiting = [queued('a-1', 1), queued('a-2', 2)];
     let unschedulable = true;
     const rule = { ...under(2), unschedulable: () => unschedulable };
@@ -808,15 +792,18 @@ const passes = (seed: number, count: number): AdmissionPass[] => {
   return out;
 };
 
-test("admitting, the whole pass: each law design wrote of it, and the order it admits in, holds on 4000 passes from a seed, `admitOne`'s laws being proved by the contract", async (t) => {
-  const all = passes(20261113, 2000);
+describe("admitting, the whole pass: each law design wrote of it, and the order it admits in, holds on 4000 passes from a seed, `admitOne`'s laws being proved by the contract", () => {
+  let all!: AdmissionPass[];
+  beforeAll(() => {
+    all = passes(20261113, 2000);
+  });
   for (const [law, holds] of Object.entries(PASS_LAWS)) {
-    await t.test(law, () => {
+    test(law, () => {
       const broken = all.find((pass) => !holds(pass, admitting(pass)));
       assert.equal(broken, undefined, `${law} is broken on ${JSON.stringify(broken)}`);
     });
   }
-  await t.test('the passes reach every answer: an admission, a slot wait and a memory wait, on a machine read and not', () => {
+  test('the passes reach every answer: an admission, a slot wait and a memory wait, on a machine read and not', () => {
     const answers = all.map(admitting);
     assert.ok(answers.some((o) => o.admit.length > 0));
     assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'slot')));
@@ -840,13 +827,13 @@ test("admitting, the whole pass: each law design wrote of it, and the order it a
   });
 });
 
-test('admitting and roomOf: the rows a person reads the whole pass by', async (t) => {
+describe('admitting and roomOf: the rows a person reads the whole pass by', () => {
   const machine = (totalBytes: number, availableBytes: number, reservedBytes: number): MachineMemory => ({
     totalBytes,
     availableBytes,
     reservedBytes,
   });
-  await t.test('roomOf: the lesser of the total less the floor and every holder, and the available less the floor and the unseen', () => {
+  test('roomOf: the lesser of the total less the floor and every holder, and the available less the floor and the unseen', () => {
     const holders: Holder[] = [
       { pool: 'a', needBytes: 3, running: true },
       { pool: 'b', needBytes: 2, running: false },
@@ -857,7 +844,7 @@ test('admitting and roomOf: the rows a person reads the whole pass by', async (t
     assert.equal(roomOf(machine(2, 2, 1), holders), 2 - 1 - 5, 'below nothing where the machine is already past it');
     assert.equal(roomOf(machine(16, 11, 1), []), 10);
   });
-  await t.test('a waiter that does not fit is passed by a smaller one behind it, and a need of nothing always fits', () => {
+  test('a waiter that does not fit is passed by a smaller one behind it, and a need of nothing always fits', () => {
     const out = admitting({
       ceiling: 5,
       machine: machine(16, 4, 1),
@@ -875,7 +862,7 @@ test('admitting and roomOf: the rows a person reads the whole pass by', async (t
       { id: 'next', wait: { for: 'memory', needBytes: 2, roomBytes: 1 } },
     ]);
   });
-  await t.test('a full pool says slot before memory, and the room told is never below nothing', () => {
+  test('a full pool says slot before memory, and the room told is never below nothing', () => {
     const out = admitting({
       ceiling: 1,
       machine: machine(4, 4, 1),

@@ -4,7 +4,8 @@
  * upgrade` refuses with nothing written; an upgrade with no conflict, up or down; a step's own closeout schema; the factory's rules,
  * `RULES.md`, carried as any file of the tree is; choices made for another version; a status lost; and a swap whose rename fails.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test, vi } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -138,8 +139,8 @@ type Previewed = {
 /** The upgrade `nemia factory diff <args>` previews. */
 const previewOf = async (...args: string[]): Promise<Previewed> => (await main(['factory', 'diff', ...args], noEngine())) as Previewed;
 
-test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir, repo } = await applied('kept');
   await main(['factory', 'add', 'plain', '--volume', `${repo}:rw`], noEngine());
   await main(['factory', 'apply', 'unrendered', '--template', dir, '--volume', `${repo}:rw`, '--set', 'budget=7'], noEngine());
@@ -172,9 +173,9 @@ test('upgrade refuses, writing nothing: no template, no render, a --to that is n
   assert.deepEqual(bytesUnder(FACTORIES), before, 'every refusal writes nothing');
 });
 
-test('an upgrade with no conflict, up or down: filed alone, then merged by the controller', async (t) => {
-  await t.test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async (t) => {
-    t.mock.method(console, 'log', () => {});
+describe('an upgrade with no conflict, up or down: filed alone, then merged by the controller', () => {
+  test('a downgrade asked with --downgrade is filed, and merged as an upgrade is', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('lowered');
     released(dir, '0.0.9', 5);
     await main(['factory', 'upgrade', 'lowered', '--to', '0.0.9', '--downgrade'], noEngine());
@@ -182,84 +183,78 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
     assert.equal(reconciled(templated('lowered')).version, '0.0.9');
     assert.match(textIn(treeDir(ROOT, 'lowered'), REVIEW), /^rounds: 5$/m);
   });
-  await t.test(
-    "a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing",
-    async (t) => {
-      t.mock.method(console, 'log', () => {});
-      const { dir } = await applied('clean');
-      const file = path.join(FACTORIES, 'clean.json');
-      const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
-      rewrite(treeDir(ROOT, 'clean'), REVIEW, 'budget: 7', 'budget: 9');
-      released(dir, '0.2.0', 5);
-      const folder = bytesUnder(path.join(FACTORIES, 'clean'));
-      const filed = await main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine());
-      assert.deepEqual(filed, { name: 'clean', from: '0.1.0', to: '0.2.0', file, dropped: [], conflicts: 0 });
-      assert.deepEqual(
-        JSON.parse(fs.readFileSync(file, 'utf8')),
-        { ...filedAs, template: { ...filedAs.template, version: '0.2.0' }, generation: 2 },
-        'the template wanted is a change of its spec, counted',
-      );
-      assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
-      const status = reconciled(templated('clean'));
-      assert.equal(status.version, '0.2.0');
-      assert.deepEqual(
-        status.conditions.map((c) => [c.type, c.status, c.reason]),
-        [
-          ['Applied', 'True', 'Upgraded'],
-          ['ConflictsPending', 'False', 'Merged'],
-        ],
-      );
-      assert.match(
-        textIn(treeDir(ROOT, 'clean'), REVIEW),
-        /^budget: 9\nloop: implement\nrounds: 5$/m,
-        "the template's change and the person's",
-      );
-      assert.match(textIn(appliedDir(ROOT, 'clean'), REVIEW), /^budget: 7\nloop: implement\nrounds: 5$/m, 'the base is the render');
-      assert.equal(status.digest, digestOf(entriesIn(appliedDir(ROOT, 'clean'))));
-      assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
-      const written = fs.statSync(statusFile(ROOT, 'clean')).mtimeMs;
-      const tree = bytesUnder(treeDir(ROOT, 'clean'));
-      assert.deepEqual(reconciled(templated('clean')), status);
-      assert.equal(fs.statSync(statusFile(ROOT, 'clean')).mtimeMs, written, 'a second pass writes no status');
-      assert.deepEqual(bytesUnder(treeDir(ROOT, 'clean')), tree, 'nor a tree');
-      await assert.rejects(
-        main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine()),
-        refusedWith('Conflict', /clean is already applied at 0\.2\.0/),
-      );
-    },
-  );
+  test("a clean upgrade writes the factory's file alone; the controller swaps the tree, then the base, and a second pass writes nothing", async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { dir } = await applied('clean');
+    const file = path.join(FACTORIES, 'clean.json');
+    const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
+    rewrite(treeDir(ROOT, 'clean'), REVIEW, 'budget: 7', 'budget: 9');
+    released(dir, '0.2.0', 5);
+    const folder = bytesUnder(path.join(FACTORIES, 'clean'));
+    const filed = await main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine());
+    assert.deepEqual(filed, { name: 'clean', from: '0.1.0', to: '0.2.0', file, dropped: [], conflicts: 0 });
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(file, 'utf8')),
+      { ...filedAs, template: { ...filedAs.template, version: '0.2.0' }, generation: 2 },
+      'the template wanted is a change of its spec, counted',
+    );
+    assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
+    const status = reconciled(templated('clean'));
+    assert.equal(status.version, '0.2.0');
+    assert.deepEqual(
+      status.conditions.map((c) => [c.type, c.status, c.reason]),
+      [
+        ['Applied', 'True', 'Upgraded'],
+        ['ConflictsPending', 'False', 'Merged'],
+      ],
+    );
+    assert.match(
+      textIn(treeDir(ROOT, 'clean'), REVIEW),
+      /^budget: 9\nloop: implement\nrounds: 5$/m,
+      "the template's change and the person's",
+    );
+    assert.match(textIn(appliedDir(ROOT, 'clean'), REVIEW), /^budget: 7\nloop: implement\nrounds: 5$/m, 'the base is the render');
+    assert.equal(status.digest, digestOf(entriesIn(appliedDir(ROOT, 'clean'))));
+    assert.equal(fs.statSync(path.join(appliedDir(ROOT, 'clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
+    const written = fs.statSync(statusFile(ROOT, 'clean')).mtimeMs;
+    const tree = bytesUnder(treeDir(ROOT, 'clean'));
+    assert.deepEqual(reconciled(templated('clean')), status);
+    assert.equal(fs.statSync(statusFile(ROOT, 'clean')).mtimeMs, written, 'a second pass writes no status');
+    assert.deepEqual(bytesUnder(treeDir(ROOT, 'clean')), tree, 'nor a tree');
+    await assert.rejects(
+      main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine()),
+      refusedWith('Conflict', /clean is already applied at 0\.2\.0/),
+    );
+  });
 });
 
-test('a switch onto a template of another name is judged by no version: neither already applied at the same number nor a downgrade', async (t) => {
+describe('a switch onto a template of another name is judged by no version: neither already applied at the same number nor a downgrade', () => {
   for (const [name, version] of [
     ['level', '0.1.0'],
     ['below', '0.0.9'],
   ] as const)
-    await t.test(
-      `the other template at ${version}, the base at 0.1.0: previewed, then filed with its plan and no --downgrade`,
-      async (t) => {
-        t.mock.method(console, 'log', () => {});
-        const { dir } = await applied(name);
-        const other = path.join(scratch('wf-upgrade-other-'), 'renamed');
-        fs.cpSync(dir, other, { recursive: true });
-        const manifest = parse(fs.readFileSync(path.join(other, 'nemia.yaml'), 'utf8'));
-        manifest.metadata.name = 'renamed';
-        fs.writeFileSync(path.join(other, 'nemia.yaml'), stringify(manifest, { lineWidth: 0 }));
-        released(other, version, 5);
-        const preview = await previewOf(name, '--to', version, '--template', other);
-        assert.deepEqual([preview.switched, preview.from, preview.to], [{ from: 'team', to: 'renamed' }, '0.1.0', version]);
-        const { line } = preview.next;
-        assert.doesNotMatch(line, /--downgrade/);
-        const plan = /--plan (sha256:[0-9a-f]{64})/.exec(line)?.[1];
-        assert.ok(plan, line);
-        await main(['factory', 'upgrade', name, '--to', version, '--template', other, '--plan', plan], noEngine());
-        assert.deepEqual([templated(name).template.version, templated(name).template.source], [version, other]);
-      },
-    );
+    test(`the other template at ${version}, the base at 0.1.0: previewed, then filed with its plan and no --downgrade`, async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const { dir } = await applied(name);
+      const other = path.join(scratch('wf-upgrade-other-'), 'renamed');
+      fs.cpSync(dir, other, { recursive: true });
+      const manifest = parse(fs.readFileSync(path.join(other, 'nemia.yaml'), 'utf8'));
+      manifest.metadata.name = 'renamed';
+      fs.writeFileSync(path.join(other, 'nemia.yaml'), stringify(manifest, { lineWidth: 0 }));
+      released(other, version, 5);
+      const preview = await previewOf(name, '--to', version, '--template', other);
+      assert.deepEqual([preview.switched, preview.from, preview.to], [{ from: 'team', to: 'renamed' }, '0.1.0', version]);
+      const { line } = preview.next;
+      assert.doesNotMatch(line, /--downgrade/);
+      const plan = /--plan (sha256:[0-9a-f]{64})/.exec(line)?.[1];
+      assert.ok(plan, line);
+      await main(['factory', 'upgrade', name, '--to', version, '--template', other, '--plan', plan], noEngine());
+      assert.deepEqual([templated(name).template.version, templated(name).template.source], [version, other]);
+    });
 });
 
-test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('an upgrade onto a template that declares other parameters: --set given, the undeclared dropped and named, held to the previewed plan', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('onto');
   const other = path.join(scratch('wf-upgrade-other-'), 'team');
   fs.cpSync(dir, other, { recursive: true });
@@ -325,8 +320,8 @@ test('an upgrade onto a template that declares other parameters: --set given, th
   assert.match(textIn(appliedDir(ROOT, 'onto'), REVIEW), /^budget: 9$/m, 'rendered with the --set');
 });
 
-test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async (t) => {
-  t.mock.method(console, 'log', () => {});
+test("a step's own closeout schema carried by an upgrade: its line merged into a step the person changed, its file beside it", async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('schemed');
   const IMPLEMENT = 'workflows/dev/implement.md';
   const SCHEMA = 'workflows/dev/implement.schema.json';
@@ -348,9 +343,9 @@ test("a step's own closeout schema carried by an upgrade: its line merged into a
   assert.equal(textIn(appliedDir(ROOT, 'schemed'), SCHEMA), STEP_OUTPUT_SCHEMA);
 });
 
-test("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", async (t) => {
-  await t.test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async (t) => {
-    t.mock.method(console, 'log', () => {});
+describe("a factory's rules carried by an upgrade: taken where the tree has none, a conflict where both added them, merged by line", () => {
+  test("a factory's rules are carried by an upgrade: taken from a template that adds them, where the tree has none", async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('ruled');
     assert.equal(fs.existsSync(path.join(treeDir(ROOT, 'ruled'), RULES)), false, 'the template had none, and the tree has none');
     released(dir, '0.2.0', 5);
@@ -368,37 +363,34 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
       error: null,
     });
   });
-  await t.test(
-    'rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a Factory proposal that a pass leaves fresh',
-    async (t) => {
-      t.mock.method(console, 'log', () => {});
-      const { dir } = await applied('both');
-      await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
-      assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
-      released(dir, '0.2.0', 5);
-      fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
-      await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
-      const waiting = reconciled(templated('both'));
-      assert.equal(waiting.version, '0.1.0');
-      assert.deepEqual(waiting.upgrade?.conflicts, [
-        { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
-      ]);
-      assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
-      await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
-      const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'both'), 'utf8')).proposals?.['Factory/both'] ?? '';
-      assert.ok(proposal, 'the rules are proposed as the Factory');
-      const recorded = reconciled(templated('both'));
-      assert.equal(recorded.version, '0.1.0', 'the merge waits on the proposal');
-      assert.deepEqual(recorded.upgrade?.conflicts[0]?.proposal, { name: proposal, phase: 'waiting' }, 'the status names it');
-      await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT }));
-      const merged = reconciled(templated('both'));
-      assert.equal(merged.version, '0.2.0');
-      assert.equal(merged.upgrade, undefined);
-      assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Theirs: never push on a Friday.\n');
-    },
-  );
-  await t.test('rules changed by the person and by the template on different lines, from a common base, merge by line', async (t) => {
-    t.mock.method(console, 'log', () => {});
+  test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a Factory proposal that a pass leaves fresh', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { dir } = await applied('both');
+    await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
+    assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
+    released(dir, '0.2.0', 5);
+    fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
+    await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
+    const waiting = reconciled(templated('both'));
+    assert.equal(waiting.version, '0.1.0');
+    assert.deepEqual(waiting.upgrade?.conflicts, [
+      { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
+    ]);
+    assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
+    await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
+    const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'both'), 'utf8')).proposals?.['Factory/both'] ?? '';
+    assert.ok(proposal, 'the rules are proposed as the Factory');
+    const recorded = reconciled(templated('both'));
+    assert.equal(recorded.version, '0.1.0', 'the merge waits on the proposal');
+    assert.deepEqual(recorded.upgrade?.conflicts[0]?.proposal, { name: proposal, phase: 'waiting' }, 'the status names it');
+    await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT }));
+    const merged = reconciled(templated('both'));
+    assert.equal(merged.version, '0.2.0');
+    assert.equal(merged.upgrade, undefined);
+    assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Theirs: never push on a Friday.\n');
+  });
+  test('rules changed by the person and by the template on different lines, from a common base, merge by line', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     const lines = ['Never push on a Friday.', '', 'Write the tests first.', '', 'Ask before a migration.', ''];
     const { dir } = await applied('lined', lines.join('\n'));
     assert.equal(textIn(treeDir(ROOT, 'lined'), RULES), lines.join('\n'));
@@ -416,8 +408,8 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
   });
 });
 
-test('choices made for another version are not merged, and the next resolve drops them', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('choices made for another version are not merged, and the next resolve drops them', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('stale');
   rewrite(treeDir(ROOT, 'stale'), REVIEW, 'rounds: 3', 'rounds: 4');
   rewrite(treeDir(ROOT, 'stale'), README, '# dev\n', '# dev, ours\n');
@@ -454,8 +446,8 @@ test('choices made for another version are not merged, and the next resolve drop
   );
 });
 
-test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with text its step does not read; the choice stays a draft", async (t) => {
-  t.mock.method(console, 'log', () => {});
+test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with text its step does not read; the choice stays a draft", async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('unread');
   rewrite(treeDir(ROOT, 'unread'), REVIEW, 'rounds: 3', 'rounds: 4');
   released(dir, '0.2.0', 5);
@@ -471,9 +463,9 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
 /** The plan's digest `nemia factory diff` previewed in `preview`, and the line that files it. */
 const planIn = (preview: Previewed): { plan: string; line: string } => ({ plan: preview.next.digest, line: preview.next.line });
 
-test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {
-  await t.test("it merges with no conflict, and the factory's file records the new value", async (t) => {
-    t.mock.method(console, 'log', () => {});
+describe('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', () => {
+  test("it merges with no conflict, and the factory's file records the new value", async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     await applied('reset');
     const file = path.join(FACTORIES, 'reset.json');
     const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -515,8 +507,8 @@ test('a parameter set again at the version applied: previewed, filed with its pl
     assert.match(textIn(appliedDir(ROOT, 'reset'), REVIEW), /^budget: 9\nloop: implement\nrounds: 3$/m, 'the base is the new render');
     await assert.rejects(upgrade(), refusedWith('Conflict', /reset is already applied at 0\.1\.0/));
   });
-  await t.test('REFUSED Conflict, nothing written: a --set at the version applied, where the template changed under it', async (t) => {
-    t.mock.method(console, 'log', () => {});
+  test('REFUSED Conflict, nothing written: a --set at the version applied, where the template changed under it', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     const { dir } = await applied('edited');
     edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
       spec.steps[1].rounds = 5;
@@ -529,53 +521,50 @@ test('a parameter set again at the version applied: previewed, filed with its pl
       );
     assert.deepEqual(bytesUnder(FACTORIES), before);
   });
-  await t.test(
-    'a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes',
-    async (t) => {
-      t.mock.method(console, 'log', () => {});
-      await applied('clash');
-      const set = async (value: number) => {
-        const sets = ['--to', '0.1.0', '--set', `budget=${value}`];
-        const { plan } = planIn(await previewOf('clash', ...sets));
-        await main(['factory', 'upgrade', 'clash', ...sets, '--plan', plan], noEngine());
-      };
-      rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 7', 'budget: 8');
-      await set(9);
-      const waiting = reconciled(templated('clash'));
-      assert.deepEqual(
-        [waiting.conditions[1].status, waiting.conditions[1].reason, waiting.upgrade?.conflicts.map((c) => c.at)],
-        ['True', 'Conflicts', [`${REVIEW}#budget`]],
-      );
-      assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 8$/m, 'left as it is while the conflict waits');
-      await main(['factory', 'resolve', 'clash', `${REVIEW}#budget`, '--theirs'], noEngine());
-      const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'clash'), 'utf8'));
-      const proposal: string = resolutions.proposals?.['Workflow/dev'] ?? '';
-      assert.deepEqual(resolutions, {
-        to: '0.1.0',
-        template: 'team',
-        base: digestOf(entriesIn(appliedDir(ROOT, 'clash'))),
-        choices: { [`${REVIEW}#budget`]: 'theirs' },
-        proposals: { 'Workflow/dev': proposal },
-      });
-      assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
-      await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT }));
-      assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
-      assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 9$/m);
-      rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 9', 'budget: 6');
-      await set(11);
-      const again = reconciled(templated('clash'));
-      assert.deepEqual(
-        again.upgrade?.conflicts.map((c) => c.at),
-        [`${REVIEW}#budget`],
-        'the choice made before the last merge landed answers no conflict of the next',
-      );
-      assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 6$/m);
-    },
-  );
+  test('a conflict at the version applied waits for a choice, made against its base, which no later change at that version takes', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await applied('clash');
+    const set = async (value: number) => {
+      const sets = ['--to', '0.1.0', '--set', `budget=${value}`];
+      const { plan } = planIn(await previewOf('clash', ...sets));
+      await main(['factory', 'upgrade', 'clash', ...sets, '--plan', plan], noEngine());
+    };
+    rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 7', 'budget: 8');
+    await set(9);
+    const waiting = reconciled(templated('clash'));
+    assert.deepEqual(
+      [waiting.conditions[1].status, waiting.conditions[1].reason, waiting.upgrade?.conflicts.map((c) => c.at)],
+      ['True', 'Conflicts', [`${REVIEW}#budget`]],
+    );
+    assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 8$/m, 'left as it is while the conflict waits');
+    await main(['factory', 'resolve', 'clash', `${REVIEW}#budget`, '--theirs'], noEngine());
+    const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'clash'), 'utf8'));
+    const proposal: string = resolutions.proposals?.['Workflow/dev'] ?? '';
+    assert.deepEqual(resolutions, {
+      to: '0.1.0',
+      template: 'team',
+      base: digestOf(entriesIn(appliedDir(ROOT, 'clash'))),
+      choices: { [`${REVIEW}#budget`]: 'theirs' },
+      proposals: { 'Workflow/dev': proposal },
+    });
+    assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
+    await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT }));
+    assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
+    assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 9$/m);
+    rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 9', 'budget: 6');
+    await set(11);
+    const again = reconciled(templated('clash'));
+    assert.deepEqual(
+      again.upgrade?.conflicts.map((c) => c.at),
+      [`${REVIEW}#budget`],
+      'the choice made before the last merge landed answers no conflict of the next',
+    );
+    assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 6$/m);
+  });
 });
 
-test('a status lost while an upgrade waits leaves the version unknown, and an upgrade naming the base version brings it back', async (t) => {
-  t.mock.method(console, 'log', () => {});
+test('a status lost while an upgrade waits leaves the version unknown, and an upgrade naming the base version brings it back', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('lost');
   const old = path.join(scratch('wf-upgrade-old-'), 'team');
   fs.cpSync(dir, old, { recursive: true });
@@ -604,15 +593,15 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   assert.match(textIn(treeDir(ROOT, 'lost'), REVIEW), /^rounds: 5$/m);
 });
 
-test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async (t) => {
-  t.mock.method(console, 'log', () => {});
+test("a swap whose new tree cannot be renamed in puts the person's tree back, or keeps it aside and says where", async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   await applied('stuck');
   rewrite(treeDir(ROOT, 'stuck'), REVIEW, 'budget: 7', 'budget: 8');
   const tree = bytesUnder(treeDir(ROOT, 'stuck'));
   const merge = entriesIn(appliedDir(ROOT, 'stuck'));
   const rename = fs.renameSync;
   const renamingIn = (from: fs.PathLike, to: fs.PathLike) => to === treeDir(ROOT, 'stuck') && !String(from).endsWith('.old');
-  const failing = t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+  const failing = vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (renamingIn(from, to)) throw Object.assign(new Error('EIO: i/o error, rename'), { code: 'EIO' });
     rename(from, to);
   });
@@ -620,11 +609,11 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
     () => swapTree(ROOT, 'stuck', merge, digestOf(entriesIn(treeDir(ROOT, 'stuck')))),
     (err: Error) => /EIO/.test(err.message),
   );
-  failing.mock.restore();
+  failing.mockRestore();
   assert.deepEqual(bytesUnder(treeDir(ROOT, 'stuck')), tree, "the person's tree is put back whole");
   assert.deepEqual(fs.readdirSync(path.join(FACTORIES, 'stuck')).sort(), ['applied', 'status.json', 'tree']);
 
-  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+  vi.spyOn(fs, 'renameSync').mockImplementation((from: fs.PathLike, to: fs.PathLike) => {
     if (renamingIn(from, to)) fs.mkdirSync(path.join(treeDir(ROOT, 'stuck'), 'seeded'), { recursive: true });
     rename(from, to);
   });
@@ -643,13 +632,19 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
 const handledWith = <D extends object>(builtins: string, command: Served<D>, args: Args) =>
   runWith(noEngine(), withBuiltins(command.handler(args), builtins));
 
-test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
-  t.mock.method(console, 'log', () => {});
-  const { dir } = await applied('from-folder');
-  const builtins = scratch('wf-upgrade-builtins-');
-  fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
-  released(path.join(builtins, 'team'), '0.2.0', 5);
-  await t.test('REFUSED Missing, nothing written: diff and upgrade to a name no builtin template has', async () => {
+describe('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', () => {
+  let dir!: string;
+  let builtins!: string;
+  beforeAll(async () => {
+    const t = teardowns();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    ({ dir } = await applied('from-folder'));
+    builtins = scratch('wf-upgrade-builtins-');
+    fs.cpSync(dir, path.join(builtins, 'team'), { recursive: true });
+    released(path.join(builtins, 'team'), '0.2.0', 5);
+    return t.end;
+  });
+  test('REFUSED Missing, nothing written: diff and upgrade to a name no builtin template has', async () => {
     const before = bytesUnder(ROOT);
     for (const command of [FACTORY_PLAN, FACTORY_UPGRADE] as Served<object>[])
       await assert.rejects(
@@ -658,15 +653,15 @@ test('--template names a builtin template by its name: an upgrade records the na
       );
     assert.deepEqual(bytesUnder(ROOT), before);
   });
-  await t.test('a factory applied from a folder, upgraded with --template <name>, records the name', async () => {
+  test('a factory applied from a folder, upgraded with --template <name>, records the name', async () => {
     await handledWith(builtins, FACTORY_UPGRADE, { factory: 'from-folder', to: '0.2.0', template: 'team' });
     assert.deepEqual(templated('from-folder').template.source, 'team');
     assert.equal(programsAt(ROOT, builtins).reconciled(templated('from-folder')).conditions[0].reason, 'Upgraded');
   });
 });
 
-test("a conflict's resolution is checked against the tree the upgrade composes: a tally reading a field the same upgrade adds to an agent's schema", async (t) => {
-  t.mock.method(console, 'log', () => {});
+test("a conflict's resolution is checked against the tree the upgrade composes: a tally reading a field the same upgrade adds to an agent's schema", async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const { dir } = await applied('tallied');
   const [given, schema] = ['agents/reviewer/output.schema.json', 'workflows/agents/reviewer.schema.json'];
   const doc = JSON.parse(textIn(dir, given));

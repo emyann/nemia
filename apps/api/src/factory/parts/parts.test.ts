@@ -5,7 +5,7 @@
  * warm list is answered from it, and judged afresh under `WF_VERIFY_REST=1`.
  */
 import { root } from '../../../test/harness.ts';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

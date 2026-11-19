@@ -3,7 +3,7 @@
  * every column when asked wide, the `Labels` column with its labels, a column per label key off each row's object's labels, a cell with
  * nothing in it `<none>`. The client and the api's MCP port print with it.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { type Table, tableLines } from 'objects';
 

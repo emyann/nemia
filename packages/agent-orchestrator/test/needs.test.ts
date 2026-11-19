@@ -12,7 +12,8 @@
  * as the daemon's sweep does. The test's store is its own, at `ROOT`, given as `ENV`; the PATH its checks inherit holds no harness's
  * program of the machine's, so only what a checkpoint plants is found.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -95,18 +96,23 @@ const refusedBy = async (promise: Promise<unknown>): Promise<unknown> => {
   return assert.fail('it was not refused');
 };
 
-test("a fresh run waits on its harness's needs until a signed-in program is in the tools folder, and a removal waits on the runs that need it", async (t) => {
-  const s = story(t);
-  const memo = needsMemo(ROOT, 2_000);
-  const b = stage.board();
+describe("a fresh run waits on its harness's needs until a signed-in program is in the tools folder, and a removal waits on the runs that need it", () => {
+  let memo!: import('../src/runner.ts').NeedsMemo;
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    memo = needsMemo(ROOT, 2_000);
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const given = <A, E, R>(program: Effect.Effect<A, E, R>) => program.pipe(Effect.provideService(NeedsMemory, memo));
   const tick = (id: string) => stage.runWith(b.e, given(advanceRun(runRecord(ROOT, id))));
   const read = async (id: string) => (await stage.runWith(b.e, given(readRun(b.e, runRecord(ROOT, id))))).read;
   const listed = async (id: string) => (await stage.runWith(b.e, given(list(b.e, runRecord(ROOT, id))))).steps.map((r) => r.message);
   const sweep = () => stage.runPlaced(needsOnce(memo));
   let id = '';
-
-  await s.test('a fresh run of a workflow naming no harness waits on the default harness while the tools folder has none', async () => {
+  s.test('a fresh run of a workflow naming no harness waits on the default harness while the tools folder has none', async () => {
     id = (await stage.runPlaced(startRun({ brief: 'build it', repo: aRepo(), workflowDir: workflow('Builds a thing.\n') }))).id;
     await sweep();
     await tick(id);
@@ -118,16 +124,14 @@ test("a fresh run waits on its harness's needs until a signed-in program is in t
     const [words] = await listed(id);
     assert.ok((words ?? '').startsWith(`waiting on ${DEFAULT_HARNESS}: nemia doctor fix ${DEFAULT_HARNESS}`), words);
   });
-
-  await s.test('a signed-in program planted in the tools folder starts it on the pass after the sweep', async () => {
+  s.test('a signed-in program planted in the tools folder starts it on the pass after the sweep', async () => {
     fs.mkdirSync(toolsBinDir(ROOT), { recursive: true });
     fs.writeFileSync(path.join(toolsBinDir(ROOT), DEFAULT_HARNESS), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     await sweep();
     await tick(id);
     assert.deepEqual(b.filings, [`${id}-implement`]);
   });
-
-  await s.test("a step on another harness adds that harness's two needs", async () => {
+  s.test("a step on another harness adds that harness's two needs", async () => {
     const other = (
       await stage.runPlaced(
         startRun({ brief: 'build it', repo: aRepo(), workflowDir: workflow('Builds.\n', `place: git\nharness: ${OTHER}`) }),
@@ -139,8 +143,7 @@ test("a fresh run waits on its harness's needs until a signed-in program is in t
     assert.ok(!names.includes(DEFAULT_HARNESS), 'and none of a harness it does not run on');
     await stage.runWith(b.e, cancelRun(other));
   });
-
-  await s.test(
+  s.test(
     'the removal of the harness is refused while a run that needs it is unfinished, naming its cancel, and let through once it is',
     async () => {
       const removal = { need: DEFAULT_HARNESS, index: 1 };
@@ -156,24 +159,28 @@ test("a fresh run waits on its harness's needs until a signed-in program is in t
       assert.equal(fix.need, DEFAULT_HARNESS);
     },
   );
-
-  await s.test('a sign-in a person types is refused, never started', async () => {
+  s.test('a sign-in a person types is refused, never started', async () => {
     const typed = await refusedBy(stage.runWith(b.e, given(startFix({ need: signInNeedOf(DEFAULT_HARNESS) }))));
     assert.ok(typed instanceof Invalid, String(typed));
     assert.equal(typed.exitCode, 2);
   });
 });
 
-test('a fresh run waits on a missing need of its workflow, starts once it is met, and a run under way is never held by one', async (t) => {
-  const s = story(t);
-  const memo = needsMemo(ROOT, 2_000);
-  const b = stage.board();
+describe('a fresh run waits on a missing need of its workflow, starts once it is met, and a run under way is never held by one', () => {
+  let memo!: import('../src/runner.ts').NeedsMemo;
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    memo = needsMemo(ROOT, 2_000);
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const tick = (id: string) => stage.runWith(b.e, advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
   const listed = async (id: string) =>
     (await stage.runWith(b.e, list(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)))).steps.map((r) => r.message);
   let id = '';
-
-  await s.test('a fresh run of a workflow whose need reads missing files nothing, holds no slot, and says what it waits on', async () => {
+  s.test('a fresh run of a workflow whose need reads missing files nothing, holds no slot, and says what it waits on', async () => {
     fs.rmSync(FLAG, { force: true });
     id = (await stage.runPlaced(startRun({ brief: 'build it', repo: aRepo(), workflowDir: needing() }))).id;
     await tick(id);
@@ -192,15 +199,13 @@ test('a fresh run waits on a missing need of its workflow, starts once it is met
     const [words] = await listed(id);
     assert.match(words ?? '', /^waiting on tool: /);
   });
-
-  await s.test('once the sweep reads the need met, the next pass files the first step', async () => {
+  s.test('once the sweep reads the need met, the next pass files the first step', async () => {
     fs.writeFileSync(FLAG, '');
     await stage.runPlaced(needsOnce(memo));
     await tick(id);
     assert.deepEqual(b.filings, [`${id}-implement`]);
   });
-
-  await s.test('a run that has filed a step is not held when the need lapses', async () => {
+  s.test('a run that has filed a step is not held when the need lapses', async () => {
     fs.rmSync(FLAG, { force: true });
     await stage.runPlaced(needsOnce(memo));
     const { read } = await stage.runWith(b.e, readRun(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
@@ -209,10 +214,16 @@ test('a fresh run waits on a missing need of its workflow, starts once it is met
   });
 });
 
-test("a run's workflow need of scope repository is checked in the run's repository, where the same check unscoped holds it", async (t) => {
-  const s = story(t);
-  const memo = needsMemo(ROOT, 2_000);
-  const b = stage.board();
+describe("a run's workflow need of scope repository is checked in the run's repository, where the same check unscoped holds it", () => {
+  let memo!: import('../src/runner.ts').NeedsMemo;
+  let b!: import('./story.ts').Board;
+  beforeAll(() => {
+    const t = teardowns();
+    memo = needsMemo(ROOT, 2_000);
+    b = stage.board();
+    return t.end;
+  });
+  const s = story(test);
   const tick = (id: string) => stage.runWith(b.e, advanceRun(runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
   const marked = (): string => {
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -232,14 +243,12 @@ test("a run's workflow need of scope repository is checked in the run's reposito
         '',
       ].join('\n'),
     );
-
-  await s.test("scoped to the repository, the need reads met in the run's repository and the first step is filed", async () => {
+  s.test("scoped to the repository, the need reads met in the run's repository and the first step is filed", async () => {
     const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped(['    scope: repository']) }))).id;
     await tick(id);
     assert.deepEqual(b.filings, [`${id}-implement`]);
   });
-
-  await s.test("with no scope, the same check reads the store's folder, and the run waits on it", async () => {
+  s.test("with no scope, the same check reads the store's folder, and the run waits on it", async () => {
     const before = b.filings.length;
     const id = (await stage.runPlaced(startRun({ brief: 'build it', repo: marked(), workflowDir: scoped([]) }))).id;
     await tick(id);
@@ -250,8 +259,7 @@ test("a run's workflow need of scope repository is checked in the run's reposito
       ['inside'],
     );
   });
-
-  await s.test('scoped to the repository, a run in a folder, which has no repository, waits on it, never checked', async () => {
+  s.test('scoped to the repository, a run in a folder, which has no repository, waits on it, never checked', async () => {
     const before = b.filings.length;
     const dir = workflow(
       [

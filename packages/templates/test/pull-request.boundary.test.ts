@@ -15,7 +15,7 @@
  *
  * Its subject is git and a spawned script: a boundary file.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';

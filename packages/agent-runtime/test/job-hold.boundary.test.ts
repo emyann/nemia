@@ -12,7 +12,8 @@
  *
  * A boundary test: real processes, the bin's and the Claude Code the SDK spawns for it.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -67,7 +68,7 @@ const answered = (dir: string, event: string): number =>
  * request, its poll shortened, `holdMs` where given. Its stdin is ended at its first result line, as the worker ends it (`closesOn`).
  * Killed at the test's end, with its Claude Code, where either outlived it.
  */
-const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?: number } = {}) => {
+const job = (t: { onTestFinished: (f: () => void) => void }, plan: object, io: { holdMs?: number } = {}) => {
   const root = scratch('ae-job-hold-');
   const dir = path.join(root, 'work');
   fs.mkdirSync(dir, { recursive: true });
@@ -107,7 +108,7 @@ const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?:
       return undefined;
     }
   };
-  t.after(() => {
+  t.onTestFinished(() => {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     const claude = claudePid();
     if (claude !== undefined && alive(claude)) process.kill(claude, 'SIGKILL');
@@ -125,14 +126,18 @@ const job = (t: { after: (f: () => void) => void }, plan: object, io: { holdMs?:
   };
 };
 
-test(
+describe(
   'a Claude Code job under the sessions’ drain: finishes its call, held at the next, cut past the grace, parked past its bound',
   WAITED,
-  async (t) => {
-    const s = story(t);
-    const a = job(t, { call: 'Bash', next: 'Edit' });
-
-    await s.test('drained with a call in flight: the hold file says draining, and the call finishes', async (c) => {
+  () => {
+    let a!: ReturnType<typeof job>;
+    beforeAll(() => {
+      const t = teardowns();
+      a = job(t, { call: 'Bash', next: 'Edit' });
+      return t.end;
+    });
+    const s = story(test);
+    s.test('drained with a call in flight: the hold file says draining, and the call finishes', async (c) => {
       await until(
         c,
         () => a.hold()?.calling?.tool === 'Bash',
@@ -159,8 +164,7 @@ test(
       assert.ok(a.hold()?.draining, 'still draining');
       assert.equal(a.hold()?.parked, undefined, 'and not parked: its call finished within the grace');
     });
-
-    await s.test('the next call waits at its hook, the hold file saying it is held back', async (c) => {
+    s.test('the next call waits at its hook, the hold file saying it is held back', async (c) => {
       a.release('next');
       await until(
         c,
@@ -171,8 +175,7 @@ test(
       assert.equal(answered(a.dir, 'PreToolUse'), 1, 'the held call’s hook is not answered: only the first call’s was');
       assert.equal(a.hold()?.calling, undefined, 'and the held call is not in flight');
     });
-
-    await s.test('lifted: the held call runs, and draining and heldBack clear', async (c) => {
+    s.test('lifted: the held call runs, and draining and heldBack clear', async (c) => {
       liftSessionDrain(a.root);
       await until(
         c,
@@ -188,9 +191,8 @@ test(
       assert.equal(code, 0, `the job ran to its end: ${a.err()}`);
       assert.equal(a.hold()?.parked, undefined, 'never parked');
     });
-
-    await s.test('grace 0 with a call in flight: the job parks with the call it cut, and leaves with its Claude Code gone', async (c) => {
-      const b = job(t, { call: 'Bash', cost: 0.25 });
+    s.test('grace 0 with a call in flight: the job parks with the call it cut, and leaves with its Claude Code gone', async (c) => {
+      const b = job(c, { call: 'Bash', cost: 0.25 });
       await until(
         c,
         () => b.hold()?.calling?.tool === 'Bash',
@@ -213,9 +215,8 @@ test(
       assert.equal(result?.total_cost_usd, 0.25, 'the cut turn’s result was printed, with its cost');
       assert.equal(wrote(b.dir, 'cost-state.jsonl').length, 1, 'and Claude Code ended on its own, saving its total, never killed');
     });
-
-    await s.test('held past a shortened bound between calls: the job parks with no call', async (c) => {
-      const d = job(t, { call: 'Bash', next: 'Edit' }, { holdMs: 1_000 });
+    s.test('held past a shortened bound between calls: the job parks with no call', async (c) => {
+      const d = job(c, { call: 'Bash', next: 'Edit' }, { holdMs: 1_000 });
       await until(
         c,
         () => d.hold()?.calling?.tool === 'Bash',
@@ -233,9 +234,8 @@ test(
       assert.equal(parked.calling, undefined, 'with no call: none was in flight');
       assert.equal(answered(d.dir, 'PreToolUse'), 1, 'and the held call never ran');
     });
-
-    await s.test('a sub-agent’s call is answered while the job’s calls are held', async (c) => {
-      const e = job(t, { nested: 'Read', fromSubAgent: true, hold: true });
+    s.test('a sub-agent’s call is answered while the job’s calls are held', async (c) => {
+      const e = job(c, { nested: 'Read', fromSubAgent: true, hold: true });
       await until(c, () => wrote(e.dir, 'said.jsonl').length === 1, 'the session took its brief', { everyMs: 20 });
       putSessionDrain(e.root, { graceMs: LONG_GRACE_MS });
       await until(
@@ -256,9 +256,8 @@ test(
       const { code } = await e.done;
       assert.equal(code, 0, e.err());
     });
-
-    await s.test('held after a call that ended: its hold file names that call as the one it stopped after', async (c) => {
-      const g = job(t, { call: 'Read', next: 'Edit' });
+    s.test('held after a call that ended: its hold file names that call as the one it stopped after', async (c) => {
+      const g = job(c, { call: 'Read', next: 'Edit' });
       await until(
         c,
         () => g.hold()?.calling?.tool === 'Read',
@@ -280,42 +279,37 @@ test(
       const { code } = await g.done;
       assert.equal(code, 0, g.err());
     });
-
-    await s.test(
-      'a drain put again with its grace keeps its `at`; put with another grace it is stamped anew and judged by it',
-      async (c) => {
-        const h = job(t, { call: 'Bash' });
-        await until(
-          c,
-          () => h.hold()?.calling?.tool === 'Bash',
-          () => `the call in flight: ${JSON.stringify(h.hold())}`,
-          { everyMs: 20 },
-        );
-        const standing = { at: new Date(Date.now() - 60_000).toISOString(), graceMs: LONG_GRACE_MS };
-        fs.mkdirSync(path.dirname(sessionDrainFile(h.root)), { recursive: true });
-        fs.writeFileSync(sessionDrainFile(h.root), JSON.stringify(standing));
-        putSessionDrain(h.root, { graceMs: standing.graceMs });
-        putSessionDrain(h.root, { graceMs: standing.graceMs });
-        assert.deepEqual(sessionDrainOf(sessionDrainFile(h.root)), standing, 'two puts of the same grace keep the drain as it stood');
-        await until(
-          c,
-          () => h.hold()?.draining !== undefined,
-          () => `draining: ${JSON.stringify(h.hold())}`,
-          { everyMs: 20 },
-        );
-        assert.equal(h.hold()?.parked, undefined, 'its call runs on within the grace');
-        putSessionDrain(h.root, { graceMs: 0 });
-        const now = sessionDrainOf(sessionDrainFile(h.root));
-        assert.equal(now?.graceMs, 0);
-        assert.notEqual(now?.at, standing.at, 'another grace writes a new `at`');
-        const { code } = await h.done;
-        assert.notEqual(code, null, 'it left by itself');
-        assert.equal(h.hold()?.parked?.calling?.tool, 'Bash', `parked at once with the call it cut: ${JSON.stringify(h.hold())}`);
-      },
-    );
-
-    await s.test('a SIGTERM still ends a held job, and its Claude Code with it', async (c) => {
-      const f = job(t, { call: 'Bash' });
+    s.test('a drain put again with its grace keeps its `at`; put with another grace it is stamped anew and judged by it', async (c) => {
+      const h = job(c, { call: 'Bash' });
+      await until(
+        c,
+        () => h.hold()?.calling?.tool === 'Bash',
+        () => `the call in flight: ${JSON.stringify(h.hold())}`,
+        { everyMs: 20 },
+      );
+      const standing = { at: new Date(Date.now() - 60_000).toISOString(), graceMs: LONG_GRACE_MS };
+      fs.mkdirSync(path.dirname(sessionDrainFile(h.root)), { recursive: true });
+      fs.writeFileSync(sessionDrainFile(h.root), JSON.stringify(standing));
+      putSessionDrain(h.root, { graceMs: standing.graceMs });
+      putSessionDrain(h.root, { graceMs: standing.graceMs });
+      assert.deepEqual(sessionDrainOf(sessionDrainFile(h.root)), standing, 'two puts of the same grace keep the drain as it stood');
+      await until(
+        c,
+        () => h.hold()?.draining !== undefined,
+        () => `draining: ${JSON.stringify(h.hold())}`,
+        { everyMs: 20 },
+      );
+      assert.equal(h.hold()?.parked, undefined, 'its call runs on within the grace');
+      putSessionDrain(h.root, { graceMs: 0 });
+      const now = sessionDrainOf(sessionDrainFile(h.root));
+      assert.equal(now?.graceMs, 0);
+      assert.notEqual(now?.at, standing.at, 'another grace writes a new `at`');
+      const { code } = await h.done;
+      assert.notEqual(code, null, 'it left by itself');
+      assert.equal(h.hold()?.parked?.calling?.tool, 'Bash', `parked at once with the call it cut: ${JSON.stringify(h.hold())}`);
+    });
+    s.test('a SIGTERM still ends a held job, and its Claude Code with it', async (c) => {
+      const f = job(c, { call: 'Bash' });
       putSessionDrain(f.root, { graceMs: LONG_GRACE_MS });
       await until(
         c,

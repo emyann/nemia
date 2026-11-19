@@ -2,20 +2,20 @@
  * The words of a factory's schedules (src/lib/schedules.ts): a fire or a run said by its weekday within six days of now, by its date
  * further off, and its year when it is another year's. `npm run e2e` looks at the card itself (`factory-schedules`).
  */
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { fireWord } from '../src/lib/schedules.ts';
 
 const NOW = new Date('2026-10-08T12:00:00.000Z');
 
-test('fireWord: when a schedule fires next, in words', async (t) => {
-  await t.test("a fire within six days is said as the quota's resets are: the time today, the weekday before it on another day", () => {
+describe('fireWord: when a schedule fires next, in words', () => {
+  test("a fire within six days is said as the quota's resets are: the time today, the weekday before it on another day", () => {
     assert.equal(fireWord(new Date('2026-10-08T13:00:00Z'), NOW, 'UTC'), '1:00 PM');
     assert.equal(fireWord(new Date('2026-10-12T13:00:00Z'), NOW, 'UTC'), 'Mon 1:00 PM');
     assert.equal(fireWord(new Date('2026-10-05T13:00:00Z'), NOW, 'UTC'), 'Mon 1:00 PM', 'a run started three days ago, too');
     assert.equal(fireWord(new Date('2026-10-14T11:59:00Z'), NOW, 'UTC'), 'Wed 11:59 AM', 'a minute under six days');
   });
-  await t.test('REFUSED: a fire six days off or more is never said by its weekday alone, which would read as this week', () => {
+  test('REFUSED: a fire six days off or more is never said by its weekday alone, which would read as this week', () => {
     assert.equal(fireWord(new Date('2026-10-14T12:00:00Z'), NOW, 'UTC'), '14 Oct 12:00 PM', 'six days on');
     assert.equal(fireWord(new Date('2026-10-01T09:00:00Z'), NOW, 'UTC'), '1 Oct 9:00 AM', 'a week ago');
     assert.equal(

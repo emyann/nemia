@@ -2,7 +2,7 @@
  * The store's library as the board reads it (`src/lib/api/storeLibrary.ts`): every kind's items in one list, each with its origin and
  * the factories that use it, what a factory may still add from it, its count in words, and the agents a harness keeps that it may import.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { AgentSource, LibraryAdd, McpServer } from 'objects';
 import { addable, importablesOf, libraryCount, libraryItemsOf, type LibraryItem } from '../src/lib/api/storeLibrary.ts';

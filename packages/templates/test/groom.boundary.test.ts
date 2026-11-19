@@ -5,14 +5,13 @@
  * check writes the amended card and the report, changes no card, and each refusal writes nothing. A refusal is held by its exit and by
  * what it wrote, never by its words.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
-import type { TestContext } from 'node:test';
 import { CLIENT, inbox, nemia, world } from './janitor-world.ts';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'groom.ts');

@@ -2,7 +2,7 @@
  * An agent's try folder written in the store (`writeTryFolder`): its step file written when it says otherwise, left alone when it says the
  * same, and every link on its way refused before anything is written.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,7 +30,7 @@ test('a step file that says the same is left as it is; one that says otherwise i
   const home = scratch('wf-try-');
   const file = path.join(writeTryFolder('scribe', 'Try it.\n', home), 'try.md');
   fs.chmodSync(file, 0o444);
-  t.after(() => fs.chmodSync(file, 0o644));
+  t.onTestFinished(() => fs.chmodSync(file, 0o644));
   assert.equal(writeTryFolder('scribe', 'Try it.\n', home), path.dirname(file), 'the same text is not written: a read-only file stands');
   fs.chmodSync(file, 0o644);
   writeTryFolder('scribe', 'Try it again.\n', home);

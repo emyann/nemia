@@ -4,7 +4,8 @@
  * off; a daemon that ends before it takes the store. Beside it the shipped wait, a Mac's login agent, a spawn that throws and a store
  * taken by another while one starts, each said and none thrown.
  */
-import { after, test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,7 +32,7 @@ const NO_SYSTEM = { platform: 'linux', wsl: false, systemd: false };
 const { [DEMAND_OFF]: _off, ...ON } = ENV;
 
 const started: number[] = [];
-after(() => {
+afterAll(() => {
   for (const pid of started) {
     try {
       process.kill(pid, 'SIGTERM');
@@ -89,65 +90,59 @@ function unitFor(name: string, root: string): void {
   fs.writeFileSync(path.join(dir, `${name}.service`), unitText(specOf(name, root)));
 }
 
-test('a ticking command starts a daemon on demand: none, one live, a login service, the start turned off, one that dies early', async (t) => {
-  const s = story(t);
-  const LINUX = () => ({ platform: 'linux', wsl: false, systemd: true });
-  t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
-  let pid = 0;
-  t.after(async () => {
-    if (pid === 0 || daemonStanding(ROOT).kind !== 'ticking') return;
-    process.kill(pid, 'SIGTERM');
-    await leaseUntil((kind) => kind !== 'ticking');
+describe('a ticking command starts a daemon on demand: none, one live, a login service, the start turned off, one that dies early', () => {
+  beforeAll(async () => {
+    const t = teardowns();
+    t.onTestFinished(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
+    t.onTestFinished(async () => {
+      if (pid === 0 || daemonStanding(ROOT).kind !== 'ticking') return;
+      process.kill(pid, 'SIGTERM');
+      await leaseUntil((kind) => kind !== 'ticking');
+    });
+    return t.end;
   });
-
-  await s.test(
-    'no lease: a daemon is spawned detached, found by its lease, and said with its pid, its log and how to stop it',
-    async () => {
-      assert.equal(daemonStanding(ROOT).kind, 'none');
-      const { host, said } = hostOf({
-        spawn: (spec) => {
-          const child = liveDemandHost(ROOT).spawn(spec);
-          if (child.pid !== undefined) started.push(child.pid);
-          return child;
-        },
-        waitMs: 60_000,
-      });
-      assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'spawn' });
-      pid = started[0];
-      const lease = daemonStanding(ROOT);
-      assert.equal(lease.kind === 'ticking' && lease.file.pid, pid);
-      const log = path.join(ROOT, 'daemon.log');
-      assert.equal(said.length, 1, said.join('\n'));
-      for (const words of [`pid ${pid}`, log, `kill ${pid}`, FIXTURE]) assert.ok(said[0].includes(words), `${words}: ${said[0]}`);
-      assert.ok(fs.existsSync(log));
-    },
-  );
-
-  await s.test('beside that live daemon nothing starts, no service is looked for, and nothing is said', async () => {
+  const s = story(test);
+  const LINUX = () => ({ platform: 'linux', wsl: false, systemd: true });
+  let pid = 0;
+  s.test('no lease: a daemon is spawned detached, found by its lease, and said with its pid, its log and how to stop it', async () => {
+    assert.equal(daemonStanding(ROOT).kind, 'none');
+    const { host, said } = hostOf({
+      spawn: (spec) => {
+        const child = liveDemandHost(ROOT).spawn(spec);
+        if (child.pid !== undefined) started.push(child.pid);
+        return child;
+      },
+      waitMs: 60_000,
+    });
+    assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'spawn' });
+    pid = started[0];
+    const lease = daemonStanding(ROOT);
+    assert.equal(lease.kind === 'ticking' && lease.file.pid, pid);
+    const log = path.join(ROOT, 'daemon.log');
+    assert.equal(said.length, 1, said.join('\n'));
+    for (const words of [`pid ${pid}`, log, `kill ${pid}`, FIXTURE]) assert.ok(said[0].includes(words), `${words}: ${said[0]}`);
+    assert.ok(fs.existsSync(log));
+  });
+  s.test('beside that live daemon nothing starts, no service is looked for, and nothing is said', async () => {
     const { host, said, calls } = hostOf({ machine: () => assert.fail('looked for a service beside a ticking daemon') });
     assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'ticking' });
     assert.deepEqual([said, calls], [[], []]);
     process.kill(pid, 'SIGTERM');
     await leaseUntil((kind) => kind === 'stopped');
   });
-
-  await s.test(
-    "once it stopped, the store's login service is started in place of a spawn, and another store's unit left alone",
-    async () => {
-      unitFor('nemia-other', '/srv/another-store');
-      unitFor('nemia', ROOT);
-      const { host, said, calls } = hostOf({ machine: LINUX, waitMs: 50 });
-      assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'service' });
-      assert.deepEqual(
-        calls.filter((c) => !c.includes(' show ')),
-        ['systemctl --user start nemia.service'],
-      );
-      assert.match(said.join('\n'), /has not taken the store after 0s/);
-      assert.match(said.join('\n'), /journalctl --user -u nemia\.service/);
-    },
-  );
-
-  await s.test('NEMIA_DAEMON_START=off starts nothing, not even the service installed, and says so once', async () => {
+  s.test("once it stopped, the store's login service is started in place of a spawn, and another store's unit left alone", async () => {
+    unitFor('nemia-other', '/srv/another-store');
+    unitFor('nemia', ROOT);
+    const { host, said, calls } = hostOf({ machine: LINUX, waitMs: 50 });
+    assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'service' });
+    assert.deepEqual(
+      calls.filter((c) => !c.includes(' show ')),
+      ['systemctl --user start nemia.service'],
+    );
+    assert.match(said.join('\n'), /has not taken the store after 0s/);
+    assert.match(said.join('\n'), /journalctl --user -u nemia\.service/);
+  });
+  s.test('NEMIA_DAEMON_START=off starts nothing, not even the service installed, and says so once', async () => {
     const { host, said, calls } = hostOf({ machine: LINUX, env: { ...ON, [DEMAND_OFF]: 'off' } });
     assert.deepEqual(await Effect.runPromise(ensureDaemon(host)), { kind: 'off' });
     assert.equal(said.length, 1);
@@ -155,8 +150,7 @@ test('a ticking command starts a daemon on demand: none, one live, a login servi
     assert.deepEqual(calls, []);
     fs.rmSync(CONFIG, { recursive: true, force: true });
   });
-
-  await s.test(
+  s.test(
     'over a lease that does not read, a daemon that ends before it takes the store is said with its exit and its log, unwaited',
     async () => {
       fs.writeFileSync(daemonFile(ROOT), '{');
@@ -181,7 +175,7 @@ test(
   async (t) => {
     fs.rmSync(CONFIG, { recursive: true, force: true });
     unitFor('nemia', ROOT);
-    t.after(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
+    t.onTestFinished(() => fs.rmSync(CONFIG, { recursive: true, force: true }));
     const live = liveDemandHost(ROOT);
     let reads = 0;
     const { host, said } = hostOf({

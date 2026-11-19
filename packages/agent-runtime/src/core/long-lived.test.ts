@@ -6,7 +6,8 @@
  * harness respawns, a gap no respawn closes ended lost, a restart after the backoff, and a stop. What each other end leads to, the
  * backoff's numbers, the clocks each wait runs on and what a sighting journals are tables.
  */
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import {
   backoffOf,
@@ -76,16 +77,19 @@ const lostEnd: Event = {
   nativeId: 'native-1',
 };
 
-test('LONG-LIVED: a session through its life — idle between turns, a crash loop its harness respawns, a gap no respawn closes ended lost, restarted after the backoff, and a stop that ends it', async (t) => {
-  const s = story(t);
-  const events: Event[] = inFlight(true);
-
-  await s.test('LONG-LIVED: the filing is read back off the journal, and a journal with no `restartPolicy` folds to a job', () => {
+describe('LONG-LIVED: a session through its life — idle between turns, a crash loop its harness respawns, a gap no respawn closes ended lost, restarted after the backoff, and a stop that ends it', () => {
+  let events!: Event[];
+  beforeAll(() => {
+    const t = teardowns();
+    events = inFlight(true);
+    return t.end;
+  });
+  const s = story(test);
+  s.test('LONG-LIVED: the filing is read back off the journal, and a journal with no `restartPolicy` folds to a job', () => {
     assert.equal(fold(TASK, [events[0]]).restartPolicy, 'Always');
     assert.equal(fold(TASK, [filed(false)]).restartPolicy, undefined);
   });
-
-  await s.test(
+  s.test(
     'LONG-LIVED: a session open between turns is idle, and left alone an hour on, where the same sighting ends a job or waits on a person',
     () => {
       const control: Record<string, string> = {
@@ -107,8 +111,7 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       assert.equal(decide(fold(TASK, inFlight(false)), seen(IDLE['listed done, its process still held']), now(HOUR)).do, 'record-end');
     },
   );
-
-  await s.test(
+  s.test(
     'LONG-LIVED: idle only while its process is held and at rest — a wait on a person, a busy turn and a session gone are what they are for a job',
     () => {
       const state = fold(TASK, events);
@@ -129,28 +132,23 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       assert.equal(needsHuman(state, seen(cases[0][1])), true, 'a prompt is still for a person');
     },
   );
-
-  await s.test(
-    'LONG-LIVED: only a stop ends it — asked of an idle session, it stops it, records the end OPERATOR, and settles stopped',
-    () => {
-      const asked: Event[] = [...events, { kind: 'stop-requested', at: at(HOUR) }];
-      for (const [name, sighting] of Object.entries(IDLE))
-        assert.deepEqual(decide(fold(TASK, asked), seen(sighting), now(HOUR + 1)), { do: 'stop', sessionId: 's1', why: 'operator' }, name);
-      const end = decide(fold(TASK, asked), seen({ state: 'canceled', held: false }), now(HOUR + 2));
-      assert.equal(end.do === 'record-end' && `${end.observed} ${end.reason}`, 'stopped operator');
-      const ended = fold(TASK, [
-        ...asked,
-        { kind: 'ended', at: at(HOUR + 3), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'operator' },
-      ]);
-      assert.deepEqual(decide(ended, seen({ state: 'canceled', held: false }), now(HOUR + 4)), {
-        do: 'settle',
-        outcome: 'stopped',
-        note: 'operator',
-      });
-    },
-  );
-
-  await s.test(
+  s.test('LONG-LIVED: only a stop ends it — asked of an idle session, it stops it, records the end OPERATOR, and settles stopped', () => {
+    const asked: Event[] = [...events, { kind: 'stop-requested', at: at(HOUR) }];
+    for (const [name, sighting] of Object.entries(IDLE))
+      assert.deepEqual(decide(fold(TASK, asked), seen(sighting), now(HOUR + 1)), { do: 'stop', sessionId: 's1', why: 'operator' }, name);
+    const end = decide(fold(TASK, asked), seen({ state: 'canceled', held: false }), now(HOUR + 2));
+    assert.equal(end.do === 'record-end' && `${end.observed} ${end.reason}`, 'stopped operator');
+    const ended = fold(TASK, [
+      ...asked,
+      { kind: 'ended', at: at(HOUR + 3), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'operator' },
+    ]);
+    assert.deepEqual(decide(ended, seen({ state: 'canceled', held: false }), now(HOUR + 4)), {
+      do: 'settle',
+      outcome: 'stopped',
+      note: 'operator',
+    });
+  });
+  s.test(
     "LONG-LIVED: Claude Code's own crash loop is reported only — each death and respawn journalled, shown restarting, no end, no action, no backoff",
     () => {
       let loop: Event[] = [...events, { kind: 'process', at: at(3), attempt: 1, pid: 100 }];
@@ -177,8 +175,7 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       assert.equal(loop.filter((e) => e.kind === 'ended').length, 0);
     },
   );
-
-  await s.test(
+  s.test(
     'LONG-LIVED: a gap no respawn closes is waited out for 120 s, nobody asked, then its attempt is ended lost — where a job listed the same waits on a person',
     () => {
       events.push({ kind: 'process', at: at(3), attempt: 1, pid: 100 }, { kind: 'gap', at: at(GAP), attempt: 1 });
@@ -204,8 +201,7 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       assert.equal(needsHuman(job, seen(RESPAWNING)), true);
     },
   );
-
-  await s.test('LONG-LIVED: a gap a respawn closed is over — the session is open again an age later, its attempt never ended', () => {
+  s.test('LONG-LIVED: a gap a respawn closed is over — the session is open again an age later, its attempt never ended', () => {
     const state = fold(TASK, [...events, { kind: 'process', at: at(GAP + 11_000), attempt: 1, pid: 200 }]);
     assert.equal(state.attempts[0].gapSince, undefined, 'the respawn closes the gap');
     assert.deepEqual(state.attempts[0].processes, [100, 200]);
@@ -214,16 +210,14 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
     assert.equal(decide(state, back, now(GAP + 300_000)).do, 'nothing');
     assert.equal(viewOfState(state, back).phase, 'idle');
   });
-
-  await s.test('LONG-LIVED: a stop asked during a gap stops it, and is never read as a respawn', () => {
+  s.test('LONG-LIVED: a stop asked during a gap stops it, and is never read as a respawn', () => {
     assert.deepEqual(decide(fold(TASK, [...events, { kind: 'stop-requested', at: at(GAP + 1) }]), seen(RESPAWNING), now(GAP + HOUR)), {
       do: 'stop',
       sessionId: 's1',
       why: 'operator',
     });
   });
-
-  await s.test(
+  s.test(
     'LONG-LIVED: an attempt ended lost is restarted after the backoff, its old job stopped first while listed, resumed and told RESTART_WORDS',
     () => {
       events.push(lostEnd);
@@ -250,8 +244,7 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       );
     },
   );
-
-  await s.test("LONG-LIVED: the runtime's own stop ends it, and nothing restarts it however long after", () => {
+  s.test("LONG-LIVED: the runtime's own stop ends it, and nothing restarts it however long after", () => {
     const restart = END + RESTART_BACKOFF.initialMs;
     events.push(
       { kind: 'starting', at: at(restart), attempt: 2, resumeFrom: 'native-1', nudge: RESTART_WORDS },
@@ -290,7 +283,7 @@ const spawnedWith = (code: string): Event[] => [
 ];
 const neverSeen: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
 
-test('LONG-LIVED: what each end leads to — restarted after the backoff, resumed or told the brief, or settled — where a job settles on its end', async (t) => {
+describe('LONG-LIVED: what each end leads to — restarted after the backoff, resumed or told the brief, or settled — where a job settles on its end', () => {
   const ends: [string, Event][] = [
     [
       'stopped at its harness',
@@ -301,7 +294,7 @@ test('LONG-LIVED: what each end leads to — restarted after the backoff, resume
   ];
   const job: Record<string, string> = { 'stopped at its harness': 'stopped', done: 'succeeded', failed: 'failed' };
   for (const [name, end] of ends)
-    await t.test(`LONG-LIVED: an end ${name}, no stop asked, is restarted after the backoff — where a job settles on it`, () => {
+    test(`LONG-LIVED: an end ${name}, no stop asked, is restarted after the backoff — where a job settles on it`, () => {
       const state = fold(TASK, [...inFlight(true), end]);
       assert.equal(decide(state, new Map(), now(END + 9_999)).do, 'nothing', name);
       assert.deepEqual(
@@ -312,80 +305,68 @@ test('LONG-LIVED: what each end leads to — restarted after the backoff, resume
       const a = decide(fold(TASK, [...inFlight(false), end]), new Map(), now(END + 10_000));
       assert.equal(a.do === 'settle' && a.outcome, job[name], `${name}, as a job`);
     });
-
-  await t.test(
-    "LONG-LIVED: a spawn its harness refused is not restarted — the task settles failed in the refusal's words and the fix, where a death is restarted after the backoff",
-    () => {
-      const death: Event = {
-        kind: 'ended',
-        at: at(END - 50_000),
-        attempt: 1,
-        sessionId: 's1',
-        observed: 'failed',
-        reason: 'harness',
-        nativeId: 'n1',
-      };
-      const refusals: [string, Event[], string][] = [
-        ['on its first attempt', [...inFlight(true).slice(0, 2), refusedEnd(1)], '1 attempt(s)'],
-        [
-          "on a restart's attempt after a death",
-          [...inFlight(true), death, { kind: 'starting', at: at(END - 40_000), attempt: 2 }, refusedEnd(2)],
-          '2 attempt(s)',
-        ],
-      ];
-      for (const [name, events, count] of refusals) {
-        const state = fold(TASK, events);
-        for (const later of [1, 10_000, HOUR]) {
-          assert.equal(observe(state, new Map(), now(END + later)).type, 'ATTEMPT_ENDED', `${name}, ${later} ms on`);
-          assert.deepEqual(
-            decide(state, new Map(), now(END + later)),
-            {
-              do: 'settle',
-              outcome: 'failed',
-              note: `${count}, none succeeded: the last could not start: ${REFUSAL}; fix what it names and file the task again`,
-            },
-            `${name}, ${later} ms on`,
-          );
-        }
+  test("LONG-LIVED: a spawn its harness refused is not restarted — the task settles failed in the refusal's words and the fix, where a death is restarted after the backoff", () => {
+    const death: Event = {
+      kind: 'ended',
+      at: at(END - 50_000),
+      attempt: 1,
+      sessionId: 's1',
+      observed: 'failed',
+      reason: 'harness',
+      nativeId: 'n1',
+    };
+    const refusals: [string, Event[], string][] = [
+      ['on its first attempt', [...inFlight(true).slice(0, 2), refusedEnd(1)], '1 attempt(s)'],
+      [
+        "on a restart's attempt after a death",
+        [...inFlight(true), death, { kind: 'starting', at: at(END - 40_000), attempt: 2 }, refusedEnd(2)],
+        '2 attempt(s)',
+      ],
+    ];
+    for (const [name, events, count] of refusals) {
+      const state = fold(TASK, events);
+      for (const later of [1, 10_000, HOUR]) {
+        assert.equal(observe(state, new Map(), now(END + later)).type, 'ATTEMPT_ENDED', `${name}, ${later} ms on`);
+        assert.deepEqual(
+          decide(state, new Map(), now(END + later)),
+          {
+            do: 'settle',
+            outcome: 'failed',
+            note: `${count}, none succeeded: the last could not start: ${REFUSAL}; fix what it names and file the task again`,
+          },
+          `${name}, ${later} ms on`,
+        );
       }
+    }
 
-      const died = fold(TASK, [...inFlight(true), { ...death, at: at(END) }]);
-      assert.equal(observe(died, new Map(), now(END + 9_999)).type, 'BACKING_OFF', 'the control: a death waits out the backoff');
-      assert.deepEqual(decide(died, new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'n1', nudge: RESTART_WORDS });
-    },
-  );
-
+    const died = fold(TASK, [...inFlight(true), { ...death, at: at(END) }]);
+    assert.equal(observe(died, new Map(), now(END + 9_999)).type, 'BACKING_OFF', 'the control: a death waits out the backoff');
+    assert.deepEqual(decide(died, new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'n1', nudge: RESTART_WORDS });
+  });
   for (const code of TRANSIENT_ERRNOS)
-    await t.test(
-      `LONG-LIVED: a spawn that failed on ${code}, a short-lived OS error, is restarted after the backoff — where a job settles lost, its spawn words not in its note`,
-      () => {
-        const inGrace = fold(TASK, [filed(true), ...spawnedWith(code)]);
-        assert.equal(observe(inGrace, new Map(), now(29_999)).type, 'UNSEEN_IN_GRACE', code);
-        assert.deepEqual(
-          decide(inGrace, new Map(), now(END)),
-          { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' },
-          code,
-        );
-        const lost = fold(TASK, [filed(true), ...spawnedWith(code), neverSeen]);
-        assert.equal(observe(lost, new Map(), now(END + 9_999)).type, 'BACKING_OFF', code);
-        assert.deepEqual(decide(lost, new Map(), now(END + 10_000)), { do: 'start', attempt: 2 }, code);
-        assert.deepEqual(
-          decide(fold(TASK, [filed(false), ...spawnedWith(code), neverSeen]), new Map(), now(END + 10_000)),
-          { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
-          `${code}, as a job`,
-        );
-      },
-    );
-
-  await t.test(
-    'LONG-LIVED: a cold restart — no session recorded on any attempt — is told the brief, continuing what the task was filed against',
-    () => {
-      const cold: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
-      assert.deepEqual(decide(fold(TASK, [...inFlight(true), cold]), new Map(), now(END + 10_000)), { do: 'start', attempt: 2 });
-      const against: Event[] = [{ ...filed(true), resumeFrom: 'native-0' } as Event, ...inFlight(true).slice(1), cold];
-      assert.deepEqual(decide(fold(TASK, against), new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'native-0' });
-    },
-  );
+    test(`LONG-LIVED: a spawn that failed on ${code}, a short-lived OS error, is restarted after the backoff — where a job settles lost, its spawn words not in its note`, () => {
+      const inGrace = fold(TASK, [filed(true), ...spawnedWith(code)]);
+      assert.equal(observe(inGrace, new Map(), now(29_999)).type, 'UNSEEN_IN_GRACE', code);
+      assert.deepEqual(
+        decide(inGrace, new Map(), now(END)),
+        { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' },
+        code,
+      );
+      const lost = fold(TASK, [filed(true), ...spawnedWith(code), neverSeen]);
+      assert.equal(observe(lost, new Map(), now(END + 9_999)).type, 'BACKING_OFF', code);
+      assert.deepEqual(decide(lost, new Map(), now(END + 10_000)), { do: 'start', attempt: 2 }, code);
+      assert.deepEqual(
+        decide(fold(TASK, [filed(false), ...spawnedWith(code), neverSeen]), new Map(), now(END + 10_000)),
+        { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+        `${code}, as a job`,
+      );
+    });
+  test('LONG-LIVED: a cold restart — no session recorded on any attempt — is told the brief, continuing what the task was filed against', () => {
+    const cold: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
+    assert.deepEqual(decide(fold(TASK, [...inFlight(true), cold]), new Map(), now(END + 10_000)), { do: 'start', attempt: 2 });
+    const against: Event[] = [{ ...filed(true), resumeFrom: 'native-0' } as Event, ...inFlight(true).slice(1), cold];
+    assert.deepEqual(decide(fold(TASK, against), new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'native-0' });
+  });
 });
 
 /** `k` attempts in a row, each ended `ran` ms after it started, the last ending at `END`. */
@@ -422,12 +403,12 @@ const BACKOFFS: [string, number[], number][] = [
   ['a run of 600 s, then two short ones', [600_000, SHORT, SHORT], 20_000],
 ];
 
-test("LONG-LIVED: the backoff is a kubelet's — 10 s, doubled for each end in a row, capped at 300 s, and counted again after a run of 10 min", async (t) => {
-  await t.test('the shipped numbers', () => {
+describe("LONG-LIVED: the backoff is a kubelet's — 10 s, doubled for each end in a row, capped at 300 s, and counted again after a run of 10 min", () => {
+  test('the shipped numbers', () => {
     assert.deepEqual(RESTART_BACKOFF, { initialMs: 10_000, factor: 2, maxMs: 300_000, resetAfterMs: 600_000 });
   });
   for (const [name, ran, ms] of BACKOFFS)
-    await t.test(`${name}: ${ms / 1_000} s`, () => {
+    test(`${name}: ${ms / 1_000} s`, () => {
       const state = fold(TASK, endedRuns(...ran));
       assert.equal(backoffOf(state.attempts), ms, name);
       assert.equal(decide(state, new Map(), now(END + ms - 1)).do, 'nothing', `${name}: backing off`);
@@ -453,58 +434,47 @@ const twoRuns = (firstWall: number, firstMono: number): Event[] => {
   ];
 };
 
-test('LONG-LIVED: each wait runs on the monotonic clock within a boot — a wall clock stepped either way moves none — and on the wall clock across one', async (t) => {
-  await t.test(
-    'LONG-LIVED: a gap runs on the monotonic clock within a boot — a wall clock stepped forward ends none early, nor one stepped back holds it past its bound — and on the wall clock across one',
-    () => {
-      const opened = [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 } as Event];
-      assert.deepEqual(
-        sightingFacts(fold(TASK, opened), seen(RESPAWNING).get(N1), at(GAP), mono(GAP)),
-        [{ kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }],
-        'the gap is journalled on both clocks',
-      );
-      const state = fold(TASK, [...opened, { kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }]);
-      const type = (n: ReturnType<typeof nowOn>) => observe(state, seen(RESPAWNING), n).type;
-      assert.equal(type(nowOn(GAP + HOUR, GAP + RESPAWN_GAP_MS - 1)), 'SESSION_RESPAWNING', 'the wall clock an hour on');
-      assert.equal(type(nowOn(GAP, GAP + RESPAWN_GAP_MS)), 'RESPAWN_OVERDUE', 'past its bound in this boot, the wall clock unmoved');
-      assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS, 0, 'b-2')), 'RESPAWN_OVERDUE', 'another boot: the wall clock');
-      assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS - 1, HOUR, 'b-2')), 'SESSION_RESPAWNING', 'another boot: the wall clock');
-    },
-  );
-
-  await t.test(
-    'LONG-LIVED: the backoff runs on the monotonic clock within a boot — a wall clock stepped forward restarts nothing early, nor one stepped back holds a restart due — and on the wall clock across one',
-    () => {
-      const state = fold(TASK, [
-        filed(true),
-        { kind: 'starting', at: at(1), attempt: 1, mono: mono(1) },
-        { kind: 'spawned', at: at(2), attempt: 1, mono: mono(2) },
-        { ...lostEnd, mono: mono(END) },
-      ]);
-      const due = RESTART_BACKOFF.initialMs;
-      assert.equal(decide(state, new Map(), nowOn(END + HOUR, END + due - 1)).do, 'nothing', 'the wall clock an hour on');
-      assert.equal(decide(state, new Map(), nowOn(END, END + due)).do, 'start', 'due in this boot, the wall clock unmoved');
-      assert.equal(decide(state, new Map(), nowOn(END + due, 0, 'b-2')).do, 'start', 'another boot: the wall clock');
-      assert.equal(decide(state, new Map(), nowOn(END + due - 1, HOUR, 'b-2')).do, 'nothing', 'another boot: the wall clock');
-    },
-  );
-
-  await t.test(
-    "LONG-LIVED: the backoff's reset after a run of 10 min is measured on the monotonic clock of the run's boot, whatever the wall clock stepped while it ran",
-    () => {
-      const { resetAfterMs, initialMs, factor } = RESTART_BACKOFF;
-      assert.equal(
-        backoffOf(fold(TASK, twoRuns(5_000, resetAfterMs)).attempts),
-        initialMs,
-        'a run of 10 min the wall clock read as 5 s resets',
-      );
-      assert.equal(
-        backoffOf(fold(TASK, twoRuns(resetAfterMs, 5_000)).attempts),
-        initialMs * factor,
-        'a run of 5 s the wall clock read as 10 min does not',
-      );
-    },
-  );
+describe('LONG-LIVED: each wait runs on the monotonic clock within a boot — a wall clock stepped either way moves none — and on the wall clock across one', () => {
+  test('LONG-LIVED: a gap runs on the monotonic clock within a boot — a wall clock stepped forward ends none early, nor one stepped back holds it past its bound — and on the wall clock across one', () => {
+    const opened = [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 } as Event];
+    assert.deepEqual(
+      sightingFacts(fold(TASK, opened), seen(RESPAWNING).get(N1), at(GAP), mono(GAP)),
+      [{ kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }],
+      'the gap is journalled on both clocks',
+    );
+    const state = fold(TASK, [...opened, { kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }]);
+    const type = (n: ReturnType<typeof nowOn>) => observe(state, seen(RESPAWNING), n).type;
+    assert.equal(type(nowOn(GAP + HOUR, GAP + RESPAWN_GAP_MS - 1)), 'SESSION_RESPAWNING', 'the wall clock an hour on');
+    assert.equal(type(nowOn(GAP, GAP + RESPAWN_GAP_MS)), 'RESPAWN_OVERDUE', 'past its bound in this boot, the wall clock unmoved');
+    assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS, 0, 'b-2')), 'RESPAWN_OVERDUE', 'another boot: the wall clock');
+    assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS - 1, HOUR, 'b-2')), 'SESSION_RESPAWNING', 'another boot: the wall clock');
+  });
+  test('LONG-LIVED: the backoff runs on the monotonic clock within a boot — a wall clock stepped forward restarts nothing early, nor one stepped back holds a restart due — and on the wall clock across one', () => {
+    const state = fold(TASK, [
+      filed(true),
+      { kind: 'starting', at: at(1), attempt: 1, mono: mono(1) },
+      { kind: 'spawned', at: at(2), attempt: 1, mono: mono(2) },
+      { ...lostEnd, mono: mono(END) },
+    ]);
+    const due = RESTART_BACKOFF.initialMs;
+    assert.equal(decide(state, new Map(), nowOn(END + HOUR, END + due - 1)).do, 'nothing', 'the wall clock an hour on');
+    assert.equal(decide(state, new Map(), nowOn(END, END + due)).do, 'start', 'due in this boot, the wall clock unmoved');
+    assert.equal(decide(state, new Map(), nowOn(END + due, 0, 'b-2')).do, 'start', 'another boot: the wall clock');
+    assert.equal(decide(state, new Map(), nowOn(END + due - 1, HOUR, 'b-2')).do, 'nothing', 'another boot: the wall clock');
+  });
+  test("LONG-LIVED: the backoff's reset after a run of 10 min is measured on the monotonic clock of the run's boot, whatever the wall clock stepped while it ran", () => {
+    const { resetAfterMs, initialMs, factor } = RESTART_BACKOFF;
+    assert.equal(
+      backoffOf(fold(TASK, twoRuns(5_000, resetAfterMs)).attempts),
+      initialMs,
+      'a run of 10 min the wall clock read as 5 s resets',
+    );
+    assert.equal(
+      backoffOf(fold(TASK, twoRuns(resetAfterMs, 5_000)).attempts),
+      initialMs * factor,
+      'a run of 5 s the wall clock read as 10 min does not',
+    );
+  });
 });
 
 const heldIn = (pid: number): Sighting => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, pid });
@@ -512,7 +482,7 @@ const GONE: Sighting = { sessionId: 's1', ...RESPAWNING };
 const WHEN = at(HOUR);
 const holding = (): Event[] => [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 }];
 
-test('LONG-LIVED: what a sighting journals — the first gap once, a process at each new pid or the end of a gap — and nothing for a job, an ended attempt or a session not seen', async (t) => {
+describe('LONG-LIVED: what a sighting journals — the first gap once, a process at each new pid or the end of a gap — and nothing for a job, an ended attempt or a session not seen', () => {
   const rows: [string, Event[], Sighting | undefined, Event[]][] = [
     ['its first process', inFlight(true), heldIn(100), [{ kind: 'process', at: WHEN, attempt: 1, pid: 100 }]],
     ['the same pid, no gap: nothing new', holding(), heldIn(100), []],
@@ -528,10 +498,10 @@ test('LONG-LIVED: what a sighting journals — the first gap once, a process at 
     ['an ended attempt', [...inGap(true), lostEnd], heldIn(300), []],
   ];
   for (const [name, events, sighting, facts] of rows)
-    await t.test(name, () => {
+    test(name, () => {
       assert.deepEqual(sightingFacts(fold(TASK, events), sighting, WHEN), facts);
     });
-  await t.test('a settled task held with a process', () => {
+  test('a settled task held with a process', () => {
     const settled = fold(TASK, [...inFlight(true), { kind: 'settled', at: at(5), outcome: 'failed' }]);
     assert.equal(settled.attempts.at(-1)?.ended, null, 'settled with its attempt left open');
     assert.deepEqual(sightingFacts(settled, heldIn(100), WHEN), []);

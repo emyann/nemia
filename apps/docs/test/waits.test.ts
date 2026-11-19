@@ -1,15 +1,15 @@
 /**
  * The wait a test makes on its event (`until`, `bell`, `test/waits.ts`), a copy of the runtime's `src/waits/waits.ts`, since this
- * package imports none, the default timeout the package's `test` script gives a test that waits, and the guard that keeps a
+ * package imports none, the default timeout the package's Vitest config gives a test that waits, and the guard that keeps a
  * hand-written bound out of a child this package's tests start (`boundsIn`). The helper's own tests are the runtime's, and so is the
  * fence that holds this copy to it byte for byte (`packages/agent-runtime/test/waits.test.ts`): a test here builds no path into a
  * package's `src` (`contract.test.ts` there).
  *
  * A bound handed to a spawn is a ceiling on a machine, and a time measured on a machine is a floor: the dev child of
  * `build.test.ts` was killed at 100 s inside the runner's 120 s. So no spawn in `test/` takes one, and the runner's
- * `--test-timeout` is the one bound every wait here ends at.
+ * `testTimeout` is the one bound every wait here ends at.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,36 +17,35 @@ import { WAITED } from './waits.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
-/** The default timeout a `test` script gives every test (`--test-timeout=<ms>`, one word), or null for none. */
-const defaultTimeout = (script: string): number | null => {
-  const word = script.split(/\s+/).find((w) => /^--test-timeout=[1-9]\d*$/.test(w));
-  return word ? Number(word.slice('--test-timeout='.length)) : null;
+/** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
+const defaultTimeout = (config: string): number | null => {
+  const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
+  return m ? Number(m[1].replaceAll('_', '')) : null;
 };
 
 /**
- * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a `test` script whose default
- * timeout is not `WAITED`'s, since node's is none.
+ * What leaves a wait unbounded in a test given no `WAITED`, as one that waits through a helper may be: a Vitest config whose default
+ * timeout is not `WAITED`'s, since Vitest's is 5 s.
  *
- * @param script the package's `test` script
+ * @param config the text of the package's `vitest.config.ts`
  * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
  */
-const timeoutBreaks = (script: string): string[] =>
-  defaultTimeout(script) === WAITED.timeout
+const timeoutBreaks = (config: string): string[] =>
+  defaultTimeout(config) === WAITED.timeout
     ? []
-    : [`the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
+    : [`the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
 
-test("the package's test script bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
-  const { scripts } = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } };
-  assert.deepEqual(timeoutBreaks(scripts.test), []);
+test("the package's Vitest config bounds every test at `WAITED`'s timeout, so a wait in a test given none still ends", () => {
+  assert.deepEqual(timeoutBreaks(fs.readFileSync(path.join(PACKAGE, 'vitest.config.ts'), 'utf8')), []);
 });
 
-test("REFUSED: a test script with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
+test("REFUSED: a Vitest config with no default timeout, or another than `WAITED`'s, leaves a test's wait unbounded", () => {
   const refused = [
-    `the test script gives no --test-timeout=${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
+    `the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`,
   ];
-  assert.deepEqual(timeoutBreaks('node --test --test-concurrency=2 test/*.test.ts'), refused, 'none');
-  assert.deepEqual(timeoutBreaks('node --test --test-concurrency=2 --test-timeout=600000 test/*.test.ts'), refused, 'a longer one');
-  assert.deepEqual(timeoutBreaks(`node --test --test-concurrency=2 --test-timeout=${WAITED.timeout} test/*.test.ts`), [], 'its own');
+  assert.deepEqual(timeoutBreaks('export default { test: { maxWorkers: 2 } };'), refused, 'none');
+  assert.deepEqual(timeoutBreaks('test: {\n    testTimeout: 600_000,\n  }'), refused, 'a longer one');
+  assert.deepEqual(timeoutBreaks(`test: {\n    testTimeout: ${WAITED.timeout},\n  }`), [], 'its own');
 });
 
 /** What starts a child, by the name a test calls: each is given its options where it is given any. */
@@ -75,7 +74,7 @@ const callAt = (text: string, from: number): string => {
 
 /**
  * Each bound a spawn in `text` is handed, by the line it is on: a `timeout:` or a `killSignal:` in the options of a call that starts a
- * child. A bound a test picks is a ceiling on a machine; the runner's `--test-timeout` is the one bound a test takes.
+ * child. A bound a test picks is a ceiling on a machine; the runner's `testTimeout` is the one bound a test takes.
  *
  * @param file the file's path, as a person reads it
  * @param text its text
@@ -95,7 +94,7 @@ const testFiles = (): string[] => fs.globSync('test/**/*.ts', { cwd: PACKAGE }).
 /** Every file that hands a spawn a bound, as they are on disk. */
 const measured = (): string[] => testFiles().flatMap((file) => boundsIn(file, fs.readFileSync(path.join(PACKAGE, file), 'utf8')));
 
-test('no test under test/ bounds a spawn by hand: the runner’s --test-timeout is the one bound', () => {
+test('no test under test/ bounds a spawn by hand: the runner’s testTimeout is the one bound', () => {
   assert.ok(testFiles().includes('test/build.test.ts'), 'the scan read the package’s tests');
   assert.ok(testFiles().includes('test/dev.ts'), 'and the helpers beside them');
   assert.deepEqual(measured(), []);

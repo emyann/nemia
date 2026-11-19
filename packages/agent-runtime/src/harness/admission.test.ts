@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -116,40 +116,37 @@ test("admission is a PreToolUse hook merged into the caller's settings, matched 
   );
 });
 
-test('REFUSED: admission that is not one, or on a harness or beside settings that cannot carry it, each naming the fix, and nothing journalled', async (t) => {
+describe('REFUSED: admission that is not one, or on a harness or beside settings that cannot carry it, each naming the fix, and nothing journalled', () => {
   for (const row of FILE_REFUSALS)
-    await t.test(row.name, async () => {
+    test(row.name, async () => {
       const { tag, message, journalled } = await filed(row.config, row.harness);
       assert.equal(tag, 'FileRefused', message);
       for (const name of row.names) assert.ok(message.includes(name), `${name} in: ${message}`);
       assert.equal(journalled, 0, 'nothing journalled');
     });
-  await t.test('a command and the tools it sees are filed on Claude Code', async () => {
+  test('a command and the tools it sees are filed on Claude Code', async () => {
     const { tag, message, journalled } = await filed({ callAdmission: ADMISSION });
     assert.equal(tag, 'filed', message);
     assert.equal(journalled, 1);
   });
-  await t.test(
-    'beside Claude Code settings given as a file, which the runtime does not rewrite, naming the key, the file and the fix',
-    () => {
-      const said = claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '/a/settings.json' } } });
-      for (const name of [
-        '`claude.settings`',
-        '"/a/settings.json"',
-        'the runtime rewrites no file',
-        'as a JSON object',
-        'leave admission off',
-      ])
-        assert.ok(said?.includes(name), `${name} in: ${said}`);
-    },
-  );
-  await t.test('taken beside settings given as JSON', () => {
+  test('beside Claude Code settings given as a file, which the runtime does not rewrite, naming the key, the file and the fix', () => {
+    const said = claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '/a/settings.json' } } });
+    for (const name of [
+      '`claude.settings`',
+      '"/a/settings.json"',
+      'the runtime rewrites no file',
+      'as a JSON object',
+      'leave admission off',
+    ])
+      assert.ok(said?.includes(name), `${name} in: ${said}`);
+  });
+  test('taken beside settings given as JSON', () => {
     assert.equal(
       claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '{"env":{}}' } } }),
       undefined,
     );
   });
-  await t.test('no admission, a file: nothing to refuse', () => {
+  test('no admission, a file: nothing to refuse', () => {
     assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { settings: '/a/settings.json' } } }), undefined);
   });
 });

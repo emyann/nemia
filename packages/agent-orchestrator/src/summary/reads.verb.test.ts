@@ -4,7 +4,7 @@
  * is gone or truly no longer reads, said once, with one full stop — and, where the factory itself is gone or does not read, naming the
  * factory instead of quoting a loader that was given no hires. On a store of its own at `ROOT`.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -8,7 +8,8 @@
  * the engine's, one story over a board in memory. A `queued` that is no yes or no is `test/refusal.test.ts`'s.
  */
 import { Effect } from 'effect';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import type { Event, FeedEntry, Sighting } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
@@ -32,8 +33,8 @@ const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event =>
 });
 const admitted = (ms = 1): Event => ({ kind: 'admitted', at: at(ms) });
 
-test('decide and admissionOf: a queued task waits for the word, read off the record alone', async (t) => {
-  await t.test('a task filed queued waits for the word, and starts once it is given', () => {
+describe('decide and admissionOf: a queued task waits for the word, read off the record alone', () => {
+  test('a task filed queued waits for the word, and starts once it is given', () => {
     const queued = fold(TASK, [filed({ queued: true })]);
     assert.deepEqual(decide(queued, new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
     assert.equal(awaitsAdmission(queued), true);
@@ -45,26 +46,23 @@ test('decide and admissionOf: a queued task waits for the word, read off the rec
     const started = fold(TASK, [filed({ queued: true }), admitted(), { kind: 'starting', at: at(2), attempt: 1 }]);
     assert.equal(admissionOf(started), undefined, 'started, it says nothing more of admission: its phase does');
   });
-  await t.test('a task filed with `queued: false` starts with no word, and says nothing of admission', () => {
+  test('a task filed with `queued: false` starts with no word, and says nothing of admission', () => {
     const s = fold(TASK, [filed({ queued: false })]);
     assert.deepEqual(decide(s, new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
     assert.equal(admissionOf(s), undefined);
   });
-  await t.test(
-    'a filing with no `queued` key — a journal an older runtime wrote — reads as queued, so a restarted daemon starts nothing it has not admitted',
-    () => {
-      const s = fold(TASK, [filed()]);
-      assert.equal(s.queued, undefined, 'folded as written');
-      assert.deepEqual(decide(s, new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
-      assert.deepEqual(decide(fold(TASK, [filed(), admitted()]), new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
-    },
-  );
-  await t.test('the wait comes after every terminal answer: a queued task is stopped, and settles, with no word', () => {
+  test('a filing with no `queued` key — a journal an older runtime wrote — reads as queued, so a restarted daemon starts nothing it has not admitted', () => {
+    const s = fold(TASK, [filed()]);
+    assert.equal(s.queued, undefined, 'folded as written');
+    assert.deepEqual(decide(s, new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
+    assert.deepEqual(decide(fold(TASK, [filed(), admitted()]), new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
+  });
+  test('the wait comes after every terminal answer: a queued task is stopped, and settles, with no word', () => {
     const s = fold(TASK, [filed({ queued: true }), { kind: 'stop-requested', at: at(1) }]);
     assert.deepEqual(decide(s, new Map(), now(5)), { do: 'settle', outcome: 'stopped', note: 'operator' });
     assert.equal(admissionOf(s), undefined, 'asked to stop: nothing to admit');
   });
-  await t.test('a task held open waits for a word before each turn: the one given for its first turn does not start its second', () => {
+  test('a task held open waits for a word before each turn: the one given for its first turn does not start its second', () => {
     const signed: Event[] = [
       filed({ queued: true, holdOpen: true, closeoutSchema: { type: 'object' } }),
       admitted(),
@@ -93,7 +91,7 @@ test('decide and admissionOf: a queued task waits for the word, read off the rec
     const let_ = fold(TASK, [...signed, { kind: 'input', at: at(5), text: 'again' }, admitted(6)]);
     assert.deepEqual(decide(let_, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'again' });
   });
-  await t.test('admissionOf reads the record alone: a state is a plain fold, and it reads nothing else', () => {
+  test('admissionOf reads the record alone: a state is a plain fold, and it reads nothing else', () => {
     const s: State = fold(TASK, [filed({ queued: true })]);
     assert.equal(admissionOf(structuredClone(s)), 'queued');
   });
@@ -154,15 +152,19 @@ const board = () => {
   return { engine, sessions, observes, reads, journal };
 };
 
-test('a queued task waits for its word, then starts on the pass after it; a task filed with no `queued` starts at once; the word is given once', async (t) => {
-  const s = story(t);
-  const b = board();
+describe('a queued task waits for its word, then starts on the pass after it; a task filed with no `queued` starts at once; the word is given once', () => {
+  let b!: ReturnType<typeof board>;
+  beforeAll(() => {
+    const t = teardowns();
+    b = board();
+    return t.end;
+  });
+  const s = story(test);
   let id = '';
   let plain = '';
   let queued = '';
   let other = '';
-
-  await s.test('filed queued, nothing starts without the word: the pass reports it pending, queued', async () => {
+  s.test('filed queued, nothing starts without the word: the pass reports it pending, queued', async () => {
     id = await Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r', queued: true }));
     assert.equal(b.journal.tasks.get(id)![0].kind === 'filed' && (b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, true);
     const first = await Effect.runPromise(b.engine.tick());
@@ -172,14 +174,12 @@ test('a queued task waits for its word, then starts on the pass after it; a task
       [[id, 'pending', 'queued']],
     );
   });
-
-  await s.test('the word starts nothing by itself: the task reads admitted', async () => {
+  s.test('the word starts nothing by itself: the task reads admitted', async () => {
     assert.deepEqual(await Effect.runPromise(b.engine.admit([id])), [id]);
     assert.equal(b.sessions.size, 0, 'the word starts nothing by itself');
     assert.equal((await Effect.runPromise(b.engine.view(id))).admission, 'admitted');
   });
-
-  await s.test('the next pass starts it, and it says nothing more of admission', async () => {
+  s.test('the next pass starts it, and it says nothing more of admission', async () => {
     const second = await Effect.runPromise(b.engine.tick());
     assert.deepEqual([...b.sessions.keys()], [nameFor(id, 1)], 'the next pass starts it');
     assert.deepEqual(
@@ -187,15 +187,13 @@ test('a queued task waits for its word, then starts on the pass after it; a task
       [[id, 'starting', undefined]],
     );
   });
-
-  await s.test('a task filed with no `queued` starts on the next pass, as ever, and `file` writes the key on every filing', async () => {
+  s.test('a task filed with no `queued` starts on the next pass, as ever, and `file` writes the key on every filing', async () => {
     plain = await Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r' }));
     assert.equal((b.journal.tasks.get(plain)![0] as { queued?: boolean }).queued, false);
     await Effect.runPromise(b.engine.tick());
     assert.deepEqual([...b.sessions.keys()].sort(), [nameFor(id, 1), nameFor(plain, 1)].sort());
   });
-
-  await s.test('admit is idempotent, and writes nothing for a task that waits for no word', async () => {
+  s.test('admit is idempotent, and writes nothing for a task that waits for no word', async () => {
     queued = await Effect.runPromise(b.engine.file({ brief: 'q', cwd: '/r', queued: true }));
     other = await Effect.runPromise(b.engine.file({ brief: 'p', cwd: '/r' }));
     assert.deepEqual(await Effect.runPromise(b.engine.admit([queued, other])), [queued]);
@@ -210,8 +208,7 @@ test('a queued task waits for its word, then starts on the pass after it; a task
     assert.deepEqual(await Effect.runPromise(b.engine.admit([queued])), [], 'started');
     assert.equal(b.journal.tasks.get(queued)!.filter((e) => e.kind === 'admitted').length, 1);
   });
-
-  await s.test('a tick reports the view of every task it left unsettled, and none it settled', async () => {
+  s.test('a tick reports the view of every task it left unsettled, and none it settled', async () => {
     const waits = await Effect.runPromise(b.engine.file({ brief: 'waits', cwd: '/r', queued: true }));
     b.sessions.set(nameFor(id, 1), { ...b.sessions.get(nameFor(id, 1))!, state: 'completed' });
     const r = await Effect.runPromise(b.engine.tick());

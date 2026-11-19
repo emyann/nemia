@@ -12,7 +12,8 @@
  * lease it steps, a signal and a start it logs — and whose pause, resume and calls are the live host's, over the stage's engine. A line
  * the take-over says of waiting on the landing throws, so a take-over that waits on it fails at once rather than hanging the story.
  */
-import { test, type TestContext } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { outlived, teardowns, type Finishes } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,31 +60,35 @@ const storeLines = (reason: string): FeedLine[] => readFeed(ROOT, 0).lines.filte
  * A take-over's process: a child of this test, on its `WF_ROOT`, that puts the store's pause through the live host's `pause` and then
  * waits to be killed. Answers once the pause is on disk; the test kills it, and `t.after` kills it where a checkpoint failed first.
  */
-const takeOverProcess = async (t: TestContext) => {
+const takeOverProcess = async (t: Finishes) => {
   const child = nodeChild(
     `const m = await import(${JSON.stringify(SERVICE_VERB)}); m.liveHost(${JSON.stringify(ROOT)}).pause({ by: ${JSON.stringify(BY)}, why: 'restarting the daemon at pid ${OLD}' }); process.stdout.write('paused\\n'); setInterval(() => {}, 60_000);`,
     ENV,
   );
-  t.after(() => void child.child.kill('SIGKILL'));
+  t.onTestFinished(() => void child.child.kill('SIGKILL'));
   await child.until(() => child.out().includes('paused'), 'the take-over process put its pause');
   return child;
 };
 
-test("a restart killed while it waits leaves the store paused no longer than the daemon's next pass", async (t) => {
-  const s = story(t);
-  const b = ticking();
+describe("a restart killed while it waits leaves the store paused no longer than the daemon's next pass", () => {
+  const outer = outlived();
+  let b!: Board;
+  let child!: Awaited<ReturnType<typeof takeOverProcess>> | undefined;
+  beforeAll(() => {
+    const t = teardowns();
+    b = ticking();
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  let child: Awaited<ReturnType<typeof takeOverProcess>> | undefined;
-
-  await s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async () => {
-    child = await takeOverProcess(t);
+  s.test('the take-over pauses the store naming its own process, and a pass while it runs leaves the pause standing', async () => {
+    child = await takeOverProcess(outer);
     assert.equal(readPauseFile(ROOT)?.heldBy?.pid, child.child.pid, 'the pause names the process that put it');
     await pass();
     assert.equal(readPause(ROOT)?.by, BY, 'a pause whose process runs stands');
     assert.equal(storeLines('StorePaused').length, 1, 'the feed says the store paused');
   });
-
-  await s.test('the take-over killed, the next pass lifts its pause and the feed says the store resumed', async () => {
+  s.test('the take-over killed, the next pass lifts its pause and the feed says the store resumed', async () => {
     assert.ok(child);
     child.child.kill('SIGKILL');
     assert.equal((await child.closed).signal, 'SIGKILL');
@@ -94,19 +99,25 @@ test("a restart killed while it waits leaves the store paused no longer than the
   });
 });
 
-test("a restart with only a landing's check running restarts at once, and the check's result is read after", async (t) => {
-  const s = story(t);
-  const b = ticking();
+describe("a restart with only a landing's check running restarts at once, and the check's result is read after", () => {
+  let b!: Board;
+  let repo!: string;
+  let dir!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    b = ticking();
+    repo = fs.mkdtempSync(path.join(ROOT, 'lands-'));
+    stage.place().world.repository(repo, {});
+    dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
+    fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
+    return t.end;
+  });
+  const s = story(test);
   const pass = () => stage.runWith(b.e, tickRun());
-  const repo = fs.mkdtempSync(path.join(ROOT, 'lands-'));
-  stage.place().world.repository(repo, {});
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nplace: git\nafter: work\ngate: true\nworkspace: base\ncheck: "true"\n---\nship it\n');
   let id = '';
   const shipOf = () => runRecord(ROOT, id).steps.ship;
-
-  await s.test("a run's ending signed off, its landing check filed and running", async () => {
+  s.test("a run's ending signed off, its landing check filed and running", async () => {
     id = (await stage.runPlaced(startRun({ brief: 'restart', repo, workflowDir: dir, isolate: true }))).id;
     await pass();
     const work = runRecord(ROOT, id).steps.work;
@@ -123,8 +134,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
     b.settle(check, 'working');
     assert.ok(!shipOf().landed, 'the landing waits on its check');
   });
-
-  await s.test('the restart pauses, signals the daemon at once, starts the service and resumes after its first pass', async () => {
+  s.test('the restart pauses, signals the daemon at once, starts the service and resumes after its first pass', async () => {
     const events: string[] = [];
     let lease: DaemonStanding = leaseOf(OLD);
     const later: DaemonStanding[] = [];
@@ -170,8 +180,7 @@ test("a restart with only a landing's check running restarts at once, and the ch
     );
     assert.equal(readPause(ROOT), null);
   });
-
-  await s.test("the check ends on its worker, and the new daemon's pass records the landing", async () => {
+  s.test("the check ends on its worker, and the new daemon's pass records the landing", async () => {
     b.settle(shipOf().check!.taskId, 'succeeded', undefined, 0);
     await pass();
     assert.ok(shipOf().landed, 'the landing is recorded off the check it did not wait for');

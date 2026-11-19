@@ -8,7 +8,8 @@
  */
 import '../../test/harness.ts';
 import { until, WAITED } from '../../test/waits.ts';
-import { test } from 'node:test';
+import { beforeAll, describe, test } from 'vitest';
+import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -90,15 +91,20 @@ const putTimeout = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
-test("GET and PUT /api/pause/timeout read and set the store's pause timeout as nemia pause-timeout does; a timeout out of its form is refused, nothing written", async (t) => {
-  const file = path.join(root, 'pause-timeout.json');
-  t.after(() => fs.rmSync(file, { force: true }));
-  await t.test('read with none set: ten minutes, the default, written by no call', async () => {
+describe("GET and PUT /api/pause/timeout read and set the store's pause timeout as nemia pause-timeout does; a timeout out of its form is refused, nothing written", () => {
+  let file!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    file = path.join(root, 'pause-timeout.json');
+    t.onTestFinished(() => fs.rmSync(file, { force: true }));
+    return t.end;
+  });
+  test('read with none set: ten minutes, the default, written by no call', async () => {
     const res = await app.request('/api/pause/timeout');
     assert.equal(res.status, 200, await res.clone().text());
     assert.deepEqual((await res.json()) as PauseTimeoutAnswer, { timeout: { ms: 600_000, set: false }, wrote: false });
   });
-  await t.test('set to 15m: written, and a read then answers it with when it was set', async () => {
+  test('set to 15m: written, and a read then answers it with when it was set', async () => {
     const res = await putTimeout({ timeout: '15m' });
     assert.equal(res.status, 200, await res.clone().text());
     const wrote = (await res.json()) as PauseTimeoutAnswer;
@@ -106,7 +112,7 @@ test("GET and PUT /api/pause/timeout read and set the store's pause timeout as n
     const read = (await (await app.request('/api/pause/timeout')).json()) as PauseTimeoutAnswer;
     assert.deepEqual(read, { timeout: { ms: 900_000, set: true, at: wrote.timeout.at }, wrote: false });
   });
-  await t.test('REFUSED: a timeout out of its form is a 422, one that is no text a 400, and the timeout set stays as it was', async () => {
+  test('REFUSED: a timeout out of its form is a 422, one that is no text a 400, and the timeout set stays as it was', async () => {
     const before = fs.readFileSync(file, 'utf8');
     for (const timeout of ['0s', '24h', 'ten']) assert.equal((await putTimeout({ timeout })).status, 422, timeout);
     assert.equal((await putTimeout({ timeout: 15 })).status, 400);

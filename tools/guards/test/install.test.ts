@@ -22,7 +22,7 @@
  *
  * `install.sh` is POSIX sh: each test parses it with `sh -n` first, so a bashism the host's sh refuses fails here.
  */
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -97,11 +97,8 @@ test('install.sh parses as POSIX sh', () => {
   assert.equal(ran.status, 0, ran.stderr);
 });
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'install.sh lays down the latest release from a file:// base, points current at it and links nemia to its launcher',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     const base = fs.realpathSync(scratch('install-base-'));
     publish(base, 'v1.2.3', HOST as Platform);
@@ -138,11 +135,8 @@ test(
   },
 );
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'REFUSED: a release whose SHA256SUMS names another sum exits 1 and leaves current, the releases and the link as they were',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     const base = fs.realpathSync(scratch('install-base-'));
     publish(base, 'v1.2.3', HOST as Platform);
@@ -269,11 +263,11 @@ const server = () => {
 /** The escape a terminal's colour begins with. */
 const ESC = String.fromCharCode(0x1b);
 
-const onHost = { skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}` };
+/** A test run only where a release is built for this machine's platform and architecture. */
+const onHost = test.skipIf(HOST === undefined);
 
-test(
+onHost(
   'a person asked on the terminal: starting at login, the bind picked from the private addresses, no token printed, a link, and doctor last',
-  onHost,
   () => {
     const run = server();
     const ran = run(['--serve'], ['', '2']);
@@ -298,7 +292,7 @@ test(
   },
 );
 
-test('a typed address is taken, and the 1 of the offer binds this machine alone, with no token minted', onHost, () => {
+onHost('a typed address is taken, and the 1 of the offer binds this machine alone, with no token minted', () => {
   const run = server();
   const typed = run(['--serve'], ['', '10.0.0.7']);
   assert.equal(typed.status, 0, typed.out);
@@ -318,9 +312,8 @@ test('a typed address is taken, and the 1 of the offer binds this machine alone,
   assert.equal(alone.asked.at(-1), 'doctor');
 });
 
-test(
+onHost(
   'a laptop is asked nothing: Nemia started on the loopback, no login service, and the first-visit link to localhost/welcome opened',
-  onHost,
   () => {
     const run = server();
     const ran = run([], ['n', '2']);
@@ -336,7 +329,7 @@ test(
   },
 );
 
-test('a laptop whose browser does not open, or under --no-open, still installs and prints the first-visit link', onHost, () => {
+onHost('a laptop whose browser does not open, or under --no-open, still installs and prints the first-visit link', () => {
   const run = server();
   const failed = run([], undefined, { OPEN_EXIT: '1' });
   assert.equal(failed.status, 0, failed.out);
@@ -353,7 +346,7 @@ test('a laptop whose browser does not open, or under --no-open, still installs a
   assert.deepEqual(process.platform === 'linux' ? headless.opened : [], [], 'no display on Linux, no opener');
 });
 
-test('a laptop with --no-service, or whose daemon does not start, still installs, opens nothing and names nemia up', onHost, () => {
+onHost('a laptop with --no-service, or whose daemon does not start, still installs, opens nothing and names nemia up', () => {
   const run = server();
   const unserved = run(['--no-service']);
   assert.equal(unserved.status, 0, unserved.out);
@@ -368,7 +361,7 @@ test('a laptop with --no-service, or whose daemon does not start, still installs
   assert.match(down.stdout, /nemia up/);
 });
 
-test('the summary is plain unless colour is asked: FORCE_COLOR colours it, and NO_COLOR wins over it', onHost, () => {
+onHost('the summary is plain unless colour is asked: FORCE_COLOR colours it, and NO_COLOR wins over it', () => {
   const run = server();
   assert.equal(run(['--no-open']).stdout.includes(ESC), false);
   assert.ok(run(['--no-open'], undefined, { FORCE_COLOR: '1' }).stdout.includes(`${ESC}[`));
@@ -380,7 +373,7 @@ test('the summary is plain unless colour is asked: FORCE_COLOR colours it, and N
   );
 });
 
-test('REFUSED: a public or wildcard bind exits 1 with no service installed, unless --public, which is passed on', onHost, () => {
+onHost('REFUSED: a public or wildcard bind exits 1 with no service installed, unless --public, which is passed on', () => {
   const run = server();
   for (const bind of ['203.0.113.5', '0.0.0.0']) {
     const refused = run(['--yes', '--bind', bind]);
@@ -456,9 +449,8 @@ test('an archive packed from a tree npm put the SDK platform packages in holds n
     );
 });
 
-test(
+onHost(
   "a client install pairs with its server, under its --context when given; a token by --token-file is still the context's, and no token is printed",
-  onHost,
   () => {
     const run = server();
     const client = ['--yes', '--client', '--server', 'http://100.64.0.1:8787'];
@@ -483,7 +475,7 @@ test(
   },
 );
 
-test('REFUSED: a client install with no server exits 1 under --yes, pairing with nothing', onHost, () => {
+onHost('REFUSED: a client install with no server exits 1 under --yes, pairing with nothing', () => {
   const run = server();
   const ran = run(['--yes', '--client']);
   assert.equal(ran.status, 1, ran.out);
@@ -514,11 +506,8 @@ const mirror = (tag: string) => {
   return { dir, log };
 };
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'REFUSED: a release tag that is not v and three dotted numbers, a pre-release too, exits 1 before anything is downloaded or deleted, by --version or latest.json',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     for (const tag of ['v1.0.0/../..', 'v1.0.0 ', 'v1.2.3-rc.1', 'v1.2.3.4', 'v1.2.3.']) {
       for (const by of ['latest.json', '--version']) {
@@ -552,11 +541,8 @@ test(
   },
 );
 
-test(
+test.skipIf(HOST === undefined && `no release is built for ${process.platform}-${process.arch}`)(
   'a release tag of v and three dotted numbers is taken, by --version and by latest.json: its archive is the next thing downloaded',
-  {
-    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
-  },
   () => {
     for (const by of ['latest.json', '--version']) {
       const { dir, log } = mirror('v1.20.3');

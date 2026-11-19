@@ -1,8 +1,8 @@
-import { test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { firstPiece } from './piece.ts';
 
-test('firstPiece gives what split gives first, for each text a separator cuts or does not', async (t) => {
+describe('firstPiece gives what split gives first, for each text a separator cuts or does not', () => {
   for (const [text, separator] of [
     ['one\ntwo', '\n'],
     ['one', '\n'],
@@ -11,5 +11,5 @@ test('firstPiece gives what split gives first, for each text a separator cuts or
     ['--flag=value', '='],
     ['a/b/c', '/'],
   ] as const)
-    await t.test(JSON.stringify([text, separator]), () => assert.equal(firstPiece(text, separator), text.split(separator)[0]));
+    test(JSON.stringify([text, separator]), () => assert.equal(firstPiece(text, separator), text.split(separator)[0]));
 });

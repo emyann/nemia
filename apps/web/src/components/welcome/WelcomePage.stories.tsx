@@ -62,7 +62,10 @@ export const CheckFailed: Story = {
   },
 };
 
-/** Both ticks passed: signed in, the quota shown beside the turn as information, and Next names the next milestone and leads to its page. */
+/**
+ * Both ticks passed: signed in, the quota shown beside the turn as information, and Next names the next milestone and leads to its
+ * page.
+ */
 export const Ready: Story = {
   parameters: { msw: harnessReady },
   play: async ({ canvasElement }) => {

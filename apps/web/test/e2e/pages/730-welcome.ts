@@ -49,11 +49,18 @@ const READS = {
   ready: [install([check('version', 'passed'), check('turn', 'passed')]), signIn('met'), NO_FACTORY],
 } as const;
 
-/** The milestones read the page answers in place of the api's, whose seeded store already holds factories: the harness done, the factory next. */
+/**
+ * The milestones read the page answers in place of the api's, whose seeded store already holds factories: the harness done, the
+ * factory next.
+ */
 const FACTORY_NEXT = {
   milestones: [
     { name: 'harness', state: 'done', message: 'a harness is installed and signed in' },
-    { name: 'factory', state: 'next', message: 'make a first factory: with Nemia, from a template, or from scratch; it may start with no volume' },
+    {
+      name: 'factory',
+      state: 'next',
+      message: 'make a first factory: with Nemia, from a template, or from scratch; it may start with no volume',
+    },
     { name: 'volume', state: 'later', message: 'give a factory a volume' },
     { name: 'landed', state: 'later', message: 'merge a first change into its base branch' },
   ],
@@ -77,7 +84,7 @@ async function asked(page: Page, method: 'GET' | 'DELETE', route: string): Promi
 /**
  * The factory step, from the ready welcome's Next: three tiles in order, Talk to Nemia first; From a template offers sdlc; a name typed and
  * Make pressed applies it through the real api, and the step shows the factory made, with Next. The factory is read from the api: made
- * from sdlc, with no volume. Its Skip for now leaves for `/`.
+ * from sdlc, with no volume. Its skip leaves for `/`.
  */
 async function makesFromTemplate(page: Page): Promise<void> {
   await page.locator('article[data-welcome] [data-welcome-next]').click();
@@ -225,12 +232,12 @@ export default {
       if (new URL(page.url()).pathname !== '/') throw new Refused(`skipped in this browser, / stays / — it went to ${page.url()}`);
     } finally {
       await asked(page, 'DELETE', `/api/factories/${MADE}`);
-      const gone = await asked(page, 'GET', `/api/factories/${MADE}`);
-      if (gone.status !== 404) throw new Refused(`${MADE} is taken back — the api still reads it, ${gone.status}`);
       await page.unroute(MILESTONES_ROUTE, milestones);
       await page.evaluate((key) => localStorage.removeItem(key), HARNESS_SKIP_KEY);
       await unhold();
       await page.unroute(READINESS_ROUTE, answer);
     }
+    const gone = await asked(page, 'GET', `/api/factories/${MADE}`);
+    if (gone.status !== 404) throw new Refused(`${MADE} is taken back — the api still reads it, ${gone.status}`);
   },
 } satisfies PageSpec;

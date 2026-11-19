@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { Milestone } from 'objects';
 import { CutButton, PageName } from '@/components/look';
@@ -21,8 +21,8 @@ const WATCH_EVERY_MS = 3_000;
  * The welcome's factory step, at `/welcome/factory`: one question, how to make a first factory, three tiles (Talk to Nemia, From a
  * template, From scratch) and the chosen way's panel; once the store holds a factory, the factory made and Next to the next milestone,
  * and after an empty one made here, the short guide. What it shows is `factoryStepOf`, over the store's milestones as the api reads them
- * (read every few seconds while her chat is the way, so a factory she files moves the step on) and the write this page made. Skip for
- * now leaves for the board on every screen.
+ * (read every few seconds while her chat is the way, so a factory she files moves the step on) and the write this page made. Its skip
+ * leaves for the board on every screen.
  */
 export function FactoryStep() {
   const navigate = useNavigate();
@@ -38,7 +38,9 @@ export function FactoryStep() {
   });
   const factory = milestones.data.milestones.find((m) => m.name === 'factory');
   const screen = factoryStepOf({ filed: factory?.state === 'done', way, made: made?.how });
-  const next: Milestone | undefined = milestones.data.milestones.find((m) => m.name !== 'harness' && m.name !== 'factory' && m.state !== 'done')?.name;
+  const next: Milestone | undefined = milestones.data.milestones.find(
+    (m) => m.name !== 'harness' && m.name !== 'factory' && m.state !== 'done',
+  )?.name;
   const nextLink = next === undefined ? undefined : MILESTONE_LINKS[next];
   const madeBy = (how: FactoryMade) => (name: string) => {
     setMade({ how, name });

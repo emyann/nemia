@@ -8,7 +8,7 @@ import { TemplateForm } from './TemplateForm';
 type Args = { templates: readonly Template[]; onMade: (name: string) => void };
 
 /**
- * The template way's form: the templates Nemia ships, what the chosen one gives, a name and nothing else. Its apply is answered by MSW
+ * The template way's form: the templates Nemia builds in, what the chosen one gives, a name and nothing else. Its apply is answered by MSW
  * (`.storybook/fixtures/templates.ts`), which keeps what it was sent.
  */
 const meta: Meta<Args> = {
@@ -71,7 +71,7 @@ export const OneBroken: Story = {
   play: async ({ canvasElement }) => {
     const broken = canvasElement.querySelector<HTMLElement>('[data-template-offer="broken"]')!;
     await expect(within(broken).getByRole('radio')).toBeDisabled();
-    await expect(within(broken).getByText(BROKEN.status.problems![0]!)).toBeVisible();
+    await expect(within(broken).getByText(BROKEN.status.problems![0])).toBeVisible();
     await expect(canvasElement.querySelector('[data-template-offer="sdlc"]')).toHaveAttribute('data-selected', 'true');
   },
 };

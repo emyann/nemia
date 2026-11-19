@@ -13,11 +13,9 @@ const lineOf = (template: Template): string =>
   readable(template) ? (template.spec.description ?? '') : (template.status.problems ?? []).join('; ');
 
 /**
- * The template way's form: each template Nemia ships as a tile, its description its line, one Nemia cannot read offered disabled with its
- * problems; what the chosen one gives, its workflows and agents by name; a name and nothing else, the template applied with no volume and
- * every parameter at its default. A refusal is said in the api's words.
- * @param templates The templates Nemia ships, as the api lists them.
- * @param onMade Told the factory's name once the api answered the apply.
+ * The template way's form: each template Nemia builds in as a tile, its description its line, one Nemia cannot read offered disabled
+ * with its problems; what the chosen one gives, its workflows and agents by name; a name and nothing else, the template applied with no
+ * volume and every parameter at its default, `onMade` told its name once the api answered. A refusal is said in the api's words.
  */
 export function TemplateForm({ templates, onMade }: { templates: readonly Template[]; onMade: (name: string) => void }) {
   const [picked, setPicked] = useState<string | undefined>(undefined);
@@ -32,12 +30,7 @@ export function TemplateForm({ templates, onMade }: { templates: readonly Templa
         if (chosen !== undefined) form.make();
       }}
     >
-      <RadioTileGroup
-        label="Template"
-        layout="column"
-        value={chosen?.metadata.name ?? null}
-        onChange={(name) => setPicked(name)}
-      >
+      <RadioTileGroup label="Template" layout="column" value={chosen?.metadata.name ?? null} onChange={(name) => setPicked(name)}>
         {templates.map((template) => (
           <RadioTile
             key={template.metadata.name}

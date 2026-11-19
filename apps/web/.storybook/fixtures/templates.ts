@@ -1,6 +1,6 @@
 /**
  * The factory step's reads and writes as the api answers them, for its stories (`Pages/Welcome factory` and its parts): the templates
- * Nemia ships typed by `objects`' own `Template` and `TemplateList`, an apply answered by its `FactoryApplied` and a filing by its
+ * Nemia builds in typed by `objects`' own `Template` and `TemplateList`, an apply answered by its `FactoryApplied` and a filing by its
  * `FactoryCreated`, so a key the api renames fails the typecheck here; and the MSW handlers a story names in `parameters.msw`, each
  * write's body kept in `sent` for its play to read.
  */

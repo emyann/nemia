@@ -4,8 +4,8 @@ import { createFactory } from '@/lib/api/factories';
 import { useFactoryWrite } from '@/lib/useFactoryWrite';
 
 /**
- * The scratch way's form: a name and nothing else, an empty factory filed with no volume. A refusal is said in the api's words.
- * @param onMade Told the factory's name once the api answered the filing.
+ * The scratch way's form: a name and nothing else, an empty factory filed with no volume, `onMade` told its name once the api answered.
+ * A refusal is said in the api's words.
  */
 export function ScratchForm({ onMade }: { onMade: (name: string) => void }) {
   const form = useFactoryWrite(createFactory, onMade);

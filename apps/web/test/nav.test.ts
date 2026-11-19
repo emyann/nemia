@@ -80,7 +80,17 @@ test('seatOf: each page of the seat table at its level, under its destination or
     assert.deepEqual(seatOf('/factories/a%20b/runs'), { level: 'factory', factory: 'a b', place: 'runs' });
   });
   await t.test('REFUSED: an address no route has, or one that only begins with a destination’s name, has no seat', () => {
-    for (const path of ['/nowhere', '/welcomex', '/chatx', '/agentsx', '/runsx', '/statsx', '/settingsx', '/factories', '/factories/kit/nowhere'])
+    for (const path of [
+      '/nowhere',
+      '/welcomex',
+      '/chatx',
+      '/agentsx',
+      '/runsx',
+      '/statsx',
+      '/settingsx',
+      '/factories',
+      '/factories/kit/nowhere',
+    ])
       assert.equal(seatOf(path), undefined, path);
   });
 });

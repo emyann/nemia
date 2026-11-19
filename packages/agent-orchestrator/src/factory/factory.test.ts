@@ -44,30 +44,29 @@ const on = (name: string, ...repos: string[]) => ({
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
 describe('factoryNameRefusal: a lowercase slug of up to 40 characters names a factory', () => {
-for (const name of ['Nemia', 'a/b', '.x', '-x', '..', '../x', 'a b', 'é', 'a'.repeat(41)])
+  for (const name of ['Nemia', 'a/b', '.x', '-x', '..', '../x', 'a b', 'é', 'a'.repeat(41)])
     test(`REFUSED: ${JSON.stringify(name).slice(0, 14)}`, () => names(factoryNameRefusal(name), `\`${name}\``));
-test('REFUSED: one not lowercase, naming the lowercase', () => names(factoryNameRefusal('Nemia'), 'nemia'));
-test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'acme', 'acme-2'));
-test('REFUSED: an empty one, saying so', () => names(factoryNameRefusal(''), 'empty'));
+  test('REFUSED: one not lowercase, naming the lowercase', () => names(factoryNameRefusal('Nemia'), 'nemia'));
+  test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'acme', 'acme-2'));
+  test('REFUSED: an empty one, saying so', () => names(factoryNameRefusal(''), 'empty'));
 });
 
 describe("workflowNameRefusal: a workflow's name is no path, hidden, nor the agents' or the skills' folder", () => {
-for (const name of ['', '.git', 'a/b', 'a\\b', 'agents', 'skills'])
+  for (const name of ['', '.git', 'a/b', 'a\\b', 'agents', 'skills'])
     test(`REFUSED: ${JSON.stringify(name)}`, () => names(workflowNameRefusal(name), name));
-test('REFUSED: skills, naming the folder it is', () => names(workflowNameRefusal('skills'), 'skills/'));
-for (const name of ['build', 'intake', 'dev-planned'])
-    test(`taken: ${name}`, () => assert.equal(workflowNameRefusal(name), undefined));
+  test('REFUSED: skills, naming the folder it is', () => names(workflowNameRefusal('skills'), 'skills/'));
+  for (const name of ['build', 'intake', 'dev-planned']) test(`taken: ${name}`, () => assert.equal(workflowNameRefusal(name), undefined));
 });
 
 describe('hireRefusal: a hire names an agent into <workflow>/<step>', () => {
-for (const step of ['build', 'build/a/b', 'build/.x', '/x', 'build/', '.git/x', 'agents/x', 'skills/x', 'build/README'])
+  for (const step of ['build', 'build/a/b', 'build/.x', '/x', 'build/', '.git/x', 'agents/x', 'skills/x', 'build/README'])
     test(`REFUSED: --step ${step}`, () => names(hireRefusal(step, 'ada'), `--step ${step}`));
-test('REFUSED: a step under agents/, naming the folder', () => names(hireRefusal('agents/x', 'ada'), 'agents/'));
-test('REFUSED: a hidden step, naming it', () => names(hireRefusal('build/.x', 'ada'), '`.x`'));
-test('REFUSED: a hidden workflow, naming it', () => names(hireRefusal('.git/x', 'ada'), '--step .git/x', '`.git`'));
-for (const agent of ['', 'a/b', '.ada', 'a b'])
+  test('REFUSED: a step under agents/, naming the folder', () => names(hireRefusal('agents/x', 'ada'), 'agents/'));
+  test('REFUSED: a hidden step, naming it', () => names(hireRefusal('build/.x', 'ada'), '`.x`'));
+  test('REFUSED: a hidden workflow, naming it', () => names(hireRefusal('.git/x', 'ada'), '--step .git/x', '`.git`'));
+  for (const agent of ['', 'a/b', '.ada', 'a b'])
     test(`REFUSED: the agent ${JSON.stringify(agent)}`, () => names(hireRefusal('build/implement', agent), `\`${agent}\``));
-for (const [step, agent] of [
+  for (const [step, agent] of [
     ['build/implement', 'ada'],
     ['intake/frame-the-idea', 'iris-2'],
   ])
@@ -75,72 +74,72 @@ for (const [step, agent] of [
 });
 
 describe('defaultFactoryRefusal: the default factory is read, never written, so no verb that writes a factory takes it', () => {
-for (const verb of ['add', 'rm', 'hire', 'fire', 'attach', 'detach', 'instruction', 'instruct'] as const)
+  for (const verb of ['add', 'rm', 'hire', 'fire', 'attach', 'detach', 'instruction', 'instruct'] as const)
     test(`REFUSED: nemia factory ${verb}`, () => names(defaultFactoryRefusal(verb), '`default`', `nemia factory ${verb}`));
 });
 
 describe('hireRefusalOf: refused for the default factory first, then a workflow not offered, then a step whose file names its agent', () => {
-const pipao = { name: 'pipao', workflows: ['build'] };
-test('REFUSED: no factory named is the default', () =>
+  const pipao = { name: 'pipao', workflows: ['build'] };
+  test('REFUSED: no factory named is the default', () =>
     assert.equal(hireRefusalOf(undefined, 'build', null), defaultFactoryRefusal('hire')));
-test('REFUSED: the default named', () =>
+  test('REFUSED: the default named', () =>
     assert.equal(hireRefusalOf({ name: DEFAULT_NAMESPACE, workflows: ['build'] }, 'build', null), defaultFactoryRefusal('hire')));
-test('REFUSED: the default first, whatever else', () =>
+  test('REFUSED: the default first, whatever else', () =>
     assert.equal(hireRefusalOf({ name: DEFAULT_NAMESPACE, workflows: [] }, 'build', 'ada'), defaultFactoryRefusal('hire')));
-test('REFUSED: a workflow it does not offer, naming the attach', () => {
+  test('REFUSED: a workflow it does not offer, naming the attach', () => {
     assert.equal(hireRefusalOf(pipao, 'intake', null), unattachedHireRefusal('pipao', 'intake'));
     names(unattachedHireRefusal('pipao', 'intake'), 'pipao', 'intake', 'nemia factory attach pipao intake');
   });
-test('REFUSED: a workflow not offered before the step naming its agent', () =>
+  test('REFUSED: a workflow not offered before the step naming its agent', () =>
     assert.equal(hireRefusalOf({ name: 'pipao', workflows: [] }, 'build', 'ada'), unattachedHireRefusal('pipao', 'build')));
-test('REFUSED: a step whose own file names its agent, naming the line to delete', () =>
+  test('REFUSED: a step whose own file names its agent, naming the line to delete', () =>
     names(hireRefusalOf(pipao, 'build', 'ada'), '`agent: ada`', '`agent:`'));
-test('taken: a step of a workflow it offers, naming no agent', () => assert.equal(hireRefusalOf(pipao, 'build', null), null));
+  test('taken: a step of a workflow it offers, naming no agent', () => assert.equal(hireRefusalOf(pipao, 'build', null), null));
 });
 
 describe('what a refused start names: the factory, the workflow, the steps, the folder, and the fix in the words of the start', () => {
-test('unattachedRefusal: taken for a workflow it offers', () =>
+  test('unattachedRefusal: taken for a workflow it offers', () =>
     assert.equal(unattachedRefusal({ name: 'pipao', workflows: ['intake', 'build'] }, 'build'), undefined));
-test('unattachedRefusal: REFUSED where it offers none, naming the attach, never the default factory', () => {
+  test('unattachedRefusal: REFUSED where it offers none, naming the attach, never the default factory', () => {
     const why = unattachedRefusal({ name: 'pipao', workflows: [] }, 'build');
     names(why, 'build', 'pipao', 'none', 'nemia factory attach pipao build');
     assert.doesNotMatch(why!, /default factory/);
   });
-test('unattachedRefusal: REFUSED naming what it offers, sorted', () => {
+  test('unattachedRefusal: REFUSED naming what it offers, sorted', () => {
     const why = unattachedRefusal({ name: 'pipao', workflows: ['intake', 'dev'] }, 'build');
     names(why, 'build', 'pipao', 'dev, intake', 'nemia factory attach pipao build');
     assert.doesNotMatch(why!, /default factory/);
     names(unattachedRefusal({ name: 'pipao', workflows: ['builder'] }, 'build'), 'builder');
   });
-test('unfilledRefusal: REFUSED naming every step no agent fills, in order, a hire line each; a named or remote step is filled', () => {
-      const steps = [
-        { name: 'implement', harness: undefined, agent: undefined },
-        { name: 'review', harness: undefined, agent: { name: 'reviewer', keys: [], body: '', given: {} } },
-        { name: 'ask', harness: 'a2a:helper', agent: undefined },
-        { name: 'ship', harness: 'claude', agent: undefined },
-      ];
-      const why = unfilledRefusal(steps, 'pipao', 'build');
-      names(why, 'build', 'pipao', '2', 'implement, ship', 'nemia factory hire pipao <agent> --step build/implement');
-      names(why, 'nemia factory hire pipao <agent> --step build/ship');
-      assert.doesNotMatch(why!, /build\/review|build\/ask|default factory|plain session/);
-      assert.ok(why!.indexOf('--step build/implement') < why!.indexOf('--step build/ship'), why);
-      assert.equal(unfilledRefusal(steps.slice(1, 3), 'pipao', 'build'), undefined);
-      names(unfilledRefusal(steps.slice(0, 1), 'pipao', 'build'), 'pipao', 'implement');
-      const routed = [
-        {
-          name: 'triage',
-          harness: undefined,
-          agent: undefined,
-          routes: ['web'],
-          route: { kind: 'table' as const, from: 'a.b', table: {} },
-        },
-        { name: 'handoff', harness: undefined, agent: undefined, workflow: 'dev' },
-      ];
-      assert.equal(unfilledRefusal(routed, 'acme', 'triage'), undefined, 'a table condition and a workflow node run no agent');
-      const judged = [{ name: 'triage', harness: undefined, agent: undefined, routes: ['web'], route: { kind: 'judge' as const } }];
-      names(unfilledRefusal(judged, 'acme', 'triage'), 'acme', 'triage');
-    });
-test('outsideRefusal: taken as path.resolve spells both; REFUSED naming the list, sorted, the --repo and the add', () => {
+  test('unfilledRefusal: REFUSED naming every step no agent fills, in order, a hire line each; a named or remote step is filled', () => {
+    const steps = [
+      { name: 'implement', harness: undefined, agent: undefined },
+      { name: 'review', harness: undefined, agent: { name: 'reviewer', keys: [], body: '', given: {} } },
+      { name: 'ask', harness: 'a2a:helper', agent: undefined },
+      { name: 'ship', harness: 'claude', agent: undefined },
+    ];
+    const why = unfilledRefusal(steps, 'pipao', 'build');
+    names(why, 'build', 'pipao', '2', 'implement, ship', 'nemia factory hire pipao <agent> --step build/implement');
+    names(why, 'nemia factory hire pipao <agent> --step build/ship');
+    assert.doesNotMatch(why!, /build\/review|build\/ask|default factory|plain session/);
+    assert.ok(why!.indexOf('--step build/implement') < why!.indexOf('--step build/ship'), why);
+    assert.equal(unfilledRefusal(steps.slice(1, 3), 'pipao', 'build'), undefined);
+    names(unfilledRefusal(steps.slice(0, 1), 'pipao', 'build'), 'pipao', 'implement');
+    const routed = [
+      {
+        name: 'triage',
+        harness: undefined,
+        agent: undefined,
+        routes: ['web'],
+        route: { kind: 'table' as const, from: 'a.b', table: {} },
+      },
+      { name: 'handoff', harness: undefined, agent: undefined, workflow: 'dev' },
+    ];
+    assert.equal(unfilledRefusal(routed, 'acme', 'triage'), undefined, 'a table condition and a workflow node run no agent');
+    const judged = [{ name: 'triage', harness: undefined, agent: undefined, routes: ['web'], route: { kind: 'judge' as const } }];
+    names(unfilledRefusal(judged, 'acme', 'triage'), 'acme', 'triage');
+  });
+  test('outsideRefusal: taken as path.resolve spells both; REFUSED naming the list, sorted, the --repo and the add', () => {
     const pipao = {
       name: 'pipao',
       volumes: [
@@ -154,19 +153,19 @@ test('outsideRefusal: taken as path.resolve spells both; REFUSED naming the list
     names(why, '/r/c', '/r/a, /r/b', '--repo /r/a', 'nemia factory volume add pipao /r/c:rw');
     assert.doesNotMatch(why!, /default factory/);
   });
-test('noFactoryRefusal: REFUSED naming the folder, the factories, the fix, the add, the attach and the files that do not read', () =>
-      names(
-        noFactoryRefusal('/s/loose', ['pipao', 'abc'], '--factory <name>', ['broken']),
-        '/s/loose',
-        '--factory <name>, one of abc, pipao',
-        'nemia factory add <name> --volume <root>:rw',
-        'nemia factory attach <name> <workflow>',
-        'broken',
-        'nemia factory ls',
-      ));
-test("noFactoryRefusal: with none filed, the api's fix once one is", () =>
+  test('noFactoryRefusal: REFUSED naming the folder, the factories, the fix, the add, the attach and the files that do not read', () =>
+    names(
+      noFactoryRefusal('/s/loose', ['pipao', 'abc'], '--factory <name>', ['broken']),
+      '/s/loose',
+      '--factory <name>, one of abc, pipao',
+      'nemia factory add <name> --volume <root>:rw',
+      'nemia factory attach <name> <workflow>',
+      'broken',
+      'nemia factory ls',
+    ));
+  test("noFactoryRefusal: with none filed, the api's fix once one is", () =>
     names(noFactoryRefusal('/s/loose', [], '?factory=<name>'), '?factory=<name>', 'nemia factory add <name> --volume <root>:rw'));
-test('ambiguousFactoryRefusal: REFUSED naming each holder with its repository, by name, and the fix for each', () =>
+  test('ambiguousFactoryRefusal: REFUSED naming each holder with its repository, by name, and the fix for each', () =>
     names(
       ambiguousFactoryRefusal(
         '/s/repo/x',
@@ -181,7 +180,7 @@ test('ambiguousFactoryRefusal: REFUSED naming each holder with its repository, b
       'a on /s/repo, b on /s/repo',
       '--factory a, or --factory b',
     ));
-test("ambiguousFactoryRefusal: in the api's words", () =>
+  test("ambiguousFactoryRefusal: in the api's words", () =>
     names(
       ambiguousFactoryRefusal(
         '/s/repo',
@@ -193,18 +192,18 @@ test("ambiguousFactoryRefusal: in the api's words", () =>
       ),
       '?factory=a, or ?factory=b',
     ));
-test('defaultStartRefusal: REFUSED naming the default, the fix and the factories', () =>
+  test('defaultStartRefusal: REFUSED naming the default, the fix and the factories', () =>
     names(defaultStartRefusal('--factory <name>', ['pipao']), '`default`', '--factory <name>, one of pipao'));
 });
 
 describe('noFactoryLine: no factory of that name, naming those there are, or the add when there is none but the default', () => {
-test('some filed', () => names(noFactoryLine('nope', ['pipao', 'abc']), 'nope', 'abc, pipao'));
-test('none filed', () => names(noFactoryLine('nope', []), 'nope', 'nemia factory add <name> --volume <path|url>:rw'));
+  test('some filed', () => names(noFactoryLine('nope', ['pipao', 'abc']), 'nope', 'abc, pipao'));
+  test('none filed', () => names(noFactoryLine('nope', []), 'nope', 'nemia factory add <name> --volume <path|url>:rw'));
 });
 
 describe("fillsOf: a factory's hires into one workflow's steps, by step, and none of another workflow's", () => {
-const hires = { 'build/implement': 'ada', 'build/review': 'agora', 'other/implement': 'otto', 'builder/implement': 'x' };
-for (const [workflow, fills] of [
+  const hires = { 'build/implement': 'ada', 'build/review': 'agora', 'other/implement': 'otto', 'builder/implement': 'x' };
+  for (const [workflow, fills] of [
     ['build', { implement: 'ada', review: 'agora' }],
     ['other', { implement: 'otto' }],
     ['intake', {}],
@@ -213,17 +212,17 @@ for (const [workflow, fills] of [
 });
 
 describe("factoryRepo: the repository of a run in a factory: the one named, else the factory's only one, else where it is started from", () => {
-const one = { volumes: [{ path: '/r/pipao', readOnly: false }] };
-const two = {
+  const one = { volumes: [{ path: '/r/pipao', readOnly: false }] };
+  const two = {
     volumes: [
       { path: '/r/b', readOnly: false },
       { path: '/r/a', readOnly: false },
     ],
   };
-test('a named repository over everything', () => assert.equal(factoryRepo(one, '/r/other', '/here'), '/r/other'));
-test('the only repository, wherever it is started from', () => assert.equal(factoryRepo(one, undefined, '/here'), '/r/pipao'));
-test('with two, where it is started from', () => assert.equal(factoryRepo(two, undefined, '/here'), '/here'));
-test('the default factory has no list', () => assert.equal(factoryRepo(undefined, undefined, '/here'), '/here'));
+  test('a named repository over everything', () => assert.equal(factoryRepo(one, '/r/other', '/here'), '/r/other'));
+  test('the only repository, wherever it is started from', () => assert.equal(factoryRepo(one, undefined, '/here'), '/r/pipao'));
+  test('with two, where it is started from', () => assert.equal(factoryRepo(two, undefined, '/here'), '/here'));
+  test('the default factory has no list', () => assert.equal(factoryRepo(undefined, undefined, '/here'), '/here'));
 });
 
 test("the factories holding a folder: its repository itself, or an ancestor of it, with that repository as the run's root", () => {
@@ -261,8 +260,8 @@ test('every factory that holds a folder is returned, none chosen: one repository
 });
 
 describe("instructionAt: a factory's instruction in its first folder as filed, at NEMIA.md or the path its file names, or the store's file", () => {
-const store = '/s/factories/pipao/NEMIA.md';
-test('NEMIA.md, in the first folder', () =>
+  const store = '/s/factories/pipao/NEMIA.md';
+  test('NEMIA.md, in the first folder', () =>
     assert.deepEqual(
       instructionAt(
         {
@@ -276,7 +275,7 @@ test('NEMIA.md, in the first folder', () =>
       ),
       { in: 'folder', folder: '/b', path: 'NEMIA.md', file: '/b/NEMIA.md' },
     ));
-test('the path its file names', () =>
+  test('the path its file names', () =>
     assert.deepEqual(
       instructionAt(
         {
@@ -296,7 +295,7 @@ test('the path its file names', () =>
         file: '/b/docs/X.md',
       },
     ));
-test("the store's file", () =>
+  test("the store's file", () =>
     assert.deepEqual(
       instructionAt(
         {
@@ -314,20 +313,19 @@ test("the store's file", () =>
 });
 
 describe("instructionPathRefusal: an instruction's path is a file inside the folder, or the instruction is kept in the store", () => {
-for (const p of ['', '  '])
-    test(`REFUSED: ${JSON.stringify(p)}, empty, naming the fix`, () =>
-      names(instructionPathRefusal(p), 'empty', 'NEMIA.md', 'store'));
-for (const p of ['/etc/x', '../x', 'docs/../../x', '.', './', '..'])
+  for (const p of ['', '  '])
+    test(`REFUSED: ${JSON.stringify(p)}, empty, naming the fix`, () => names(instructionPathRefusal(p), 'empty', 'NEMIA.md', 'store'));
+  for (const p of ['/etc/x', '../x', 'docs/../../x', '.', './', '..'])
     test(`REFUSED: ${JSON.stringify(p)}, naming the fix`, () => names(instructionPathRefusal(p), `\`${p}\``, 'NEMIA.md', 'store'));
-test('REFUSED: an absolute one, saying so', () => names(instructionPathRefusal('/etc/x'), '`/etc/x`', 'absolute'));
-test('REFUSED: one that climbs out, saying so', () => names(instructionPathRefusal('docs/../../x'), 'climbs out'));
-for (const p of ['CLAUDE.md', 'docs/../NEMIA.md', 'docs/NEMIA.md', '..x/a.md'])
+  test('REFUSED: an absolute one, saying so', () => names(instructionPathRefusal('/etc/x'), '`/etc/x`', 'absolute'));
+  test('REFUSED: one that climbs out, saying so', () => names(instructionPathRefusal('docs/../../x'), 'climbs out'));
+  for (const p of ['CLAUDE.md', 'docs/../NEMIA.md', 'docs/NEMIA.md', '..x/a.md'])
     test(`taken: ${p}`, () => assert.equal(instructionPathRefusal(p), undefined));
 });
 
 describe('factoryLines: `nemia factory ls`, the default first, then each factory by name with what it holds under its line', () => {
-test('the default alone', () => assert.deepEqual(factoryLines([]), [DEFAULT_LINE]));
-test('each by name with its repositories, and one that does not read with why', () => {
+  test('the default alone', () => assert.deepEqual(factoryLines([]), [DEFAULT_LINE]));
+  test('each by name with its repositories, and one that does not read with why', () => {
     const factories = [
       {
         name: 'pipao',
@@ -357,7 +355,7 @@ test('each by name with its repositories, and one that does not read with why', 
       'pipao    /code/pipao',
     ]);
   });
-test('its harness settings, each by its key with its value, and none for a factory that sets none', () => {
+  test('its harness settings, each by its key with its value, and none for a factory that sets none', () => {
     const acme = {
       name: 'acme',
       file: '/s/factories/acme.json',
@@ -374,7 +372,7 @@ test('its harness settings, each by its key with its value, and none for a facto
     ]);
     assert.deepEqual(factoryLines([acme]), [DEFAULT_LINE, 'acme     /code/acme']);
   });
-test('its cost lines, one per workflow, sorted, and none for a factory that sets none', () => {
+  test('its cost lines, one per workflow, sorted, and none for a factory that sets none', () => {
     const mill = {
       name: 'mill',
       file: '/s/factories/mill.json',
@@ -391,7 +389,7 @@ test('its cost lines, one per workflow, sorted, and none for a factory that sets
     ]);
     assert.deepEqual(factoryLines([mill]), [DEFAULT_LINE, 'mill     /code/mill']);
   });
-test('its hires, sorted by step, whatever order its file has them in', () =>
+  test('its hires, sorted by step, whatever order its file has them in', () =>
     assert.deepEqual(
       factoryLines([
         {
@@ -405,7 +403,7 @@ test('its hires, sorted by step, whatever order its file has them in', () =>
       ]),
       [DEFAULT_LINE, 'pipao    /code/pipao', '         build/implement ← ada', '         build/review ← agora'],
     ));
-test('the workflows it offers on one line, by name, before its hires; no such line when it has none', () =>
+  test('the workflows it offers on one line, by name, before its hires; no such line when it has none', () =>
     assert.deepEqual(
       factoryLines([
         {
@@ -427,7 +425,7 @@ test('the workflows it offers on one line, by name, before its hires; no such li
       ]),
       [DEFAULT_LINE, 'nemia    /code/nemia', 'pipao    /code/pipao', '         workflows: build, intake', '         build/implement ← ada'],
     ));
-test('where its instruction is kept, when its file says', () => {
+  test('where its instruction is kept, when its file says', () => {
     const base = { file: '/s/f.json', volumes: [{ path: '/code/a', readOnly: false }], workflows: [], hires: {}, schedules: {} };
     assert.deepEqual(
       factoryLines([
@@ -444,7 +442,7 @@ test('where its instruction is kept, when its file says', () => {
       ],
     );
   });
-test("a templated factory's template, applied or not yet, and each condition that is amiss", () => {
+  test("a templated factory's template, applied or not yet, and each condition that is amiss", () => {
     const made = {
       name: 'made',
       file: '/s/factories/made.json',
@@ -474,47 +472,47 @@ test("a templated factory's template, applied or not yet, and each condition tha
       '         ConflictsPending True, Conflicts: Two files wait.',
     ]);
   });
-test("its schedules under its hires, by workflow, with the zone, the repository, the brief's first line, the next fire and last run", () => {
-      const since = '2026-10-01T00:00:00.000Z';
-      const now = Date.parse('2026-10-08T12:00:00.000Z');
-      const listed = (workflow: string, over: Partial<ScheduleListed>): ScheduleListed => ({
-        factory: 'nemia',
-        workflow,
-        cron: '',
-        tz: null,
-        brief: '',
-        repo: null,
-        next: null,
-        last: null,
-        refused: null,
-        ...over,
-      });
-      const factories = [
-        {
-          name: 'nemia',
-          file: '/s/nemia.json',
-          volumes: [{ path: '/code/nemia', readOnly: false }],
-          workflows: ['janitor', 'build'],
-          hires: {},
-          schedules: {
-            janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
-            build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
-          },
-        },
-      ];
-      const schedules = [
-        listed('janitor', { next: '2026-10-12T13:00:00.000Z', last: { run: 'read-the-stats-ab12', at: '2026-10-05T13:00:02.000Z' } }),
-        listed('build', { next: '2026-11-01T00:00:00.000Z', refused: 'build is not attached to nemia' }),
-        { ...listed('janitor', { last: { run: 'another-factory-s-run', at: since } }), factory: 'pipao' },
-      ];
-      assert.deepEqual(factoryLines(factories, schedules, now).slice(1), [
-        'nemia    /code/nemia',
-        '         workflows: build, janitor',
-        '         schedule build  0 0 1 * * on /code/nemia  "Tidy"',
-        '           next 2026-11-01T00:00:00.000Z, in 23d12h  last none',
-        '           refused: build is not attached to nemia',
-        '         schedule janitor  0 9 * * 1 (America/Montreal)  "Read the stats"',
-        '           next 2026-10-12T13:00:00.000Z, in 4d01h  last read-the-stats-ab12 (2026-10-05T13:00:02.000Z, 2d22h ago)',
-      ]);
+  test("its schedules under its hires, by workflow, with the zone, the repository, the brief's first line, the next fire and last run", () => {
+    const since = '2026-10-01T00:00:00.000Z';
+    const now = Date.parse('2026-10-08T12:00:00.000Z');
+    const listed = (workflow: string, over: Partial<ScheduleListed>): ScheduleListed => ({
+      factory: 'nemia',
+      workflow,
+      cron: '',
+      tz: null,
+      brief: '',
+      repo: null,
+      next: null,
+      last: null,
+      refused: null,
+      ...over,
     });
+    const factories = [
+      {
+        name: 'nemia',
+        file: '/s/nemia.json',
+        volumes: [{ path: '/code/nemia', readOnly: false }],
+        workflows: ['janitor', 'build'],
+        hires: {},
+        schedules: {
+          janitor: { cron: '0 9 * * 1', brief: 'Read the stats\nand say what moved', tz: 'America/Montreal', since },
+          build: { cron: '0 0 1 * *', brief: 'Tidy', repo: '/code/nemia', since },
+        },
+      },
+    ];
+    const schedules = [
+      listed('janitor', { next: '2026-10-12T13:00:00.000Z', last: { run: 'read-the-stats-ab12', at: '2026-10-05T13:00:02.000Z' } }),
+      listed('build', { next: '2026-11-01T00:00:00.000Z', refused: 'build is not attached to nemia' }),
+      { ...listed('janitor', { last: { run: 'another-factory-s-run', at: since } }), factory: 'pipao' },
+    ];
+    assert.deepEqual(factoryLines(factories, schedules, now).slice(1), [
+      'nemia    /code/nemia',
+      '         workflows: build, janitor',
+      '         schedule build  0 0 1 * * on /code/nemia  "Tidy"',
+      '           next 2026-11-01T00:00:00.000Z, in 23d12h  last none',
+      '           refused: build is not attached to nemia',
+      '         schedule janitor  0 9 * * 1 (America/Montreal)  "Read the stats"',
+      '           next 2026-10-12T13:00:00.000Z, in 4d01h  last read-the-stats-ab12 (2026-10-05T13:00:02.000Z, 2d22h ago)',
+    ]);
+  });
 });

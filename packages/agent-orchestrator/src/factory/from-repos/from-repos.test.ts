@@ -9,7 +9,7 @@ import { volumesFromRepos, type FormerKeys } from './from-repos.ts';
 const URL = 'https://example.com/o/app.git';
 
 describe('a file written before one list is read into one list, and one written after is answered as it is', () => {
-const rows: { name: string; file: FormerKeys; want: readonly unknown[] }[] = [
+  const rows: { name: string; file: FormerKeys; want: readonly unknown[] }[] = [
     {
       name: 'each repository leads, writable, in the order it was filed, its URL its origin',
       file: { repos: ['/b', '/s/clones/app', '/a'], origins: { '/s/clones/app': URL } },
@@ -54,7 +54,7 @@ const rows: { name: string; file: FormerKeys; want: readonly unknown[] }[] = [
     },
     { name: 'a file with neither is a factory with no volume', file: {}, want: [] },
   ];
-for (const row of rows)
+  for (const row of rows)
     test(row.name, () => {
       assert.deepEqual(JSON.parse(JSON.stringify(volumesFromRepos(row.file))), row.want);
     });

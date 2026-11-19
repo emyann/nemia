@@ -39,7 +39,7 @@ const statesOf = (root: string, harness: 'met' | 'missing', runs: readonly Run[]
 };
 
 describe('a store meets its milestones in order, each read from what it holds now', () => {
-test('an empty store has the harness next, the rest later', () => {
+  test('an empty store has the harness next, the rest later', () => {
     assert.deepEqual(statesOf(scratch('wf-milestones-'), 'missing'), {
       harness: 'next',
       factory: 'later',
@@ -47,7 +47,7 @@ test('an empty store has the harness next, the rest later', () => {
       landed: 'later',
     });
   });
-test('a harness signed in, a factory filed, a volume mounted and a run landed are each done', () => {
+  test('a harness signed in, a factory filed, a volume mounted and a run landed are each done', () => {
     const root = scratch('wf-milestones-');
     assert.equal(statesOf(root, 'met').harness, 'done');
     assert.equal(statesOf(root, 'met').factory, 'next');
@@ -66,7 +66,7 @@ test('a harness signed in, a factory filed, a volume mounted and a run landed ar
     const landed: Run = { ...run, steps: { ...run.steps, implement: { taskId: 'r-landed-implement', landed: { commit: 'abc' } } } };
     assert.deepEqual(statesOf(root, 'met', [landed]), { harness: 'done', factory: 'done', volume: 'done', landed: 'done' });
   });
-test('REFUSED: a volume a mount would refuse is no milestone', () => {
+  test('REFUSED: a volume a mount would refuse is no milestone', () => {
     const root = scratch('wf-milestones-');
     const inStore = path.join(root, 'kept');
     fs.mkdirSync(inStore);

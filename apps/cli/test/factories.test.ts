@@ -58,14 +58,14 @@ async function refused(argv: readonly string[], code: number, named: string): Pr
 }
 
 describe('a person files a factory, wires its parts, sees each in the listing, and removes it', () => {
-const s = story(test);
-s.test('`factory add` with a repository typed relative files it on the folder by its whole path', async () => {
+  const s = story(test);
+  s.test('`factory add` with a repository typed relative files it on the folder by its whole path', async () => {
     const said = await out(['factory', 'add', 'mill', '--volume', 'mill:rw', '--no-trust']);
     assert.match(said, new RegExp(`^mill  ${repo}$`, 'm'));
     assert.match(said, /^filed: .*mill\.json$/m);
     assert.match(await out(['factory', 'ls']), new RegExp(`^mill +${repo}$`, 'm'));
   });
-s.test('`factory attach` attaches the workflow, and says so again unchanged; `hire` and `fire` fill its step', async () => {
+  s.test('`factory attach` attaches the workflow, and says so again unchanged; `hire` and `fire` fill its step', async () => {
     assert.match(await out(['factory', 'attach', 'mill', 'make']), /^mill  attached make$/m);
     assert.match(await out(['factory', 'attach', 'mill', 'make']), /^unchanged: /m);
     const folder = path.basename(repo);
@@ -84,7 +84,7 @@ s.test('`factory attach` attaches the workflow, and says so again unchanged; `hi
     assert.match(listed, /^ +make\/code ← reviewer$/m);
     assert.match(await out(['factory', 'fire', 'mill', '--step', 'make/code']), /^mill  make\/code  fired reviewer$/m);
   });
-s.test('`factory schedule` schedules the workflow, the listing says its next fire, and `unschedule` takes it back', async () => {
+  s.test('`factory schedule` schedules the workflow, the listing says its next fire, and `unschedule` takes it back', async () => {
     assert.match(
       await out(['factory', 'schedule', 'mill', 'make', '--cron', '0 9 * * 1', '--brief', 'Read the stats']),
       /^mill  make at 0 9 \* \* 1$/m,
@@ -95,13 +95,13 @@ s.test('`factory schedule` schedules the workflow, the listing says its next fir
     assert.match(listed, /^ +next \S+, in \S+  last none$/m);
     assert.match(await out(['factory', 'unschedule', 'mill', 'make']), /^mill  make no longer at 0 8 \* \* 1$/m);
   });
-s.test('`factory volume add` mounts a folder typed relative by its whole path; `volume rm` takes it off typed so too', async () => {
+  s.test('`factory volume add` mounts a folder typed relative by its whole path; `volume rm` takes it off typed so too', async () => {
     const notes = path.join(here, 'notes');
     assert.match(await out(['factory', 'volume', 'add', 'mill', 'notes:ro']), new RegExp(`^mill  volume ${notes} :ro$`, 'm'));
     assert.match(await out(['factory', 'ls']), new RegExp(`^ +volume ${notes} :ro$`, 'm'));
     assert.match(await out(['factory', 'volume', 'rm', 'mill', 'notes']), new RegExp(`^mill  volume ${notes} removed$`, 'm'));
   });
-s.test('`factory setting` and `cost-line` set and take off what the runs are given, each seen in the listing', async () => {
+  s.test('`factory setting` and `cost-line` set and take off what the runs are given, each seen in the listing', async () => {
     assert.match(
       await out(['factory', 'setting', 'set', 'mill', 'claude.language', '"french"']),
       /^mill  setting claude\.language "french"$/m,
@@ -114,7 +114,7 @@ s.test('`factory setting` and `cost-line` set and take off what the runs are giv
     assert.match(await out(['factory', 'setting', 'rm', 'mill', 'claude.language']), /^mill  setting claude\.language removed$/m);
     assert.match(await out(['factory', 'cost-line', 'rm', 'mill', 'make']), /^mill  cost line make removed$/m);
   });
-s.test('`factory rules` writes the words of stdin, prints them bare, and removes them with --clear', async () => {
+  s.test('`factory rules` writes the words of stdin, prints them bare, and removes them with --clear', async () => {
     assert.match(await out(['factory', 'rules', 'mill', '--file', '-'], 'Keep it short.\n'), /^mill: rules written to /m);
     assert.match(await out(['factory', 'rules', 'mill']), /^Keep it short\.$/m);
     assert.match(await out(['factory', 'rules', 'mill', '--file', 'RULES.md']), /^mill: rules written to /m);
@@ -122,7 +122,7 @@ s.test('`factory rules` writes the words of stdin, prints them bare, and removes
     assert.match(await out(['factory', 'rules', 'mill', '--clear']), /^mill: rules removed, /m);
     assert.match(await out(['factory', 'rules', 'mill', '--clear']), /^mill has no rules to remove$/m);
   });
-s.test('`factory instruction --store`, then `instruct` writes its words from a file and takes them off once', async () => {
+  s.test('`factory instruction --store`, then `instruct` writes its words from a file and takes them off once', async () => {
     assert.match(await out(['factory', 'instruction', 'mill', '--store']), /^mill: instruction kept in the store: /m);
     assert.match(await out(['factory', 'instruct', 'mill', '--file', 'NEMIA.md']), /^mill: instruction written to /m);
     assert.match(await out(['factory', 'instruction', 'mill']), /^The mill presses drafts\.$/m);
@@ -130,7 +130,7 @@ s.test('`factory instruction --store`, then `instruct` writes its words from a f
     assert.match(await out(['factory', 'instruct', 'mill', '--clear']), /^mill: instruction removed, /m);
     assert.match(await out(['factory', 'instruct', 'mill', '--clear']), /^mill has no instruction in the store to remove$/m);
   });
-s.test('`factory server add` records a server, `servers` lists it with its state, and `server rm` takes it off', async () => {
+  s.test('`factory server add` records a server, `servers` lists it with its state, and `server rm` takes it off', async () => {
     const added = await out(['factory', 'server', 'add', 'mill', 'docs', '--url', 'https://a.example/mcp', '--header', 'X-Team=mill']);
     assert.match(added, /^mill  docs → http https:\/\/a\.example\/mcp$/m);
     assert.match(
@@ -141,13 +141,15 @@ s.test('`factory server add` records a server, `servers` lists it with its state
     assert.match(await out(['factory', 'server', 'rm', 'mill', 'docs']), /^mill  docs removed$/m);
     assert.match(await out(['factory', 'servers', 'mill']), /^mill  no server recorded/m);
   });
-s.test('`factory revisions` sets the policy and says the one it replaced; `trust` asks nothing of a harness here', async () => {
+  s.test('`factory revisions` sets the policy and says the one it replaced; `trust` asks nothing of a harness here', async () => {
     assert.match(await out(['factory', 'revisions', 'mill', 'follow']), /^mill  revisions: follow$/m);
     assert.match(await out(['factory', 'revisions', 'mill', 'pinned']), /^mill  revisions: pinned \(was follow\)$/m);
     assert.match(await out(['factory', 'ls']), /^ +revisions: pinned$/m);
     assert.equal((await nemia(['factory', 'trust', 'mill'])).code, 0);
   });
-s.test('REFUSED, exit 2: a hire with no step, a header with no value, a callback port with no client, before anything is asked', async () => {
+  s.test(
+    'REFUSED, exit 2: a hire with no step, a header with no value, a callback port with no client, before anything is asked',
+    async () => {
       await refused(['factory', 'hire', 'mill', 'implementer'], 2, '--step');
       await refused(['factory', 'server', 'add', 'mill', 'docs', '--url', 'https://a.example/mcp', '--header', 'novalue'], 2, 'novalue');
       await refused(
@@ -157,12 +159,13 @@ s.test('REFUSED, exit 2: a hire with no step, a header with no value, a callback
       );
       await refused(['factory', 'rules', 'mill', '--file', 'nowhere.md'], 2, path.join(here, 'nowhere.md'));
       await refused(['factory', 'cost-line', 'set', 'mill', 'make', 'lots'], 2, 'lots');
-    });
-s.test('REFUSED by the api in its words: a workflow the factory has not attached, a step it does not offer', async () => {
+    },
+  );
+  s.test('REFUSED by the api in its words: a workflow the factory has not attached, a step it does not offer', async () => {
     assert.notEqual((await nemia(['factory', 'detach', 'mill', 'nowhere'])).code, 0);
     assert.notEqual((await nemia(['factory', 'hire', 'mill', 'implementer', '--step', 'nowhere/code'])).code, 0);
   });
-s.test('`factory rm` removes it, and the listing holds the default alone', async () => {
+  s.test('`factory rm` removes it, and the listing holds the default alone', async () => {
     assert.match(await out(['factory', 'rm', 'mill']), /^mill  removed — /m);
     const listed = await out(['factory', 'ls']);
     assert.doesNotMatch(listed, /^mill /m);

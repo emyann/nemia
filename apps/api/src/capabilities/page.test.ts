@@ -32,7 +32,7 @@ const listedOn = (name: string, repos: string[]): FactoryListing =>
   ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })) }) as unknown as FactoryListing;
 
 describe('pageRead: the repository the page reads, or why none', () => {
-const rows: Array<{
+  const rows: Array<{
     name: string;
     place: Parameters<typeof pageRead>[0];
     listings: FactoryListing[];
@@ -105,7 +105,7 @@ const rows: Array<{
       read: '/r',
     },
   ];
-for (const row of rows)
+  for (const row of rows)
     test(row.name, () => {
       const read = pageRead(row.place, row.listings);
       if (typeof row.read === 'string') {
@@ -152,42 +152,48 @@ test("with no factory filed, the page reads no repository whatever the api's own
 });
 
 describe('an install unpacked from an archive, its source an address: the page reads no path built from it, and a factory once filed', () => {
-let release!: any;
-let file!: Omit<any, "kind" | "root">;
-let running!: Running;
-let _noRepoOfItsOwn!: any;
-let _notExposed!: any;
-let env!: any;
-let app!: Hono<import("../layer.ts").ApiEnv>;
-let repoA!: string;
-let repoB!: string;
-let repoC!: string;
-beforeAll(() => {
-const t = teardowns();
-release = scratch('nemia-api-release-');
-write(
-    path.join(release, 'release.json'),
-    JSON.stringify({ tag: 'v1.5.0', commit: 'abcdef1234567890', source: SOURCE, builtAt: '2026-11-12T00:00:00.000Z', from: 'archive' }),
-  );
-file = JSON.parse(fs.readFileSync(path.join(release, 'release.json'), 'utf8')) as Omit<
-    Extract<Running, { kind: 'install' }>,
+  let release!: string;
+  let file!: Omit<
+    {
+      readonly kind: 'install';
+      readonly root: string;
+    } & import('../../../../node_modules/agent-orchestrator/src/release/release.ts').ReleaseFile,
     'kind' | 'root'
   >;
-running = { kind: 'install', root: release, ...file };
-({ HKB_REPO: _noRepoOfItsOwn, WF_EXPOSED: _notExposed, ...env } = process.env);
-({ app } = appOf(Layer.merge(liveOf(env), ApiConfig.layer(env, running))));
-return t.end;
-});
-const s = story(test);
-const SOURCE = 'https://github.com/emyann/nemia/releases';
-const page = async (query = ''): Promise<CapabilitiesWithSteps> => {
+  let running!: Running;
+  let _noRepoOfItsOwn!: string | undefined;
+  let _notExposed!: string | undefined;
+  let env!: { [key: string]: string | undefined };
+  let app!: import('hono').Hono<import('../layer.ts').ApiEnv, import('hono/types').BlankSchema, '/'>;
+  let repoA!: string;
+  let repoB!: string;
+  let repoC!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    release = scratch('nemia-api-release-');
+    write(
+      path.join(release, 'release.json'),
+      JSON.stringify({ tag: 'v1.5.0', commit: 'abcdef1234567890', source: SOURCE, builtAt: '2026-11-12T00:00:00.000Z', from: 'archive' }),
+    );
+    file = JSON.parse(fs.readFileSync(path.join(release, 'release.json'), 'utf8')) as Omit<
+      Extract<Running, { kind: 'install' }>,
+      'kind' | 'root'
+    >;
+    running = { kind: 'install', root: release, ...file };
+    ({ HKB_REPO: _noRepoOfItsOwn, WF_EXPOSED: _notExposed, ...env } = process.env);
+    ({ app } = appOf(Layer.merge(liveOf(env), ApiConfig.layer(env, running))));
+    return t.end;
+  });
+  const s = story(test);
+  const SOURCE = 'https://github.com/emyann/nemia/releases';
+  const page = async (query = ''): Promise<CapabilitiesWithSteps> => {
     const res = await app.request(`/api/capabilities${query}`);
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as CapabilitiesWithSteps;
   };
-const namesNoAddress = (answer: unknown): void =>
+  const namesNoAddress = (answer: unknown): void =>
     assert.ok(!JSON.stringify(answer).includes('https:'), `the source's address is never a path: ${JSON.stringify(answer)}`);
-s.test('with no factory, the page reads no repository, says so, and names the lines that file one', async () => {
+  s.test('with no factory, the page reads no repository, says so, and names the lines that file one', async () => {
     const answer = await page();
     assert.equal(answer.repo, undefined, 'no repository is read');
     assert.equal(answer.unread?.reason, 'no-factory');
@@ -199,7 +205,7 @@ s.test('with no factory, the page reads no repository, says so, and names the li
     assert.equal(answer.skills.length + answer.agents.length + answer.mcp.length + answer.steps.length, 0, 'no list under a path');
     namesNoAddress(answer);
   });
-s.test('the default factory is on no repository, and a read that needs one is refused, naming the fix', async () => {
+  s.test('the default factory is on no repository, and a read that needs one is refused, naming the fix', async () => {
     const factories = (await (await app.request('/api/factories')).json()) as {
       items: Array<{ metadata: { name: string }; spec: { volumes: Array<{ path: string }> } }>;
     };
@@ -209,8 +215,8 @@ s.test('the default factory is on no repository, and a read that needs one is re
     assert.equal(refused.status, 422);
     namesNoAddress(await refused.json());
   });
-s.test('one factory filed on one repository: the page reads it, with no factory named', async () => {
-repoA = repoWithSkill('a');
+  s.test('one factory filed on one repository: the page reads it, with no factory named', async () => {
+    repoA = repoWithSkill('a');
     addFactory({ name: 'alpha', volumes: [repoA].map((r) => `${r}:rw`) });
     const answer = await page();
     assert.equal(answer.repo, repoA);
@@ -220,21 +226,21 @@ repoA = repoWithSkill('a');
       ['a-skill'],
     );
   });
-s.test('a second factory, on two repositories: pick a factory; named, pick one of its repositories; each read by ?repo=', async () => {
-repoB = repoWithSkill('b');
-repoC = repoWithSkill('c');
-      addFactory({ name: 'beta', volumes: [repoB, repoC].map((r) => `${r}:rw`) });
-      assert.equal((await page()).unread?.reason, 'several-factories');
-      assert.equal((await page('?factory=alpha')).repo, repoA, 'the factory the picker names');
-      const pick = (await page('?factory=beta')).unread;
-      assert.equal(pick?.reason, 'several-repositories');
-      assert.equal(pick?.factory, 'beta');
-      assert.deepEqual(pick?.repos, [repoB, repoC].sort());
-      const read = await page(`?factory=beta&repo=${encodeURIComponent(repoC)}`);
-      assert.equal(read.repo, repoC);
-      assert.deepEqual(
-        (read.skills as Array<{ name: string }>).map((skill) => skill.name),
-        ['c-skill'],
-      );
-    });
+  s.test('a second factory, on two repositories: pick a factory; named, pick one of its repositories; each read by ?repo=', async () => {
+    repoB = repoWithSkill('b');
+    repoC = repoWithSkill('c');
+    addFactory({ name: 'beta', volumes: [repoB, repoC].map((r) => `${r}:rw`) });
+    assert.equal((await page()).unread?.reason, 'several-factories');
+    assert.equal((await page('?factory=alpha')).repo, repoA, 'the factory the picker names');
+    const pick = (await page('?factory=beta')).unread;
+    assert.equal(pick?.reason, 'several-repositories');
+    assert.equal(pick?.factory, 'beta');
+    assert.deepEqual(pick?.repos, [repoB, repoC].sort());
+    const read = await page(`?factory=beta&repo=${encodeURIComponent(repoC)}`);
+    assert.equal(read.repo, repoC);
+    assert.deepEqual(
+      (read.skills as Array<{ name: string }>).map((skill) => skill.name),
+      ['c-skill'],
+    );
+  });
 });

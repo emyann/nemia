@@ -188,25 +188,25 @@ test('under a remote context `nemia factory add --volume <url>:rw` files the fac
 });
 
 describe('`nemia factory add --template` is refused naming `nemia factory apply`, exit 2, under a remote context and on this machine alike', () => {
-let env!: NodeJS.ProcessEnv;
-let root!: string;
-let folder!: string;
-let server!: string;
-let set!: Said;
-beforeAll(async () => {
-({ env, root, folder } = aLaptop('nemia-context-add-template-'));
-server = `http://127.0.0.1:${await freePort()}`;
-set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
-assert.equal(set.code, 0, set.err);
-});
-const typed = ['factory', 'add', 'mill', '--template', 'mill', '--volume', 'https://github.com/o/r:rw'];
-test('under the remote context, before its server is asked', async () => {
+  let env!: NodeJS.ProcessEnv;
+  let root!: string;
+  let folder!: string;
+  let server!: string;
+  let set!: Said;
+  beforeAll(async () => {
+    ({ env, root, folder } = aLaptop('nemia-context-add-template-'));
+    server = `http://127.0.0.1:${await freePort()}`;
+    set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
+    assert.equal(set.code, 0, set.err);
+  });
+  const typed = ['factory', 'add', 'mill', '--template', 'mill', '--volume', 'https://github.com/o/r:rw'];
+  test('under the remote context, before its server is asked', async () => {
     const said = await nemia(typed, { ...env, NEMIA_CONTEXT: 'vps' });
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);
     assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
   });
-test('on this machine', async () => {
+  test('on this machine', async () => {
     const said = await nemia(typed, env);
     assert.equal(said.code, 2, said.err);
     assert.match(said.err, /nemia factory apply <name> --template/);

@@ -152,14 +152,23 @@ const held = (dst: Side) => ({
 const NOTHING = { factories: [], folder: [], cards: [] };
 
 describe('the export reads the source whole and writes nothing of it', () => {
-let src!: Side;
-let exp!: FactoryExport;
-beforeAll(async () => {
-src = side('wf-move-src-');
-planted(src);
-exp = await exported(src);
-});
-test('the cards that follow are those of the factory no run was started from; one a run keeps is left, with why', () => {
+  let src!: Side;
+  let exp!: {
+    readonly name: string;
+    readonly cards: readonly { readonly name: string; readonly source: string }[];
+    readonly folder: { readonly archive: string };
+    readonly file: string;
+    readonly left: readonly { readonly name: string; readonly why: string }[];
+    readonly stays: readonly string[];
+    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
+  };
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    planted(src);
+    exp = await exported(src);
+  });
+  test('the cards that follow are those of the factory no run was started from; one a run keeps is left, with why', () => {
     assert.deepEqual(
       exp.cards.map((c) => c.name),
       ['add-a-flag-c3d4'],
@@ -170,53 +179,71 @@ test('the cards that follow are those of the factory no run was started from; on
     );
     assert.equal(exp.left[0]?.why.includes('run-a1b2'), true);
   });
-test('its folder is packed but its proposals and delegations, which are named as staying', () => {
+  test('its folder is packed but its proposals and delegations, which are named as staying', () => {
     assert.deepEqual(exp.stays, ['proposals', 'delegations']);
     assert.deepEqual(
       unpackArchive(Buffer.from(exp.folder.archive, 'base64')).files.map((f) => f.path),
       ['applied/factory.json', 'level.json', 'tree/factory.json', 'tree/workflows/press/implement.md'],
     );
   });
-test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
+  test('a template kept at a folder of the source travels packed, and a builtin one by its name', async () => {
     assert.equal(exp.template !== undefined && 'archive' in exp.template, true);
     const builtin = side('wf-move-src-');
     planted(builtin, 'shop-template');
     assert.deepEqual((await exported(builtin)).template, { name: 'shop-template' });
   });
-test('its cards stay where they are told to, none left behind named', async () => {
+  test('its cards stay where they are told to, none left behind named', async () => {
     const kept = await exported(src, 'stay');
     assert.deepEqual([kept.cards, kept.left], [[], []]);
   });
-test('the file it carries holds no tree, generation counted as read', () => {
+  test('the file it carries holds no tree, generation counted as read', () => {
     const file = JSON.parse(exp.file) as Record<string, unknown>;
     assert.equal('tree' in file || 'name' in file, false);
   });
-test('nothing of the source is written', () => {
+  test('nothing of the source is written', () => {
     assert.deepEqual(done(src.cards.cards.entries()).length, 3);
     assert.equal(done(src.factories.folder.read(NAME)).stays.length, 2);
   });
-test('REFUSED: the default factory, which has no folder to move, is a Conflict', async () => {
+  test('REFUSED: the default factory, which has no folder to move, is a Conflict', async () => {
     assert.equal(refusal(await on(src, factoryExported('default', {}))).kind, 'Conflict');
   });
 });
 
 describe('the import files the factory on the target, clones its repositories, and trusts none of them', () => {
-let src!: Side;
-let origin!: string;
-let exp!: FactoryExport;
-let dst!: Side;
-let answered!: unknown;
-let record!: unknown;
-beforeAll(async () => {
-src = side('wf-move-src-');
-({ origin } = planted(src));
-exp = await exported(src);
-dst = side('wf-move-dst-');
-answered = answer(await imported(dst, exp));
-record = done(dst.factories.factories.read(NAME));
-if (isDefaultFactory(record)) return assert.fail('read as the default');
-});
-test('its repository is the target’s clone of its origin, cloned there', () => {
+  let src!: Side;
+  let origin!: string;
+  let exp!: {
+    readonly name: string;
+    readonly cards: readonly { readonly name: string; readonly source: string }[];
+    readonly folder: { readonly archive: string };
+    readonly file: string;
+    readonly left: readonly { readonly name: string; readonly why: string }[];
+    readonly stays: readonly string[];
+    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
+  };
+  let dst!: Side;
+  let answered!: {
+    name: string;
+    file: string;
+    repos: string[];
+    cloned: string[];
+    volumes: { name: string; path: string }[];
+    cards: { name: string; was: string }[];
+    untrusted: string[];
+  };
+  let record!: Exclude<import('../factory.model.ts').FactoryRecord, import('../factory.model.ts').DefaultFactory>;
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    ({ origin } = planted(src));
+    exp = await exported(src);
+    dst = side('wf-move-dst-');
+    answered = answer(await imported(dst, exp));
+    const read = done(dst.factories.factories.read(NAME));
+    if (isDefaultFactory(read)) return assert.fail('read as the default');
+    record = read;
+  });
+  test('its repository is the target’s clone of its origin, cloned there', () => {
     assert.deepEqual(
       record.volumes.map((v) => v.path),
       [path.join(dst.root, 'clones', 'localhost', ...new URL(origin).pathname.split('/').filter(Boolean))],
@@ -224,32 +251,32 @@ test('its repository is the target’s clone of its origin, cloned there', () =>
     assert.deepEqual(answered.cloned, [origin]);
     assert.equal(fs.existsSync(record.volumes[0]?.path ?? ''), true, 'the place cloned it there');
   });
-test('its template, version and parameters, the template kept under the target’s store', () => {
+  test('its template, version and parameters, the template kept under the target’s store', () => {
     assert.equal(record.template?.source.startsWith(path.join(dst.root, 'templates-sent')), true);
     assert.deepEqual([record.template?.version, record.template?.params], ['1.0.0', { team: 'ann' }]);
     assert.equal(record.tree, path.join(dst.root, 'factories', 'shop', 'tree'));
   });
-test('its tree’s edits and its level, and none of what stays', () => {
+  test('its tree’s edits and its level, and none of what stays', () => {
     const { files } = done(dst.factories.folder.read(NAME));
     const implement = files.find((f) => f.path === 'tree/workflows/press/implement.md');
     assert.equal(new TextDecoder().decode(implement?.bytes), '---\n---\nBuild it, edited.\n');
     assert.deepEqual(done(dst.factories.level.read(NAME)), { level: 'auto', since: SINCE });
     assert.deepEqual(done(dst.factories.folder.read(NAME)).stays, []);
   });
-test('its places are all untrusted, for the person to trust', () => {
+  test('its places are all untrusted, for the person to trust', () => {
     assert.deepEqual(
       answered.untrusted,
       record.volumes.map((v) => v.path),
     );
   });
-test('its card is filed under its old name, not queued, and says where it came from', () => {
+  test('its card is filed under its old name, not queued, and says where it came from', () => {
     assert.deepEqual(answered.cards, [{ name: 'add-a-flag-c3d4', was: 'add-a-flag-c3d4' }]);
     const text = done(dst.cards.cards.read(CardName.read('add-a-flag-c3d4'))) ?? '';
     const card = parseInboxCard('add-a-flag-c3d4.md', text);
     assert.deepEqual([card.queued, card.factory], [undefined, 'shop']);
     assert.equal(card.body.includes('laptop'), true);
   });
-test('a card whose name the target holds is filed under a new one, its old name answered', async () => {
+  test('a card whose name the target holds is filed under a new one, its old name answered', async () => {
     const other = side('wf-move-dst-');
     done(other.cards.cards.add(CardName.read('add-a-flag-c3d4'), aCard('Mine already')));
     const cards = answer(await imported(other, exp)).cards;
@@ -260,53 +287,62 @@ test('a card whose name the target holds is filed under a new one, its old name 
 });
 
 describe('REFUSED: the import refuses before anything is written, and writes nothing', () => {
-let src!: Side;
-let exp!: FactoryExport;
-let local!: FactoryExport;
-beforeAll(async () => {
-src = side('wf-move-src-');
-planted(src);
-exp = await exported(src);
-local = {
-    ...exp,
-    file: JSON.stringify({
-      ...(JSON.parse(exp.file) as object),
-      volumes: [
-        { path: '/work/notes', readOnly: false },
-        { path: '/work/data', readOnly: true, name: 'data' },
-      ],
-    }),
+  let src!: Side;
+  let exp!: {
+    readonly name: string;
+    readonly cards: readonly { readonly name: string; readonly source: string }[];
+    readonly folder: { readonly archive: string };
+    readonly file: string;
+    readonly left: readonly { readonly name: string; readonly why: string }[];
+    readonly stays: readonly string[];
+    readonly template?: { readonly name: string } | { readonly archive: string } | { readonly path: string } | undefined;
+    readonly instruction?: { readonly path: string; readonly words: string } | undefined;
   };
-});
-test('a name the target holds is a Conflict', async () => {
+  let local!: FactoryExport;
+  beforeAll(async () => {
+    src = side('wf-move-src-');
+    planted(src);
+    exp = await exported(src);
+    local = {
+      ...exp,
+      file: JSON.stringify({
+        ...(JSON.parse(exp.file) as object),
+        volumes: [
+          { path: '/work/notes', readOnly: false },
+          { path: '/work/data', readOnly: true, name: 'data' },
+        ],
+      }),
+    };
+  });
+  test('a name the target holds is a Conflict', async () => {
     const dst = side('wf-move-dst-');
     planted(dst);
     const before = held(dst);
     assert.equal(refusal(await imported(dst, exp)).kind, 'Conflict');
     assert.deepEqual(held(dst), before);
   });
-test('a repository with no origin and nothing typed is Invalid, naming the flag that gives it one', async () => {
+  test('a repository with no origin and nothing typed is Invalid, naming the flag that gives it one', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local, { volumes: { data: scratch('wf-move-volume-') } }));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--repo /work/notes='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-test('a volume whose path the target refuses is Invalid, naming the flag that gives it another', async () => {
+  test('a volume whose path the target refuses is Invalid, naming the flag that gives it another', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local, { repos: { '/work/notes': scratch('wf-move-notes-') } }));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-test('both at once, each named in one refusal', async () => {
+  test('both at once, each named in one refusal', async () => {
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--repo /work/notes=') && refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
-test('a folder sent that does not unpack is Invalid', async () => {
+  test('a folder sent that does not unpack is Invalid', async () => {
     const dst = side('wf-move-dst-');
     assert.equal(refusal(await imported(dst, { ...exp, folder: { archive: 'bm90IGFuIGFyY2hpdmU=' } })).kind, 'Invalid');
     assert.deepEqual(held(dst), NOTHING);

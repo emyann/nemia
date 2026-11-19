@@ -16,19 +16,19 @@ const read = (landed: MilestoneRead['state']): MilestoneRead[] => [
 ];
 
 describe('Getting started: shown until a change is merged, or the person dismisses it', () => {
-describe('each row: whether the list is shown', () => {
-const rows: [MilestoneRead['state'], boolean, boolean][] = [
+  describe('each row: whether the list is shown', () => {
+    const rows: [MilestoneRead['state'], boolean, boolean][] = [
       ['next', false, true],
       ['later', false, true],
       ['done', false, false],
       ['next', true, false],
       ['done', true, false],
     ];
-for (const [landed, dismissed, shown] of rows)
+    for (const [landed, dismissed, shown] of rows)
       test(`the change ${landed}, dismissed ${dismissed}: ${shown ? 'shown' : 'hidden'}`, () =>
         assert.equal(starterShown(read(landed), dismissed), shown));
-});
-test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
+  });
+  test('a dismissal kept is read back, as the floor reads it on its next draw', (t) => {
     const kept = new Map<string, string>();
     const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
     Object.defineProperty(globalThis, 'localStorage', {

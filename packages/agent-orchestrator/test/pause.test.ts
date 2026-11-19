@@ -21,7 +21,7 @@
  * schedule's fire is held by the pause alone.
  */
 import { beforeAll, describe, test, vi } from 'vitest';
-import { teardowns } from 'test-kit/checkpoints';
+import { heldDate, teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -111,61 +111,199 @@ const askOf = (id: string, step: string, n: number) => JSON.parse(fs.readFileSyn
 const scheduledDues = (): string[] => listRuns(ROOT).flatMap((r) => (r.scheduled ? [r.scheduled.due] : []));
 
 describe("the store paused, then paused at once, then resumed: nothing new starts, each session stops at its tool call's end, and what the pause stopped is tried again", () => {
-let parked!: Set<string>;
-let b!: Board;
-let repo!: string;
-let ONE!: any;
-let CHECKED!: any;
-let SHIP!: any;
-let stopping!: any;
-beforeAll(async () => {
-const t = teardowns();
-vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-04T12:00:00Z') });
-parked = new Set<string>();
-b = ticking(parked);
-repo = aRepo();
-addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
-attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
-setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
-ONE = folder(['work']);
-CHECKED = folder(['work'], () => 'check: "true"\n');
-SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
-stopping = {
-    ...b.e,
-    stop: (taskId: string) =>
-      Effect.suspend(() => {
-        const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
-        stops.push({
-          taskId,
-          askOnDisk:
-            run !== undefined && asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
-        });
-        if (taskId !== task('ended')) return b.e.stop(taskId);
-        return Effect.promise(async () => {
-          const before = [...b.filings];
-          const asked = Object.values(runs).map((r) => asksOf(r.id));
-          await pass();
-          raced.push({
-            filed: b.filings.length - before.length,
-            asksKept: Object.values(runs).every((r, k) => asked[k].every((f) => asksOf(r.id).includes(f))),
-          });
-          b.settle(taskId, 'succeeded', SIGNED);
-        }).pipe(Effect.andThen(Effect.suspend(() => b.e.stop(taskId))));
-      }),
+  let parked!: Set<string>;
+  let b!: Board;
+  let repo!: string;
+  let ONE!: string;
+  let CHECKED!: string;
+  let SHIP!: string;
+  let stopping!: {
+    stop: (taskId: string) => Effect.Effect<void, import('agent-runtime').JournalError | import('agent-runtime').StopRefused>;
+    file: (
+      spec: import('agent-runtime').TaskSpec,
+    ) => Effect.Effect<string, import('agent-runtime').FileRefused | import('agent-runtime').JournalError>;
+    tick: () => Effect.Effect<
+      import('agent-runtime').TickReport,
+      import('agent-runtime').TickRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+    >;
+    admit: (
+      taskIds: readonly string[],
+    ) => Effect.Effect<string[], import('agent-runtime').AdmitRefused | import('agent-runtime').JournalError>;
+    view: (taskId: string) => Effect.Effect<import('agent-runtime').TaskView, import('agent-runtime').JournalError>;
+    path: (taskId: string) => Effect.Effect<import('agent-runtime').LifecycleTransition[], import('agent-runtime').JournalError>;
+    list: (
+      taskIds?: readonly string[],
+    ) => Effect.Effect<
+      import('agent-runtime').TaskList,
+      import('agent-runtime').ListRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+    >;
+    logs: (taskId: string) => Effect.Effect<string, import('agent-runtime').JournalError | import('agent-runtime').RunnerError>;
+    transcript: (
+      taskId: string,
+      after?: import('agent-runtime').TranscriptCursor,
+      options?: { readonly attempt?: number },
+    ) => Effect.Effect<
+      import('agent-runtime').Transcript,
+      import('agent-runtime').TranscriptRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+    >;
+    output: (
+      taskId: string,
+      stream: 'stdout' | 'stderr',
+      lastBytes?: number,
+    ) => Effect.Effect<
+      string | undefined,
+      import('agent-runtime').OutputRefused | import('agent-runtime').JournalError | import('agent-runtime').RunnerError
+    >;
+    follow: (
+      taskId: string,
+    ) => Effect.Effect<
+      import('effect/Stream').Stream<import('agent-runtime').Followed, import('agent-runtime').RunnerError> | undefined,
+      import('agent-runtime').FollowRefused | import('agent-runtime').JournalError
+    >;
+    say: (
+      taskId: string,
+      text: string,
+    ) => Effect.Effect<
+      import('agent-runtime').Said,
+      import('agent-runtime').SayRefused | import('agent-runtime').SayUnsent | import('agent-runtime').JournalError
+    >;
+    interrupt: (
+      taskId: string,
+    ) => Effect.Effect<
+      import('../../../node_modules/agent-runtime/src/service/interrupt.ts').Interrupted,
+      import('agent-runtime').InterruptRefused | import('agent-runtime').InterruptUnsent | import('agent-runtime').JournalError
+    >;
+    answerAsk: (
+      taskId: string,
+      given: import('agent-runtime').Answering,
+    ) => Effect.Effect<
+      import('agent-runtime').AskAnswered,
+      import('agent-runtime').AnswerRefused | import('agent-runtime').AnswerUnsent | import('agent-runtime').JournalError
+    >;
+    quota: (
+      harness?: string,
+    ) => Effect.Effect<import('agent-runtime').HarnessQuota, import('agent-runtime').QuotaRefused | import('agent-runtime').RunnerError>;
+    mcpState: (
+      servers: Record<string, import('agent-runtime').RemoteMcpServer>,
+    ) => Effect.Effect<import('agent-runtime').McpServersRead, import('agent-runtime').McpStateRefused>;
+    mcpSignIn: (
+      name: string,
+      server: import('agent-runtime').RemoteMcpServer,
+      clientSecret?: string,
+    ) => Effect.Effect<import('agent-runtime').McpSignInStarted, import('agent-runtime').McpSignInRefused>;
+    mcpSignInState: (name: string) => Effect.Effect<import('agent-runtime').McpSignInState>;
+    mcpSignInCallback: (
+      name: string,
+      url: string,
+    ) => Effect.Effect<import('agent-runtime').McpSignInState, import('agent-runtime').McpSignInRefused>;
+    mcpSignOut: (
+      name: string,
+      server: import('agent-runtime').RemoteMcpServer,
+    ) => Effect.Effect<{ readonly signedOut: true }, import('agent-runtime').McpSignInRefused>;
+    answer: (
+      taskId: string,
+      text: string,
+      options?: { config?: import('agent-runtime').HarnessArgs },
+    ) => Effect.Effect<import('agent-runtime').Input, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+    close: (taskId: string) => Effect.Effect<void, import('agent-runtime').InputRefused | import('agent-runtime').JournalError>;
+    sweep: (options?: {
+      yes?: boolean;
+    }) => Effect.Effect<import('agent-runtime').SweepReport, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+    removeBody: (ref: string) => Effect.Effect<void, import('agent-runtime').BodyRefused | import('agent-runtime').JournalError>;
+    forget: (
+      taskIds: readonly string[],
+      options?: { yes?: boolean },
+    ) => Effect.Effect<
+      import('agent-runtime').ForgetReport,
+      import('../../../node_modules/agent-runtime/src/service/forget.ts').ForgetFailure
+    >;
+    kept: () => Effect.Effect<
+      import('agent-runtime').KeptReport,
+      import('agent-runtime').KeptRefused | import('agent-runtime').JournalError
+    >;
+    compact: (options?: {
+      yes?: boolean;
+    }) => Effect.Effect<
+      import('agent-runtime').CompactReport,
+      import('agent-runtime').CompactRefused | import('agent-runtime').RunnerError
+    >;
+    feed: (after?: import('agent-runtime').Cursor) => Effect.Effect<
+      {
+        entries: import('agent-runtime').FeedEntry[];
+        cursor: import('agent-runtime').Cursor;
+        refused?: import('agent-runtime').FeedRefusal[];
+        forgotten?: number;
+      },
+      import('agent-runtime').JournalError
+    >;
+    watch: (options: {
+      onEntry: (entry: import('agent-runtime').FeedEntry) => void | Promise<void>;
+      from?: import('agent-runtime').Cursor;
+      intervalMs?: number;
+      onError?: (e: unknown) => void;
+    }) => Effect.Effect<{ stop: () => void }>;
+    io: () => Effect.Effect<import('agent-runtime').EngineIo>;
+    tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+    hold: () => Effect.Effect<import('agent-runtime').Served | null, never, import('effect/Scope').Scope>;
+    drain: (holder: number | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+    drainSessions: (given: { graceMs: number } | null) => Effect.Effect<void, import('agent-runtime').DrainRefused>;
+    up: (options?: {
+      intervalMs?: number;
+      onTick?: (r: import('agent-runtime').TickReport) => void;
+      onError?: (e: unknown) => void;
+    }) => Effect.Effect<{ stop: () => void }>;
   };
-return t.end;
-});
-const s = story(test);
-const pass = () => stage.runWith(b.e, tickRun());
-const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
+  heldDate(Date.parse('2026-10-04T12:00:00Z'));
+  beforeAll(async () => {
+    const t = teardowns();
+    parked = new Set<string>();
+    b = ticking(parked);
+    repo = aRepo();
+    addFactoryAt(ROOT, { name: 'solo', volumes: [repo].map((r) => `${r}:rw`) });
+    attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'dev' });
+    setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
+    ONE = folder(['work']);
+    CHECKED = folder(['work'], () => 'check: "true"\n');
+    SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
+    stopping = {
+      ...b.e,
+      stop: (taskId: string) =>
+        Effect.suspend(() => {
+          const run = Object.values(runs).find((r) => JSON.stringify(runRecord(ROOT, r.id).steps).includes(`"${taskId}"`));
+          stops.push({
+            taskId,
+            askOnDisk:
+              run !== undefined &&
+              asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(ROOT, run.id), f), 'utf8').includes(taskId)),
+          });
+          if (taskId !== task('ended')) return b.e.stop(taskId);
+          return Effect.promise(async () => {
+            const before = [...b.filings];
+            const asked = Object.values(runs).map((r) => asksOf(r.id));
+            await pass();
+            raced.push({
+              filed: b.filings.length - before.length,
+              asksKept: Object.values(runs).every((r, k) => asked[k].every((f) => asksOf(r.id).includes(f))),
+            });
+            b.settle(taskId, 'succeeded', SIGNED);
+          }).pipe(Effect.andThen(Effect.suspend(() => b.e.stop(taskId))));
+        }),
+    };
+    return t.end;
+  });
+  const s = story(test);
+  const pass = () => stage.runWith(b.e, tickRun());
+  const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
-const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
-const task = (name: keyof typeof runs, step = 'work') => runRecord(ROOT, runs[name].id).steps[step].taskId!;
-const checkOf = (name: keyof typeof runs) => runRecord(ROOT, runs[name].id).steps.work.check!.taskId;
-const stops: { taskId: string; askOnDisk: boolean }[] = [];
-const raced: { filed: number; asksKept: boolean }[] = [];
-let filings: string[] = [];
-s.test('a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing', async () => {
+  const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;
+  const task = (name: keyof typeof runs, step = 'work') => runRecord(ROOT, runs[name].id).steps[step].taskId!;
+  const checkOf = (name: keyof typeof runs) => runRecord(ROOT, runs[name].id).steps.work.check!.taskId;
+  const stops: { taskId: string; askOnDisk: boolean }[] = [];
+  const raced: { filed: number; asksKept: boolean }[] = [];
+  let filings: string[] = [];
+  s.test(
+    'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
+    async () => {
       assert.deepEqual([readPause(ROOT), listRuns(ROOT).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
       const said = (await stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping)) as PausedNow;
       assert.deepEqual([said.kept, said.interrupted, said.skipped], [false, [], []], 'paused at once, nothing stopped');
@@ -185,8 +323,9 @@ s.test('a store with nothing at work: `nemia pause --now --yes` puts the pause, 
       await stage.main(['resume']);
       assert.equal(readPause(ROOT), null);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
-    });
-s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
+    },
+  );
+  s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
     runs.session = await begun(ONE);
     runs.checking = await begun(CHECKED);
     runs.asked = await begun(ONE);
@@ -213,7 +352,9 @@ s.test('a session, a check and a landing at work, a step a person already asked 
     markCancelled(ROOT, runs.called.id);
     assert.equal(readPause(ROOT), null);
   });
-s.test('`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing', async () => {
+  s.test(
+    '`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing',
+    async () => {
       const read = await stage.runWith(b.e, nowRead());
       assert.deepEqual(
         read.map((i) => `${i.run} ${i.step} ${i.kind}`).sort(),
@@ -227,8 +368,11 @@ s.test('`nemia pause --now` alone says what it would stop, at what cost, and the
       );
       assert.equal(fs.existsSync(pauseFile(ROOT)), false);
       assert.deepEqual([asksOf(runs.session.id), asksOf(runs.checking.id), stops], [[], [], []]);
-    });
-s.test("`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now", async () => {
+    },
+  );
+  s.test(
+    "`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now",
+    async () => {
       await stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping);
       assert.deepEqual([readPause(ROOT)?.why, readPause(ROOT)?.by, readPause(ROOT)?.timeoutMs, stops], ['lunch', 'ann', 600_000, []]);
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the sessions' drain put at the store's timeout, 10m by default");
@@ -237,8 +381,11 @@ s.test("`nemia pause --yes` pauses as a plain pause does, stopping nothing and p
         names(err.message, 'already paused', 'nemia resume', 'nemia pause --now');
         return true;
       });
-    });
-s.test('a pass under the pause files nothing new — no try asked, no check of a step signed off — and the due schedule starts nothing', async (t) => {
+    },
+  );
+  s.test(
+    'a pass under the pause files nothing new — no try asked, no check of a step signed off — and the due schedule starts nothing',
+    async () => {
       vi.setSystemTime(Date.parse(MONDAY) + 30_000);
       b.settle(task('session'), 'working');
       filings = [...b.filings];
@@ -252,8 +399,11 @@ s.test('a pass under the pause files nothing new — no try asked, no check of a
         "what still finishes: four sessions, the landing's and the session of a run called off, and a check; the clock is past the timeout, so their calls are being cut",
       );
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the pass puts the sessions' drain again at the pause's timeout");
-    });
-s.test('`nemia watch --once` opens with the pause as the pass reads it; `nemia start` says nothing of its run is filed until it resumes', async () => {
+    },
+  );
+  s.test(
+    '`nemia watch --once` opens with the pause as the pass reads it; `nemia start` says nothing of its run is filed until it resumes',
+    async () => {
       const standing = pausedWords(await stage.runWith(b.e, pausedRead()));
       assert.match(standing ?? '', /^Paus/, 'the pause as the pass reads it, which `nemia watch` opens with (apps/cli/test)');
       const free = fs.mkdtempSync(path.join(ROOT, 'free-'));
@@ -261,8 +411,11 @@ s.test('`nemia watch --once` opens with the pause as the pass reads it; `nemia s
       const started = (await stage.main(['start', 'a paused start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started;
       assert.ok(started.paused !== undefined, 'the start answers the pause that stands, which the client says nothing is filed until');
       assert.equal(pausedWords(started.paused), standing, 'the pause as the pass reads it');
-    });
-s.test("`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call", async () => {
+    },
+  );
+  s.test(
+    "`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call",
+    async () => {
       const pause = readPause(ROOT);
       const said = (await stage.main(['pause', '--now', '--yes', '--why', 'other'], stopping)) as PausedNow;
       assert.equal(said.kept, true, "the store's pause stands as it was put");
@@ -293,8 +446,11 @@ s.test("`nemia pause --now --yes` keeps the pause as it was put, its timeout cut
       );
       assert.equal(fs.existsSync(asksDir(ROOT, runs.called.id)), false, 'a run called off is left alone');
       for (const name of ['session', 'ended', 'called'] as const) parked.add(task(name));
-    });
-s.test('the pause read names each session parked, finishing nothing, the check it stopped tried again on the resume, and one stopped by another hand promised nothing', async () => {
+    },
+  );
+  s.test(
+    'the pause read names each session parked, finishing nothing, the check it stopped tried again on the resume, and one stopped by another hand promised nothing',
+    async () => {
       await Effect.runPromise(b.e.stop(task('asked')));
       const read = await stage.runWith(b.e, pausedRead());
       const of = (name: keyof typeof runs, kind: 'session' | 'check' = 'session') =>
@@ -308,8 +464,11 @@ s.test('the pause read names each session parked, finishing nothing, the check i
       assert.deepEqual(of('checking', 'check'), { run: runs.checking.id, step: 'work', kind: 'check', stopping: true, resumed: true });
       assert.deepEqual(of('asked'), { run: runs.asked.id, step: 'work', kind: 'session', stopping: true });
       assert.deepEqual(of('landing'), { run: runs.landing.id, step: 'ship', kind: 'session' }, "the landing's session finishes, unstopped");
-    });
-s.test('the check and the session asked of stopped and the landing ended, a pass under the pause files nothing — nor one a restarted daemon makes — and says Paused, the sessions parked', async () => {
+    },
+  );
+  s.test(
+    'the check and the session asked of stopped and the landing ended, a pass under the pause files nothing — nor one a restarted daemon makes — and says Paused, the sessions parked',
+    async () => {
       for (const id of [checkOf('checking'), task('asked')]) b.settle(id, 'stopped');
       b.settle(task('landing', 'ship'), 'succeeded', SIGNED);
       await pass();
@@ -318,8 +477,9 @@ s.test('the check and the session asked of stopped and the landing ended, a pass
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "each pass puts the drain again at the pause's timeout, cut to 0");
       const words = pausedWords(await stage.runWith(b.e, pausedRead())) ?? '';
       assert.match(words, /^Paused since /, 'Paused, once nothing outside a landing held is at work');
-    });
-s.test('`nemia up` says the pause once across passes, again each time its words change, and resumed once', () => {
+    },
+  );
+  s.test('`nemia up` says the pause once across passes, again each time its words change, and resumed once', () => {
     const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
     const two = {
       pause,
@@ -354,7 +514,9 @@ s.test('`nemia up` says the pause once across passes, again each time its words 
       RESUMED,
     ]);
   });
-s.test("`nemia resume` lifts it and the sessions' drain: each session parked goes on as the same try, each check runs again, the due fire starts — and nothing says a pause", async () => {
+  s.test(
+    "`nemia resume` lifts it and the sessions' drain: each session parked goes on as the same try, each check runs again, the due fire starts — and nothing says a pause",
+    async () => {
       const before = task('session');
       await stage.main(['resume']);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted by the resume");
@@ -379,8 +541,9 @@ s.test("`nemia resume` lifts it and the sessions' drain: each session parked goe
       world().repository(free, {});
       const started = (await stage.main(['start', 'a free start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started;
       assert.equal(started.paused, undefined, 'resumed, the start answers no pause');
-    });
-s.test('REFUSED: `nemia resume` with no pause standing, naming the verb that puts one', async () => {
+    },
+  );
+  s.test('REFUSED: `nemia resume` with no pause standing, naming the verb that puts one', async () => {
     await assert.rejects(stage.main(['resume']), (err: Error & { exitCode?: number; _tag?: string }) => {
       assert.deepEqual([err._tag, err.exitCode], ['Missing', 2], err.message);
       names(err.message, 'not paused', 'nemia pause');

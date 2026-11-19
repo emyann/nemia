@@ -143,36 +143,38 @@ const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }): stri
 };
 
 describe('mounts on every filing: a factory run whose implement writes one folder of it, reads the inbox and the inputs, then a review and an ending read what was handed', () => {
-let repos!: string[];
-let team!: string;
-let own!: string;
-let web!: string;
-let docs!: string;
-let wide!: string;
-let given!: any;
-let inbox!: any;
-beforeAll(() => {
-const t = teardowns();
-({ repos, team } = fresh());
-([own, web, docs] = repos);
-wide = workflow(team, 'wide', {
-    implement: `---\nplace: git\nagent: implementer\nwritable: ${path.basename(web)}\nreads: inbox\n---\nBuild what was asked.\n`,
-    review: '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 2\n---\nReview it.\n',
-    ship: '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ngate: true\n---\nShip it.\n',
+  let repos!: string[];
+  let team!: string;
+  let own!: string;
+  let web!: string;
+  let docs!: string;
+  let wide!: string;
+  let given!: string;
+  let inbox!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ repos, team } = fresh());
+    [own, web, docs] = repos;
+    wide = workflow(team, 'wide', {
+      implement: `---\nplace: git\nagent: implementer\nwritable: ${path.basename(web)}\nreads: inbox\n---\nBuild what was asked.\n`,
+      review: '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 2\n---\nReview it.\n',
+      ship: '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ngate: true\n---\nShip it.\n',
+    });
+    attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide', repo: path.basename(own) });
+    given = path.join(ROOT, 'template-draft.md');
+    fs.writeFileSync(given, 'the draft\n');
+    inbox = path.join(ROOT, 'inbox');
+    return t.end;
   });
-attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide', repo: path.basename(own) });
-given = path.join(ROOT, 'template-draft.md');
-fs.writeFileSync(given, 'the draft\n');
-inbox = path.join(ROOT, 'inbox');
-return t.end;
-});
-const s = story(test);
-let id = '';
-let inputs = '';
-let frozen = '';
-let writes: Mount[] = [];
-let tried = '';
-s.test('nemia start freezes the other repositories on the record read-only, and says them and the one implement alone writes', async () => {
+  const s = story(test);
+  let id = '';
+  let inputs = '';
+  let frozen = '';
+  let writes: Mount[] = [];
+  let tried = '';
+  s.test(
+    'nemia start freezes the other repositories on the record read-only, and says them and the one implement alone writes',
+    async () => {
       const out = await started(['build it', '--workflows', wide, '--factory', 'trio', '--repo', own, '--input', given]);
       id = out.id;
       const run = runRecord(ROOT, id);
@@ -189,8 +191,11 @@ s.test('nemia start freezes the other repositories on the record read-only, and 
       frozen = path.join(ROOT, 'runs', id, 'workflow', String(run.workflowFiles));
       assert.equal(out.facts.workflowFiles, frozen, "the start says where it copied its workflow's files");
       writes = [{ path: web, readOnly: false }, ...readOnly(docs, inbox, inputs, frozen)];
-    });
-s.test("implement's first filing writes its folder alone, reads the rest, and names each on its brief; the factory changed since changes none", async () => {
+    },
+  );
+  s.test(
+    "implement's first filing writes its folder alone, reads the rest, and names each on its brief; the factory changed since changes none",
+    async () => {
       fs.writeFileSync(
         path.join(ROOT, 'factories', 'trio.json'),
         `${JSON.stringify({ volumes: [...repos, aRepo()].map((at) => ({ path: at, readOnly: false })) })}\n`,
@@ -206,8 +211,9 @@ s.test("implement's first filing writes its folder alone, reads the rest, and na
       }
       assert.deepEqual(unnamed(first), [], first.brief);
       names(first.brief, '`template-draft.md`', 'nemia start --input');
-    });
-s.test('a try of implement is filed the same folders, and told them again', async () => {
+    },
+  );
+  s.test('a try of implement is filed the same folders, and told them again', async () => {
     const b = stage.board();
     b.settle(`${id}-implement`, 'failed');
     await pass(id);
@@ -220,7 +226,9 @@ s.test('a try of implement is filed the same folders, and told them again', asyn
     assert.deepEqual(unnamed(filing), [], filing.brief);
     names(filing.brief, '`template-draft.md`');
   });
-s.test('review reads every folder of the factory, its own folder, what implement handed over and the inputs, and writes none; no inbox', async () => {
+  s.test(
+    'review reads every folder of the factory, its own folder, what implement handed over and the inputs, and writes none; no inbox',
+    async () => {
       stage.board().end(tried, 'succeeded', { closeout: SIGNED, nativeId: null });
       await pass(id);
       const review = filedFor(id, 'review');
@@ -243,8 +251,11 @@ s.test('review reads every folder of the factory, its own folder, what implement
       assert.doesNotMatch(review.brief, /Folders of this factory[^\n]*artifacts/, 'no handed folder said as a factory folder');
       assert.doesNotMatch(review.brief, /you may write/);
       assert.equal(review.brief.includes(inbox), false, 'told no inbox');
-    });
-s.test('a round of implement, on a new session since its try kept no session id, is filed and told every folder as its first filing was', async () => {
+    },
+  );
+  s.test(
+    'a round of implement, on a new session since its try kept no session id, is filed and told every folder as its first filing was',
+    async () => {
       stage.board().settle(runRecord(ROOT, id).steps.review.taskId!, 'succeeded', reviewed(true));
       await pass(id);
       const round = filedFor(id, 'implement');
@@ -253,43 +264,46 @@ s.test('a round of implement, on a new session since its try kept no session id,
       assert.deepEqual(round.config?.mounts, writes);
       assert.deepEqual(unnamed(round), [], round.brief);
       names(round.brief, '`template-draft.md`');
+    },
+  );
+  s.test('the ending, filed once a person approves it, reads what implement and review handed over and writes none of it', async () => {
+    const b = stage.board();
+    const wt = runRecord(ROOT, id).steps.implement.workspace!;
+    fs.writeFileSync(path.join(wt, 'flag.txt'), 'the flag\n');
+    stage.place().world.commit(wt, 'add the flag');
+    b.settle(runRecord(ROOT, id).steps.implement.taskId!, 'succeeded', {
+      ...SIGNED,
+      replies: [{ finding: 'none', answer: 'fixed', why: 'none' }],
     });
-s.test('the ending, filed once a person approves it, reads what implement and review handed over and writes none of it', async () => {
-      const b = stage.board();
-      const wt = runRecord(ROOT, id).steps.implement.workspace!;
-      fs.writeFileSync(path.join(wt, 'flag.txt'), 'the flag\n');
-      stage.place().world.commit(wt, 'add the flag');
-      b.settle(runRecord(ROOT, id).steps.implement.taskId!, 'succeeded', {
-        ...SIGNED,
-        replies: [{ finding: 'none', answer: 'fixed', why: 'none' }],
-      });
-      await pass(id);
-      await pass(id);
-      b.settle(runRecord(ROOT, id).steps.review.taskId!, 'succeeded', reviewed(false));
-      await pass(id);
-      await stage.runWith(b.e, approveRun(id, 'ship'));
-      await pass(id);
-      const config = filedFor(id, 'ship').config as Filed;
-      for (const by of ['implement', 'review']) {
-        const file = path.join(artifactsDir(ROOT, { id }, by), 'shot.png');
-        assert.ok(readsAt(config, file), by);
-        assert.equal(writesAt(config, file), false, by);
-      }
-    });
+    await pass(id);
+    await pass(id);
+    b.settle(runRecord(ROOT, id).steps.review.taskId!, 'succeeded', reviewed(false));
+    await pass(id);
+    await stage.runWith(b.e, approveRun(id, 'ship'));
+    await pass(id);
+    const config = filedFor(id, 'ship').config as Filed;
+    for (const by of ['implement', 'review']) {
+      const file = path.join(artifactsDir(ROOT, { id }, by), 'shot.png');
+      assert.ok(readsAt(config, file), by);
+      assert.equal(writesAt(config, file), false, by);
+    }
+  });
 });
 
 describe('where a run mounts less: the default factory and a factory of one repository, a run given no input, a folder team, a folder gone at start, a remote agent', () => {
-let repos!: string[];
-let team!: string;
-let plain!: string;
-let notes!: string;
-beforeAll(() => {
-const t = teardowns();
-({ repos, team, plain, notes } = fresh());
-return t.end;
-});
-const s = story(test);
-s.test("a run in the default factory, or in a factory of one repository, given no input, mounts nothing but its workflow's files, review's own folder and what implement handed over", async () => {
+  let repos!: string[];
+  let team!: string;
+  let plain!: string;
+  let notes!: string;
+  beforeAll(() => {
+    const t = teardowns();
+    ({ repos, team, plain, notes } = fresh());
+    return t.end;
+  });
+  const s = story(test);
+  s.test(
+    "a run in the default factory, or in a factory of one repository, given no input, mounts nothing but its workflow's files, review's own folder and what implement handed over",
+    async () => {
       addFactoryAt(ROOT, { name: 'solo', volumes: [`${repos[0]}:rw`] });
       attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'plain' });
       for (const factory of [undefined, 'default', 'solo']) {
@@ -312,13 +326,16 @@ s.test("a run in the default factory, or in a factory of one repository, given n
         );
         assert.doesNotMatch(review.brief, /Folders of this factory/, String(factory));
       }
-    });
-s.test('a folder team in a factory mounts every repository of it, having none of its own', async () => {
+    },
+  );
+  s.test('a folder team in a factory mounts every repository of it, having none of its own', async () => {
     const run = await stage.runPlaced(startRun({ brief: 'a note', repo: repos[0], workflowDir: notes, factory: 'trio' }));
     assert.equal(run.place?.kind, 'folder');
     assert.deepEqual(runRecord(ROOT, run.id).mounts, readOnly(...repos));
   });
-s.test('a factory folder that is no directory at start is left out of the mounts, and nemia start says so; none left, the record has no key', async () => {
+  s.test(
+    'a factory folder that is no directory at start is left out of the mounts, and nemia start says so; none left, the record has no key',
+    async () => {
       fs.rmSync(repos[2], { recursive: true });
       const out = await started(['build it', '--workflows', plain, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
       assert.deepEqual(runRecord(ROOT, out.id).mounts, readOnly(repos[1]));
@@ -329,8 +346,9 @@ s.test('a factory folder that is no directory at start is left out of the mounts
         startRun({ brief: 'build it', repo: repos[0], workflowDir: plain, isolate: false, factory: 'trio' }),
       );
       assert.equal('mounts' in runRecord(ROOT, none.id), false);
-    });
-s.test('a step on a remote agent is filed no mounts, and its brief names none, a round of it included', async () => {
+    },
+  );
+  s.test('a step on a remote agent is filed no mounts, and its brief names none, a round of it included', async () => {
     fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify({ peer: { url: 'https://peer.example' } }));
     const asked = workflow(team, 'asked', { ask: '---\nplace: git\nharness: a2a:peer\n---\nAsk it.\n' });
     const [own, other] = [aRepo(), aRepo()];
@@ -384,38 +402,38 @@ const coded = (team: string, factory: string, agent: string, own = '') => {
 };
 
 describe("REFUSED at nemia start: a factory's folder a step cannot be filed, each Invalid with exit 2 naming its facts, and no run written", () => {
-test("a harness that cannot hold the factory's read-only mounts, in the runtime's words; with nothing to mount, the same step starts", async () => {
-      const { repos, team } = fresh();
-      const dir = coded(team, 'trio', 'permissionMode: bypassPermissions\n');
-      await refused(
-        { ...at(dir, repos[0], 'trio') },
-        `gives the session ${repos[1]} read-only`,
-        'danger-full-access',
-        "the factory trio's",
-        'nemia factory hire trio <agent> --step coded/code',
-      );
-      addFactoryAt(ROOT, { name: 'solo', volumes: [`${repos[0]}:rw`] });
-      attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'coded' });
-      hireAgentAt(ROOT, { factory: 'solo', agent: 'coder', step: 'coded/code' });
-      const run = await stage.runPlaced(startRun(at(dir, repos[0], 'solo')));
-      assert.equal('mounts' in run, false);
-    });
-test('a writable volume is a repository the factory works on, mounted read-only beside a run on another; a read-only one is mounted as marked', async () => {
-      const { repos, team } = fresh();
-      const dir = coded(team, 'trio', 'sandbox: workspace-write\n');
-      const extra = aRepo();
-      const volume = scratch('wf-mounts-volume-');
-      await typed(['factory', 'volume', 'add', 'trio', `${extra}:rw`]);
-      await typed(['factory', 'volume', 'add', 'trio', `${volume}:ro`]);
-      const run = await stage.runPlaced(startRun(at(dir, repos[0], 'trio')));
-      const record = runRecord(ROOT, run.id);
-      assert.deepEqual(record.volumes, readOnly(volume));
-      assert.equal(
-        record.mounts?.some((m) => m.path === extra && m.readOnly),
-        true,
-      );
-    });
-test('a factory folder whose path a permission rule cannot name, naming the step first, the factory and its fixes', async () => {
+  test("a harness that cannot hold the factory's read-only mounts, in the runtime's words; with nothing to mount, the same step starts", async () => {
+    const { repos, team } = fresh();
+    const dir = coded(team, 'trio', 'permissionMode: bypassPermissions\n');
+    await refused(
+      { ...at(dir, repos[0], 'trio') },
+      `gives the session ${repos[1]} read-only`,
+      'danger-full-access',
+      "the factory trio's",
+      'nemia factory hire trio <agent> --step coded/code',
+    );
+    addFactoryAt(ROOT, { name: 'solo', volumes: [`${repos[0]}:rw`] });
+    attachWorkflowAt(ROOT, { factory: 'solo', workflow: 'coded' });
+    hireAgentAt(ROOT, { factory: 'solo', agent: 'coder', step: 'coded/code' });
+    const run = await stage.runPlaced(startRun(at(dir, repos[0], 'solo')));
+    assert.equal('mounts' in run, false);
+  });
+  test('a writable volume is a repository the factory works on, mounted read-only beside a run on another; a read-only one is mounted as marked', async () => {
+    const { repos, team } = fresh();
+    const dir = coded(team, 'trio', 'sandbox: workspace-write\n');
+    const extra = aRepo();
+    const volume = scratch('wf-mounts-volume-');
+    await typed(['factory', 'volume', 'add', 'trio', `${extra}:rw`]);
+    await typed(['factory', 'volume', 'add', 'trio', `${volume}:ro`]);
+    const run = await stage.runPlaced(startRun(at(dir, repos[0], 'trio')));
+    const record = runRecord(ROOT, run.id);
+    assert.deepEqual(record.volumes, readOnly(volume));
+    assert.equal(
+      record.mounts?.some((m) => m.path === extra && m.readOnly),
+      true,
+    );
+  });
+  test('a factory folder whose path a permission rule cannot name, naming the step first, the factory and its fixes', async () => {
     const { plain } = fresh();
     const [own, spaced] = [aRepo(), aRepo('First (Last)-')];
     factoryOf('spaced', [own, spaced]);
@@ -431,13 +449,13 @@ test('a factory folder whose path a permission rule cannot name, naming the step
     );
     assert.match(said, /^implement: /, "the step's line first");
   });
-test('REFUSED: a `writable:` name no folder of the factory has, naming the step, its line, the folders and the fix', async () => {
+  test('REFUSED: a `writable:` name no folder of the factory has, naming the step, its line, the folders and the fix', async () => {
     const { repos, plain } = fresh();
     writing(plain, 'nope');
     const said = await refused(at(plain, repos[0], 'trio'), '`writable: nope`', ...repos.map((r) => path.basename(r)), 'delete the name');
     assert.match(said, /^plain\/implement: /);
   });
-test('REFUSED: a `writable:` name two folders of the factory share, naming both', async () => {
+  test('REFUSED: a `writable:` name two folders of the factory share, naming both', async () => {
     const { plain } = fresh();
     const own = aRepo();
     const [one, two] = ['p1-', 'p2-'].map((p) => {
@@ -450,53 +468,53 @@ test('REFUSED: a `writable:` name two folders of the factory share, naming both'
     writing(plain, 'web');
     await refused(at(plain, own, 'twins'), '`writable: web`', '2 folders', one, two);
   });
-test('REFUSED: a `writable:` folder that is no directory at start', async () => {
+  test('REFUSED: a `writable:` folder that is no directory at start', async () => {
     const { repos, plain } = fresh();
     writing(plain, path.basename(repos[2]));
     fs.rmSync(repos[2], { recursive: true });
     await refused(at(plain, repos[0], 'trio'), `\`writable: ${path.basename(repos[2])}\``, `${repos[2]} is no directory`);
   });
-test('REFUSED: a `writable:` in a run started in no factory', async () => {
+  test('REFUSED: a `writable:` in a run started in no factory', async () => {
     const { repos, plain } = fresh();
     writing(plain, path.basename(repos[1]));
     const said = await refused(at(plain, repos[0]), 'started in none', 'nemia start --factory <name>', 'or delete the line');
     assert.match(said, /^plain\/implement: `writable: /);
   });
-test("REFUSED: a read-only folder no rule can name, beside a step's `writable:` one, is said as the read-only mount it is", async () => {
-      const { plain } = fresh();
-      const [own, spaced, web] = [aRepo(), aRepo('First (Last)-'), aRepo()];
-      factoryOf('spaced-web', [own, spaced, web]);
-      writing(plain, path.basename(web));
-      const said = await refused(
-        at(plain, own, 'spaced-web'),
-        `${JSON.stringify(spaced)} read-only`,
-        "That folder is the factory spaced-web's",
-        'nemia factory hire spaced-web <agent> --step plain/implement',
-      );
-      assert.match(said, /^implement: `mounts` gives the session /, 'quotes no `writable:` line: not a folder it names');
-    });
-test("REFUSED: a `writable:` folder on a harness that cannot hold a writable mount, quoted by its line, with the factory's fix", async () => {
-      const { repos, team } = fresh();
-      const dir = coded(team, 'trio', '', `writable: ${path.basename(repos[1])}\n`);
-      const said = await refused(
-        at(dir, repos[0], 'trio'),
-        `gives the session ${repos[1]} writable`,
-        '`codex` harness cannot hold a writable mount',
-        '`claude`',
-        'coded/code names it in `writable:`',
-        'nemia factory hire trio <agent> --step coded/code',
-        'delete the name from `writable:`',
-      );
-      assert.match(said, /^code: `writable: [^`]+` \(filed as `mounts`\): /);
-      assert.equal(said.split('\n').length, 2, "the runtime's line, then the factory's");
-    });
-test("a `writable:` that names the run's own repository mounts nothing more: that folder is its workspace", async () => {
+  test("REFUSED: a read-only folder no rule can name, beside a step's `writable:` one, is said as the read-only mount it is", async () => {
+    const { plain } = fresh();
+    const [own, spaced, web] = [aRepo(), aRepo('First (Last)-'), aRepo()];
+    factoryOf('spaced-web', [own, spaced, web]);
+    writing(plain, path.basename(web));
+    const said = await refused(
+      at(plain, own, 'spaced-web'),
+      `${JSON.stringify(spaced)} read-only`,
+      "That folder is the factory spaced-web's",
+      'nemia factory hire spaced-web <agent> --step plain/implement',
+    );
+    assert.match(said, /^implement: `mounts` gives the session /, 'quotes no `writable:` line: not a folder it names');
+  });
+  test("REFUSED: a `writable:` folder on a harness that cannot hold a writable mount, quoted by its line, with the factory's fix", async () => {
+    const { repos, team } = fresh();
+    const dir = coded(team, 'trio', '', `writable: ${path.basename(repos[1])}\n`);
+    const said = await refused(
+      at(dir, repos[0], 'trio'),
+      `gives the session ${repos[1]} writable`,
+      '`codex` harness cannot hold a writable mount',
+      '`claude`',
+      'coded/code names it in `writable:`',
+      'nemia factory hire trio <agent> --step coded/code',
+      'delete the name from `writable:`',
+    );
+    assert.match(said, /^code: `writable: [^`]+` \(filed as `mounts`\): /);
+    assert.equal(said.split('\n').length, 2, "the runtime's line, then the factory's");
+  });
+  test("a `writable:` that names the run's own repository mounts nothing more: that folder is its workspace", async () => {
     const { repos, plain } = fresh();
     writing(plain, path.basename(repos[0]));
     const run = await stage.runPlaced(startRun(at(plain, repos[0], 'trio')));
     assert.deepEqual(runRecord(ROOT, run.id).mounts, readOnly(repos[1], repos[2]));
   });
-test('REFUSED: a record whose mounts are not mounts is unreadable, naming the field', async () => {
+  test('REFUSED: a record whose mounts are not mounts is unreadable, naming the field', async () => {
     const { repos, plain } = fresh();
     const run = await stage.runPlaced(startRun(at(plain, repos[0], 'trio')));
     const file = path.join(ROOT, 'runs', `${run.id}.json`);
@@ -513,13 +531,29 @@ const stepsOf = (fronts: Record<string, string>) =>
   Object.entries(fronts).map(([name, front]) => parseWorkflow(name, `---\nplace: git\n${front}\n---\n${name} it\n`));
 
 describe('the folders a step is filed, read by their pure functions and by the model a fence test holds a filing to', () => {
-let team!: import("../src/workflow.ts").StepSpec[];
-let filed!: Map<string, { env: Record<string, string>; projectMcp?: string[]; mcp?: Record<string, import("../src/factory/servers/servers.ts").FactoryServer>; mounts?: import("../src/record/record.ts").Mount[]; model: string | undefined; effort: string | undefined; contextTokens: number | undefined; permissionMode: string | undefined; tools: string[] | undefined; disallowedTools: string[] | undefined; allowedTools: string[] | undefined; budgetUsd: number | undefined; } & object>;
-beforeAll(() => {
-team = loadWorkflows(TEAM_DEV);
-filed = filedOf(team);
-});
-test("factoryMounts: a factory's repositories as path.resolve spells them, sorted and once each, but the run's own", () => {
+  let team!: import('../src/workflow.ts').StepSpec[];
+  let filed!: Map<
+    string,
+    {
+      env: Record<string, string>;
+      projectMcp?: string[];
+      mcp?: Record<string, import('../src/factory/servers/servers.ts').FactoryServer>;
+      mounts?: import('../src/record/record.ts').Mount[];
+      model: string | undefined;
+      effort: string | undefined;
+      contextTokens: number | undefined;
+      permissionMode: string | undefined;
+      tools: string[] | undefined;
+      disallowedTools: string[] | undefined;
+      allowedTools: string[] | undefined;
+      budgetUsd: number | undefined;
+    } & object
+  >;
+  beforeAll(() => {
+    team = loadWorkflows(TEAM_DEV);
+    filed = filedOf(team);
+  });
+  test("factoryMounts: a factory's repositories as path.resolve spells them, sorted and once each, but the run's own", () => {
     const [a, b, c] = ['/srv/a', '/srv/b', '/srv/c'];
     assert.deepEqual(
       factoryMounts(
@@ -588,37 +622,34 @@ test("factoryMounts: a factory's repositories as path.resolve spells them, sorte
     );
     assert.deepEqual(factoryMounts({ volumes: [{ path: a, readOnly: false }] }, a), [], 'a factory of one repository mounts none');
   });
-test("the tests' team: a later step reads, and never writes, what each step it comes after handed over; its own folder only where its mode writes outside by rule", () => {
-      const review = filed.get('review')!;
-      const ship = filed.get('ship')!;
-      assert.ok(readsAt(review, handedBy('implement')));
-      assert.equal(writesAt(review, handedBy('implement')), false);
-      for (const by of ['implement', 'review']) {
-        assert.ok(readsAt(ship, handedBy(by)), `ship reads ${by}'s`);
-        assert.equal(writesAt(ship, handedBy(by)), false, `ship writes none of ${by}'s`);
-      }
-      assert.equal(readsAt(filed.get('implement')!, handedBy('review')), false, 'implement comes after nothing');
-      const ruled = [...filed.keys()].filter((name) => writesOutsideByRule(team.find((s) => s.name === name)!.permissionMode));
-      assert.ok(ruled.includes('review') && !ruled.includes('implement'), ruled.join(', '));
-      for (const [name, config] of filed) {
-        assert.equal(mountHolds(config, handedBy(name), true), ruled.includes(name), `${name}'s own folder, read-only`);
-        assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder, writable by none`);
-      }
-    });
-test('REFUSED: a step does not read the folder of a step it does not come after; it reads those it does, in the order of the workflow', () => {
-      const steps = stepsOf({ a: 'permissionMode: dontAsk', b: 'permissionMode: dontAsk', c: 'after: a', d: 'after: b, c' });
-      const diamond = filedOf(steps);
-      const reads = (name: string) => ['a', 'b', 'c', 'd'].filter((by) => by !== name && readsAt(diamond.get(name)!, handedBy(by)));
-      assert.deepEqual(reads('c'), ['a'], "never its sibling b's nor d's after it");
-      assert.deepEqual(reads('d'), ['a', 'b', 'c'], 'b and c, and a through c');
-      assert.deepEqual([reads('a'), reads('b')], [[], []]);
-      assert.ok(readsAt(diamond.get('a')!, handedBy('a')), 'a, in dontAsk, reads its own folder, and no other');
-      assert.deepEqual(
-        handedMounts(steps[3], steps, RUN_ARTIFACTS),
-        readOnly(...['a', 'b', 'c'].map((by) => path.join(RUN_ARTIFACTS, by))),
-      );
-    });
-test('a step on a sandboxed or a remote harness is filed no handed mount, nor the inbox, nor the inputs', () => {
+  test("the tests' team: a later step reads, and never writes, what each step it comes after handed over; its own folder only where its mode writes outside by rule", () => {
+    const review = filed.get('review')!;
+    const ship = filed.get('ship')!;
+    assert.ok(readsAt(review, handedBy('implement')));
+    assert.equal(writesAt(review, handedBy('implement')), false);
+    for (const by of ['implement', 'review']) {
+      assert.ok(readsAt(ship, handedBy(by)), `ship reads ${by}'s`);
+      assert.equal(writesAt(ship, handedBy(by)), false, `ship writes none of ${by}'s`);
+    }
+    assert.equal(readsAt(filed.get('implement')!, handedBy('review')), false, 'implement comes after nothing');
+    const ruled = [...filed.keys()].filter((name) => writesOutsideByRule(team.find((s) => s.name === name)!.permissionMode));
+    assert.ok(ruled.includes('review') && !ruled.includes('implement'), ruled.join(', '));
+    for (const [name, config] of filed) {
+      assert.equal(mountHolds(config, handedBy(name), true), ruled.includes(name), `${name}'s own folder, read-only`);
+      assert.equal(mountHolds(config, handedBy(name), false), false, `${name}'s own folder, writable by none`);
+    }
+  });
+  test('REFUSED: a step does not read the folder of a step it does not come after; it reads those it does, in the order of the workflow', () => {
+    const steps = stepsOf({ a: 'permissionMode: dontAsk', b: 'permissionMode: dontAsk', c: 'after: a', d: 'after: b, c' });
+    const diamond = filedOf(steps);
+    const reads = (name: string) => ['a', 'b', 'c', 'd'].filter((by) => by !== name && readsAt(diamond.get(name)!, handedBy(by)));
+    assert.deepEqual(reads('c'), ['a'], "never its sibling b's nor d's after it");
+    assert.deepEqual(reads('d'), ['a', 'b', 'c'], 'b and c, and a through c');
+    assert.deepEqual([reads('a'), reads('b')], [[], []]);
+    assert.ok(readsAt(diamond.get('a')!, handedBy('a')), 'a, in dontAsk, reads its own folder, and no other');
+    assert.deepEqual(handedMounts(steps[3], steps, RUN_ARTIFACTS), readOnly(...['a', 'b', 'c'].map((by) => path.join(RUN_ARTIFACTS, by))));
+  });
+  test('a step on a sandboxed or a remote harness is filed no handed mount, nor the inbox, nor the inputs', () => {
     const review = team.find((s) => s.name === 'review')!;
     const codex = { ...review, harness: 'codex', permissionMode: 'read-only' };
     assert.deepEqual(handedMounts(codex, team, RUN_ARTIFACTS), [], 'codex reads the disk in its sandbox already');
@@ -635,32 +666,32 @@ test('a step on a sandboxed or a remote harness is filed no handed mount, nor th
     assert.deepEqual(inputsMounts({ harness: 'codex' }, repo, INPUTS), []);
     assert.deepEqual(inputsMounts({ harness: 'a2a:peer' }, repo, INPUTS), []);
   });
-test("REFUSED: a step whose `reads:` names no inbox reads none of it; a folder team's steps and a run given no input read no inputs", () => {
-      for (const [name, config] of filed) {
-        assert.equal(readsAt(config, CARD), false, `${name} reads no card`);
-        assert.equal(readsAt(config, INPUT_FILE), false, `${name} is given no input`);
-      }
-      assert.deepEqual(inputsMounts({ harness: 'claude' }, [{ place: 'folder' as const }], INPUTS), [], 'a folder team');
-      assert.deepEqual(inputsMounts({ harness: 'claude' }, [{ place: 'git' as const }], undefined), [], 'a run given none');
-    });
-test('REFUSED: each folder mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
-      const reading = filedOf([...stepsOf({ reader: 'reads: inbox' })]).get('reader')!;
-      const given = filedOf(team, INPUTS).get('implement')!;
-      const cases: [string, Filed, string, string][] = [
-        ['a handed folder', filed.get('review')!, handedBy('implement'), path.join(RUN_ARTIFACTS, 'implement')],
-        ['the inbox', reading, CARD, INBOX],
-        ['the inputs', given, INPUT_FILE, INPUTS],
-      ];
-      for (const [what, config, file, folder] of cases) {
-        assert.ok(readsAt(config, file), `${what} is read`);
-        const opened = { ...config, mounts: config.mounts!.map((m) => ({ ...m, readOnly: false })) };
-        assert.ok(writesAt(opened, file), `${what}: the model sees a writable mount as a write`);
-        const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${folder}/**)`] };
-        assert.ok(writesAt({ ...allowed, mounts: [] }, file), `${what}: the model sees an Edit allow as a write`);
-        assert.equal(writesAt(allowed, file), false, `${what}: the read-only mount's deny beats the allow`);
-      }
-    });
-test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or not local', () => {
+  test("REFUSED: a step whose `reads:` names no inbox reads none of it; a folder team's steps and a run given no input read no inputs", () => {
+    for (const [name, config] of filed) {
+      assert.equal(readsAt(config, CARD), false, `${name} reads no card`);
+      assert.equal(readsAt(config, INPUT_FILE), false, `${name} is given no input`);
+    }
+    assert.deepEqual(inputsMounts({ harness: 'claude' }, [{ place: 'folder' as const }], INPUTS), [], 'a folder team');
+    assert.deepEqual(inputsMounts({ harness: 'claude' }, [{ place: 'git' as const }], undefined), [], 'a run given none');
+  });
+  test('REFUSED: each folder mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
+    const reading = filedOf([...stepsOf({ reader: 'reads: inbox' })]).get('reader')!;
+    const given = filedOf(team, INPUTS).get('implement')!;
+    const cases: [string, Filed, string, string][] = [
+      ['a handed folder', filed.get('review')!, handedBy('implement'), path.join(RUN_ARTIFACTS, 'implement')],
+      ['the inbox', reading, CARD, INBOX],
+      ['the inputs', given, INPUT_FILE, INPUTS],
+    ];
+    for (const [what, config, file, folder] of cases) {
+      assert.ok(readsAt(config, file), `${what} is read`);
+      const opened = { ...config, mounts: config.mounts!.map((m) => ({ ...m, readOnly: false })) };
+      assert.ok(writesAt(opened, file), `${what}: the model sees a writable mount as a write`);
+      const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${folder}/**)`] };
+      assert.ok(writesAt({ ...allowed, mounts: [] }, file), `${what}: the model sees an Edit allow as a write`);
+      assert.equal(writesAt(allowed, file), false, `${what}: the read-only mount's deny beats the allow`);
+    }
+  });
+  test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or not local', () => {
     const told = (step: { harness: string; reads?: string[] }) =>
       mountsLine(step, {}, { handed: [], store: readsMounts(step, '/s/inbox'), inputs: [] });
     names(told({ harness: 'claude', reads: ['inbox'] }).join('\n'), '`reads:` names them: `/s/inbox`');
@@ -669,21 +700,21 @@ test('mountsLine names the inbox for a local step whose `reads:` names it, and n
     assert.deepEqual(told({ harness: 'codex', reads: ['inbox'] }), [], 'codex reads the disk in its sandbox already');
     assert.match(mountsLine({ harness: 'claude' }, { mounts: readOnly('/srv/a') }).join('\n'), /mounted read-only/, "a factory's folder");
   });
-test('mountsLine names each folder the steps before it handed over, by its path and step, and how to list one; nothing for none', () => {
-      const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
-      const [blank, line, ...more] = mountsLine({ harness: 'claude' }, {}, { handed, store: [], inputs: [] });
-      assert.deepEqual([blank, more], ['', []]);
-      names(
-        line,
-        "`/s/runs/r-1/artifacts/design` (design's)",
-        "`/s/runs/r-1/artifacts/implement` (implement's)",
-        'must not write',
-        '`/s/runs/r-1/artifacts/design/**`',
-      );
-      assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [], inputs: [] }), [], 'a step handed none');
-      assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [], inputs: [] }), [], 'a remote agent is filed none');
-    });
-test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
+  test('mountsLine names each folder the steps before it handed over, by its path and step, and how to list one; nothing for none', () => {
+    const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
+    const [blank, line, ...more] = mountsLine({ harness: 'claude' }, {}, { handed, store: [], inputs: [] });
+    assert.deepEqual([blank, more], ['', []]);
+    names(
+      line,
+      "`/s/runs/r-1/artifacts/design` (design's)",
+      "`/s/runs/r-1/artifacts/implement` (implement's)",
+      'must not write',
+      '`/s/runs/r-1/artifacts/design/**`',
+    );
+    assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [], inputs: [] }), [], 'a step handed none');
+    assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [], inputs: [] }), [], 'a remote agent is filed none');
+  });
+  test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
     const handed = artifactsDir(ROOT, { id: 'r-1' }, 'implement');
     const brief = ['## What was asked for', '', 'build it'].join('\n');
     assert.deepEqual(unnamed({ brief, config: { mounts: readOnly(handed) } }), [handed]);
@@ -717,7 +748,7 @@ const refuses = (row: string, lines: string, ...naming: string[]): Row => ({
 const MOUNTS = readOnly('/srv/a', '/srv/web');
 
 describe('`writable:`: the folders a step may write, read, refused, and mounted', () => {
-const rows: Row[] = [
+  const rows: Row[] = [
     reads('the folder names it lists', 'writable: web, docs', ['web', 'docs']),
     reads('none without the line', 'permissionMode: dontAsk'),
     refuses(
@@ -784,7 +815,7 @@ const rows: Row[] = [
     },
     { row: 'stepMounts: a run that mounts none', run: () => assert.equal(stepMounts({ writable: ['web'] }, undefined), undefined) },
   ];
-for (const { row, run, naming } of rows)
+  for (const { row, run, naming } of rows)
     test(row, () => {
       if (!naming) return void run();
       const [at = '', ...named] = naming;
@@ -799,12 +830,12 @@ for (const { row, run, naming } of rows)
 });
 
 describe("volumeMounts: a factory's volumes as a step is filed them, a writable one writable only where the step's fence writes", () => {
-const [ro, rw] = ['/vol/ro', '/vol/rw'];
-const volumes = [
+  const [ro, rw] = ['/vol/ro', '/vol/rw'];
+  const volumes = [
     { path: ro, readOnly: true },
     { path: rw, readOnly: false },
   ];
-const rows: { row: string; step: Parameters<typeof volumeMounts>[0]; want: Mount[] }[] = [
+  const rows: { row: string; step: Parameters<typeof volumeMounts>[0]; want: Mount[] }[] = [
     { row: 'a step that writes: :ro read-only, :rw writable', step: { permissionMode: 'acceptEdits' }, want: volumes },
     {
       row: 'a step that asks before an edit and allows none writes nothing: :rw held read-only',
@@ -819,9 +850,9 @@ const rows: { row: string; step: Parameters<typeof volumeMounts>[0]; want: Mount
     },
     { row: 'a remote agent is filed none', step: { harness: 'a2a:far' }, want: [] },
   ];
-for (const { row, step, want } of rows) test(row, () => assert.deepEqual(volumeMounts(step, volumes), want));
-test('a run that mounts none files none', () => assert.deepEqual(volumeMounts({}, undefined), []));
-test('the brief names each volume as it is filed, a writable one as no workspace of the step', () => {
+  for (const { row, step, want } of rows) test(row, () => assert.deepEqual(volumeMounts(step, volumes), want));
+  test('a run that mounts none files none', () => assert.deepEqual(volumeMounts({}, undefined), []));
+  test('the brief names each volume as it is filed, a writable one as no workspace of the step', () => {
     const line = (step: Parameters<typeof mountsLine>[0], at: string) =>
       mountsLine(step, { volumes }).find((l) => l.includes(`\`${at}\``)) ?? '';
     assert.match(line({ permissionMode: 'acceptEdits' }, rw), /you may write.*not your workspace/);
@@ -829,6 +860,6 @@ test('the brief names each volume as it is filed, a writable one as no workspace
     assert.match(line({ permissionMode: 'plan' }, rw), /must not write/);
     assert.deepEqual(mountsLine({ harness: 'a2a:far' }, { volumes }), []);
   });
-test("`writable:` widens no volume: it names the factory's repositories, and a volume is not among the run's mounts", () =>
+  test("`writable:` widens no volume: it names the factory's repositories, and a volume is not among the run's mounts", () =>
     assert.deepEqual(stepMounts({ writable: ['rw'] }, readOnly('/srv/a')), readOnly('/srv/a')));
 });

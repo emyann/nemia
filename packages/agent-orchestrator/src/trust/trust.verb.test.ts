@@ -97,8 +97,10 @@ function takenBack(folder: string): void {
 }
 
 describe("a factory's places trusted: added, left as they are, listed and trusted by the verb, taken back by hand, and where nothing is", () => {
-const s = story(test);
-s.test('factory add trusts each writable volume, a repository on its root and a workspace on the repository it was cut from', async () => {
+  const s = story(test);
+  s.test(
+    'factory add trusts each writable volume, a repository on its root and a workspace on the repository it was cut from',
+    async () => {
       anew();
       const { repo, workspace, plain } = places();
       const added = await asked(['factory', 'add', 'one', '--volume', `${repo}:rw`, '--volume', `${plain}:rw`]);
@@ -126,8 +128,9 @@ s.test('factory add trusts each writable volume, a repository on its root and a 
         wrote(inside).map((one) => [one.place, one.folder]),
         [[workspace, repo]],
       );
-    });
-s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
+    },
+  );
+  s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
     anew();
     const { repo, plain, notes } = places();
     await typed(['factory', 'add', 'one', '--volume', `${repo}:rw`]);
@@ -141,7 +144,9 @@ s.test('a place already trusted is left byte for byte and nothing is said of it;
     assert.ok(fs.readFileSync(file).equals(bytes));
     assert.deepEqual(trusted(), [repo]);
   });
-s.test('the listing says a place that is not trusted with the line that trusts it, and factory trust then does, and it says nothing', async () => {
+  s.test(
+    'the listing says a place that is not trusted with the line that trusts it, and factory trust then does, and it says nothing',
+    async () => {
       anew();
       const { repo, workspace, plain } = places();
       await typed(['factory', 'add', 'one', '--volume', `${workspace}:rw`, '--volume', `${plain}:rw`, '--no-trust']);
@@ -179,8 +184,9 @@ s.test('the listing says a place that is not trusted with the line that trusts i
       assert.deepEqual(trusted(), [plain]);
       await typed(['factory', 'trust', 'one']);
       assert.deepEqual(trusted(), [plain, repo].sort());
-    });
-s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothing written', async () => {
+    },
+  );
+  s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothing written', async () => {
     anew();
     await assert.rejects(typed(['factory', 'trust', 'nowhere']), (err: Error & { _tag?: string; exitCode?: number }) => {
       assert.equal(err._tag, 'Missing');
@@ -190,7 +196,9 @@ s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothin
     });
     assert.equal(fs.existsSync(file), false);
   });
-s.test('a place whose repository is not answered is neither trusted nor listed as untrusted, and the factory is filed all the same', async () => {
+  s.test(
+    'a place whose repository is not answered is neither trusted nor listed as untrusted, and the factory is filed all the same',
+    async () => {
       anew();
       const { repo } = places();
       const deaf = placeOver(stand().place, { root: () => unreadBy('root', 'the place did not answer in time') });
@@ -206,8 +214,11 @@ s.test('a place whose repository is not answered is neither trusted nor listed a
         'the place is said unasked, with why',
       );
       assert.deepEqual(await untrusted(deaf), []);
-    });
-s.test('a harness file that does not read refuses no add: the factory is filed, the file left as it is, and the line says what to do', async () => {
+    },
+  );
+  s.test(
+    'a harness file that does not read refuses no add: the factory is filed, the file left as it is, and the line says what to do',
+    async () => {
       anew();
       const { repo } = places();
       fs.writeFileSync(file, '{');
@@ -220,5 +231,6 @@ s.test('a harness file that does not read refuses no add: the factory is filed, 
         [['Claude Code', repo]],
       );
       assert.ok(refused[0]?.refused?.includes('Claude Code'), 'the refusal names the harness to run once in the place');
-    });
+    },
+  );
 });

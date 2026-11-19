@@ -22,20 +22,17 @@ import type {
   SDKStatusMessage,
   SDKSystemMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { Result, Schema } from 'effect';
-import { firstRefusal } from '../../core/index.ts';
+import { Option, Result, Schema } from 'effect';
+import { firstRefusal, noneOf } from '../../core/index.ts';
 import type { PartialMark } from '../detached/follow.ts';
-import type { InitRead } from '../../../contracts/capture.contract.ts';
 
 const Count = Schema.Natural;
 
 const Measure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
-/** A block whose `type` is none of `known`: only its `type` is checked. */
-const otherThan = (known: readonly string[]) =>
-  Schema.Struct({
-    type: Schema.String.check(Schema.makeFilter((t: string) => !known.includes(t) || `Expected the fields of a ${t} block`)),
-  });
+/** A block whose `type` is none of `known`'s: only its `type` is checked. */
+const otherThan = (known: { readonly discriminants: ReadonlyArray<PropertyKey> }) =>
+  Schema.Struct({ type: noneOf(known, (t) => `Expected the fields of a ${t} block`) });
 
 /** Every key of `T`, of each of its members when it is a union. */
 type KeyOfAny<T> = T extends unknown ? keyof T : never;
@@ -79,6 +76,9 @@ const ToolUseBlock = reading(
   }),
 ).of<Extract<SdkBlock, { type: 'tool_use' }>>();
 
+/** The blocks of an assistant message the runtime reads: its calls. */
+const Blocks = Schema.Union([ToolUseBlock]).pipe(Schema.toTaggedUnion('type'));
+
 /** A message begun, under `--include-partial-messages`: its id, the one its whole `assistant` lines carry. */
 const StartEvent = reading(
   Schema.Struct({
@@ -92,12 +92,15 @@ const TextDelta = reading(Schema.Struct({ type: Schema.Literal('text_delta'), te
   Extract<SdkEventOf<'content_block_delta'>['delta'], { type: 'text_delta' }>
 >();
 
+/** The pieces of a block the runtime reads: its text. */
+const Deltas = Schema.Union([TextDelta]).pipe(Schema.toTaggedUnion('type'));
+
 /** A piece of a block being written: the block's place in its message, and its text when it is text. */
 const DeltaEvent = reading(
   Schema.Struct({
     type: Schema.Literal('content_block_delta'),
     index: Count,
-    delta: Schema.Union([TextDelta, otherThan(['text_delta'])]),
+    delta: Schema.Union([...Deltas.members, otherThan(Deltas)]),
   }),
 ).of<SdkEventOf<'content_block_delta'>>();
 
@@ -105,6 +108,9 @@ const DeltaEvent = reading(
 const StopEvent = reading(Schema.Struct({ type: Schema.Literal('content_block_stop'), index: Count })).of<
   SdkEventOf<'content_block_stop'>
 >();
+
+/** The events of a partial message the runtime reads: a message begun, a piece of a block, a block written whole. */
+const Events = Schema.Union([StartEvent, DeltaEvent, StopEvent]).pipe(Schema.toTaggedUnion('type'));
 
 /**
  * The parts of a line the runtime reads: a call Claude Code refused without asking — its tool, the id of its call, and the input it
@@ -196,7 +202,7 @@ const PRINTED = {
   stream_event: reading(
     Schema.Struct({
       type: Schema.Literal('stream_event'),
-      event: Schema.Union([StartEvent, DeltaEvent, StopEvent, otherThan(['message_start', 'content_block_delta', 'content_block_stop'])]),
+      event: Schema.Union([...Events.members, otherThan(Events)]),
     }),
   ).of<SDKPartialAssistantMessage>(),
   assistant: reading(
@@ -204,7 +210,7 @@ const PRINTED = {
       type: Schema.Literal('assistant'),
       message: reading(
         Schema.Struct({
-          content: Schema.Union([Schema.String, Schema.Array(Schema.Union([ToolUseBlock, otherThan(['tool_use'])]))]),
+          content: Schema.Union([Schema.String, Schema.Array(Schema.Union([...Blocks.members, otherThan(Blocks)]))]),
         }),
       ).of<SDKAssistantMessage['message']>(),
     }),
@@ -306,28 +312,39 @@ export const initRanIn = (line: Printed<'system init'>): string | undefined => l
 export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
 
 /**
+ * What a capture keeps of an `init` line: the fields a reader reads, as the line names them, but the mode, in the runtime's word
+ * (`ranIn`).
+ */
+type InitText = Pick<Printed<'system init'>, 'cwd' | 'model' | 'claude_code_version'> & { readonly ranIn?: string };
+
+/**
  * A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read.
  * @param ranIn The mode the line named.
  */
 export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
 
 /** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
-export const initLineText = ({ ranIn, ...read }: InitRead): string =>
+export const initLineText = ({ ranIn, ...read }: InitText): string =>
   JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
+
+const decodeEvent = Schema.decodeUnknownOption(Events);
 
 /**
  * What one `stream_event`'s event says of the text being written, as a follow reads it (`PartialMark`): a message begun, a piece of
- * the text block at its index, a block written whole. Read off the event's own fields, so the same reading serves a line decoded
- * from a kept stdout (`claudePartials`) and an event handed by the Agent SDK as it comes (`attached-follow.ts`).
+ * the text block at its index, a block written whole. The event is decoded by the schemas a `stream_event` line's is (`Events`), so
+ * the same reading serves a line decoded from a kept stdout (`claudePartials`) and an event handed by the Agent SDK as it comes
+ * (`attached-follow.ts`).
  *
  * @param event The `stream_event`'s event, unchecked.
- * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input
+ * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input —
+ *   and for an event that does not decode
  */
-export const partialMarksOf = (event: unknown): PartialMark[] => {
-  const e = (event ?? {}) as { type?: unknown; index?: unknown; message?: { id?: unknown }; delta?: { type?: unknown; text?: unknown } };
-  if (e.type === 'message_start' && typeof e.message?.id === 'string') return [{ begun: e.message.id }];
-  if (e.type === 'content_block_stop' && typeof e.index === 'number') return [{ stopped: e.index }];
-  if (e.type === 'content_block_delta' && typeof e.index === 'number' && e.delta?.type === 'text_delta' && typeof e.delta.text === 'string')
-    return [{ index: e.index, text: e.delta.text }];
-  return [];
-};
+export const partialMarksOf = (event: unknown): PartialMark[] =>
+  Option.match(decodeEvent(event), {
+    onNone: () => [],
+    onSome: Events.match({
+      message_start: (e) => [{ begun: e.message.id }],
+      content_block_stop: (e) => [{ stopped: e.index }],
+      content_block_delta: (e) => (Deltas.guards.text_delta(e.delta) ? [{ index: e.index, text: e.delta.text }] : []),
+    }),
+  });

@@ -9,7 +9,7 @@
  * as saying nothing.
  */
 import { Predicate, Result, Schema } from 'effect';
-import { firstRefusal } from '../../core/index.ts';
+import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
 
@@ -48,24 +48,22 @@ const FileChangeItem = Schema.Struct({
   stderr: Schema.optional(Schema.String),
 });
 
-const READ_ITEMS = ['UserMessage', 'AgentMessage', 'Reasoning', 'CommandExecution', 'FileChange'];
-
-/** An item whose `type` is none the runtime reads: only its `type` and `id` are checked. */
-const OtherItem = Schema.Struct({
-  type: Schema.optional(
-    Schema.String.check(Schema.makeFilter((t: string) => !READ_ITEMS.includes(t) || `Expected the fields of a ${t} item`)),
-  ),
-  id: Schema.optional(Schema.String),
-});
-
-const Item = Schema.Union([
+/** The thread items the runtime reads, by `type`: `Items.guards` narrows a decoded item to one of them. */
+export const Items = Schema.Union([
   messageItem('UserMessage'),
   messageItem('AgentMessage'),
   ReasoningItem,
   CommandExecutionItem,
   FileChangeItem,
-  OtherItem,
-]);
+]).pipe(Schema.toTaggedUnion('type'));
+
+/** An item whose `type` is none the runtime reads: only its `type` and `id` are checked. */
+const OtherItem = Schema.Struct({
+  type: Schema.optional(noneOf(Items, (t) => `Expected the fields of a ${t} item`)),
+  id: Schema.optional(Schema.String),
+});
+
+const Item = Schema.Union([...Items.members, OtherItem]);
 
 /** A thread item of an `item_completed` record, as `Item` decodes it. */
 export type RolloutItem = typeof Item.Type;

@@ -30,9 +30,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   job runs it and `npm run build`, and refuses a `theme/` or a `src/routeTree.gen.ts` whose committed bytes are not what they write. A face the `DESIGN.md` names is loaded by
   `src/styles.css` from its npm package, under the exact family the package registers (`Michroma`, `Chakra Petch`, `Share Tech Mono`),
   and given to the theme's hook (`--font-michroma`); the label face (`Archivo Variable`, `--font-label`) is the board's own.
-  The symbols none of the four has (`← → ↗ ≥ ✓ ⧉`) are drawn from one face served with them, Noto Sans Math, declared under each
-  family by `src/components/look/symbols.css`, its `unicode-range` those characters alone and one rule per face `styles.css` loads,
-  its descriptors exact: a character the board adds that its faces lack joins every rule, so no reader's system font draws it.
+  The symbols none of the four has are drawn from two faces served with them, declared under each family by
+  `src/components/look/symbols.css`: Noto Sans Math for `← → ↗ ≥ ✓ ⧉`, and the symbols subset of Noto Sans Symbols 2 for `✗`, which
+  Noto Sans Math lacks. Each rule's `unicode-range` is its face's characters alone, one rule per face `styles.css` loads, its
+  descriptors exact: a character the board adds that its faces lack joins every rule of the symbol face that has it, so no reader's
+  system font draws it.
 - The kit's corners (`rounded-shape-*`) follow `DESIGN.md`; shadcn's (`--radius`) are the board's own.
 - Classes merge through `cn` of `src/lib/utils.ts`, built from the kit's `twMergeConfig`.
 - A scroll bar is drawn by `src/styles.css` from `data-scroll-bar`, which `markScrolls` (`lib/useScrollMark.ts`) writes on what scrolls.

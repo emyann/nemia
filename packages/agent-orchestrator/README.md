@@ -3585,6 +3585,36 @@ mode writes outside its directory only by rule (`ownMounts`), and none in a stor
 step runs as it did. A store whose path
 no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
 
+### A factory's home: where a session starts, and the folder it works on
+
+A factory made from a template may have a home: the `home/` folder of its tree, which the template's own `home/` renders into byte
+for byte. It is the Claude Code project the factory's sessions start in: its `CLAUDE.md`, its `.claude/rules`, `.claude/skills` and
+`.claude/settings.json`, and its `.mcp.json`. `nemia start` copies it whole into `runs/<id>/home/<hex>/`, as it copies the workflow's
+folder, and records the digest as `homeFiles`; a link in it refuses the start before the run has an id. Every try of a step starts in
+the same copy, so a continued session resumes there, and a change to the tree reaches the runs started after it.
+
+Where the run froze a home, a step on this machine whose harness adds a writable folder (Claude Code) starts in the home
+(`sessionStart`, `src/filed/session-start/session-start.ts`, proved by `contracts/session-home.contract.ts`). The home is denied to it
+whole: it changes only by a proposal a person approves, never by a session. Its workspace, the worktree a run works in, is added beside
+it first: writable by the step's own rules alone (a `ruled` mount, which the runtime gives no allow or deny of its own), or read-only
+where its fence writes nothing. The step's rules were written for the folder it works on, and still mean it: a relative path in a
+`Read`, `Edit`, `Write` or `NotebookEdit` rule is read in the workspace (`Edit(**)` is filed `Edit(//<workspace>/**)`), and
+`${{ workspace }}` anywhere in a rule is the workspace's path, put in at filing, which is how a `Bash` rule names it, as sdlc's
+read-only agents allow `Bash(cd ${{ workspace }})`. The session is told the workspace as `WF_WORKSPACE` and in its brief, its project
+servers are read from the home's `.mcp.json` where it has one and else from the workspace's (`projectMcpFrom`), and its check runs in
+the workspace as before. A factory with no home, a run started before homes were, a step on Codex or a remote agent, and a folder run
+start in their workspace, filed as they were.
+
+Each volume has two switches, the person's (`nemia factory volume add <factory> <path|url>:ro|:rw --claude-md on|off --skills on|off`,
+kept by an add that names none, and refused in a proposal as every volume is): `claudeMd`, off by default, loads the volume's
+CLAUDE.md files into the sessions that start in the home (Claude Code's `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`, one switch for
+every added folder, so each other added folder is named in the settings' `claudeMdExcludes`, beside the step's own, which Claude Code
+skips, measured in `packages/agent-runtime/docs/harness.md`; a step whose settings are a file, which nothing rewrites, loads no added
+folder's at all); and `skills`, on by default, offers the skills of
+its `.claude/skills` beside the step's own, read from the step's workspace at filing. A run freezes the switches at start. The
+repository's skills and CLAUDE.md files stay code a session may change on its branch, reviewed like any other file: steering a
+session cannot write is the home's.
+
 ### What a step reads of the store: `reads:`
 
 A step may read what the store holds by its name, never by a path: a folder its tools reach as they reach the workspace, or a figure

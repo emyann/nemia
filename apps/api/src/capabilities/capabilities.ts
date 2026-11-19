@@ -13,72 +13,14 @@ import { Context, Effect, Layer, Predicate } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
+import type { CapabilitiesWithSteps, CapabilityServer } from 'objects';
 
-/** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
-export type Described = { name: string; description: string | null; source: string };
-
-/** A tool a server listed. `denied` is the rule in `permissions.deny` that refuses it, if one does. */
-export type McpTool = { name: string; description: string | null; denied: string | null };
-
-/** A server as `.mcp.json` declares it, and what it answered when the api asked it for its tools. */
-export type McpServer = {
-  name: string;
-  source: string;
-  /**
-   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`HARNESS_TRANSPORTS`, the harness's own, which objects'
-   * `McpTransport` of a url is not): `stdio` for a server with a command and none given, and `unknown` for any other word, or a url with
-   * none, the word as written quoted in `notAsked`.
-   */
-  type: HarnessTransport | 'unknown';
-  /**
-   * `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the
-   * page.
-   */
-  command: string | null;
-  args: string[];
-  url: string | null;
-  /**
-   * Whether `.claude/settings.json` enables it: `enabledMcpjsonServers` or `enableAllProjectMcpServers`, and not `disabledMcpjsonServers`.
-   */
-  enabled: boolean;
-  /** What it listed, or null when it was not asked or did not answer. */
-  tools: McpTool[] | null;
-  /** Why it did not list its tools, and the end of what it printed on stderr. */
-  error: string | null;
-  /** Why the api did not ask it — not enabled, or not a stdio server. */
-  notAsked: string | null;
-  /**
-   * The state the harness reports of the server of this name the default factory records — `connected`, `needs-auth`, `failed`,
-   * `pending` or `disabled`, the harness's own word, carried — or `null`: for a server the default factory does not record, and for one
-   * whose state could not be read, which is not an absence. A server of the checkout's `.mcp.json` alone has none.
-   */
-  factoryState: string | null;
-  /** When it was asked: the api asks each server once while it runs. */
-  checkedAt: string | null;
-};
-
-/** A permission rule of the settings, and the file it was read from. */
-export type DeniedRule = { rule: string; source: string };
-
-export type Capabilities = {
-  /** The checkout everything was read from. */
-  repo: string;
-  skills: Described[];
-  agents: Described[];
-  mcp: McpServer[];
-  denied: DeniedRule[];
-  /**
-   * `permissions.ask` in `.claude/settings.json`, in its order: what asks whatever an allow rule or the harness's own leave says — Claude
-   * Code reads them after the deny rules and before the allow rules. In `dontAsk`, where nothing asks, what they match is denied.
-   */
-  asked: DeniedRule[];
-  /**
-   * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude
-   * Code's read-only commands (`CLAUDE_RULES.readOnlyCommands`) among it. In `dontAsk`, all it runs of what asks.
-   */
-  allowed: DeniedRule[];
-  /** A file that is there and does not read: what was left out because of it, and the fix. */
-  warnings: string[];
+/**
+ * What the repository offers, read from its working folder: the parts of objects' `CapabilitiesWithSteps` that are the repository's own,
+ * and the folder it was read from. Each part says what it is on objects' Schema.
+ */
+export type Capabilities = Pick<CapabilitiesWithSteps, 'skills' | 'agents' | 'mcp' | 'denied' | 'asked' | 'allowed' | 'warnings'> & {
+  readonly repo: string;
 };
 
 /** The checkout this api's source is in: the repository a person started it from. */
@@ -154,7 +96,7 @@ export async function capabilitiesOf(
         factoryState: null,
         checkedAt: null,
       };
-      if (server.invalid) return entry satisfies McpServer;
+      if (server.invalid) return entry satisfies CapabilityServer;
       if (!server.command)
         return {
           ...entry,
@@ -162,12 +104,12 @@ export async function capabilitiesOf(
             server.type === 'unknown'
               ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${HARNESS_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
               : `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
-        } satisfies McpServer;
+        } satisfies CapabilityServer;
       if (!entry.enabled) {
         return {
           ...entry,
           notAsked: `Not enabled by ${SETTINGS}, so the api does not start it. Add "${server.name}" to enabledMcpjsonServers there to list its tools.`,
-        } satisfies McpServer;
+        } satisfies CapabilityServer;
       }
       const stdio = { ...server, command: server.command };
       const launch = launchOf(repo, stdio, env);
@@ -177,7 +119,7 @@ export async function capabilitiesOf(
         return {
           ...entry,
           error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
-        } satisfies McpServer;
+        } satisfies CapabilityServer;
       }
       const answer = await asker(repo, stdio, launch, deadlineMs);
       return {
@@ -185,7 +127,7 @@ export async function capabilitiesOf(
         tools: answer.tools?.map((tool) => ({ ...tool, denied: CLAUDE_RULES.denyingRule(deny, server.name, tool.name) })) ?? null,
         error: answer.error,
         checkedAt: answer.checkedAt,
-      } satisfies McpServer;
+      } satisfies CapabilityServer;
     }),
   );
   return {
@@ -197,7 +139,7 @@ export async function capabilitiesOf(
     asked: ask.map((rule) => ({ rule, source: SETTINGS })),
     allowed: allow.map((rule) => ({ rule, source: SETTINGS })),
     warnings,
-  } satisfies Capabilities as Capabilities;
+  } satisfies Capabilities;
 }
 
 /** `.claude/skills/*\/SKILL.md`, by directory. A directory without a SKILL.md is not a skill. */

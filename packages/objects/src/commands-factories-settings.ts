@@ -3,7 +3,7 @@
  * a harness setting given their sessions (`nemia factory setting set|rm`) and a workflow's cost line (`nemia factory cost-line set|rm`),
  * each with its long help and the forms `nemia factory --help` lists. Pure.
  */
-import { type Args, type CommandWords, dollarsOf, type Spec } from './command.ts';
+import { type Args, type CommandWords, dollarsOf, type Flag, type Spec } from './command.ts';
 import { NO_TRUST } from './commands-factories-templated.ts';
 
 /**
@@ -22,11 +22,11 @@ const VOLUME_HERE = {
   why: "the api serves it as the Factory's `addVolume` and `removeVolume` of `objects`' Api, calling this handler: a volume is a folder of the machine the store runs on, named there by its whole path",
 } as const;
 
-const VOLUME_ADD_USAGE = '<factory> <path|url>:ro|:rw [--no-trust]';
+const VOLUME_ADD_USAGE = '<factory> <path|url>:ro|:rw [--no-trust] [--claude-md on|off] [--skills on|off]';
 const VOLUME_RM_USAGE = '<factory> <path>';
 
 /** The forms of `nemia factory volume`, as `nemia factory --help` lists them beside the factory's others. */
-export const VOLUME_FORMS = `nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust]  (nemia factory volume add --help)
+export const VOLUME_FORMS = `nemia factory volume add <factory> <path|url>:ro|:rw [--no-trust] [--claude-md on|off] [--skills on|off]  (nemia factory volume add --help)
 nemia factory volume rm <factory> <path>`;
 
 /** `nemia factory volume add --help`: what a volume is, read-only or writable. */
@@ -47,12 +47,33 @@ Kept in the factory's own file (factories/<name>.json, "volumes"), never in a te
 nemia factory adopt and upgrade. Copied onto a run at its start, so a run in flight keeps what it began
 with. A second add of one path replaces it; nemia factory lists them under the factory.
 
+Two switches say what a volume gives the factory's sessions, which start in its home when the factory
+has one: --claude-md on lets the volume's CLAUDE.md files load (off by default), and --skills off hides
+the skills of its .claude/skills (on by default). A second add keeps the switches it does not name.
+They are the person's, and no proposal changes them.
+
 Refused, and nothing written: no :ro or :rw, a folder that is no directory, a writable one that is no
 git repository, a writable folder inside another writable one or holding one, a folder at or inside the
 store but a clone, a writable one holding the store, the default factory, a volume rm of a path it does
 not reach, and of a writable one a run not ended works on or the wiring names for a workflow. A start
 is refused where a step's harness cannot hold a volume's mount, and in a factory with no writable
 volume.`;
+
+/** `--claude-md on|off`, on `nemia factory volume add`: whether the volume's CLAUDE.md files reach the factory's sessions. */
+const CLAUDE_MD: Flag = {
+  flag: '--claude-md',
+  kind: 'text',
+  key: 'claudeMd',
+  takes: "--claude-md takes on or off: whether the volume's CLAUDE.md files reach the factory's sessions",
+};
+
+/** `--skills on|off`, on `nemia factory volume add`: whether the volume's skills are offered to the factory's sessions. */
+const SKILLS: Flag = {
+  flag: '--skills',
+  kind: 'text',
+  key: 'skills',
+  takes: "--skills takes on or off: whether the skills of the volume's .claude/skills are offered to the factory's sessions",
+};
 
 /** `nemia factory volume add`: a folder mounted for every local step of a factory's runs, read-only or writable. */
 export const FACTORY_VOLUME_ADD_WORDS = {
@@ -68,7 +89,7 @@ export const FACTORY_VOLUME_ADD_WORDS = {
       { key: 'factory', takes: 'required', kind: 'name' },
       { key: 'volume', takes: 'required', kind: 'name' },
     ],
-    flags: [NO_TRUST],
+    flags: [NO_TRUST, CLAUDE_MD, SKILLS],
     unknown: (arg) =>
       arg.startsWith('-')
         ? `nemia factory volume add does not take ${arg}: nemia factory volume add ${VOLUME_ADD_USAGE}.`

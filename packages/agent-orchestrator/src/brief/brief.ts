@@ -47,7 +47,13 @@ import type { ToldVia } from 'objects';
  * What a step's place says to it: an ending's landing words (`words`), the place's commands (`say`), and, for a judge, what each workflow a
  * node after it routes to says it is for (`targets`, by the workflow's name).
  */
-export type BriefPlace = { readonly words?: LandingWords; readonly say?: PlaceSay; readonly targets?: Readonly<Record<string, string>> };
+export type BriefPlace = {
+  readonly words?: LandingWords;
+  readonly say?: PlaceSay;
+  readonly targets?: Readonly<Record<string, string>>;
+  /** The step's workspace, absolute, which a session that starts in its factory's home is told to work in (`mountsLine`). */
+  readonly workspace?: string;
+};
 
 /**
  * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
@@ -237,7 +243,7 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
-  const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
+  const request = [run.brief, ...mountsLine(step, run, folders, place.workspace), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
   const parts = [...opening, headingOf('What was asked for'), '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
 

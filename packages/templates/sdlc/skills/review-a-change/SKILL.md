@@ -32,7 +32,7 @@ description: "Review a change in this repository as a second engineer would: aga
 3. **Read the check's verdict; run the checks your step names yourself**: where the step before you has a check, your brief hands you
    its exit and the end of its output (`## What <step>'s check said`); a check that did not pass is a finding. Run each check your step
    names bare, one command per call. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the workspace root,
-   never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run or read in the check's output is not a
+   never `git -C`, `VAR=`, `for` or a `cd` but the one into your workspace your brief names: your fence refuses them. A claim you did not run or read in the check's output is not a
    finding.
 4. **Check where each change lives**, against the repository's own boundary rules — its `CLAUDE.md` files and any architecture
    document they name — and against the spec's `placement` and each change's `where`. Code in a boundary those rules give to another

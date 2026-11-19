@@ -25,10 +25,12 @@ export type QuestionAnswer = NonNullable<RunApprove['answers']>[number];
 export type { RetryMode } from 'objects';
 
 /**
- * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones; and
- * of a round's.
+ * What an ask of a try must answer of `RunAsked`, which keeps each key optional since a try's ask and a round's answer different ones: the
+ * try asked for, its ask file, and whether the tick stops the step's blocked session first.
  */
 const AskedTrySchema = Schema.Struct({ try: Schema.Number, file: Schema.String, stopFirst: Schema.Boolean });
+
+/** What an ask of a round must answer of `RunAsked`: the looping step, the round asked for, and its ask file. */
 const AskedRoundSchema = Schema.Struct({ step: Schema.String, round: Schema.Number, file: Schema.String });
 
 /** The route an ask of `step` of the run `runId` is sent to, as an answer it does not read names it. */
@@ -60,8 +62,7 @@ export async function askTry(
   how: { mode: RetryMode; model?: string; message?: string; budget?: number; answers?: readonly QuestionAnswer[] },
 ) {
   const asked = await runs.retry(namespace, runId, step, how, TRY_MAY);
-  const { try: n, file, stopFirst } = decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
-  return { try: n, file, stopFirst };
+  return decoded(retryRoute(namespace, runId, step), AskedTrySchema, asked, TRY_MAY);
 }
 
 /**
@@ -79,8 +80,7 @@ export async function askTry(
  */
 export async function askRound(namespace: string, runId: string, step: string, how: { budget?: number }) {
   const asked = await runs.retry(namespace, runId, step, { mode: 'continue', round: true, ...how }, ROUND_MAY);
-  const { step: looping, round, file } = decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
-  return { step: looping, round, file };
+  return decoded(retryRoute(namespace, runId, step), AskedRoundSchema, asked, ROUND_MAY);
 }
 
 /**

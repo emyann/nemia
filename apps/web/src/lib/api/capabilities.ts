@@ -1,317 +1,30 @@
 /**
- * What the repository offers a step, and what each step gets (`GET /api/capabilities`), read through the objects' client. A copy that
- * stays: `objects`' `CapabilitiesWithSteps` carries each list as JSON (the api's reach of each step, which no other client reads), so
- * the board decodes the keys its Capabilities page draws here, and refuses an answer that leaves one out.
+ * What the repository offers a step, and what each step gets (`GET /api/capabilities`), read through the objects' client and decoded with
+ * `objects`' `CapabilitiesWithSteps`, every list with its shape.
  */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { type CapabilitiesUnread, CapabilitiesWithSteps, MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
-import { decodes } from './decodes.ts';
-import { decoded } from './read.ts';
+import { CapabilitiesWithSteps, type CapabilityDescribed, type CapabilityServer, type StepReach } from 'objects';
 import { call, read } from './objects.ts';
 
-/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
-const Strings = Schema.mutable(Schema.Array(Schema.String));
+export type { StepReach };
 
-/** A list of `item`, as a decoded answer holds it. */
-const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
+/** What a Claude Code step with no `tools:` has, as measured. */
+export type MeasuredTools = CapabilitiesWithSteps['measured'];
 
-/** Copies `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
-export type Described = { name: string; description: string | null; source: string };
+/** The Bash commands Claude Code runs without a rule, unless a rule names them. */
+export type ReadOnlyCommands = CapabilitiesWithSteps['readOnly'];
 
-/** Decodes a `Described`. */
-const DescribedSchema = decodes<Described>()(
-  Schema.Struct({
-    name: Schema.String,
-    description: Schema.NullOr(Schema.String),
-    source: Schema.String,
-  }),
-);
+/** A skill or an agent, and the file it was read from. */
+export type Described = CapabilityDescribed;
 
-/** Copies `McpServer` in apps/api/src/capabilities/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
-export type McpServer = {
-  name: string;
-  source: string;
-  /** The transport a harness loads it over, or `unknown` for any other word, which `notAsked` quotes as written. */
-  type: 'stdio' | McpTransport | 'unknown';
-  command: string | null;
-  args: string[];
-  url: string | null;
-  enabled: boolean;
-  /** `denied` is the rule in `permissions.deny` that refuses the tool, if one does. */
-  tools: Array<{ name: string; description: string | null; denied: string | null }> | null;
-  error: string | null;
-  notAsked: string | null;
-  checkedAt: string | null;
-  /**
-   * The state the harness reports of the server of this name the **default factory** records — the harness's own word, carried — or
-   * null: for a server the default factory does not record, and for one whose state could not be read, which is not an absence.
-   */
-  factoryState: string | null;
-};
-
-/** Decodes a `McpServer` of the capabilities, a server a harness reaches: named apart from the kind of objects. */
-const ReachedServerSchema = decodes<McpServer>()(
-  Schema.Struct({
-    name: Schema.String,
-    source: Schema.String,
-    type: Schema.Literals(['stdio', ...MCP_TRANSPORTS, 'unknown'] as const),
-    command: Schema.NullOr(Schema.String),
-    args: Strings,
-    url: Schema.NullOr(Schema.String),
-    enabled: Schema.Boolean,
-    tools: Schema.NullOr(
-      List(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String), denied: Schema.NullOr(Schema.String) })),
-    ),
-    error: Schema.NullOr(Schema.String),
-    notAsked: Schema.NullOr(Schema.String),
-    checkedAt: Schema.NullOr(Schema.String),
-    factoryState: Schema.NullOr(Schema.String),
-  }),
-);
-
-/** A permission rule, and where it was read: the settings' file, or a step's `disallowedTools:`. */
-type Rule = { rule: string; source: string };
-
-/** Decodes a `Rule`. */
-const RuleSchema = decodes<Rule>()(Schema.Struct({ rule: Schema.String, source: Schema.String }));
+/** A server of the repository's `.mcp.json`, and what it answered: named apart from the kind of objects. */
+export type McpServer = CapabilityServer;
 
 /**
- * Copies `MEASURED_TOOLS` in apps/api/src/capabilities/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on
- * `measuredAt` with `version` — data, never claimed current.
+ * What the repository the page reads offers a step, and what each step gets. Where it reads none, `repo` is left out, every list is empty,
+ * and `unread` says why and what to do.
  */
-export type MeasuredTools = {
-  harness: string;
-  version: string;
-  measuredAt: string;
-  source: string;
-  /** What the measurement named. */
-  tools: string[];
-  /** What such a step is taken to have that no measurement named, each with why: inferred, never measured. */
-  inferred: Array<{ name: string; why: string }>;
-  lacks: string[];
-};
-
-/** Decodes `MeasuredTools`. */
-const MeasuredToolsSchema = decodes<MeasuredTools>()(
-  Schema.Struct({
-    harness: Schema.String,
-    version: Schema.String,
-    measuredAt: Schema.String,
-    source: Schema.String,
-    tools: Strings,
-    inferred: List(Schema.Struct({ name: Schema.String, why: Schema.String })),
-    lacks: Strings,
-  }),
-);
-
-/**
- * Copies `READ_ONLY_COMMANDS` in apps/api/src/capabilities/capabilities.ts: the Bash commands Claude Code runs without a rule in every
- * mode, unless a deny names them — `measured` running so on `measuredAt` with `version`, the rest only `documented` — data, never claimed
- * current.
- */
-export type ReadOnlyCommands = {
-  harness: string;
-  version: string;
-  measuredAt: string;
-  source: string;
-  measured: string[];
-  /** Named by the docs, not measured; `git` is its read-only forms. */
-  documented: string[];
-  docs: string;
-};
-
-/** Decodes `ReadOnlyCommands`. */
-const ReadOnlyCommandsSchema = decodes<ReadOnlyCommands>()(
-  Schema.Struct({
-    harness: Schema.String,
-    version: Schema.String,
-    measuredAt: Schema.String,
-    source: Schema.String,
-    measured: Strings,
-    documented: Strings,
-    docs: Schema.String,
-  }),
-);
-
-/**
- * Copies `StepReach` in apps/api/src/capabilities/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on
- * Claude Code, the built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled
- * server's tools; the deny rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is
- * denied without a prompt.
- */
-export type StepReach = {
-  workflow: string;
-  from: Extract<DefinitionOrigin, 'repo' | 'user'>;
-  step: string;
-  harness: string;
-  claudeCode: boolean;
-  fence: {
-    tools: string[] | null;
-    disallowedTools: string[];
-    allowedTools: string[];
-    permissionMode: string | null;
-    sandbox: string | null;
-    effort: string | null;
-    mcp: string[];
-  };
-  tools: {
-    from: 'declared' | 'measured';
-    names: string[];
-    inferred: string[];
-    removed: Array<{ name: string; rule: string; source: string; of: string | null }>;
-  } | null;
-  skills: { names: string[]; why: string | null } | null;
-  /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */
-  mcp: Array<{
-    server: string;
-    tools: Array<{ name: string; denied: Rule | null; asks: Rule | null; allowed: boolean }> | null;
-    why: string | null;
-  }> | null;
-  denied: Rule[];
-  /** The settings' ask rules: what asks whatever an allow says, and in dontAsk, or on a job, is denied. None off Claude Code. */
-  asked: Rule[];
-  /**
-   * Copies `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does
-   * not have; the Bash rules that stand, each with the narrower denies that still refuse some of it and the narrower ask rules that make
-   * some of it ask; and why there is no Bash command, for a step with no Bash.
-   */
-  allowed: {
-    rules: string[];
-    takenBack: Array<{ rule: string; by: Rule }>;
-    asked: Array<{ rule: string; by: Rule }>;
-    unused: string[];
-    bash: Array<{ rule: string; command: string; except: string[]; asks: string[] }>;
-    /**
-     * Every standing rule a narrower deny still refuses part of, or a narrower ask rule makes part of ask — a Bash command, one tool of a
-     * server.
-     */
-    exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
-    dontAsk: boolean;
-    /** Why what an ask rule makes ask is denied without a prompt: `dontAsk`, or `a job`, which asks nobody. Null where it prompts. */
-    askDenier: 'dontAsk' | 'a job' | null;
-    why: string | null;
-  };
-  /**
-   * Copies `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny
-   * refuses it; and the rule that refuses it — a deny, or that ask rule where `askDenier` says what asks is denied. None without Bash, null
-   * off Claude Code.
-   */
-  readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
-};
-
-/** Decodes what the settings' allow rules give a step (`StepReach.allowed`). */
-const AllowedForSchema = decodes<StepReach['allowed']>()(
-  Schema.Struct({
-    rules: Strings,
-    takenBack: List(Schema.Struct({ rule: Schema.String, by: RuleSchema })),
-    asked: List(Schema.Struct({ rule: Schema.String, by: RuleSchema })),
-    unused: Strings,
-    bash: List(Schema.Struct({ rule: Schema.String, command: Schema.String, except: Strings, asks: Strings })),
-    exceptions: List(Schema.Struct({ rule: Schema.String, except: Strings, asks: Strings })),
-    dontAsk: Schema.Boolean,
-    askDenier: Schema.NullOr(Schema.Literals(['dontAsk', 'a job'])),
-    why: Schema.NullOr(Schema.String),
-  }),
-);
-
-/** Decodes a `StepReach`. */
-const StepReachSchema = decodes<StepReach>()(
-  Schema.Struct({
-    workflow: Schema.String,
-    from: Schema.Literals(['repo', 'user']),
-    step: Schema.String,
-    harness: Schema.String,
-    claudeCode: Schema.Boolean,
-    fence: Schema.Struct({
-      tools: Schema.NullOr(Strings),
-      disallowedTools: Strings,
-      allowedTools: Strings,
-      permissionMode: Schema.NullOr(Schema.String),
-      sandbox: Schema.NullOr(Schema.String),
-      effort: Schema.NullOr(Schema.String),
-      mcp: Strings,
-    }),
-    tools: Schema.NullOr(
-      Schema.Struct({
-        from: Schema.Literals(['declared', 'measured']),
-        names: Strings,
-        inferred: Strings,
-        removed: List(Schema.Struct({ name: Schema.String, rule: Schema.String, source: Schema.String, of: Schema.NullOr(Schema.String) })),
-      }),
-    ),
-    skills: Schema.NullOr(Schema.Struct({ names: Strings, why: Schema.NullOr(Schema.String) })),
-    mcp: Schema.NullOr(
-      List(
-        Schema.Struct({
-          server: Schema.String,
-          tools: Schema.NullOr(
-            List(
-              Schema.Struct({
-                name: Schema.String,
-                denied: Schema.NullOr(RuleSchema),
-                asks: Schema.NullOr(RuleSchema),
-                allowed: Schema.Boolean,
-              }),
-            ),
-          ),
-          why: Schema.NullOr(Schema.String),
-        }),
-      ),
-    ),
-    denied: List(RuleSchema),
-    asked: List(RuleSchema),
-    allowed: AllowedForSchema,
-    readOnly: Schema.NullOr(
-      List(
-        Schema.Struct({
-          command: Schema.String,
-          measured: Schema.Boolean,
-          denied: Schema.NullOr(RuleSchema),
-          asks: Schema.NullOr(RuleSchema),
-        }),
-      ),
-    ),
-  }),
-);
-
-/**
- * What the repository the page reads offers a step, and what each step gets: `objects`' `CapabilitiesWithSteps`, read by its keys. Where it
- * reads none, `repo` is left out, every list is empty, and `unread` says why and what to do.
- */
-export type Capabilities = {
-  repo?: string;
-  unread?: CapabilitiesUnread;
-  skills: Described[];
-  agents: Described[];
-  mcp: McpServer[];
-  denied: Rule[];
-  /** `permissions.ask` in the settings, in its order. */
-  asked: Rule[];
-  /** `permissions.allow` in the settings, in its order. */
-  allowed: Rule[];
-  warnings: string[];
-  measured: MeasuredTools;
-  readOnly: ReadOnlyCommands;
-  steps: StepReach[];
-};
-
-/** Decodes `Capabilities`: `objects`' `CapabilitiesWithSteps`, each of its lists it carries as JSON read by its keys. */
-const CapabilitiesSchema = decodes<Capabilities>()(
-  Schema.Struct({
-    ...CapabilitiesWithSteps.fields,
-    skills: List(DescribedSchema),
-    agents: List(DescribedSchema),
-    mcp: List(ReachedServerSchema),
-    denied: List(RuleSchema),
-    asked: List(RuleSchema),
-    allowed: List(RuleSchema),
-    warnings: Strings,
-    measured: MeasuredToolsSchema,
-    readOnly: ReadOnlyCommandsSchema,
-    steps: List(StepReachSchema),
-  }),
-);
+export type Capabilities = CapabilitiesWithSteps;
 
 /** Where the page is read: the factory its path names and one of its repositories (`?repo=`), each where it names one. */
 type CapabilitiesPlace = { factory?: string; repo?: string };
@@ -327,8 +40,5 @@ const queryOf = ({ factory, repo }: CapabilitiesPlace) => ({ ...(factory && { fa
 export const capabilitiesQuery = (place: CapabilitiesPlace) =>
   queryOptions({
     queryKey: ['capabilities', place.factory ?? null, place.repo ?? null],
-    queryFn: () =>
-      call((c) => c.server.capabilities({ query: queryOf(place) }), read(CapabilitiesWithSteps)).then((answer) =>
-        decoded('GET /api/capabilities', CapabilitiesSchema, answer),
-      ),
+    queryFn: () => call((c) => c.server.capabilities({ query: queryOf(place) }), read(CapabilitiesWithSteps)),
   });

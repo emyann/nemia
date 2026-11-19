@@ -18,7 +18,7 @@ import { addFactory, removeFactory } from 'agent-orchestrator/testing';
 
 const { measuredTools: MEASURED_TOOLS, readOnlyCommands: READ_ONLY_COMMANDS } = CLAUDE_RULES;
 
-type CapabilitiesWithSteps = import('./reach.ts').CapabilitiesWithSteps;
+type CapabilitiesWithSteps = import('objects').CapabilitiesWithSteps;
 assert.equal(
   DISALLOW,
   'disallowedTools:',
@@ -1137,7 +1137,7 @@ const askingRepo = (permissions: object) =>
 test('REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job — and a deny over it is still the deny', async () => {
   const cat = { rule: 'Bash(cat:*)', source: SETTINGS };
   const { 'dev/review': review, 'dev/implement': implement } = await claudeStepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
-  const of = (step: { readOnly: Array<{ command: string }> }, command: string) => step.readOnly.find((c) => c.command === command);
+  const of = (step: { readOnly: ReadonlyArray<{ command: string }> }, command: string) => step.readOnly.find((c) => c.command === command);
   assert.deepEqual(
     of(review, 'cat'),
     { command: 'cat', measured: true, denied: cat, asks: cat },

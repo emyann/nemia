@@ -24,7 +24,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { filedFolders, type FiledFolders } from '../filed/filed.ts';
+import { filedFolders, startOf } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
 import type { RetryBriefing } from '../brief/index.ts';
@@ -59,7 +59,7 @@ import type { Place } from '../place/place.store.ts';
 import type { PlaceSay } from '../place/place.ts';
 import { composeBrief } from '../brief/index.ts';
 import { artifactsDir, inputsDir, isDirectory } from '../record/record.store.ts';
-import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
+import { carriedFilesDir, startFoundAt, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import { doorAtOnce } from '../factory/door/factories.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
@@ -246,19 +246,35 @@ const handedRunsAt = (home: string, ids: readonly string[]) =>
   });
 
 /**
- * What a step of `run` is filed with (`filedConfig`): its folders, and the MCP servers the run's factory records, read from the store
- * `home` the caller was given. The root is a parameter and has no default: a caller that passes none does not compile, so no filing
- * reads a store nobody named (`test/root-given.test.ts`).
+ * What a step of `run` is filed with (`filedConfig`): its folders, the MCP servers the run's factory records, read from the store `home`
+ * the caller was given, its workspace, and what the filing finds of the run's home where it froze one (`startFoundAt`). The root is a
+ * parameter and has no default: a caller that passes none does not compile, so no filing reads a store nobody named
+ * (`test/root-given.test.ts`).
  * @param run The run, read down to what names its folders and its factory.
  * @param home The store's root folder.
+ * @param workspace The step's workspace, absolute.
  */
 export const filedAt = (
-  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles'>,
+  run: Pick<Run, 'id' | 'inputs' | 'cards' | 'context' | 'factory' | 'workflowFiles' | 'carriedFiles' | 'homeFiles' | 'mounts' | 'volumes'>,
   home: string,
+  workspace: string,
 ) => ({
   ...filedFoldersAt(home, run),
   servers: recordedServers(run.factory, home),
+  workspace,
+  ...startFoundAt(home, run, workspace),
 });
+
+/**
+ * The folder a step's session starts in (`startOf`): the run's copy of its factory's home where it froze one and the step's harness adds
+ * its workspace beside it, else its workspace, as before homes were.
+ * @param step The step filed.
+ * @param run The run: its frozen home, its mounts and its volumes.
+ * @param home The store's root.
+ * @param workspace The step's workspace, absolute.
+ */
+export const sessionCwd = (step: StepSpec, run: Pick<Run, 'id' | 'homeFiles' | 'mounts' | 'volumes'>, home: string, workspace: string) =>
+  startOf(step, workspace, startFoundAt(home, run, workspace).start).cwd;
 
 /**
  * The MCP servers the factory `factory` records, beside the library's it has added (its own winning a name), each through `mcpServerOf` —
@@ -333,7 +349,7 @@ export const foldersTold = (
       const from = path.basename(m.path);
       return [m.path, filesHanded(home, run, from, reads.signedOff(from))] as const;
     });
-  return { ...folders, named: Object.fromEntries(named), closeouts } satisfies FiledFolders as FiledFolders;
+  return { ...folders, named: Object.fromEntries(named), closeouts };
 };
 
 /** What a try's telling reads of its pass (`Filing`): the run, and what the pass read of its steps, tasks and closeouts. */
@@ -364,8 +380,7 @@ export const found = <T>(value: T | undefined, what: string) => {
  * @param run The run.
  * @param name The step's name.
  */
-export const recordNamed = (run: Run, name: string) =>
-  found(run.steps[name], `the record of step ${name} of run ${run.id}`) satisfies StepRecord as StepRecord;
+export const recordNamed = (run: Run, name: string) => found(run.steps[name], `the record of step ${name} of run ${run.id}`);
 
 /**
  * The task of the session a try stops first (`Retry.stopFirst`), which runs: a step with none on the record is thrown (`found`).
@@ -384,7 +399,7 @@ export const stepNamed = (f: TriedReads, name: string) =>
   found(
     f.reads.steps.find((s) => s.name === name),
     `the step ${name}`,
-  ) satisfies StepSpec as StepSpec;
+  );
 
 /** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
 const endingSaid = (f: TriedReads, ending: StepSpec) => {
@@ -414,24 +429,23 @@ export const tryTold = (
   r: Retry,
   record: StepRecord,
   t: { status: StepStatus; resumeFrom: string | undefined; refusal: RetryBriefing['refusal'] },
-) =>
-  ({
-    try: r.try,
-    by: r.by,
-    mode: r.mode,
-    ...(r.model ? { model: r.model } : {}),
-    ...(r.message !== undefined ? { message: r.message } : {}),
-    ...(r.budget !== undefined ? { budget: r.budget } : {}),
-    ...(r.pastCap ? { pastCap: true as const } : {}),
-    resumed: Boolean(t.resumeFrom),
-    ...(t.resumeFrom ? { said: saidIn(record.taskId === null ? undefined : f.reads.views.get(record.taskId)) } : {}),
-    status: t.status,
-    ...(t.refusal ? { refusal: t.refusal } : {}),
-    ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
-    ...(t.status === 'unsigned' ? lacksTold(home, f.run, r.step, record) : {}),
-    ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
-    ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
-  }) satisfies RetryBriefing as RetryBriefing;
+) => ({
+  try: r.try,
+  by: r.by,
+  mode: r.mode,
+  ...(r.model ? { model: r.model } : {}),
+  ...(r.message !== undefined ? { message: r.message } : {}),
+  ...(r.budget !== undefined ? { budget: r.budget } : {}),
+  ...(r.pastCap ? { pastCap: true as const } : {}),
+  resumed: Boolean(t.resumeFrom),
+  ...(t.resumeFrom ? { said: saidIn(record.taskId === null ? undefined : f.reads.views.get(record.taskId)) } : {}),
+  status: t.status,
+  ...(t.refusal ? { refusal: t.refusal } : {}),
+  ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
+  ...(t.status === 'unsigned' ? lacksTold(home, f.run, r.step, record) : {}),
+  ...(t.status === 'unsigned' ? refusedTold(stepNamed(f, r.step), f.reads.signedOff(r.step), f.reads.steps) : {}),
+  ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
+});
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the

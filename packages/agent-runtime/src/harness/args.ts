@@ -60,6 +60,12 @@ export type HarnessArgs = {
    */
   projectMcp?: string[];
   /**
+   * The folder whose `.mcp.json` the session's checkout servers are read from, absolute: the whole file where `projectMcp` is absent,
+   * the entries it names where it is given. Absent: the session's `cwd`. For a session that starts in one folder and works on another
+   * beside it, whose servers are the other's. Refused unless an absolute path with no NUL in it.
+   */
+  projectMcpFrom?: string;
+  /**
    * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
    * the session compacts its conversation, a summary in place of what it read, and carries on, a job and a long-lived session
    * alike. Every attempt gets the same window, a continuation included. Absent: the harness's own, which is the
@@ -176,6 +182,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   disallowedTools: true,
   mcp: true,
   projectMcp: true,
+  projectMcpFrom: true,
   contextTokens: true,
   worktree: true,
   budgetUsd: true,
@@ -383,10 +390,13 @@ const mayAskRefusalOf = ({ mayAsk }: HarnessArgs) =>
     : `\`mayAsk: ${JSON.stringify(mayAsk)}\` is not true or false. Give true to hold a call that would ask a person while one answers it, or leave it out to have such a call denied.`;
 
 /**
- * Why a task's `projectMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name
- * twice, or a name the task's own `mcp` gives too, where one would hide the other.
+ * Why a task's `projectMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: a `projectMcpFrom` that is no absolute
+ * folder, not a list of server names, a name twice, or a name the task's own `mcp` gives too, where one would hide the other.
  */
-const projectMcpRefusalOf = ({ projectMcp, mcp }: HarnessArgs) => {
+const projectMcpRefusalOf = ({ projectMcp, projectMcpFrom, mcp }: HarnessArgs) => {
+  if (projectMcpFrom !== undefined && !(isArg(projectMcpFrom) && path.isAbsolute(projectMcpFrom))) {
+    return `\`projectMcpFrom: ${JSON.stringify(projectMcpFrom)}\` is not an absolute folder. Name the folder whose \`.mcp.json\` the session's servers are read from by its absolute path, or leave it out for the session's \`cwd\`.`;
+  }
   if (projectMcp === undefined) return undefined;
   const names: unknown = projectMcp;
   if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w-]+$/.test(n)))) {

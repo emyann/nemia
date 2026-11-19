@@ -83,14 +83,24 @@ export function volumeRefusal(
  * ones were given in stays (`workedOn`), and what that one was marked (`was`), null for a new one: each with its name, the one it is named
  * on read for one its file stores none of (`volumesNamed`), and the new one's taken among them (`volumeNameAt`), so the file stores every
  * name and none moves.
+ * A switch the added volume does not give (`claudeMd`, `skills`) is the one of its path kept.
  * @param factory The factory: its volumes as its file holds them.
- * @param volume The volume added: its path, whether it is read-only, and its origin where it is a clone.
+ * @param volume The volume added: its path, whether it is read-only, its origin where it is a clone, and the switches given.
  */
 export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume) {
   const at = path.resolve(volume.path);
   const volumes = volumesNamed(factory.volumes);
-  const was = volumes.find((v) => path.resolve(v.path) === at)?.readOnly ?? null;
-  const named = { ...volume, path: at, name: volumeNameAt(factory.volumes, at) };
+  const before = volumes.find((v) => path.resolve(v.path) === at);
+  const was = before?.readOnly ?? null;
+  const claudeMd = volume.claudeMd ?? before?.claudeMd;
+  const skills = volume.skills ?? before?.skills;
+  const named = {
+    ...volume,
+    path: at,
+    name: volumeNameAt(factory.volumes, at),
+    ...(claudeMd === undefined ? {} : { claudeMd }),
+    ...(skills === undefined ? {} : { skills }),
+  };
   const kept = was === null ? [...volumes, named] : volumes.map((v) => (path.resolve(v.path) === at ? named : v));
   return { volumes: kept.filter((v, i) => kept.findIndex((w) => path.resolve(w.path) === path.resolve(v.path)) === i), was };
 }
@@ -99,13 +109,19 @@ export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume) {
  * The volumes `step` is filed with, of those its run mounts (`volumes`): each read-only as it was marked, and a writable one writable only
  * where the step's fence writes (`writesNothing`), since a volume widens where a step's writes reach, never what it may do. None for a
  * step on a remote agent, filed no local field. `writable:` never names one: it names a repository of the factory, by its folder's name.
+ * Each keeps its switches (`claudeMd`, `skills`) for the filing, which reads them and hands the runtime the path and the mode alone.
  * @param step The step filed: its harness and its fence.
  * @param volumes The volumes its run mounts, or undefined where it mounts none.
  */
 export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined) => {
   if (!volumes?.length || isRemoteHarness(step.harness)) return [];
   const unwriting = writesNothing(step);
-  return volumes.map((v) => ({ path: v.path, readOnly: v.readOnly || unwriting }));
+  return volumes.map((v) => ({
+    path: v.path,
+    readOnly: v.readOnly || unwriting,
+    ...(v.claudeMd === true ? { claudeMd: true as const } : {}),
+    ...(v.skills === false ? { skills: false as const } : {}),
+  }));
 };
 
 /** A volume with its name: the one its file stores, or the one `volumesNamed` gives it on read. */
@@ -158,6 +174,8 @@ export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>) {
         ...v,
         ...(first?.name === undefined ? {} : { name: first.name }),
         ...(first?.origin === undefined ? {} : { origin: first.origin }),
+        ...(first?.claudeMd === undefined ? {} : { claudeMd: first.claudeMd }),
+        ...(first?.skills === undefined ? {} : { skills: first.skills }),
       };
     }),
   );

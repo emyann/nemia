@@ -63,6 +63,15 @@ export const carriedFilesRoot = (runs: string, id: string, hex?: string) =>
   hex === undefined ? path.join(runs, id, 'carried') : path.join(runs, id, 'carried', hex);
 
 /**
+ * The run's own copies of its factory's home, `<runs>/<id>/home`, and with `hex` the one copy under that digest (`Run.homeFiles`).
+ * @param runs The store's runs folder.
+ * @param id The run's id.
+ * @param hex The digest of one copy, or undefined for the folder of every copy.
+ */
+export const homeFilesRoot = (runs: string, id: string, hex?: string) =>
+  hex === undefined ? path.join(runs, id, 'home') : path.join(runs, id, 'home', hex);
+
+/**
  * Replaces `to` with a copy of the directory `from`, taken now, or with nothing when `from` is not there. The copy leaves out:
  * - every symlink, unfollowed: a link in a step's folder pointing out of it undoes the fence, as `writeWorkflow` refuses by name;
  * - the source's own `given/` directory, which the run made for that step: what a step waits on is what that step made. A regular file

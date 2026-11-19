@@ -158,7 +158,7 @@ function tryRefused(
   const config = filedConfig(step, steps, run, {
     model: tryModel(step, record, how),
     budgetUsd,
-    ...filedAt(run, home),
+    ...filedAt(run, home, run.steps[step.name]?.workspace ?? run.workspace),
     own,
     landingDenied: () => denied,
   });

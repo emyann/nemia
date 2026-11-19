@@ -8,7 +8,7 @@ description: "Read a factory's stats since the janitor's last run, against the s
 1. **Run each read bare**, one command per call, run as your step says the command is reached:
    `nemia stats --json --workflow <the workflow your step is in>`, `nemia stats --json --by agent --from <day> --to <day>`,
    `nemia stats --json --by step --from <day> --to <day>`, `nemia inbox`. Never wrap one in `timeout` or `( … )`, pipe it to `tail` or
-   `grep`, or redirect it; never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. Read a file with Read and search with Grep
+   `grep`, or redirect it; never `git -C`, `VAR=`, `for` or a `cd` but the one into your workspace your brief names: your fence refuses them. Read a file with Read and search with Grep
    or Glob.
 2. **Choose the period.** A period the brief gives wins. Else it runs from the last day the first of those reads counts a run on
    (`all.days`, the latest with `runs` above 0) to today; with none, the last 14 days to today. It is compared with as many days,

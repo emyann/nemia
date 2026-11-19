@@ -209,7 +209,7 @@ export {
   type VerbHarness,
 } from './harness/declaration.ts';
 export { REMOTE_DECLARATION } from './a2a/vocabulary.ts';
-export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';
+export { ADDED_FOLDER_READS, addedFolderReadsOf, CONFIG_FOLDERS, configFolderIn, type AddedFolderReads } from './harness/config-folders.ts';
 /**
  * A harness's trust of a folder, off its own file: whether it is given (`trustedFolder`), what it is in a person's words
  * (`folderTrust`), and the act of giving it (`trustFolder`); each `undefined` for a harness that keeps none.

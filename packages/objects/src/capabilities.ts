@@ -166,7 +166,7 @@ const ReachedTool = Schema.Struct({
 export const StepReach = Schema.Struct({
   workflow: Text('The workflow.'),
   from: Schema.Literals(['repo', 'user']).annotate({
-    description: "Where the workflow was read: the repository's, or yours.",
+    description: "The workflow's origin: `repo`, the repository's; `user`, the person's library.",
   }),
   step: Text('The step.'),
   harness: Text("The harness it runs on: the step's, or the default harness where it names none."),

@@ -198,9 +198,7 @@ export const decodeLine = <K extends LineKind>(
   const kind = kindOf(entry, kinds);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
-  return Result.isSuccess(decoded)
-    ? { line: decoded.success as Line<K> }
-    : { wrong: refusal(where, kind, entry, LINES[kind] as Schema.Codec<unknown>) };
+  return Result.isSuccess(decoded) ? { line: decoded.success as Line<K> } : { wrong: refusal(where, kind, entry, LINES[kind]) };
 };
 
 /**

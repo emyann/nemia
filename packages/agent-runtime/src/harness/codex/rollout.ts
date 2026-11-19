@@ -113,7 +113,7 @@ const kindOf = (entry: unknown): RolloutKind | undefined => {
 
 /** Why `entry`, a `kind` record at `where`, is refused: the record, its kind, its first wrong field, what is there, and the fix. */
 const refusal = (where: string, kind: RolloutKind, entry: unknown): string => {
-  const { path, words } = firstRefusal(ROLLOUT[kind] as Schema.Codec<unknown>, entry, 'Codex writes');
+  const { path, words } = firstRefusal(ROLLOUT[kind], entry, 'Codex writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')

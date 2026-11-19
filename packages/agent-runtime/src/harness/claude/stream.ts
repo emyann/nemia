@@ -265,7 +265,7 @@ export const printedKindOf = (text: string): PrintedKind | 'other' | undefined =
 
 /** Why `value`, a `kind` line at line `at`, is refused: the line, its kind, its first wrong field, what is there, and the fix. */
 const refusal = (at: number, kind: PrintedKind, value: unknown): string => {
-  const { path, words } = firstRefusal(PRINTED[kind] as Schema.Codec<unknown>, value, 'Claude Code prints');
+  const { path, words } = firstRefusal(PRINTED[kind], value, 'Claude Code prints');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
     .split(' ')

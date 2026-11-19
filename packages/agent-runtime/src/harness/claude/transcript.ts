@@ -127,16 +127,16 @@ const blockEvents = (
       text,
       ...(origin ? { origin } : {}),
     }) satisfies TranscriptEvent;
-  if (Blocks.guards.text(block)) return [said(block.text ?? '')] satisfies TranscriptEvent[];
+  if (Blocks.guards.text(block)) return [said(block.text ?? '')] satisfies TranscriptEvent[] as TranscriptEvent[];
   if (Blocks.guards.thinking(block) || Blocks.guards.redacted_thinking(block)) {
     return [
       { id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   if (Blocks.guards.tool_use(block)) {
     return [
       { id: block.id ?? `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   if (Blocks.guards.tool_result(block)) {
     return [
@@ -147,20 +147,21 @@ const blockEvents = (
         kind: 'tool_result',
         result: { text: resultText(block.content), isError: block.is_error === true },
       },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
-  return [said(`[${block.type}]`)] satisfies TranscriptEvent[];
+  return [said(`[${block.type}]`)] satisfies TranscriptEvent[] as TranscriptEvent[];
 };
 
 /** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
 const queuedEvents = (line: Line<'attachment'>, id: string, at: string) => {
   const a = line.attachment;
-  if (a === undefined || !Attachments.guards.queued_command(a) || typeof a.prompt !== 'string') return [] satisfies TranscriptEvent[];
+  if (a === undefined || !Attachments.guards.queued_command(a) || typeof a.prompt !== 'string')
+    return [] satisfies TranscriptEvent[] as TranscriptEvent[];
   const from = a.origin?.kind;
-  if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }] satisfies TranscriptEvent[];
-  return (
-    a.commandMode === 'prompt' && (from === 'human' || from === undefined) ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }] : []
-  ) satisfies TranscriptEvent[];
+  if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }] satisfies TranscriptEvent[] as TranscriptEvent[];
+  return (a.commandMode === 'prompt' && (from === 'human' || from === undefined)
+    ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
+    : []) satisfies TranscriptEvent[] as TranscriptEvent[];
 };
 
 /**
@@ -205,15 +206,17 @@ const queuedEvents = (line: Line<'attachment'>, id: string, at: string) => {
 export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string) => {
   const where = `the line at byte ${offset} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
   const read = decodeLine(entry, ['user', 'assistant', 'system', 'attachment'], where);
-  if (read === undefined) return [] satisfies TranscriptEvent[];
+  if (read === undefined) return [] satisfies TranscriptEvent[] as TranscriptEvent[];
   if ('wrong' in read) throw new Error(read.wrong);
   const { line } = read;
   const at = isoTime(line.timestamp);
-  if (!at || line.isSidechain === true) return [] satisfies TranscriptEvent[];
+  if (!at || line.isSidechain === true) return [] satisfies TranscriptEvent[] as TranscriptEvent[];
   const id = line.uuid || `@${offset}`;
   if (line.type === 'system')
-    return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }] satisfies TranscriptEvent[];
-  if (line.type === 'attachment') return queuedEvents(line, id, at) satisfies TranscriptEvent[];
+    return [
+      { id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' },
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
+  if (line.type === 'attachment') return queuedEvents(line, id, at) satisfies TranscriptEvent[] as TranscriptEvent[];
   const role = line.isMeta === true ? 'system' : line.type;
   const from =
     line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: originOf(line.origin.kind) } : undefined;
@@ -221,8 +224,10 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: st
   if (typeof content === 'string')
     return [
       { id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) },
-    ] satisfies TranscriptEvent[];
-  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role, from)) satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
+  return (content ?? []).flatMap<TranscriptEvent>((block, i) =>
+    blockEvents(block, i, id, at, role, from),
+  ) satisfies TranscriptEvent[] as TranscriptEvent[];
 };
 
 /**

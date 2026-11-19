@@ -291,7 +291,7 @@ export const readAnswers = (root: string, name: string) => jsonLines(filesOf(roo
 export const openAsks = (root: string, name: string) => {
   const { lines } = askLinesOf(root, name);
   const closed = new Set(lines.filter((l) => l.closed !== undefined).map((l) => l.id));
-  return lines.flatMap((l) =>
+  return lines.flatMap<SessionAsk>((l) =>
     l.questions === undefined || closed.has(l.id) ? [] : askOf({ ...l, questions: l.questions }),
   ) satisfies SessionAsk[];
 };
@@ -358,7 +358,7 @@ export const everyRun = (root: string) => {
       .readdirSync(dir)
       .filter((f) => f.endsWith('.json') && !f.endsWith('.mcp.json') && f !== DRAIN_FILE && f !== SESSION_DRAIN_FILE);
   } catch {
-    return new Map();
+    return new Map<string, AttachedRun>();
   }
   return new Map(names.flatMap((f) => [readRun(path.join(dir, f)) ?? []].flat().map((run) => [run.name, run] as const)));
 };

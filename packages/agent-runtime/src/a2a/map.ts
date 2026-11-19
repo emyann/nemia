@@ -236,7 +236,7 @@ const passedText = (m: Message, read: string) => {
 export const spawnOf = (m: Message) => {
   const md = m.metadata ?? {};
   const brief = passedText(m, 'spawnOf');
-  return {
+  const spawn: SpawnRequest = {
     name: m.taskId,
     brief,
     cwd: md.cwd,
@@ -249,6 +249,7 @@ export const spawnOf = (m: Message) => {
     traceparent: md.traceparent,
     ...(md.resources ? { resources: md.resources } : {}),
   };
+  return spawn;
 };
 
 /**
@@ -280,7 +281,7 @@ export const closeoutArtifact = (payload: unknown, at?: number) =>
  */
 export const closeoutOf = (t: Task) => {
   const content = t.artifacts.find((a) => a.artifactId === 'closeout')?.parts[0]?.content;
-  return content?.$case === 'text' || content?.$case === 'data' ? content.value : undefined;
+  return content?.$case === 'text' || content?.$case === 'data' ? (content.value as unknown) : undefined;
 };
 
 type Fill = { message?: Message; history?: Message[]; metadata?: Record<string, unknown>; artifacts?: Artifact[] };
@@ -424,7 +425,7 @@ export const sightingOfTask = (t: Task) => {
 const statementOf = (artifacts: readonly Artifact[]) => {
   for (const a of [...artifacts].reverse()) {
     const data = [...a.parts].reverse().find((p) => p.content?.$case === 'data');
-    if (data?.content?.$case === 'data') return data.content.value;
+    if (data?.content?.$case === 'data') return data.content.value as unknown;
   }
   return undefined;
 };

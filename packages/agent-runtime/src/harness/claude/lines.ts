@@ -192,7 +192,10 @@ export const decodeLine = <K extends LineKind>(entry: unknown, kinds: readonly K
   const kind = kindOf(entry, kinds);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
-  return Result.isSuccess(decoded) ? { line: decoded.success as Line<K> } : { wrong: refusal(where, kind, entry, decoded.failure) };
+  const read: { line: Line<K> } | { wrong: string } = Result.isSuccess(decoded)
+    ? { line: decoded.success as Line<K> }
+    : { wrong: refusal(where, kind, entry, decoded.failure) };
+  return read;
 };
 
 /**

@@ -245,7 +245,7 @@ const kindOf = (value: unknown, kinds: readonly PrintedKind[]) => {
 /** The JSON object `text` holds, when it parses: `undefined` for a line torn mid-write, stderr, or prose. */
 const parsed = (text: string) => {
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
     return undefined;
   }

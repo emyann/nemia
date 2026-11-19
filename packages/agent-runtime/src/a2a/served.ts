@@ -123,7 +123,7 @@ export class ServedHandler implements A2ARequestHandler {
   }
 
   async sendMessage(_params: SendMessageRequest, _context: ServerCallContext) {
-    throw refuse('sendMessage');
+    return Promise.reject(refuse('sendMessage'));
   }
 
   // oxlint-disable-next-line require-yield -- the SDK's handler types this as a stream, and this port serves none
@@ -132,30 +132,30 @@ export class ServedHandler implements A2ARequestHandler {
   }
 
   async cancelTask(_params: CancelTaskRequest, _context: ServerCallContext) {
-    throw refuse('cancelTask');
+    return Promise.reject(refuse('cancelTask'));
   }
 
   async listTasks(_params: ListTasksRequest, _context: ServerCallContext) {
-    throw refuse('listTasks');
+    return Promise.reject(refuse('listTasks'));
   }
 
   async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext) {
-    throw refuse('createTaskPushNotificationConfig');
+    return Promise.reject(refuse('createTaskPushNotificationConfig'));
   }
 
   async getTaskPushNotificationConfig(_params: GetTaskPushNotificationConfigRequest, _context: ServerCallContext) {
-    throw refuse('getTaskPushNotificationConfig');
+    return Promise.reject(refuse('getTaskPushNotificationConfig'));
   }
 
   async listTaskPushNotificationConfigs(_params: ListTaskPushNotificationConfigsRequest, _context: ServerCallContext) {
-    throw refuse('listTaskPushNotificationConfigs');
+    return Promise.reject(refuse('listTaskPushNotificationConfigs'));
   }
 
   async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext) {
-    throw refuse('deleteTaskPushNotificationConfig');
+    return Promise.reject(refuse('deleteTaskPushNotificationConfig'));
   }
 
   async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext) {
-    throw refuse('getAuthenticatedExtendedAgentCard');
+    return Promise.reject(refuse('getAuthenticatedExtendedAgentCard'));
   }
 }

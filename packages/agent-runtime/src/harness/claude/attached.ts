@@ -507,7 +507,7 @@ export const attachedSessions = (
     has: (name) => fs.existsSync(filesOf(root, name).run),
     following: pushes.following,
     ops: { ...opsOf(root, live, start, runs, pushes), release: releaseOn(root) },
-  } satisfies Attached;
+  } satisfies Attached as Attached;
 };
 
 /**

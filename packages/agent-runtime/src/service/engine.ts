@@ -627,9 +627,8 @@ const talliedVerb = <A, E, R>(program: Effect.Effect<A, E, R>) =>
  * `up` over `tick`, a pass: one pass every `intervalMs` (3 s by default), none while the last still runs, each report handed to
  * `onTick` and each failure to `onError`, until the handle's `stop`.
  */
-const upOf =
-  (tick: EngineShape['tick']) =>
-  (o = {}) =>
+const upOf = (tick: EngineShape['tick']) =>
+  ((o = {}) =>
     Effect.sync(() => {
       const every = o.intervalMs ?? 3_000;
       let running = false;
@@ -651,7 +650,7 @@ const upOf =
           clearInterval(timer);
         },
       };
-    });
+    })) satisfies EngineShape['up'];
 
 /** `logs` of the task `view` reads, asked of its own harness: `(no session yet)` before its harness names one. */
 const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, harnessOf: (state: State) => Harnessed) =>

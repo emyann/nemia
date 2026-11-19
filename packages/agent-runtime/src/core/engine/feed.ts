@@ -69,7 +69,7 @@ const headerLine = (key: 'feedBase' | 'sealedTo', value: number) => {
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
 const parsed = (line: string) => {
   try {
-    return JSON.parse(line);
+    return JSON.parse(line) as unknown;
   } catch {
     return line;
   }

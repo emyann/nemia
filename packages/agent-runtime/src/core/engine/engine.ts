@@ -712,14 +712,14 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
     yield* journal.append(TaskId.read(v.id), { kind: 'waits', at: new Date().toISOString() });
     unjudged.add(v.id);
   }
-  return views.map((v) => {
-    if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' } satisfies TaskView;
+  return views.map<TaskView>((v) => {
+    if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' };
     if (unjudged.has(v.id)) {
       const { waits: _, ...state } = v.state;
-      return { ...unwaiting(v), state } satisfies TaskView;
+      return { ...unwaiting(v), state };
     }
     const wait = recorded.get(v.id);
-    return (wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v) satisfies TaskView;
+    return wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v;
   });
 });
 
@@ -907,7 +907,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
     ? yield* (
         runner.observeFor
           ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) }))))
-          : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ })))
+          : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ }) satisfies Observation as Observation))
       ).pipe(Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map(), unread: ALL_READ })))
     : { seen: new Map<string, Sighting>(), unreadWhy: undefined };
   return { views: states.map((state) => viewOfState(state, seen, unreadWhy, runner.bridgeAsked)), unreadable } satisfies TaskList;

@@ -444,7 +444,7 @@ const lineKept = (text: string, denied: ReadonlySet<string>) => {
 export const claudePartials = (output: string, before: number) => {
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
   if ('wrong' in read) return read satisfies { marks: PartialMark[] } | { wrong: string } as { marks: PartialMark[] } | { wrong: string };
-  return { marks: read.lines.flatMap(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) } satisfies
+  return { marks: read.lines.flatMap<PartialMark>(({ line }) => partialMarksOf((line as Printed<'stream_event'>).event)) } satisfies
     | { marks: PartialMark[] }
     | { wrong: string } as { marks: PartialMark[] } | { wrong: string };
 };

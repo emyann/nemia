@@ -133,8 +133,8 @@ export type Relay = {
  */
 export const relayOf = (sentAt: string, whole = 0) =>
   ({
-    said: new Set(),
-    open: new Map(),
+    said: new Set<string>(),
+    open: new Map<string, string>(),
     at: sentAt,
     lastMessage: '',
     artifacts: 0,

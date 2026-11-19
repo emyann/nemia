@@ -255,7 +255,9 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   }
 
   async getAuthenticatedExtendedAgentCard(_params: GetExtendedAgentCardRequest, _context: ServerCallContext) {
-    throw new ExtendedAgentCardNotConfiguredError(`the \`${this.harness}\` harness has no extended card: its card is the whole of it.`);
+    return Promise.reject(
+      new ExtendedAgentCardNotConfiguredError(`the \`${this.harness}\` harness has no extended card: its card is the whole of it.`),
+    );
   }
 
   /**
@@ -584,19 +586,19 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   }
 
   async createTaskPushNotificationConfig(_params: TaskPushNotificationConfig, _context: ServerCallContext) {
-    throw this.noPush();
+    return Promise.reject(this.noPush());
   }
 
   async getTaskPushNotificationConfig(_params: GetTaskPushNotificationConfigRequest, _context: ServerCallContext) {
-    throw this.noPush();
+    return Promise.reject(this.noPush());
   }
 
   async listTaskPushNotificationConfigs(_params: ListTaskPushNotificationConfigsRequest, _context: ServerCallContext) {
-    throw this.noPush();
+    return Promise.reject(this.noPush());
   }
 
   async deleteTaskPushNotificationConfig(_params: DeleteTaskPushNotificationConfigRequest, _context: ServerCallContext) {
-    throw this.noPush();
+    return Promise.reject(this.noPush());
   }
 
   /**

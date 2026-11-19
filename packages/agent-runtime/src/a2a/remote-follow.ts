@@ -300,5 +300,5 @@ export const remoteTranscriptOf = (d: FollowDeps) => (sessionId: string, after?:
  */
 export const remoteTranscriptByName = (d: FollowDeps) => async (name: string, after?: TranscriptCursor) => {
   const e = d.entryOf(name);
-  return (e ? transcriptOfEntry(d, e, e.taskId, after) : null) satisfies Transcript | null;
+  return e ? transcriptOfEntry(d, e, e.taskId, after) : null;
 };

@@ -570,7 +570,7 @@ const sessionFilesOf = (spec: HarnessSpec, root: string) => {
     records: (sessions: readonly { name: string; nativeId?: string }[]) => {
       const reader = spec.transcript;
       const ids = sessions.flatMap((s) => (s.nativeId ? [s.nativeId] : []));
-      if (!reader || !ids.length) return new Map();
+      if (!reader || !ids.length) return new Map<string, string[]>();
       const found = reader.records?.(ids);
       const of = (id: string) => {
         if (found) return found.get(id) ?? [];

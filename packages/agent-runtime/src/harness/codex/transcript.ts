@@ -54,12 +54,16 @@ const textsOf = (blocks: readonly (string | { readonly text?: string })[] | unde
 /** A completed thread item as events, under `id` and at `at`. */
 const itemEvents = (item: RolloutItem, id: string, at: string) => {
   if (Items.guards.UserMessage(item))
-    return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }] satisfies TranscriptEvent[];
+    return [
+      { id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') },
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   if (Items.guards.AgentMessage(item))
-    return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }] satisfies TranscriptEvent[];
+    return [
+      { id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') },
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   if (Items.guards.Reasoning(item)) {
     const text = [...textsOf(item.summary_text), ...textsOf(item.raw_content)].join('\n');
-    return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }] satisfies TranscriptEvent[];
+    return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   if (Items.guards.CommandExecution(item)) {
     return [
@@ -71,7 +75,7 @@ const itemEvents = (item: RolloutItem, id: string, at: string) => {
         kind: 'tool_result',
         result: { text: item.aggregated_output ?? '', isError: !(item.status === 'completed' && item.exit_code === 0) },
       },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   if (Items.guards.FileChange(item)) {
     return [
@@ -86,9 +90,9 @@ const itemEvents = (item: RolloutItem, id: string, at: string) => {
           isError: item.status !== 'completed',
         },
       },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
-  return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }] satisfies TranscriptEvent[];
+  return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }] satisfies TranscriptEvent[] as TranscriptEvent[];
 };
 
 /**
@@ -122,10 +126,10 @@ const itemEvents = (item: RolloutItem, id: string, at: string) => {
 export const codexRolloutEvents = (entry: unknown, offset: number, file?: string) => {
   const where = `the line at byte ${offset} of ${file ? `the rollout \`${file}\`` : 'the rollout'}`;
   const read = rolloutRecordOf(entry, where);
-  if (read === undefined) return [] satisfies TranscriptEvent[];
+  if (read === undefined) return [] satisfies TranscriptEvent[] as TranscriptEvent[];
   if ('wrong' in read) throw new Error(read.wrong);
   const at = isoTime(read.record.timestamp);
-  if (!at) return [] satisfies TranscriptEvent[];
+  if (!at) return [] satisfies TranscriptEvent[] as TranscriptEvent[];
   if (read.kind === 'event_msg task_complete') {
     const { turn_id: turn, error } = read.record.payload;
     return [
@@ -136,8 +140,8 @@ export const codexRolloutEvents = (entry: unknown, offset: number, file?: string
         kind: 'system',
         text: error?.message ?? 'task_complete',
       },
-    ] satisfies TranscriptEvent[];
+    ] satisfies TranscriptEvent[] as TranscriptEvent[];
   }
   const { item } = read.record.payload;
-  return (item ? itemEvents(item, item.id || `@${offset}`, at) : []) satisfies TranscriptEvent[];
+  return (item ? itemEvents(item, item.id || `@${offset}`, at) : []) satisfies TranscriptEvent[] as TranscriptEvent[];
 };

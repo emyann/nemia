@@ -408,7 +408,7 @@ const formerArgsOut = (config: Record<string, unknown>, claude: object | undefin
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
 const parsed = (line: string) => {
   try {
-    return JSON.parse(line);
+    return JSON.parse(line) as unknown;
   } catch {
     return line;
   }
@@ -688,7 +688,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
           return () => {};
         }
       },
-    } satisfies BodiedJournalOps;
+    } satisfies BodiedJournalOps as BodiedJournalOps;
   };
 
   /**

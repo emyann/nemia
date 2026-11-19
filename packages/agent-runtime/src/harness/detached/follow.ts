@@ -91,7 +91,7 @@ export const marked = <A extends PartialAt>(at: A, marks: readonly PartialMark[]
       open = undefined;
     }
   }
-  return [{ ...at, message, open }, said];
+  return [{ ...at, message, open }, said] as const;
 };
 
 const refusal = (source: FollowSource, message: string, refused?: true) =>

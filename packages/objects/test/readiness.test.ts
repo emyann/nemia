@@ -5,7 +5,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { Fix, missingSaid, Need, Pairing, PairingClaimed, Readiness, WorkflowSpec } from 'objects';
+import { Fix, missingSaid, Need, Pairing, PairingClaimed, Readiness, WorkflowStatus } from 'objects';
 
 const need = {
   name: 'gh',
@@ -20,8 +20,8 @@ const piece = { name: 'gh', area: 'workflow', state: 'missing', message: 'gh is 
 
 test('a workflow carries its needs, a readiness read its pieces, a fix its phase, a pairing its phase', () => {
   assert.deepEqual(Schema.decodeUnknownSync(Need)(need), need);
-  const spec = { steps: [], needs: [need] };
-  assert.deepEqual(Schema.decodeUnknownSync(WorkflowSpec)(spec), spec);
+  const status = { needs: [need] };
+  assert.deepEqual(Schema.decodeUnknownSync(Schema.Struct({ needs: WorkflowStatus.fields.needs }))(status), status);
   const read = {
     ready: false,
     pieces: [

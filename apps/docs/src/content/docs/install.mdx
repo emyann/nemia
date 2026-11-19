@@ -1,13 +1,19 @@
 ---
 title: Install
-description: Install a released Nemia on a Linux or macOS machine with one command, as a server or as a client of one, and keep it up to date.
+description: Install a released Nemia with one line, on a Mac, on Linux or on Windows through WSL, as a laptop's, a server or a client of one, and keep it up to date.
 ---
 
-A released Nemia is one archive per platform: Linux on x64 or arm64, and macOS on Apple silicon or Intel (macOS 13.5 or later). It
-carries its own Node, the code, the production dependencies, the board's built pages and the templates; no harness, which you activate
-after ([Activate a harness](#activate-a-harness)). Nothing else is installed
-system-wide, and no root is needed. A dedicated machine, such as a small VPS running Ubuntu 24.04, is the first place it is made for.
-[Self-hosting](/self-hosting/) takes such a machine from fresh to a factory's first run, GitHub included.
+Nemia installs with one line, on:
+
+- **macOS** on Apple silicon, and on Intel, each at 13.5 or later;
+- **Linux** on x64 or arm64;
+- **Windows through WSL**: run the line in a WSL terminal, which installs the Linux archive for that machine.
+
+A released Nemia is one archive per platform. It carries its own Node, the code, the production dependencies, the board's built pages
+and the templates; no harness, which you activate after ([Activate a harness](#activate-a-harness)). Nothing else is installed
+system-wide, and no root is needed. [Getting started](/getting-started/) follows a first install on a laptop to a first landed change;
+[On a server](#on-a-server) says what changes on a dedicated machine, and [Self-hosting](/self-hosting/) takes such a machine from
+fresh to a factory's first run, GitHub included.
 
 ## Install
 
@@ -30,16 +36,30 @@ lays the release down:
 
 On a laptop it then asks nothing. It starts Nemia now, on this machine alone (127.0.0.1), with no service that starts it at login,
 opens the board's welcome page in your browser, and prints a short summary of what it did, ending on the link to that page under
-`http://localhost:8787/welcome`: a first-visit link, which signs that browser in to the board once, within ten minutes. Where no browser could be opened, open the
-printed link yourself; `nemia board link --base http://localhost:8787/welcome` makes another. `--no-open` opens nothing. To start
-Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or `NO_COLOR` is set.
+`http://localhost:8787/welcome`: a first-visit link, which signs that browser in to the board once, within ten minutes. It opens the
+browser with `open` on macOS, and with `xdg-open` on Linux where a display is set; where no browser could be opened, open the printed link
+yourself (under WSL, in Windows' own browser). `nemia board link --base http://localhost:8787/welcome` makes another. `--no-open` opens
+nothing. To start Nemia at login later, run `nemia service install`. The summary is plain where the output is no terminal or
+`NO_COLOR` is set.
 
 After that, `nemia open` opens the board in your browser signed in, at any time, with no token to see or type: it makes a first-visit
 link and opens it under `localhost`, or prints it where no browser can be opened. The board stays signed in while you use it, until
 thirty days after your last visit or until you forget it in Settings. `nemia board link` still prints a link without opening it.
 
-On a server, said by `--serve` or by a `--bind <address>`, it asks two things instead, each of which you can also answer by a flag
-with `--yes`, for a machine you set up by script:
+Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
+as GitHub lays out a release, `--no-open` opens no browser on a laptop, and `--board-base <url>` is the address the first-visit link is
+printed under (below).
+
+The installer prints no token, and installs no harness and asks for no harness's credential: a release carries no Claude Code and no
+Codex. A laptop's summary names `nemia doctor` (below): what is in place, and the command that fixes each piece that is not. You
+activate the harness your factories run on when you need it ([Activate a harness](#activate-a-harness)); on a laptop, the welcome page
+asks it first.
+
+## On a server
+
+On a dedicated machine, such as a small VPS running Ubuntu 24.04, say so to the installer by `--serve` or by a `--bind <address>`. It
+then asks two things instead of opening a browser, each of which you can also answer by a flag with `--yes`, for a machine you set up
+by script:
 
 - **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
   with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
@@ -47,12 +67,7 @@ with `--yes`, for a machine you set up by script:
 - **The address to bind** (below), picked by number from this machine's private addresses (`nemia service addresses` lists them with
   their kind), or typed. Left at its default, the daemon listens on this machine alone.
 
-Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
-as GitHub lays out a release, `--no-open` opens no browser on a laptop, and `--board-base <url>` is the address the first-visit link is printed under (below).
-
-The installer prints no token, and installs no harness and asks for no harness's credential: a release carries no Claude Code and no
-Codex. A server's install ends on `nemia doctor` (below), and a laptop's summary names it: what is in place, and the command that fixes each piece that is not. You activate the
-harness your factories run on when you need it ([Activate a harness](#activate-a-harness)).
+A server's install ends on `nemia doctor` (below).
 
 ## Bind it to a private network
 

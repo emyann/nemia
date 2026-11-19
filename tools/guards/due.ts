@@ -253,38 +253,53 @@ export const dependencyFolders = (root: string, folder = GUARDS): string[] => {
  * @param root the repository's root.
  */
 export const claimsOf = (root: string): Claims => {
-  const tasks = readJson<{ tasks?: Record<string, { inputs?: string[] }> }>(path.join(root, 'turbo.json')).tasks ?? {};
   const workspaces = workspacesOf(root);
   const claims: Record<string, Claim[]> = {};
-  const add = (key: string, claim: Claim) => {
+  for (const [key, claim] of [...turboClaims(root, workspaces), ...writtenClaims(root, workspaces)])
     claims[key] = [...(claims[key] ?? []), claim];
+  return claims;
+};
+
+/** The claims of the jobs that run a turbo task, each beside its key, read off `turbo.json` and each workspace's scripts. */
+const turboClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => {
+  const tasks = readJson<{ tasks?: Record<string, { inputs?: string[] }> }>(path.join(root, 'turbo.json')).tasks ?? {};
+  const keyOf = (task: string, name: string, folder: string): string => {
+    if (task !== 'test') return task;
+    return folder === GUARDS ? 'guards' : `test ${name}`;
   };
-  const turboClaim = (name: string, folder: string, task: string): Claim => ({
-    inputs: tasks[`${name}#${task}`]?.inputs ?? tasks[task]?.inputs ?? ['$TURBO_DEFAULT$'],
-    folder,
-    folders: dependencyFolders(root, folder),
-  });
-  for (const [name, folder] of [...workspaces].sort(([a], [b]) => a.localeCompare(b))) {
-    const scripts = readJson<Manifest>(path.join(root, folder, 'package.json')).scripts ?? {};
-    if (scripts.test !== undefined) add(folder === GUARDS ? 'guards' : `test ${name}`, turboClaim(name, folder, 'test'));
-    if (scripts.typecheck !== undefined) add('typecheck', turboClaim(name, folder, 'typecheck'));
-    if (scripts.build !== undefined) add('build', turboClaim(name, folder, 'build'));
-  }
-  add('lint', { inputs: ['$TURBO_ROOT$/**', ...LINT_SKIPS.map((ext) => `!$TURBO_ROOT$/**/*.${ext}`)], folder: '.', folders: [] });
-  add('lint', { inputs: LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), folder: '.', folders: [] });
-  for (const [key, names] of Object.entries(WRITTEN)) {
-    for (const name of names) {
+  return [...workspaces]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([name, folder]) => {
+      const scripts = readJson<Manifest>(path.join(root, folder, 'package.json')).scripts ?? {};
+      return ['test', 'typecheck', 'build']
+        .filter((task) => scripts[task] !== undefined)
+        .map((task): [string, Claim] => [
+          keyOf(task, name, folder),
+          {
+            inputs: tasks[`${name}#${task}`]?.inputs ?? tasks[task]?.inputs ?? ['$TURBO_DEFAULT$'],
+            folder,
+            folders: dependencyFolders(root, folder),
+          },
+        ]);
+    });
+};
+
+/** The claims of the jobs that run no turbo task, each beside its key, from this file's table. */
+const writtenClaims = (root: string, workspaces: Map<string, string>): [string, Claim][] => [
+  ['lint', { inputs: ['$TURBO_ROOT$/**', ...LINT_SKIPS.map((ext) => `!$TURBO_ROOT$/**/*.${ext}`)], folder: '.', folders: [] }],
+  ['lint', { inputs: LINT_CONFIGS.map((file) => `$TURBO_ROOT$/${file}`), folder: '.', folders: [] }],
+  ...Object.entries(WRITTEN).flatMap(([key, names]) => [
+    ...names.map((name): [string, Claim] => {
       const folder = workspaces.get(name);
       if (folder === undefined)
         throw new Error(
           `tools/guards/due.ts's WRITTEN gives ${key} the workspace ${name}, which the root package.json's workspaces do not hold: name the workspace by its package name, or take it off`,
         );
-      add(key, { inputs: ['$TURBO_DEFAULT$'], folder, folders: dependencyFolders(root, folder) });
-    }
-    if (key.startsWith('contracts ')) add(key, { inputs: [CONTRACTS_TOOL], folder: '.', folders: [] });
-  }
-  return claims;
-};
+      return [key, { inputs: ['$TURBO_DEFAULT$'], folder, folders: dependencyFolders(root, folder) }];
+    }),
+    ...(key.startsWith('contracts ') ? [[key, { inputs: [CONTRACTS_TOOL], folder: '.', folders: [] }] as [string, Claim]] : []),
+  ]),
+];
 
 const SHA = /^[0-9a-f]{7,64}$/;
 

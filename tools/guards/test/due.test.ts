@@ -130,16 +130,21 @@ const ROOT_CLAIMS = claimsOf(ROOT);
 /** The keys of the repository's own claims a change to `file` makes due. */
 const reached = (file: string) => Object.keys(ROOT_CLAIMS).filter((key) => jobDueOf(key, [file], ROOT_CLAIMS).due);
 
-/**
- * A docs page reaches the runtime's and the orchestrator's suites too: their `test` inputs in `turbo.json` name every app's `src`, which
- * those suites read for words and paths, and the decision skips nothing turbo's cache would not.
- */
-test("on the repository's own claims, a change reaches the jobs that read it and no other", () => {
+test("on the repository's own claims, a change reaches the jobs that read it and no other, as turbo's inputs say what each reads", () => {
   const rows: { file: string; due: string[]; not: string[] }[] = [
     {
       file: 'apps/docs/src/content/docs/x.mdx',
-      due: ['build', 'test docs', 'guards', 'lint', 'typecheck'],
-      not: ['test api', 'test cli', 'test web', 'test objects', 'test templates', 'e2e', 'e2e-look', ...LEGS.map((leg) => `contracts ${leg}`)],
+      due: ['build', 'test docs', 'guards', 'lint', 'typecheck', 'test agent-runtime', 'test agent-orchestrator'],
+      not: [
+        'test api',
+        'test cli',
+        'test web',
+        'test objects',
+        'test templates',
+        'e2e',
+        'e2e-look',
+        ...LEGS.map((leg) => `contracts ${leg}`),
+      ],
     },
     { file: 'README.md', due: ['test docs'], not: ['contracts rest', 'e2e', 'lint', 'build', 'guards'] },
     {

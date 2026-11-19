@@ -10,7 +10,8 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Result, Schema, SchemaIssue } from 'effect';
+import { Result, Schema } from 'effect';
+import { refusedIn } from 'objects';
 import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { agentsDir } from '../folder/folder.ts';
@@ -421,14 +422,14 @@ const RULES_SHAPE =
   'Write it as { "rules": [{ "id", "says", "breaks" }] }: an id once each, what the rule says, and the calls that break it, each a ' +
   '`disallowedTools:` rule such as `Bash(cat:*)` — or delete the file.';
 
-/** Why a skill's rules do not read: the first field the schema refuses, by its path. */
-function rulesFieldRefusal(error: Schema.SchemaError): string {
-  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
-  const at = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p)).map(String);
+/** Why `value` does not read as a skill's rules: the first field the schema refuses, by its path, read by its `_tag` (`refusedIn`). */
+function rulesFieldRefusal(value: unknown): string {
+  const decoded = Schema.decodeUnknownResult(SkillRulesSchema)(value, { reportInput: true });
+  const place = Result.isFailure(decoded) ? refusedIn(decoded.failure.issue)[0] : undefined;
+  const at = (place?.path ?? []).map(String);
   const field = at.length ? `\`${at.join('.')}\`` : 'shape';
-  return first?.message === 'Missing key'
-    ? `its ${field} is missing`
-    : `its ${field} is wrong (${first?.message ?? "not a skill's rules"})`;
+  if (place === undefined) return `its ${field} is wrong (not a skill's rules)`;
+  return place._tag === 'MissingKey' ? `its ${field} is missing` : `its ${field} is wrong (${place.message ?? place.expected})`;
 }
 
 /**
@@ -454,7 +455,7 @@ export function readSkillRules(skillDir: string): SkillRule[] {
   }
   const decoded = Schema.decodeUnknownResult(SkillRulesSchema)(raw);
   if (Result.isFailure(decoded))
-    throw new WorkflowError(`${file} does not read as a skill's rules: ${rulesFieldRefusal(decoded.failure)}. ${RULES_SHAPE}`);
+    throw new WorkflowError(`${file} does not read as a skill's rules: ${rulesFieldRefusal(raw)}. ${RULES_SHAPE}`);
   const rules = decoded.success.rules.map((r) => ({ id: r.id, says: r.says, breaks: [...r.breaks] }));
   rules.forEach((r, i) => {
     const before = rules.findIndex((other) => other.id === r.id);

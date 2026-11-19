@@ -143,7 +143,7 @@ function readProposal(home: string, factory: string, name: string): Proposal | u
   }
   const read = Schema.decodeUnknownResult(Proposal)(raw);
   if (Result.isFailure(read)) {
-    const { path: at, words } = firstRefusal(raw, read.failure);
+    const { path: at, words } = firstRefusal(Proposal, raw);
     throw new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
   }
   return read.success;

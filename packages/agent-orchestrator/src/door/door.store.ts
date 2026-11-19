@@ -11,7 +11,8 @@
  * A store file by its name, as the kinds go (`test/boundary.test.ts`): it touches no disk, and a pure file loads no Effect but
  * `effect/Data`. The client builds `tried` on `fromThrow`, so a controller's read and a door's act fail and die alike.
  */
-import { Effect, Option, Result, Schema, SchemaIssue } from 'effect';
+import { Effect, Option, Result, Schema } from 'effect';
+import { refusedIn } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid, isRefusal, type Refusal } from '../refusal/refusal.ts';
 
@@ -70,11 +71,11 @@ export function atOnce<T, I extends string>(door: DoorOf<T, I>): T {
  * @param value The value to decode.
  */
 export function brokenBy(schema: Schema.Top, value: unknown): string | null {
-  const decoded = Schema.decodeUnknownResult(schema as Schema.Codec<unknown>)(value);
+  const decoded = Schema.decodeUnknownResult(schema as Schema.Codec<unknown>)(value, { reportInput: true });
   if (Result.isSuccess(decoded)) return null;
-  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(decoded.failure.issue).issues;
-  const at = (first?.path ?? []).map((p) => String(typeof p === 'object' && p !== null && 'key' in p ? p.key : p)).join('.');
-  return `${at ? `its \`${at}\` ` : ''}${first?.message ?? 'is not what the schema says'}`;
+  const [place] = refusedIn(decoded.failure.issue);
+  const at = (place?.path ?? []).map(String).join('.');
+  return `${at ? `its \`${at}\` ` : ''}${place ? (place.message ?? place.expected) : 'is not what the schema says'}`;
 }
 
 /**

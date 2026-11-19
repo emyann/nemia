@@ -73,7 +73,7 @@ export function readStanding(home: string): StandingFile | undefined {
   }
   const decoded = Schema.decodeUnknownResult(StandingFileSchema)(json);
   if (Result.isSuccess(decoded)) return decoded.success;
-  const { path: at, words } = firstRefusal(json, decoded.failure);
+  const { path: at, words } = firstRefusal(StandingFileSchema, json);
   throw new Invalid({ message: `${standingFile(home)}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${REWRITTEN}` });
 }
 

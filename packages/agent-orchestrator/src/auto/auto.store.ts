@@ -142,9 +142,9 @@ function jsonIn(file: string, fix: string): unknown {
   }
 }
 
-/** The refusal of `raw`, read from `file`, that its schema refused with `error`: its first wrong field, and `fix`. */
-function unread(file: string, raw: unknown, error: Schema.SchemaError, fix: string): Invalid {
-  const { path: at, words } = firstRefusal(raw, error);
+/** The refusal of `raw`, read from `file`, that `schema` refused: its first wrong field, and `fix`. */
+function unread(file: string, raw: unknown, schema: Schema.ConstraintDecoder<unknown>, fix: string): Invalid {
+  const { path: at, words } = firstRefusal(schema, raw);
   return new Invalid({ message: `${file}: ${at.length ? `its ${at.join('.')} ` : ''}${words}: ${fix}.` });
 }
 
@@ -166,7 +166,7 @@ export function readConfirmed(home: string, agent: string): Confirmed | undefine
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ConfirmedSchema)(raw);
-  if (Result.isFailure(read)) throw unread(file, raw, read.failure, fix);
+  if (Result.isFailure(read)) throw unread(file, raw, ConfirmedSchema, fix);
   return { since: read.success.since, rules: read.success.rules.map(ruleOf) };
 }
 
@@ -181,7 +181,7 @@ export function readProposed(home: string, agent: string): Proposed | undefined 
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ProposedSchema)(raw);
-  if (Result.isFailure(read)) throw unread(file, raw, read.failure, fix);
+  if (Result.isFailure(read)) throw unread(file, raw, ProposedSchema, fix);
   const { at, rules, guidance, digest } = read.success;
   return { at, rules: rules.map(ruleOf), guidance: [...guidance], digest };
 }

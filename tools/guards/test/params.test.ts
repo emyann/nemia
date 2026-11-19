@@ -16,7 +16,7 @@ import { counted, owedIn, shipped } from './params.ts';
 const BASELINE = 'tools/guards/test/params.baseline.json';
 
 /** What today's counts and `baseline` disagree on, each a sentence naming the fix. */
-export const breaks = (today: Readonly<Record<string, number>>, baseline: Readonly<Record<string, number>>): string[] => [
+export const breaks = (today: Readonly<Record<string, number>>, baseline: Readonly<Record<string, number>>) => [
   ...Object.entries(today)
     .filter(([file, owed]) => owed > (baseline[file] ?? 0))
     .map(

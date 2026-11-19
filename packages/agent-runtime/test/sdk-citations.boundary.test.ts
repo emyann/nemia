@@ -60,10 +60,10 @@ const CLAIMS: Record<string, string> = {
 };
 
 /** Every `sdk.d.ts:<n>` and `sdk.d.ts:<n>-<m>` in `text`, by the `<n>` or `<n>-<m>` it cites. */
-const citationsIn = (text: string): string[] => [...text.matchAll(/sdk\.d\.ts:(\d+(?:-\d+)?)/g)].map((m) => m[1]);
+const citationsIn = (text: string) => [...text.matchAll(/sdk\.d\.ts:(\d+(?:-\d+)?)/g)].map((m) => m[1]);
 
 /** The files git lists under the packages and the apps, where our prose is. */
-const ours = (): string[] =>
+const ours = () =>
   execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'tools', 'workflows', 'docs', 'README.md'], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -76,7 +76,7 @@ const ours = (): string[] =>
  * Where the citation `cited`, made in `at`, does not hold what `claims` says it does in the `sdk.d.ts` whose lines are `lines`,
  * worded with what the cited lines do hold. `claims` is a parameter so the refusals below can be made to happen on a planted table.
  */
-const citationRefusals = (lines: string[], at: string, cited: string, claims: Record<string, string> = CLAIMS): string[] => {
+const citationRefusals = (lines: string[], at: string, cited: string, claims: Record<string, string> = CLAIMS) => {
   const claim = claims[cited];
   if (claim === undefined)
     return [

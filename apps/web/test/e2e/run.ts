@@ -65,7 +65,7 @@ let results: WorkerResult[] = [];
 let first: WorkerResult | undefined;
 
 /** Stop every worker and remove every store. Idempotent: `exit` runs it again after a signal did. */
-function cleanUp(): void {
+function cleanUp() {
   for (const child of children) {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
   }
@@ -81,7 +81,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 }
 
 /** Each line `from` says, after `prefix`, onto `to`, a whole line at a time; resolves once `from` ends. */
-function relay(from: NodeJS.ReadableStream, to: NodeJS.WritableStream, prefix: string, kept: string[]): Promise<void> {
+function relay(from: NodeJS.ReadableStream, to: NodeJS.WritableStream, prefix: string, kept: string[]) {
   let partial = '';
   const say = (line: string) => {
     kept.push(line);
@@ -93,7 +93,7 @@ function relay(from: NodeJS.ReadableStream, to: NodeJS.WritableStream, prefix: s
     partial = lines.pop() ?? '';
     lines.forEach(say);
   });
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     from.on('end', () => {
       if (partial) say(partial);
       resolve();
@@ -108,7 +108,7 @@ type Ran = { result: WorkerResult; handed: number };
  * Worker `i` started on `store` with `args`, handed its pages from `queue` one at a time as it asks; resolves with what it wrote to its
  * result file `result`, or a failure saying how it ended without one, and with how many pages it was handed.
  */
-async function runWorker(i: number, store: string, args: readonly string[], result: string, queue: PageQueue<string>): Promise<Ran> {
+async function runWorker(i: number, store: string, args: readonly string[], result: string, queue: PageQueue<string>) {
   let handed = 0;
   const worker = path.join(import.meta.dirname, 'worker.ts');
   const child = spawn(process.execPath, [worker, '--worker', String(i), '--store', store, '--result', result, ...args], {
@@ -139,7 +139,7 @@ async function runWorker(i: number, store: string, args: readonly string[], resu
       failure: `worker ${i} ended (${how}) without saying what it did. What it said last:\n    ${kept.join('\n    ')}`,
       tails: '',
     },
-  };
+  } satisfies Ran;
 }
 
 /** How many workers of this run have failed, over every seat. */
@@ -152,7 +152,7 @@ let unvisited = 0;
  * fresh store for the pages left, while the run still names failures (`startsAgain`); once it does not, the queue is stopped and no
  * worker starts another page.
  */
-async function runSeat(seat: Seat, args: readonly string[], dir: string, queue: PageQueue<string>): Promise<WorkerResult[]> {
+async function runSeat(seat: Seat, args: readonly string[], dir: string, queue: PageQueue<string>) {
   const did: WorkerResult[] = [];
   for (let store = seat.store; ; store = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-'))) {
     stores.push(store);
@@ -173,7 +173,7 @@ async function runSeat(seat: Seat, args: readonly string[], dir: string, queue: 
  * The web app, built into `dist/`, once, for every worker's `vite preview` to serve; not built again where `dist/` is already the build
  * of the sources as they stand (`current`).
  */
-function build(): void {
+function build() {
   const inputs = inputsOf(WEB, REPO);
   if (current(WEB, inputs)) {
     console.log('e2e: the web app in dist/ is the build of these sources, so it is not built again (rm -rf apps/web/dist to build it)');
@@ -194,7 +194,7 @@ function build(): void {
  * otherwise, so no caller says where the e2e writes — and the path it wrote. A shard is a run of some pages and is held to no bound of its
  * own; its times are written down for the shards of one run to be summed against that bound together afterwards (`pages-bound.ts`).
  */
-function wroteShard(shard: { i: number; of: number }, timings: readonly PageTiming[]): string {
+function wroteShard(shard: { i: number; of: number }, timings: readonly PageTiming[]) {
   const file = path.join(OUT, `pages-${shard.i}-of-${shard.of}.json`);
   const wrote: ShardPages = { shard: shard.i, of: shard.of, pages: [...timings] };
   fs.mkdirSync(OUT, { recursive: true });
@@ -203,7 +203,7 @@ function wroteShard(shard: { i: number; of: number }, timings: readonly PageTimi
 }
 
 /** The line saying what each worker took: its pages, its whole time and its setup. */
-const workerLine = (r: WorkerResult): string =>
+const workerLine = (r: WorkerResult) =>
   `worker ${r.worker}: ${new Set(r.timings.map((t) => t.name)).size} pages in ${Math.round(r.ms / 1000)} s ` +
   `(seeding and serving ${Math.round(r.setupMs / 1000)} s)`;
 
@@ -211,7 +211,7 @@ const workerLine = (r: WorkerResult): string =>
  * The run: loads the pages and reads its plan first, so a stray in pages/ or a bad command line is refused before the build, not after it;
  * builds the app; starts the workers over their shares, each on a store of its own; and reads what they did.
  */
-async function main(): Promise<void> {
+async function main() {
   const started = performance.now();
   const pages = await loadPages();
   const plan = planOf(process.argv.slice(2), pages);

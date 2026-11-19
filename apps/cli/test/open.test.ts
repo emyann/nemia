@@ -23,7 +23,7 @@ const store = await servedStore('nemia-open-', () => undefined);
 afterAll(store.stop);
 
 /** A folder of stand-in openers, `open` and `xdg-open`, each writing its arguments to `opened` and exiting `code`. */
-function openers(code: number): { bin: string; opened: string } {
+function openers(code: number) {
   const bin = scratch('nemia-open-bin-');
   const opened = path.join(bin, 'opened');
   for (const name of ['open', 'xdg-open']) {
@@ -31,14 +31,14 @@ function openers(code: number): { bin: string; opened: string } {
     fs.writeFileSync(file, `#!/bin/sh\nprintf '%s\\n' "$@" >> '${opened}'\nexit ${code}\n`);
     fs.chmodSync(file, 0o755);
   }
-  return { bin, opened };
+  return { bin, opened } satisfies { bin: string; opened: string };
 }
 
 /** What the stand-ins were handed, a line an argument, or nothing where none ran. */
-const handed = (opened: string): string[] => (fs.existsSync(opened) ? fs.readFileSync(opened, 'utf8').trim().split('\n') : []);
+const handed = (opened: string) => (fs.existsSync(opened) ? fs.readFileSync(opened, 'utf8').trim().split('\n') : []) satisfies string[];
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -47,17 +47,17 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** The store's environment with `bin` first on `PATH` and the display variables `display` sets, the others unset. */
-function withOpeners(bin: string, display: NodeJS.ProcessEnv, base: NodeJS.ProcessEnv = store.env): NodeJS.ProcessEnv {
+function withOpeners(bin: string, display: NodeJS.ProcessEnv, base: NodeJS.ProcessEnv = store.env) {
   const { DISPLAY: _d, WAYLAND_DISPLAY: _w, ...rest } = base;
-  return { ...rest, PATH: `${bin}${path.delimiter}${base.PATH ?? ''}`, ...display };
+  return { ...rest, PATH: `${bin}${path.delimiter}${base.PATH ?? ''}`, ...display } satisfies NodeJS.ProcessEnv;
 }
 
 /** A first-visit link under `base`, as the api mints one. */
-const linkUnder = (base: string): RegExp => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/\\?link=\\S+$`);
+const linkUnder = (base: string) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/\\?link=\\S+$`) satisfies RegExp;
 
 /**
  * A first-visit link under this machine's `localhost`, whatever its port: the board's address is the api's to say (`boardBase`, held by

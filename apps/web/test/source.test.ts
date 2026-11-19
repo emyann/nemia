@@ -22,14 +22,14 @@ const CONTROL = new RegExp(
 );
 
 /** Where `text` holds a control character that is not text, as `line:column` and its code, or null. */
-export function controlAt(text: string): string | null {
+export function controlAt(text: string) {
   const m = CONTROL.exec(text);
   if (!m) return null;
   const before = text.slice(0, m.index).split('\n');
   return `${before.length}:${before.at(-1)!.length + 1} (code ${m[0].charCodeAt(0)})`;
 }
 
-const sources = (dir: string): string[] =>
+const sources = (dir: string) =>
   fs
     .readdirSync(dir, { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|json|md)$/.test(e.name))

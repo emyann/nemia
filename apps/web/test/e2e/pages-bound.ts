@@ -24,7 +24,7 @@ const SHARD_FILE = /^pages-\d+-of-\d+\.json$/;
  * Every shard file under `dirs`, each directory read through its whole tree (a download without `merge-multiple` nests a folder per
  * artifact), in the order their names sort.
  */
-function shardsIn(dirs: readonly string[]): ShardPages[] {
+function shardsIn(dirs: readonly string[]) {
   return dirs.flatMap((dir) =>
     fs
       .readdirSync(dir, { withFileTypes: true, recursive: true })
@@ -32,7 +32,7 @@ function shardsIn(dirs: readonly string[]): ShardPages[] {
       .map((entry) => path.join(entry.parentPath, entry.name))
       .sort()
       .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')) as ShardPages),
-  );
+  ) satisfies ShardPages[];
 }
 
 const dirs = process.argv.slice(2);

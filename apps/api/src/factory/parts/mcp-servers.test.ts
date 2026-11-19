@@ -33,7 +33,7 @@ const send = (method: string, url: string, body: unknown) =>
   app.request(url, { method, headers: json, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -41,10 +41,10 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 }
 
 /** The record's file, or null: what a refusal must leave as it was. */
-const held = (): string | null => (fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : null);
+const held = () => (fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : null);
 
 /** A request refused with `status`, its words, and the record as it was. */
-async function refused(res: () => Response | Promise<Response>, status: number): Promise<string> {
+async function refused(res: () => Response | Promise<Response>, status: number) {
   const before = held();
   const answer = await res();
   const body = (await answer.json()) as { error: string };
@@ -183,7 +183,7 @@ test("Nemia's builtin servers are the orchestrator package's own folder, never a
 });
 
 /** The cell of `row` under the column `name` of `table`. */
-const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+const cellOf = (table: Table, row: Table['rows'][number], name: string) =>
   row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
 
 test("a factory's MCP servers asked as a Table answer a server's columns and a line each, a header named and never its value", async () => {

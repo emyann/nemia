@@ -8,13 +8,13 @@ import type { PageSpec } from '../visit.ts';
 const NOWHERE = '/no-such-page';
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** What the frame draws as the page, beside its rail and under its top bar, as text. */
-const drawnOf = (page: Page): Promise<string> => page.locator('main[data-frame-page]').innerText();
+const drawnOf = (page: Page) => page.locator('main[data-frame-page]').innerText() satisfies Promise<string>;
 
 export default {
   /**

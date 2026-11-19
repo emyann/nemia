@@ -33,7 +33,7 @@ import {
   seriesRead,
   tierDir,
 } from './series.store.ts';
-import { RANGES, seriesMemo, type RollupLine } from './series.ts';
+import { RANGES, seriesMemo } from './series.ts';
 import { engineOf } from '../runtime-client.ts';
 
 const ROOT = scratch('wf-series-store-');
@@ -57,7 +57,7 @@ const fresh = () => {
 };
 
 /** A `store.runs` line at `t` of one sample `v`, labelled `l`. */
-const line = (t: string, v: number, l: Record<string, string> = {}): RollupLine => ({
+const line = (t: string, v: number, l: Record<string, string> = {}) => ({
   t,
   s: 'store.runs',
   l,
@@ -68,7 +68,7 @@ const line = (t: string, v: number, l: Record<string, string> = {}): RollupLine 
   last: v,
 });
 
-const pass = (at: string, ms: number): RecentPass => ({
+const pass = (at: string, ms: number) => ({
   at,
   ms,
   runs: 40,
@@ -101,13 +101,11 @@ const filesNow = () =>
 const typed = (argv: readonly string[]) => handledArgv(argv, noEngine(), undefined, undefined, ENV);
 
 /** That `err` is a refusal of kind `tag` with exit 2. */
-const refusedAs =
-  (tag: string) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
-    assert.equal(err._tag, tag, err.message);
-    assert.equal(err.exitCode, 2, err.message);
-    return true;
-  };
+const refusedAs = (tag: string) => (err: Error & { exitCode?: number; _tag?: string }) => {
+  assert.equal(err._tag, tag, err.message);
+  assert.equal(err.exitCode, 2, err.message);
+  return true;
+};
 
 /** Four passes rolled into the minutes 13:57 to 14:00, and those of 13:00 into its hour, by three passes of the tick. */
 const fourMinutes = () => {

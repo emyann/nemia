@@ -95,13 +95,14 @@ const LOOP: StepSpec[] = [
 const [IMPLEMENT, LOOPING_REVIEW] = [LOOP[0], LOOP[1]];
 const FOUND = [{ file: 'src/run.ts', line: 183, what: 'a producer with no findings reads as done' }];
 /** How review signed off: its findings, whether to go round again, and a summary that must travel nowhere. */
-const reviewed = (again: unknown): Closeout => ({
-  outcome: 'done',
-  summary: 'REVIEWER-SUMMARY',
-  artifacts: [],
-  needs: undefined,
-  output: { findings: FOUND, again },
-});
+const reviewed = (again: unknown) =>
+  ({
+    outcome: 'done',
+    summary: 'REVIEWER-SUMMARY',
+    artifacts: [],
+    needs: undefined,
+    output: { findings: FOUND, again },
+  }) satisfies Closeout;
 const REPLIES = [{ finding: 'src/run.ts:183', answer: "won't fix", why: 'an empty list is a review with nothing worth changing' }];
 /** How implement signed off past round 1: its replies, and a summary that must travel nowhere. */
 const answered: Closeout = {
@@ -112,44 +113,43 @@ const answered: Closeout = {
   output: { replies: REPLIES },
 };
 /** The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it — ship unfiled. */
-const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
-  const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}) => {
+  const earlier = (prefix: string, checked: boolean) =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
       cause: 'round' as const,
-    }));
+    })) satisfies EarlierTry[];
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {
     implement: { taskId: `i${n}`, check: { taskId: `c${n}` }, ...tries(earlier('i', true)) },
     review: { taskId: `r${n}`, ...tries(earlier('r', false)) },
     ship: { taskId: null },
   };
-  return run({}, { steps, ...extra });
+  return run({}, { steps, ...extra }) satisfies Run;
 };
 /** Round `n` with review not filed yet: implement's try is the one at work. */
-const reviewDue = (n: number): Run => {
+const reviewDue = (n: number) => {
   const r = inRound(n);
-  return { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  const due: Run = { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  return due;
 };
-const ALL_SUCCEEDED = (): TaskPhase => 'succeeded';
+const ALL_SUCCEEDED = () => 'succeeded' as const satisfies TaskPhase;
 /** implement's closeout — with replies past round 1 — and review's, saying `again`. */
-const saidIn =
-  (n: number, again: unknown) =>
-  (name: string): Closeout | undefined =>
-    name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined;
-const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
+const saidIn = (n: number, again: unknown) => (name: string) =>
+  (name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined) satisfies
+    | Closeout
+    | undefined;
+const roundAskFor = (round: number) => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' }) satisfies RoundAsk;
 /** Why a person judged a loop's findings later work rather than this run's. */
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
 /** Try `t` of review, accepted as it stands at a known time. */
-const acceptedTry = (t: number, message: string = ENOUGH): Partial<RepositoryRun> => ({
-  acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }],
-});
+const acceptedTry = (t: number, message: string = ENOUGH) =>
+  ({
+    acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }],
+  }) satisfies Partial<RepositoryRun>;
 /** The engine's own phase words — `working` — or the feed's `running`. */
-const shown =
-  (m: Record<string, ListedPhase>) =>
-  (id: string): ListedPhase =>
-    m[id] ?? 'unknown';
+const shown = (m: Record<string, ListedPhase>) => (id: string) => (m[id] ?? ('unknown' as const)) satisfies ListedPhase;
 /** The loop on round `n`, listed as `nemia ls` lists it, with `more` of the listing's inputs. */
 const listedInRound = (r: Run, said: (name: string) => Closeout | undefined, more: Partial<Parameters<typeof listing>[0]> = {}) =>
   listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked, ...more });
@@ -157,22 +157,24 @@ const FILES = '/wf/runs/r-1/artifacts/implement';
 /** The JSON a brief carries in its first fenced block. */
 const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]);
 /** implement's closeout with `replies` as given. */
-const replying = (replies: unknown): Closeout => ({
-  outcome: 'done',
-  summary: 'IMPLEMENTER-SUMMARY',
-  artifacts: [],
-  needs: undefined,
-  output: { replies },
-});
+const replying = (replies: unknown) =>
+  ({
+    outcome: 'done',
+    summary: 'IMPLEMENTER-SUMMARY',
+    artifacts: [],
+    needs: undefined,
+    output: { replies },
+  }) satisfies Closeout;
 const THREE_ANSWERS = ['**Fix it.**', '**Say why not.**', '**Sign off blocked.**'];
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout>) => (name: string) => m[name];
-const said = (outcome: Closeout['outcome']): Closeout => ({
-  outcome,
-  summary: 'rewrote the parser\nand the three tests that pinned it',
-  artifacts: [],
-  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
-});
+const said = (outcome: Closeout['outcome']) =>
+  ({
+    outcome,
+    summary: 'rewrote the parser\nand the three tests that pinned it',
+    artifacts: [],
+    needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
+  }) satisfies Closeout;
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
 const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1') =>
   run(
@@ -185,17 +187,17 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1') =>
     },
   );
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'continue'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
+const askFor = (n: number, mode: RetryMode = 'continue') =>
+  ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' }) satisfies RetryAsk;
 /**
  * What the engine measured of each task's sessions, by id — dollars on its ended attempts — and the tasks its harness ended at their
  * budget.
  */
-const spends =
-  (usd: Record<string, number>, budgetEnded: string[] = []): SpendOf =>
-  (id) =>
+const spends = (usd: Record<string, number>, budgetEnded: string[] = []) =>
+  ((id) =>
     id in usd || budgetEnded.includes(id)
       ? { usd: usd[id] ?? 0, measured: id in usd ? 1 : 0, unmeasured: id in usd ? 0 : 1, budgetEnded: budgetEnded.includes(id) }
-      : undefined;
+      : undefined) satisfies SpendOf;
 /** implement checked, with `retries: 2` and a $3 budget, on claude; review after it. */
 const BUDGETED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2, budget: 3 }, step('review', ['implement'])];
 /** implement on try 2 — `retries:` filed it — its check refused again. */
@@ -245,10 +247,8 @@ const listed = (steps: StepSpec[], r: Run, p: (id: string) => ListedPhase, saidO
 const OVER = { verdict: () => 1 as const, spent: spends({ t0: 1.75, t1: 2.5 }) };
 const B: StepSpec[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
 const nothingSaid = () => undefined;
-const loopSpends =
-  (usd: Record<string, number>): SpendOf =>
-  (id) =>
-    id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined;
+const loopSpends = (usd: Record<string, number>) =>
+  ((id) => (id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined)) satisfies SpendOf;
 /** implement checked with a $3 budget, in the loop. */
 const BUDGETED_LOOP: StepSpec[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
 type LoopRead = { rounds?: RoundAsk[]; spent?: SpendOf; verdict?: () => 0 | undefined };
@@ -643,8 +643,8 @@ describe("declaredOutput and outputLines: a target's replies as `nemia decide` p
 });
 
 describe("composeBrief of round 1's empty replies: handed to nobody", () => {
-  const reads = (name: string): Closeout | undefined =>
-    name === 'implement' ? replying([]) : name === 'review' ? reviewed(false) : undefined;
+  const reads = (name: string) =>
+    (name === 'implement' ? replying([]) : name === 'review' ? reviewed(false) : undefined) satisfies Closeout | undefined;
   test('the looping step on round 1 is handed no replies; on round 2 filed off them, none either', () => {
     assert.doesNotMatch(composeBrief(LOOPING_REVIEW, inRound(1), LOOP, reads, FILES), /## Replies from|"replies"/);
     const second = composeBrief(LOOPING_REVIEW, reviewDue(2), LOOP, reads, FILES);
@@ -1651,7 +1651,7 @@ describe('a round asked past a budget holds no step of its loop on the pass befo
   test('beside a step that failed, the loop whose round is due is not called over budget, nor offered again', () => {
     const BESIDE = [...BUDGETED_LOOP, step('lint')];
     const beside = { ...r, steps: { ...r.steps, lint: { taskId: 'l1' } } };
-    const lintFailed = (id: string): TaskPhase => (id === 'l1' ? 'failed' : 'succeeded');
+    const lintFailed = (id: string) => (id === 'l1' ? ('failed' as const) : ('succeeded' as const)) satisfies TaskPhase;
     const d = decidedInLoop(BESIDE, beside, said, { rounds: [{ ...roundAskFor(2), budget: 10 }], spent }, lintFailed);
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.overBudget], ['failed', ['lint'], []]);
     assert.deepEqual([overBudgetLine(BESIDE, beside, d, spent), roundLines(BESIDE, beside, d, spent)], [undefined, []]);

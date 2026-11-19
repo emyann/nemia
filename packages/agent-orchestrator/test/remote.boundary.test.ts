@@ -56,11 +56,11 @@ const FILE = path.join(ROOT, 'a2a-agents.json');
  * `agents` added to the store's `a2a-agents.json`, the ones declared before kept: a try asked of an earlier checkpoint's agent is
  * filed on a later tick, and an engine with no such harness refuses the tick.
  */
-const declare = (agents: Record<string, { url: string }>): void =>
+const declare = (agents: Record<string, { url: string }>) =>
   fs.writeFileSync(FILE, JSON.stringify({ ...(fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {}), ...agents }));
 
 /** What `run` answered, and what it printed on stdout, line by line, and on stderr, while it ran. */
-async function said(run: () => Promise<unknown>): Promise<{ answered: unknown; out: string[]; err: string }> {
+async function said(run: () => Promise<unknown>) {
   const out: string[] = [];
   const err: string[] = [];
   const { log, error } = console;
@@ -72,11 +72,11 @@ async function said(run: () => Promise<unknown>): Promise<{ answered: unknown; o
   } finally {
     Object.assign(console, { log, error });
   }
-  return { answered, out: out.join('\n').split('\n'), err: err.join('\n') };
+  return { answered, out: out.join('\n').split('\n'), err: err.join('\n') } satisfies { answered: unknown; out: string[]; err: string };
 }
 
 /** `nemia argv` on the stage's place over the engine `e`, and what it printed on stdout. */
-const printed = async (argv: string[], e: Engine): Promise<string[]> => (await said(() => stage.main(argv, e))).out;
+const printed = async (argv: string[], e: Engine) => (await said(() => stage.main(argv, e))).out;
 
 /** `nemia ls` over the engine `e`: step `step` of run `id` as it words it — its word, its cost, its branch and its note. */
 const listedStep = async (e: Engine, id: string, step = 'ask') => {
@@ -85,7 +85,7 @@ const listedStep = async (e: Engine, id: string, step = 'ask') => {
 };
 
 /** A folder team of one step `step` on `harness`, telling it `told`. */
-function team(name: string, harness: string, step = 'ask', told = 'Read the note and say whether it is right.'): string {
+function team(name: string, harness: string, step = 'ask', told = 'Read the note and say whether it is right.') {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, `${step}.md`), `---\nworkspace: folder\nharness: ${harness}\n---\n${told}\n`);
@@ -96,7 +96,7 @@ const GIVEN = path.join(ROOT, 'tides.md');
 fs.writeFileSync(GIVEN, '# Tides\n');
 
 /** `nemia start` of `dir` as `start` types it, from the store, a directory that is no repository, and the run's id. */
-async function startedBy(start: (argv: string[]) => Promise<unknown>, dir: string, given = true): Promise<string> {
+async function startedBy(start: (argv: string[]) => Promise<unknown>, dir: string, given = true) {
   const cwd = process.cwd();
   process.chdir(ROOT);
   try {
@@ -109,21 +109,23 @@ async function startedBy(start: (argv: string[]) => Promise<unknown>, dir: strin
 const started = (dir: string, given = true) => startedBy((argv) => stage.main(argv), dir, given);
 
 /** The engine's journal of a task, as it stands on disk. */
-const journal = (task: string): Array<Record<string, unknown>> => {
+const journal = (task: string) => {
   const file = path.join(ROOT, 'engine', 'tasks', `${task}.jsonl`);
-  return fs.existsSync(file)
-    ? fs
-        .readFileSync(file, 'utf8')
-        .trim()
-        .split('\n')
-        .map((line) => JSON.parse(line))
-    : [];
+  return (
+    fs.existsSync(file)
+      ? fs
+          .readFileSync(file, 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+      : []
+  ) satisfies Array<Record<string, unknown>>;
 };
 
 const tick = (e: Engine) => stage.runWith(e, tickRun({ repo: ROOT }));
 
 /** Ticks in test `t`, every 100ms, until the step's task settles, a pass after, and once more so the run reads what it came to. */
-async function settle(t: Waiter, e: Engine, id: string): Promise<void> {
+async function settle(t: Waiter, e: Engine, id: string) {
   let seen = 'not read yet';
   await until(
     t,
@@ -159,7 +161,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
 }
 
 /** Each moment as a line a reader can compare. */
-const shown = (got: Moment[]): string[] =>
+const shown = (got: Moment[]) =>
   got.map((m) =>
     m.kind === 'events'
       ? `events ${m.events.map((ev) => `${ev.role} ${JSON.stringify(ev.text)}`).join(', ')}`
@@ -170,7 +172,7 @@ const shown = (got: Moment[]): string[] =>
           : m.kind === 'streamed'
             ? `streamed ${m.yes}`
             : m.kind,
-  );
+  ) satisfies string[];
 
 /**
  * The run of a one-step team on an agent at `url`, ticked on a runtime of its own, with the feed's hub, until its step is at work, and
@@ -217,10 +219,10 @@ async function following(t: TestContext, agent: string, url: string) {
 }
 
 /** A gate the agent's answer waits behind, and the hand that opens it. */
-function gate(): { held: Promise<void>; go: () => void } {
+function gate() {
   let go = () => {};
   const held = new Promise<void>((resolve) => (go = resolve));
-  return { held, go };
+  return { held, go } satisfies { held: Promise<void>; go: () => void };
 }
 
 describe(
@@ -264,6 +266,7 @@ describe(
         assert.ok(runRecord(ROOT, id).steps.ask?.taskId, 'filed');
         assert.equal(decided.timeline.steps.ask?.length, 1, 'the decision reads its one try');
         assert.deepEqual(listed, ['unverified', undefined, null, undefined]);
+        // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
         const everything = (dir: string): string[] =>
           fs
             .readdirSync(dir, { withFileTypes: true })

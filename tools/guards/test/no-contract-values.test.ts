@@ -20,13 +20,13 @@ import { specifiersIn, withoutComments } from 'test-kit/imports';
 import { REPO, workspaces } from 'test-kit/repo';
 
 /** Whether `spec` names a contract's module: one under a `contracts/` folder, or a file named `*.contract.ts`. */
-const isContract = (spec: string): boolean => /(^|\/)contracts\//.test(spec) || /\.contract(\.[cm]?[jt]sx?)?$/.test(spec);
+const isContract = (spec: string) => /(^|\/)contracts\//.test(spec) || /\.contract(\.[cm]?[jt]sx?)?$/.test(spec);
 
 /**
  * Each `import … from` and `export … from` of `text`, outside its comments, and whether it is erased as it runs: only where the statement
  * itself says `type` (`import type`, `export type`), never by the braces' members alone.
  */
-const statementsOf = (text: string): { spec: string; erased: boolean }[] =>
+const statementsOf = (text: string) =>
   [...withoutComments(text).matchAll(/^\s*(?:import|export)\s+(type\s+)?[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)].map((m) => ({
     spec: m[2] ?? '',
     erased: Boolean(m[1]),
@@ -37,7 +37,7 @@ const FIX =
   'import its types alone (`import type`), and move a value the code and the contract share into src, the contract importing it from there';
 
 /** `file`, holding `text`, as a sentence per contract it reads a value of, naming the fix; nothing where it reads only types. */
-const contractValuesIn = (file: string, text: string): string[] => {
+const contractValuesIn = (file: string, text: string) => {
   const values = statementsOf(text)
     .filter((one) => !one.erased && isContract(one.spec))
     .map((one) => one.spec);
@@ -50,7 +50,7 @@ const contractValuesIn = (file: string, text: string): string[] => {
 };
 
 /** Every source file under `dir` that ships, by path from the root: no test, no `node_modules`. */
-const shipped = (dir: string): string[] => {
+const shipped = (dir: string) => {
   const at = path.join(REPO, dir);
   if (!fs.existsSync(at)) return [];
   return fs

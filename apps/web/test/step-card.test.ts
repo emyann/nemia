@@ -18,7 +18,7 @@ type Step = RunDetail['steps'][number];
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 
 /** A step of the answer, settled as `word` and its codes say, with nothing beside it but what `extra` puts. */
-const quiet = (name: string, word: Word, extra: Partial<Step> = {}): Step =>
+const quiet = (name: string, word: Word, extra: Partial<Step> = {}) =>
   step({
     name,
     ...coded(word),
@@ -30,26 +30,27 @@ const quiet = (name: string, word: Word, extra: Partial<Step> = {}): Step =>
     spent: { usd: 3.71, measured: 1, unmeasured: 0, said: '$3.71' },
     budget: { usd: 10, said: '$10', of: '$3.71 of $10', over: false },
     ...extra,
-  });
+  }) satisfies Step;
 
 /** One try of a step, of `round`. */
-const aTry = (n: number, round = 1): Step['tries'][number] => ({
-  try: n,
-  round,
-  cause: null,
-  current: true,
-  taskId: `t-${n}`,
-  note: null,
-  ...triedAs('running'),
-  attempts: { count: 1, latest: null },
-  check: null,
-  closeout: null,
-  unreadable: null,
-  answer: null,
-});
+const aTry = (n: number, round = 1) =>
+  ({
+    try: n,
+    round,
+    cause: null,
+    current: true,
+    taskId: `t-${n}`,
+    note: null,
+    ...triedAs('running'),
+    attempts: { count: 1, latest: null },
+    check: null,
+    closeout: null,
+    unreadable: null,
+    answer: null,
+  }) satisfies Step['tries'][number];
 
 /** The card of `name` on a run of design, implement, review whose steps say `words`, its answer's steps `steps`. */
-function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada'): StepCardFacts {
+function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada') {
   const listed = summary(Object.entries(words));
   const row = { ...listed, steps: listed.steps.map((s) => ({ ...s, spec: s.name === name && agent ? givenAgent(agent) : null })) };
   return stepCardOf({
@@ -58,7 +59,7 @@ function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent:
     detail: detail({ steps }),
     agents: [{ name: 'Ada', role: 'Software engineer' }],
     now: NOW,
-  });
+  }) satisfies StepCardFacts;
 }
 
 const STATUSES: Record<string, Word> = { design: 'verified ✓', implement: 'running (working)', review: 'waiting' };

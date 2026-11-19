@@ -25,19 +25,20 @@ import { daemon, quota } from './factory-fixtures.ts';
 const NOW = new Date('2026-09-30T05:10:00.000Z');
 
 /** A five-hour window, 82% used and marked. */
-const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
-  key: 'five_hour',
-  label: '5-hour',
-  usedPercentage: 82,
-  resetsAt: '2026-09-30T08:00:00.000Z',
-  reset: false,
-  marked: true,
-  ...extra,
-});
+const win = (extra: Partial<QuotaWindow> = {}) =>
+  ({
+    key: 'five_hour',
+    label: '5-hour',
+    usedPercentage: 82,
+    resetsAt: '2026-09-30T08:00:00.000Z',
+    reset: false,
+    marked: true,
+    ...extra,
+  }) satisfies QuotaWindow;
 
 /** A run in flight with one step per status, in `factory`, and `extra` over it. */
-const run = (statuses: readonly Word[], extra: Partial<RunView> = {}): RunView =>
-  summary([], { steps: statuses.map((status, i) => listedStep(`step-${i}`, status, i)), ...extra });
+const run = (statuses: readonly Word[], extra: Partial<RunView> = {}) =>
+  summary([], { steps: statuses.map((status, i) => listedStep(`step-${i}`, status, i)), ...extra }) satisfies RunView;
 
 /** A light answer holding `waiting` and `inFlight`, its counts their lengths. */
 const light = (waiting: RunView[], inFlight: RunView[]) => ({
@@ -180,6 +181,7 @@ describe('quotaShort: the quota, short', () => {
 });
 
 /** Every `.tsx` under `src`, by its path from the app. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const sources = (dir: string): string[] =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const at = path.join(dir, entry.name);

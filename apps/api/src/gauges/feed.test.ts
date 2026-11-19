@@ -55,26 +55,28 @@ const emptyFeed = () => {
       Effect.runPromise(written(runs).pipe(Effect.provide(StoreRoot.layer(path.dirname(feedFile(root)))))),
   });
 };
-const planAt = (word: string, note?: string): FeedWords => ({
-  run: { word: 'running' },
-  steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
-});
+const planAt = (word: string, note?: string) =>
+  ({
+    run: { word: 'running' },
+    steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
+  }) satisfies FeedWords;
 const end = () => readFeed(root, 0).cursor;
 /** A run running, at each step named, all at `running`: the words a pass hands the feed for it. */
-const steps = (...named: readonly string[]): FeedWords => ({
-  run: { word: 'running' },
-  steps: named.map((name) => ({ name, word: 'running' })),
-});
+const steps = (...named: readonly string[]) =>
+  ({
+    run: { word: 'running' },
+    steps: named.map((name) => ({ name, word: 'running' })),
+  }) satisfies FeedWords;
 
 type Block = { event?: string; data?: string; id?: string };
 /**
  * Server-sent events as a reader gets them: the fields of each block, a comment line read as nothing, as an EventSource reads it, and the
  * `opened` event the stream opens with skipped, as every reader of it skips it (`OPENED`).
  */
-const blocks = (text: string): Block[] => sent(text).filter((block) => block.event !== OPENED.event);
+const blocks = (text: string) => sent(text).filter((block) => block.event !== OPENED.event) satisfies Block[];
 
 /** Every block of server-sent events, the `opened` event among them. */
-const sent = (text: string): Block[] =>
+const sent = (text: string) =>
   text
     .split('\n\n')
     .map((block) =>
@@ -91,7 +93,7 @@ const sent = (text: string): Block[] =>
           return [line.slice(0, colon), line.slice(colon + 2)];
         }),
       ),
-    );
+    ) satisfies Block[];
 
 /**
  * Read a stream until `holds` holds for the blocks it has sent, or it ends: one chunk an ask, so the wait is paced by the stream itself,
@@ -103,12 +105,7 @@ const sent = (text: string): Block[] =>
  * @param holds what the blocks sent must come to
  * @returns the whole blocks sent, once `holds` holds for them; or every block, once the stream ends
  */
-function readUntil(
-  t: Waiter,
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  text: { value: string },
-  holds: (said: Block[]) => boolean,
-): Promise<Block[]> {
+function readUntil(t: Waiter, reader: ReadableStreamDefaultReader<Uint8Array>, text: { value: string }, holds: (said: Block[]) => boolean) {
   const decoder = new TextDecoder();
   const complete = () => blocks(text.value.slice(0, text.value.lastIndexOf('\n\n') + 2));
   return until(
@@ -122,7 +119,7 @@ function readUntil(
     },
     () => `the events waited for, from a stream that had sent ${complete().length}: ${text.value}`,
     { everyMs: 0 },
-  );
+  ) satisfies Promise<Block[]>;
 }
 
 /** A stream opened on the api, and a reader of it. */
@@ -220,7 +217,7 @@ describe(
             `event ${i}: its id is where a read takes up after that line, and no other`,
           );
 
-        const again = await open('?after=0', { 'Last-Event-ID': all[0].id! });
+        const again = await open('?after=0', { 'Last-Event-ID': all[0].id });
         const resumed = await readUntil(t, again.reader, again.text, (s) => s.length >= 2);
         await pass({ 'r-1': planAt('failed') });
         const more = await readUntil(t, again.reader, again.text, (s) => s.length >= 3);
@@ -230,7 +227,7 @@ describe(
           all.slice(1).map((b) => b.id),
           'the header wins over the address: the second and third, not the first',
         );
-        assert.equal(JSON.parse(more[2].data!).word, 'failed', 'and then what is written next');
+        assert.equal(JSON.parse(more[2].data).word, 'failed', 'and then what is written next');
 
         const fromSecond = await open(`?after=${all[1].id}`);
         const third = await readUntil(t, fromSecond.reader, fromSecond.text, (s) => s.length >= 2);
@@ -325,7 +322,7 @@ describe(
           'a line of no run and no step is the store’s, never a run event',
         );
         assert.deepEqual(
-          all.slice(2).map((b) => JSON.parse(b.data!).reason),
+          all.slice(2).map((b) => JSON.parse(b.data).reason),
           ['StorePaused', 'StoreResumed'],
         );
         assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
@@ -353,7 +350,7 @@ describe(
           "a factory's line is never a daemon's or the store's",
         );
         assert.deepEqual(
-          all.slice(2).map((b) => JSON.parse(b.data!).reason),
+          all.slice(2).map((b) => JSON.parse(b.data).reason),
           ['ConflictsPending', 'ConflictsSettled'],
         );
         assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
@@ -374,7 +371,7 @@ describe(
           ['run', 'step', 'step'],
           'the run, its step, and the denial of that step — each an event of what it is about',
         );
-        const shot = JSON.parse(all[2].data!);
+        const shot = JSON.parse(all[2].data);
         assert.deepEqual(
           { reason: shot.reason, type: shot.type, source: shot.source, call: shot.call, try: shot.try, step: shot.step },
           { reason: 'ToolDenied', type: 'Warning', source: 'runtime', call: 'Bash(git push)', try: 2, step: 'plan' },
@@ -404,7 +401,7 @@ describe(
  * `query` and `headers` asked of the stream, refused with `status` before it opens: an answer, not a stream, whose words name each of
  * `facts`. A stream opened for it is let go, so the refusal is what the row waits on.
  */
-async function refusedBefore(query: string, headers: Record<string, string>, status: number, facts: string[]): Promise<void> {
+async function refusedBefore(query: string, headers: Record<string, string>, status: number, facts: string[]) {
   const res = await app.request(`${STREAM}${query}`, { headers });
   const where = `${query} ${JSON.stringify(headers)}`;
   if (res.status !== status) await res.body?.cancel();
@@ -426,29 +423,30 @@ describe(
     });
     let size!: number;
     const whatToPass = ['Last-Event-ID', 'pass none to read the feed from the start'];
-    const cursors = (size: number): [string, string, Record<string, string>, string[]][] => [
+    const cursors = (size: number) =>
       [
-        'inside a line, by address',
-        `?after=${size - 2}`,
-        {},
-        [`\`${size - 2}\` is not a cursor this feed gave`, 'falls inside a line of the feed'],
-      ],
-      [
-        'inside a line, by Last-Event-ID',
-        '',
-        { 'Last-Event-ID': String(size - 2) },
-        [`\`${size - 2}\``, 'falls inside a line of the feed, not after one'],
-      ],
-      [
-        'past the end',
-        `?after=${size + 10}`,
-        {},
-        [`\`${size + 10}\` is not a cursor this feed gave`, 'past the end of the feed', `(${size} bytes`],
-      ],
-      ['not a number', '?after=abc', {}, ['`abc` is not a cursor this feed gave', 'a whole number of bytes']],
-      ['below zero', '?after=-1', {}, ['`-1` is not a cursor this feed gave', 'a whole number of bytes']],
-      ['a Last-Event-ID no stream sent', '', { 'Last-Event-ID': 'page-2' }, ['`page-2`', 'not a cursor this feed gave']],
-    ];
+        [
+          'inside a line, by address',
+          `?after=${size - 2}`,
+          {},
+          [`\`${size - 2}\` is not a cursor this feed gave`, 'falls inside a line of the feed'],
+        ],
+        [
+          'inside a line, by Last-Event-ID',
+          '',
+          { 'Last-Event-ID': String(size - 2) },
+          [`\`${size - 2}\``, 'falls inside a line of the feed, not after one'],
+        ],
+        [
+          'past the end',
+          `?after=${size + 10}`,
+          {},
+          [`\`${size + 10}\` is not a cursor this feed gave`, 'past the end of the feed', `(${size} bytes`],
+        ],
+        ['not a number', '?after=abc', {}, ['`abc` is not a cursor this feed gave', 'a whole number of bytes']],
+        ['below zero', '?after=-1', {}, ['`-1` is not a cursor this feed gave', 'a whole number of bytes']],
+        ['a Last-Event-ID no stream sent', '', { 'Last-Event-ID': 'page-2' }, ['`page-2`', 'not a cursor this feed gave']],
+      ] satisfies [string, string, Record<string, string>, string[]][];
     cursors(0).forEach(([name], i) =>
       test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () => {
         const [, query, headers, facts] = cursors(size)[i];
@@ -527,7 +525,7 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
     'unreadable',
     "the read resolves only once the api closes the stream: one that went on trying would reach its test's timeout",
   );
-  const { error, retrying } = JSON.parse(last.data!);
+  const { error, retrying } = JSON.parse(last.data);
   assert.equal(retrying, false);
   assert.match(error, /is past the end of the feed/);
   assert.equal(said.filter((b) => b.event === 'unreadable').length, 1, 'said once');
@@ -580,7 +578,7 @@ test(
         fs.appendFileSync(feedFile(root), `${JSON.stringify(line)}\n`);
         const failed = await readUntil(t, reader, text, (s) => s.length >= 1);
         assert.equal(failed[0].event, 'unreadable');
-        const { error, retrying } = JSON.parse(failed[0].data!);
+        const { error, retrying } = JSON.parse(failed[0].data);
         assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
         assert.match(error, /EACCES/);
         await new Promise((r) => setTimeout(r, FAILING_FOR_MS));
@@ -683,7 +681,7 @@ describe(
  * Every line of the feed as a stream sends it, in order: the signed line (`readFeed`) as its data, and the cursor just after it as its
  * id, counted off the file's own bytes — so a test names what a selector must keep and what it must drop by the feed itself.
  */
-const everySent = (): { line: FeedLine; sent: { data: string; id: string } }[] => {
+const everySent = () => {
   const raw = fs
     .readFileSync(feedFile(root), 'utf8')
     .split('\n')
@@ -692,14 +690,14 @@ const everySent = (): { line: FeedLine; sent: { data: string; id: string } }[] =
   return readFeed(root, 0).lines.map((line, i) => {
     cursor += Buffer.byteLength(raw[i], 'utf8') + 1;
     return { line, sent: { data: JSON.stringify(line), id: String(cursor) } };
-  });
+  }) satisfies { line: FeedLine; sent: { data: string; id: string } }[];
 };
 
 /** What a stream sent, by data and id alone: what a selector keeps, without the event name each line's own test holds. */
-const sentOf = (said: Block[]): { data: string; id: string }[] => said.map((b) => ({ data: b.data!, id: b.id! }));
+const sentOf = (said: Block[]) => said.map((b) => ({ data: b.data!, id: b.id! })) satisfies { data: string; id: string }[];
 
 /** The label a line carries under `key`, or undefined: what a selector reads of it. */
-const labelOf = (line: FeedLine, key: string): string | undefined => (line as { labels?: Record<string, string> }).labels?.[key];
+const labelOf = (line: FeedLine, key: string) => (line as { labels?: Record<string, string> }).labels?.[key] satisfies string | undefined;
 
 /**
  * What `feedEvents` sends from `from` under `selectors`, up to and including the first bookmark, at a cadence of the test's own. The wait
@@ -737,7 +735,7 @@ describe(
             "run a's lines alone, each its own line's cursor as its id, with no line of run b's among them",
           );
           assert.equal(
-            said.filter((b) => labelOf(JSON.parse(b.data!) as FeedLine, 'run') === 'r-b').length,
+            said.filter((b) => labelOf(JSON.parse(b.data) as FeedLine, 'run') === 'r-b').length,
             0,
             "a line the selector does not take never crosses the wire: run b's are dropped at the source",
           );
@@ -968,7 +966,7 @@ describe(
       const { reader, text } = await open(`?until=end&selector=${encodeURIComponent('reason=NeedsHuman')}&selector=run%3Dr-a`);
       const said = await readUntil(t, reader, text, () => false);
       assert.equal(said[0].event, 'hint', `the hint first: ${JSON.stringify(said)}`);
-      assert.match((JSON.parse(said[0].data!) as { message: string }).message, /NeedsHuman.*reason=AwaitingAnswer/);
+      assert.match((JSON.parse(said[0].data) as { message: string }).message, /NeedsHuman.*reason=AwaitingAnswer/);
       assert.equal(said.filter((b) => b.event === 'hint').length, 1, 'one hint, for the one former reason named');
       assert.ok(said.slice(1).every((b) => b.event !== 'hint'));
       assert.equal(said.at(-1)!.event, 'bookmark');

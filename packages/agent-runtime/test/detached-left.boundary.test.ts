@@ -17,7 +17,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { detachedOps, STALE_MS, type HarnessSpec } from '../src/harness/detached/detached.ts';
+import { detachedOps, STALE_MS } from '../src/harness/detached/detached.ts';
 import { Engine } from '../src/index.ts';
 import { RunnerError } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
@@ -29,13 +29,13 @@ import { stepMono } from './clock.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
-const sh = (script: string): HarnessSpec => ({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', script] }) });
+const sh = (script: string) => ({ name: 'sh', can: [], command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
 const fileOf = (dir: string, name: string, end: string) => path.join(dir, 'runs', 'sh', `${safe(name)}${end}`);
 const QUICK = { stopGraceMs: 300, beatMs: 200 } as const;
 
 type Written = { pid: number; state: string; harness?: { pid: number; start?: string } };
-const runOf = (dir: string, name: string): Written | undefined => {
+const runOf = (dir: string, name: string) => {
   try {
     return JSON.parse(fs.readFileSync(fileOf(dir, name, '.json'), 'utf8')) as Written;
   } catch {

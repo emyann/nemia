@@ -1032,7 +1032,7 @@ const PINNED: Record<string, string[]> = {
 };
 
 /** Where `exported` differs from `pinned`: each name dropped or added, worded with what to do. */
-const drift = (entry: string, exported: string[], pinned: string[]): string[] => [
+const drift = (entry: string, exported: string[], pinned: string[]) => [
   ...pinned
     .filter((n) => !exported.includes(n))
     .map((n) => `${entry} no longer exports ${n}: re-export it by name from the entry, as before the move`),

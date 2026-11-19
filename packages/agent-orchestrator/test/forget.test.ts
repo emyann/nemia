@@ -66,8 +66,10 @@ const files = filesStoreAt(ROOT);
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? onHandler(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 const world = () => stage.place().world;
 
@@ -115,7 +117,7 @@ const closed: string[] = [];
 const e = () => board().e;
 
 /** A repository of the stage's place with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
@@ -144,12 +146,12 @@ const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
 const hasBranch = (repo: string, branch: string) => world().tip(repo, branch) !== null;
 const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 /** The ids of the tasks the engine has a record of. */
-const listed = async (): Promise<string[]> => (await Effect.runPromise(e().list())).views.map((v) => v.id);
+const listed = async () => (await Effect.runPromise(e().list())).views.map((v) => v.id);
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
-const worktreesOf = (repo: string): string[] => {
+const worktreesOf = (repo: string) => {
   const outcome = stage.place().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in outcome, `the inventory of ${repo}`);
-  return outcome.answer.workspaces.map((w) => w.path);
+  return outcome.answer.workspaces.map((w) => w.path) satisfies string[];
 };
 
 /**
@@ -172,15 +174,15 @@ const aParent = async (repo: string, { work, signed = Boolean(work) }: { work?: 
  * `nemia <argv>` as a person types it: `rm` and `prune` as the client runs them over the api (`forgetTyped`), any other through the CLI;
  * the lines it printed, what `rm` answered of each run it forgot, and the error it ended with, if it did.
  */
-const typed = async (...argv: string[]): Promise<Typed> => {
+const typed = async (...argv: string[]) => {
   if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e(), effect), ROOT, argv);
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void printed.push(a.join(' ')));
   try {
     await stage.main(argv, e());
-    return { printed, forgot: [], error: undefined };
+    return { printed, forgot: [], error: undefined } satisfies Typed;
   } catch (err) {
-    return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } };
+    return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } } satisfies Typed;
   } finally {
     log.mockRestore();
   }

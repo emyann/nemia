@@ -39,7 +39,7 @@ const personToken = Effect.runSync(
 );
 
 /** `n` characters of words, so no text compresses to nothing. */
-const words = (n: number, seed: string): string => `${seed} `.repeat(Math.ceil(n / (seed.length + 1))).slice(0, n);
+const words = (n: number, seed: string) => `${seed} `.repeat(Math.ceil(n / (seed.length + 1))).slice(0, n);
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -138,7 +138,7 @@ const settled = () => {
  * The SDK's client connected to `/mcp` of this file's app, presenting the person's token: by `initialize` (the legacy era, the client's
  * default), or pinned to the modern revision where `modern`.
  */
-async function connected(modern = false): Promise<Client> {
+async function connected(modern = false) {
   const on = app();
   const client = new Client(
     { name: 'bound-test', version: '0.0.0' },

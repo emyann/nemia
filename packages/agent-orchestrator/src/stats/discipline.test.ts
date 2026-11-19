@@ -193,8 +193,7 @@ const declaredTwo = new Map([
 ]);
 
 /** Whether the one rule `breaks` is broken by a try denied `call`. */
-const broken = (call: string, breaks: string[]): boolean | undefined =>
-  rulesOfTry([call], new Map([['s', [{ id: 'r', says: 'x', breaks }]]]))?.[0].broken;
+const broken = (call: string, breaks: string[]) => rulesOfTry([call], new Map([['s', [{ id: 'r', says: 'x', breaks }]]]))?.[0].broken;
 
 const RULES: Array<{ name: string; check: () => void }> = [
   {

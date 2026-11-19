@@ -22,7 +22,7 @@ const LIFECYCLE = 'src/core/lifecycle.ts';
 const SELF = 'packages/agent-runtime/test/xstate-boundary.test.ts';
 
 /** Where `file` (a path from the repository's root) reaches XState outside the lifecycle: each breach, worded with what to do instead. */
-function xstateBreaches(file: string, text: string): string[] {
+function xstateBreaches(file: string, text: string) {
   if (file === `packages/agent-runtime/${LIFECYCLE}` || file === SELF) return [];
   return specifiersIn(withoutComments(text))
     .filter((spec) => spec === XSTATE || spec.startsWith(`${XSTATE}/`) || spec.startsWith('@xstate/'))
@@ -33,7 +33,7 @@ function xstateBreaches(file: string, text: string): string[] {
 }
 
 /** Every workspace's code, tests included, by its path from the root: a test of another package importing XState is a second user of it. */
-const workspaceFiles = (): string[] =>
+const workspaceFiles = () =>
   ['packages', 'apps'].flatMap((top) =>
     fs.readdirSync(path.join(ROOT, top)).flatMap((ws) =>
       ['src', 'bin', 'test'].flatMap((dir) => {
@@ -142,7 +142,7 @@ const JUDGEMENT = ['lifecycleOf', 'observe', 'spawnRefused', 'settledQuiet', 'Li
 const AS_DATA = ['lifecycleGraph'];
 
 /** Whether `value` is a function that takes nothing and answers what a JSON round trip gives back unchanged: no machine, no move. */
-const answersPlainData = (value: unknown): boolean => {
+const answersPlainData = (value: unknown) => {
   if (typeof value !== 'function' || value.length !== 0) return false;
   try {
     const answer: unknown = value();
@@ -156,7 +156,7 @@ const answersPlainData = (value: unknown): boolean => {
  * What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/core/lifecycle.ts` exports, or a
  * reading `decide` moves by. A name of `AS_DATA` is refused unless its value answers plain data.
  */
-function exportBreaches(entry: string, exported: Record<string, unknown>, inside: { names: Set<string>; values: Set<unknown> }): string[] {
+function exportBreaches(entry: string, exported: Record<string, unknown>, inside: { names: Set<string>; values: Set<unknown> }) {
   const lifecycles = (name: string, value: unknown) =>
     AS_DATA.includes(name) ? !answersPlainData(value) : inside.names.has(name) || inside.values.has(value);
   return Object.entries(exported).flatMap(([name, value]) =>

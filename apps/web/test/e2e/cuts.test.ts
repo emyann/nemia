@@ -32,8 +32,7 @@ afterAll(async () => {
 });
 
 /** The story `id` opened alone, in `theme`. */
-const open = (id: string, theme: 'light' | 'dark' = 'dark', look: Look = {}): Promise<Page> =>
-  openStory(browser, served.at, theme, id, look);
+const open = (id: string, theme: 'light' | 'dark' = 'dark', look: Look = {}) => openStory(browser, served.at, theme, id, look);
 
 const PAGER_FIRST = 'look-pager--on-the-first-page';
 const TITLE_STORY = 'look-textlink--title';
@@ -69,7 +68,7 @@ test('the text link by the keyboard: Enter navigates once', WAITED, async () => 
  * The colour of the ring drawn around what has the focus, off its computed outline, the kit's ring: null when no outline is drawn,
  * none wide or one that is transparent.
  */
-const ringOf = (page: Page): Promise<Rgb | null> =>
+const ringOf = (page: Page) =>
   page.evaluate(() => {
     const style = getComputedStyle(document.activeElement!);
     if (style.outlineStyle === 'none' || !(parseFloat(style.outlineWidth) > 0)) return null;
@@ -85,7 +84,7 @@ const ringOf = (page: Page): Promise<Rgb | null> =>
  * picture of the window, in the band the kit's ring draws four pixels outside each side of the link, the top's and the right's inside the
  * cut corner.
  */
-async function ringGaps(page: Page, name: string): Promise<string[]> {
+async function ringGaps(page: Page, name: string) {
   const ring = await ringOf(page);
   assert.ok(ring, 'the focused link has a ring, by its computed outline');
   const box = await page.locator('[data-ring-probe]').boundingBox();
@@ -113,14 +112,14 @@ const PRESS_STORY = 'look-cutbutton--press';
 const DISABLED_STORY = 'look-cutbutton--disabled-press';
 
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
-const coloursOf = <K extends string>(page: Page, name: string, points: Record<K, readonly [number, number]>): Promise<Record<K, Rgb>> =>
+const coloursOf = <K extends string>(page: Page, name: string, points: Record<K, readonly [number, number]>) =>
   coloursIn(browser, page, path.join(pictures, `${name}.png`), points);
 
 /**
  * Where the cut button paints what it must not, none when its shape is exact: a pixel outside its box beside each cut, which must
  * be the ground it sits on, and inside each cut corner, which must be too; and its fill, which must not be.
  */
-async function buttonSpills(page: Page, name: string): Promise<string[]> {
+async function buttonSpills(page: Page, name: string) {
   const { box, out } = await edgesOf(page, BUTTON);
   assert.ok(
     [box.left, box.top].every((edge) => Math.abs(edge - Math.round(edge)) < 0.02),
@@ -179,7 +178,7 @@ test(
  * shape's outline the ring's band, three pixels out, is not drawn (three places a straight side, three a cut); and `square`, the
  * box's corners a rectangular ring would turn and the shape's does not, where the ring is drawn.
  */
-async function buttonRing(page: Page, name: string): Promise<{ missing: string[]; square: string[] }> {
+async function buttonRing(page: Page, name: string) {
   const { box, out } = await edgesOf(page, BUTTON);
   const [midX, midY] = [Math.round((box.left + box.right) / 2), Math.round((box.top + box.bottom) / 2)];
   const [ringTop, ringLeft, ringRight, ringBottom] = [out.top - 2, out.left - 2, out.right + 2, out.bottom + 2];
@@ -260,7 +259,7 @@ const QUIET_STORY = 'look-cutbutton--quiet';
  * straight sides a row or a column inside its box, and three places along each cut, on the pixel whose middle is half a pixel inside
  * the cut's line, each closer to the hairline's colour, read in the middle of its top, than to the card's ground beside it.
  */
-async function hairlineGaps(page: Page, name: string): Promise<string[]> {
+async function hairlineGaps(page: Page, name: string) {
   const { box, out } = await edgesOf(page, BUTTON);
   const [midX, midY] = [Math.round((box.left + box.right) / 2), Math.round((box.top + box.bottom) / 2)];
   const inside = 0.5 * Math.SQRT2;
@@ -321,10 +320,10 @@ test(
 
 /** The cut frame its stories draw on the page's own ground, and on another, each by its story's id and the frame there. */
 const ON = { plain: 'look-cutframe--on-the-page', other: 'look-cutframe--on-another-ground' } as const;
-const frameOn = (ground: 'plain' | 'other'): string => `[data-ground="${ground}"] [data-cut-frame]`;
+const frameOn = (ground: 'plain' | 'other') => `[data-ground="${ground}"] [data-cut-frame]`;
 
 /** Where the cut frame on the other ground paints over that ground inside a cut corner, none when the ground shows through both. */
-async function cornerPatches(page: Page, name: string): Promise<string[]> {
+async function cornerPatches(page: Page, name: string) {
   const { out } = await edgesOf(page, frameOn('other'));
   const found = await coloursOf(page, name, {
     ground: [out.left - 30, out.top - 30],
@@ -346,7 +345,7 @@ const PATCHED = `${frameOn('other')} [data-cut-shape] > * { clip-path: none !imp
  * from it: three pixels above its top edge, three pixels outside the middle of its top-right cut, and past the box's own top-right
  * corner, where a glow that follows the cut has faded and a square one has not.
  */
-async function glowOf(page: Page, name: string): Promise<{ edge: number; cut: number; corner: number }> {
+async function glowOf(page: Page, name: string) {
   const { box, out } = await edgesOf(page, frameOn('plain'));
   const off = 3 / Math.SQRT2;
   const found = await coloursOf(page, name, {
@@ -359,8 +358,7 @@ async function glowOf(page: Page, name: string): Promise<{ edge: number; cut: nu
 }
 
 /** Whether a glow, as `glowOf` measured it, is there along the edge and the cut, and follows the cut. */
-const glowFollows = (glow: { edge: number; cut: number; corner: number }): boolean =>
-  glow.edge >= 6 && glow.cut >= 6 && glow.corner * 3 <= glow.cut;
+const glowFollows = (glow: { edge: number; cut: number; corner: number }) => glow.edge >= 6 && glow.cut >= 6 && glow.corner * 3 <= glow.cut;
 
 /** The frame with no glow, and with a glow its box casts, square behind the cut. */
 const NO_GLOW = `${frameOn('plain')} [data-cut-shape] { filter: none !important; }`;
@@ -409,7 +407,7 @@ const GRAINED = {
  * How many colours a strip of what `selector` finds is painted in: twenty-four pixels in a row, four under its top edge and
  * twenty in from its left, where a part holds no text. One is a plain ground; a grain paints several.
  */
-async function coloursAlong(page: Page, name: string, selector: string): Promise<number> {
+async function coloursAlong(page: Page, name: string, selector: string) {
   const { out } = await edgesOf(page, selector);
   const strip = Object.fromEntries(Array.from({ length: 24 }, (_, i) => [`${i}`, [out.left + 21 + i, out.top + 5] as const]));
   const found = Object.values(await coloursOf(page, name, strip));
@@ -472,15 +470,14 @@ test(
 const TITLE = '[data-plain-link]';
 
 /** Whether the link `TITLE` finds is underlined as it stands now. */
-const underlined = (page: Page): Promise<boolean> =>
-  page.locator(TITLE).evaluate((link) => getComputedStyle(link).textDecorationLine.includes('underline'));
+const underlined = (page: Page) => page.locator(TITLE).evaluate((link) => getComputedStyle(link).textDecorationLine.includes('underline'));
 
 /**
  * Where a text link is underlined when it must not be, or not when it must, none when it is right: with the pointer away and the
  * keyboard elsewhere, under the pointer, and with the keyboard on it. The pointer is the browser's own: the link's line is CSS's
  * `:hover`, which no event a play function sends reaches.
  */
-async function lineFaults(page: Page): Promise<string[]> {
+async function lineFaults(page: Page) {
   const faults: string[] = [];
   await page.mouse.move(0, 0);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

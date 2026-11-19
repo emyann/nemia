@@ -53,33 +53,33 @@ const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** Every file under `dir`, by its path in it, with its bytes, so a pass is seen to have written nothing there. */
-const bytesUnder = (dir: string): Record<string, string> =>
+const bytesUnder = (dir: string) =>
   Object.fromEntries(
     (fs.readdirSync(dir, { recursive: true }) as string[])
       .filter((f) => fs.statSync(path.join(dir, f)).isFile())
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'base64')]),
-  );
+  ) satisfies Record<string, string>;
 
 /** The text of `file` in `folder`. */
-const textIn = (folder: string, file: string): string => fs.readFileSync(path.join(folder, file), 'utf8');
+const textIn = (folder: string, file: string) => fs.readFileSync(path.join(folder, file), 'utf8');
 
 /** `file` in `folder` with `from` replaced by `to`. */
-const rewrite = (folder: string, file: string, from: string, to: string): void => {
+const rewrite = (folder: string, file: string, from: string, to: string) => {
   const text = textIn(folder, file);
   assert.ok(text.includes(from), `${file} holds ${from}`);
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
 };
 
 /** What `argv` printed, as `nemia` prints it, line by line. */
-async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
+async function printedBy(t: TestContext, ...argv: string[]) {
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
   try {
@@ -123,20 +123,23 @@ const proposalIn = (factory: string, name: string) =>
   JSON.parse(fs.readFileSync(path.join(FACTORIES, factory, 'proposals', `${name}.json`), 'utf8'));
 
 /** The proposals of the factory `factory` the store holds, by name. */
-const proposalsOf = (factory: string): string[] => {
+const proposalsOf = (factory: string) => {
   const dir = path.join(FACTORIES, factory, 'proposals');
-  return fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : [];
+  {
+    const made: string[] = fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => f.replace(/\.json$/, '')) : [];
+    return made;
+  }
 };
 
 /** The proposal recorded for the owner `owner` (`<Kind>/<name>`) of `factory`'s upgrade, in `resolutions.json`. */
-const recordedFor = (factory: string, owner: string): string | undefined =>
-  JSON.parse(fs.readFileSync(resolutionsFile(ROOT, factory), 'utf8')).proposals?.[owner];
+const recordedFor = (factory: string, owner: string) =>
+  (JSON.parse(fs.readFileSync(resolutionsFile(ROOT, factory), 'utf8')) as { proposals?: Record<string, string> }).proposals?.[owner];
 
 /**
  * A factory `name` applied from the tests' team with the workflow's script at 0.1.0, the person's line of it in its tree, and the
  * template at 0.2.0 changing the same line, the upgrade filed: one conflict, the script's line.
  */
-async function scripted(t: TestContext, name: string): Promise<void> {
+async function scripted(t: TestContext, name: string) {
   const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stage.place().world.repository(repo, {});
@@ -159,7 +162,7 @@ async function scripted(t: TestContext, name: string): Promise<void> {
 }
 
 /** The person's own text for the script's line, in a file of its own. */
-const scriptChoice = (): string => {
+const scriptChoice = () => {
   const mine = path.join(scratch('wf-upgrade-conflict-script-'), 'line.ts');
   fs.writeFileSync(mine, '  "test --mine --theirs",\n');
   return mine;
@@ -492,7 +495,7 @@ describe("a workflow's resolution declined: the status says to resolve again, an
 
 describe("a workflow's resolution made from a session: its agent's in its own factory, refused in another", () => {
   const s = story(test);
-  const liveToken = async (factoryName: string, task: string): Promise<string> => {
+  const liveToken = async (factoryName: string, task: string) => {
     const token = mintToken(ROOT, { agent: 'implementer', factory: factoryName, run: null, step: null, attempt: 1, task });
     await Effect.runPromise(stage.board().e.file({ id: task, brief: 'resolve it', cwd: ROOT, restartPolicy: 'Always' }));
     return token;
@@ -590,7 +593,7 @@ const OWN_FENCE = `${OWN_CHECK}\nclaude:\n  fence:\n    disallowedTools: Bash(*:
  * added to dev, and dev's implement given `own`, another check and a skill only the factory's repository holds, as the nemia factory's
  * overlays give one; the person and the template's 0.2.0 each changing a line of dev's script, the upgrade filed: its conflicts.
  */
-async function editedAfterApply(t: TestContext, name: string, own = OWN_CHECK): Promise<string[]> {
+async function editedAfterApply(t: TestContext, name: string, own = OWN_CHECK) {
   const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   fs.mkdirSync(path.join(repo, '.claude/skills/look'), { recursive: true });

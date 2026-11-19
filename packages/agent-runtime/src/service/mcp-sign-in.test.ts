@@ -63,7 +63,7 @@ const until = async (check: () => boolean) => {
 };
 
 /** The refusal `effect` fails with: a verb that succeeds fails the test. */
-const refusalOf = <A>(effect: Effect.Effect<A, McpSignInRefused>): Promise<McpSignInRefused> => Effect.runPromise(Effect.flip(effect));
+const refusalOf = <A>(effect: Effect.Effect<A, McpSignInRefused>) => Effect.runPromise(Effect.flip(effect));
 
 const OTHER: RemoteMcpServer = { ...GITHUB, url: 'https://other.example/mcp' };
 const LINEAR: RemoteMcpServer = { ...GITHUB, url: 'https://mcp.linear.app/mcp' };

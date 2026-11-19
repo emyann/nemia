@@ -867,15 +867,16 @@ describe('ae show, ae ls and ae feed print what an attempt measured, cost and wa
       { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', closeoutSchema: { type: 'object' } },
       { kind: 'starting', at: '2026-09-23T09:00:01Z', attempt: 1 },
     ];
-    const end = (extra: object): Event => ({
-      kind: 'ended',
-      at: '2026-09-23T09:00:04Z',
-      attempt: 1,
-      sessionId: 's',
-      observed: 'succeeded',
-      reason: 'harness',
-      ...extra,
-    });
+    const end = (extra: object) =>
+      ({
+        kind: 'ended',
+        at: '2026-09-23T09:00:04Z',
+        attempt: 1,
+        sessionId: 's',
+        observed: 'succeeded',
+        reason: 'harness',
+        ...extra,
+      }) satisfies Event;
     const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]), entryLine('t-1', end(extra))];
     assert.deepEqual(shown({ closedOut: false }), [
       'attempt 1  succeeded (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
@@ -897,7 +898,7 @@ describe('ae show, ae ls and ae feed print what an attempt measured, cost and wa
     );
   });
   test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
-    const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra });
+    const filed = (extra: object) => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra }) satisfies Event;
     assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000, budgetUsd: 0.25 } })])), [
       'budget: $0.25 an attempt',
       'context: 200000 tokens a session, compacted past about it',
@@ -905,7 +906,8 @@ describe('ae show, ae ls and ae feed print what an attempt measured, cost and wa
     assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
   });
   test('ae ls prints no priority, which only orders admission under a ceiling `ae` runs without', () => {
-    const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra });
+    const filed = (extra: object) =>
+      ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra }) satisfies Event;
     const shown = (extra: object) => taskLine({ id: 't-1', state: fold('t-1', [filed(extra)]), phase: 'pending', sessionId: null });
     for (const extra of [{ priority: 3 }, { priority: -1 }, {}])
       assert.match(shown(extra), /pending {11}  review it$/, JSON.stringify(extra));

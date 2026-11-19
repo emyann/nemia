@@ -24,30 +24,31 @@ const PINNED = path.join(import.meta.dirname, 'fixtures', 'briefs');
 const STEPS = loadWorkflows(TEAM_DEV);
 
 /** The step `name` of the tests' team. */
-const stepNamed = (name: string): StepSpec => {
+const stepNamed = (name: string) => {
   const found = STEPS.find((s) => s.name === name);
   if (!found) throw new Error(`the tests' team has no step ${name}`);
-  return found;
+  return found satisfies StepSpec;
 };
 
 /** A repository run of the tests' team, implement and review filed on one branch, with `steps` over its records. */
-const runOf = (steps: Partial<RepositoryRun['steps']> = {}): RepositoryRun => ({
-  id: 'r-1',
-  repo: '/repo',
-  workspace: '/wt/implement',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: TEAM_DEV,
-  createdAt: '2026-01-01T00:00:00Z',
-  steps: {
-    implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
-    review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
-    ship: { taskId: null },
-    ...steps,
-  },
-});
+const runOf = (steps: Partial<RepositoryRun['steps']> = {}) =>
+  ({
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt/implement',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: TEAM_DEV,
+    createdAt: '2026-01-01T00:00:00Z',
+    steps: {
+      implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      ship: { taskId: null },
+      ...steps,
+    },
+  }) satisfies RepositoryRun;
 
 const REVIEWED: Closeout = { outcome: 'done', summary: 'fine', output: { again: false, findings: [] } } as unknown as Closeout;
 
@@ -58,13 +59,10 @@ const NONE = [undefined, undefined, undefined, undefined, undefined, undefined, 
 type Telling = (run: Run, step: StepSpec) => BriefPlace;
 
 /** What `placeTold` tells a step, by `place`, the package's git place when given none. */
-const toldBy =
-  (place: Place = builtinGitPlace): Telling =>
-  (run, step) =>
-    placeTold(run, STEPS, step, place);
+const toldBy = (place: Place = builtinGitPlace) => ((run, step) => placeTold(run, STEPS, step, place)) satisfies Telling;
 
 /** The six briefs of a repository run, by the name of their pinned file, each told what `told` says. */
-function briefs(told: Telling): Record<string, string> {
+function briefs(told: Telling) {
   const implement = stepNamed('implement');
   const review = stepNamed('review');
   const ship = stepNamed('ship');
@@ -118,17 +116,17 @@ function briefs(told: Telling): Record<string, string> {
       undefined,
       told(mergedRun, review),
     ),
-  };
+  } satisfies Record<string, string>;
 }
 
 /** The two sentences of the contracts that name git as prose, not as a command a step runs: they stay git's. */
 const PROSE = /unless git ignores it|sandboxes keep git read-only/;
 
 /** The lines of `brief` that name git, but the contracts' prose (`PROSE`). */
-const gitLines = (brief: string): string[] => brief.split('\n').filter((line) => /\bgit\b/.test(line) && !PROSE.test(line));
+const gitLines = (brief: string) => brief.split('\n').filter((line) => /\bgit\b/.test(line) && !PROSE.test(line)) satisfies string[];
 
 /** The package's place, its words Mercurial's: what a place of another tool would say. */
-function hgPlace(): Place {
+function hgPlace() {
   const declared = builtinGitPlace.declared;
   const hg = (line: string) => line.replaceAll('git', 'hg');
   const say = Object.fromEntries(
@@ -152,7 +150,7 @@ function hgPlace(): Place {
         stage: 'hg -R {repo} merge {branches}',
       },
     },
-  };
+  } satisfies Place;
 }
 
 test("a repository run's briefs say what they said before the place gave their git words, line for line", () => {

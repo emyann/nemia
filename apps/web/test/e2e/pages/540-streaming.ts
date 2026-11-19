@@ -68,7 +68,7 @@ const beat = (f: ReturnType<typeof files>) =>
  * started and spawned on the engine's journal and feed, the job's run file, its stdout opened on a message, and the transcript holding
  * the prompt.
  */
-function written(f: ReturnType<typeof files>): void {
+function written(f: ReturnType<typeof files>) {
   const neighbour = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${NEIGHBOUR.id}.json`), 'utf8')) as Record<string, unknown>;
   const at = new Date().toISOString();
   const run = {

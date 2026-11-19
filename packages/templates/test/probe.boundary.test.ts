@@ -52,21 +52,14 @@ process.exitCode = Number(process.env.STUB_EXIT ?? 0);
 `;
 
 /** Run git in `dir`, as nobody in particular. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
 /** A place to probe from: a scratch repository on `branch`, a home, a store and a stub `claude` listing `rows`; trusted unless not. */
-function placed({ branch = 'wf/r-1/run', rows = [] as unknown[], trust = true } = {}): {
-  repo: string;
-  home: string;
-  probes: string;
-  log: string;
-  rowsFile: string;
-  bin: string;
-} {
+function placed({ branch = 'wf/r-1/run', rows = [] as unknown[], trust = true } = {}) {
   const repo = scratch('wf-probe-repo-');
   git(repo, 'init', '-q', '-b', branch);
   const home = scratch('wf-probe-home-');
@@ -82,7 +75,7 @@ function placed({ branch = 'wf/r-1/run', rows = [] as unknown[], trust = true } 
 }
 
 /** The environment a probe runs in at `at`, `more` over it. */
-const envAt = (at: ReturnType<typeof placed>, more: Record<string, string> = {}): NodeJS.ProcessEnv => ({
+const envAt = (at: ReturnType<typeof placed>, more: Record<string, string> = {}) => ({
   PATH: `${at.bin}${path.delimiter}${process.env.PATH ?? ''}`,
   HOME: at.home,
   WF_ROOT: path.join(at.home, 'store'),
@@ -92,18 +85,14 @@ const envAt = (at: ReturnType<typeof placed>, more: Record<string, string> = {})
 });
 
 /** Run the script at `at` with `args`, bounded; its exit, streams and the calls the stub `claude` was given. */
-function probe(
-  at: ReturnType<typeof placed>,
-  args: string[],
-  more: Record<string, string> = {},
-): { code: number | null; out: string; err: string; calls: Called[] } {
+function probe(at: ReturnType<typeof placed>, args: string[], more: Record<string, string> = {}) {
   const ran = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: at.repo, env: envAt(at, more), encoding: 'utf8', timeout: 60_000 });
   const lines = fs.existsSync(at.log) ? fs.readFileSync(at.log, 'utf8').split('\n').filter(Boolean) : [];
   return { code: ran.status, out: ran.stdout, err: ran.stderr, calls: lines.map((line) => JSON.parse(line) as Called) };
 }
 
 /** A listed background session, as `claude agents --all --json` gives one. */
-const row = (name: string, state: string, id = 'abcd1234'): Record<string, unknown> => ({
+const row = (name: string, state: string, id = 'abcd1234') => ({
   id,
   name,
   state,
@@ -256,7 +245,7 @@ test('REFUSED: the check with no run named, or a listing claude cannot give; no 
 });
 
 /** A scratch repository whose base commit holds `files`, one commit on: the repository and the base's commit. */
-function based(files: Record<string, string>): { repo: string; base: string } {
+function based(files: Record<string, string>) {
   const repo = scratch('wf-probe-check-');
   git(repo, 'init', '-q', '-b', 'wf/r-1/run');
   for (const [name, text] of Object.entries({ 'README.md': 'base\n', ...files })) {

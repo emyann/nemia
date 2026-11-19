@@ -16,7 +16,7 @@ import { listOfItems, workflow, workflowObject } from './library-fixtures.ts';
 import { decidable, step, transcript } from './run-fixtures.ts';
 
 /** Every request the test's `fetch` was asked, its url read against a stand-in origin, answered by `answer` as JSON. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown): URL[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown) {
   const asked: URL[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -27,7 +27,7 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies URL[];
 }
 
 /** A page of `items` of `kind` that says `next` is the page after it, where there is one. */

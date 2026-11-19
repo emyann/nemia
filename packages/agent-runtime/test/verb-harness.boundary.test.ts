@@ -7,16 +7,15 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { commandHarness, Engine, testOps, type EngineShape } from '../src/index.ts';
+import { commandHarness, Engine, testOps } from '../src/index.ts';
 import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 
 /** The engine of `layer`, run as a test runs the stand-in's. */
-const verbEngineOf = (layer: Parameters<typeof builtEngine>[0]): EngineShape => builtEngine(layer);
+const verbEngineOf = (layer: Parameters<typeof builtEngine>[0]) => builtEngine(layer);
 
 /** The tag a call failed with; one that succeeded fails the test. */
-const verbTagOf = async (asked: Effect.Effect<unknown, { _tag: string }>): Promise<string> =>
-  (await Effect.runPromise(Effect.flip(asked)))._tag;
+const verbTagOf = async (asked: Effect.Effect<unknown, { _tag: string }>) => (await Effect.runPromise(Effect.flip(asked)))._tag;
 
 test('a verb only some harnesses answer: unknown, undeclared and none refused in its own error, on the real engine', async () => {
   {

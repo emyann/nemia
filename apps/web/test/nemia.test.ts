@@ -19,22 +19,23 @@ import { clockWord } from '../src/lib/quota.ts';
 import { factoryWords, freshLevel, LEVELS, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../src/lib/nemia.ts';
 
 /** Where she is, as the api answers it: off, never set, unless `over` says otherwise. */
-const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
-  level: 'manual',
-  since: null,
-  task: null,
-  phase: null,
-  sessionId: null,
-  reach: [],
-  bridge: null,
-  stopped: false,
-  rests: true,
-  spend: null,
-  allows: [],
-  factories: [],
-  untrusted: null,
-  ...over,
-});
+const nemiaLevel = (over: Partial<NemiaLevel> = {}) =>
+  ({
+    level: 'manual',
+    since: null,
+    task: null,
+    phase: null,
+    sessionId: null,
+    reach: [],
+    bridge: null,
+    stopped: false,
+    rests: true,
+    spend: null,
+    allows: [],
+    factories: [],
+    untrusted: null,
+    ...over,
+  }) satisfies NemiaLevel;
 
 /** A factory at Manual by default, the store's, raised to Semi-auto until 18:00 UTC. */
 const raised: FactoryLevel = {

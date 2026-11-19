@@ -19,11 +19,11 @@ import { declaredAs } from '../src/objects/refused.ts';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 
 /** The status `objects`' class `tag` declares (`httpApiStatus`). */
-const declared = (tag: 'Missing' | 'Conflict' | 'Invalid' | 'Forbidden' | 'Unauthorized'): unknown =>
+const declared = (tag: 'Missing' | 'Conflict' | 'Invalid' | 'Forbidden' | 'Unauthorized') =>
   Schema.resolveAnnotations(objects[tag])?.httpApiStatus;
 
 /** A router that throws `thrown`, mounted on an app that answers with `answerError`, as app.ts mounts its routers and answers. */
-const answered = async (thrown: unknown): Promise<{ status: number; body: unknown }> => {
+const answered = async (thrown: unknown) => {
   const router = new Hono().get('/thrown', () => {
     throw thrown;
   });

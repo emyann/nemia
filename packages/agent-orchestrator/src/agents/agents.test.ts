@@ -40,7 +40,7 @@ import { writeWorkflow } from '../runner.ts';
 const ROOT = scratch('wf-agents-table-');
 
 /** A tree of files under a fresh directory, each written from `files` by its path from it; the directory. */
-function tree(files: Record<string, string>): string {
+function tree(files: Record<string, string>) {
   const dir = fs.mkdtempSync(path.join(ROOT, 'tree-'));
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
@@ -50,7 +50,7 @@ function tree(files: Record<string, string>): string {
 }
 
 /** What `fn` is refused with: a `WorkflowError`, exit 2, and its message. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {
@@ -65,19 +65,20 @@ function refusal(fn: () => unknown): string {
 type Refused = readonly [name: string, refused: () => unknown, ...facts: string[]];
 
 /** Each row of `all` a test of the describe it is called in, refused as `refusal` says and naming each of its facts. */
-function refusedRows(rows: readonly Refused[]): void {
+function refusedRows(rows: readonly Refused[]) {
   for (const [name, refused, ...facts] of rows) test(name, () => names(refusal(refused), ...facts));
 }
 
 /** Each row of `all` a test of the describe it is called in: its name, and what it asserts. */
-function rows(all: ReadonlyArray<readonly [string, () => void]>): void {
+function rows(all: ReadonlyArray<readonly [string, () => void]>) {
   for (const [name, body] of all) test(name, body);
 }
 
-const agent = (name: string, text: string, read?: (file: string) => string | undefined): Agent => parseAgent(name, text, read);
+const agent = (name: string, text: string, read?: (file: string) => string | undefined) => parseAgent(name, text, read) satisfies Agent;
 
 /** The agents a step may name, by name, each parsed from its file's text. */
-const agentsOf = (files: Record<string, string>): Agents => new Map(Object.entries(files).map(([name, text]) => [name, agent(name, text)]));
+const agentsOf = (files: Record<string, string>) =>
+  new Map(Object.entries(files).map(([name, text]) => [name, agent(name, text)])) satisfies Agents;
 
 const IMPLEMENTER =
   '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallowedTools: SendMessage\n---\nImplement what you are asked.\n';
@@ -87,7 +88,7 @@ const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
 
 /** A team of one step `build` naming `agent: builder` in `<dir>/workflows/team`, the agent and skills beside it as `files` gives them. */
-const team = (builder: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
+const team = (builder: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n") =>
   path.join(
     tree({ 'workflows/team/build.md': step.replace(/^---\n/, '---\nplace: git\n'), 'workflows/agents/builder.md': builder, ...files }),
     'workflows',
@@ -368,14 +369,17 @@ describe('REFUSED at shipped defaults: an agent file, one row per line it may no
         ['memory: 4Gi', "a step's own `memory:`"],
         ['isolation: worktree', '`workspace:`'],
       ] as const
-    ).map(([line, fix]): Refused => [
-      `Claude Code's own subagent key \`${line}\`, saying what does it in a run`,
-      () => agent('code-reviewer', `---\ndescription: Reviews.\n${line}\n---\nYou review.\n`),
-      'agents/code-reviewer.md',
-      `\`${line.split(':')[0]}\``,
-      "Claude Code's own subagent key",
-      fix,
-    ]),
+    ).map(
+      ([line, fix]) =>
+        [
+          `Claude Code's own subagent key \`${line}\`, saying what does it in a run`,
+          () => agent('code-reviewer', `---\ndescription: Reviews.\n${line}\n---\nYou review.\n`),
+          'agents/code-reviewer.md',
+          `\`${line.split(':')[0]}\``,
+          "Claude Code's own subagent key",
+          fix,
+        ] satisfies Refused,
+    ),
     [
       '`mcpServers:`, naming the `mcp:` line that does its work',
       () => agent('scout', '---\ndescription: Looks.\nmcpServers: github\n---\nYou look.\n'),
@@ -441,13 +445,16 @@ describe('REFUSED at shipped defaults: an agent file, one row per line it may no
       'both set',
       'one key',
     ],
-    ...['harnessPrompt: replace', 'systemPrompt: own'].map((line): Refused => [
-      `\`${line}\` with no instructions: a session with no prompt at all`,
-      () => agent('builder', `---\n${line}\n---\n`),
-      `\`${line}\``,
-      "in place of Claude Code's own prompt",
-      'this agent has none',
-    ]),
+    ...['harnessPrompt: replace', 'systemPrompt: own'].map(
+      (line) =>
+        [
+          `\`${line}\` with no instructions: a session with no prompt at all`,
+          () => agent('builder', `---\n${line}\n---\n`),
+          `\`${line}\``,
+          "in place of Claude Code's own prompt",
+          'this agent has none',
+        ] satisfies Refused,
+    ),
     [
       'F11: skills given with no `Skill` in its tools',
       () => agent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n'),
@@ -640,13 +647,13 @@ const hire = (name: string, step = 'implement') => ({ agent: name, factory: 'acm
 
 /** The scout, with `lines` in its frontmatter, and the step `look` naming it (or no agent) with `step` in its own. */
 const scoutWith = (lines: string) => agent('scout', `---\ndescription: Looks.\n${lines}---\nYou look.\n`);
-const lookOf = (named: Agent | undefined, lines = ''): StepSpec =>
+const lookOf = (named: Agent | undefined, lines = '') =>
   parseWorkflow(
     'look',
     `---\nplace: git\n${named ? `agent: ${named.name}\n` : ''}${lines}---\nLook.\n`,
     undefined,
     named && new Map([[named.name, named]]),
-  );
+  ) satisfies StepSpec;
 const filed = (step: StepSpec) =>
   filedConfig(
     step,
@@ -654,7 +661,7 @@ const filed = (step: StepSpec) =>
     { gates: [] },
     { model: undefined, budgetUsd: undefined, runArtifacts: '/runs/r/artifacts', inbox: '/inbox', own: {}, landingDenied: () => [] },
   );
-const fromRecord = (step: StepSpec): StepSpec => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
+const fromRecord = (step: StepSpec) => Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(step))) as StepSpec;
 
 describe("a step resolved with the agent it names: the agent's keys and words, the step's own winning and its own kept", () => {
   const agents = agentsOf({ implementer: IMPLEMENTER });
@@ -995,12 +1002,15 @@ describe('REFUSED at shipped defaults: a step and the agent it names, one row pe
         ),
       'are both set',
     ],
-    ...['permissionMode: read-only', 'sandbox: read-only'].map((line): Refused => [
-      `a fenced agent run on codex with a fence of its own, \`${line}\``,
-      () => parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, fenced),
-      'build: `harness: codex` runs its agent implementer on codex',
-      'agents/implementer.md fences it for claude',
-    ]),
+    ...['permissionMode: read-only', 'sandbox: read-only'].map(
+      (line) =>
+        [
+          `a fenced agent run on codex with a fence of its own, \`${line}\``,
+          () => parseWorkflow('build', `---\nplace: git\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, fenced),
+          'build: `harness: codex` runs its agent implementer on codex',
+          'agents/implementer.md fences it for claude',
+        ] satisfies Refused,
+    ),
     [
       "a codex agent's sandbox, which cannot be compared with the step's Claude Code mode",
       () => parseWorkflow('review', '---\nplace: git\nagent: reviewer\nharness: claude\npermissionMode: plan\n---\n', undefined, fenced),
@@ -1053,24 +1063,27 @@ describe('REFUSED at shipped defaults: a step and the agent it names, one row pe
       'a session the step starts',
       "`resume: plan` continues plan's",
     ],
-    ...['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'].flatMap((model): Refused[] => [
-      [
-        `F21: \`model: ${model}\` on an agent with no mode, filed in \`auto\`, which Claude Code drops`,
-        () => loadWorkflows(team(`---\nmodel: ${model}\n---\nYou build.\n`, {})),
-        'build: `agent: builder` names an agent',
-        'whose file is refused',
-        `agents/builder.md: \`model: ${model}\``,
-        'no `permissionMode:`',
-        "filed in `auto`, the runtime's default",
-        'Claude Code drops `auto` on that model',
-      ],
-      [
-        `F21: \`model: ${model}\` on a step that says \`permissionMode: auto\``,
-        () => loadWorkflows(team('---\n---\nx\n', {}, `---\nagent: builder\nmodel: ${model}\npermissionMode: auto\n---\n`)),
-        `build: \`model: ${model}\` says \`permissionMode: auto\``,
-        'Claude Code drops `auto`',
-      ],
-    ]),
+    ...['claude-haiku-4-5-20251001', 'claude-sonnet-4-5'].flatMap(
+      (model) =>
+        [
+          [
+            `F21: \`model: ${model}\` on an agent with no mode, filed in \`auto\`, which Claude Code drops`,
+            () => loadWorkflows(team(`---\nmodel: ${model}\n---\nYou build.\n`, {})),
+            'build: `agent: builder` names an agent',
+            'whose file is refused',
+            `agents/builder.md: \`model: ${model}\``,
+            'no `permissionMode:`',
+            "filed in `auto`, the runtime's default",
+            'Claude Code drops `auto` on that model',
+          ],
+          [
+            `F21: \`model: ${model}\` on a step that says \`permissionMode: auto\``,
+            () => loadWorkflows(team('---\n---\nx\n', {}, `---\nagent: builder\nmodel: ${model}\npermissionMode: auto\n---\n`)),
+            `build: \`model: ${model}\` says \`permissionMode: auto\``,
+            'Claude Code drops `auto`',
+          ],
+        ] satisfies Refused[],
+    ),
     [
       "a step's mcp: line with an empty name, under the step's name",
       () => lookOf(scoutWith(''), 'mcp: a,, b\n'),
@@ -1140,7 +1153,7 @@ describe('REFUSED at shipped defaults: a step and the agent it names, one row pe
 });
 
 describe('the folder of agents: beside the workflows, read whole, a broken one refused only where a step names it', () => {
-  const workflows = (files: Record<string, string>): string => tree(files);
+  const workflows = (files: Record<string, string>) => tree(files);
   rows([
     [
       "loadAgents reads every agent in the folder, and keeps a broken one's refusal for the step that names it",
@@ -1408,7 +1421,9 @@ describe("skillEntryOf: a skill's card entry read off its SKILL.md's keys as YAM
     ['description: d\ntags: ["", "x"]', 'is not a list of words'],
   ];
   refusedRows([
-    ...cases.map(([front, why]): Refused => [`REFUSED: ${JSON.stringify(front)}`, () => entry(front), 'skills/a-skill/SKILL.md', why]),
+    ...cases.map(
+      ([front, why]) => [`REFUSED: ${JSON.stringify(front)}`, () => entry(front), 'skills/a-skill/SKILL.md', why] satisfies Refused,
+    ),
     [
       'REFUSED: no frontmatter at all',
       () => skillEntryOf('skills/a-skill/SKILL.md', 'a-skill', 'No frontmatter.\n'),
@@ -1452,7 +1467,7 @@ const SCRIBE =
  * reads and one it does not (`preload`); `file-it` a frontmatter `name`, no title, no tags, no examples; `just-an-id` neither, named by its
  * folder as Claude Code names it.
  */
-function composed(): { root: string; found: ReturnType<typeof skillsFor>; scribe: Agent } {
+function composed() {
   const root = path.join(tree({}), 'workflows');
   const skill = (id: string, text: string) => {
     fs.mkdirSync(path.join(root, 'skills', id), { recursive: true });
@@ -1480,7 +1495,11 @@ function composed(): { root: string; found: ReturnType<typeof skillsFor>; scribe
     '---\nname: File it away\ndescription: File a finished note where the team reads it. # not part of it\n---\nHow to file.\n',
   );
   skill('just-an-id', '---\ndescription: Say nothing but the id.\n---\n');
-  return { root, found: skillsFor(path.join(root, '_')), scribe: parseAgent('scribe', SCRIBE, () => undefined) };
+  return { root, found: skillsFor(path.join(root, '_')), scribe: parseAgent('scribe', SCRIBE, () => undefined) } satisfies {
+    root: string;
+    found: ReturnType<typeof skillsFor>;
+    scribe: Agent;
+  };
 }
 
 describe("agentCard: what an agent says it can do, in A2A's shape — not an Agent Card, the omission pinned", () => {

@@ -44,7 +44,7 @@ const write = (file: string, text: string) => {
 };
 
 /** A repository with a file on `main`. Its base's sha. */
-function aRepo(): { repo: string; base: string } {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   write(path.join(repo, 'README.md'), '# app\n');

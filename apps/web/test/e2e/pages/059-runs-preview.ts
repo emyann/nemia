@@ -21,16 +21,16 @@ const LAPTOP = { width: 1280, height: 800 };
 const MEDIUM = { width: 1000, height: 800 };
 
 /** Every rail on the page, in flight and in the waiting cards, as the group its bars stand in. */
-const railsOf = (page: Page): Locator =>
+const railsOf = (page: Page) =>
   page
     .locator(`${FLIGHT} [data-run-steps], section[data-section="waiting"] [data-run-steps]`)
-    .filter({ has: page.locator('button[data-step-bar][data-step-preview="card"]') });
+    .filter({ has: page.locator('button[data-step-bar][data-step-preview="card"]') }) satisfies Locator;
 
 /**
  * What the one open card shows, read beside `rail`: its action inside the window and inside the preview's box, how far the box is
  * scrolled, whether the box stands inside the window across, and the bars of the rail whose centre the box stands over.
  */
-const seenBy = (rail: Locator): Promise<Record<string, unknown> & { covered: string[] }> =>
+const seenBy = (rail: Locator) =>
   rail.evaluate((found) => {
     const box = document.querySelector('[data-slot="preview-card"]')!;
     const action = box.querySelector('[data-step-action]')!.getBoundingClientRect();
@@ -47,7 +47,7 @@ const seenBy = (rail: Locator): Promise<Record<string, unknown> & { covered: str
       across: own.left >= 0 && own.right <= innerWidth,
       covered,
     };
-  });
+  }) satisfies Promise<Record<string, unknown> & { covered: string[] }>;
 
 /**
  * Brings `rail` to the window's `edge`, puts the pointer just before its first bar, crossing no other card's parts on its way, then
@@ -55,7 +55,7 @@ const seenBy = (rail: Locator): Promise<Record<string, unknown> & { covered: str
  * bar of the rail and inside the window across; where `unscrolled`, its action shows whole inside the window and the preview, the
  * preview unscrolled. Refuses the first bar that does not, naming the window.
  */
-async function slideAlong(page: Page, rail: Locator, bars: Locator[], edge: 'center' | 'end', unscrolled: boolean): Promise<void> {
+async function slideAlong(page: Page, rail: Locator, bars: Locator[], edge: 'center' | 'end', unscrolled: boolean) {
   const where = JSON.stringify(page.viewportSize());
   await rail.evaluate((found, block) => found.scrollIntoView({ block }), edge);
   await page.mouse.move(0, 0);
@@ -85,7 +85,7 @@ async function slideAlong(page: Page, rail: Locator, bars: Locator[], edge: 'cen
  * rail at the window's foot; in a medium window, each rail at the centre, every card stands clear of its rail and inside the window
  * across. The window is put back after.
  */
-async function alongEachRail(page: Page): Promise<void> {
+async function alongEachRail(page: Page) {
   const size = page.viewportSize() ?? LAPTOP;
   try {
     for (const [sized, unscrolled] of [
@@ -113,7 +113,7 @@ async function alongEachRail(page: Page): Promise<void> {
 const PHONE = { width: 390, height: 844 };
 
 /** What the api answers at `url`, read in the page as the board reads it. */
-async function answer<T>(page: Page, url: string): Promise<T> {
+async function answer<T>(page: Page, url: string) {
   const text = await page.evaluate(async (at) => (await fetch(at)).text(), url);
   try {
     return JSON.parse(text) as T;
@@ -123,7 +123,7 @@ async function answer<T>(page: Page, url: string): Promise<T> {
 }
 
 /** A bar of the table in flight to open, the first of a step an agent works where the seed names one, and its run. */
-async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: string }> {
+async function aBar(page: Page) {
   const bars = await page
     .locator(`${FLIGHT} tr[data-run] [data-step-bar]`)
     .evaluateAll((found) =>
@@ -136,14 +136,18 @@ async function aBar(page: Page): Promise<{ bar: Locator; run: string; step: stri
     return listed !== undefined && agentOf(listed) !== null;
   });
   const { run, step } = worked ?? bars[0];
-  return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step };
+  return { bar: page.locator(`${FLIGHT} tr[data-run="${run}"] [data-step-bar="${step}"]`), run, step } satisfies {
+    bar: Locator;
+    run: string;
+    step: string;
+  };
 }
 
 /**
  * The card the board's rule gives for the step, from the api's own answers: the run's object, its lines and each of its steps' tries and
  * told, composed as the board composes them (`runDetailOf`): a step the api has none of reads as none, as the board's reads do.
  */
-async function expected(page: Page, run: string, step: string): Promise<StepCardFacts> {
+async function expected(page: Page, run: string, step: string) {
   const at = `/api/runs/${encodeURIComponent(run)}`;
   const [runs, object, lines, agents] = await Promise.all([
     rowsAnswered(page),
@@ -169,7 +173,7 @@ async function expected(page: Page, run: string, step: string): Promise<StepCard
 }
 
 /** That `card` says the agent, the time box's label, the five facts and the action the rule gives. */
-async function readsAsExpected(card: Locator, want: StepCardFacts, where: string): Promise<void> {
+async function readsAsExpected(card: Locator, want: StepCardFacts, where: string) {
   await expectNone(async () => {
     const got = {
       agent: await card.locator('[data-step-agent]').textContent(),
@@ -188,16 +192,16 @@ async function readsAsExpected(card: Locator, want: StepCardFacts, where: string
 }
 
 /** The preview's card, open beside its bar. */
-const previewOf = (page: Page): Locator => page.locator('[data-slot="preview-card"] [data-step-card]');
+const previewOf = (page: Page) => page.locator('[data-slot="preview-card"] [data-step-card]') satisfies Locator;
 
 /** Whether `bar` holds the focus. */
-const focusedOn = (bar: Locator): Promise<boolean> => bar.evaluate((found) => found === document.activeElement);
+const focusedOn = (bar: Locator) => bar.evaluate((found) => found === document.activeElement) satisfies Promise<boolean>;
 
 /**
  * That `press` on the card's action opens the step's page, which is left once its session's stream is open, every read before it
  * answered, for the runs page again.
  */
-async function followed(page: Page, run: string, step: string, press: () => Promise<void>): Promise<void> {
+async function followed(page: Page, run: string, step: string, press: () => Promise<void>) {
   const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
   await press();
   const at = `/runs/${encodeURIComponent(run)}/steps/${encodeURIComponent(step)}`;
@@ -212,7 +216,7 @@ async function followed(page: Page, run: string, step: string, press: () => Prom
  * the bar; the card opens, reading what the api says of the step; Tab moves into it, to its action, and Enter on the action opens
  * the step's page. Escape on the bar closes it.
  */
-async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts): Promise<void> {
+async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts) {
   const reach = async () => {
     await page.locator(`${FLIGHT} tr[data-run="${run}"]`).focus();
     for (let at = 0; at < 12 && !(await focusedOn(bar)); at += 1) await page.keyboard.press('ArrowRight');
@@ -234,7 +238,7 @@ async function byTheKeyboard(page: Page, bar: Locator, run: string, step: string
 }
 
 /** By the pointer: hovering the bar opens the card, which stays while the pointer moves onto it, and its action opens the step's page. */
-async function byThePointer(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts): Promise<void> {
+async function byThePointer(page: Page, bar: Locator, run: string, step: string, want: StepCardFacts) {
   await page.mouse.move(0, 0);
   await bar.hover();
   await expectVisible(previewOf(page), 'a bar the pointer rests on opens its step card');
@@ -258,7 +262,7 @@ const GLOW_REACH = 10;
  * That the open preview's frame stands inset in the preview's box by the glow's reach on every side, measured along the box's own
  * scroll: the box clips what passes its edge, so a frame that fills it loses its glow.
  */
-async function glowHasRoom(page: Page, what: string): Promise<void> {
+async function glowHasRoom(page: Page, what: string) {
   const insets = await page.locator('[data-slot="preview-card"]').evaluate((box) => {
     const frame = box.querySelector('[data-cut-frame]')!.getBoundingClientRect();
     const outer = box.getBoundingClientRect();
@@ -273,7 +277,7 @@ async function glowHasRoom(page: Page, what: string): Promise<void> {
 }
 
 /** At a gate: a waiting card's bar that waits on you opens its card in the frame that glows, the glow drawn whole. */
-async function aGateGlows(page: Page): Promise<void> {
+async function aGateGlows(page: Page) {
   await page.mouse.move(0, 0);
   const bar = page.locator('section[data-section="waiting"] [data-step-bar][data-step-preview="card"][aria-label$="waits on you"]').first();
   await bar.hover();
@@ -292,7 +296,7 @@ const SHORT = { width: 1280, height: 420 };
  * In a window too short for the card on either side of its bar: the card stays inside the window and scrolls within itself, so its
  * action is brought into view with the preview still open.
  */
-async function inAShortWindow(page: Page, bar: Locator): Promise<void> {
+async function inAShortWindow(page: Page, bar: Locator) {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize(SHORT);
   try {
@@ -327,7 +331,7 @@ async function inAShortWindow(page: Page, bar: Locator): Promise<void> {
 }
 
 /** The page with the card open, in the page's theme. */
-async function photographCard(page: Page, what: string): Promise<void> {
+async function photographCard(page: Page, what: string) {
   await photograph(page, path.join(OUT, `runs-preview-${what}-${await themeOf(page)}.png`));
 }
 
@@ -335,7 +339,7 @@ async function photographCard(page: Page, what: string): Promise<void> {
  * On a phone's window: a press on a waiting card's bar opens the same card in a modal sheet named by the bar, and the scrim closes it,
  * focus back on the bar.
  */
-async function onAPhone(page: Page): Promise<void> {
+async function onAPhone(page: Page) {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.setViewportSize(PHONE);
   try {
@@ -360,7 +364,7 @@ async function onAPhone(page: Page): Promise<void> {
 }
 
 /** The breakdown a Clock cell's preview opens, wherever on the page it stands. */
-const breakdownOf = (page: Page): Locator => page.locator('[data-slot="tooltip"] [data-breakdown]');
+const breakdownOf = (page: Page) => page.locator('[data-slot="tooltip"] [data-breakdown]') satisfies Locator;
 
 /**
  * The Clock cell's own preview, beside the rail's: on a resting pointer and on focus it opens the breakdown, Escape and the focus
@@ -368,7 +372,7 @@ const breakdownOf = (page: Page): Locator => page.locator('[data-slot="tooltip"]
  * breakdown gone. Read in a laptop's window and at a phone's, where the rail's bars open a sheet instead and the clock's preview is
  * the same.
  */
-async function theClockPreview(page: Page): Promise<void> {
+async function theClockPreview(page: Page) {
   const size = page.viewportSize() ?? LAPTOP;
   const first = page.locator(`${FLIGHT} tr[data-run]`).first();
   const clock = first.locator('td[data-clock] button');

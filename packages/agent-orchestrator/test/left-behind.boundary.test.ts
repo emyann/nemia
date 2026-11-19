@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { Logger, Effect, References } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
@@ -38,20 +38,21 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const GRACE = '100 millis';
 
 /** A run id of this test alone. */
-const runId = (name: string): string => `${name}-${randomUUID().slice(0, 8)}`;
+const runId = (name: string) => `${name}-${randomUUID().slice(0, 8)}`;
 
 /** A run a pass answered, as far as the sweep reads it: its id, its status, and whether the pass found it at rest. */
-const answered = (id: string, status: Answered['status'], atRest: boolean): Answered => ({
-  run: { id, steps: {} } as never,
-  status,
-  feed: atRest ? { atRest: true } : {},
-});
+const answered = (id: string, status: Answered['status'], atRest: boolean) =>
+  ({
+    run: { id, steps: {} } as never,
+    status,
+    feed: atRest ? { atRest: true } : {},
+  }) satisfies Answered;
 
 /**
  * A detached `node` that ignores SIGTERM, working in `cwd` with the variables `marks` (and none of the run's that the test process
  * carries), ended by its pid when the test ends. Answers once it has taken its SIGTERM handler, so a SIGTERM that ends it is a bug.
  */
-async function leftChild(t: TestContext, cwd: string, marks: Record<string, string>): Promise<ChildProcess> {
+async function leftChild(t: TestContext, cwd: string, marks: Record<string, string>) {
   const env: Record<string, string | undefined> = {
     ...process.env,
     WF_RUN: undefined,
@@ -73,7 +74,7 @@ async function leftChild(t: TestContext, cwd: string, marks: Record<string, stri
 }
 
 /** Whether `pid` runs no more: gone from `/proc`, or a zombie left for its parent to reap. */
-const ended = (pid: number): boolean => {
+const ended = (pid: number) => {
   try {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
     return stat.slice(stat.lastIndexOf(')') + 2).startsWith('Z');

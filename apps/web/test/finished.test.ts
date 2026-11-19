@@ -33,12 +33,12 @@ const answer = (next: string | null = 'f.next') =>
   });
 
 /** The board's read of a page of the finished runs from the token `from`, the api answering `value`. */
-async function read(value: unknown, older: string[] = []): Promise<FinishedPage> {
+async function read(value: unknown, older: string[] = []) {
   const before = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedRunsQuery(undefined, older));
+    return (await client.fetchQuery(finishedRunsQuery(undefined, older))) satisfies FinishedPage;
   } finally {
     client.clear();
     globalThis.fetch = before;

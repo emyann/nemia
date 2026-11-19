@@ -27,7 +27,7 @@ const [S, M] = [1_000, 60_000];
 const spent = (usd: number) => ({ usd, measured: 1, unmeasured: 0, said: `$${usd.toFixed(2)}` });
 
 /** A run at its last gate, as the api answers it: a clock whose five parts add up, a cost beyond its steps', tokens beyond their kinds. */
-const answered = (): WaitingRun =>
+const answered = () =>
   waitingRun(
     summary(
       [
@@ -68,7 +68,7 @@ const answered = (): WaitingRun =>
         { step: 'land', cost: null },
       ],
     },
-  );
+  ) satisfies WaitingRun;
 
 const AS_OF = '2026-10-12T12:00:00.000Z';
 
@@ -76,7 +76,7 @@ const AS_OF = '2026-10-12T12:00:00.000Z';
  * `run` as the board reads it: its object, with its frame's parts, in the RunList of the runs not finished, made the frame's waiting row
  * again (`openOf`); the run at its last gate where none is given.
  */
-async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
+async function decoded(run: WaitingRun = answered()) {
   const before = globalThis.fetch;
   const { wallMs, clock, stepCosts, waitingSince, cost, tokens, waitingOnYou, waitingOnYouWords } = run;
   const steps = run.steps.map((own) => step({ ...own, timeline: [] }));
@@ -106,14 +106,14 @@ async function decoded(run: WaitingRun = answered()): Promise<WaitingRun> {
   }
 }
 
-const sum = (breakdown: Breakdown): number => breakdown.rows.reduce((total, row) => total + row.amount, 0);
-const whats = (breakdown: Breakdown): string[] => breakdown.rows.map((row) => row.what);
+const sum = (breakdown: Breakdown) => breakdown.rows.reduce((total, row) => total + row.amount, 0);
+const whats = (breakdown: Breakdown) => breakdown.rows.map((row) => row.what) satisfies string[];
 
 /** The whole minutes a clock's row says, none for `none` and `under 1m`. */
-const minutesOf = (said: string): number => (/^\d+m$/.test(said) ? Number(said.slice(0, -1)) : 0);
+const minutesOf = (said: string) => (/^\d+m$/.test(said) ? Number(said.slice(0, -1)) : 0);
 
 /** The cents a cost's row says, none for a step with none. */
-const centsOf = (said: string): number => (said.startsWith('$') ? Math.round(Number(said.slice(1)) * 100) : 0);
+const centsOf = (said: string) => (said.startsWith('$') ? Math.round(Number(said.slice(1)) * 100) : 0);
 
 describe('clockBreakdown, costBreakdown, tokensBreakdown: each breakdown adds up to its tile, its rest and rounding said', () => {
   test('REFUSED: a breakdown that does not add up to its tile: the clock, the cost and the tokens, each with its last line for the rest', async () => {

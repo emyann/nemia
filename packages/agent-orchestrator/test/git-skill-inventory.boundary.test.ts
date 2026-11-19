@@ -27,11 +27,11 @@ const ENV: NodeJS.ProcessEnv = {
 };
 
 /** Git in `dir`, its stdout trimmed. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A new repository on `main` with one commit of `f`, its path resolved, as git names its worktrees. */
-function repository(): string {
+function repository() {
   const dir = fs.realpathSync(scratch('wf-git-inventory-'));
   git(dir, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(dir, 'f'), 'base\n');
@@ -41,16 +41,16 @@ function repository(): string {
 }
 
 /** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
-const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> => gitPlace({ env: ENV }).askNow(verb, request as never);
+const run = <V extends PlaceVerb>(verb: V, request: object) => gitPlace({ env: ENV }).askNow(verb, request as never);
 
 /** The answer of an outcome, or a failure naming what it was instead. */
-function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
+function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
   assert.ok('answer' in outcome, `an answer expected, got ${JSON.stringify(outcome)}`);
   return outcome.answer;
 }
 
 /** The words of an unread outcome, or a failure naming what it was instead. */
-function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
+function unreadOf(outcome: PlaceOutcome<PlaceVerb>) {
   assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
   return outcome.unread.said;
 }

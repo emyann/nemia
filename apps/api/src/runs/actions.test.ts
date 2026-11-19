@@ -128,19 +128,19 @@ async function asTyped(name: string, argv: string[]) {
 }
 
 /** Every file under a run's asks directory, waiting or consumed. */
-const asked = (run: string): string[] => {
+const asked = (run: string) => {
   const dir = path.join(root, 'runs', `${run}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
 
 /** A file the run wrote, its words but when and who wrote it (`actorIn`). */
-const written = (file: string): unknown => {
+const written = (file: string) => {
   const { at: _when, actor: _who, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   return rest;
 };
 
 /** Who a file the run wrote says wrote it: the caller over the api, none for a verb run in-process. */
-const actorIn = (file: string): unknown => (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>).actor;
+const actorIn = (file: string) => (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>).actor;
 
 /** A removal on the board, as its run page sends it. */
 const remove = (id: string) => app.request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers: BOARD, body: '{}' });
@@ -161,7 +161,7 @@ function aGitRepo(repo: string) {
 }
 
 /** A try of one step, `implement`, signed off and handed off, on `repo`: with its clean worktree on its branch when `repo` is git's. */
-function aGitTry(id: string, repo: string, git?: ReturnType<typeof aGitRepo>): string {
+function aGitTry(id: string, repo: string, git?: ReturnType<typeof aGitRepo>) {
   const worktree = path.join(root, 'worktrees', id, 'implement');
   if (git) git('worktree', 'add', '-q', '-b', `wf/${id}/implement`, worktree);
   signedOff(`${id}-implement`, DONE);

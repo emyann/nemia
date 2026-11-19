@@ -10,7 +10,7 @@ import type { StoriesTouched } from '../../../contracts/touched-stories.contract
  * `src/components`, never a story itself and never the vendored `ui/` (shadcn's and the ds kit's) and `ai-elements/`.
  * @param file The path from the workspace root.
  */
-export const owesAStory = (file: string): boolean =>
+export const owesAStory = (file: string) =>
   /^apps\/web\/src\/components\/.+\.tsx$/.test(file) &&
   !file.endsWith('.stories.tsx') &&
   !/^apps\/web\/src\/components\/(ui|ai-elements)\//.test(file);

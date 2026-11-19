@@ -11,7 +11,7 @@ import { authOf, MISSING_QUOTE, shownUrl } from './remote-client.ts';
 const flood = 'k'.repeat(10_000);
 
 /** A card that asks for a bearer token under the scheme `name`. */
-const cardAsking = (name: string): AgentCard =>
+const cardAsking = (name: string) =>
   AgentCard.fromJSON({
     supportedInterfaces: [{ url: 'https://a.example/a2a', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }],
     securitySchemes: { [name]: { httpAuthSecurityScheme: { scheme: 'Bearer' } } },

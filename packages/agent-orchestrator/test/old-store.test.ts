@@ -49,7 +49,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 
 /** The fixture copied into the scratch store, its placeholders made this store's: the fixture itself is never written. */
-const copied = (base: string): void => {
+const copied = (base: string) => {
   for (const entry of fs.readdirSync(FIXTURE, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const from = path.join(entry.parentPath, entry.name);
@@ -60,14 +60,14 @@ const copied = (base: string): void => {
 };
 
 /** A record as it stands on disk. */
-const written = (id: string): Record<string, unknown> & { workflow: Array<Record<string, unknown>> } =>
-  JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8'));
+const written = (id: string) =>
+  JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown> & { workflow: Array<Record<string, unknown>> };
 
 /** Whether `object` holds any of `keys` as its own. */
-const holdsAny = (object: unknown, ...keys: string[]): boolean => keys.some((key) => Object.hasOwn(object as object, key));
+const holdsAny = (object: unknown, ...keys: string[]) => keys.some((key) => Object.hasOwn(object as object, key));
 
 /** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
-const listed = async (): Promise<RunsListed> => {
+const listed = async () => {
   const error = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     return (await stage.main(['ls'])) as RunsListed;

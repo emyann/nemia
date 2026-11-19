@@ -23,7 +23,7 @@ import { Effect } from 'effect';
 import type { Card, CardList } from 'objects';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
-const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Effect.runSync(Effect.provideService(program, StoreRoot, root));
 /**
  * The scratch repository, and `desk`, the factory filed on it: a card in `default` is started there by `?factory=desk`, and a run from a
  * brief there by `?repo=`, which finds `desk`, the one factory that holds it (`startCard`). The default factory reads no repository.
@@ -32,22 +32,20 @@ const repo = scratch('nemia-api-inbox-repo-');
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
-/** A card filed, as a test reads the Card the create answers: its name, its file, the keys it writes, and its body. */
-type Filed = { name: string; file: string; workflow: string | null; repo: string | null; factory: string | null; body: string };
 /** What POST /api/runs answers a card it started (201): the run and the card, which stays in the inbox. */
 type CardStarted = { id: string; card: string; ignoredRepo?: string; run?: { from?: string; steps: { name: string }[] } };
 type Refused = { error: string };
 
 /** Rows ordered by their first cell, a card's name. */
-const byName = (a: unknown[], b: unknown[]): number => String(a[0]).localeCompare(String(b[0]));
+const byName = (a: unknown[], b: unknown[]) => String(a[0]).localeCompare(String(b[0]));
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A record of a run started from `card`, as `nemia start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
-const startedFrom = (id: string, card: string): string =>
+const startedFrom = (id: string, card: string) =>
   JSON.stringify({
     id,
     place: { kind: 'folder' },
@@ -72,16 +70,15 @@ attachWorkflow({ factory: 'desk', workflow: 'dev' });
 hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
-const cards = (): string[] => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
-const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const cards = () => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
+const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
 const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** The factory a card's namespace names: none for `default`. */
-const factoryOf = (c: Card): string | null =>
-  c.metadata.namespace === undefined || c.metadata.namespace === 'default' ? null : c.metadata.namespace;
+const factoryOf = (c: Card) => (c.metadata.namespace === undefined || c.metadata.namespace === 'default' ? null : c.metadata.namespace);
 
 /** The namespace a filing is sent to: the factory it names, where it names one by text, else `default`. */
-const namespaceOf = (body: unknown): string =>
+const namespaceOf = (body: unknown) =>
   typeof body === 'object' && body !== null && 'factory' in body && typeof body.factory === 'string' && body.factory !== 'default'
     ? body.factory
     : 'default';
@@ -94,7 +91,7 @@ const file = (body: unknown, headers: Record<string, string> = JSON_TYPE) =>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 /** The Card a create answered, as a test reads it (`Filed`). */
-const filedFrom = async (res: Response): Promise<Filed> => {
+const filedFrom = async (res: Response) => {
   const c = (await res.json()) as Card;
   return {
     name: c.metadata.name,
@@ -137,26 +134,25 @@ const entryOf = (c: Card) => ({
   filedAt: c.metadata.creationTimestamp,
   labels: c.metadata.labels ?? {},
 });
-type Entry = ReturnType<typeof entryOf>;
-const listed = async (address = '/api/cards'): Promise<Entry[]> => {
+const listed = async (address = '/api/cards') => {
   const res = await app.request(address);
   assert.equal(res.status, 200, `${address}: ${await res.clone().text()}`);
   return ((await res.json()) as CardList).items.map(entryOf);
 };
 
 /** Every card and record gone, so each test starts from an empty inbox and store. */
-const clear = (): void => {
+const clear = () => {
   fs.rmSync(inbox, { recursive: true, force: true });
   fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
 };
 
 /** The inbox folder as it is: each file's name and text, to show a read wrote nothing. */
-const inboxFiles = (): Array<[string, string]> => cards().map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
+const inboxFiles = () => cards().map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
 /** One card read by its name in whichever factory holds it (`GET /api/cards/:name`): the Card with its file as written. */
 const cardPage = (name: string) => app.request(`/api/cards/${name}`);
 
 /** What the package refuses `text`, `workflow` and `repo` with, filed by its own function. */
-const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }): string => {
+const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }) => {
   try {
     onStore(addToInbox(opts));
   } catch (err) {
@@ -170,7 +166,7 @@ const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }
  * A factory of its own on the folder `about`, with a `dev` of its own attached, its step naming its agent: a card filed in it starts on
  * `about`, its one repository, whatever the card says. Its name, for the test to file its cards in and remove it after.
  */
-const onFolder = (about: string): string => {
+const onFolder = (about: string) => {
   const name = `on-${path
     .basename(about)
     .toLowerCase()
@@ -294,7 +290,7 @@ test('POST /api/runs with `card` of a card already started is refused, 409, nami
 });
 
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */
-const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}): Promise<string> => {
+const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}) => {
   try {
     await runWith(engine(process.env), startFromInbox({ name, callerRepo: repo, workflow: 'dev', ...extra }));
   } catch (err) {
@@ -959,7 +955,7 @@ describe("a card's labels: filed with them, listed with them, selected by them w
  * `dev` attached — a `dev` neither its repository nor yours has. Filed for one test and taken off after it, so the other tests read the
  * store's factories as they file them.
  */
-const acmeFactory = (): { dev: string; repo: string; gone: () => void } => {
+const acmeFactory = () => {
   const repo = scratch('nemia-api-inbox-acme-');
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -971,7 +967,7 @@ const acmeFactory = (): { dev: string; repo: string; gone: () => void } => {
     JSON.stringify({ volumes: [{ path: repo, readOnly: false }], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
-  const gone = (): void => {
+  const gone = () => {
     fs.rmSync(path.join(root, 'factories', 'acme.json'), { force: true });
     fs.rmSync(path.join(root, 'factories', 'acme'), { recursive: true, force: true });
   };

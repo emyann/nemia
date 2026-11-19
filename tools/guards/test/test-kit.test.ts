@@ -29,12 +29,12 @@ const KIT = 'tools/test-kit';
 const SHIPPED = ['src', 'bin', 'place', 'contracts'];
 
 /** A test file: beside the code, or anything under a workspace's `test/`. */
-const isTest = (file: string, workspace: string): boolean => /\.test\.tsx?$/.test(file) || file.startsWith(`${workspace}/test/`);
+const isTest = (file: string, workspace: string) => /\.test\.tsx?$/.test(file) || file.startsWith(`${workspace}/test/`);
 
 const CODE = /\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/;
 
 /** Every file under `dir` of the root whose name `wanted` accepts, by path from the root; a `node_modules` is never entered. */
-const under = (dir: string, wanted: (file: string) => boolean): string[] => {
+const under = (dir: string, wanted: (file: string) => boolean) => {
   const at = path.join(REPO, dir);
   if (!fs.existsSync(at)) return [];
   return fs
@@ -44,10 +44,10 @@ const under = (dir: string, wanted: (file: string) => boolean): string[] => {
 };
 
 /** Whether a module names the kit. */
-const isKit = (spec: string): boolean => spec === 'test-kit' || spec.startsWith('test-kit/');
+const isKit = (spec: string) => spec === 'test-kit' || spec.startsWith('test-kit/');
 
 /** Where `file`, a shipped file of `workspace` that is no test, imports the kit. */
-const shippedKitImports = (file: string, workspace: string, text: string): string[] =>
+const shippedKitImports = (file: string, workspace: string, text: string) =>
   isTest(file, workspace)
     ? []
     : specifiersIn(withoutComments(text))
@@ -55,7 +55,7 @@ const shippedKitImports = (file: string, workspace: string, text: string): strin
         .map((spec) => `${file} imports ${spec}: only a test takes the test kit — what ships carries no test code`);
 
 /** Where `file`, a test of `workspace`, imports a file of another workspace's `test/`, each by its path from the root. */
-const crossTestImports = (file: string, workspace: string, text: string, all: readonly string[]): string[] =>
+const crossTestImports = (file: string, workspace: string, text: string, all: readonly string[]) =>
   specifiersIn(withoutComments(text)).flatMap((spec) => {
     const target = resolved(file, spec);
     const other = target === undefined ? undefined : all.find((ws) => ws !== workspace && target.startsWith(`${ws}/test/`));
@@ -65,7 +65,7 @@ const crossTestImports = (file: string, workspace: string, text: string, all: re
   });
 
 /** Where a file of the kit imports anything but a node built-in, TypeScript, Vitest, its own files or its own entries. */
-const kitReaches = (file: string, text: string): string[] =>
+const kitReaches = (file: string, text: string) =>
   specifiersIn(withoutComments(text))
     .filter(
       (spec) =>
@@ -79,7 +79,7 @@ const kitReaches = (file: string, text: string): string[] =>
     .map((spec) => `${file} imports ${spec}: the test kit imports only node: built-ins, typescript and vitest, so every layer may use it`);
 
 /** Where a workspace's `package.json` lists the kit under its `dependencies`, which ship. */
-const kitDependencies = (manifest: string, text: string): string[] => {
+const kitDependencies = (manifest: string, text: string) => {
   const { dependencies = {} } = JSON.parse(text) as { dependencies?: Record<string, string> };
   return 'test-kit' in dependencies
     ? [`${manifest} lists test-kit under dependencies: move it to devDependencies, which a package's installs leave out`]
@@ -87,7 +87,7 @@ const kitDependencies = (manifest: string, text: string): string[] => {
 };
 
 /** Each line of `text` that calls the temp directory by name, or makes a root with `mkdtempSync` in `machineTempDir()`. */
-const tmpdirCalls = (text: string): string[] =>
+const tmpdirCalls = (text: string) =>
   text
     .split('\n')
     .flatMap((line, i) => (/\btmpdir\s*\(|\bmkdtemp\w*\s*\(.*\bmachineTempDir\s*\(/.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
@@ -107,15 +107,15 @@ const ROOTS_BY_HAND = [
 ];
 
 /** The workspaces whose code and tests the sweeps read: every one the root names but the kit itself. */
-const swept = (): string[] => workspaces().filter((ws) => ws !== KIT);
+const swept = () => workspaces().filter((ws) => ws !== KIT);
 
 /** Each workspace's test files: under its `test/`, and beside its code. */
-const testFilesOf = (workspace: string): string[] => [
+const testFilesOf = (workspace: string) => [
   ...under(`${workspace}/test`, (f) => /\.tsx?$/.test(f)),
   ...SHIPPED.flatMap((dir) => under(`${workspace}/${dir}`, (f) => /\.test\.tsx?$/.test(f))),
 ];
 
-const read = (file: string): string => fs.readFileSync(path.join(REPO, file), 'utf8');
+const read = (file: string) => fs.readFileSync(path.join(REPO, file), 'utf8');
 
 /** The test kit's entry, spelled in parts so no sweep reads this file's plants as its own imports. */
 const ENTRY = ['test', 'kit/scratch'].join('-');

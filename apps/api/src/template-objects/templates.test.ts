@@ -20,13 +20,13 @@ import { Agent, AgentList, Skill, SkillList, Template, TemplateList, Workflow, W
 import { appOver, eachTest } from '../../test/placed.ts';
 import { scratch } from 'test-kit/scratch';
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** The manifest of the template `name`, its `parameters` given as the YAML lines under `spec.parameters`, where it has any. */
-const manifest = (name: string, parameters?: string): string =>
+const manifest = (name: string, parameters?: string) =>
   [
     'apiVersion: nemia.dev/v1alpha1',
     'kind: FactoryTemplate',
@@ -42,7 +42,7 @@ const manifest = (name: string, parameters?: string): string =>
   ].join('\n');
 
 /** The template `name` in `folder`: one workflow, `press`, whose step `draft` the agent `drafter` fills, and one skill, `inking`. */
-function template(folder: string, name: string, parameters?: string): void {
+function template(folder: string, name: string, parameters?: string) {
   const at = path.join(folder, name);
   write(path.join(at, 'nemia.yaml'), manifest(name, parameters));
   write(
@@ -91,7 +91,7 @@ const renders = scratch('nemia-api-renders-');
 const app = eachTest(() => appOver(standIn(), stand(), Layer.succeed(BuiltinTemplates)(folder), Layer.succeed(TemplateRenders)(renders)));
 
 /** The api's answer to a GET of `url`: its status and its body. */
-async function get(url: string): Promise<{ status: number; body: unknown }> {
+async function get(url: string) {
   const res = await app().request(url);
   return { status: res.status, body: await res.json() };
 }

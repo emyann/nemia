@@ -51,15 +51,17 @@ export const kept = (plan: object, config: Record<string, unknown> = {}) => {
 };
 
 /** The lines of the stand-in's `file`, each parsed. */
-export const lines = (dir: string, file: string): unknown[] => {
+export const lines = (dir: string, file: string) => {
   const at = path.join(dir, file);
-  return fs.existsSync(at)
-    ? fs
-        .readFileSync(at, 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l) as unknown)
-    : [];
+  return (
+    fs.existsSync(at)
+      ? fs
+          .readFileSync(at, 'utf8')
+          .split('\n')
+          .filter(Boolean)
+          .map((l) => JSON.parse(l) as unknown)
+      : []
+  ) satisfies unknown[];
 };
 
 /** How often a test's holder polls a held call and a process it waits to be gone, in milliseconds. */

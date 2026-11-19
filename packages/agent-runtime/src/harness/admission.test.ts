@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { builtEngine } from '../../test/engine.ts';
 
 /** The tag a refusal is failed with, or the class of an error that has none. */
-const tagOf = (err: unknown): string => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
+const tagOf = (err: unknown) => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
 
 /**
  * What `file` says of a task with `config` on `harness`: `filed`, or its refusal's tag and words; and how many tasks the store then
@@ -80,9 +80,11 @@ const FILE_REFUSALS: readonly { name: string; config: unknown; harness?: string;
  * The settings a Claude Code session is given for `config`, read back as the SDK's own `Options.settings` carries them
  * (`attachedOptions`): a job's and a held session's alike.
  */
-const settingsGiven = (config: SpawnRequest['config']): [string, Record<string, unknown>][] => [
-  ['a session', attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }).settings as Record<string, unknown>],
-];
+const settingsGiven = (config: SpawnRequest['config']) =>
+  [['a session', attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }).settings as Record<string, unknown>]] satisfies [
+    string,
+    Record<string, unknown>,
+  ][];
 
 test("admission is a PreToolUse hook merged into the caller's settings, matched to its tools alone, running `ae admission -- <command>`", () => {
   const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
@@ -163,10 +165,11 @@ const HOOK_INPUT = JSON.stringify({
 /** A run of admission that printed `stdout` and exited `status`. */
 const ran =
   (stdout: string, status: number | null = 0, failed = false) =>
-  (): AdmissionRun => ({ status, stdout, failed });
+  () =>
+    ({ status, stdout, failed }) satisfies AdmissionRun;
 
 /** The decision a hook output says, or undefined for none. */
-const decisionOf = (out: string): string | undefined =>
+const decisionOf = (out: string) =>
   out === ''
     ? undefined
     : (JSON.parse(out) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision;

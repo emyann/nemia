@@ -12,58 +12,63 @@ import type { Followed } from '../harness/index.ts';
 const SENT = '2026-10-07T10:00:00.000Z';
 const AT = '2026-10-07T10:00:05.000Z';
 
-const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
-const message = (messageId: string, words: string, role = Role.ROLE_AGENT): Message => ({
-  messageId,
-  contextId: 'c-1',
-  taskId: 't-1',
-  role,
-  parts: [text(words)],
-  metadata: undefined,
-  extensions: [],
-  referenceTaskIds: [],
-});
-const artifact = (artifactId: string, name: string, ...words: string[]): Artifact => ({
-  artifactId,
-  name,
-  description: '',
-  parts: words.map(text),
-  metadata: undefined,
-  extensions: [],
-});
-const task = (state: TaskState, history: Message[], artifacts: Artifact[] = [], status?: Message): Task => ({
-  id: 't-1',
-  contextId: 'c-1',
-  status: { state, message: status, timestamp: AT },
-  artifacts,
-  history,
-  metadata: undefined,
-});
+const text = (value: string) => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' }) satisfies Part;
+const message = (messageId: string, words: string, role = Role.ROLE_AGENT) =>
+  ({
+    messageId,
+    contextId: 'c-1',
+    taskId: 't-1',
+    role,
+    parts: [text(words)],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
+  }) satisfies Message;
+const artifact = (artifactId: string, name: string, ...words: string[]) =>
+  ({
+    artifactId,
+    name,
+    description: '',
+    parts: words.map(text),
+    metadata: undefined,
+    extensions: [],
+  }) satisfies Artifact;
+const task = (state: TaskState, history: Message[], artifacts: Artifact[] = [], status?: Message) =>
+  ({
+    id: 't-1',
+    contextId: 'c-1',
+    status: { state, message: status, timestamp: AT },
+    artifacts,
+    history,
+    metadata: undefined,
+  }) satisfies Task;
 const asked = message('m-0', 'review this', Role.ROLE_USER);
 
-const ofTask = (t: Task): StreamResponse => ({ payload: { $case: 'task', value: t } });
-const status = (state: TaskState, said?: Message): StreamResponse => ({
-  payload: {
-    $case: 'statusUpdate',
-    value: { taskId: 't-1', contextId: 'c-1', status: { state, message: said, timestamp: AT }, metadata: undefined },
-  },
-});
-const chunk = (artifactId: string, words: string, append: boolean, lastChunk: boolean): StreamResponse => ({
-  payload: {
-    $case: 'artifactUpdate',
-    value: { taskId: 't-1', contextId: 'c-1', artifact: artifact(artifactId, 'result', words), append, lastChunk, metadata: undefined },
-  },
-});
+const ofTask = (t: Task) => ({ payload: { $case: 'task', value: t } }) satisfies StreamResponse;
+const status = (state: TaskState, said?: Message) =>
+  ({
+    payload: {
+      $case: 'statusUpdate',
+      value: { taskId: 't-1', contextId: 'c-1', status: { state, message: said, timestamp: AT }, metadata: undefined },
+    },
+  }) satisfies StreamResponse;
+const chunk = (artifactId: string, words: string, append: boolean, lastChunk: boolean) =>
+  ({
+    payload: {
+      $case: 'artifactUpdate',
+      value: { taskId: 't-1', contextId: 'c-1', artifact: artifact(artifactId, 'result', words), append, lastChunk, metadata: undefined },
+    },
+  }) satisfies StreamResponse;
 
 /** Each moment as a line a reader can compare: its kind, then what it carries. */
-const shown = (ms: Followed[]): string[] =>
+const shown = (ms: Followed[]) =>
   ms.map((m) =>
     m.kind === 'state'
       ? `state ${m.state}`
       : m.kind === 'partial'
         ? `partial ${m.key} ${JSON.stringify(m.text)}${m.append ? ' +' : ''}${m.last ? ' last' : ''}`
         : `events ${m.events.map((e) => `${e.role} ${e.id} ${JSON.stringify(e.text)}`).join(', ')}`,
-  );
+  ) satisfies string[];
 
 /** Each row: one reading of a Task, or one follow of it, and what it gives. Rows share nothing: each builds its own relay. */
 const ROWS: Array<{ name: string; run: () => void }> = [
@@ -96,7 +101,7 @@ const ROWS: Array<{ name: string; run: () => void }> = [
         ],
         "the status message after the history, then the artifact whole, its parts joined: one named `transcript` is the agent's words",
       );
-      const noTime = { ...done, status: { ...done.status!, timestamp: '' } };
+      const noTime = { ...done, status: { ...done.status, timestamp: '' } };
       assert.equal(transcriptOfTask(noTime, SENT, 0).events[0].at, SENT, 'no status time: when the message was sent');
     },
   },

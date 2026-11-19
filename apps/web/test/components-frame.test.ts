@@ -19,7 +19,7 @@ import { routedWith } from './markup-fixtures.ts';
 const { createElement } = await import('react');
 
 /** The frame's tab strip at `path`, inside a router, around a page that reads `the page`. */
-async function frameTabsAt(path: string): Promise<string> {
+async function frameTabsAt(path: string) {
   const { FrameTabs } = await import('../src/components/frame/FrameTabs.tsx');
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
   return routedWith(createElement(FrameTabs, { path, children: createElement('p', { 'data-page': '' }, 'the page') }));
@@ -98,14 +98,14 @@ const pieceOf = (name: string, cost: 'run' | 'server', state: 'met' | 'missing')
 });
 
 /** The setup banner at `/runs`, over a readiness read whose pieces are `pieces` and whose `ran` is `ran`. */
-async function bannerOver(pieces: ReturnType<typeof pieceOf>[], ran: boolean): Promise<string> {
+async function bannerOver(pieces: ReturnType<typeof pieceOf>[], ran: boolean) {
   const { SetupBanner } = await import('../src/components/frame/SetupBanner.tsx');
   const read = { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran };
   return routedWith(createElement(SetupBanner, { path: '/runs' }), [[['readiness'], read]]);
 }
 
 /** The banner's words, its markup's tags taken out. */
-const wordsOf = (html: string): string => html.replace(/<[^>]*>/g, '');
+const wordsOf = (html: string) => html.replace(/<[^>]*>/g, '');
 
 describe('the setup banner is raised by a missing piece a run waits on alone, says what the missing pieces cost, and "first run" only where no run was ever started', () => {
   test('REFUSED: a server whose factories have run, missing only linger, which no run waits on: no banner, so no "first run" nor "not ready"', async () => {

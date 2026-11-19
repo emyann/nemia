@@ -26,10 +26,10 @@ class Stream implements StreamLike {
   /**
    * Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here.
    */
-  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
     this.#target.addEventListener(type, listener as EventListener);
   }
-  dispatchEvent(event: Event): void {
+  dispatchEvent(event: Event) {
     this.#target.dispatchEvent(event);
   }
   readonly start: FeedStart;

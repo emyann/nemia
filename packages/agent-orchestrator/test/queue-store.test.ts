@@ -70,7 +70,8 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_CONCURRENT: undefined,
 };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>) =>
+  Effect.runSync(Effect.provideService(program, StoreRoot, ROOT)) satisfies A;
 const addToInbox = (opts: Parameters<typeof addToInboxVerb>[0]) => atRoot(addToInboxVerb(opts));
 const readInbox = () => atRoot(readInboxVerb());
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
@@ -83,13 +84,13 @@ const verb = (argv: readonly string[], e?: Engine) => typed(argv, e ?? stage.boa
 type Queued = { was: string; queued: string | null; place: number | null; of: number | null; factoryRepo: string | null };
 
 /** `nemia inbox queue <argv>` on its entry's handler (`verb`): what it did. */
-const queuedBy = async (...argv: string[]): Promise<Queued> => (await verb(['inbox', 'queue', ...argv])) as Queued;
+const queuedBy = async (...argv: string[]) => (await verb(['inbox', 'queue', ...argv])) as Queued;
 
 /** `nemia inbox add` as the api calls its handler: the idea's text, a file read where it is typed, and the card's keys. */
 const added = (input: InboxAddInput) => handled(INBOX_ADD, input, { e: stage.board().e, place: stage.place().place, env: ENV });
 
 /** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry (`verb`). */
-const listedLines = async (): Promise<string[]> => {
+const listedLines = async () => {
   const { cards, defaultStarts } = (await verb(['inbox'])) as { cards: InboxListing[]; defaultStarts: boolean };
   return inboxLines(cards, defaultStarts);
 };
@@ -138,7 +139,7 @@ const emptyStore = (cap: string | undefined) => {
 };
 
 /** A repository with one commit, so a start has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
@@ -152,7 +153,7 @@ const oneStep = (() => {
 })();
 
 /** A folder of steps written from their frontmatter and a one-line body. */
-const folderOf = (steps: Record<string, string>): string => {
+const folderOf = (steps: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, front] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\nplace: git\n${front}\n---\n${name} it\n`);
@@ -163,11 +164,7 @@ const folderOf = (steps: Record<string, string>): string => {
  * `nemia start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the
  * record as the test's to say.
  */
-const started = async (
-  brief: string,
-  createdAt: string,
-  opts: { isolate?: boolean; after?: string[]; repo?: string } = {},
-): Promise<Run> => {
+const started = async (brief: string, createdAt: string, opts: { isolate?: boolean; after?: string[]; repo?: string } = {}) => {
   const run = await runPlaced(
     startRun({
       brief,
@@ -185,7 +182,7 @@ const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}
 const runsWritten = () => fs.readdirSync(RUNS).filter((f) => f.endsWith('.json')).length;
 
 /** What `nemia argv` printed, line by line, over `e` (the stage's engine when none is named). */
-const printedBy = async (t: TestContext, argv: string[], e?: Engine): Promise<string[]> => {
+const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     printed.push(args.join(' '));
@@ -199,20 +196,20 @@ const printedBy = async (t: TestContext, argv: string[], e?: Engine): Promise<st
 };
 
 /** What `nemia ls argv…` answers (`RunsListed`), over the stage's engine. */
-const listedBy = async (...argv: string[]): Promise<RunsListed> => (await stage.main(['ls', ...argv])) as RunsListed;
+const listedBy = async (...argv: string[]) => (await stage.main(['ls', ...argv])) as RunsListed;
 
 /** Each step `nemia ls` answers waiting for a run slot, as its run, its name and its word, in the order the listing answers them. */
-const slotHeld = (listed: RunsListed): Array<[run: string, step: string, word: string]> =>
+const slotHeld = (listed: RunsListed) =>
   listed.runs.flatMap(({ run, listed: l }) =>
     'said' in l
       ? []
       : l.steps
           .filter((st) => shownStatus(st).includes('waiting for a run slot'))
-          .map((st): [string, string, string] => [run.id, st.name, shownStatus(st)]),
-  );
+          .map((st) => [run.id, st.name, shownStatus(st)] satisfies [string, string, string]),
+  ) satisfies Array<[run: string, step: string, word: string]>;
 
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
-const aRepoWith = (...workflows: string[]): string => {
+const aRepoWith = (...workflows: string[]) => {
   const repo = aRepo();
   for (const name of workflows) {
     fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
@@ -222,7 +219,7 @@ const aRepoWith = (...workflows: string[]): string => {
 };
 
 /** A card written by hand, under a name of the test's: its keys as given, then its body. */
-const aCard = (name: string, keys: Record<string, string>, body: string): string => {
+const aCard = (name: string, keys: Record<string, string>, body: string) => {
   fs.mkdirSync(INBOX, { recursive: true });
   const file = path.join(INBOX, `${name}.md`);
   fs.writeFileSync(
@@ -241,7 +238,7 @@ const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
  * The factory `solo`, filed afresh on one repository that holds the tests' team under `workflows/`, with `attached` attached to it: the
  * team's `dev` names its agents in its steps, so a start of it in `solo` hires no one.
  */
-const aSoloFactory = (attached: readonly string[]): string => {
+const aSoloFactory = (attached: readonly string[]) => {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const repo = aRepo();
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
@@ -251,7 +248,7 @@ const aSoloFactory = (attached: readonly string[]): string => {
 };
 
 /** Unfactored starts as shipped, for one test: the switch the tests' ambient sets is taken off, and put back after. */
-const asShipped = (t: { onTestFinished: (f: () => void) => void }): void => {
+const asShipped = (t: { onTestFinished: (f: () => void) => void }) => {
   const was = ENV.WF_DEFAULT_FACTORY_STARTS;
   ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
   t.onTestFinished(() => {

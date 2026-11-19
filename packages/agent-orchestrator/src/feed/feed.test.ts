@@ -63,19 +63,20 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 const emptyStore = () => fs.rmSync(FEED, { force: true });
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
-const lines = (): RunLine[] => readFeed(ROOT, 0).lines.filter(isRunLine);
+const lines = () => readFeed(ROOT, 0).lines.filter(isRunLine) satisfies RunLine[];
 /** The store's lines in the feed: its pause put and lifted. */
-const storeLines = (): StoreLine[] => readFeed(ROOT, 0).lines.filter(isStoreLine);
-const factoryLines = (): FactoryLine[] => readFeed(ROOT, 0).lines.filter(isFactoryLine);
-const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
+const storeLines = () => readFeed(ROOT, 0).lines.filter(isStoreLine) satisfies StoreLine[];
+const factoryLines = () => readFeed(ROOT, 0).lines.filter(isFactoryLine) satisfies FactoryLine[];
+const size = () => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 
 /** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
-const atWork = (denials: readonly { step: string; try: number; call: string }[]): FeedWords => ({
-  run: { word: 'running' },
-  labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
-  steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
-  denials,
-});
+const atWork = (denials: readonly { step: string; try: number; call: string }[]) =>
+  ({
+    run: { word: 'running' },
+    labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+    steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
+    denials,
+  }) satisfies FeedWords;
 
 /** Every one-shot the feed holds, in order, with the fields a selector matches one by. */
 const shots = () =>
@@ -87,12 +88,13 @@ const shots = () =>
  * What a pass judged of a run a person has acted on, with the one-shots the pass read of it beside its words: a person's acts
  * (`actsOf`), the runtime's faults (`faultsOf`), and the two moments a hold is paired by.
  */
-const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted' | 'unheld'>): FeedWords => ({
-  run: { word: 'running' },
-  labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
-  steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
-  ...once,
-});
+const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted' | 'unheld'>) =>
+  ({
+    run: { word: 'running' },
+    labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
+    steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
+    ...once,
+  }) satisfies FeedWords;
 
 /** Every line of one reason the feed holds, in order, with the fields a selector matches one by. */
 const said = (reason: Reason) =>
@@ -566,7 +568,7 @@ describe("recordFeed writes a one-shot once per occurrence, counted off the feed
       fixes: [],
       cost: 'server',
     };
-    const met = (piece: ReadinessPiece): ReadinessPiece => ({ ...piece, state: 'met', fixes: [] });
+    const met = (piece: ReadinessPiece) => ({ ...piece, state: 'met', fixes: [] }) satisfies ReadinessPiece;
     test('a read with a missing piece a run waits on writes one NotReady line, naming each piece and its fix; a second pass none', () => {
       pass({ pieces: [mise, toolchain, linger] });
       pass({ pieces: [mise, toolchain, linger] });
@@ -1103,7 +1105,7 @@ describe('feedWords says each run and step in the word nemia ls prints, with its
     });
   });
   test("a run a person's word stops says its first waiting step's reason, and a held run waits on the runs its hold names, or on the hold where it names none", () => {
-    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
+    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned') => codedStep({ reason }) satisfies CodedStep;
     assert.deepEqual(runCodes('running', ['r-2']), { reason: 'Waiting', on: 'run', phase: 'pending' });
     assert.deepEqual(runCodes('running', []), { reason: 'Waiting', on: 'hold', phase: 'pending' }, 'a hold that names no run');
     assert.deepEqual(runCodes('waiting', null, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
@@ -1209,12 +1211,13 @@ describe('foldFeed keeps the last word of each run and step, forgets a removed r
   test("a removed run's one-shots go with it: a run back under an id it had says its acts again, and never reads them as already written", () => {
     const at = '2026-09-22T10:00:00.000Z';
     const put = '2026-09-22T09:00:00.000Z';
-    const oneShotsOf = (run: string): FeedLine[] => [
-      { at, run, word: 'cancel asked', note: `at ${put}` },
-      { at, run, word: 'hold put', note: `since ${put}` },
-      { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
-      { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
-    ];
+    const oneShotsOf = (run: string) =>
+      [
+        { at, run, word: 'cancel asked', note: `at ${put}` },
+        { at, run, word: 'hold put', note: `since ${put}` },
+        { at, run, step: 'plan', word: 'approved', note: `try 1 · at ${put}`, try: 1 },
+        { at, run, step: 'plan', word: 'denied: Bash(git push)', note: 'try 1', call: 'Bash(git push)', try: 1 },
+      ] satisfies FeedLine[];
     const fold = foldFeed(freshFold(), [...oneShotsOf('r-1'), ...oneShotsOf('r-1x'), { at, run: 'r-1', word: 'running' }]);
     assert.equal([...fold.shots.keys()].length, 8, 'the fixture holds four one-shots of each run, of its own kind and of its step');
 

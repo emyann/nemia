@@ -42,7 +42,7 @@ const attemptOn = async (s: RemoteServer, o: Partial<EngineOptions> = {}) => {
 };
 
 /** The words an attempt ended in, asserted bounded. */
-const boundedError = (a: { error?: string }): string => {
+const boundedError = (a: { error?: string }) => {
   const words = a.error ?? '';
   assert.ok(words.length < BOUND, `${words.length} characters`);
   return words;
@@ -55,7 +55,7 @@ const quotesCut = (text: string, value: string, max: number) => {
 };
 
 const realFetch = globalThis.fetch;
-const urlOf = (input: string | URL | Request): string => (input instanceof Request ? input.url : String(input));
+const urlOf = (input: string | URL | Request) => (input instanceof Request ? input.url : String(input));
 
 /**
  * `fetch` stubbed for the test: a request `answer` answers gets its response (or its throw), and every other one goes to the real
@@ -68,7 +68,7 @@ const stubFetch = (t: TestContext, answer: (url: string, init: RequestInit | und
   });
 
 /** A JSON-RPC error for the call `init` carries, with `code` and `message`. */
-const rpcError = (init: RequestInit | undefined, code: number, message: string): Response =>
+const rpcError = (init: RequestInit | undefined, code: number, message: string) =>
   Response.json({ jsonrpc: '2.0', id: (JSON.parse(String(init?.body)) as { id: unknown }).id, error: { code, message } });
 
 /** What a verb of `ops` failed with. */

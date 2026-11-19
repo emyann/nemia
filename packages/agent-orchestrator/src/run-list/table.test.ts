@@ -40,7 +40,7 @@ const runOf = (
     pruned?: boolean;
     status?: Record<string, unknown>;
   } = {},
-): Run =>
+) =>
   ({
     apiVersion: 'nemia/v1',
     kind: 'Run',
@@ -62,7 +62,7 @@ const runOf = (
   }) as unknown as Run;
 
 /** The cell of `run` under the column named `column`. */
-const cellOf = (run: Run, column: string): unknown => runCells(run)[RUN_COLUMNS.findIndex((c) => c.name === column)];
+const cellOf = (run: Run, column: string) => runCells(run)[RUN_COLUMNS.findIndex((c) => c.name === column)];
 
 test("a run's row is its cells in the columns' order: its name, its word, its brief's first line cut at 56, its cost, its note, what waits on you, its labels by key, its steps", () => {
   assert.deepEqual(

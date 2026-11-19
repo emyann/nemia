@@ -19,7 +19,7 @@ import { matchesOf, targetsOf, type Match } from './e2e/stories/targets.ts';
 const SHOOT = path.join(import.meta.dirname, 'e2e', 'stories', 'shoot.ts');
 
 /** Writes `files` under `root`, each by its path from it. */
-const write = (root: string, files: Record<string, string>): void => {
+const write = (root: string, files: Record<string, string>) => {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), text);
@@ -27,14 +27,14 @@ const write = (root: string, files: Record<string, string>): void => {
 };
 
 /** Runs git in `root`, as a fixed author, its output trimmed. */
-const git = (root: string, ...args: string[]): string =>
+const git = (root: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     cwd: root,
     encoding: 'utf8',
   }).trim();
 
 /** Commits every file under `root` with `message`, and its id. */
-const commit = (root: string, message: string): string => {
+const commit = (root: string, message: string) => {
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', message);
   return git(root, 'rev-parse', 'HEAD');
@@ -53,7 +53,7 @@ const GRAIN = 'apps/web/src/components/look/grain.css';
 const DRAWN = 'apps/web/.storybook/drawn.ts';
 
 /** A repository with a part, its story, a lib file it imports, a story of the look reaching nothing, and two parts with no story. */
-function planted(): { root: string; base: string } {
+function planted() {
   const root = scratch('stories-shoot-');
   git(root, 'init', '-q', '-b', 'main');
   write(root, {
@@ -263,14 +263,13 @@ test('a pass into an empty --out, or one not there yet, clears nothing and passe
 });
 
 /** Each picture's key of the touched `ids` in the planted tree at `root`, by `<id>-<theme>`, as `shoot.ts` keys them. */
-const keyed = (root: string, ids: readonly string[]): Map<string, string> =>
-  keysOf(root, root, reachesOf(root, STORY_FILES, ids), picturesOf(ids));
+const keyed = (root: string, ids: readonly string[]) => keysOf(root, root, reachesOf(root, STORY_FILES, ids), picturesOf(ids));
 
 /** The planted story files, from the root. */
 const STORY_FILES = [TAG_STORIES, 'apps/web/src/components/run/Card.stories.tsx'];
 
 /** The keys of `after` that differ from `before`'s, by picture. */
-const movedKeys = (before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): string[] =>
+const movedKeys = (before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>) =>
   [...before].flatMap(([name, key]) => (after.get(name) === key ? [] : [name])).sort();
 
 const EVERY_PICTURE = EVERY_STORY.flatMap((id) => [`${id}-dark`, `${id}-light`]).sort();
@@ -336,7 +335,7 @@ test('a picture the cache holds is copied byte for byte, the rest are left to dr
  * A stand-in for Storybook's build in the planted workspace, where `buildStorybook` runs it: it writes down the folder each build was
  * asked in, a line each, in `built.txt` beside it, and fails; the builds asked, by folder.
  */
-const standInStorybook = (root: string): (() => string[]) => {
+const standInStorybook = (root: string) => {
   const bin = path.join(root, 'node_modules', 'storybook', 'dist', 'bin');
   write(bin, {
     'dispatcher.js':

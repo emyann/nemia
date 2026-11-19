@@ -53,7 +53,7 @@ const RULES = 'RULES.md';
 const LINE = `${RULES}:1-1`;
 
 /** `nemia <argv>` read by its entry's words and run on its handler, over the board's engine and the test's place. */
-const handedTo = async (...argv: string[]): Promise<void> => {
+const handedTo = async (...argv: string[]) => {
   await typed(argv, stage.board().e, undefined, stage.place().place, ENV);
 };
 
@@ -61,7 +61,7 @@ const handedTo = async (...argv: string[]): Promise<void> => {
  * `nemia factory resolve <argv>` on its entry's handler with this machine's proposer (`factoryTyped`), its console muted: a resolution
  * is proposed only where a template is a folder on the machine, so its handler refuses it from anywhere else.
  */
-const resolvedBy = async (t: TestContext, ...argv: string[]): Promise<void> => {
+const resolvedBy = async (t: TestContext, ...argv: string[]) => {
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   try {
     await stage.main(['factory', 'resolve', ...argv]);
@@ -75,7 +75,7 @@ const factory = (name: string) =>
   readFactoryAt(ROOT, name) as ReturnType<typeof readFactoryAt> & { template: NonNullable<ReturnType<typeof readFactoryAt>['template']> };
 
 /** The text of `RULES.md` in `dir` with `from` replaced by `to`. */
-const rewrite = (dir: string, from: string, to: string): void => {
+const rewrite = (dir: string, from: string, to: string) => {
   const file = path.join(dir, RULES);
   const text = fs.readFileSync(file, 'utf8');
   assert.ok(text.includes(from), `${RULES} holds ${from}`);

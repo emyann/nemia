@@ -61,7 +61,7 @@ export const servers: Array<{ name: string; child: ChildProcess; output: () => s
  * Each line written to the say file `file`, kept as JSON where it parses and handed to `onLine` once kept, as the session's holder reads
  * the words said to it: polled, and unreferenced, so it keeps nothing alive; it goes with the store.
  */
-export function heardOn(file: string, onLine: (line: unknown) => void = () => {}): void {
+export function heardOn(file: string, onLine: (line: unknown) => void = () => {}) {
   let read = 0;
   fs.watchFile(file, { interval: 50, persistent: false }, () => {
     const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
@@ -83,7 +83,7 @@ export function heardOn(file: string, onLine: (line: unknown) => void = () => {}
 }
 
 /** Stop both servers and remove the store. Idempotent: `exit` runs it again after a signal did. */
-export function cleanUp(): void {
+export function cleanUp() {
   for (const { child } of servers) {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
   }
@@ -95,7 +95,7 @@ export function cleanUp(): void {
  * Has this process stop its servers and remove its store on its way out: on exit, and on a signal, which it then exits on with 128 + the
  * signal's number, saying `who` is stopping them.
  */
-export function stopOnTheWayOut(who: string): void {
+export function stopOnTheWayOut(who: string) {
   process.on('exit', cleanUp);
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(signal, () => {
@@ -110,7 +110,7 @@ export function stopOnTheWayOut(who: string): void {
  * Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. Rejects when the server exits or
  * cannot start before that, or says nothing within `START_MS`; a server that dies after is seen as failed requests.
  */
-export function startServer(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, listening: RegExp): Promise<string> {
+export function startServer(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, listening: RegExp) {
   const child = spawn(process.execPath, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let raw = '';
   const output = () => plain(raw);
@@ -133,11 +133,11 @@ export function startServer(name: string, args: string[], cwd: string, env: Node
     child.stderr.on('data', read);
     child.on('exit', (code, signal) => fail(`exited (${signal ?? `code ${code}`}) before it was listening`));
     child.on('error', (err) => fail(`could not start: ${err.message}`));
-  });
+  }) satisfies Promise<string>;
 }
 
 /** Each server's last lines, for a failure. */
-export const tails = (): string =>
+export const tails = () =>
   servers
     .map(({ name, output }) => {
       const tail = output().trimEnd().split('\n').slice(-15).join('\n    ');
@@ -157,7 +157,7 @@ export type AgentHolder = { kind: 'agent'; agent: string; factory: string | null
  * readable by its owner alone. With no holder it is the person's. The web imports no package. Answers the token, which the store keeps
  * only the digest of; the record is the caller's to take back.
  */
-export function mintPersonToken(root: string, name: string, holder?: AgentHolder): string {
+export function mintPersonToken(root: string, name: string, holder?: AgentHolder) {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(root, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -176,7 +176,7 @@ export function mintPersonToken(root: string, name: string, holder?: AgentHolder
  * makes through it (`page.request`, `fetch` in the page), presents the person's token. A context meant to meet the token page is never
  * given it. Refuses where no store was seeded.
  */
-export async function seated(context: BrowserContext, base: string): Promise<BrowserContext> {
+export async function seated(context: BrowserContext, base: string) {
   if (seatToken === undefined) throw new Error('no store is seeded, so there is no token to give a browser: seed one (seedStore) first');
   await context.addCookies([
     { name: TOKEN_COOKIE, value: seatToken, domain: new URL(base).hostname, path: '/', httpOnly: true, sameSite: 'Strict' },
@@ -185,9 +185,9 @@ export async function seated(context: BrowserContext, base: string): Promise<Bro
 }
 
 /** The headers a request made from Node to the seat presents: the seat's token as its bearer (`seatToken`). */
-export const bearer = (): Record<string, string> => {
+export const bearer = () => {
   if (seatToken === undefined) throw new Error('no store is seeded, so there is no token to present: seed one (seedStore) first');
-  return { authorization: `Bearer ${seatToken}` };
+  return { authorization: `Bearer ${seatToken}` } satisfies Record<string, string>;
 };
 
 /**
@@ -196,7 +196,7 @@ export const bearer = (): Record<string, string> => {
  * opening with the filing the api reads off its task's view; and last a token of the person's (`SEAT_TOKEN`), kept for the browsers.
  * Refuses a directory that is not empty: it may be another worker's store, or a person's.
  */
-export function seedStore(root: string): void {
+export function seedStore(root: string) {
   if (!fs.existsSync(root) || fs.readdirSync(root).length)
     throw new Error(`a store is seeded in an empty directory of its own, and ${root} is not one: whoever serves it makes one`);
   setStore(root);
@@ -224,7 +224,7 @@ export function seedStore(root: string): void {
  * as a claude that cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word, and ends well
  * having said nothing. Returns the directory it is in.
  */
-export function fakeClaude(root: string): string {
+export function fakeClaude(root: string) {
   const bin = path.join(root, 'bin');
   fs.mkdirSync(bin);
   const answer = path.join(root, QUOTA.file);
@@ -251,7 +251,7 @@ export function fakeClaude(root: string): string {
 }
 
 /** `pathValue` (a PATH) without each folder that holds `program`, every other folder kept in its order. */
-export const withoutProgram = (pathValue: string, program: string): string =>
+export const withoutProgram = (pathValue: string, program: string) =>
   pathValue
     .split(path.delimiter)
     .filter((dir) => dir === '' || !fs.existsSync(path.join(dir, program)))
@@ -261,50 +261,54 @@ export const withoutProgram = (pathValue: string, program: string): string =>
  * The api's environment over `root`: Claude Code's transcripts are in the store (CLAUDE_CONFIG_DIR), where the engine reads a session's
  * conversation, never from this machine's.
  */
-export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
-  ...process.env,
-  PORT: '0',
-  WF_ROOT: root,
-  /** The e2e's starts are made in its scratch checkout, which no factory of its store holds: they go to the default factory. */
-  WF_DEFAULT_FACTORY_STARTS: '1',
-  /** The folder the api's tick works in; a request is placed by its factory alone, the checkout read through FACTORIES' `hiring`. */
-  HKB_REPO: path.join(root, 'checkout'),
-  CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
-  /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */
-  HKB_QUOTA_KEEP_MS: '0',
-  /** Asked again at once after an answer the usage service gave nothing for: the page that draws one reads the good answer it puts back. */
-  HKB_QUOTA_BACKOFF_MS: '0',
-  /** Each read waits for its own ask, however slow: at a keep of 0 no other ask answers it. */
-  HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
-  /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
-  OTEL_EXPORTER_OTLP_ENDPOINT: '',
-  /**
-   * No bind, whatever a server's unit sets: the api listens on the loopback, where `startServer` reads its address, as every test seat's
-   * does (`SERVING_VARIABLES`, packages/agent-orchestrator/src/config/config.store.ts). The web app imports no package, so it is
-   * named here.
-   */
-  NEMIA_BIND: '',
-  /** Nor is the store marked exposed, by the same rule; a seat that wants one lays it over this (`serveExposed`). */
-  WF_EXPOSED: '',
-  /** Nor does it declare a name it is served at, by the same rule. */
-  WF_SERVED_NAMES: '',
-  /**
-   * This machine's PATH without a folder that holds a `claude`, the store's or one installed here: the readiness read checks a harness
-   * installed by finding its program on PATH, and a fresh seed has none.
-   */
-  PATH: withoutProgram(process.env.PATH ?? '', 'claude'),
-  /**
-   * The store's `claude` is the Claude Code the engine's sessions run, as the engine's environment names one: the quota asks the one a
-   * job runs, never a `claude` on PATH, so without it the Agent SDK's own would answer the quota pages.
-   */
-  AE_CLAUDE_EXECUTABLE: path.join(bin, 'claude'),
-});
+export const apiEnvOf = (root: string, bin: string) =>
+  ({
+    ...process.env,
+    PORT: '0',
+    WF_ROOT: root,
+    /** The e2e's starts are made in its scratch checkout, which no factory of its store holds: they go to the default factory. */
+    WF_DEFAULT_FACTORY_STARTS: '1',
+    /** The folder the api's tick works in; a request is placed by its factory alone, the checkout read through FACTORIES' `hiring`. */
+    HKB_REPO: path.join(root, 'checkout'),
+    CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
+    /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */
+    HKB_QUOTA_KEEP_MS: '0',
+    /**
+     * Asked again at once after an answer the usage service gave nothing for: the page that draws one reads the good answer it puts
+     * back.
+     */
+    HKB_QUOTA_BACKOFF_MS: '0',
+    /** Each read waits for its own ask, however slow: at a keep of 0 no other ask answers it. */
+    HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
+    /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
+    OTEL_EXPORTER_OTLP_ENDPOINT: '',
+    /**
+     * No bind, whatever a server's unit sets: the api listens on the loopback, where `startServer` reads its address, as every test seat's
+     * does (`SERVING_VARIABLES`, packages/agent-orchestrator/src/config/config.store.ts). The web app imports no package, so it is
+     * named here.
+     */
+    NEMIA_BIND: '',
+    /** Nor is the store marked exposed, by the same rule; a seat that wants one lays it over this (`serveExposed`). */
+    WF_EXPOSED: '',
+    /** Nor does it declare a name it is served at, by the same rule. */
+    WF_SERVED_NAMES: '',
+    /**
+     * This machine's PATH without a folder that holds a `claude`, the store's or one installed here: the readiness read checks a harness
+     * installed by finding its program on PATH, and a fresh seed has none.
+     */
+    PATH: withoutProgram(process.env.PATH ?? '', 'claude'),
+    /**
+     * The store's `claude` is the Claude Code the engine's sessions run, as the engine's environment names one: the quota asks the one a
+     * job runs, never a `claude` on PATH, so without it the Agent SDK's own would answer the quota pages.
+     */
+    AE_CLAUDE_EXECUTABLE: path.join(bin, 'claude'),
+  }) satisfies NodeJS.ProcessEnv;
 
 /**
  * Stops every server started here by the handle kept, and resolves once each is gone: sent SIGTERM, and SIGKILL when it is still there
  * `STOP_MS` later. The list is emptied, so servers started after are the only ones kept.
  */
-export async function stopServers(): Promise<void> {
+export async function stopServers() {
   const stopping = servers.splice(0).map(
     ({ child }) =>
       new Promise<void>((resolve) => {
@@ -325,7 +329,7 @@ export async function stopServers(): Promise<void> {
  * to it, each on a free port, and fills `seat` in as each says where it listens, answering both once they do. The app served is the
  * one built into `dist`, or into the web app's own `dist/` when none is given.
  */
-export async function startServers(seat: Served, dist?: string): Promise<Required<Served>> {
+export async function startServers(seat: Served, dist?: string) {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
   seat.apiPort = await startServer(
     'the api',
@@ -341,7 +345,7 @@ export async function startServers(seat: Served, dist?: string): Promise<Require
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${seat.apiPort}` },
     /Local:\s+(http:\/\/[^\s/]+)/,
   );
-  return { apiPort: seat.apiPort, base: seat.base };
+  return { apiPort: seat.apiPort, base: seat.base } satisfies Required<Served>;
 }
 
 /**
@@ -350,7 +354,7 @@ export async function startServers(seat: Served, dist?: string): Promise<Require
  * app proxying `/api` to it, each on a free port. `name` says which seat in what the servers print. Answers the app's address, and
  * `stop`, which ends both and waits for them, leaving the worker's own servers running: a page that starts one stops it before it ends.
  */
-export async function serveSeat(name: string, env: NodeJS.ProcessEnv = {}): Promise<{ base: string; stop: () => Promise<void> }> {
+export async function serveSeat(name: string, env: NodeJS.ProcessEnv = {}) {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
   const from = servers.length;
   const stop = async () => {
@@ -385,7 +389,7 @@ export async function serveSeat(name: string, env: NodeJS.ProcessEnv = {}): Prom
       { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
       /Local:\s+(http:\/\/[^\s/]+)/,
     );
-    return { base, stop };
+    return { base, stop } satisfies { base: string; stop: () => Promise<void> };
   } catch (err) {
     await stop();
     throw err;
@@ -393,7 +397,7 @@ export async function serveSeat(name: string, env: NodeJS.ProcessEnv = {}): Prom
 }
 
 /** A second seat (`serveSeat`) marked exposed (`WF_EXPOSED=1`), as an install bound beyond its machine serves it. */
-export const serveExposed = (): Promise<{ base: string; stop: () => Promise<void> }> => serveSeat('exposed', { WF_EXPOSED: '1' });
+export const serveExposed = () => serveSeat('exposed', { WF_EXPOSED: '1' }) satisfies Promise<{ base: string; stop: () => Promise<void> }>;
 
 /**
  * Seeds `root`, an empty directory, and serves it (`startServers`). draft's say file (SAYING) is read, standing in for its holder,
@@ -401,7 +405,7 @@ export const serveExposed = (): Promise<{ base: string; stop: () => Promise<void
  * when it reads the words between calls. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the
  * tick would.
  */
-export async function serveStore(root: string, seat: Served, dist?: string): Promise<Required<Served>> {
+export async function serveStore(root: string, seat: Served, dist?: string) {
   seedStore(root);
   const bin = fakeClaude(root);
   const draftTranscript = path.join(root, DRAFT_TRANSCRIPT);

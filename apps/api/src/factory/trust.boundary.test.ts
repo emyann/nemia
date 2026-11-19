@@ -18,7 +18,7 @@ import { app } from '../app.ts';
 type FactoryTrusted = import('objects').FactoryTrusted;
 
 /** A git repository with one commit: a factory's place, whose root the git place answers. */
-const gitRepo = (prefix: string): string => {
+const gitRepo = (prefix: string) => {
   const repo = scratch(prefix);
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -30,7 +30,7 @@ addFactory({ name: 'mill', volumes: [gitRepo('nemia-api-factory-trust-')].map((r
 const send = (method: string, url: string) => app.request(url, { method, headers: { 'content-type': 'application/json' }, body: '{}' });
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -45,7 +45,7 @@ describe("a person trusts a factory's places again: each is trusted for Claude C
     return t.end;
   });
   const s = story(test);
-  const trusted = (): boolean =>
+  const trusted = () =>
     fs.existsSync(claudeJson) &&
     Object.values(
       (JSON.parse(fs.readFileSync(claudeJson, 'utf8')) as { projects?: Record<string, { hasTrustDialogAccepted?: boolean }> }).projects ??

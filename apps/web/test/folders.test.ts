@@ -23,7 +23,7 @@ const ROOT = 'src/components';
 const VENDORED = [`${ROOT}/ui/`, `${ROOT}/ai-elements/`];
 
 /** The board's source files under `src/`, the vendored folders left out, by path from the package. */
-const sourceFiles = (): string[] =>
+const sourceFiles = () =>
   fs
     .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)
@@ -31,7 +31,7 @@ const sourceFiles = (): string[] =>
     .sort();
 
 /** The file a specifier of `file` names, among `known`, or undefined for a package's or one outside them. */
-function target(file: string, spec: string, known: ReadonlySet<string>): string | undefined {
+function target(file: string, spec: string, known: ReadonlySet<string>) {
   const base = spec.startsWith('@/')
     ? `src/${spec.slice(2)}`
     : spec.startsWith('.')
@@ -42,7 +42,7 @@ function target(file: string, spec: string, known: ReadonlySet<string>): string 
 }
 
 /** `text` with each specifier that names one of `known` rewritten as the relative path of that file, extension and all. */
-const resolvedText = (file: string, text: string, known: ReadonlySet<string>): string =>
+const resolvedText = (file: string, text: string, known: ReadonlySet<string>) =>
   text.replace(/(\bfrom\s*|\bimport\s*\(\s*|^\s*import\s*)(['"])([^'"]+)\2/gm, (whole, head: string, quote: string, spec: string) => {
     const found = target(file, spec, known);
     if (found === undefined) return whole;
@@ -51,12 +51,12 @@ const resolvedText = (file: string, text: string, known: ReadonlySet<string>): s
   });
 
 /** The value imports among `files`, each read from the package and named as the file it resolves to. */
-const graphOf = (files: readonly string[], read: (file: string) => string): Map<string, string[]> => {
+const graphOf = (files: readonly string[], read: (file: string) => string) => {
   const known = new Set(files);
   return valueGraph(new Map(files.map((f) => [f, resolvedText(f, read(f), known)])));
 };
 
-const readOf = (file: string): string => fs.readFileSync(path.join(PKG, file), 'utf8');
+const readOf = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
 test('REFUSED: a component a third folder under src/components, a folder or a file named for no concept, a cycle of value imports', () => {
   assert.equal(depthBreaks(['src/components/run/x/y/z.tsx'], ROOT).length, 1);

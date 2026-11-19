@@ -35,18 +35,22 @@ const refusing: AsyncRunner = {
 type World = { seen: Map<string, Sighting>; unread: Set<string>; kept: Map<string, string[]>; forgetFails?: boolean };
 
 /** A harness that refuses every spawn, so each task settles on its first pass, and looks and forgets as `world` says. */
-const fakeHarness = (world: World): RunnerOps => ({
-  ...asyncOps(refusing),
-  observeFor: () => Effect.succeed({ seen: world.seen, unread: world.unread }),
-  forget: ({ name }, { dry }) => {
-    if (world.forgetFails) return Effect.fail(new RunnerError({ verb: 'forget', message: `fake: ${name} cannot be removed` }));
-    const files = world.kept.get(name) ?? [];
-    if (!dry) world.kept.delete(name);
-    return Effect.succeed({ files, left: [] });
-  },
-});
+const fakeHarness = (world: World) =>
+  ({
+    ...asyncOps(refusing),
+    observeFor: () => Effect.succeed({ seen: world.seen, unread: world.unread }),
+    forget: ({ name }, { dry }) => {
+      if (world.forgetFails) return Effect.fail(new RunnerError({ verb: 'forget', message: `fake: ${name} cannot be removed` }));
+      const files = world.kept.get(name) ?? [];
+      if (!dry) world.kept.delete(name);
+      return Effect.succeed({ files, left: [] });
+    },
+  }) satisfies RunnerOps;
 
-const freshWorld = (): World => ({ seen: new Map(), unread: new Set(), kept: new Map() });
+const freshWorld = () => {
+  const made: World = { seen: new Map(), unread: new Set(), kept: new Map() };
+  return made;
+};
 
 /**
  * A store on the files under a scratch root, an engine on the fake harness, and `n` tasks settled on it; `counting: false` takes the
@@ -86,14 +90,15 @@ const forgetRefused = (r: Awaited<ReturnType<typeof refusalOf>>, taskId: string,
   assert.ok(r.message.endsWith(': nothing was forgotten.'), r.message);
 };
 
-const sighting = (name: string, state: Sighting['state'], held?: boolean): Sighting => ({
-  sessionId: name,
-  state,
-  ...(held === undefined ? {} : { held }),
-});
+const sighting = (name: string, state: Sighting['state'], held?: boolean) =>
+  ({
+    sessionId: name,
+    state,
+    ...(held === undefined ? {} : { held }),
+  }) satisfies Sighting;
 
 /** What `main(argv)` printed with `console.log`, on the board at `root`. */
-const printed = async (root: string, argv: string[]): Promise<string[]> => {
+const printed = async (root: string, argv: string[]) => {
   const lines: string[] = [];
   const log = console.log;
   const given = process.env.AE_ROOT;
@@ -110,7 +115,7 @@ const printed = async (root: string, argv: string[]): Promise<string[]> => {
 };
 
 /** What a call that should refuse with an exit code threw. */
-const thrownBy = async (call: () => unknown): Promise<Error & { exitCode?: number }> => {
+const thrownBy = async (call: () => unknown) => {
   try {
     await call();
   } catch (e) {

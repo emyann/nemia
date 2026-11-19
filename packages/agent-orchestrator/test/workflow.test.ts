@@ -37,19 +37,19 @@ import { TEAM_DEV, teamCopy } from './team.ts';
  * That `message` opens on `at` — the step or file it is about — and names each of `named`: the line as written, and the key, line or
  * command its fix names. The sentence around them is the code's to word ("Errors say what to do next", CLAUDE.md).
  */
-const names = (message: string, at: string, ...named: string[]): true => {
+const names = (message: string, at: string, ...named: string[]) => {
   assert.ok(message.startsWith(at), `opens on ${at}: ${message}`);
   for (const name of named) assert.ok(message.includes(name), `names ${name}: ${message}`);
-  return true;
+  return true as const satisfies true;
 };
 
 /** Refused as a `WorkflowError` with exit 2, the author's to fix, its message as `names` reads it. */
 const refusedNaming =
   (at: string, ...named: string[]) =>
-  (e: unknown): true => {
+  (e: unknown) => {
     assert.ok(e instanceof WorkflowError, String(e));
     assert.equal(e.exitCode, 2, e.message);
-    return names(e.message, at, ...named);
+    return names(e.message, at, ...named) satisfies true;
   };
 
 /** A strict output schema: `findings`, each a file, a line and what would go wrong. */
@@ -83,7 +83,7 @@ test('an empty or missing folder says so', () => {
 });
 
 /** A folder holding `files`, by name. */
-const folder = (files: Record<string, string>): string => {
+const folder = (files: Record<string, string>) => {
   const dir = scratch('wf-readme-');
   for (const [name, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
@@ -93,14 +93,14 @@ const folder = (files: Record<string, string>): string => {
 };
 
 /** What `loadWorkflows` refused `dir` with; fails the test if it loaded. */
-const folderRefusal = (dir: string): WorkflowError => {
+const folderRefusal = (dir: string) => {
   try {
     loadWorkflows(dir);
   } catch (e) {
     assert.ok(e instanceof WorkflowError, String(e));
-    return e;
+    return e satisfies WorkflowError;
   }
-  return assert.fail(`${dir} loaded, and should have been refused`);
+  return assert.fail(`${dir} loaded, and should have been refused`) satisfies WorkflowError;
 };
 
 test("a README in a workflow folder is not a step, and its first paragraph is the workflow's description", () => {
@@ -162,7 +162,7 @@ test('a README to write keeps the needs a read gave: the frontmatter written fro
   const dir = folder({
     'README.md': '---\nowner: ops\nneeds:\n  - name: tool\n    message: the tool\n    check: command -v tool\n---\n# dev\n',
   });
-  const writtenAs = (text: string | undefined): string => {
+  const writtenAs = (text: string | undefined) => {
     const at = folder({ 'implement.md': 'Implement it.\n' });
     if (text !== undefined) fs.writeFileSync(path.join(at, 'README.md'), text);
     return at;
@@ -237,7 +237,7 @@ test('the shipped examples are valid workflows too', () => {
 });
 
 /** `lines` with `place: git` before them, unless they say a place already, as every step file must. */
-const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(lines) ? lines : `place: git\n${lines}`);
+const placed = (lines: string) => (/^(place:|workspace: folder)/m.test(lines) ? lines : `place: git\n${lines}`);
 
 /** A step with this frontmatter and a body, with `place: git` unless it says a place (`placed`), as a folder hands it to the parser. */
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
@@ -336,11 +336,11 @@ test('every key a step has is read — none is accepted and then dropped', () =>
 });
 
 /** A table of one line of meaning per key, as the board lays a file's keys out: why `meanings` is not one, or null. */
-function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>): string | null {
+function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>) {
   if (JSON.stringify(Object.keys(meanings)) !== JSON.stringify(keys))
-    return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order`;
+    return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order` satisfies string | null;
   const bad = Object.entries(meanings).find(([, line]) => typeof line !== 'string' || !line.trim() || /[\r\n]/.test(line));
-  return bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null;
+  return (bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null) satisfies string | null;
 }
 
 test("every key a step has has one line of meaning, in the keys' order — a count's in its refusal's words", () => {
@@ -393,7 +393,7 @@ const outputFolder = (files: Record<string, string | object | null> = {}) => {
 type Row = { row: string; run: () => unknown; naming?: [at: string, ...named: string[]] };
 
 /** Each row of `rows` as a subtest of `t`: a refusal read as a `WorkflowError` with exit 2 naming what it says; any other, run. */
-function table(rows: readonly Row[]): void {
+function table(rows: readonly Row[]) {
   for (const { row, run, naming } of rows)
     test(row, () => {
       if (!naming) return void run();
@@ -402,11 +402,12 @@ function table(rows: readonly Row[]): void {
 }
 
 /** A row refusing `outputFolder(files)` at load, naming each of `named` after `review: `. */
-const atLoad = (row: string, files: Record<string, string | object | null>, ...named: string[]): Row => ({
-  row: `REFUSED: ${row}`,
-  run: () => loadWorkflows(outputFolder(files)),
-  naming: ['review: ', ...named],
-});
+const atLoad = (row: string, files: Record<string, string | object | null>, ...named: string[]) =>
+  ({
+    row: `REFUSED: ${row}`,
+    run: () => loadWorkflows(outputFolder(files)),
+    naming: ['review: ', ...named],
+  }) satisfies Row;
 
 describe('`output:` schema files are read at load, beside the steps: the file as the step names it, strict, inside the folder', () => {
   beforeAll(() => {
@@ -584,7 +585,7 @@ describe('`output:` schema files are read at load, beside the steps: the file as
 });
 
 /** A repository whose workflows/ holds `dev` and `ui`, each a folder of one step, and `notes`, a folder of none. */
-const withWorkflows = (): { repo: string; workflows: string; plans: string } => {
+const withWorkflows = () => {
   const repo = scratch('wf-named-');
   const workflows = path.join(repo, 'workflows');
   for (const name of ['dev', 'ui']) {
@@ -596,7 +597,7 @@ const withWorkflows = (): { repo: string; workflows: string; plans: string } => 
   fs.mkdirSync(path.join(plans, 'dev'), { recursive: true });
   fs.mkdirSync(path.join(plans, 'agents'));
   fs.writeFileSync(path.join(repo, 'brief.md'), 'a brief\n');
-  return { repo, workflows, plans };
+  return { repo, workflows, plans } satisfies { repo: string; workflows: string; plans: string };
 };
 
 describe("`workflowFolder`: a path from where it is written first, then a name under the repository's workflows/ — and a refusal naming where it looked", () => {
@@ -792,7 +793,7 @@ describe('`nemia start` is told which files of a folder still say a former line,
 });
 
 test('REFUSED: a date, a card, a finding or a measured version in the words a person reads of a former key, a retired card file or a refusal', () => {
-  const said = (fn: () => unknown): string => {
+  const said = (fn: () => unknown) => {
     try {
       fn();
     } catch (e) {
@@ -829,7 +830,7 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
 });
 
 test('REFUSED at load: a skill whose `rules.json` does not read — not JSON, a rule with no `breaks`, two rules under one id — naming the skill, the file and the field', () => {
-  const refusedWith = (rules: string): string => {
+  const refusedWith = (rules: string) => {
     const root = teamCopy('wf-rules-');
     fs.writeFileSync(path.join(root, 'skills', 'implement-a-change', 'rules.json'), rules);
     try {
@@ -858,18 +859,16 @@ test('REFUSED at load: a skill whose `rules.json` does not read — not JSON, a 
 });
 
 /** A folder's own files, for `parseWorkflow`'s `read`, as `loadWorkflows` reads them. */
-const readIn =
-  (dir: string) =>
-  (file: string): string | undefined => {
-    try {
-      return fs.readFileSync(path.resolve(dir, file), 'utf8');
-    } catch {
-      return undefined;
-    }
-  };
+const readIn = (dir: string) => (file: string) => {
+  try {
+    return fs.readFileSync(path.resolve(dir, file), 'utf8') satisfies string | undefined;
+  } catch {
+    return undefined satisfies string | undefined;
+  }
+};
 
 /** Every workflow folder there is to read: the tests' team's `dev`, and the package's examples. */
-const everyFolder = (): string[] => {
+const everyFolder = () => {
   const examples = path.join(import.meta.dirname, '..', 'wf-examples');
   return [
     TEAM_DEV,
@@ -877,7 +876,7 @@ const everyFolder = (): string[] => {
       .readdirSync(examples)
       .map((name) => path.join(examples, name))
       .filter((dir) => fs.statSync(dir).isDirectory()),
-  ];
+  ] satisfies string[];
 };
 
 test('`renderStep` is the parser run backwards: every step of every folder there is, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {

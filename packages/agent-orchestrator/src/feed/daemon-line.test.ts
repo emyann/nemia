@@ -19,24 +19,26 @@ const AT = new Date(NOW).toISOString();
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
 
 /** A lease the daemon of pid 4242 wrote, with `over` on it. */
-const file = (over: Partial<DaemonFile> = {}): DaemonFile => ({
-  pid: 4242,
-  by: 'api',
-  startedAt: ago(60),
-  cwd: '/srv/nemia',
-  every: 4000,
-  passedAt: ago(5),
-  ...over,
-});
+const file = (over: Partial<DaemonFile> = {}) =>
+  ({
+    pid: 4242,
+    by: 'api',
+    startedAt: ago(60),
+    cwd: '/srv/nemia',
+    every: 4000,
+    passedAt: ago(5),
+    ...over,
+  }) satisfies DaemonFile;
 
 /** The lease standing as `kind`, its pid confirmed. */
-const standing = (kind: 'stopped' | 'gone' | 'stalled', over: Partial<DaemonFile> = {}): DaemonStanding => ({
-  kind,
-  file: file(over),
-  last: NOW - 300_000,
-  quiet: 300_000,
-  identity: 'same',
-});
+const standing = (kind: 'stopped' | 'gone' | 'stalled', over: Partial<DaemonFile> = {}) =>
+  ({
+    kind,
+    file: file(over),
+    last: NOW - 300_000,
+    quiet: 300_000,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 test('a daemon’s line says how the one before it ended: stopped and when, gone without a stop and how, or none before it', () => {
   assert.deepEqual(

@@ -27,7 +27,7 @@ import { parseSelectors, selects } from '../watch/selector.ts';
 const DEFAULT = parseSelectors(DEFAULT_SELECTORS);
 
 /** Whether the default filter takes `line`: `'wake'` where it does, `'routine'` where the line joins the digest instead. */
-const sorted = (line: FeedLine, selectors = DEFAULT): 'wake' | 'routine' => (selects(selectors, line) ? 'wake' : 'routine');
+const sorted = (line: FeedLine, selectors = DEFAULT) => (selects(selectors, line) ? 'wake' : 'routine');
 
 const AT = '2026-10-05T12:00:00.000Z';
 
@@ -55,7 +55,7 @@ const linesOf = (
   l: Listing,
   status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting' },
   closeout?: Closeout,
-): RunLine[] => {
+) => {
   const words = feedWords(l, {}, status, () => closeout);
   return [
     upgraded({ at: AT, run: 'r-1', ...words.run }) as RunLine,
@@ -223,7 +223,7 @@ describe('readDelivered comes to one message for a read with a wake, and to none
 
 test('a digest is due once its minutes have passed since its first line, and never while it is empty', () => {
   const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 500_000 } };
-  const after = (ms: number): Instant => ({ at: 1_000_000 + ms, mono: { boot: 'b', ms: 500_000 + ms } });
+  const after = (ms: number) => ({ at: 1_000_000 + ms, mono: { boot: 'b', ms: 500_000 + ms } });
   assert.equal(digestDue(since, 60, after(59 * 60_000 + 999)), false, 'a millisecond before');
   assert.equal(digestDue(since, 60, after(60 * 60_000)), true, 'at the minute');
   assert.equal(digestDue(since, 60, after(61 * 60_000)), true, 'after it');

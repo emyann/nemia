@@ -77,7 +77,7 @@ const FINDINGS = {
 const FOUND = [{ file: 'src/flag.ts', line: 12, what: 'the flag is read before it is parsed' }];
 
 const world = () => stage.place().world;
-const board = (): Board => stage.board();
+const board = () => stage.board() satisfies Board;
 /** One pass of the tick over the run `id`, on the stage's engine. */
 const tick = (id: string) => stage.runWith(board().e, advanceRun(runRecord(ROOT, id)));
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
@@ -87,12 +87,12 @@ const parentNow = (id: string) => stage.runWith(board().e, standingLiveOf([id]).
 const decided = async (id: string) => (await stage.runWith(board().e, decideRun(id))).decision;
 const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, runRecord(ROOT, id)))).steps.map((s) => s.message);
 /** The brief the engine was filed with for the task `id`. */
-const briefOf = (id: string): string => board().tasks.get(id)!.spec.brief;
+const briefOf = (id: string) => board().tasks.get(id)!.spec.brief;
 /** The runs in the store, by their records (a run's own folder beside each): a refused start writes none. */
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((name) => name.endsWith('.json')).length;
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, {});
   return repo;
@@ -110,9 +110,9 @@ const oneStep = () => folderOf({ implement: [] });
 /** `implement`, then `review` after it. */
 const twoSteps = () => folderOf({ implement: [], review: ['after: implement'] });
 /** A run this file started on a repository: its repository and base branch are on its record. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
-  return run;
+  return run satisfies RepositoryRun;
 };
 /** `nemia start`, as the runner starts it, over the stage's place. */
 const started = async (opts: Parameters<typeof startRun>[0]) => repositoryRunOf(await stage.runPlaced(startRun(opts)));
@@ -141,17 +141,17 @@ const aParent = async (
   return { run, wt, branch: runRecord(ROOT, run.id).steps.implement.branch! };
 };
 /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand. */
-const mergedByHand = (repo: string, branch: string, message = `Merge ${branch}`): void => {
+const mergedByHand = (repo: string, branch: string, message = `Merge ${branch}`) => {
   world().stage(repo, branch);
   world().commit(repo, message);
 };
 /** The workspace `wt` and the branch `branch` of `repo` taken away, as a person removes a worktree and deletes its branch. */
-const droppedByHand = (repo: string, wt: string, branch: string): void => {
+const droppedByHand = (repo: string, wt: string, branch: string) => {
   const outcome = stage.place().place.askNow('remove', { repo, workspaces: [wt], branches: [branch] });
   assert.deepEqual('answer' in outcome && [outcome.answer.removed, outcome.answer.deleted], [[wt], [branch]]);
 };
 /** Every commit `rev` follows in `root`, itself first. */
-const commitsOf = (root: string, rev: string): string[] => {
+const commitsOf = (root: string, rev: string) => {
   const seen: string[] = [];
   const next = [world().tip(root, rev) ?? rev];
   while (next.length) {
@@ -160,10 +160,10 @@ const commitsOf = (root: string, rev: string): string[] => {
     seen.push(at);
     next.push(...world().read(root, at).parents);
   }
-  return seen;
+  return seen satisfies string[];
 };
 /** How many commits `tip` holds in `root` that `base` does not. */
-const ahead = (root: string, base: string, tip: string): number => {
+const ahead = (root: string, base: string, tip: string) => {
   const below = commitsOf(root, base);
   return commitsOf(root, tip).filter((id) => !below.includes(id)).length;
 };
@@ -171,14 +171,14 @@ const ahead = (root: string, base: string, tip: string): number => {
 const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
 /** The `## From run <id>` section of a brief, to the next heading of its own level. */
-const sectionOf = (brief: string, id: string): string => {
+const sectionOf = (brief: string, id: string) => {
   const at = brief.indexOf(`\n## From run ${id}\n`);
   assert.ok(at >= 0, `the brief hands ${id}: ${brief}`);
   const next = brief.indexOf('\n## ', at + 1);
   return brief.slice(at, next < 0 ? undefined : next);
 };
 /** What `console.log` printed while `run` ran, a line each. */
-const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<string[]> => {
+const printedBy = async (t: TestContext, run: () => Promise<unknown>) => {
   const out: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
     out.push(args.map(String).join(' '));
@@ -191,10 +191,10 @@ const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<s
   return out.join('\n').split('\n');
 };
 /** `nemia ls <id>`: what it answers (`RunsListed`), run `id`'s row in it, and its listing (`listedRow`). */
-const listedOf = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+const listedOf = async (id: string) => {
   const listed = (await stage.main(['ls', id])) as RunsListed;
   const listing = listedRow(listed, id);
-  return { run: listed.runs.find((r) => r.run.id === id)!.run, listing };
+  return { run: listed.runs.find((r) => r.run.id === id)!.run, listing } satisfies { run: Run; listing: Listing };
 };
 /** Step `name`'s row as `nemia ls` words it: its word, its cost, its branch and its note. */
 const wordsOf = (listing: Listing, name: string) => {
@@ -214,7 +214,7 @@ const refusedNaming =
 /** A card's text: its frontmatter keys, and its body. */
 const cardText = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
 /** A plan folder holding these files, by name — a function of the folder, so a card can name a workflow by a path from it. */
-const aPlan = (files: (dir: string) => Record<string, string>): string => {
+const aPlan = (files: (dir: string) => Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   for (const [file, text] of Object.entries(files(dir))) fs.writeFileSync(path.join(dir, file), text);
   return dir;

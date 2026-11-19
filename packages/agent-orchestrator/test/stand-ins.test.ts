@@ -117,7 +117,7 @@ const WORDS = [
 ];
 
 /** The site names of `text` as a test of the orchestrator, under `clauses`. */
-const clausesIn = (text: string, clauses = CLAUSES): string[] => reachIn(`${T}/plant.test.ts`, text, clauses).map((s) => s.clause);
+const clausesIn = (text: string, clauses = CLAUSES) => reachIn(`${T}/plant.test.ts`, text, clauses).map((s) => s.clause);
 
 test('a plant of each clause is one site under it, and over several lines too', () => {
   assert.deepEqual(Object.keys(PLANTS).sort(), CLAUSES.map((c) => c.name).sort(), 'every clause has its plants');
@@ -146,19 +146,16 @@ test('words that name the real thing and reach nothing measure no site: a string
 });
 
 /** A reader over `files`, each a text by its path from the repository root. */
-const over =
-  (files: Readonly<Record<string, string>>) =>
-  (file: string): string | undefined =>
-    files[file];
+const over = (files: Readonly<Record<string, string>>) => (file: string) => files[file];
 
 /** The measure of each of `tests` over `files`. */
-const measured = (files: Readonly<Record<string, string>>, tests: readonly string[] = Object.keys(files)): Map<string, Reach> => {
+const measured = (files: Readonly<Record<string, string>>, tests: readonly string[] = Object.keys(files)) => {
   const reach = reachOver(over(files));
   return new Map(tests.map((file) => [file, reach(file)]));
 };
 
 /** What `files`, all tests, break against an empty baseline. */
-const breaksOf = (files: Readonly<Record<string, string>>): string[] => reachBreaks(measured(files), {}, () => true);
+const breaksOf = (files: Readonly<Record<string, string>>) => reachBreaks(measured(files), {}, () => true);
 
 /** One fixture for each kind the rule refuses, as a test of the orchestrator writes it, with the kinds it measures. */
 const FIXTURES: readonly { readonly says: string; readonly text: string; readonly kinds: readonly Kind[] }[] = [
@@ -234,7 +231,7 @@ test('REFUSED: a boundary test that reaches nothing real, told to drop the name,
 test('REFUSED: the baseline only shrinks — a file not listed, a kind its entry lacks, a kind or an entry left loose, a file gone', () => {
   const file = `${T}/a.test.ts`;
   const files = { [file]: FIXTURES[0].text };
-  const held = (baseline: Baseline, exists = true): string[] => reachBreaks(measured(files), baseline, () => exists);
+  const held = (baseline: Baseline, exists = true) => reachBreaks(measured(files), baseline, () => exists);
   assert.deepEqual(held({ [file]: ['git', 'process'] }), [], 'a table equal to the measure breaks nothing');
   assert.equal(held({}).length, 2, 'a file measured and not listed is refused, once a kind');
   assert.deepEqual(held({ [file]: ['process'] }), [
@@ -293,7 +290,7 @@ test('REFUSED: a reach through a helper the file imports, and the helper that on
 });
 
 test('how far a helper is followed: no type import, no file of a src or of another test, no package, and no file that is not there', () => {
-  const kindsOf = (text: string, more: Readonly<Record<string, string>> = {}): readonly Kind[] =>
+  const kindsOf = (text: string, more: Readonly<Record<string, string>> = {}) =>
     reachOf(`${T}/a.test.ts`, over({ ...CHAIN, ...more, [`${T}/a.test.ts`]: text })).kinds;
   assert.deepEqual(kindsOf("import { two } from './two.ts';\n"), ['git', 'process'], 'the helper is followed');
   assert.deepEqual(kindsOf("import type { Two } from './two.ts';\nimport { type Two as T } from './two.ts';\n"), []);
@@ -308,7 +305,7 @@ test('how far a helper is followed: no type import, no file of a src or of anoth
 
 test('the runtime is judged for git and a process alone, where the engine is its own code; the api for all five', () => {
   const text = `${FIXTURES[5].text}${FIXTURES[0].text}import { Layer } from 'effect';\nLayer.succeed(Engine)(fake);\n`;
-  const kindsIn = (file: string): readonly Kind[] => reachOf(file, over({ [file]: text })).kinds;
+  const kindsIn = (file: string) => reachOf(file, over({ [file]: text })).kinds;
   assert.deepEqual(kindsIn('packages/agent-runtime/test/x.test.ts'), ['git', 'process']);
   assert.deepEqual(kindsIn('apps/api/test/x.test.ts'), ['git', 'process', 'engine', 'hand']);
   assert.deepEqual(kindsIn(`${T}/x.test.ts`), ['git', 'process', 'engine', 'hand']);
@@ -355,11 +352,11 @@ test("REFUSED: a test file with a git call in every package, where its test scri
   assert.equal(breaks.length, 2 * read.length);
 });
 
-const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
+const onDisk = (file: string) => fs.existsSync(path.join(ROOT, file));
 
 let measure: ReadonlyMap<string, Reach> | undefined;
 /** What every package's tests reach, measured once for the whole file: a test plants a file into a copy, never into this. */
-const repositoryReach = (): ReadonlyMap<string, Reach> => (measure ??= measureOf(ROOT));
+const repositoryReach = () => (measure ??= measureOf(ROOT));
 
 test("every package's tests are held to the baseline: no new file, no new kind, and no entry left loose", () => {
   const found = repositoryReach();
@@ -370,7 +367,7 @@ test("every package's tests are held to the baseline: no new file, no new kind, 
         [...found.keys()].some((f) => f.startsWith(`${pkg}/${dir}/`)),
         `the scan reads ${pkg}/${dir}`,
       );
-  const kindsOf = (file: string): readonly Kind[] | undefined => found.get(file)?.kinds;
+  const kindsOf = (file: string) => found.get(file)?.kinds;
   assert.deepEqual(kindsOf(`${T}/forget-linked.test.ts`), ['git', 'process', 'place', 'hand']);
   assert.deepEqual(kindsOf('packages/agent-runtime/test/detached.test.ts'), ['git', 'process']);
   assert.deepEqual(kindsOf('apps/api/test/layer.test.ts'), ['engine', 'hand']);
@@ -511,7 +508,7 @@ test('the shared board is gone: no file of the three packages names its file', (
 
 test('the sizes of the baseline add up: its entries by package, and its listed kinds by kind', () => {
   const size = sizes(REAL_REACH);
-  const sum = (counts: Readonly<Record<string, number>>): number => Object.values(counts).reduce((a, b) => a + b, 0);
+  const sum = (counts: Readonly<Record<string, number>>) => Object.values(counts).reduce((a, b) => a + b, 0);
   assert.equal(size.entries, Object.keys(REAL_REACH).length);
   assert.equal(sum(size.byPackage), size.entries);
   assert.equal(size.kinds, Object.values(REAL_REACH).flat().length);
@@ -532,13 +529,11 @@ test('the sizes of the baseline add up: its entries by package, and its listed k
 });
 
 /** The repository's text of `file`, or `undefined` where it has none. */
-const repository = (file: string): string | undefined => (onDisk(file) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : undefined);
+const repository = (file: string) => (onDisk(file) ? fs.readFileSync(path.join(ROOT, file), 'utf8') : undefined);
 
 /** The repository, with `files` in place of its own: a text, or `undefined` for a file taken away. */
-const repositoryWith =
-  (files: Readonly<Record<string, string | undefined>>) =>
-  (file: string): string | undefined =>
-    file in files ? files[file] : repository(file);
+const repositoryWith = (files: Readonly<Record<string, string | undefined>>) => (file: string) =>
+  file in files ? files[file] : repository(file);
 
 test('every stand-in the packages hold walks its contract whole, on itself and on the real thing in a boundary test', () => {
   assert.ok(STAND_INS.length > 0);
@@ -566,7 +561,7 @@ test('REFUSED: a stand-in whose contract is missing on a side, walked on the rea
   ] as const) {
     const text = repository(side) ?? '';
     assert.ok(text.includes(loop) && text.includes(whole), `${side} walks with the line the fixtures change`);
-    const breaks = (changed: string | undefined): string[] => contractBreaks(place, repositoryWith({ [side]: changed }));
+    const breaks = (changed: string | undefined) => contractBreaks(place, repositoryWith({ [side]: changed }));
     assert.deepEqual(breaks(undefined), [
       `the test place has no walk of its contract on ${what}: ${side} is missing, and a stand-in without its contract is refused`,
     ]);
@@ -612,7 +607,7 @@ test("REFUSED: the engine's stand-in without its whole contract — a side missi
   ] as const) {
     const text = repository(side) ?? '';
     assert.ok(text.includes(whole), `${side} walks with the line the fixtures change`);
-    const breaks = (changed: string | undefined): string[] => contractBreaks(engine, repositoryWith({ [side]: changed }));
+    const breaks = (changed: string | undefined) => contractBreaks(engine, repositoryWith({ [side]: changed }));
     assert.deepEqual(breaks(undefined), [
       `the test engine has no walk of its contract on ${what}: ${side} is missing, and a stand-in without its contract is refused`,
     ]);

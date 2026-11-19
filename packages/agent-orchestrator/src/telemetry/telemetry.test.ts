@@ -43,7 +43,7 @@ const DEAF = 'http://127.0.0.1:9';
  * by default (`OtlpTracer`, `OtlpLogger`, `OtlpMetrics`), which a collector that does not answer waits out; so each such rest is waited
  * for as it is asked, then moved past, a millisecond short and then the millisecond, never waited on the wall clock.
  */
-const steered = async <A>(t: Waiter, program: Effect.Effect<A>): Promise<A> => {
+const steered = async <A>(t: Waiter, program: Effect.Effect<A>) => {
   const clock = steeredClock();
   let done = false;
   const ran = Effect.runPromise(program.pipe(Effect.provide(clock.layer))).finally(() => {
@@ -61,7 +61,7 @@ const steered = async <A>(t: Waiter, program: Effect.Effect<A>): Promise<A> => {
 };
 
 /** What `fn` printed through `console.log` and `console.error`, each line by line. */
-const printed = async (t: TestContext, fn: () => Promise<unknown>): Promise<{ out: string[]; err: string[] }> => {
+const printed = async (t: TestContext, fn: () => Promise<unknown>) => {
   const out: string[] = [];
   const err: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void out.push(args.join(' ')));

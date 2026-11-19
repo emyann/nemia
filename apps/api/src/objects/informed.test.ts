@@ -53,7 +53,7 @@ beforeEachTest(() => {
 });
 
 /** `f` with the informer's check of each kept answer off, as a test that counts what is read turns it off for its request. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   process.env.WF_VERIFY_REST = '0';
   try {
     return await f();

@@ -75,7 +75,7 @@ const ADVISED = {
 const started: unknown[] = [];
 
 /** An SSE block. */
-const sse = (event: string, data: string): string =>
+const sse = (event: string, data: string) =>
   `event: ${event}\n${data
     .split('\n')
     .map((l) => `data: ${l}`)
@@ -121,16 +121,16 @@ afterAll(() => {
 const server = `http://127.0.0.1:${(stub.address() as AddressInfo).port}`;
 
 /** A port nothing listens on: taken and given back. */
-const freePort = (): Promise<number> =>
+const freePort = () =>
   new Promise((resolve) => {
     const s = net.createServer().listen(0, '127.0.0.1', () => {
       const address = s.address();
       s.close(() => resolve(typeof address === 'object' && address !== null ? address.port : 0));
     });
-  });
+  }) satisfies Promise<number>;
 
 /** A laptop whose context in use is `at` with `token`, `~/.local/bin` on its PATH where `onPath`. */
-function aLaptop(prefix: string, at: string, token: string, onPath = true): NodeJS.ProcessEnv {
+function aLaptop(prefix: string, at: string, token: string, onPath = true) {
   const folder = scratch(prefix);
   const home = path.join(folder, 'home');
   const env = {
@@ -142,11 +142,11 @@ function aLaptop(prefix: string, at: string, token: string, onPath = true): Node
     PATH: [...(onPath ? [path.join(home, '.local', 'bin')] : []), process.env.PATH ?? ''].join(path.delimiter),
   };
   configWritten({ contexts: [{ name: 'vps', server: at, token }], current: 'vps' }, env);
-  return env;
+  return env satisfies NodeJS.ProcessEnv;
 }
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -155,17 +155,17 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 type Piece = { name: string; area: string; state: string };
-const piecesOf = (said: Said): Piece[] => (JSON.parse(said.out) as { pieces: Piece[] }).pieces;
-const clientStates = (said: Said): Record<string, string> =>
+const piecesOf = (said: Said) => (JSON.parse(said.out) as { pieces: Piece[] }).pieces;
+const clientStates = (said: Said) =>
   Object.fromEntries(
     piecesOf(said)
       .filter((p) => p.area === 'client')
       .map((p) => [p.name, p.state]),
-  );
+  ) satisfies Record<string, string>;
 
 test("`nemia doctor --json`: the server's pieces, and the laptop's own under `client`, every one in place", async () => {
   const said = await nemia(['doctor', '--json'], aLaptop('nemia-ready-json-', server, GOOD));

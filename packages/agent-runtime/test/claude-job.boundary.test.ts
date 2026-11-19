@@ -45,7 +45,7 @@ const watchedPath = (dir: string) => {
 };
 
 /** The lines of the stand-in's `file`, each parsed; `[]` where it wrote none. */
-const wrote = (dir: string, file: string): unknown[] => {
+const wrote = (dir: string, file: string) => {
   try {
     return fs
       .readFileSync(path.join(dir, file), 'utf8')

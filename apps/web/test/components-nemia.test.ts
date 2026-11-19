@@ -31,7 +31,7 @@ const { ChatActions } = await import('../src/components/nemia/chat/ChatActions.t
 type AskQuestion = import('../src/lib/api/chat.ts').AskQuestion;
 
 /** Nemia's section, drawn over a cache holding `level`, her memory, `facts`, and each fact's words, read as if opened once. */
-async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): Promise<string> {
+async function nemiaWith(level: Record<string, unknown>, facts: string[] = []) {
   const { NemiaSettings } = await import('../src/components/nemia/NemiaSettings.tsx');
   const client = new QueryClient();
   client.setQueryData(['nemia', 'level'], {
@@ -57,8 +57,8 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
 }
 
 /** The level the Select pressed at `mark` shows in `html`, or undefined where there is none. */
-const pickedAt = (html: string, mark: string): string | undefined =>
-  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*>(?:<[^>]*>)*([^<]+)</)?.[1];
+const pickedAt = (html: string, mark: string) =>
+  html.slice(html.indexOf(mark)).match(/data-slot="select-value"[^>]*>(?:<[^>]*>)*([^<]+)</)?.[1] satisfies string | undefined;
 
 test("REFUSED to offer: the default factory's own switch or raise, a raise over a raise, a raise of a factory at Semi-auto by default", async () => {
   const row = (factory: string, over: Record<string, unknown> = {}) => ({
@@ -172,10 +172,12 @@ test('Nemia asked bridged and not up: why, in place of her link; not asked: her 
 });
 
 /** Where the line that trusts her folder sits in Nemia's section `html`: inside her level's part, under its switch, or elsewhere. */
-const trustAt = (html: string): 'level' | 'elsewhere' | 'none' => {
+const trustAt = (html: string) => {
   const at = html.indexOf('data-nemia-trust');
-  if (at < 0) return 'none';
-  return at > html.indexOf('data-nemia-pick') && at < html.indexOf('>Factories</h3>') ? 'level' : 'elsewhere';
+  if (at < 0) return 'none' as const satisfies 'level' | 'elsewhere' | 'none';
+  return (
+    at > html.indexOf('data-nemia-pick') && at < html.indexOf('>Factories</h3>') ? ('level' as const) : ('elsewhere' as const)
+  ) satisfies 'level' | 'elsewhere' | 'none';
 };
 
 test("Nemia's folder the keeper could not trust: under the switch, the refusal's words said once, no command to run; her session untrusted; no refusal: no such line", async () => {
@@ -288,26 +290,28 @@ test('a chat the api cannot stream and reads again on a beat is a quiet note at 
 type ChatAskEvent = Extract<ChatEvent, { kind: 'question' | 'proposal' }>;
 
 /** One question of hers, its choices explained; `plain` is the same with nothing to explain, which her proposal draws as actions. */
-const askQuestion = (plain = false): AskQuestion => ({
-  question: 'What the board shows as an old closeout’s one line?',
-  header: 'Summary',
-  options: [
-    { label: 'Cut it on read', description: plain ? '' : 'The first line, cut at a word.', recommended: true },
-    { label: 'First line as it is', description: plain ? '' : 'The board cuts it by its layout.', recommended: false },
-  ],
-  multiSelect: false,
-});
+const askQuestion = (plain = false) =>
+  ({
+    question: 'What the board shows as an old closeout’s one line?',
+    header: 'Summary',
+    options: [
+      { label: 'Cut it on read', description: plain ? '' : 'The first line, cut at a word.', recommended: true },
+      { label: 'First line as it is', description: plain ? '' : 'The board cuts it by its layout.', recommended: false },
+    ],
+    multiSelect: false,
+  }) satisfies AskQuestion;
 
 /** An ask of hers in her chat, its choice on it where one was made. */
-const askEvent = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>): ChatAskEvent => ({
-  kind,
-  id: 'q:call-1',
-  call: 'call-1',
-  at: new Date(Date.UTC(2026, 9, 15, 22, 2, 0)).toISOString(),
-  text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
-  questions,
-  ...(chose === undefined ? {} : { chose, choseAt: CHOSE_AT.toISOString() }),
-});
+const askEvent = (kind: 'question' | 'proposal', questions: readonly AskQuestion[], chose?: Record<string, string>) =>
+  ({
+    kind,
+    id: 'q:call-1',
+    call: 'call-1',
+    at: new Date(Date.UTC(2026, 9, 15, 22, 2, 0)).toISOString(),
+    text: 'The design signed off with a question it cannot settle alone. [Read the design](/runs/r-1)',
+    questions,
+    ...(chose === undefined ? {} : { chose, choseAt: CHOSE_AT.toISOString() }),
+  }) satisfies ChatAskEvent;
 
 /** When the person chose, and the time of day the board writes it as, read where the draw reads it: a moment is drawn in the zone
  * the browser is in, and the runner's is not this machine's. */

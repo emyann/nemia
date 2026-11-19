@@ -47,10 +47,10 @@ const STEPS: StepSpec[] = [
 const [, DESIGN, IMPLEMENT] = STEPS as [StepSpec, StepSpec, StepSpec, StepSpec];
 
 /** A closeout of design proposing `budgets`, flat as a harness gives it under `output`. */
-const proposing = (budgets: unknown): Closeout => ({ outcome: 'done', summary: 's', artifacts: [], output: { budgets } });
+const proposing = (budgets: unknown) => ({ outcome: 'done', summary: 's', artifacts: [], output: { budgets } }) satisfies Closeout;
 
 /** What `budgetsOf` gives `value` when it refuses it, or a failure when it decodes. */
-const decodeFails = (value: unknown): string => {
+const decodeFails = (value: unknown) => {
   const read = budgetsOf(value);
   assert.ok(!Array.isArray(read), `${JSON.stringify(value)} decoded`);
   return read.error;
@@ -145,10 +145,10 @@ test('ownStatus: a gated step whose budgets cannot be set reads unsigned, and wi
 
 test('approvedCaps: each budget the step proposed that the person did not change is the cap the approval sets for its step', () => {
   const later = ['implement', 'review', 'land'];
-  const subsets = (usd: number): StepBudget[][] =>
+  const subsets = (usd: number) =>
     Array.from({ length: 2 ** later.length }, (_, mask) =>
       later.filter((_, i) => mask & (1 << i)).map((step, i) => ({ step, usd: usd + i })),
-    );
+    ) satisfies StepBudget[][];
   let cases = 0;
   for (const proposed of subsets(10)) {
     for (const given of subsets(50)) {
@@ -167,14 +167,14 @@ test('approvedCaps: each budget the step proposed that the person did not change
 });
 
 describe('budgetOf: the cap in force, read from the record and the approvals in force on every pass', () => {
-  const onTry = (approvals: Run['approvals'], tries?: Run['steps'][string]['tries']): Run =>
+  const onTry = (approvals: Run['approvals'], tries?: Run['steps'][string]['tries']) =>
     run(
       { design: 'd1', implement: 'm1' },
       {
         approvals,
         steps: { design: { taskId: 'd1' }, implement: { taskId: 'm1', ...(tries ? { tries } : {}) } },
       },
-    );
+    ) satisfies Run;
   const at = (n: number, budgets: Record<string, number>, tryNo = 1) => ({
     step: 'design',
     try: tryNo,

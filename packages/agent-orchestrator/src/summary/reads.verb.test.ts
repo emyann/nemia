@@ -17,7 +17,7 @@ import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 
 const ROOT = scratch('wf-reads-verb-');
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -26,7 +26,7 @@ const FROZEN = 'the steps, their spec, prose and graph are the workflow the run 
 const HIRED_STEP = '---\nplace: git\nskills: spec-it\n---\nDesign it.\n';
 
 /** A repository holding the workflow `build`, whose `design` names no agent and adds the skill `spec-it`, the agent `seldon` beside it. */
-function repository(): { repo: string; folder: string } {
+function repository() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const folder = path.join(repo, 'workflows', 'build');
   write(path.join(folder, 'design.md'), HIRED_STEP);
@@ -36,14 +36,14 @@ function repository(): { repo: string; folder: string } {
 }
 
 /** The factory `name` over `repo`, attaching `build` and hiring `seldon` into `build/design`. */
-function hiring(name: string, repo: string): void {
+function hiring(name: string, repo: string) {
   addFactoryAt(ROOT, { name, volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'build' });
   hireAgentAt(ROOT, { factory: name, agent: 'seldon', step: 'build/design' });
 }
 
 /** A run of `folder` in `factory`, frozen unless `frozen` is false: all `workflowsOf` reads of a record. */
-const runOf = (repo: string, folder: string, factory: string | undefined, frozen = true): Run =>
+const runOf = (repo: string, folder: string, factory: string | undefined, frozen = true) =>
   ({
     id: 'a-run',
     repo,
@@ -54,7 +54,7 @@ const runOf = (repo: string, folder: string, factory: string | undefined, frozen
   }) as unknown as Run;
 
 /** Why `folder` does not load, read with `fills` none, in the loader's own words. */
-const loaderWords = (folder: string, repo: string): string => {
+const loaderWords = (folder: string, repo: string) => {
   try {
     loadWorkflows(folder, { repo, home: ROOT });
   } catch (err) {

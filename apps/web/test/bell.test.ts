@@ -11,7 +11,7 @@ import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
-const run = (id: string, extra: Partial<RunView> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunView =>
+const run = (id: string, extra: Partial<RunView> = {}, steps: readonly string[] = ['plan', 'build', 'ship']) =>
   summary([], {
     id,
     brief: `# ${id}'s brief\n\nMore.`,
@@ -19,38 +19,44 @@ const run = (id: string, extra: Partial<RunView> = {}, steps: readonly string[] 
     startedAt: '2026-10-01T00:00:00.000Z',
     steps: steps.map((name, i) => listedStep(name, 'waiting', i, { taskId: `t-${name}` })),
     ...extra,
-  });
+  }) satisfies RunView;
 
 /** A run whose second step waits at its gate. */
-const atGate = (id: string, extra: Partial<RunView> = {}): RunView => {
+const atGate = (id: string, extra: Partial<RunView> = {}) => {
   const base = run(id, {
     status: 'awaiting approval',
     moving: false,
     waitingOnYou: ['build'],
     waitingOnYouWords: ['approve build'],
   });
-  return { ...base, steps: base.steps.map((step) => (step.name === 'build' ? { ...step, approve: 'approve build' } : step)), ...extra };
+  return {
+    ...base,
+    steps: base.steps.map((step) => (step.name === 'build' ? { ...step, approve: 'approve build' } : step)),
+    ...extra,
+  } satisfies RunView;
 };
 
 /** The bell's rows of those of `runs` the board's own rule says wait on a person. */
 const bellRuns = (runs: readonly RunView[]) => bellRows(runs.filter(waitsOnYou));
 
 /** A hold on a run until `p` lands: one a person lifts alone when `onYou`. */
-const holdOn = (onYou: boolean): RunView['holding'] => ({
-  at: '2026-10-01T00:00:00.000Z',
-  runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
-  word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
-  advice: 'wf hold r --off',
-  waitingOnYou: onYou,
-});
+const holdOn = (onYou: boolean) =>
+  ({
+    at: '2026-10-01T00:00:00.000Z',
+    runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
+    word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
+    advice: 'wf hold r --off',
+    waitingOnYou: onYou,
+  }) satisfies RunView['holding'];
 
 /** What a run started after `p` waits on: a run that never lands without a person when `onYou`. */
-const waitOn = (onYou: boolean): RunView['waiting'] => ({
-  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
-  word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
-  advice: 'nothing to decide yet',
-  waitingOnYou: onYou,
-});
+const waitOn = (onYou: boolean) =>
+  ({
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
+    word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
+    advice: 'nothing to decide yet',
+    waitingOnYou: onYou,
+  }) satisfies RunView['waiting'];
 
 describe("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", () => {
   test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {

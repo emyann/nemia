@@ -67,7 +67,7 @@ const PALETTE = new RegExp(
 );
 
 /** Where `text` first names a palette colour, as `line:column` and the words found, or null. */
-export function paletteAt(text: string): string | null {
+export function paletteAt(text: string) {
   const m = PALETTE.exec(text);
   if (!m) return null;
   const before = text.slice(0, m.index).split('\n');
@@ -75,7 +75,7 @@ export function paletteAt(text: string): string | null {
 }
 
 /** The files of `root`'s `src` the colour guards read: every `.ts`, `.tsx` and `.css` outside the kit, as its path from `root`. */
-function sources(root: string): string[] {
+function sources(root: string) {
   return fs
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))
@@ -85,7 +85,7 @@ function sources(root: string): string[] {
 }
 
 /** Every file of `root`'s `src` outside the kit that names a palette colour, as its path from `root` and where. */
-export function paletteIn(root: string): string[] {
+export function paletteIn(root: string) {
   return sources(root).flatMap((file) => {
     const at = paletteAt(fs.readFileSync(path.join(root, file), 'utf8'));
     return at ? [`${file}:${at}`] : [];
@@ -102,13 +102,13 @@ export const RAW: Record<string, RegExp> = {
 };
 
 /** `text` with each comment that opens its line, `//` to its end or `/*` to its close, written as spaces, so every place holds. */
-export function codeOf(text: string): string {
-  const blank = (comment: string): string => comment.replace(/[^\n]/g, ' ');
+export function codeOf(text: string) {
+  const blank = (comment: string) => comment.replace(/[^\n]/g, ' ');
   return text.replace(/^([ \t]*)(\/\*[\s\S]*?\*\/|\/\/[^\n]*)/gm, (_, indent: string, comment: string) => indent + blank(comment));
 }
 
 /** The colour that starts at `index` of `code`: a hex as found, a function to its closing bracket on its line. */
-function colourAt(code: string, index: number, found: string): string {
+function colourAt(code: string, index: number, found: string) {
   if (!found.endsWith('(')) return found;
   let depth = 0;
   for (let i = index; i < code.length && code[i] !== '\n'; i++) {
@@ -119,7 +119,7 @@ function colourAt(code: string, index: number, found: string): string {
 }
 
 /** Every raw colour written outside a comment of `text`, in the order written, by the `families` given (all of them unless told). */
-export function rawAt(text: string, families: Record<string, RegExp> = RAW): { colour: string; at: string }[] {
+export function rawAt(text: string, families: Record<string, RegExp> = RAW) {
   const code = codeOf(text);
   return Object.values(families)
     .flatMap((family) => [...code.matchAll(family)])
@@ -141,7 +141,7 @@ export interface Kept {
 export const KEPT: Kept[] = [];
 
 /** Every raw colour in `root`'s `src` outside the kit that `kept` does not list for its file, as `file:line:column (colour)`. */
-export function rawIn(root: string, kept: Kept[] = KEPT): string[] {
+export function rawIn(root: string, kept: Kept[] = KEPT) {
   return sources(root).flatMap((file) =>
     rawAt(fs.readFileSync(path.join(root, file), 'utf8'))
       .filter(({ colour }) => !kept.some((k) => k.file === file && k.colour === colour))
@@ -150,7 +150,7 @@ export function rawIn(root: string, kept: Kept[] = KEPT): string[] {
 }
 
 /** The entries of `kept` that hold nothing: no reason given, or a colour its file under `root` no longer writes. */
-export function idle(root: string, kept: Kept[] = KEPT): string[] {
+export function idle(root: string, kept: Kept[] = KEPT) {
   return kept
     .filter(({ file, colour, why }) => {
       const at = path.join(root, file);
@@ -272,7 +272,7 @@ test('every raw family is needed: the rule built without one finds nothing of wh
 });
 
 /** A board's root in a scratch folder, holding each of `files` by its path from that root. */
-function boardOf(files: Record<string, string>): string {
+function boardOf(files: Record<string, string>) {
   const root = scratch('palette-');
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });

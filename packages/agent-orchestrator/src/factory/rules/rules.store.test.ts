@@ -20,7 +20,7 @@ const ROOT = scratch('wf-rules-store-');
 /** Refused by kind, exit 2, and the facts its words name — never its sentence. */
 const refused =
   (tag: 'Conflict' | 'Invalid', ...facts: string[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
+  (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
     names(err.message, ...facts);
     return true;

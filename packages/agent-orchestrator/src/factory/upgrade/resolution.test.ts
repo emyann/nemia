@@ -10,11 +10,10 @@ import assert from 'node:assert/strict';
 import { conflictOwners, mergeTrees, ownerKey, ownerOfKey, resolvedAgain, segmentsOf, takenFromTree, type TreeFile } from './index.ts';
 
 /** A tree of text files, by path. */
-const tree = (files: Record<string, string>): TreeFile[] =>
-  Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
+const tree = (files: Record<string, string>) => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 
 /** A tree's files by path and text, a file that is no text by its byte count. */
-const texts = (files: readonly TreeFile[]): Record<string, string> =>
+const texts = (files: readonly TreeFile[]) =>
   Object.fromEntries(files.map((f) => [f.path, f.bytes.includes(0) ? `${f.bytes.length} bytes` : f.bytes.toString()]));
 
 /** Bytes that are no text: a NUL among them. */

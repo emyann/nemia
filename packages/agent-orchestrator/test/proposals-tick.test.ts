@@ -41,10 +41,10 @@ const quiet = () => {
 const tick = () => stage.runWith(quiet(), withProposalsPass(tickRun()));
 
 /** A program run on the stage's engine and place. */
-const run = <A, E>(program: Effect.Effect<A, E, any>): Promise<A> => stage.runWith(stage.board().e, program);
+const run = <A, E>(program: Effect.Effect<A, E, any>) => stage.runWith(stage.board().e, program);
 
 /** A templated factory `name` whose tree holds the workflow `dev` of one step, `plan`: its tree. */
-function factory(name: string): string {
+function factory(name: string) {
   const factories = path.join(ROOT, 'factories');
   fs.mkdirSync(factories, { recursive: true });
   fs.writeFileSync(
@@ -62,7 +62,7 @@ function factory(name: string): string {
 }
 
 /** The run `started` of a workflow of one step, `plan`, in a repository of the stage's place, and its run-end proposal approved. */
-async function approvedAtRunEnd(factoryName: string): Promise<{ run: string; proposal: string }> {
+async function approvedAtRunEnd(factoryName: string) {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'plan.md'), '---\nplace: git\n---\nplan it\n');
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));

@@ -9,11 +9,10 @@ import { mergeTrees, type TreeFile } from './index.ts';
 import { ownerSpec } from './owner-spec.ts';
 
 /** A tree of text files, by path. */
-const tree = (files: Record<string, string>): TreeFile[] =>
-  Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
+const tree = (files: Record<string, string>) => Object.entries(files).map(([path, text]) => ({ path, bytes: Buffer.from(text) }));
 
 /** A tree's text files, by path, as `ownerSpec` is handed the tree's now. */
-const texts = (files: readonly TreeFile[]): ReadonlyMap<string, string> => new Map(files.map((f) => [f.path, f.bytes.toString()]));
+const texts = (files: readonly TreeFile[]) => new Map(files.map((f) => [f.path, f.bytes.toString()]));
 
 describe('an owner as the choices compose it, row by row: a removal of the rules or the instruction, and a hire dropped', () => {
   for (const file of ['RULES.md', 'NEMIA.md'])

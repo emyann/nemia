@@ -88,7 +88,7 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     paths: Record<string, { get?: unknown; post?: unknown; put?: unknown }>;
     components: { schemas: Record<string, unknown> };
   };
-  const unworded = (document: unknown): unknown => {
+  const unworded = (document: unknown) => {
     const copy = structuredClone(document) as { paths: Record<string, Record<string, { summary?: string; description?: string }>> };
     for (const item of Object.values(copy.paths))
       for (const op of Object.values(item)) {
@@ -156,7 +156,7 @@ test('each operation is named by its id, says what it does in its own words, and
   type Said = { operationId?: string; summary?: string; description?: string };
   const doc = (await (await app().request('/openapi/v3/nemia/v1')).json()) as { paths: Record<string, Record<string, Said>> };
   const bare = OpenApi.fromApi(Api) as unknown as { paths: Record<string, Record<string, Said>> };
-  const byId = (document: { paths: Record<string, Record<string, Said>> }): Map<string, Said> =>
+  const byId = (document: { paths: Record<string, Record<string, Said>> }) =>
     new Map(Object.values(document.paths).flatMap((item) => Object.values(item).map((op) => [op.operationId ?? '?', op] as const)));
   const ops = byId(doc);
   const own = byId(bare);
@@ -167,7 +167,7 @@ test('each operation is named by its id, says what it does in its own words, and
     assert.ok(words.length > 0 && op.description?.startsWith(words), `${id} opens on what the endpoint says of itself`);
     assert.ok(op.description?.includes(EQUIVALENTS_HEADING), `${id} has its CLI and MCP section`);
   }
-  const section = (id: string): string => ops.get(id)?.description?.split(EQUIVALENTS_HEADING)[1] ?? '';
+  const section = (id: string) => ops.get(id)?.description?.split(EQUIVALENTS_HEADING)[1] ?? '';
   assert.ok(section('runs.listAll').includes('`nemia ls'), 'a command that links the endpoint is named');
   assert.ok(section('runs.listAll').includes('`ls`'), 'with its tool on the MCP port');
   assert.ok(section('runs.listAll').includes('an agent reads it'), 'and who answers for it when an agent calls it');

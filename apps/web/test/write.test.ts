@@ -32,8 +32,10 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknow
 }
 
 /** A request's body as text: the objects' client sends its JSON as bytes. */
-const text = (body: BodyInit | null | undefined): string | undefined =>
-  body === undefined || body === null || typeof body === 'string' ? (body ?? undefined) : new TextDecoder().decode(body as Uint8Array);
+const text = (body: BodyInit | null | undefined) =>
+  (body === undefined || body === null || typeof body === 'string'
+    ? (body ?? undefined)
+    : new TextDecoder().decode(body as Uint8Array)) satisfies string | undefined;
 
 const FIX =
   'The board and the api were built apart: restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.';
@@ -52,11 +54,11 @@ const unread = (route: string, at: string, found: string, may: string) => (err: 
 };
 
 /** The error `promise` rejects with; fails where it resolves. */
-const rejection = (promise: Promise<unknown>): Promise<unknown> =>
+const rejection = (promise: Promise<unknown>) =>
   promise.then(
     (value) => assert.fail(`resolved with ${JSON.stringify(value)}`),
     (err: unknown) => err,
-  );
+  ) satisfies Promise<unknown>;
 
 const MAY = 'The thing may be written: look at it before writing it again.';
 

@@ -42,13 +42,14 @@ const SPEC: ServiceSpec = {
 };
 
 /** A lease held by `pid`, ticking unless said, written by the api. */
-const lease = (pid: number, kind: 'ticking' | 'stopped' | 'gone' = 'ticking'): DaemonStanding => ({
-  kind,
-  file: { pid, by: 'api', url: 'http://127.0.0.1:8787', startedAt: new Date(0).toISOString(), cwd: '/', every: 4000, passedAt: null },
-  last: 0,
-  quiet: 0,
-  identity: 'same',
-});
+const lease = (pid: number, kind: 'ticking' | 'stopped' | 'gone' = 'ticking') =>
+  ({
+    kind,
+    file: { pid, by: 'api', url: 'http://127.0.0.1:8787', startedAt: new Date(0).toISOString(), cwd: '/', every: 4000, passedAt: null },
+    last: 0,
+    quiet: 0,
+    identity: 'same',
+  }) satisfies DaemonStanding;
 
 test('the unit is written whole: the daemon under the installer’s node, its store and PATH, restarted on failure, started at login', () => {
   assert.equal(
@@ -196,7 +197,7 @@ describe('REFUSED: an --env, a store name or a system the service cannot be inst
 });
 
 /** The refusal `systemOf` answers, or null where it names a system. */
-const refusalOf = (asked: ReturnType<typeof systemOf>): string | null => ('refusal' in asked ? asked.refusal : null);
+const refusalOf = (asked: ReturnType<typeof systemOf>) => ('refusal' in asked ? asked.refusal : null) satisfies string | null;
 
 test('the service’s file: a user unit under the config folder, an agent under LaunchAgents', () => {
   const dirs = { home: '/srv/ann', configHome: '/srv/ann/.config' };

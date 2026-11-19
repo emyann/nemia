@@ -9,7 +9,7 @@ import { serveSeat } from '../served.ts';
 import { apiEnv, OUT, store } from '../world.ts';
 
 /** A path as a regular expression matches it, character for character. */
-const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The brief the page tries `scribe` on, and the file the try leaves in its folder. */
 const TRY = {
@@ -32,7 +32,7 @@ const removal = (page: Page, id: string) =>
  * started after it reads the harness installed and signed in: a fresh seed has none, and a try held on its harness is not moving.
  * Answers what takes it back, the folders it made among it.
  */
-function harnessPlanted(): () => void {
+function harnessPlanted() {
   const program = apiEnv.AE_CLAUDE_EXECUTABLE;
   if (!program) throw new Refused("the api's environment names the store's claude (AE_CLAUDE_EXECUTABLE) — it names none");
   const tools = path.join(store!, 'tools');
@@ -42,10 +42,10 @@ function harnessPlanted(): () => void {
   if (fs.existsSync(at)) throw new Refused(`a fresh seed has no harness in its tools folder — ${at} is there`);
   fs.mkdirSync(bin, { recursive: true });
   fs.symlinkSync(program, at);
-  return () => fs.rmSync(made ? tools : at, { recursive: true, force: true });
+  return (() => fs.rmSync(made ? tools : at, { recursive: true, force: true })) satisfies () => void;
 }
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
@@ -55,7 +55,7 @@ const goto = async (page: Page, to: string): Promise<void> => {
  * the run made for it, the session signed off at a cost the harness priced — flat, as a harness writes it, with the `notes` `scribe`'s
  * schema asks for, without which it reads unsigned — and a file written there.
  */
-function ranTo(id: string): void {
+function ranTo(id: string) {
   const record = path.join(store!, 'runs', `${id}.json`);
   const run = JSON.parse(fs.readFileSync(record, 'utf8')) as { workspace: string; steps: Record<string, unknown> };
   const cwd = path.join(run.workspace, 'try');

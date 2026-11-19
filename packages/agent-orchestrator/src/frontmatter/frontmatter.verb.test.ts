@@ -21,7 +21,7 @@ const TAIL = '---\ncheck: npm test # every file\nbudget: 2\n---\nThe body.\n';
 const NEITHER = '---\nafter: [review\nthis line is prose\n---\nThe body.\n';
 
 /** `text` written at `file`, its folders made. */
-const put = (file: string, text: string, mode = 0o644): string => {
+const put = (file: string, text: string, mode = 0o644) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
   fs.chmodSync(file, mode);
@@ -29,7 +29,7 @@ const put = (file: string, text: string, mode = 0o644): string => {
 };
 
 /** What follows a file's frontmatter, byte for byte. */
-const bodyOf = (text: string): string => text.slice(text.indexOf('\n---\n', 3) + 5);
+const bodyOf = (text: string) => text.slice(text.indexOf('\n---\n', 3) + 5);
 
 /** A file's keys as the step and agent readers read them (`readKeys`), a harness's block read into its fence keys. */
 const keysOf = (file: string, text: string) => readKeys(file, splitFrontmatter(file, text).block!, () => undefined).meta;

@@ -16,13 +16,13 @@ const FACTORY = FACTORIES.hiring.name;
 const OTHER = FACTORIES.others[0];
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Refuses unless the address is `pathname` with `search`, whole. */
-async function expectAt(page: Page, pathname: string, search: string, assertion: string): Promise<void> {
+async function expectAt(page: Page, pathname: string, search: string, assertion: string) {
   await page.waitForURL((url) => url.pathname === pathname && url.search === search, { timeout: WAIT_MS }).catch(() => undefined);
   const url = new URL(page.url());
   if (url.pathname !== pathname || url.search !== search)
@@ -33,21 +33,21 @@ async function expectAt(page: Page, pathname: string, search: string, assertion:
 const hrefsOf = (page: Page) => sectionsOf(page).evaluateAll((links) => links.map((link) => link.getAttribute('href')));
 
 /** The badge the rail draws on Waiting, the count it shows. */
-const badgeOf = (page: Page): Locator => railPlace(page, 'Waiting').locator('[data-slot="badge"]');
+const badgeOf = (page: Page) => railPlace(page, 'Waiting').locator('[data-slot="badge"]') satisfies Locator;
 
 /** What the api answers at `pathname`, read apart from the page. */
-async function answer<T>(page: Page, pathname: string): Promise<T> {
+async function answer<T>(page: Page, pathname: string) {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
 /** The rail's Waiting counts the runs that wait on you in every factory, as the light answer says; none drawn for none. */
-async function waitingIs(page: Page, where: string): Promise<void> {
+async function waitingIs(page: Page, where: string) {
   const open = await openAnswered(page);
   await expectTexts(badgeOf(page), open.counts.waiting ? [String(open.counts.waiting)] : [], `${where}: Waiting counts what waits on you`);
 }
 
 /** The pane's lines are `factory`'s own: Runs what waits on you there, the Inbox its cards not yet started, each count on its badge. */
-async function linesAre(page: Page, factory: string): Promise<void> {
+async function linesAre(page: Page, factory: string) {
   const open = await openAnswered(page, factory);
   const cards = notStarted(entriesOf(await answer<CardList>(page, `/api/cards?limit=${LIST_PAGE.most}`)), factory).length;
   await expectVisible(
@@ -71,7 +71,7 @@ async function linesAre(page: Page, factory: string): Promise<void> {
 }
 
 /** The colour `role`, a meaning of the board's stylesheet, computes to in this page. */
-const meaning = (page: Page, role: string): Promise<string> =>
+const meaning = (page: Page, role: string) =>
   page.evaluate((role) => {
     const probe = document.createElement('span');
     probe.style.backgroundColor = `var(${role})`;
@@ -79,10 +79,10 @@ const meaning = (page: Page, role: string): Promise<string> =>
     const colour = getComputedStyle(probe).backgroundColor;
     probe.remove();
     return colour;
-  }, role);
+  }, role) satisfies Promise<string>;
 
 /** Waiting's badge is drawn in yours, what waits on you: never the kit's red, which is failure on the board. */
-async function badgeColour(page: Page): Promise<void> {
+async function badgeColour(page: Page) {
   const want = await meaning(page, '--meaning-yours');
   const drawn = await badgeOf(page).evaluate((badge) => getComputedStyle(badge).backgroundColor);
   if (drawn !== want) throw new Refused(`the Waiting badge is drawn in --meaning-yours, ${want} — it is ${drawn}`);
@@ -93,7 +93,7 @@ async function badgeColour(page: Page): Promise<void> {
  * the place under its path, every place of the pane leading under it and its lines its own; on a run's page a factory picked opens its
  * runs; Factories in the rail leads to the store's floor.
  */
-async function picks(page: Page): Promise<void> {
+async function picks(page: Page) {
   await waitingIs(page, 'on the store');
   await badgeColour(page);
   await visit(page, `/factories/${DEFAULT_NAMESPACE}/runs`);
@@ -134,7 +134,7 @@ async function picks(page: Page): Promise<void> {
  * The pane's Start a run starts in its factory, named in the address. An address naming the start in no factory asks for the factory
  * first; moving through the factories with the keyboard picks none, and pressing one opens the start in it, named in the address.
  */
-async function asksItsFactory(page: Page): Promise<void> {
+async function asksItsFactory(page: Page) {
   await visit(page, `/factories/${FACTORY}/runs`);
   await startOf(page).click();
   await expectVisible(page.getByRole('complementary', { name: `Start a run in ${FACTORY}` }), `the pane's start starts in ${FACTORY}`);
@@ -168,7 +168,7 @@ async function asksItsFactory(page: Page): Promise<void> {
 }
 
 /** On a phone's screen the drawer holds the destinations, Waiting's count with them; a destination pressed there closes it. */
-async function onPhone(page: Page): Promise<void> {
+async function onPhone(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, '/runs');
   await page.locator('header[data-frame-header] [data-menu-button]').click();

@@ -13,7 +13,7 @@ import { testPlace } from '../place/memory/index.ts';
 import { PLACE_VERBS, type PlaceAnswers, type PlaceVerb } from '../src/place/place.ts';
 import { placeOver, type OwnVerbs } from './place-over.ts';
 import { scratch } from 'test-kit/scratch';
-import { failing, unwalked, walksOn, WALKS, type Side } from './place-walks.ts';
+import { failing, unwalked, walksOn, WALKS } from './place-walks.ts';
 
 for (const [name, walk] of walksOn(testPlace)) test(name, walk);
 
@@ -40,7 +40,7 @@ const LIES: { readonly [V in PlaceVerb]: (answer: PlaceAnswers[V]) => PlaceAnswe
 };
 
 /** A new test place whose `verb` does what it does and answers `lie` of its true answer; a refusal and an unread outcome as they are. */
-function lying<V extends PlaceVerb>(verb: V, lie: (answer: PlaceAnswers[V]) => PlaceAnswers[V]): Side {
+function lying<V extends PlaceVerb>(verb: V, lie: (answer: PlaceAnswers[V]) => PlaceAnswers[V]) {
   const { place, world } = testPlace();
   const own: OwnVerbs = {
     [verb]: (request: never) => {
@@ -53,7 +53,7 @@ function lying<V extends PlaceVerb>(verb: V, lie: (answer: PlaceAnswers[V]) => P
 
 /** The side that lies about `verb` as `LIES` says. */
 const liar =
-  <V extends PlaceVerb>(verb: V): (() => Side) =>
+  <V extends PlaceVerb>(verb: V) =>
   () =>
     lying(verb, LIES[verb]);
 
@@ -91,7 +91,7 @@ const REFUSED_WORDS = ['head', 'heads', 'checkout', 'staged', 'worktree', 'workt
 const ALLOWED: Readonly<Record<string, string>> = { branch: 'a generic version-control word' };
 
 /** The words of a name: camelCase, PascalCase and SNAKE_CASE split apart, each lower case. */
-const wordsOf = (name: string): string[] =>
+const wordsOf = (name: string) =>
   name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
@@ -104,7 +104,7 @@ const wordsOf = (name: string): string[] =>
  * nested type or of a type reached through an alias is read and a word in prose is not. The walk stops at a type declared in another
  * file, Effect's and the language's own among them, but for a mapped utility (`Readonly`, `Record`), whose properties are the file's.
  */
-export function contractNames(file: string): string[] {
+export function contractNames(file: string) {
   const program = ts.createProgram([file], {
     allowImportingTsExtensions: true,
     noEmit: true,
@@ -118,10 +118,10 @@ export function contractNames(file: string): string[] {
   const source = program.getSourceFile(file);
   const module = source && checker.getSymbolAtLocation(source);
   assert.ok(module, `${file} is a module the checker reads`);
-  const here = (declaration: ts.Declaration): boolean => path.resolve(declaration.getSourceFile().fileName) === path.resolve(file);
+  const here = (declaration: ts.Declaration) => path.resolve(declaration.getSourceFile().fileName) === path.resolve(file);
   const names = new Set<string>();
   const entered = new Set<ts.Type>();
-  const elsewhere = (type: ts.Type): boolean => {
+  const elsewhere = (type: ts.Type) => {
     const symbol = type.aliasSymbol ?? (type.flags & ts.TypeFlags.Object ? type.symbol : undefined);
     if (!symbol?.declarations?.length || symbol.declarations.some(here)) return false;
     const mapped =
@@ -129,7 +129,7 @@ export function contractNames(file: string): string[] {
       type.aliasSymbol?.declarations?.some((d) => ts.isTypeAliasDeclaration(d) && ts.isMappedTypeNode(d.type));
     return !mapped;
   };
-  const walk = (type: ts.Type): void => {
+  const walk = (type: ts.Type) => {
     if (entered.has(type)) return;
     entered.add(type);
     if (type.isUnion() || type.isIntersection()) return type.types.forEach(walk);
@@ -151,7 +151,7 @@ export function contractNames(file: string): string[] {
 }
 
 /** Each name of `names` that says a refused word, with the word. */
-const gitWords = (names: readonly string[]): string[] =>
+const gitWords = (names: readonly string[]) =>
   names.flatMap((name) =>
     wordsOf(name)
       .filter((word) => REFUSED_WORDS.includes(word) && !(word in ALLOWED))
@@ -159,7 +159,7 @@ const gitWords = (names: readonly string[]): string[] =>
   );
 
 /** The names a fixture `door.ts` of `text` says, read as the contract is. */
-const namesIn = (text: string): string[] => {
+const namesIn = (text: string) => {
   const file = path.join(scratch('wf-place-words-'), 'door.ts');
   fs.writeFileSync(file, text);
   return contractNames(file);

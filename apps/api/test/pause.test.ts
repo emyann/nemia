@@ -40,7 +40,7 @@ const FILE = path.join(root, 'cordon');
  * That `answer` is a refusal of `status` and nothing else — a 400 of a decode with the key it refused (`field`) — naming each of
  * `facts`.
  */
-function refused(answer: { status: number; body: Record<string, unknown> }, status: number, ...facts: string[]): void {
+function refused(answer: { status: number; body: Record<string, unknown> }, status: number, ...facts: string[]) {
   assert.equal(answer.status, status, JSON.stringify(answer.body));
   assert.deepEqual(Object.keys(answer.body), status === 400 ? ['error', 'field'] : ['error'], 'the refusal and nothing else');
   names(answer.body.error, ...facts);

@@ -15,14 +15,14 @@ import { probe, readyAt, served } from '../src/daemon.ts';
 import { Refused } from '../src/refused.ts';
 
 /** A port free on loopback now, which nothing listens on. */
-const freePort = (): Promise<number> =>
+const freePort = () =>
   new Promise((resolve) => {
     const server = net.createServer();
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo;
       server.close(() => resolve(port));
     });
-  });
+  }) satisfies Promise<number>;
 
 const answering = http.createServer((_req, res) => {
   res.writeHead(404);

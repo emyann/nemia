@@ -33,16 +33,16 @@ type Config = {
 };
 
 /** A config's text read as oxlint reads it: JSON with comments. */
-const parse = (text: string, name: string): Config => {
+const parse = (text: string, name: string) => {
   const parsed = ts.parseConfigFileTextToJson(name, text);
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Config;
 };
 
-const read = (name: string): string => fs.readFileSync(path.join(ROOT, name), 'utf8');
+const read = (name: string) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 
 /** The folder of the first override block that refuses `x!`, taken from the whole config: the fixture's source lies there. */
-const guarded = (): string => {
+const guarded = () => {
   const block = (parse(read(FULL), FULL).overrides ?? []).find((each) => 'typescript/no-non-null-assertion' in each.rules);
   assert.ok(block, `no override block of ${FULL} sets typescript/no-non-null-assertion: give the fixture another override to break`);
   return block.files[0].replace(/\/\*\*$/, '');
@@ -52,7 +52,7 @@ const guarded = (): string => {
 const OWN = ['$schema', 'extends', 'options', 'ignorePatterns'];
 
 /** What makes `fast` more or less than `full` without its type-aware rules, one line each; none when it is only that. */
-const drift = (full: Config, fast: Config): string[] => [
+const drift = (full: Config, fast: Config) => [
   ...Object.keys(fast)
     .filter((key) => !OWN.includes(key))
     .map((key) => `${FAST} sets "${key}": take it out, and set it in ${FULL}, which ${FAST} extends`),
@@ -66,7 +66,7 @@ const drift = (full: Config, fast: Config): string[] => [
 ];
 
 /** The rules oxlint lists as type-aware, as its diagnostics name them: `typescript(no-floating-promises)`. */
-const typeAware = (): Set<string> => {
+const typeAware = () => {
   const rules = JSON.parse(execFileSync(path.join(BIN, 'oxlint'), ['--rules', '-f', 'json'], { encoding: 'utf8' })) as {
     scope: string;
     value: string;
@@ -79,7 +79,7 @@ const typeAware = (): Set<string> => {
  * A fixture that breaks a type-aware rule, a rule of the top level, a rule an override sets for one folder, the comment
  * plugin's rule, and one under an ignore pattern, in a scratch tree beside the whole config (its plugins made absolute) and `fastText`.
  */
-const tree = (fastText: string): string => {
+const tree = (fastText: string) => {
   const dir = scratch('lint-fast-');
   const full = parse(read(FULL), FULL);
   const require = createRequire(path.join(ROOT, 'package.json'));
@@ -118,7 +118,7 @@ const tree = (fastText: string): string => {
  * What oxlint reports over `dir` with `config`, each `file:line code severity`, sorted: a rule the fast config carried as a warning
  * would let `npm run lint:fast` exit 0 where `npm run lint` exits 1, so the severity is compared with the rest.
  */
-const lint = (dir: string, config: string): string[] => {
+const lint = (dir: string, config: string) => {
   const ran = spawnSync(path.join(BIN, 'oxlint'), ['-c', config, '-f', 'json', '.'], {
     cwd: dir,
     encoding: 'utf8',
@@ -134,7 +134,7 @@ const lint = (dir: string, config: string): string[] => {
 };
 
 /** Each diagnostic the whole config reports but the type-aware ones, that the fast one does not, and each it adds, one line each. */
-const unlike = (dir: string, aware: Set<string>): string[] => {
+const unlike = (dir: string, aware: Set<string>) => {
   const whole = lint(dir, FULL).filter((line) => !aware.has(line.split(' ')[1]));
   const fast = lint(dir, FAST);
   return [

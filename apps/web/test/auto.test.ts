@@ -37,13 +37,9 @@ const LIST: PolicyList = {
 
 /** Every call answering `body` as JSON, with `status`, for the length of the test; the calls made, by method and path. */
 /** A body as the client sent it, as text: a string as it is, bytes decoded. */
-const textOf = (body: BodyInit | null): string => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
+const textOf = (body: BodyInit | null) => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
 
-function answering(
-  t: { onTestFinished: (fn: () => void) => void },
-  body: unknown,
-  status = 200,
-): { method: string; path: string; body: unknown }[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const before = globalThis.fetch;
   const calls: { method: string; path: string; body: unknown }[] = [];
   globalThis.fetch = async (input, init) => {

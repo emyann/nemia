@@ -43,7 +43,7 @@ const git = (repo: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q');
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');
@@ -68,7 +68,7 @@ const folder = (...steps: string[]) => {
  * The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name; `journal` is
  * kept so a test can append to a task as the runtime would.
  */
-const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
+const memoryJournal = (starts: Map<string, number>) => {
   const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
@@ -86,7 +86,7 @@ const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -151,13 +151,13 @@ const MEMO = freshRestMemo();
 /** A pass that judges every run the memo answers again in full, and throws where the two differ. */
 const verified = () => runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }));
 /** A pass as the daemon makes it: the memo trusted. */
-const measured = async (memo = MEMO): Promise<PassCost> => (await runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: false }))).cost!;
+const measured = async (memo = MEMO) => (await runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: false }))).cost! satisfies PassCost;
 
 /**
  * Passes until every run but those in flight has finished and the memo answers it: filed, admitted, started, signed, settled, at rest. A
  * session whose name holds one of `blocking` signs blocked.
  */
-const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
+const finish = async (blocking: readonly string[] = []) => {
   for (let k = 0; k < 12; k++) {
     await verified();
     h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
@@ -169,7 +169,7 @@ const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
 };
 
 /** One pass, measured once the memo is steady: the pass that follows is the one compared. */
-const steady = async (): Promise<PassCost> => {
+const steady = async () => {
   await finish();
   return measured();
 };
@@ -239,7 +239,7 @@ test('two factories on two repositories ask one place, the instance the pass is 
   ] as const)
     touched.add((await runPlaced(startRun({ brief: `in ${factory}`, repo, workflowDir: dir, isolate: true, factory }))).id);
   const asked: Array<{ verb: string; repo?: string }> = [];
-  const noted = (verb: string, request: object): void => {
+  const noted = (verb: string, request: object) => {
     asked.push({ verb, ...('repo' in request && typeof request.repo === 'string' ? { repo: path.resolve(request.repo) } : {}) });
   };
   const one: Place = {

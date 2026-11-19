@@ -15,7 +15,7 @@ const FACTORY = FACTORIES.hiring.name;
  * page is served beside: the query's function, its address resolved against the page's, presenting the seat's token as the browser's
  * cookie would (`bearer`). Refused with why where the api refuses it or it does not decode.
  */
-async function finished(page: Page, factory: string | undefined, older: string[]): Promise<FinishedPage> {
+async function finished(page: Page, factory: string | undefined, older: string[]) {
   const before = globalThis.fetch;
   globalThis.fetch = (input, init) => {
     const headers = new Headers(init?.headers);
@@ -24,7 +24,7 @@ async function finished(page: Page, factory: string | undefined, older: string[]
   };
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedRunsQuery(factory, older));
+    return (await client.fetchQuery(finishedRunsQuery(factory, older))) satisfies FinishedPage;
   } catch (err) {
     throw new Refused(`the page after ${older.length} of the finished runs is read off the RunList — ${(err as Error).message}`);
   } finally {

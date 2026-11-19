@@ -357,7 +357,7 @@ const HARNESS_KEPT: Readonly<Record<string, Kept>> = {
 };
 
 /** What a kept file and its measure disagree on, each a sentence naming the fix: a file gone, a count changed, or no why. */
-function keptBreaks(rule: Rule, counts: Record<string, number>, kept: Readonly<Record<string, Kept>>): string[] {
+function keptBreaks(rule: Rule, counts: Record<string, number>, kept: Readonly<Record<string, Kept>>) {
   return Object.entries(kept).flatMap(([file, entry]) => {
     const why = entry.why.trim() ? [] : [`${file} is kept for ${rule.what} with no why: say why that harness is its to name`];
     const counted = countBreak(file, rule.what, counts[file] ?? 0, entry.count, onDisk);
@@ -366,7 +366,7 @@ function keptBreaks(rule: Rule, counts: Record<string, number>, kept: Readonly<R
 }
 
 /** `counts` without the files `kept` names, which `keptBreaks` judges. */
-const unkept = (counts: Record<string, number>, kept: Readonly<Record<string, Kept>>): Record<string, number> =>
+const unkept = (counts: Record<string, number>, kept: Readonly<Record<string, Kept>>) =>
   Object.fromEntries(Object.entries(counts).filter(([file]) => !(file in kept)));
 
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
@@ -440,28 +440,28 @@ const TEAM_GUARD_FILES: ReadonlySet<string> = new Set([
  * The files no rule reads: what `.gitattributes` marks vendored or generated (`ours`, from git), and an installed package's. Not ours to
  * rewrite, so no rule of ours can hold them.
  */
-const vendored = (file: string): boolean => file.split('/').includes('node_modules') || !ours(file);
+const vendored = (file: string) => file.split('/').includes('node_modules') || !ours(file);
 
 /** The files a layer's rule leaves out: tests, and the vendored and generated files. */
-const skipped = (file: string): boolean => file.endsWith('.test.ts') || file.split('/').includes('test') || vendored(file);
+const skipped = (file: string) => file.endsWith('.test.ts') || file.split('/').includes('test') || vendored(file);
 
 /** The files the team's rules leave out: the vendored and generated files, and this guard's own two. Tests are read. */
-const teamSkipped = (file: string): boolean => vendored(file) || TEAM_GUARD_FILES.has(file);
+const teamSkipped = (file: string) => vendored(file) || TEAM_GUARD_FILES.has(file);
 
 /** A source file, which every rule reads. */
-const isSource = (file: string): boolean => /\.tsx?$/.test(file);
+const isSource = (file: string) => /\.tsx?$/.test(file);
 
 /**
  * What the team's rules read: a source file, and a test's text fixture — a `.md`, `.json`, `.txt` or `.yaml` under a `test` folder —
  * which names an agent or a path into `workflows/` as plainly as a test's own source does.
  */
-const teamRead = (file: string): boolean => isSource(file) || (/\.(?:md|json|txt|ya?ml)$/.test(file) && file.split('/').includes('test'));
+const teamRead = (file: string) => isSource(file) || (/\.(?:md|json|txt|ya?ml)$/.test(file) && file.split('/').includes('test'));
 
 /**
  * Every file under `dirs` that `read` takes (a `.ts` or `.tsx`, unless another is given) and `skip` keeps, by its path from the root,
  * with its text.
  */
-const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skipped, read = isSource): Map<string, string> =>
+const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skipped, read = isSource) =>
   new Map(
     dirs
       .filter((dir) => fs.existsSync(path.join(ROOT, dir)))
@@ -474,17 +474,17 @@ const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skip
   );
 
 /** The team: the name of each agent in `agentsDir`, laid out as a template's are, a folder each. */
-const teamOf = (agentsDir: string): string[] =>
+const teamOf = (agentsDir: string) =>
   fs
     .readdirSync(agentsDir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => e.name)
     .sort();
 
-const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+const escaped = (word: string) => word.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
 
 /** Whether the match at `at`, `length` long, is a quoted literal or a path segment of `text`. */
-function quotedOrPath(text: string, at: number, length: number): boolean {
+function quotedOrPath(text: string, at: number, length: number) {
   const before = text[at - 1] ?? '';
   const after = text[at + length] ?? '';
   return (/['"`]/.test(before) && before === after) || before === '/' || after === '/';
@@ -494,7 +494,7 @@ function quotedOrPath(text: string, at: number, length: number): boolean {
  * How many times `text` says one of `words`, whole and in any case: no letter, digit, `_` or `$` on either side. A word in `plain`
  * counts only as a quoted literal or a path segment.
  */
-function wordsIn(text: string, words: readonly string[], plain: readonly string[] = []): number {
+function wordsIn(text: string, words: readonly string[], plain: readonly string[] = []) {
   if (words.length === 0) return 0;
   const pattern = new RegExp(`(?<![\\w$])(?:${words.map(escaped).join('|')})(?![\\w$])`, 'gi');
   const isPlain = new Set(plain.map((w) => w.toLowerCase()));
@@ -503,10 +503,10 @@ function wordsIn(text: string, words: readonly string[], plain: readonly string[
   return count;
 }
 
-const matches = (text: string, pattern: RegExp): number => [...text.matchAll(pattern)].length;
+const matches = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].length;
 
 /** A quoted segment of a join. */
-const QUOTED = (word: string): string => `['"\`]${word}['"\`]`;
+const QUOTED = (word: string) => `['"\`]${word}['"\`]`;
 
 /**
  * How many times `text` names a path into the team's `workflows/`, given the team's `folders` (each a workflow of it, or a folder it
@@ -515,7 +515,7 @@ const QUOTED = (word: string): string => `['"\`]${word}['"\`]`;
  * templated after `${REPO}`, once each where no folder follows it (which the first two count). A join of another root — a store's,
  * a fixture repository's — is the product's own folder, and not counted.
  */
-function teamPathsIn(text: string, folders: readonly string[]): number {
+function teamPathsIn(text: string, folders: readonly string[]) {
   if (folders.length === 0) return 0;
   const folder = `(?:${folders.map(escaped).join('|')})`;
   const noFolder = `(?!\\s*,\\s*${QUOTED(folder)}|/${folder}(?![\\w$-]))`;
@@ -533,7 +533,7 @@ function teamPathsIn(text: string, folders: readonly string[]): number {
  * How many times `text` says the layer above's word: `LAYER_ABOVE` whole but a sign-in (`SIGN_IN`), and `A_TRY` — of `LAYER_ABOVE`, the
  * words `retired` does not hold, the runtime's glossary's (`RETIRED`) unless another set is given.
  */
-const layerAboveIn = (text: string, retired: ReadonlySet<string> = RETIRED): number => {
+const layerAboveIn = (text: string, retired: ReadonlySet<string> = RETIRED) => {
   const signIns = [...text.matchAll(SIGN_IN)].filter((m) => !retired.has((m[1] ?? '').toLowerCase())).length;
   return (
     wordsIn(
@@ -546,11 +546,11 @@ const layerAboveIn = (text: string, retired: ReadonlySet<string> = RETIRED): num
 };
 
 /** Each file's count by `count`, for the files that say one at least once. */
-const measuredBy = (texts: ReadonlyMap<string, string>, count: (text: string) => number): Record<string, number> =>
+const measuredBy = (texts: ReadonlyMap<string, string>, count: (text: string) => number) =>
   Object.fromEntries([...texts].map(([file, text]) => [file, count(text)]).filter(([, n]) => n !== 0));
 
 /** What an entry fails to name: a card `CARDS` knows, else a move with where it goes. */
-function namingBreak(file: string, what: string, entry: Entry): string | undefined {
+function namingBreak(file: string, what: string, entry: Entry) {
   if ('card' in entry)
     return entry.card in CARDS
       ? undefined
@@ -561,7 +561,7 @@ function namingBreak(file: string, what: string, entry: Entry): string | undefin
 }
 
 /** What an entry's count and its file's measure disagree on, as a sentence naming the fix. */
-function countBreak(file: string, what: string, count: number, allowed: number, exists: (file: string) => boolean): string | undefined {
+function countBreak(file: string, what: string, count: number, allowed: number, exists: (file: string) => boolean) {
   if (!exists(file)) return `${file} holds ${what} in the baseline but is not on disk: where it moved, rename its entry; else take it off`;
   if (count === 0) return `${file} holds no ${what} left: take its entry off the baseline`;
   if (count > allowed) return `${file} holds ${count} ${what}, more than the ${allowed} the baseline allows: never add them here`;
@@ -573,7 +573,7 @@ function countBreak(file: string, what: string, count: number, allowed: number, 
  * What a measure and its baseline disagree on, each a sentence naming the fix: a file no entry holds, a count above or below the
  * measure, an entry for a file gone or clean, and an entry that names no card it can be held to.
  */
-function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Baseline, exists: (file: string) => boolean): string[] {
+function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Baseline, exists: (file: string) => boolean) {
   const out: string[] = [];
   for (const [file, count] of Object.entries(counts))
     if (!(file in baseline)) out.push(`${file} holds ${count} ${rule.what}: ${rule.fix}; never add them here`);
@@ -586,24 +586,22 @@ function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Bas
   return out;
 }
 
-const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
+const onDisk = (file: string) => fs.existsSync(path.join(ROOT, file));
 
 /** Each count already taken, by what it counts (`key`) and the text it read: a planted file is the one text a breach reads anew. */
 const counted = new Map<string, Map<string, number>>();
 
 /** `count`, kept for each text it is given under `key`, which names everything `count` reads beside the text. */
-const kept =
-  (key: string, count: (text: string) => number) =>
-  (text: string): number => {
-    let byText = counted.get(key);
-    if (!byText) counted.set(key, (byText = new Map()));
-    let n = byText.get(text);
-    if (n === undefined) byText.set(text, (n = count(text)));
-    return n;
-  };
+const kept = (key: string, count: (text: string) => number) => (text: string) => {
+  let byText = counted.get(key);
+  if (!byText) counted.set(key, (byText = new Map()));
+  let n = byText.get(text);
+  if (n === undefined) byText.set(text, (n = count(text)));
+  return n;
+};
 
 /** Each file's count of `words`, for the files that say one at least once, kept under its words. */
-const measured = (texts: ReadonlyMap<string, string>, words: readonly string[], plain: readonly string[] = []): Record<string, number> =>
+const measured = (texts: ReadonlyMap<string, string>, words: readonly string[], plain: readonly string[] = []) =>
   measuredBy(
     texts,
     kept(JSON.stringify(['words', words, plain]), (text) => wordsIn(text, words, plain)),
@@ -639,7 +637,7 @@ function breaches(texts: Texts, team: string[], folders: readonly string[] = TEA
 
 let repositoryRead: Readonly<Texts> | undefined;
 /** The texts each rule reads, read once for the whole file: a test plants a file into a copy of a map, never into these. */
-const repository = (): Readonly<Texts> =>
+const repository = () =>
   (repositoryRead ??= Object.freeze({
     harness: textsOf(HARNESS_RULE.dirs),
     workflow: textsOf(WORKFLOW_RULE.dirs),
@@ -656,7 +654,7 @@ const TEAM = teamOf(path.join(SDLC, 'agents'));
 const TEAM_FOLDERS = [...workflowsIn(path.join(SDLC, 'workflows')), 'servers'];
 
 /** Each word of `plain` that none of the runtime's `lists` holds: a plain word left behind when the runtime dropped it. */
-const stalePlain = (plain: readonly string[], lists: readonly (readonly string[])[]): string[] =>
+const stalePlain = (plain: readonly string[], lists: readonly (readonly string[])[]) =>
   plain
     .filter((w) => !lists.some((list) => list.includes(w)))
     .map((w) => `PLAIN_HARNESS holds ${w}, which the runtime no longer lists: take it off`);
@@ -707,7 +705,7 @@ test("the harness words, the workflow words, the layer above's words and the tea
 
 test('REFUSED: a new file in each layer that says a word of another', () => {
   const texts = repository();
-  const planted = (rule: 'harness' | 'workflow' | 'team' | 'fence', file: string, text: string, team = TEAM): string[] =>
+  const planted = (rule: 'harness' | 'workflow' | 'team' | 'fence', file: string, text: string, team = TEAM) =>
     breaches({ ...texts, [rule]: new Map([...texts[rule], [file, text]]) }, team);
   const harness = HARNESS_RULE.fix;
   assert.deepEqual(planted('harness', 'packages/agent-orchestrator/src/x/x.ts', 'export const h = "codex";\n'), [
@@ -720,7 +718,7 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
     `apps/web/src/lib/x.ts holds 1 harness words: ${harness}; never add them here`,
   ]);
   const kept = 'apps/api/src/mcp/instructions.ts';
-  const keptBroken = (text: string): string[] => planted('harness', kept, text).filter((b) => b.startsWith(`${kept} `));
+  const keptBroken = (text: string) => planted('harness', kept, text).filter((b) => b.startsWith(`${kept} `));
   assert.equal(keptBroken(`${texts.harness.get(kept) ?? ''}\n/** Or through Codex. */\n`).length, 1, 'a kept file is held to its count');
   assert.equal(keptBroken('export const x = 1;\n').length, 1, 'a kept file that no longer says the word is taken off');
   assert.deepEqual(planted('harness', kept, texts.harness.get(kept) ?? ''), [], 'a kept file at its count is let through');
@@ -779,8 +777,8 @@ test('REFUSED: a new agent of the team, with no edit to the test', () => {
 
 test('REFUSED: a count above or below the baseline, an entry gone or clean, one with no card, an unknown card, a move with nowhere to go', () => {
   const rule: Rule = { what: 'harness words', dirs: [], fix: 'say it here' };
-  const exists = (file: string): boolean => file !== 'src/gone.ts';
-  const breaks = (counts: Record<string, number>, entry: Entry): string[] => ratchetBreaks(rule, counts, { 'src/a.ts': entry }, exists);
+  const exists = (file: string) => file !== 'src/gone.ts';
+  const breaks = (counts: Record<string, number>, entry: Entry) => ratchetBreaks(rule, counts, { 'src/a.ts': entry }, exists);
   const held: Entry = { count: 2, card: 'u42s' };
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, held), [], 'the measure the baseline holds is let through');
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, move: 'a move', to: 'a place' }), [], 'a move with where it goes');
@@ -845,7 +843,7 @@ test("the paths matcher counts a path into the team's workflows/, and not a prod
 
 test("REFUSED: a product test that names the team, the owner's factory or a path into the team's workflows/", () => {
   const texts = repository();
-  const planted = (file: string, text: string): string[] =>
+  const planted = (file: string, text: string) =>
     breaches({ ...texts, team: new Map([...texts.team, [file, text]]) }, TEAM).map((b) => b.slice(0, b.indexOf(':')));
   assert.deepEqual(planted('packages/agent-orchestrator/test/x.test.ts', "const lead = 'grace';\n"), [
     'packages/agent-orchestrator/test/x.test.ts holds 1 team names',

@@ -6,16 +6,16 @@ import type { TestContext } from 'vitest';
  * `ms` later than the one before, so a deadline taken on the wall clock passes at its first look. The monotonic clocks
  * (`performance.now()`, `process.hrtime`) and a file's mtime, the kernel's, do not move with it.
  */
-export const steppingClock = (t: TestContext, ms: number): void => {
+export const steppingClock = (t: TestContext, ms: number) => {
   const Real = Date;
   let ahead = 0;
-  const read = (): number => Real.now() + (ahead += ms);
+  const read = () => Real.now() + (ahead += ms);
   globalThis.Date = class extends Real {
     constructor(...args: ConstructorParameters<DateConstructor> | []) {
       if (args.length === 0) super(read());
       else super(...args);
     }
-    static override now(): number {
+    static override now() {
       return read();
     }
   } as DateConstructor;

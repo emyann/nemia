@@ -16,7 +16,7 @@ const INSTALL: Running = { kind: 'install', root: '/s/releases/v9', tag: 'v9', c
 const CHECKOUT: Running = { kind: 'checkout', root: '/home/me/nemia' };
 
 /** What `GET /api/health` answers an app that runs `running`. */
-async function healthOn(running: Running): Promise<Health> {
+async function healthOn(running: Running) {
   const { app } = appOf(Layer.merge(liveOf(), ApiConfig.layer(process.env, running)));
   const res = await app.request('/api/health');
   assert.equal(res.status, 200);

@@ -125,7 +125,7 @@ const emptyStore = () => {
   fs.mkdirSync(RUNS, { recursive: true });
 };
 
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   return repo;
@@ -138,7 +138,7 @@ const oneStep = (() => {
   return dir;
 })();
 
-const started = async (n: number): Promise<Run[]> => {
+const started = async (n: number) => {
   const runs: Run[] = [];
   for (let k = 0; k < n; k++)
     runs.push(await runPlaced(startRun({ brief: `run ${k}`, repo: aRepo(), workflowDir: oneStep, isolate: false })));

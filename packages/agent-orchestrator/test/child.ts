@@ -24,7 +24,7 @@ export type NodeChild = {
 };
 
 /** How a child ended, as a person reads it: "exited 3", "was killed by SIGTERM", or "could not start: …". */
-function endOf(ended: Ended): string {
+function endOf(ended: Ended) {
   if (ended.error) return `could not start: ${ended.error.message}`;
   return ended.signal ? `was killed by ${ended.signal}` : `exited ${ended.code}`;
 }
@@ -41,7 +41,7 @@ function endOf(ended: Ended): string {
  * @param env the child's whole environment
  * @returns the child, its output so far, its end, and the wait
  */
-export function nodeChild(program: string, env: NodeJS.ProcessEnv): NodeChild {
+export function nodeChild(program: string, env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, ['--input-type=module', '-e', `${PRELUDE}\n${program}`], { env, stdio: ['pipe', 'pipe', 'pipe'] });
   child.stdin.on('error', () => undefined);
   let out = '';
@@ -72,11 +72,11 @@ export function nodeChild(program: string, env: NodeJS.ProcessEnv): NodeChild {
         lookers.delete(look);
         how();
       };
-      const holds = (): boolean | Error => {
+      const holds = () => {
         try {
-          return ok();
+          return ok() satisfies boolean | Error;
         } catch (e) {
-          return e instanceof Error ? e : new Error(String(e));
+          return (e instanceof Error ? e : new Error(String(e))) satisfies boolean | Error;
         }
       };
       const look = () => {
@@ -94,5 +94,5 @@ export function nodeChild(program: string, env: NodeJS.ProcessEnv): NodeChild {
       });
       look();
     });
-  return { child, out: () => out, err: () => err, closed, until };
+  return { child, out: () => out, err: () => err, closed, until } satisfies NodeChild;
 }

@@ -58,25 +58,25 @@ const OWN = /^apps\/web\/(src|\.storybook|theme)\//;
 const PREVIEW = `${BOARD}/.storybook/preview.tsx`;
 
 /** Each local stylesheet a stylesheet's text `@import`s, outside its comments, by its specifier. */
-const cssImportsIn = (text: string): string[] =>
+const cssImportsIn = (text: string) =>
   [...text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/g)].flatMap((m) =>
     m[1]?.startsWith('.') ? [m[1]] : [],
-  );
+  ) satisfies string[];
 
 /** The modules `file`'s text names: a stylesheet's `@import`s, a module's imports. */
-const specsOf = (file: string, text: string): string[] =>
-  file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec);
+const specsOf = (file: string, text: string) =>
+  (file.endsWith('.css') ? cssImportsIn(text) : importsIn(text).map(({ spec }) => spec)) satisfies string[];
 
 /** A story file of the board, from the workspace root: anywhere under `src/components` but the vendored folders. */
-const isStoryFile = (file: string): boolean =>
+const isStoryFile = (file: string) =>
   /^apps\/web\/src\/components\/.+\.stories\.tsx$/.test(file) && !/^apps\/web\/src\/components\/(ui|ai-elements)\//.test(file);
 
 /** The workspace root of the git repository `cwd` is in. */
-const rootOf = (cwd: string): string =>
+const rootOf = (cwd: string) =>
   execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** Runs git in `root`, its output as text; throws naming the command where it fails. */
-const git = (root: string, args: readonly string[]): string => {
+const git = (root: string, args: readonly string[]) => {
   const ran = spawnSync('git', ['-c', 'core.quotePath=false', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 });
   if (ran.status !== 0) throw new Refusal(`git ${args.join(' ')} failed (${(ran.stderr ?? '').trim() || ran.error?.message})`);
   return ran.stdout;
@@ -91,35 +91,36 @@ class Refusal extends Error {}
  * @param root The workspace root.
  * @param base Where the work began: the merge base of HEAD and the base branch.
  */
-export const changedSince = (root: string, base: string): string[] => [
-  ...new Set(
-    git(root, ['log', '--first-parent', '--cc', '--no-renames', '--format=', '--name-only', `${base}..HEAD`, '--'])
-      .split('\n')
-      .filter(Boolean),
-  ),
-];
+export const changedSince = (root: string, base: string) =>
+  [
+    ...new Set(
+      git(root, ['log', '--first-parent', '--cc', '--no-renames', '--format=', '--name-only', `${base}..HEAD`, '--'])
+        .split('\n')
+        .filter(Boolean),
+    ),
+  ] satisfies string[];
 
 /** The file `spec`, imported by `from`, resolves to among the workspace's files, from its root; none for a package or a file not there. */
-const resolved = (root: string, from: string, spec: string): string | undefined => {
+const resolved = (root: string, from: string, spec: string) => {
   const named = spec.startsWith('@/')
     ? path.posix.join(BOARD, 'src', spec.slice(2))
     : spec.startsWith('.')
       ? path.posix.join(path.posix.dirname(from), spec)
       : undefined;
-  if (named === undefined) return undefined;
+  if (named === undefined) return undefined satisfies string | undefined;
   for (const tail of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
     const file = named + tail;
-    if (fs.statSync(path.join(root, file), { throwIfNoEntry: false })?.isFile()) return file;
+    if (fs.statSync(path.join(root, file), { throwIfNoEntry: false })?.isFile()) return file satisfies string | undefined;
   }
-  return undefined;
+  return undefined satisfies string | undefined;
 };
 
 /** Each file of the board's own `file`'s text names, by its path from the workspace root. */
-const ownOf = (root: string, file: string): string[] =>
+const ownOf = (root: string, file: string) =>
   specsOf(file, fs.readFileSync(path.join(root, file), 'utf8')).flatMap((spec) => {
     const next = resolved(root, file, spec);
     return next !== undefined && OWN.test(next) ? [next] : [];
-  });
+  }) satisfies string[];
 
 /**
  * What every story is drawn in: Storybook's preview, each file of the board's own it imports, and the stylesheets those `@import`,
@@ -127,14 +128,14 @@ const ownOf = (root: string, file: string): string[] =>
  * reaches only the stories that import it.
  * @param root The workspace root.
  */
-const drawnIn = (root: string): string[] => {
-  if (!fs.existsSync(path.join(root, PREVIEW))) return [];
+const drawnIn = (root: string) => {
+  if (!fs.existsSync(path.join(root, PREVIEW))) return [] satisfies string[];
   const drawn = [PREVIEW, ...ownOf(root, PREVIEW)];
   for (let at = 1; at < drawn.length; at++) {
     const file = drawn[at] ?? PREVIEW;
     if (file.endsWith('.css')) for (const next of ownOf(root, file)) if (!drawn.includes(next)) drawn.push(next);
   }
-  return [...new Set(drawn)];
+  return [...new Set(drawn)] satisfies string[];
 };
 
 /**
@@ -144,33 +145,34 @@ const drawnIn = (root: string): string[] => {
  * @param story The story file, from the workspace root.
  * @param drawn What every story is drawn in (`drawnIn`).
  */
-export const reachOf = (root: string, story: string, drawn: readonly string[]): StoryReach => {
+export const reachOf = (root: string, story: string, drawn: readonly string[]) => {
   const reaches = [story];
   for (let at = 0; at < reaches.length; at++) {
     for (const next of ownOf(root, reaches[at] ?? story)) if (!reaches.includes(next)) reaches.push(next);
   }
-  return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] };
+  return { story, reaches: [...reaches, ...drawn.filter((file) => !reaches.includes(file))] } satisfies StoryReach;
 };
 
 /**
  * Storybook's id of each story of `source`, the story file's text: `toId(title, storyNameFromExport(name))` of each named export.
  * @param source The story file's text.
  */
-export const idsOf = (source: string): string[] => {
+export const idsOf = (source: string) => {
   const module = storyModuleOf(source);
   const title = module.title;
-  return title === null ? [] : module.stories.map((story) => toId(title, storyNameFromExport(story.name)));
+  return (title === null ? [] : module.stories.map((story) => toId(title, storyNameFromExport(story.name)))) satisfies string[];
 };
 
 /** Every story id of the workspace at `root`, read off its story files. */
-const knownIds = (root: string): string[] => storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8')));
+const knownIds = (root: string) =>
+  storyFiles(root).flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))) satisfies string[];
 
 /**
  * The matches the targets in `dir` ask for; refuses where `dir` is no folder, or a target names no story of the workspace at `root`.
  * @param root The workspace root.
  * @param dir The targets' folder.
  */
-const matchesIn = (root: string, dir: string): Match[] => {
+const matchesIn = (root: string, dir: string) => {
   if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory())
     throw new Refusal(`--targets ${dir} is no folder: name the folder the targets are in`);
   const { matches, unknown } = matchesOf(targetsOf(fs.readdirSync(dir)), knownIds(root));
@@ -180,15 +182,15 @@ const matchesIn = (root: string, dir: string): Match[] => {
         unknown.map((target) => `${target.file} (the nearest ids: ${target.nearest.join(', ')})`).join('; ') +
         '; rename each target-<story id>[-light|-dark].png after a story the board holds',
     );
-  return matches;
+  return matches satisfies Match[];
 };
 
 /** The story files of the workspace at `root`, in path order. */
-const storyFiles = (root: string): string[] =>
+const storyFiles = (root: string) =>
   git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '--', BOARD])
     .split('\n')
     .filter((file) => isStoryFile(file) && fs.existsSync(path.join(root, file)))
-    .sort();
+    .sort() satisfies string[];
 
 /**
  * What `changed` touches of the stories of the workspace at `root`: the ids of each touched story file, in path order, and the bare
@@ -196,19 +198,22 @@ const storyFiles = (root: string): string[] =>
  * @param root The workspace root.
  * @param changed The paths the change touched, from the workspace root.
  */
-export const touchedOf = (root: string, changed: readonly string[]): { stories: string[]; bare: string[] } => {
+export const touchedOf = (root: string, changed: readonly string[]) => {
   const drawn = drawnIn(root);
   const reach = storyFiles(root).map((story) => reachOf(root, story, drawn));
   const owing = [...new Set(changed.filter((file) => owesAStory(file) && fs.existsSync(path.join(root, file))))];
   const touched = storiesTouched(changed, reach, owing);
-  return { stories: touched.stories.flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))), bare: [...touched.bare] };
+  return {
+    stories: touched.stories.flatMap((file) => idsOf(fs.readFileSync(path.join(root, file), 'utf8'))),
+    bare: [...touched.bare],
+  } satisfies { stories: string[]; bare: string[] };
 };
 
 /** Serves the built Storybook at `dir` on loopback while `use` runs, handing it the address: MSW's worker needs a secure origin. */
-async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<T> {
+async function served<T>(dir: string, use: (at: string) => Promise<T>) {
   const server = await serveBuilt(dir);
   try {
-    return await use(server.at);
+    return (await use(server.at)) satisfies T;
   } finally {
     server.close();
   }
@@ -218,7 +223,7 @@ async function served<T>(dir: string, use: (at: string) => Promise<T>): Promise<
  * Draws each of `pictures` whose story the Storybook at `dir` holds into `out` as `<prefix><id>-<theme>.png`, by the e2e's
  * `photograph`, which stills every animation for the shot, theme by theme; the pictures drawn.
  */
-async function shootAll(browser: Browser, dir: string, pictures: readonly Picture[], out: string, prefix: string): Promise<Picture[]> {
+async function shootAll(browser: Browser, dir: string, pictures: readonly Picture[], out: string, prefix: string) {
   const { photograph } = await import('../board.ts');
   const held = new Set(builtIds(dir));
   const shot = pictures.filter(({ id }) => held.has(id));
@@ -240,7 +245,7 @@ async function shootAll(browser: Browser, dir: string, pictures: readonly Pictur
 }
 
 /** Whether the pictures `before` and `after` differ by a pixel, and where they do, a picture of it: each differing pixel red. */
-async function differ(browser: Browser, before: string, after: string): Promise<{ differs: boolean; png: Buffer }> {
+async function differ(browser: Browser, before: string, after: string) {
   const page = await browser.newPage();
   try {
     const [a, b] = [before, after].map((file) => `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`);
@@ -282,7 +287,10 @@ async function differ(browser: Browser, before: string, after: string): Promise<
       },
       [a, b],
     );
-    return { differs: found.differs, png: Buffer.from(found.url.slice(found.url.indexOf(',') + 1), 'base64') };
+    return { differs: found.differs, png: Buffer.from(found.url.slice(found.url.indexOf(',') + 1), 'base64') } satisfies {
+      differs: boolean;
+      png: Buffer;
+    };
   } finally {
     await page.close();
   }
@@ -298,14 +306,14 @@ process.on('exit', () => {
  * A scratch folder of its own under the machine's temp directory, removed as the script exits: a script run by hand, not a test, so no
  * runner's hooks take the kit's roots away (`test-kit/scratch` registers Vitest's, which throw outside a run).
  */
-const scratch = async (prefix: string): Promise<string> => {
+const scratch = async (prefix: string) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   made.push(dir);
   return dir;
 };
 
 /** Extracts the board at `commit` into a scratch folder over the checkout's `node_modules`; the board's folder there. */
-async function boardAt(root: string, commit: string): Promise<string> {
+async function boardAt(root: string, commit: string) {
   const dir = await scratch('nemia-stories-base-');
   const archive = spawnSync('git', ['archive', '--format=tar', commit, BOARD], { cwd: root, maxBuffer: 1 << 30 });
   if (archive.status !== 0) throw new Refusal(`git archive ${commit} ${BOARD} failed: ${archive.stderr.toString().trim()}`);
@@ -325,7 +333,7 @@ const EARLIER = /^(?:(?:before|after|diff|story|match)-.+\.png|stories\.json)$/;
  * not there yet holds none. How many it removed.
  * @param out The pictures' folder, `--out`.
  */
-export const clearEarlier = (out: string): number => {
+export const clearEarlier = (out: string) => {
   if (!fs.statSync(out, { throwIfNoEntry: false })?.isDirectory()) return 0;
   const entries = fs.readdirSync(out, { withFileTypes: true });
   const earlier = entries.filter((entry) => entry.isFile() && EARLIER.test(entry.name));
@@ -373,7 +381,7 @@ type Side = { root: string; cache: string | undefined; out: string; opened: () =
  * @param files Its story files, from the root.
  * @param ids The story ids wanted.
  */
-export const reachesOf = (root: string, files: readonly string[], ids: readonly string[]): Map<string, string[]> => {
+export const reachesOf = (root: string, files: readonly string[], ids: readonly string[]) => {
   const drawn = drawnIn(root);
   const reaches = new Map<string, string[]>();
   for (const file of files) {
@@ -382,30 +390,30 @@ export const reachesOf = (root: string, files: readonly string[], ids: readonly 
     const reach = [...reachOf(root, file, drawn).reaches];
     for (const id of held) reaches.set(id, reach);
   }
-  return reaches;
+  return reaches satisfies Map<string, string[]>;
 };
 
 /** The story files of the board extracted at `root`, read off its folder, in path order: a `git archive` holds no repository. */
-const storyFilesIn = (root: string): string[] => {
+const storyFilesIn = (root: string) => {
   const components = path.join(root, BOARD, 'src', 'components');
-  if (!fs.existsSync(components)) return [];
+  if (!fs.existsSync(components)) return [] satisfies string[];
   return fs
     .readdirSync(components, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(root, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
     .filter(isStoryFile)
-    .sort();
+    .sort() satisfies string[];
 };
 
 /**
  * Pictures `pictured` at the head into `out` as `story-<id>-<theme>.png`: each the cache holds copied, the rest drawn from a build of
  * the checkout's Storybook, made only where one is left to draw, and kept in the cache.
  */
-async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pictured: readonly string[] }): Promise<Counts> {
+async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pictured: readonly string[] }) {
   const wanted = picturesOf(pictured);
   const keys = keysOf(root, root, reachesOf(root, storyFiles(root), pictured), wanted);
   const missing = takenFromCache(cache, keys, wanted, out, 'story-');
-  if (missing.length === 0) return { copied: wanted.length, rendered: 0 };
+  if (missing.length === 0) return { copied: wanted.length, rendered: 0 } satisfies Counts;
   const built = path.join(await scratch('nemia-stories-head-'), 'static');
   const why = await buildStorybook(root, path.join(root, BOARD), built);
   if (why !== undefined) throw new Refusal(why);
@@ -418,7 +426,7 @@ async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pict
     );
   const drawn = await shootAll(await opened(), built, missing, out, 'story-');
   keptInCache(cache, keys, drawn, out, 'story-');
-  return { copied: wanted.length - missing.length, rendered: drawn.length };
+  return { copied: wanted.length - missing.length, rendered: drawn.length } satisfies Counts;
 }
 
 /**
@@ -426,14 +434,7 @@ async function drawnAtHead({ root, cache, out, pictured, opened }: Side & { pict
  * copied, the rest drawn from a build of the base's board, extracted over the checkout's `node_modules`, made only where one is left to
  * draw, and kept in the cache; why where the base would not build.
  */
-async function drawnAtBase({
-  root,
-  cache,
-  out,
-  commit,
-  shot,
-  opened,
-}: Side & { commit: string; shot: readonly string[] }): Promise<{ counts: Counts; why?: string }> {
+async function drawnAtBase({ root, cache, out, commit, shot, opened }: Side & { commit: string; shot: readonly string[] }) {
   const board = await boardAt(root, commit);
   const baseRoot = path.resolve(board, '..', '..');
   const reaches = reachesOf(baseRoot, storyFilesIn(baseRoot), shot);
@@ -441,13 +442,13 @@ async function drawnAtBase({
   const keys = keysOf(baseRoot, root, reaches, wanted);
   const missing = takenFromCache(cache, keys, wanted, out, 'before-');
   const copied = wanted.length - missing.length;
-  if (missing.length === 0) return { counts: { copied, rendered: 0 } };
+  if (missing.length === 0) return { counts: { copied, rendered: 0 } } satisfies { counts: Counts; why?: string };
   const built = path.join(await scratch('nemia-stories-built-base-'), 'static');
   const why = await buildStorybook(root, board, built);
-  if (why !== undefined) return { counts: { copied, rendered: 0 }, why };
+  if (why !== undefined) return { counts: { copied, rendered: 0 }, why } satisfies { counts: Counts; why?: string };
   const drawn = await shootAll(await opened(), built, missing, out, 'before-');
   keptInCache(cache, keys, drawn, out, 'before-');
-  return { counts: { copied, rendered: drawn.length } };
+  return { counts: { copied, rendered: drawn.length } } satisfies { counts: Counts; why?: string };
 }
 
 /**
@@ -455,12 +456,7 @@ async function drawnAtBase({
  * `diff-<id>-<theme>.png` into `out` for each theme they differ in; two pictures of the same bytes differ in none, and are compared in
  * no browser.
  */
-async function compared(
-  opened: () => Promise<Browser>,
-  shot: readonly string[],
-  beforeDir: string,
-  out: string,
-): Promise<{ fresh: string[]; changed: string[] }> {
+async function compared(opened: () => Promise<Browser>, shot: readonly string[], beforeDir: string, out: string) {
   const before = shot.filter((id) => THEMES.every((theme) => fs.existsSync(path.join(beforeDir, pictureName('before-', { id, theme })))));
   const changed: string[] = [];
   for (const id of before) {
@@ -478,11 +474,11 @@ async function compared(
     }
     if (differs) changed.push(id);
   }
-  return { fresh: shot.filter((id) => !before.includes(id)), changed };
+  return { fresh: shot.filter((id) => !before.includes(id)), changed } satisfies { fresh: string[]; changed: string[] };
 }
 
 /** Sets each target of `matches` in `targetsDir` beside its story's picture at the head in `out`, as its `match-<id>-<theme>.png`. */
-async function composeAll(root: string, browser: Browser, targetsDir: string, matches: readonly Match[], out: string): Promise<void> {
+async function composeAll(root: string, browser: Browser, targetsDir: string, matches: readonly Match[], out: string) {
   const short = git(root, ['rev-parse', '--short', 'HEAD']).trim();
   const css = fs.readFileSync(path.join(root, BOARD, 'theme', 'theme.css'), 'utf8');
   for (const match of matches) {
@@ -500,7 +496,7 @@ async function composeAll(root: string, browser: Browser, targetsDir: string, ma
   );
 }
 
-async function main(): Promise<number> {
+async function main() {
   const { values, positionals } = argsOf(process.argv.slice(2));
   const root = rootOf(process.cwd());
   if (positionals.length > 0 && values.changed === undefined) throw new Refusal(`a path is named after --changed: ${USAGE}`);
@@ -540,7 +536,7 @@ async function main(): Promise<number> {
   const pictured = [...stories, ...matched.filter((id) => !stories.includes(id))];
   const cache = values['no-cache'] ? undefined : cacheDirOf(root);
   let browser: Browser | undefined;
-  const opened = async (): Promise<Browser> => (browser ??= await (await import('playwright')).chromium.launch());
+  const opened = async () => (browser ??= await (await import('playwright')).chromium.launch()) satisfies Browser;
   try {
     if (pictured.length > 0) {
       report.pictures.head = await drawnAtHead({ root, cache, out, pictured, opened });

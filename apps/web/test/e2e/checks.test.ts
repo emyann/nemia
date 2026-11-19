@@ -86,7 +86,7 @@ async function servedPage(html: string) {
 }
 
 /** A stream opened by the page, in `window.es` for the page to close, answered with its headers before this resolves. */
-async function opened(page: Page, pathname: string): Promise<void> {
+async function opened(page: Page, pathname: string) {
   await Promise.all([
     page.waitForResponse((r) => new URL(r.url()).pathname === pathname),
     page.evaluate((p) => {

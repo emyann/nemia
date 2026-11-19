@@ -28,11 +28,11 @@ const NO_CHECK: GateSite = { workflow: 'ship', step: 'draft', approvedFirst: fal
 const CHECKED: GateSite = { workflow: 'ship', step: 'build', approvedFirst: false, hasCheck: true };
 
 /** Every word a person reads in a table: each miss, each suggestion's own words, and what keeps a rule now. */
-const wordsOf = (table: ReturnType<typeof gateRows>): string[] =>
+const wordsOf = (table: ReturnType<typeof gateRows>) =>
   table.rows.flatMap((row) => [...row.misses.map((m) => m.words), ...(row.now ?? []).map((n) => n.words)]);
 
 /** Whether `words` hold a condition's id outside the phrase a rule says it in, a brace, or a file's name. */
-const readsAsCode = (words: string): boolean => {
+const readsAsCode = (words: string) => {
   const prose = Object.values(CONDITION_WORDS).reduce((rest, phrase) => rest.split(phrase).join(' '), words);
   return CONDITIONS.some((c) => new RegExp(`\\b${c}\\b`).test(prose)) || /[{}]/.test(words) || /\w\/\w|\.(ts|md|json|ya?ml)\b/.test(words);
 };

@@ -1075,16 +1075,25 @@ const SKILLS_CLOSEOUT = {
 const PLUGIN_SKILL = 'nemia-aeprobe:say-the-word';
 
 /** The skills Claude Code listed to the model in the session `id`'s transcript (its `skill_listing`), and how many it counted. */
-const skillListing = (id: string | undefined): { count?: number; names: string[] } | undefined => {
+const skillListing = (id: string | undefined) => {
   const file = id ? claudeTranscriptFile(id) : undefined;
-  if (file === undefined || !fs.existsSync(file)) return undefined;
+  if (file === undefined || !fs.existsSync(file)) {
+    const made: { count?: number; names: string[] } | undefined = undefined;
+    return made;
+  }
   for (const l of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
     const a = (JSON.parse(l) as { attachment?: { type?: string; content?: string; skillCount?: number } }).attachment;
     if (a?.type !== 'skill_listing') continue;
     const names = (a.content ?? '').split('\n').flatMap((line) => /^- ([^:\s]+(?::[^:\s]+)?):/.exec(line)?.[1] ?? []);
-    return { count: a.skillCount, names };
+    {
+      const made: { count?: number; names: string[] } | undefined = { count: a.skillCount, names };
+      return made;
+    }
   }
-  return { names: [] };
+  {
+    const made: { count?: number; names: string[] } | undefined = { names: [] };
+    return made;
+  }
 };
 
 test.skipIf(skip)(
@@ -1169,9 +1178,10 @@ const LIGHT_CLOSEOUT = {
  * What a session's transcript says it was sent: the tools of its first request (`api-request-shape`), each by name with whether it was
  * deferred (`defer_loading`), and the path of every `CLAUDE.md` attached as it read into a folder (`nested_memory`).
  */
-const firstRequest = (id: string | undefined): { tools: { name: string; deferred: boolean }[]; nested: string[] } | undefined => {
+const firstRequest = (id: string | undefined) => {
   const file = id ? claudeTranscriptFile(id) : undefined;
-  if (file === undefined || !fs.existsSync(file)) return undefined;
+  if (file === undefined || !fs.existsSync(file))
+    return undefined satisfies { tools: { name: string; deferred: boolean }[]; nested: string[] } | undefined;
   let tools: { name: string; deferred: boolean }[] | undefined;
   const nested: string[] = [];
   for (const l of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
@@ -1184,7 +1194,7 @@ const firstRequest = (id: string | undefined): { tools: { name: string; deferred
       tools = (row.shape?.tools ?? []).map((t) => ({ name: t.name ?? '', deferred: t.defer_loading === true }));
     if (row.attachment?.type === 'nested_memory' && row.attachment.path) nested.push(row.attachment.path);
   }
-  return { tools: tools ?? [], nested };
+  return { tools: tools ?? [], nested } satisfies { tools: { name: string; deferred: boolean }[]; nested: string[] } | undefined;
 };
 
 test.skipIf(skip)(
@@ -1280,9 +1290,9 @@ test.skipIf(skip)(
 );
 
 /** The running totals Claude Code saved in the session `id`'s transcript as each of its processes exited, in order. */
-const savedTotals = (id: string | undefined): number[] => {
+const savedTotals = (id: string | undefined) => {
   const file = id ? claudeTranscriptFile(id) : undefined;
-  if (file === undefined || !fs.existsSync(file)) return [];
+  if (file === undefined || !fs.existsSync(file)) return [] satisfies number[];
   return fs
     .readFileSync(file, 'utf8')
     .split('\n')
@@ -1290,13 +1300,13 @@ const savedTotals = (id: string | undefined): number[] => {
     .flatMap((l) => {
       const line = JSON.parse(l) as { type?: string; totalCostUSD?: number };
       return line.type === 'cost-state' && typeof line.totalCostUSD === 'number' ? [line.totalCostUSD] : [];
-    });
+    }) satisfies number[];
 };
 
 /** The `total_cost_usd` of each result an attached session's capture holds, in order, its processes one after another. */
-const totalsOf = (root: string, name: string): number[] => {
+const totalsOf = (root: string, name: string) => {
   const out = filesOf(root, name).out;
-  if (!fs.existsSync(out)) return [];
+  if (!fs.existsSync(out)) return [] satisfies number[];
   return fs
     .readFileSync(out, 'utf8')
     .split('\n')
@@ -1304,7 +1314,7 @@ const totalsOf = (root: string, name: string): number[] => {
     .flatMap((l) => {
       const line = JSON.parse(l) as { type?: string; total_cost_usd?: number };
       return line.type === 'result' && typeof line.total_cost_usd === 'number' ? [line.total_cost_usd] : [];
-    });
+    }) satisfies number[];
 };
 
 const CUT_BRIEF =

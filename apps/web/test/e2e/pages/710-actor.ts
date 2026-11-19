@@ -13,7 +13,7 @@ const APPROVER = { kind: 'person', token: 'laptop' } as const;
 const HOLDER = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
 
 /** The hold the page writes on REGATED, until HELD lands. */
-const holdFile = (): string => path.join(store!, 'runs', `${REGATED.id}.hold`);
+const holdFile = () => path.join(store!, 'runs', `${REGATED.id}.hold`);
 
 export default {
   /**

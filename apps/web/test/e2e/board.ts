@@ -13,27 +13,18 @@ import {
   type RunList,
   type ScheduleList,
 } from 'objects';
-import {
-  FINISHED_SELECTOR,
-  FINISHED_SIZE,
-  finishedOf,
-  OPEN_SELECTOR,
-  openOf,
-  rowsOf,
-  type FinishedPage,
-  type OpenRuns,
-} from '../../src/lib/api/runs.ts';
-import { judged, type RunView } from '../../src/lib/api/judged.ts';
-import { factoryViewOf, type Factory } from '../../src/lib/api/factories.ts';
+import { FINISHED_SELECTOR, FINISHED_SIZE, finishedOf, OPEN_SELECTOR, openOf, rowsOf } from '../../src/lib/api/runs.ts';
+import { judged } from '../../src/lib/api/judged.ts';
+import { factoryViewOf } from '../../src/lib/api/factories.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
 import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
 /** The factory a page sits in, read from its path as the board reads it (`seatOf`, src/components/nav/nav.ts): none for the store's. */
-export const pickedIn = (url: URL): string | null => {
+export const pickedIn = (url: URL) => {
   const name = /^\/factories\/([^/]+)/.exec(url.pathname)?.[1];
-  return name === undefined ? null : decodeURIComponent(name);
+  return (name === undefined ? null : decodeURIComponent(name)) satisfies string | null;
 };
 
 /** The store rail's groups, in their order, each with its destinations in theirs. */
@@ -50,63 +41,63 @@ export const RAIL_PLACES: readonly string[] = RAIL_GROUPS.flatMap(([, places]) =
 export const PANE_PLACES = ['Floor', 'Runs', 'Inbox', 'Workflows', 'Agents', 'Skills', 'Proposals', 'Settings'] as const;
 
 /** The store's rail at the left of a window not narrow: her face, the menu button on a factory's page, and the groups. */
-export const railColumnOf = (page: Page): Locator => page.locator('[data-frame-rail]');
+export const railColumnOf = (page: Page) => page.locator('[data-frame-rail]') satisfies Locator;
 
 /** The destinations of the frame, the rail's on a wide window and the drawer's on a narrow one. */
-export const railOf = (page: Page): Locator => page.locator('[data-frame-rail], [aria-label="Places"]');
+export const railOf = (page: Page) => page.locator('[data-frame-rail], [aria-label="Places"]') satisfies Locator;
 
 /** The rail's destination named `name`, by its label, whatever its badge adds to its name; never a place of the pane in the drawer. */
-export const railPlace = (page: Page, name: string): Locator =>
+export const railPlace = (page: Page, name: string) =>
   railOf(page)
     .getByRole('link')
     .and(page.locator(':not([data-pane-place])'))
-    .filter({ has: page.getByText(name, { exact: true }) });
+    .filter({ has: page.getByText(name, { exact: true }) }) satisfies Locator;
 
 /** The destinations the rail lights: the page's own, one at most on every page of the board. */
-export const litOf = (page: Page): Locator => railOf(page).locator('a[aria-current="page"]:not([data-pane-place])');
+export const litOf = (page: Page) => railOf(page).locator('a[aria-current="page"]:not([data-pane-place])') satisfies Locator;
 
 /** The factory pane, docked beside the rail or in the narrow screen's drawer. */
-export const paneOf = (page: Page): Locator => page.locator('[data-factory-pane]');
+export const paneOf = (page: Page) => page.locator('[data-factory-pane]') satisfies Locator;
 
 /** The pane's place named `name`. */
-export const placeOf = (page: Page, name: (typeof PANE_PLACES)[number]): Locator =>
-  paneOf(page).locator(`a[data-pane-place="${name.toLowerCase()}"]`);
+export const placeOf = (page: Page, name: (typeof PANE_PLACES)[number]) =>
+  paneOf(page).locator(`a[data-pane-place="${name.toLowerCase()}"]`) satisfies Locator;
 
 /** The pane's place lit: the one the page sits at. */
-export const placeLitOf = (page: Page): Locator => paneOf(page).locator('a[data-pane-place][aria-current="page"]');
+export const placeLitOf = (page: Page) => paneOf(page).locator('a[data-pane-place][aria-current="page"]') satisfies Locator;
 
 /** The frame's strip of Settings' tabs, under the page's head and above the page. */
-export const frameTabsOf = (page: Page): Locator => page.getByRole('tablist', { name: 'Settings', exact: true });
+export const frameTabsOf = (page: Page) => page.getByRole('tablist', { name: 'Settings', exact: true }) satisfies Locator;
 
 /**
  * A level of a deep page's trail, by its name: a link up to that level's page, or the page itself, the last.
  * @param page The page whose head draws the trail.
  * @param name The level's name.
  */
-export const trailLevel = (page: Page, name: string): Locator =>
-  page.getByRole('navigation', { name: 'Where you are' }).getByRole('link', { name, exact: true });
+export const trailLevel = (page: Page, name: string) =>
+  page.getByRole('navigation', { name: 'Where you are' }).getByRole('link', { name, exact: true }) satisfies Locator;
 
 /** The page's head, one line over the page's column. */
-export const topBarOf = (page: Page): Locator => page.locator('header[data-frame-header]');
+export const topBarOf = (page: Page) => page.locator('header[data-frame-header]') satisfies Locator;
 
 /** The machine bar at the window's foot. */
-export const machineBarOf = (page: Page): Locator => page.locator('footer[data-machine-bar]');
+export const machineBarOf = (page: Page) => page.locator('footer[data-machine-bar]') satisfies Locator;
 
 /** The factory pane's switcher. */
-export const pickerOf = (page: Page): Locator => page.locator('[data-factory-picker]');
+export const pickerOf = (page: Page) => page.locator('[data-factory-picker]') satisfies Locator;
 
 /** The pane's lists, each a link: the Runs, the Inbox and the Workflows of its factory. */
-export const sectionsOf = (page: Page): Locator =>
-  paneOf(page).locator('a[data-pane-place="runs"], a[data-pane-place="inbox"], a[data-pane-place="workflows"]');
+export const sectionsOf = (page: Page) =>
+  paneOf(page).locator('a[data-pane-place="runs"], a[data-pane-place="inbox"], a[data-pane-place="workflows"]') satisfies Locator;
 
 /** The pane's Start a run, which opens the start of a run in the frame's side sheet. */
-export const startOf = (page: Page): Locator => paneOf(page).getByRole('button', { name: 'Start a run' });
+export const startOf = (page: Page) => paneOf(page).getByRole('button', { name: 'Start a run' }) satisfies Locator;
 
 /** The machine bar's line, which opens the machine's gauges in the frame's side sheet. */
-export const gaugesButtonOf = (page: Page): Locator => machineBarOf(page).locator('button[data-gauges-button]');
+export const gaugesButtonOf = (page: Page) => machineBarOf(page).locator('button[data-gauges-button]') satisfies Locator;
 
 /** Opens the machine's gauges in the frame's side sheet, unless they are open, and returns the bar. */
-export async function gaugesOf(page: Page): Promise<Locator> {
+export async function gaugesOf(page: Page) {
   const bar = page.locator('aside[data-bar="gauges"]');
   if (!(await bar.isVisible())) await gaugesButtonOf(page).click();
   await expectVisible(bar, 'the machine bar opens the gauges in the side sheet');
@@ -114,7 +105,7 @@ export async function gaugesOf(page: Page): Promise<Locator> {
 }
 
 /** Picks the factory `choice` in the pane's switcher. */
-export async function pick(page: Page, choice: string): Promise<void> {
+export async function pick(page: Page, choice: string) {
   await pickerOf(page).locator('button').first().click();
   await page
     .getByRole('option')
@@ -129,7 +120,7 @@ export async function pick(page: Page, choice: string): Promise<void> {
  * @param select The Select's root.
  * @param word The option's words.
  */
-export async function pickIn(page: Page, select: Locator, word: string): Promise<void> {
+export async function pickIn(page: Page, select: Locator, word: string) {
   await select.locator('[data-slot="select-trigger"]').click();
   const menu = page.locator('[data-slot="select-popover"]');
   await menu.getByRole('option', { name: word, exact: true }).click();
@@ -141,7 +132,7 @@ export async function pickIn(page: Page, select: Locator, word: string): Promise
  * @param page The page the Select's options open over.
  * @param select The Select's root.
  */
-export async function optionsIn(page: Page, select: Locator): Promise<string[]> {
+export async function optionsIn(page: Page, select: Locator) {
   await select.locator('[data-slot="select-trigger"]').click();
   const menu = page.locator('[data-slot="select-popover"]');
   await menu.getByRole('option').first().waitFor();
@@ -155,13 +146,13 @@ export async function optionsIn(page: Page, select: Locator): Promise<string[]> 
  * The words of the option the kit's Select `select` holds picked, `''` while it holds none.
  * @param select The Select's root.
  */
-export async function heldIn(select: Locator): Promise<string> {
+export async function heldIn(select: Locator) {
   if ((await select.locator('[data-slot="select-trigger"]').getAttribute('data-populated')) === null) return '';
   return ((await select.locator('[data-slot="select-value"]').textContent()) ?? '').trim();
 }
 
 /** Opens the Select pressed at `trigger` and picks the level said `word` among its options. */
-export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | 'Semi-auto' | 'Auto'): Promise<void> {
+export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | 'Semi-auto' | 'Auto') {
   await trigger.click();
   await page.getByRole('option', { name: word, exact: true }).click();
 }
@@ -170,7 +161,7 @@ export async function pickLevel(page: Page, trigger: Locator, word: 'Manual' | '
  * On every page of a window not narrow: the machine bar with its gauges, the store's rail with its groups and their destinations in
  * their order, one lit at most; and on a factory's page whose pane is docked, the pane's switcher reading that factory.
  */
-export async function sidebar(page: Page): Promise<void> {
+export async function sidebar(page: Page) {
   await expectVisible(gaugesButtonOf(page), 'the machine bar has its gauges');
   for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the rail has ${place}`);
   await expectCount(
@@ -188,7 +179,7 @@ export async function sidebar(page: Page): Promise<void> {
 }
 
 /** That the pane's switcher reads `name`, the factory the page sits in. */
-export async function expectPicked(page: Page, name: string): Promise<void> {
+export async function expectPicked(page: Page, name: string) {
   await expectVisible(
     pickerOf(page).locator('[data-slot="select-value"]').getByText(name, { exact: true }),
     `the switcher reads ${name}, the factory the page sits in`,
@@ -200,7 +191,7 @@ export async function expectPicked(page: Page, name: string): Promise<void> {
  * watched as the page itself is. A page of its own rather than a reload: a reload cuts off an in-flight
  * refetch, which the watch would rightly count as a failed request.
  */
-export async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Promise<void> {
+export async function nextVisit(page: Page, check: (again: Page) => Promise<void>) {
   const again = await page.context().newPage();
   try {
     const { problems } = watch(again);
@@ -224,7 +215,7 @@ export async function nextVisit(page: Page, check: (again: Page) => Promise<void
  */
 export function fed(run: string, word: string): void;
 export function fed(run: string, step: string, word: string): void;
-export function fed(run: string, ...said: [string] | [string, string]): void {
+export function fed(run: string, ...said: [string] | [string, string]) {
   const [step, word] = said.length === 2 ? said : [undefined, said[0]];
   const line = { at: new Date().toISOString(), run, ...(step !== undefined ? { step } : {}), word };
   fs.appendFileSync(path.join(store!, 'feed.jsonl'), `${JSON.stringify(line)}\n`);
@@ -235,23 +226,23 @@ export function fed(run: string, ...said: [string] | [string, string]): void {
  * `{ at, daemon, word }`, the pid and `daemon started`): for a page that writes a `daemon.json` by hand, where no daemon runs to say so,
  * and a board that must see it on the feed rather than on the fallback a minute later. A report and never an input, as `fed`'s lines are.
  */
-export function fedDaemon(pid: number = process.pid): void {
+export function fedDaemon(pid: number = process.pid) {
   const line = { at: new Date().toISOString(), daemon: pid, word: 'daemon started' };
   fs.appendFileSync(path.join(store!, 'feed.jsonl'), `${JSON.stringify(line)}\n`);
 }
 
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
-export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
+export const cancelledAt = () => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
 /** The frame's bar, in its side sheet, while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
-export const stepBar = (page: Page, run: string, step: string): Locator => page.locator(`aside[data-bar="step:${run}/${step}"]`);
+export const stepBar = (page: Page, run: string, step: string) => page.locator(`aside[data-bar="step:${run}/${step}"]`) satisfies Locator;
 
 /**
  * The Clock cell's button of `row` — or the Cost cell's, by `cell` — reached by the table's own arrow keys from the row: the keyboard
  * alone, which is what makes the focus a visible one and so opens the preview — React Aria opens a tooltip on focus only where the focus
  * came from the keyboard. `where` names the table the row is in, for the refusal.
  */
-export async function reachClock(page: Page, row: Locator, where: string, cell: 'clock' | 'cost' = 'clock'): Promise<Locator> {
+export async function reachClock(page: Page, row: Locator, where: string, cell: 'clock' | 'cost' = 'clock') {
   const button = row.locator(`td[data-${cell}] button`);
   await row.scrollIntoViewIfNeeded();
   await row.focus();
@@ -262,8 +253,8 @@ export async function reachClock(page: Page, row: Locator, where: string, cell: 
 }
 
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
-export const themeOf = (page: Page): Promise<string> =>
-  page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+export const themeOf = (page: Page) =>
+  page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) satisfies Promise<string>;
 
 /**
  * Takes a picture of a page or of what a locator finds into `file`, with every CSS animation stilled for the shot and played again after
@@ -283,7 +274,7 @@ export async function photograph(
     always = false,
     ...options
   }: { fullPage?: boolean; always?: boolean; clip?: { x: number; y: number; width: number; height: number } } = {},
-): Promise<void> {
+) {
   if (!photographing && !always) return;
   const putBack = options.fullPage && 'viewportSize' in target ? await grownToPage(target, file) : undefined;
   try {
@@ -298,14 +289,14 @@ export async function photograph(
 export const TALLEST_WINDOW = 16_384;
 
 /** How tall `page`'s document is, measured as Playwright measures a full-page picture. */
-const pageHeight = (page: Page): Promise<number> =>
+const pageHeight = (page: Page) =>
   page.evaluate(() => {
     const { body, documentElement: root } = document;
     return Math.max(body.scrollHeight, root.scrollHeight, body.offsetHeight, root.offsetHeight, body.clientHeight, root.clientHeight);
-  });
+  }) satisfies Promise<number>;
 
 /** Resolves once `page` has drawn two more frames: what a resize or a scroll changes is laid out and painted. */
-const twoFrames = (page: Page): Promise<void> =>
+const twoFrames = (page: Page) =>
   page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 
 /**
@@ -314,7 +305,7 @@ const twoFrames = (page: Page): Promise<void> =>
  * back, or with nothing, having changed nothing, when the page fits its window, has none, or is taller than `TALLEST_WINDOW`: that last
  * is said on the log with `file`'s name, since its picture shows the frame where the window was.
  */
-async function grownToPage(page: Page, file: string): Promise<(() => Promise<void>) | undefined> {
+async function grownToPage(page: Page, file: string) {
   const size = page.viewportSize();
   let height = await pageHeight(page);
   if (!size || height <= size.height) return undefined;
@@ -403,7 +394,7 @@ async function waitForLife(page: Page, face: string, ok: 'alive' | 'still', asse
  * breathing and blinking with the pointer away from it. With reduced motion asked for, none of its idle loops runs; no longer asked, they
  * run again, without a reload. Leaves the pointer in the page's top-right corner and reduced motion not asked for.
  */
-export async function expectAlive(page: Page, face: string, who: string): Promise<void> {
+export async function expectAlive(page: Page, face: string, who: string) {
   await page.locator(face).scrollIntoViewIfNeeded();
   await page.mouse.move((page.viewportSize()?.width ?? 1280) - 5, 5, { steps: 4 });
   await waitForLife(page, face, 'alive', `${who}'s face moves with nothing hovering it`);
@@ -420,17 +411,20 @@ export const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
  * The path of the Card's verbs the board sends, in whatever namespace: the cards filed into (no `name`), a card (`name`), or its `verb`
  * (`queue`, `unqueue`, `start`, `labels`) — as a pattern, since a card's namespace is its factory, `default` for none.
  */
-export const cardsPath = (name?: string, verb?: string): RegExp =>
+export const cardsPath = (name?: string, verb?: string) =>
   new RegExp(
     `^/api/namespaces/[^/]+/cards${name === undefined ? '' : `/${encodeURIComponent(name)}`}${verb === undefined ? '' : `/${verb}`}$`,
-  );
+  ) satisfies RegExp;
 
 /** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
-export const filesIn = (dir: string): Array<[string, string]> =>
+export const filesIn = (dir: string) =>
   fs
     .readdirSync(dir)
     .sort()
-    .map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
+    .map((name) => [
+      name,
+      fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)',
+    ]) satisfies Array<[string, string]>;
 
 /**
  * A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — or at `level` where the page
@@ -440,7 +434,7 @@ export async function expectRendered(
   body: Locator,
   text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string },
   level = 4,
-): Promise<void> {
+) {
   await expectVisible(body.getByRole('heading', { level, name: text.heading }), `its ## is a heading, an h${level} (${text.heading})`);
   await expectTexts(body.locator('ul > li'), text.items, `its list is a list (${text.items.join(' · ')})`);
   for (const cell of text.cells ?? [])
@@ -459,7 +453,7 @@ type KeyRow = { key: string; value: string | null; meaning: string };
  * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says
  * it. `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
  */
-export async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>): Promise<void> {
+export async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>) {
   const answered = await page.request.get(new URL(api, page.url()).href);
   if (!answered.ok()) throw new Refused(`GET ${api} answers the page's keys — it answered ${answered.status()}`);
   const { keys } = (await answered.json()) as { keys: KeyRow[] };
@@ -474,7 +468,7 @@ export async function expectKeys(page: Page, file: Locator, api: string, set: Re
  * `CARD_KEYS`' order, each with its value — or `not set` — and what it means (`CARD_KEY_MEANINGS`). `set` is what the card's file sets, by
  * key, as the seed wrote it, of a card in the default factory: every other key reads `not set`.
  */
-export async function expectCardKeys(page: Page, file: Locator, name: string, set: Readonly<Record<string, string>>): Promise<void> {
+export async function expectCardKeys(page: Page, file: Locator, name: string, set: Readonly<Record<string, string>>) {
   const api = `/api/cards/${name}`;
   const answered = await page.request.get(new URL(api, page.url()).href);
   if (!answered.ok()) throw new Refused(`GET ${api} answers the card — it answered ${answered.status()}`);
@@ -491,7 +485,7 @@ export async function expectCardKeys(page: Page, file: Locator, name: string, se
 }
 
 /** The key table's rows: one per row of `keys`, in its order, each with its value — or `not set` — and what it means. */
-async function expectKeyRows(page: Page, file: Locator, keys: readonly KeyRow[]): Promise<void> {
+async function expectKeyRows(page: Page, file: Locator, keys: readonly KeyRow[]) {
   const rows = file.locator('section[aria-label="Keys"] tr[data-key]');
   await expectCount(rows, keys.length, `a row per key (${keys.map((k) => k.key).join(', ')})`);
   const order = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-key')));
@@ -509,7 +503,7 @@ async function expectKeyRows(page: Page, file: Locator, keys: readonly KeyRow[])
 }
 
 /** Source: the file as written, frontmatter included, in place of what the page renders of it — and back. */
-export async function expectSource(file: Locator, body: Locator, onDisk: string): Promise<void> {
+export async function expectSource(file: Locator, body: Locator, onDisk: string) {
   const toggle = file.getByRole('button', { name: 'Source' });
   await toggle.click();
   const source = file.locator('pre[data-source]');
@@ -531,7 +525,7 @@ export async function expectSource(file: Locator, body: Locator, onDisk: string)
  * Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id: what the quota pages
  * write.
  */
-export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): string {
+export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered') {
   const file = path.join(API, 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
   return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 }
@@ -556,7 +550,7 @@ export const QUOTA_ANSWER_MS = QUOTA_ASKS_MS + 2_000;
  * it. A page that wrote the same state twice in a row would pass on an answer from before its change. Refuses, naming the state it waited
  * for and the state and `askedAt` of each answer it saw, when none came in `state` within `QUOTA_ANSWER_MS`.
  */
-export async function reloadForQuota(page: Page, state: string): Promise<void> {
+export async function reloadForQuota(page: Page, state: string) {
   const seen: string[] = [];
   const answered = page.waitForResponse(
     async (r) => {
@@ -582,11 +576,11 @@ export async function reloadForQuota(page: Page, state: string): Promise<void> {
 export const LEDGER = 'section[aria-label="Every step"]';
 
 /** A step's part at L in `scope`: its row of the run page's ledger, the step bar's part or the step page's. */
-export const partOf = (scope: Page | Locator, step: string): Locator =>
-  scope.locator(`article[data-step-part="L"][data-step-name="${step}"]`);
+export const partOf = (scope: Page | Locator, step: string) =>
+  scope.locator(`article[data-step-part="L"][data-step-name="${step}"]`) satisfies Locator;
 
 /** The first fold `name` in `scope`, opened if it is closed (a fold draws what it holds only once open), and returned. */
-export async function openFold(scope: Locator, name: string): Promise<Locator> {
+export async function openFold(scope: Locator, name: string) {
   const fold = scope.locator(`[data-fold="${name}"]`).first();
   const trigger = fold.locator(':scope > [data-slot="disclosure-trigger"]');
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
@@ -595,7 +589,7 @@ export async function openFold(scope: Locator, name: string): Promise<Locator> {
 }
 
 /** The run page's menu of actions on `page`, opened: its button pressed and the kit's menu that holds Remove, Hold or Lift, and Prune. */
-export async function openRunMenu(page: Page): Promise<Locator> {
+export async function openRunMenu(page: Page) {
   const menu = page.getByRole('menu', { name: /^Actions on / });
   if (!(await menu.isVisible())) await page.locator('button[data-run-menu]').click();
   await expectVisible(menu, "the run's menu opens on its actions");
@@ -609,7 +603,7 @@ export async function openRunMenu(page: Page): Promise<Locator> {
  * @param label What the action's item says.
  * @param asked The name the question's dialog is given (`Hold <run>`, `Lift the hold on <run>`).
  */
-export async function askRunAction(page: Page, label: string, asked: string): Promise<Locator> {
+export async function askRunAction(page: Page, label: string, asked: string) {
   await (await openRunMenu(page)).getByRole('menuitem', { name: label, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: asked });
   await expectVisible(dialog, `${label} asks its question once the menu closes`);
@@ -620,10 +614,10 @@ export async function askRunAction(page: Page, label: string, asked: string): Pr
  * The actions the run page's menu holds, as its button names them (`remove`, `hold` or `lift`, `prune`): none where the page, read, draws
  * no menu.
  */
-export async function runMenuActions(page: Page): Promise<string[]> {
+export async function runMenuActions(page: Page) {
   await expectVisible(page.locator('header[data-run-header]'), "the run's header is drawn");
   const menu = page.locator('button[data-run-menu]');
-  if (!(await menu.count())) return [];
+  if (!(await menu.count())) return [] satisfies string[];
   return ((await menu.getAttribute('data-run-menu')) ?? '').split(' ').filter(Boolean);
 }
 
@@ -631,12 +625,12 @@ export async function runMenuActions(page: Page): Promise<string[]> {
  * The Debug panel of the step part `part`, opened: its Detail fold opened, its trigger pressed and the path of `taskId` drawn, with the
  * lifecycle it is drawn on.
  */
-export async function openDebug(part: Locator, taskId: string): Promise<{ panel: Locator; lifecycle: Locator }> {
+export async function openDebug(part: Locator, taskId: string) {
   const detail = await openFold(part, 'detail');
   const panel = detail.getByRole('region', { name: 'Debug' });
   await panel.getByRole('button', { name: /Debug$/ }).click();
   await expectVisible(panel.locator(`[data-path="${taskId}"]`), `opened, the Debug panel draws the path of ${taskId}`);
-  return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') };
+  return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') } satisfies { panel: Locator; lifecycle: Locator };
 }
 
 /**
@@ -650,9 +644,9 @@ export const DREW_WITHIN_MS = 90_000;
  * The clocks the page may have drawn an instant with, read now: the one this read sees, and the oldest `DREW_WITHIN_MS` allows.
  * Oldest first, so a refusal names the page's own form first.
  */
-const drewWith = (): readonly Date[] => {
+const drewWith = () => {
   const now = new Date();
-  return [new Date(now.getTime() - DREW_WITHIN_MS), now];
+  return [new Date(now.getTime() - DREW_WITHIN_MS), now] satisfies readonly Date[];
 };
 
 /**
@@ -665,7 +659,7 @@ const drewWith = (): readonly Date[] => {
  * @param triggers The marks, links or buttons the tooltips hang off.
  * @param what What the triggers are, named in the refusal.
  */
-export async function tipsOf(triggers: Locator, what: string): Promise<string[]> {
+export async function tipsOf(triggers: Locator, what: string) {
   const page = triggers.page();
   const said: string[] = [];
   await page.mouse.move(1, 1);
@@ -699,7 +693,7 @@ export async function expectInstant(
   about: string,
   what: string,
   words: (at: Date, timeZone: string, now: Date) => string = (at, timeZone, now) => instantWords(at, now, timeZone),
-): Promise<void> {
+) {
   const timeZone = await time.page().evaluate(() => new Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [at, text, title] = [await time.getAttribute('datetime'), await time.textContent(), await time.getAttribute('title')];
   if (!at) throw new Refused(`${what} is a time with its instant — it has no datetime`);
@@ -711,12 +705,12 @@ export async function expectInstant(
 }
 
 /** What the api answers at `pathname`, read apart from the page: the page's own requests do not count it. */
-export async function answered<T>(page: Page, pathname: string): Promise<T> {
+export async function answered<T>(page: Page, pathname: string) {
   return (await (await page.request.get(new URL(pathname, page.url()).href)).json()) as T;
 }
 
 /** The path of a RunList read: every factory's (`/api/runs`), or the namespace of `factory`'s, with `query` encoded as the client does. */
-export const runListPath = (factory: string | undefined, query: Record<string, string> = {}): string => {
+export const runListPath = (factory: string | undefined, query: Record<string, string> = {}) => {
   const params = new URLSearchParams(query).toString();
   return `${factory === undefined ? '/api/runs' : `/api/namespaces/${encodeURIComponent(factory)}/runs`}${params ? `?${params}` : ''}`;
 };
@@ -725,18 +719,18 @@ export const runListPath = (factory: string | undefined, query: Record<string, s
  * Every run, read apart from the page as the board reads them: the plain RunList whole (`GET /api/runs`, a page of the most a page
  * holds), each run's view (`rowsOf`). The api judges every run of the seed: a run it could not judge is refused.
  */
-export const rowsAnswered = async (page: Page): Promise<RunView[]> =>
+export const rowsAnswered = async (page: Page) =>
   rowsOf(await answered<RunList>(page, runListPath(undefined, { limit: String(LIST_PAGE.most) }))).map((row) => {
     if (judged(row)) return row;
     throw new Refused(`the api judges every run of the seed: it could not judge ${row.id} (${row.unjudged})`);
   });
 
 /** The frame, read apart from the page as the board reads it: the RunList of the runs not finished, of every factory or `factory`'s. */
-export const openAnswered = async (page: Page, factory?: string): Promise<OpenRuns> =>
+export const openAnswered = async (page: Page, factory?: string) =>
   openOf(await answered<RunList>(page, runListPath(factory, { fieldSelector: OPEN_SELECTOR })));
 
 /** A page of the finished runs, read apart from the page as the board reads it: nine from the token `from`, the first for none. */
-export const finishedAnswered = async (page: Page, factory?: string, from?: string): Promise<FinishedPage> =>
+export const finishedAnswered = async (page: Page, factory?: string, from?: string) =>
   finishedOf(
     await answered<RunList>(
       page,
@@ -748,23 +742,23 @@ export const finishedAnswered = async (page: Page, factory?: string, from?: stri
  * Whether `pathname` is the run `id` on its namespaced path, in whichever namespace it is: the run itself (its removal), or with `tail` one
  * of its named actions (`/hold`, `/labels`, `/steps/<step>/retry`).
  */
-export const isRunAction = (pathname: string, id: string, tail = ''): boolean =>
+export const isRunAction = (pathname: string, id: string, tail = '') =>
   /^\/api\/namespaces\/[^/]+\/runs\/(.+)$/.exec(pathname)?.[1] === `${id}${tail}`;
 
 /** The namespaced path of the run `id` (`/api/namespaces/<factory>/runs/<id>`), its namespace read off its object. */
-export async function runPath(page: Page, id: string): Promise<string> {
+export async function runPath(page: Page, id: string) {
   const run = await answered<{ metadata: { namespace?: string; labels: Record<string, string> } }>(page, `/api/runs/${id}`);
   return `/api/namespaces/${run.metadata.namespace ?? run.metadata.labels.factory ?? 'default'}/runs/${id}`;
 }
 
 /** Whether `pathname` is a run's start, in whichever namespace (`POST /api/namespaces/<factory>/runs`). */
-export const isRunStart = (pathname: string): boolean => /^\/api\/namespaces\/[^/]+\/runs$/.test(pathname);
+export const isRunStart = (pathname: string) => /^\/api\/namespaces\/[^/]+\/runs$/.test(pathname);
 
 /**
  * The factories as the board's pages draw them, read apart from the page: the api's `FactoryList` (a page of the most a page holds),
  * each factory's lines and, but for the default factory, its schedules, made the board's view as the board makes it (`factoryViewOf`).
  */
-export async function factoriesAnswered(page: Page): Promise<Factory[]> {
+export async function factoriesAnswered(page: Page) {
   const listed = await answered<FactoryList>(page, `/api/factories?limit=${LIST_PAGE.most}`);
   return Promise.all(
     listed.items.map(async (factory) => {
@@ -784,7 +778,7 @@ export async function factoriesAnswered(page: Page): Promise<Factory[]> {
  * Photographs the whole page as `<name>-<what>-<theme>.png` in the window it is in, then 390 wide as `<name>-<what>-phone-<theme>.png`,
  * and puts the window back. Takes none unless the page is pictured (`photograph`); the window is narrowed and put back all the same.
  */
-export async function photographBothWidths(page: Page, out: string, name: string, what: string): Promise<void> {
+export async function photographBothWidths(page: Page, out: string, name: string, what: string) {
   const size = page.viewportSize() ?? { width: 1280, height: 800 };
   const theme = await themeOf(page);
   await photograph(page, path.join(out, `${name}-${what}-${theme}.png`), { fullPage: true });
@@ -850,7 +844,7 @@ export type HerChat = {
  * The id her chat gives the line at `i` of `said`: `m:1:e<i>:0` for her words, the `0` their place in the message's content, and
  * `t:1:e<i>` for a tool call.
  */
-export const herEvent = (said: readonly HerLine[], i: number): string => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
+export const herEvent = (said: readonly HerLine[], i: number) => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
 
 /**
  * Her session's run file (`attachedRun`): in a turn the engine reads it `working`, and her phase answering; its turn over it is `idle`,
@@ -860,7 +854,7 @@ export const herEvent = (said: readonly HerLine[], i: number): string => ('text'
 const herRun = (state: 'working' | 'idle', startedAt: string) => attachedRun(`ae/${NEMIA_TASK}/1`, NEMIA_SESSION, state, startedAt);
 
 /** One line of her transcript as Claude Code writes it, `seconds` before now. */
-const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
+const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string) => {
   const head = {
     sessionId: NEMIA_SESSION,
     isSidechain: false,
@@ -870,13 +864,19 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
     uuid: `e${i}`,
     timestamp: at(i * 4),
   };
-  if ('text' in line) return [{ ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: line.text }] } }];
+  if ('text' in line) {
+    const made: object[] = [{ ...head, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: line.text }] } }];
+    return made;
+  }
   const call = {
     ...head,
     type: 'assistant',
     message: { role: 'assistant', content: [{ type: 'tool_use', id: `e${i}`, name: line.tool, input: { description: line.says } }] },
   };
-  if (line.result === undefined) return [call];
+  if (line.result === undefined) {
+    const made: object[] = [call];
+    return made;
+  }
   const result = {
     ...head,
     uuid: `r${i}`,
@@ -884,7 +884,10 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
     type: 'user',
     message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `e${i}`, content: line.result }] },
   };
-  return [call, result];
+  {
+    const made: object[] = [call, result];
+    return made;
+  }
 };
 
 /**
@@ -896,7 +899,7 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
  * Answers what takes it back: every file it made removed. A page calls it in a `try` and
  * the take-back in its `finally`, so no page after it reads her.
  */
-export function herChat(what: HerChat): () => void {
+export function herChat(what: HerChat) {
   const root = store!;
   const now = Date.now();
   const at = (seconds: number) => new Date(now - 600_000 + seconds * 1000).toISOString();
@@ -971,12 +974,12 @@ export function herChat(what: HerChat): () => void {
     fs.mkdirSync(path.join(nemiaDir, 'chat'), { recursive: true });
     fs.writeFileSync(path.join(nemiaDir, 'chat', 'read.json'), `${JSON.stringify({ through: what.read, at: at(600) })}\n`);
   }
-  return () => {
+  return (() => {
     fs.rmSync(nemiaDir, { recursive: true, force: true });
     fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'claude', 'projects', NEMIA_PROJECT), { recursive: true, force: true });
     fs.rmSync(herRunFile, { force: true });
-  };
+  }) satisfies () => void;
 }
 
 /**
@@ -988,22 +991,22 @@ export function herChat(what: HerChat): () => void {
  * Answers what puts it back — the file as it was, or gone where there was none — so the read works on the beat after and the band goes.
  * Called between `herChat` and its take-back, whose removal of her folder would take the file too.
  */
-export function herChatUnreadable(): () => void {
+export function herChatUnreadable() {
   const file = path.join(store!, 'nemia', 'chat', 'outbox.jsonl');
   const held = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${held ?? ''}{"id":"half-written"}\n`);
-  return () => {
+  return (() => {
     if (held === undefined) fs.rmSync(file, { force: true });
     else fs.writeFileSync(file, held);
-  };
+  }) satisfies () => void;
 }
 
 /**
  * Her turn over, as her holder writes it once a turn of the session it holds has ended: her run file `idle`, which the engine reads
  * `input-required`, so her presence says she is no longer answering. Taken back with the rest by `herChat`'s take-back.
  */
-export function herTurnOver(): void {
+export function herTurnOver() {
   const { run } = attachedFiles(store!, `ae/${NEMIA_TASK}/1`);
   fs.writeFileSync(run, JSON.stringify({ ...(JSON.parse(fs.readFileSync(run, 'utf8')) as object), state: 'idle' }));
 }
@@ -1012,21 +1015,21 @@ export function herTurnOver(): void {
  * The stop the api writes when the turn she was answering is ended, on her chat's own file as `chatStop` appends it: one line, so a
  * second visit of a page reads the one stop it made. Her chat draws it as the keeper's quiet marker.
  */
-export function herStopped(at: string): void {
+export function herStopped(at: string) {
   const dir = path.join(store!, 'nemia', 'chat');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
 }
 
 /** Her face in the rail (or in the top bar on a narrow screen), the frame's side sheet that holds her chat or a bar, and her panel. */
-export const herFaceOf = (page: Page): Locator => page.locator('[data-nemia-face-button]');
-export const herSheetOf = (page: Page): Locator => page.locator('[data-slot="side-sheet"]');
+export const herFaceOf = (page: Page) => page.locator('[data-nemia-face-button]') satisfies Locator;
+export const herSheetOf = (page: Page) => page.locator('[data-slot="side-sheet"]') satisfies Locator;
 
 /** The frame's docked sheet's holder, which says how it stands (`data-frame-sheet`) and what it shows (`data-sheet-shows`). */
-export const frameSheetOf = (page: Page): Locator => page.locator('[data-frame-sheet]');
+export const frameSheetOf = (page: Page) => page.locator('[data-frame-sheet]') satisfies Locator;
 
 /** The frame's docked sheet comes to show `shows`, within `WAIT_MS`: what the address's `?bar=` names, her chat, or nothing. */
-export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none', assertion: string): Promise<void> {
+export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none', assertion: string) {
   try {
     await page.locator(`[data-frame-sheet][data-sheet-shows="${shows}"]`).waitFor({ state: 'attached', timeout: WAIT_MS });
   } catch {
@@ -1036,16 +1039,16 @@ export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none'
     throw new Refused(`${assertion} — the sheet shows ${now}`);
   }
 }
-export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
+export const chatPanelOf = (page: Page) => page.locator('[data-chat-panel]') satisfies Locator;
 
 /**
  * The words of every cue her face says now, in its order: none where her face counts none (`data-nemia-cues`), else read off the tooltip
  * a fresh hover of her face opens.
  */
-export async function herCues(page: Page): Promise<string[]> {
+export async function herCues(page: Page) {
   const face = herFaceOf(page);
   const count = Number(await face.getAttribute('data-nemia-cues', { timeout: WAIT_MS }));
-  if (count === 0) return [];
+  if (count === 0) return [] satisfies string[];
   await page.mouse.move(0, 0);
   await face.hover();
   const cues = page.locator('[data-nemia-cues] [data-cue]');
@@ -1054,7 +1057,7 @@ export async function herCues(page: Page): Promise<string[]> {
 }
 
 /** Her cues come to hold what `holds` asks of their words, within `timeout`, each read by a fresh hover (`herCues`). */
-export async function expectCues(page: Page, holds: (words: string[]) => boolean, assertion: string, timeout = WAIT_MS): Promise<void> {
+export async function expectCues(page: Page, holds: (words: string[]) => boolean, assertion: string, timeout = WAIT_MS) {
   await expectNone(
     async () => {
       const words = await herCues(page);
@@ -1069,7 +1072,7 @@ export async function expectCues(page: Page, holds: (words: string[]) => boolean
  * `element` is in the window and nothing is drawn over it: the element at the centre of its box is it or inside it. What a fixed layer
  * laid over a page's foot would fail.
  */
-export async function expectUncovered(element: Locator, assertion: string): Promise<void> {
+export async function expectUncovered(element: Locator, assertion: string) {
   const seen = await element.evaluate((own) => {
     const box = own.getBoundingClientRect();
     const x = box.left + box.width / 2;
@@ -1083,7 +1086,7 @@ export async function expectUncovered(element: Locator, assertion: string): Prom
 }
 
 /** Opens her side sheet from her face, and waits for the panel in it and for the sheet to have come in whole. */
-export async function openChat(page: Page): Promise<Locator> {
+export async function openChat(page: Page) {
   await herFaceOf(page).click();
   const panel = chatPanelOf(page);
   await expectVisible(panel, "her face in the rail opens Nemia's chat");
@@ -1092,7 +1095,7 @@ export async function openChat(page: Page): Promise<Locator> {
 }
 
 /** Her sheet, docked or modal, has come in whole: it stands at the right of the window, its slide or its widening done. */
-export async function expectSheetIn(page: Page): Promise<void> {
+export async function expectSheetIn(page: Page) {
   await expectNone(
     () =>
       herSheetOf(page).evaluate((sheet) => {
@@ -1107,7 +1110,7 @@ export async function expectSheetIn(page: Page): Promise<void> {
  * The panel stands wholly inside the window, and its composer wholly inside its frame: the header's three controls can be reached, the
  * frame's cut corners are drawn, and nothing of the panel is laid over the page beneath it.
  */
-export async function expectPanelHeld(page: Page): Promise<void> {
+export async function expectPanelHeld(page: Page) {
   const room = page.viewportSize();
   const panel = await chatPanelOf(page).boundingBox();
   if (room === null || panel === null) throw new Refused('the panel has a size to measure');
@@ -1127,7 +1130,7 @@ export async function expectPanelHeld(page: Page): Promise<void> {
 }
 
 /** The composer's field in her chat. */
-export const chatFieldOf = (page: Page): Locator => page.locator('[data-chat-composer] textarea');
+export const chatFieldOf = (page: Page) => page.locator('[data-chat-composer] textarea') satisfies Locator;
 
 /** The piece the e2e plants in every readiness read the board makes: missing, and a run waits on it, so the setup banner is raised. */
 export const BANNER_PIECE = {
@@ -1148,7 +1151,7 @@ export const READINESS_ROUTE = '**/api/readiness';
  * the api's own read on the board routes it on to the api itself (`page.route` with `route.continue()`, which a page's route takes before
  * the context's).
  */
-export async function bannerShown(context: BrowserContext): Promise<void> {
+export async function bannerShown(context: BrowserContext) {
   await context.route(READINESS_ROUTE, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const response = await route.fetch();
@@ -1163,7 +1166,7 @@ export async function bannerShown(context: BrowserContext): Promise<void> {
  * by nothing, and each agent's row shows at least the agent's name, the words before its first ` · `, whole inside its row (the rest of
  * the row may be cut short). The intent's 'A.', 'Q.' and 'd…' at 1280 beside her sheet are what this refuses.
  */
-export async function expectStripWhole(page: Page, assertion: string): Promise<void> {
+export async function expectStripWhole(page: Page, assertion: string) {
   const strip = page.locator('[data-overview-strip]');
   await expectCount(strip.locator('[data-strip-heading]'), 3, `${assertion}: the strip shows its three headings`);
   await expectUncut(strip.locator('[data-strip-heading]'), `${assertion}: each heading is read whole`);
@@ -1198,7 +1201,7 @@ export async function expectStripWhole(page: Page, assertion: string): Promise<v
  * @param name The run's id, the card's or the proposal's name, which the snackbar names.
  * @param assertion What the page asserts by it.
  */
-export async function snackbarSaying(page: Page, name: string, assertion: string): Promise<Locator> {
+export async function snackbarSaying(page: Page, name: string, assertion: string) {
   const said = page.locator('[data-slot="snackbar-region"] [data-slot="snackbar"]', { hasText: name });
   await expectVisible(said, assertion);
   return said;

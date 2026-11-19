@@ -27,7 +27,7 @@ const NEWER: VersionAnswer = {
 const CHECKOUT: VersionAnswer = { version: '0.3.0', release: { kind: 'checkout', root: '/code/nemia' } };
 
 /** An upgrade to v0.4.0 in `phase`, having printed `output`. */
-const upgrade = (phase: Upgrade['phase'], output = 'Fetching v0.4.0\n'): Upgrade => ({
+const upgrade = (phase: Upgrade['phase'], output = 'Fetching v0.4.0\n') => ({
   id: 'u-1',
   tag: 'v0.4.0',
   from: 'v0.3.0',
@@ -37,7 +37,7 @@ const upgrade = (phase: Upgrade['phase'], output = 'Fetching v0.4.0\n'): Upgrade
 });
 
 /** The section over both reads answered. */
-const section = (version: VersionAnswer, upgrades?: UpgradesRead): Promise<string> =>
+const section = (version: VersionAnswer, upgrades?: UpgradesRead) =>
   upgrades === undefined
     ? routedWith(createElement(ServerRelease), [[['version'], version]])
     : routedWith(createElement(ServerRelease), [

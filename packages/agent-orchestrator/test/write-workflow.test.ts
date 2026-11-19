@@ -26,7 +26,7 @@ fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: tr
 fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
 
 /** A copy of the tests' team's `dev` — README, comments and all — as a workflow of the store's, named `name`. */
-function devIn(name: string): string {
+function devIn(name: string) {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
   for (const file of fs.readdirSync(TEAM_DEV)) fs.copyFileSync(path.join(TEAM_DEV, file), path.join(dir, file));
@@ -34,8 +34,8 @@ function devIn(name: string): string {
 }
 
 /** Every file under `dir`, by its path from `dir`, with what it holds: what a refused write must leave as it was. */
-function snapshot(dir: string): Record<string, string> {
-  if (!fs.existsSync(dir)) return {};
+function snapshot(dir: string) {
+  if (!fs.existsSync(dir)) return {} satisfies Record<string, string>;
   return Object.fromEntries(
     fs
       .readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -45,11 +45,11 @@ function snapshot(dir: string): Record<string, string> {
         return [path.relative(dir, at), fs.readFileSync(at, 'utf8')];
       })
       .sort(([a], [b]) => (a < b ? -1 : 1)),
-  );
+  ) satisfies Record<string, string>;
 }
 
 /** The refusal `write` threw — a `WorkflowError`, exit 2 — with `dir` asserted as it was before it; fails the test if it wrote. */
-function refusal(dir: string, write: () => unknown): string {
+function refusal(dir: string, write: () => unknown) {
   const before = snapshot(dir);
   const existed = fs.existsSync(dir);
   try {
@@ -64,7 +64,8 @@ function refusal(dir: string, write: () => unknown): string {
   return assert.fail(`${dir} was written, and should have been refused`);
 }
 
-const step = (name: string, more: Partial<StepDraft> = {}): StepDraft => ({ name, after: [], place: 'git', body: `${name} it`, ...more });
+const step = (name: string, more: Partial<StepDraft> = {}) =>
+  ({ name, after: [], place: 'git', body: `${name} it`, ...more }) satisfies StepDraft;
 
 test("a workflow's steps written back as they were leave every file as it was — comments included — and read back as the steps", () => {
   const dir = devIn('as-it-was');
@@ -191,7 +192,7 @@ test("written where the board lists workflows from — the store's workflows/ an
 type Refused = { row: string; dir: () => string; write: (dir: string) => unknown; naming: string[]; asLoaded?: (dir: string) => string };
 
 /** What `loadWorkflows` refuses a copy of dev with `file` written as `text` with: a folder on disk read with the words of a write. */
-const loadRefusal = (file: string, text: string): string => {
+const loadRefusal = (file: string, text: string) => {
   const copy = devIn(`copy-${path.basename(file, '.md')}-${Math.random().toString(36).slice(2, 6)}`);
   fs.writeFileSync(path.join(copy, file), text);
   try {
@@ -209,7 +210,7 @@ const devSteps = (dir: string) => loadWorkflows(dir) as [StepSpec, StepSpec, Ste
 const linkedTo = new Map<string, string>();
 
 /** `file` of `dir` moved out of it and linked back in, where it was. */
-const linked = (dir: string, file: string): void => {
+const linked = (dir: string, file: string) => {
   const to = path.join(scratch('wf-write-linked-'), file);
   fs.renameSync(path.join(dir, file), to);
   fs.symlinkSync(to, path.join(dir, file));

@@ -23,9 +23,10 @@ describe('taskSpend: what a task cost is the dollars on its attempts that are ov
     usage: costUsd === undefined ? null : { costUsd },
     ...(limit ? { limit } : {}),
   });
-  const view = (settled: 'succeeded' | 'failed' | 'stopped' | null, ...attempts: Array<ReturnType<typeof attempt>>): TaskClock => ({
-    state: { brief: 'filed', settled, attempts },
-  });
+  const view = (settled: 'succeeded' | 'failed' | 'stopped' | null, ...attempts: Array<ReturnType<typeof attempt>>) =>
+    ({
+      state: { brief: 'filed', settled, attempts },
+    }) satisfies TaskClock;
   test("the ended attempts' dollars, and the harness's cut read off the last attempt's `limit`", () => {
     assert.deepEqual(taskSpend(view('failed', attempt(clock(5), 'harness', 1.25), attempt(clock(9), 'harness', 3.5, 'budget'))), {
       usd: 4.75,
@@ -87,9 +88,10 @@ describe("taskUsage: a step's usage counts the resumed attempts that rebuilt the
     firstContextTokens: first,
     firstCacheWriteTokens: firstWrite,
   });
-  const view = (...attempts: object[]): TaskClock => ({
-    state: { brief: 'b', attempts: attempts as TaskClock['state']['attempts'], settled: 'succeeded' },
-  });
+  const view = (...attempts: object[]) =>
+    ({
+      state: { brief: 'b', attempts: attempts as TaskClock['state']['attempts'], settled: 'succeeded' },
+    }) satisfies TaskClock;
   test('a resumed attempt that rewrote its cache is counted', () => {
     assert.equal(taskUsage(view(attempt(1, cold), attempt(2, rewrote, 'sess-1')))!.rebuiltCaches, 1);
   });
@@ -101,7 +103,7 @@ describe("taskUsage: a step's usage counts the resumed attempts that rebuilt the
 
 describe('budgetUsdFor and budgetOf: what is left of the cap in force goes to the engine', () => {
   const capped: StepSpec = { ...step('implement'), harness: 'claude', budget: 3 };
-  const onRecord = (record?: Run['steps'][string]): Run =>
+  const onRecord = (record?: Run['steps'][string]) =>
     ({ id: 'r1', brief: 'b', workflowDir: '/w', createdAt: 'x', steps: record ? { implement: record } : {} }) as Run;
   const cost = (usd: number) => ({ usd, measured: 1, unmeasured: 0 });
   test('nothing spent: the whole cap', () => {
@@ -125,21 +127,22 @@ describe('budgetUsdFor and budgetOf: what is left of the cap in force goes to th
 });
 
 /** A closeout that gave `output`. */
-const gave = (output: Record<string, unknown>): Closeout => ({ outcome: 'done', summary: 'did it', artifacts: [], output });
+const gave = (output: Record<string, unknown>) => ({ outcome: 'done', summary: 'did it', artifacts: [], output }) satisfies Closeout;
 /** A schema of `fields`, each a required string. */
-const schemaOf = (...fields: string[]): OutputSchema => ({
-  type: 'object',
-  properties: Object.fromEntries(fields.map((f) => [f, { type: 'string' }])),
-  required: fields,
-  additionalProperties: false,
-});
+const schemaOf = (...fields: string[]) =>
+  ({
+    type: 'object',
+    properties: Object.fromEntries(fields.map((f) => [f, { type: 'string' }])),
+    required: fields,
+    additionalProperties: false,
+  }) satisfies OutputSchema;
 /** `implement` as a revision followed after its try was filed declares it: `goal` and a new `why`. */
 const GROWN: StepSpec[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal', 'why') } }];
 /** The same step as it was filed: `goal` alone. */
 const FILED: StepSpec[] = [{ ...step('implement'), output: { file: 'implement.schema.json', schema: schemaOf('goal') } }];
 /** A run on `GROWN` whose `implement` try's record says `record` of its filing, as `runRecord` reads it (`keptDeclared`). */
-const filedAs = (record: { declared?: string[]; closeoutHash?: string }): Run =>
-  keptDeclared(run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } }, workflow: GROWN }));
+const filedAs = (record: { declared?: string[]; closeoutHash?: string }) =>
+  keptDeclared(run({ implement: 'i1' }, { steps: { implement: { taskId: 'i1', ...record } }, workflow: GROWN })) satisfies Run;
 
 /** A looping review and its target, the loop on round `n` with review unfiled. */
 const LOOPING: OutputSchema = {
@@ -153,24 +156,25 @@ const LOOP: StepSpec[] = [
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
 ];
-const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
-  const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}) => {
+  const earlier = (prefix: string, checked: boolean) =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
       cause: 'round' as const,
-    }));
+    })) satisfies EarlierTry[];
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {
     implement: { taskId: `i${n}`, check: { taskId: `c${n}` }, ...tries(earlier('i', true)) },
     review: { taskId: `r${n}`, ...tries(earlier('r', false)) },
     ship: { taskId: null },
   };
-  return run({}, { steps, ...extra });
+  return run({}, { steps, ...extra }) satisfies Run;
 };
-const reviewDue = (n: number): Run => {
+const reviewDue = (n: number) => {
   const r = inRound(n);
-  return { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  const due: Run = { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  return due;
 };
 
 describe("a loop's target and a person's acceptance: what is owed, asked and spent", () => {

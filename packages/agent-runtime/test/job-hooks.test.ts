@@ -16,20 +16,21 @@ import { readJobHold } from '../src/harness/claude/job-hold.ts';
 import { putSessionDrain, sessionDrainFile } from '../src/core/engine/drain.ts';
 
 /** A `PreToolUse` input of `tool`, from a sub-agent where `agent` names one, else from the main thread. */
-const preToolUse = (tool: string, id: string, agent?: string): HookInput => ({
-  session_id: 's1',
-  transcript_path: '/dev/null',
-  cwd: '/',
-  hook_event_name: 'PreToolUse',
-  tool_name: tool,
-  tool_input: {},
-  tool_use_id: id,
-  ...(agent ? { agent_id: agent } : {}),
-});
+const preToolUse = (tool: string, id: string, agent?: string) =>
+  ({
+    session_id: 's1',
+    transcript_path: '/dev/null',
+    cwd: '/',
+    hook_event_name: 'PreToolUse',
+    tool_name: tool,
+    tool_input: {},
+    tool_use_id: id,
+    ...(agent ? { agent_id: agent } : {}),
+  }) satisfies HookInput;
 
 /** Whether `answer` settles within the turn of the event loop a call let through settles in. */
-const answeredNow = (answer: Promise<unknown>): Promise<boolean> =>
-  Promise.race([answer.then(() => true), new Promise<boolean>((r) => setImmediate(() => r(false)))]);
+const answeredNow = (answer: Promise<unknown>) =>
+  Promise.race([answer.then(() => true), new Promise<boolean>((r) => setImmediate(() => r(false)))]) satisfies Promise<boolean>;
 
 test('a job parked under the drain cuts a main-thread call that comes after, and lets a sub-agent’s through', async () => {
   const root = scratch('ae-job-hooks-');

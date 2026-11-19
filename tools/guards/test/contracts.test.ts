@@ -14,7 +14,7 @@ import { readWorkflow, type Workflow } from './ci-workflow.ts';
 import ts from 'typescript';
 import { loadProject, readContract, sourceFile } from '@emyann/tsverify/api';
 import { ALONE, LEGS, commandsOf, contractFilesUnder, legOf } from '../../contracts/legs.ts';
-import { main, type Ran } from '../../contracts/prove.ts';
+import { main } from '../../contracts/prove.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -32,7 +32,7 @@ const CACHE = 'node_modules/.cache/tsverify';
 const LEG = '${{ matrix.leg }}';
 
 /** Where the `contracts` job and the root's script drift from the legs, each said with its fix. */
-const contractsDrift = (workflow: Workflow, script: string | undefined): string[] => {
+const contractsDrift = (workflow: Workflow, script: string | undefined) => {
   const job = workflow.jobs[JOB];
   if (job === undefined) return [`ci.yml has no ${JOB} job: add it back, a matrix of the legs tools/contracts/legs.ts names`];
   const drift: string[] = [];
@@ -54,11 +54,11 @@ const contractsDrift = (workflow: Workflow, script: string | undefined): string[
   return drift;
 };
 
-const rootScript = (): string | undefined =>
+const rootScript = () =>
   (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }).scripts?.contracts;
 
 /** Whether the file at `file` (absolute) exports `name` as a contract tsverify reads, through the program its CLI reads it by. */
-const exportsContract = (file: string, name: string): boolean => {
+const exportsContract = (file: string, name: string) => {
   const config = ts.findConfigFile(path.dirname(file), (f) => ts.sys.fileExists(f));
   assert.ok(config !== undefined, `a tsconfig.json above ${file}`);
   const project = loadProject([file], config);
@@ -136,7 +136,7 @@ test('the contracts job runs every leg with a verdict cache of its own, and npm 
 
 test("REFUSED: a leg left out of the matrix, legs cancelled by one, a leg's command, a cache shared by the legs, and a script of one leg", () => {
   const shipped = readWorkflow();
-  const broken = (edit: (job: NonNullable<Workflow['jobs'][string]>) => void): Workflow => {
+  const broken = (edit: (job: NonNullable<Workflow['jobs'][string]>) => void) => {
     const copy = structuredClone(shipped);
     const job = copy.jobs[JOB];
     assert.ok(job !== undefined, `the ${JOB} job is there today`);
@@ -181,7 +181,7 @@ const UNDECIDED = PLANTED.split('\n').slice(2, 8);
 test('a run whose tsverify left a contract undecided ends on that contract and its fix, after every passing line', async () => {
   const written: string[] = [];
   let first = true;
-  const run = async (): Promise<Ran> => {
+  const run = async () => {
     const ran = first ? { status: 1, output: PLANTED } : { status: 0, output: PLANTED.replace(/◐/g, '✓') };
     first = false;
     return ran;

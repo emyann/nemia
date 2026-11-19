@@ -28,7 +28,7 @@ const PLANTED = ['---', 'workflow: build', 'gate: plan', 'labels:', '  team: cor
 const QUEUED_CARD = PLANTED.replace('workflow: build\n', `workflow: build\nqueued: ${QUEUED}\n`);
 
 /** A card's text: its frontmatter lines, then its body. */
-const card = (keys: readonly string[], body = 'Add a cache to the views.\n\nThe lists come later.\n'): string =>
+const card = (keys: readonly string[], body = 'Add a cache to the views.\n\nThe lists come later.\n') =>
   keys.length ? ['---', ...keys, '---', '', body].join('\n') : body;
 
 type Over<A> = { exit: Exit.Exit<A, unknown>; text: string | null; others: readonly string[] };
@@ -37,7 +37,7 @@ type Over<A> = { exit: Exit.Exit<A, unknown>; text: string | null; others: reado
  * A program run over fresh memory doors with the run `r-1` and the card `add-a-cache-x1y2` (`text`) planted first, a run started from
  * the card where `started`: its exit, the card's text after it, and every other entry's file the door holds.
  */
-function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started?: boolean } = {}): Over<A> {
+function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started?: boolean } = {}) {
   const name$ = CardName.read('add-a-cache-x1y2');
   const all = Effect.gen(function* () {
     const runs = (yield* RunDoor).runs;
@@ -49,22 +49,23 @@ function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started
     const files = (yield* door.entries()).map((entry) => entry.file);
     return { exit, text: yield* door.read(name$), others: files.filter((f) => f !== 'add-a-cache-x1y2.md') };
   });
-  return Effect.runSync(all.pipe(Effect.provide(Layer.mergeAll(runDoorMemory(), cardDoorMemory()))));
+  return Effect.runSync(all.pipe(Effect.provide(Layer.mergeAll(runDoorMemory(), cardDoorMemory())))) satisfies Over<A>;
 }
 
 /** The refusal an exit failed with: its kind and exit code, and its message. */
-function refusal(exit: Exit.Exit<unknown, unknown>): [string, number, string] {
+function refusal(exit: Exit.Exit<unknown, unknown>) {
   if (!Exit.isFailure(exit)) assert.fail('refused');
   const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
   if (failure === undefined || failure._tag !== 'Fail') assert.fail(`a failure, not a defect: ${String(exit.cause)}`);
   const error = failure.error as { _tag: string; exitCode: number; message: string };
-  return [error._tag, error.exitCode, error.message];
+  return [error._tag, error.exitCode, error.message] satisfies [string, number, string];
 }
 
-const edit = (source: string, resourceVersion?: string): CardEdit => ({
-  source,
-  ...(resourceVersion !== undefined ? { resourceVersion } : {}),
-});
+const edit = (source: string, resourceVersion?: string) =>
+  ({
+    source,
+    ...(resourceVersion !== undefined ? { resourceVersion } : {}),
+  }) satisfies CardEdit;
 
 test('a card retitled and cut keeps its name and labels, and takes the text: its workflow, no gate, its body', () => {
   const source = card(['workflow: quick']);

@@ -32,7 +32,7 @@ const ID_GROUND = '[data-id-ground]';
  * Pictures what `selector` finds drawn `times` as large, as `name` in the folder of pictures, and puts it back at its size. `under`
  * is what the pointer is put on once it is enlarged, since what grows moves from under a pointer placed before.
  */
-async function enlarged(page: Page, selector: string, times: number, name: string, under?: string): Promise<void> {
+async function enlarged(page: Page, selector: string, times: number, name: string, under?: string) {
   const part = page.locator(selector);
   await part.evaluate((found, zoom) => ((found as HTMLElement).style.zoom = String(zoom)), times);
   if (under) await page.locator(under).hover();
@@ -44,7 +44,7 @@ async function enlarged(page: Page, selector: string, times: number, name: strin
 }
 
 /** Presses Tab until what has the focus is inside what `selector` finds, from the top of the story, which is drawn alone. */
-async function tabInto(page: Page, selector: string): Promise<void> {
+async function tabInto(page: Page, selector: string) {
   for (let i = 0; i < 40; i += 1) {
     await page.keyboard.press('Tab');
     if (await page.locator(selector).evaluate((found) => found.contains(document.activeElement))) return;
@@ -53,7 +53,7 @@ async function tabInto(page: Page, selector: string): Promise<void> {
 }
 
 /** Takes the focus and the pointer off everything. */
-async function atRest(page: Page): Promise<void> {
+async function atRest(page: Page) {
   await page.mouse.move(0, 0);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
@@ -64,20 +64,20 @@ const ONE_ROW = '[data-framed="one"] [data-cut-frame]';
 const NARROW = '[data-framed="narrow"]';
 
 /** Pictures what `selector` finds as `name` in the folder of pictures, as large as its page draws it. */
-async function pictured(page: Page, selector: string, name: string): Promise<void> {
+async function pictured(page: Page, selector: string, name: string) {
   const file = path.join(OUT, name);
   await photograph(page.locator(selector), file, { always: true });
   console.log(`parts: ${file}`);
 }
 
 /** Writes on what `selector` finds the mark of what scrolls, as the board's listener does, or takes it off. */
-const mark = (page: Page, selector: string, word: 'shown' | null): Promise<void> =>
+const mark = (page: Page, selector: string, word: 'shown' | null) =>
   page
     .locator(selector)
     .evaluate((found, word) => (word ? found.setAttribute('data-scroll-bar', word) : found.removeAttribute('data-scroll-bar')), word);
 
 /** Pictures the bottom-left corner and the right edge of the one-row framed table, as `parts-bars-corner-` and `-edge-<tail>`. */
-async function framedCorners(page: Page, tail: string): Promise<void> {
+async function framedCorners(page: Page, tail: string) {
   await page.locator(ONE_ROW).evaluate((frame) => frame.scrollIntoView({ block: 'center' }));
   const box = await page.locator(ONE_ROW).boundingBox();
   if (!box) throw new Error(`${ONE_ROW} is not drawn`);
@@ -93,7 +93,7 @@ async function framedCorners(page: Page, tail: string): Promise<void> {
 }
 
 /** Pictures the box's scroll bar at rest, while it scrolls, under the pointer and held. */
-async function barStates(page: Page, tail: string): Promise<void> {
+async function barStates(page: Page, tail: string) {
   await page.locator(SCROLLER).evaluate((box) => box.scrollIntoView({ block: 'center' }));
   await pictured(page, SCROLLER, `parts-bars-thumb-rest-${tail}`);
   await mark(page, SCROLLER, 'shown');
@@ -110,7 +110,7 @@ async function barStates(page: Page, tail: string): Promise<void> {
 }
 
 /** Pictures the narrow table's sideways bar, marked as scrolling. */
-async function sideways(page: Page, tail: string): Promise<void> {
+async function sideways(page: Page, tail: string) {
   await page.locator(NARROW).evaluate((table) => table.scrollIntoView({ block: 'center' }));
   await mark(page, `${NARROW} [data-table-box]`, 'shown');
   await pictured(page, NARROW, `parts-bars-sideways-${tail}`);
@@ -120,8 +120,8 @@ async function sideways(page: Page, tail: string): Promise<void> {
 let at = '';
 
 /** The story `id` opened alone in `browser`, in `theme`. */
-const open = (browser: Browser, id: string, theme: 'light' | 'dark', look: Look = {}): Promise<Page> =>
-  openStory(browser, at, theme, id, look);
+const open = (browser: Browser, id: string, theme: 'light' | 'dark', look: Look = {}) =>
+  openStory(browser, at, theme, id, look) satisfies Promise<Page>;
 
 /** Runs `use` on the story `id` opened alone, and closes it. */
 async function onStory(browser: Browser, id: string, theme: 'light' | 'dark', use: (page: Page) => Promise<void>, look: Look = {}) {
@@ -134,7 +134,7 @@ async function onStory(browser: Browser, id: string, theme: 'light' | 'dark', us
 }
 
 /** The pictures of the scroll bars, in a browser of each kind of bar, light then dark. */
-async function barsPictured(): Promise<void> {
+async function barsPictured() {
   const look = { scale: 4, still: true };
   for (const kind of ['classic', 'overlay'] as const) {
     const drawing = await launch(kind);
@@ -152,7 +152,7 @@ async function barsPictured(): Promise<void> {
 }
 
 /** A picture of each story of `ids` but a page body's, as `parts-<id>-<theme>.png`. */
-async function sheets(browser: Browser, ids: readonly string[], theme: 'light' | 'dark'): Promise<void> {
+async function sheets(browser: Browser, ids: readonly string[], theme: 'light' | 'dark') {
   for (const id of ids.filter((one) => !one.startsWith('pages-'))) {
     await onStory(browser, id, theme, async (page) => {
       await page.setViewportSize({ width: 1280, height: 200 });
@@ -164,7 +164,7 @@ async function sheets(browser: Browser, ids: readonly string[], theme: 'light' |
 }
 
 /** The enlarged pictures of the cut, its button, the rail, a page's name, a title and an id, in `theme`. */
-async function closeUps(browser: Browser, theme: 'light' | 'dark'): Promise<void> {
+async function closeUps(browser: Browser, theme: 'light' | 'dark') {
   await onStory(browser, 'look-cutframe--on-the-page', theme, (page) =>
     enlarged(page, '[data-ground="plain"]', 4, `parts-cut-corner-${theme}.png`),
   );
@@ -213,7 +213,7 @@ const STORYBOOK_MS = 5 * 60_000;
  * Builds Nemia's Storybook into `out`, and says how long it took and the most memory its largest process held, as the system's
  * `time` measures them.
  */
-async function buildStorybook(out: string): Promise<void> {
+async function buildStorybook(out: string) {
   const args = ['-v', process.execPath, fromNodeModules(path.join('storybook', 'dist', 'bin', 'dispatcher.js')), 'build', '-o', out];
   const child = spawn('/usr/bin/time', [...args, '--disable-telemetry'], {
     cwd: WEB,
@@ -230,7 +230,7 @@ async function buildStorybook(out: string): Promise<void> {
 }
 
 /** Pictures Storybook's index, served at `at`, with a story of the cut button open. */
-async function storybookPictured(browser: Browser): Promise<void> {
+async function storybookPictured(browser: Browser) {
   for (const theme of ['light', 'dark'] as const) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();

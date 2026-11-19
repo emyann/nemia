@@ -29,26 +29,27 @@ const RUN = {
 } as unknown as Run;
 
 /** A run awaiting a person on `branches`, with `more` of what it awaits. */
-const awaiting = (more: Partial<Extract<Decision, { kind: 'awaiting' }>> = {}): Decision => ({
-  kind: 'awaiting',
-  outcome: 'waiting',
-  branches: ['wf/r-1/implement'],
-  failed: [],
-  awaitingAnswer: [],
-  failedCheck: [],
-  unfinishedCheck: [],
-  unsigned: [],
-  unverified: [],
-  exhausted: [],
-  overBudget: [],
-  budgetExhausted: [],
-  denied: [],
-  awaitingApproval: [],
-  direct: false,
-  ...more,
-});
+const awaiting = (more: Partial<Extract<Decision, { kind: 'awaiting' }>> = {}) =>
+  ({
+    kind: 'awaiting',
+    outcome: 'waiting',
+    branches: ['wf/r-1/implement'],
+    failed: [],
+    awaitingAnswer: [],
+    failedCheck: [],
+    unfinishedCheck: [],
+    unsigned: [],
+    unverified: [],
+    exhausted: [],
+    overBudget: [],
+    budgetExhausted: [],
+    denied: [],
+    awaitingApproval: [],
+    direct: false,
+    ...more,
+  }) satisfies Decision;
 
-const offer = (command: string): Offer => ({ step: 'implement', command, said: `implement: it says so:  ${command}  (--fresh)` });
+const offer = (command: string) => ({ step: 'implement', command, said: `implement: it says so:  ${command}  (--fresh)` }) satisfies Offer;
 
 describe('choicesOf', () => {
   test('each offer is its own bare command, labelled by its verb, with the sentence it ends on', () => {

@@ -53,7 +53,7 @@ const writeTranscript = (sessionId: string, lines: object[]) => {
  * A conversation as Claude Code 2.1.270 writes one: a title, the prompt, a thought, words, a Bash call and its failed result,
  * the StructuredOutput call and its result, and a system line. Nine lines, eight events: a title line is none.
  */
-const conversation = (sessionId: string): object[] => {
+const conversation = (sessionId: string) => {
   const line = { sessionId, isSidechain: false, userType: 'external', cwd: '/code/app', version: '2.1.270', gitBranch: 'main' };
   const said = (type: string, uuid: string, s: number, content: unknown) => ({
     ...line,
@@ -146,7 +146,7 @@ const streamUrl = (step: string, query = '') => `/api/runs/${RUN}/steps/${step}/
 
 type Block = { event?: string; data?: string; id?: string };
 /** Server-sent events as a reader gets them: the fields of each block. */
-const blocks = (text: string): Block[] =>
+const blocks = (text: string) =>
   text
     .split('\n\n')
     .filter((block) => block.trim())
@@ -350,11 +350,7 @@ describe(
 );
 
 /** Read a stream until `until` holds for what it has sent, or it ends. */
-async function readUntil(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  text: { value: string },
-  until: (said: Block[]) => boolean,
-): Promise<Block[]> {
+async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: { value: string }, until: (said: Block[]) => boolean) {
   const decoder = new TextDecoder();
   for (;;) {
     const complete = text.value.slice(0, text.value.lastIndexOf('\n\n') + 2);

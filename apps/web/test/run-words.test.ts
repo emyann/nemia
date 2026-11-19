@@ -36,8 +36,14 @@ const DONE = [
 ] as const;
 
 /** A row of three done steps and `land` saying `word` with its codes, which waits on a person. */
-const landing = (word: Word, extra: Partial<RunView> = {}): RunView =>
-  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], waitingOnYouWords: [COMMAND], ...extra });
+const landing = (word: Word, extra: Partial<RunView> = {}) =>
+  summary([...DONE, ['land', word]], {
+    status: 'failed',
+    moving: false,
+    waitingOnYou: ['land'],
+    waitingOnYouWords: [COMMAND],
+    ...extra,
+  }) satisfies RunView;
 
 const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, waitingOnYou: true };
 const waiting = {
@@ -82,10 +88,11 @@ const ROWS: Record<WaitKind, { row: RunView; says: string; opens: string }> = {
 };
 
 /** `row` with the task of its step `name` set to `taskId`. */
-const tasked = (row: RunView, name: string, taskId: string | null): RunView => ({
-  ...row,
-  steps: row.steps.map((step) => (step.name === name ? { ...step, taskId } : step)),
-});
+const tasked = (row: RunView, name: string, taskId: string | null) =>
+  ({
+    ...row,
+    steps: row.steps.map((step) => (step.name === name ? { ...step, taskId } : step)),
+  }) satisfies RunView;
 
 describe("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's words of each kind of wait", () => {
   test('each kind of wait says its one sentence, over a row of the light answer', () => {
@@ -147,10 +154,11 @@ describe("waitOf, waitSentence, openWord, waitTag: the one sentence and the butt
     assert.equal(waitOf(landing('failed ✗ check (exit 137)'))?.kind, 'check');
   });
   test('a check that did not finish is read off its verdict, never off the words beside it', () => {
-    const said = (row: RunView, message: string, verdict: RunView['steps'][number]['verdict']): RunView => ({
-      ...row,
-      steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, verdict } : step)),
-    });
+    const said = (row: RunView, message: string, verdict: RunView['steps'][number]['verdict']) =>
+      ({
+        ...row,
+        steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, verdict } : step)),
+      }) satisfies RunView;
     const unfinished = landing('failed ✗ check (unfinished)');
     assert.equal(waitOf(said(unfinished, 'failed ✗ check (exit 1)', { result: 'unfinished', exit: null }))?.kind, 'unfinished');
     assert.equal(waitOf(said(unfinished, 'failed ✗ check (unfinished)', { result: 'failed', exit: 1 }))?.kind, 'check');

@@ -26,7 +26,7 @@ const { FactoryBlockNode } = await import('../src/components/factory/FactoryBloc
 const { UnassignedStart } = await import('../src/components/factory/FactoryCardStart.tsx');
 
 /** A factory's block on the Factories canvas, rendered to markup, `inspected` or not. */
-function factoryBlockMarkup(inspected: boolean): string {
+function factoryBlockMarkup(inspected: boolean) {
   const block = {
     name: 'hiring',
     default: false,
@@ -176,7 +176,7 @@ test("REFUSED: the floor's start in a factory of several repositories offers no 
 });
 
 /** A factory's rules as its settings page draws them over the api's answer `read`: the file is `/store/factories/hiring/RULES.md`. */
-async function rulesMarkup(read: { words: string | null; error: string | null }): Promise<string> {
+async function rulesMarkup(read: { words: string | null; error: string | null }) {
   const { FactoryRules } = await import('../src/components/factory/FactoryRules.tsx');
   const { factoryRulesQuery } = await import('../src/lib/api/factories.ts');
   const answer = { name: 'hiring', file: '/store/factories/hiring/RULES.md', ...read };
@@ -212,7 +212,7 @@ test("a factory's rules that cannot be told say why and what they stop, and what
 });
 
 /** The Factories with no factory, drawn over a cache holding the store's lines and Nemia's `level`, or none read yet. */
-async function noFactoryWith(level: Record<string, unknown> | null): Promise<string> {
+async function noFactoryWith(level: Record<string, unknown> | null) {
   const { FactoriesCanvas } = await import('../src/components/factory/FactoriesCanvas.tsx');
   const client = new QueryClient();
   client.setQueryData(['store'], {

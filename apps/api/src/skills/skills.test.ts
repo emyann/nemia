@@ -35,7 +35,7 @@ addFactory({ name: 'bench', volumes: [repo].map((r) => `${r}:rw`) });
 const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** `url` with the scratch repository's `?repo=`, where it asks the default factory and names no repository. */
-const onRepoUrl = (url: string): string =>
+const onRepoUrl = (url: string) =>
   !/^\/api\/namespaces\/default(?:[/?]|$)/.test(url) || /[?&]repo=/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}${ON_REPO}`;
 
 /** `on`, each request it is asked read on the scratch repository (`onRepoUrl`). */
@@ -65,7 +65,7 @@ const [inLibrary, inRepo, toCopy] = ['ask-for-another-round', 'implement-a-chang
 const LIBRARY = path.join(root, 'workflows', 'skills');
 const THEIRS = path.join(repo, '.claude', 'skills');
 
-function skill(dir: string, name: string, text: string): void {
+function skill(dir: string, name: string, text: string) {
   fs.mkdirSync(path.join(dir, name), { recursive: true });
   fs.writeFileSync(path.join(dir, name, 'SKILL.md'), text);
 }
@@ -95,7 +95,7 @@ type SkillObject = {
 };
 
 /** A Skill as the row the retired `GET /api/skills` listed it as: its users of yours by name. */
-const rowOfObject = ({ metadata: { name }, status: o }: SkillObject): SkillRow =>
+const rowOfObject = ({ metadata: { name }, status: o }: SkillObject) =>
   ({
     name,
     from: o.origin,
@@ -120,7 +120,7 @@ const detailOfObject = (o: SkillObject) => {
  * `copy` of a builtin as its `/copy`, a `skill` as the spec named in `metadata`, a `preload` alone as itself, a `version` as
  * `metadata.resourceVersion`. A Skill answered is read as the page the story asserts on; a refusal as it is.
  */
-async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>): Promise<Response> {
+async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string>) {
   const [, name] = /^\/api\/skills\/[^/]+(?:\/([^/]+))?$/.exec(url) ?? [];
   const D = '/api/skills';
   const asked = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : null) as Record<string, unknown> | null;
@@ -143,7 +143,7 @@ async function sentTo(method: 'POST' | 'PUT', url: string, body: unknown, header
 const send = (url: string, body: unknown, headers: Record<string, string> = json) => sentTo('POST', url, body, headers);
 
 /** Every file of the library, by its path in it, with what it holds. */
-const snapshot = (): Record<string, string> =>
+const snapshot = () =>
   Object.fromEntries(
     (fs.readdirSync(LIBRARY, { recursive: true }) as string[])
       .sort()
@@ -151,7 +151,7 @@ const snapshot = (): Record<string, string> =>
       .map((f) => [f, fs.readFileSync(path.join(LIBRARY, f), 'utf8')]),
   );
 
-async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<void> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp) {
   const before = snapshot();
   const answer = await res;
   const body = (await answer.json()) as { error: string };
@@ -166,7 +166,7 @@ async function refused(res: Response | Promise<Response>, status: number, patter
 }
 
 /** The skills by place, as the retired `GET /api/skills` listed them: yours, the repository's, the builtin. */
-async function listed(on: { request: typeof app.request } = app): Promise<SkillPlace[]> {
+async function listed(on: { request: typeof app.request } = app) {
   const places: SkillPlace[] = [];
   for (const from of ['user', 'repo', 'builtin'] as const) {
     const res = await on.request(`/api/namespaces/default/skills?origin=${from}`);
@@ -177,7 +177,7 @@ async function listed(on: { request: typeof app.request } = app): Promise<SkillP
   return places;
 }
 
-const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined =>
+const rowOf = (places: SkillPlace[], from: string, name: string) =>
   places.find((p) => p.from === from)?.skills.find((s) => s.name === name);
 
 test("the skills are listed by place — yours, the repository's, then what is built into Nemia — each name where an agent of yours finds it", async () => {
@@ -356,20 +356,20 @@ type SkillSaved = SkillDetail;
 const put = (url: string, body: unknown, headers: Record<string, string> = json) => sentTo('PUT', url, body, headers);
 
 /** A skill's page, read from the object at its origin. */
-async function pageOf(from: string, name: string): Promise<Response> {
+async function pageOf(from: string, name: string) {
   const res = await app.request(`/api/namespaces/default/skills/${name}?origin=${from}`);
   if (!res.ok) return res;
   return new Response(JSON.stringify(detailOfObject((await res.json()) as SkillObject)), { status: res.status, headers: json });
 }
 
-async function detail(from: string, name: string): Promise<SkillDetail> {
+async function detail(from: string, name: string) {
   const res = await pageOf(from, name);
   const body = await res.json();
   assert.equal(res.status, 200, JSON.stringify(body));
   return body as SkillDetail;
 }
 
-const agentVersionOf = async (name: string): Promise<string> =>
+const agentVersionOf = async (name: string) =>
   ((await (await app.request(`/api/namespaces/default/agents/${name}?origin=user`)).json()) as { metadata: { resourceVersion: string } })
     .metadata.resourceVersion;
 
@@ -664,7 +664,7 @@ test("REFUSED at shipped defaults: a write of the repository's skills, which the
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
 });
 
-function snapshotOf(dir: string): Record<string, string> {
+function snapshotOf(dir: string) {
   return Object.fromEntries(
     (fs.readdirSync(dir, { recursive: true }) as string[])
       .sort()
@@ -706,7 +706,7 @@ test("the picker finds a skill and the agents of yours that give it through the 
 });
 
 /** The cell of `row` under the column `name` of `table`. */
-const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+const cellOf = (table: Table, row: Table['rows'][number], name: string) =>
   row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
 
 test('the skills asked as a Table answer the columns of a skill, a row per skill of the page with its metadata alone, and a line each', async () => {

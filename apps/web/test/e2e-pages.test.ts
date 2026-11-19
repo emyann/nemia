@@ -14,14 +14,14 @@ import { scratch } from 'test-kit/scratch';
  * A directory of pages: each file's name and what it holds — a page named as given, or any text. And a NAMES naming each file that is named
  * as a page is, unless `files` gives one of its own.
  */
-function dirOf(files: Record<string, string>): string {
+function dirOf(files: Record<string, string>) {
   const dir = scratch('nemia-e2e-pages-');
   const names = Object.keys(files).flatMap((file) => /^\d{3}-(.+)\.ts$/.exec(file)?.[1] ?? []);
   for (const [name, text] of Object.entries({ [NAMES]: names.map((name) => `${name}\n`).join(''), ...files }))
     fs.writeFileSync(path.join(dir, name), text);
   return dir;
 }
-const page = (name: string): string => `export default { name: ${JSON.stringify(name)}, route: '/', expect: async () => {} };\n`;
+const page = (name: string) => `export default { name: ${JSON.stringify(name)}, route: '/', expect: async () => {} };\n`;
 
 test('every file in pages/ but NAMES is a page the e2e visits, once, named as its file is, and NAMES names each', async () => {
   const files = fs.readdirSync(PAGES_DIR).filter((file) => file !== NAMES);
@@ -81,7 +81,7 @@ test('a whole run whose pages cost more than their bound fails: the runner throw
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
-    /async function main\(\): Promise<void> \{\s*const started = performance\.now\(\);/,
+    /async function main\(\) \{\s*const started = performance\.now\(\);/,
     'the runner starts its clock first, so the time it says covers the whole run',
   );
   assert.match(
@@ -229,8 +229,8 @@ test('an empty pages/ is refused: an e2e that visits nothing passes', async () =
 
 /** Three pages, in the order they are visited, for a plan to choose from. */
 const ABC = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
-const namesOf = (pages: readonly { name: string }[]): string[] => pages.map((p) => p.name);
-const picturedOf = (plan: { pictured: (name: string) => boolean }): string[] => namesOf(ABC).filter((name) => plan.pictured(name));
+const namesOf = (pages: readonly { name: string }[]) => pages.map((p) => p.name);
+const picturedOf = (plan: { pictured: (name: string) => boolean }) => namesOf(ABC).filter((name) => plan.pictured(name));
 
 test('the e2e visits every page once, in the dark theme, and pictures none, unless it is asked otherwise', () => {
   const plan = planOf([], ABC);

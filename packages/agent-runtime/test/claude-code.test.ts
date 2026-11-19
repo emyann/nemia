@@ -59,7 +59,7 @@ const fake = (plan: object = {}) => {
   return {
     dir,
     /** The lines the stand-in wrote into `file`, each parsed; `undefined` where it wrote none. */
-    said: (file: string): unknown[] | undefined => {
+    said: (file: string) => {
       try {
         return fs
           .readFileSync(path.join(dir, file), 'utf8')

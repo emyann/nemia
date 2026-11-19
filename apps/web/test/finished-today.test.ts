@@ -16,7 +16,7 @@ const finishedRun = (id: string, finishedAt: string) =>
   runObject(detail({ id, status: 'succeeded', moving: false }), { state: 'finished', finishedAt, outcome: 'succeeded' });
 
 /** Each page the api answers, by the `continue` it was asked with ('' for the first), and the URLs it was asked. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Record<string, unknown>): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Record<string, unknown>) {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input: string | URL | Request) => {
@@ -28,14 +28,14 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, pages: Recor
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies string[];
 }
 
 /** The runs finished since `DAY_START`, read through a client of their own. */
-async function readToday(): Promise<FinishedRun[]> {
+async function readToday() {
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedTodayQuery(undefined, DAY_START));
+    return (await client.fetchQuery(finishedTodayQuery(undefined, DAY_START))) satisfies FinishedRun[];
   } finally {
     client.clear();
   }

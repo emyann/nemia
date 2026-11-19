@@ -49,7 +49,7 @@ const at = '2026-09-19T00:10:00.000Z';
 const work = path.join(root, 'runs', 'f-notes', 'work');
 
 /** A task filed in the step's folder on the engine, and signed off. */
-function signedOff(taskId: string, cwd: string): void {
+function signedOff(taskId: string, cwd: string) {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
   standIn().settle(taskId, 'succeeded', {
     exitCode: 0,
@@ -349,7 +349,7 @@ describe("a folder run read on the board: listed by its kind and place, its page
  * The folder team as `shore`'s repository has it, and `shore` filed on that directory, offering it with an agent of the repository's
  * hired into its step: a card names a workflow its factory offers.
  */
-const teamInRepo = (): void => {
+const teamInRepo = () => {
   fs.cpSync(team, path.join(notARepo, 'workflows', 'notes'), { recursive: true });
   fs.mkdirSync(path.join(notARepo, 'workflows', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(notARepo, 'workflows', 'agents', 'scribe.md'), '---\nharness: claude\n---\nYou write notes.\n');
@@ -362,7 +362,7 @@ const teamInRepo = (): void => {
  * An old card, filed before `repo:` was retired, for the team that works on a repository, and started on the one that works in folders,
  * as the board's start form lets a person pick another: a filing refuses a `repo` now, so it is written as it was. Its name.
  */
-const oldCard = (name: string, body: string, repo: string): string => {
+const oldCard = (name: string, body: string, repo: string) => {
   fs.writeFileSync(path.join(root, 'inbox', `${name}.md`), `---\nworkflow: change\nrepo: ${repo}\n---\n${body}\n`);
   return name;
 };
@@ -408,7 +408,7 @@ describe('a folder team as the board finds and files for it, the repository a pl
     async () => {
       const json = { 'content-type': 'application/json' };
       teamInRepo();
-      const file = async (body: string): Promise<string> => {
+      const file = async (body: string) => {
         const res = await app().request('/api/namespaces/default/cards', {
           method: 'POST',
           headers: json,

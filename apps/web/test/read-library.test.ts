@@ -26,7 +26,7 @@ import {
  * Every read answered by `answer` of the path and query it asks, as JSON, for the length of the test; a status of its own where `answer`
  * gives one. Returns the paths asked, in order.
  */
-function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (asked: string) => unknown, status = 200): string[] {
+function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (asked: string) => unknown, status = 200) {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -38,7 +38,7 @@ function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (asked
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies string[];
 }
 
 /** Every read answering `body`, whatever it asks. */
@@ -50,13 +50,14 @@ const readSkills = skillsQuery.queryFn as unknown as () => Promise<SkillPlace[]>
 const readWorkflows = workflowsQuery.queryFn as unknown as () => Promise<WorkflowListing[]>;
 
 /** `workflow()` as its object's view reads it: its graph with a node for each step. */
-const viewed = (listing: WorkflowListing = workflow()): WorkflowListing => ({
-  ...listing,
-  graph: { ...listing.graph, nodes: listing.steps.map((step) => ({ name: step.name, kind: 'step' })) },
-});
+const viewed = (listing: WorkflowListing = workflow()) =>
+  ({
+    ...listing,
+    graph: { ...listing.graph, nodes: listing.steps.map((step) => ({ name: step.name, kind: 'step' })) },
+  }) satisfies WorkflowListing;
 
 /** `value` without `keys`, as an api that does not send them answers. */
-const without = <T extends object>(value: T, ...keys: string[]): T =>
+const without = <T extends object>(value: T, ...keys: string[]) =>
   Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
 
 describe("a step's page and a list of workflows are read in the place named, under a key of that place", () => {

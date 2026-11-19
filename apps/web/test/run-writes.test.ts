@@ -33,11 +33,11 @@ const WRITES = [
  * Every invalidation of one run's own record (`['runs', id]`) written by hand in `text`, across line breaks: `runsMoved` given the run
  * reads it, with the list, so a write that refreshes it by hand is one that forgot the list or calls twice.
  */
-const recordByHand = (text: string): number =>
+const recordByHand = (text: string) =>
   [...text.matchAll(/invalidateQueries\(\s*\{\s*queryKey:\s*\[\s*'runs'\s*,\s*[^,\]\s]+\s*\]/g)].length;
 
 /** Every source file under `dir` that refreshes a run's record by hand, by its path from `dir`, and how many times. */
-const recordByHandIn = (dir: string): Array<{ file: string; times: number }> =>
+const recordByHandIn = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.tsx?$/.test(file))
@@ -51,10 +51,10 @@ const recordByHandIn = (dir: string): Array<{ file: string; times: number }> =>
 const RECORD_ALONE = [{ file: 'components/step/session/SessionComposer.tsx', times: 1 }];
 
 /** Whether `text` invalidates the whole list of the runs by its bare key, in place of `runsMoved`. */
-const byHand = (text: string): boolean => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);
+const byHand = (text: string) => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);
 
 /** Every source file under `dir` that spells the bare key of the whole list, by its path from `dir`, and how many times. */
-const byHandIn = (dir: string): Array<{ file: string; times: number }> =>
+const byHandIn = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.tsx?$/.test(file))

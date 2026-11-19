@@ -98,7 +98,7 @@ const started = (brief: string, dir = FOLDER, more: { after?: string[]; isolate?
   stage.runPlaced(startRun({ brief, repo: REPO, workflowDir: dir, isolate: false, ...more }));
 
 /** The run's record as an early tick wrote it: no workflow frozen on it, its steps read off `dir` on every pass. */
-const unfrozen = (id: string, dir: string): void => {
+const unfrozen = (id: string, dir: string) => {
   const { workflow: _, ...record } = JSON.parse(fs.readFileSync(runFile(ROOT, id), 'utf8')) as Record<string, unknown>;
   fs.writeFileSync(runFile(ROOT, id), `${JSON.stringify({ ...record, workflowDir: dir }, null, 2)}\n`);
 };
@@ -125,14 +125,14 @@ const printedBy = async (t: unknown, argv: string[], engine: Parameters<typeof s
 };
 
 /** What `nemia ls` reads of `id` among `listed`: its listing, or why nobody judged it. */
-const listingOf = (listed: RunsListed, id: string): RunsListed['runs'][number]['listed'] => {
+const listingOf = (listed: RunsListed, id: string) => {
   const one = listed.runs.find((r) => r.run.id === id);
   assert.ok(one, `nemia ls lists ${id}: ${listed.runs.map((r) => r.run.id).join(', ')}`);
   return one.listed;
 };
 
 /** Why nobody judged the run `listed` lists, or undefined where it was judged. */
-const unreadableOf = (listed: RunsListed['runs'][number]['listed']): string | undefined => ('said' in listed ? listed.said : undefined);
+const unreadableOf = (listed: RunsListed['runs'][number]['listed']) => ('said' in listed ? listed.said : undefined);
 
 /** Whether the feed says `id` was removed. */
 const saidRemoved = (id: string) => readFeed(ROOT).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);

@@ -27,7 +27,7 @@ const { FileCard } = await import('../src/components/inbox/FileCard.tsx');
  * key, its words, and whether it is the one picked; React Aria's own empty option, which stands for none picked, is left out.
  * @param html The markup the Selects are rendered in.
  */
-const selectsOf = (html: string): [string, string, boolean][][] =>
+const selectsOf = (html: string) =>
   [...html.matchAll(/<select tabindex="-1">(.*?)<\/select>/g)].map((list) =>
     [...list[1].matchAll(/<option value="([^"]+)"( selected="")?>([^<]*)</g)].map((m) => [m[1], m[3], m[2] !== undefined]),
   );

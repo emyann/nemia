@@ -25,7 +25,7 @@ const ROOT = scratch('wf-closeout-logged-');
 type Kept = { level: string; message: unknown; annotations: Record<string, unknown> };
 
 /** A program's log records, as it ran over a logger that keeps every record. */
-async function logsOf<A>(program: Effect.Effect<A, unknown>): Promise<Kept[]> {
+async function logsOf<A>(program: Effect.Effect<A, unknown>) {
   const logs: Kept[] = [];
   const keeper = Logger.make(({ message, logLevel, fiber }) => {
     logs.push({

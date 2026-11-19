@@ -14,26 +14,29 @@ const AS_OF = '2026-09-30T00:00:00.000Z';
 const listed = (id: string, createdAt: string) => ({ ...detail({ id, createdAt }), wallMs: 0, finishedAt: null, clock: null });
 
 /** A finished run, created at `createdAt`. */
-const finished = (id: string, createdAt: string): FinishedRun => ({
-  ...detail({ id, createdAt, status: 'succeeded', moving: false }),
-  wallMs: 0,
-  finishedAt: AS_OF,
-  outcome: 'succeeded',
-  clock: null,
-});
+const finished = (id: string, createdAt: string) =>
+  ({
+    ...detail({ id, createdAt, status: 'succeeded', moving: false }),
+    wallMs: 0,
+    finishedAt: AS_OF,
+    outcome: 'succeeded',
+    clock: null,
+  }) satisfies FinishedRun;
 
 /** The light answer, its waiting and in-flight runs as given. */
-const openOf = (waiting: OpenRuns['waiting'], inFlight: OpenRuns['inFlight']): OpenRuns => ({
-  asOf: AS_OF,
-  counts: { waiting: waiting.length, inFlight: inFlight.length, finished: 0 },
-  waiting,
-  inFlight,
-});
+const openOf = (waiting: OpenRuns['waiting'], inFlight: OpenRuns['inFlight']) =>
+  ({
+    asOf: AS_OF,
+    counts: { waiting: waiting.length, inFlight: inFlight.length, finished: 0 },
+    waiting,
+    inFlight,
+  }) satisfies OpenRuns;
 
 /** A page of the finished runs, with the token of the next. */
-const page = (runs: FinishedRun[], next: string | null = null): FinishedPage => ({ asOf: AS_OF, total: runs.length, runs, continue: next });
+const page = (runs: FinishedRun[], next: string | null = null) =>
+  ({ asOf: AS_OF, total: runs.length, runs, continue: next }) satisfies FinishedPage;
 
-const ids = (runs: ReadonlyArray<{ id: string }>): string[] => runs.map((run) => run.id);
+const ids = (runs: ReadonlyArray<{ id: string }>) => runs.map((run) => run.id) satisfies string[];
 
 test('pickedOf: the open runs newest created first, waiting and in flight together, then the finished in the order of their pages', () => {
   const open = openOf(

@@ -25,7 +25,7 @@ const radius: Radius = {
   lessons: [{ path: 'CLAUDE.md', added: 2, removed: 0 }],
 };
 const read: Touched = { branch: 'wf/r/implement', radius };
-const unread = (branch: string): Touched => ({ branch, radius: { error: `git could not diff abc...${branch}` } });
+const unread = (branch: string) => ({ branch, radius: { error: `git could not diff abc...${branch}` } });
 
 describe("touchedSummary, barOf, mostLines: the Factory card's line of what a run changed, and its bars", () => {
   test("the Factory card's line: every group once, each change's lines once — a rename across packages is not counted twice", () => {
@@ -49,7 +49,7 @@ describe("touchedSummary, barOf, mostLines: the Factory card's line of what a ru
     assert.equal(touchedSummary([]), 'touched nothing — no branch to read');
   });
   test("REFUSED: a fan-out's result branches each carry the parent's changes, and the card counts them once — not once per branch", () => {
-    const branch = (name: string, changes: Radius['changes'], groups: Radius['groups']): Touched => ({
+    const branch = (name: string, changes: Radius['changes'], groups: Radius['groups']) => ({
       branch: `wf/r/${name}`,
       radius: { changes, groups, agentFacing: [], checkAffecting: [], lessons: [] },
     });

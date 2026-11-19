@@ -15,12 +15,12 @@ const CARD = 'label-the-card-e2e0';
 const LABEL = 'team=core';
 
 /** Edits `id`'s labels through the api, as the run page's field does. */
-async function labelRun(page: Page, id: string, edits: string[]): Promise<void> {
+async function labelRun(page: Page, id: string, edits: string[]) {
   const answered = await page.request.post(new URL(`${await runPath(page, id)}/labels`, page.url()).href, { data: { labels: edits } });
   if (answered.status() !== 200) throw new Refused(`the api labels ${id} — it answered ${answered.status()}: ${await answered.text()}`);
 }
 
-async function load(page: Page, route: string): Promise<void> {
+async function load(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }

@@ -71,7 +71,7 @@ const TREE: Record<string, string> = {
   'src/run.ts': "import { rule } from './factory/rules/rules.ts';",
 };
 
-const faced = (file: string): boolean => !/\.(store|verb|model|test)\.ts$/.test(file);
+const faced = (file: string) => !/\.(store|verb|model|test)\.ts$/.test(file);
 const facesOf = (tree: Record<string, string>) => faceBreaks(Object.keys(tree), (f) => importsIn(tree[f] ?? ''), { root: 'src', faced });
 
 test("let through: a file of a concept importing a sibling part's file by path", () => {

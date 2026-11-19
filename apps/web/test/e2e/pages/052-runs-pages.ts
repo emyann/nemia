@@ -14,40 +14,40 @@ const FACTORY = FACTORIES.hiring.name;
 const WRITTEN = 2 * FINISHED_SIZE;
 
 /** The id of the run written `nth`, from 1, the newest finished of them; each finished a minute before the one before it. */
-const idOf = (nth: number): string => `a-page-of-finished-runs-e2p${String(nth).padStart(2, '0')}`;
+const idOf = (nth: number) => `a-page-of-finished-runs-e2p${String(nth).padStart(2, '0')}`;
 
 /** The rows of the finished table. */
-const rowsOf = (page: Page): Locator => page.locator('section[data-section="finished"] tr[data-run]');
+const rowsOf = (page: Page) => page.locator('section[data-section="finished"] tr[data-run]') satisfies Locator;
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** The page's address, as its path and search. */
-const addressOf = (page: Page): string => {
+const addressOf = (page: Page) => {
   const url = new URL(page.url());
   return `${url.pathname}${url.search}`;
 };
 
 /** The trail of tokens to the factory's third page: the `continue` of its first page and of its second, as the board reads them. */
-async function trailToThird(page: Page): Promise<string[]> {
+async function trailToThird(page: Page) {
   const first = await finishedAnswered(page, FACTORY);
   const second = first.continue === null ? null : await finishedAnswered(page, FACTORY, first.continue);
   if (first.continue === null || second?.continue == null) throw new Refused(`the factory's finished runs make three pages`);
-  return [first.continue, second.continue];
+  return [first.continue, second.continue] satisfies string[];
 }
 
 /** The trail the address holds, its tokens in order; none for the first page. */
-const trailAt = (url: URL): string[] => url.searchParams.get('older')?.split('~') ?? [];
+const trailAt = (url: URL) => (url.searchParams.get('older')?.split('~') ?? []) satisfies string[];
 
 /** The address of the factory's page the trail leads to. */
-const pageAddress = (trail: readonly string[]): string =>
+const pageAddress = (trail: readonly string[]) =>
   `/factories/${FACTORY}/runs${trail.length ? `?older=${encodeURIComponent(trail.join('~'))}` : ''}`;
 
 /** Page 3 of the factory, loaded by its address and loaded again, shows page 3 of that factory: its last row, and where it stands. */
-async function thirdPage(page: Page, trail: string[]): Promise<void> {
+async function thirdPage(page: Page, trail: string[]) {
   await visit(page, pageAddress(trail));
   for (const how of ['loaded by its address', 'loaded again']) {
     await expectTexts(page.locator('[data-pager-at]'), ['Page 3 / 3'], `${how}, the pager stands on page 3 of the factory's three`);
@@ -70,7 +70,7 @@ async function thirdPage(page: Page, trail: string[]): Promise<void> {
 }
 
 /** Newer pops the trail and Older puts a token on it, the factory kept in the address; the first page's address holds no trail. */
-async function newerAndOlder(page: Page, trail: string[]): Promise<void> {
+async function newerAndOlder(page: Page, trail: string[]) {
   await page.locator('[data-pager-newer]').click();
   const toSecond = (url: URL) => trailAt(url).join() === trail.slice(0, 1).join() && url.pathname === `/factories/${FACTORY}/runs`;
   await page.waitForURL(toSecond, { timeout: WAIT_MS });
@@ -101,7 +101,7 @@ async function newerAndOlder(page: Page, trail: string[]): Promise<void> {
 const PAST = `f.${Buffer.from(JSON.stringify(['1970-01-01T00:00:00.000Z', ''])).toString('base64url')}`;
 
 /** A token past the last gives a page that draws no table and says so, and Newer pops it. */
-async function pastTheLast(page: Page, trail: string[]): Promise<void> {
+async function pastTheLast(page: Page, trail: string[]) {
   await visit(page, pageAddress([...trail, PAST]));
   await expectCount(rowsOf(page), 0, 'a page past the last holds no row');
   await expectTexts(page.locator('[data-pager-at]'), ['Page 4 is past the last, 3.'], 'and the pager says so');
@@ -115,7 +115,7 @@ async function pastTheLast(page: Page, trail: string[]): Promise<void> {
  * A trail that holds no token of the finished runs (`?older=bogus`) reads as the first page, as a `?page=` that was no number did: the
  * trail is never sent, and the waiting and in-flight sections are drawn as ever, never the page's failure.
  */
-async function noToken(page: Page): Promise<void> {
+async function noToken(page: Page) {
   await visit(page, `/factories/${FACTORY}/runs?older=bogus`);
   await expectVisible(page.locator('section[data-section="waiting"]'), 'a trail that is no token still draws the waiting runs');
   await expectVisible(page.locator('section[data-section="in-flight"]'), 'and the runs in flight');
@@ -135,11 +135,11 @@ const LONGEST_AGO = ['11 months ago', '59 minutes ago'];
  * Every text of a column the owner saw run into the next: the `how long ago` words, the Clock cell's own, and the words of what a row
  * in flight does now, which read as one word with the clock beside it.
  */
-const tightOf = (page: Page): Locator =>
-  page.locator('td[data-finished] time, td[data-clock] [data-clock-words], tr[data-run] td [data-now-words]');
+const tightOf = (page: Page) =>
+  page.locator('td[data-finished] time, td[data-clock] [data-clock-words], tr[data-run] td [data-now-words]') satisfies Locator;
 
 /** Every such text ends inside its cell's own room, short of the cell's padding: none reaches the next column. */
-async function expectRoom(page: Page, assertion: string): Promise<void> {
+async function expectRoom(page: Page, assertion: string) {
   await expectNone(async () => {
     const over = await tightOf(page).evaluateAll((all) =>
       all.flatMap((text) => {
@@ -158,10 +158,10 @@ async function expectRoom(page: Page, assertion: string): Promise<void> {
 const LONGEST_WORKFLOW = 'build-team';
 
 /** The workflow links of the finished rows' meta lines. */
-const workflowsOf = (page: Page): Locator => page.locator('section[data-section="finished"] tr[data-run] a[data-workflow]');
+const workflowsOf = (page: Page) => page.locator('section[data-section="finished"] tr[data-run] a[data-workflow]') satisfies Locator;
 
 /** Every Workflow link shows its name whole: what it holds fits the room it is cut to. */
-async function expectWorkflowsWhole(page: Page, assertion: string): Promise<void> {
+async function expectWorkflowsWhole(page: Page, assertion: string) {
   await expectNone(async () => {
     if (!(await workflowsOf(page).count())) return 'no workflow to look at';
     const cut = await workflowsOf(page).evaluateAll((all) =>
@@ -177,7 +177,7 @@ async function expectWorkflowsWhole(page: Page, assertion: string): Promise<void
  * Every column the owner saw overlap has its room, at both widths: a run from more than a year back says how long ago it was, uncut,
  * and so do the longest words the column takes, written into every such cell and taken out again.
  */
-async function datesFit(page: Page): Promise<void> {
+async function datesFit(page: Page) {
   const back = seedFinished(store!, LONG_AGO);
   try {
     await visit(page, `/factories/${FACTORY}/runs`);

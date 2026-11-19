@@ -35,14 +35,15 @@ const served = (name: string, route: 'files' | 'artifacts' = 'artifacts') => ({
 });
 
 /** The closeout of `step()`, with `extra` over it. */
-const closeout = (extra: Partial<NonNullable<Step['closeout']>> = {}): NonNullable<Step['closeout']> => ({
-  ...step().closeout!,
-  questions: [],
-  ...extra,
-});
+const closeout = (extra: Partial<NonNullable<Step['closeout']>> = {}) =>
+  ({
+    ...step().closeout!,
+    questions: [],
+    ...extra,
+  }) satisfies NonNullable<Step['closeout']>;
 
 /** design, done: it declares `verdict` (a string) and `pr` (a link), gave both, named one file and left two in its folders. */
-const design = (): Step =>
+const design = () =>
   step({
     name: 'design',
     ...coded('verified ✓'),
@@ -66,10 +67,10 @@ const design = (): Step =>
     }),
     files: [served('spec.md', 'files'), served('notes.txt', 'files')],
     artifactsFolder: { files: [served('spec.md'), served('notes.txt'), served('shot.png')], error: null },
-  });
+  }) satisfies Step;
 
 /** implement, at work: handed design's output, told by a person, a check and another run, under its agent. */
-const implement = (): Step =>
+const implement = () =>
   step({
     name: 'implement',
     ...coded('working'),
@@ -99,10 +100,10 @@ const implement = (): Step =>
       { kind: 'text', text: 'Design gave this.', source: 'step', step: 'design' },
       { kind: 'text', text: 'Make it so.', source: 'person' },
     ],
-  });
+  }) satisfies Step;
 
 /** review, to come: it declares `findings`, a list of objects, and has run no try. */
-const review = (): Step =>
+const review = () =>
   step({
     name: 'review',
     ...coded('waiting'),
@@ -126,9 +127,9 @@ const review = (): Step =>
     timeline: [],
     layers: null,
     taskParts: null,
-  });
+  }) satisfies Step;
 
-const run = (): RunDetail =>
+const run = () =>
   detail({
     holding: null,
     waiting: null,
@@ -140,7 +141,7 @@ const run = (): RunDetail =>
       ],
     },
     steps: [design(), implement(), review()],
-  });
+  }) satisfies RunDetail;
 
 test('the slots come out in one order at every size, a smaller size leaving some out', () => {
   const part = stepPartOf(run(), 'implement', NOW);

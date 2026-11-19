@@ -48,7 +48,7 @@ const e = () => engineOf(engine().layer);
 const PLACE = { home: ROOT, repo: ROOT };
 
 /** A program run over this test's engine, place and store. */
-const run = <A, E>(program: Effect.Effect<A, E, any>): Promise<A> => runWith(e(), program);
+const run = <A, E>(program: Effect.Effect<A, E, any>) => runWith(e(), program) satisfies Promise<A>;
 
 /** The refusal a program fails with, as it was: `_tag`, `exitCode` and, for `Forbidden`, its reason. */
 const refusalOf = async (program: Effect.Effect<unknown, unknown, any>) =>
@@ -60,7 +60,7 @@ const STEP = '---\nplace: folder\nbudget: 5\n---\nPlan the change.\n';
  * A factory `name` made from a template, its tree rendered: one workflow `dev` with a step `plan`, and an agent `implementer` beside it.
  * Its level as given.
  */
-function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual'): string {
+function factory(name: string, level: 'manual' | 'semi-auto' | 'auto' = 'manual') {
   const repo = scratch(`wf-proposals-repo-${name}-`);
   const factories = path.join(ROOT, 'factories');
   fs.mkdirSync(factories, { recursive: true });
@@ -101,13 +101,13 @@ const plantRun = (id: string, factoryName: string) =>
   );
 
 /** The text of the plan step in `tree`. */
-const planIn = (tree: string): string => fs.readFileSync(path.join(tree, 'workflows', 'dev', 'plan.md'), 'utf8');
+const planIn = (tree: string) => fs.readFileSync(path.join(tree, 'workflows', 'dev', 'plan.md'), 'utf8');
 
 /** A caller as `sessionCaller` answers a live token: what the api hands the programs as it is, with no mapping. */
 type FromToken = Exclude<import('../src/token/caller.verb.ts').CallerOf, { kind: 'refused' }>;
 
 /** An agent's session of `agent` in `factory`, a run's step where `run` is given, as `sessionCaller` answers its token. */
-const agentOf = (agent: string, factoryName: string, runId?: string): Caller => {
+const agentOf = (agent: string, factoryName: string, runId?: string) => {
   const answered: FromToken = {
     kind: 'agent',
     agent,
@@ -117,18 +117,18 @@ const agentOf = (agent: string, factoryName: string, runId?: string): Caller => 
     token: null,
     narrowed: null,
   };
-  return answered;
+  return answered satisfies Caller;
 };
 
 /** The `dev` workflow of `factory` as it is, its plan step's body replaced by `body`, at the version it was read. */
-async function devChanged(factoryName: string, body: string): Promise<ProposedObject> {
+async function devChanged(factoryName: string, body: string) {
   const now = await run(currentOf(PLACE, factoryName, 'Workflow', 'dev'));
   const spec = now.spec as { readme?: string; steps: { name: string; keys: Record<string, unknown>; body: string }[] };
   return {
     kind: 'Workflow',
     metadata: { name: 'dev', resourceVersion: now.version ?? undefined },
     spec: { ...spec, steps: spec.steps.map((s) => (s.name === 'plan' ? { ...s, body } : s)) },
-  };
+  } satisfies ProposedObject;
 }
 
 /** `agent`'s delegation in `factory` granting `resources` with `verbs`, written by the person. */
@@ -136,7 +136,7 @@ const delegated = (factoryName: string, agent: string, resources: string[], verb
   run(delegationPut(PERSON, factoryName, agent, { rules: [{ resources, resourceNames: [], verbs }] }));
 
 /** `agent`'s proposal rule over `factory`, proposed and confirmed as the person reads it. */
-async function ruleConfirmed(agent: string, rule: Omit<Rule, 'answer' | 'id'>): Promise<void> {
+async function ruleConfirmed(agent: string, rule: Omit<Rule, 'answer' | 'id'>) {
   const full: Rule = { id: `take-${rule.factory}`, answer: 'approve-proposal', ...rule };
   writeProposed(ROOT, agent, { at: new Date().toISOString(), rules: [full], guidance: [], digest: null });
   await run(POLICY_CONFIRM.handler({ name: agent, id: full.id, words: ruleWords(full) }));
@@ -204,22 +204,22 @@ test('REFUSED stale: the workflow written between propose and approve leaves the
 });
 
 /** A file of the `dev` workflow of `tree`, by its name, or undefined where it is not there. */
-const devFile = (tree: string, name: string): string | undefined => {
+const devFile = (tree: string, name: string) => {
   try {
-    return fs.readFileSync(path.join(tree, 'workflows', 'dev', name), 'utf8');
+    return fs.readFileSync(path.join(tree, 'workflows', 'dev', name), 'utf8') satisfies string | undefined;
   } catch {
-    return undefined;
+    return undefined satisfies string | undefined;
   }
 };
 
 /** The `dev` workflow of `factory` as it is, its other files replaced by `files`, at the version it was read. */
-async function devFiles(factoryName: string, files: { path: string; text: string }[]): Promise<ProposedObject> {
+async function devFiles(factoryName: string, files: { path: string; text: string }[]) {
   const now = await run(currentOf(PLACE, factoryName, 'Workflow', 'dev'));
   return {
     kind: 'Workflow',
     metadata: { name: 'dev', resourceVersion: now.version ?? undefined },
     spec: { ...(now.spec as object), files },
-  };
+  } satisfies ProposedObject;
 }
 
 describe("a Workflow proposal carries its folder's scripts: applied whole, undone back, and stale once a script moved after the read", () => {
@@ -300,11 +300,11 @@ test('an Agent proposal carries its result schema: accepted, applied with the sc
 });
 
 /** A file of the skill `tidy` of `tree`, by its path in it, or undefined where it is not there. */
-const tidyFile = (tree: string, file: string): string | undefined => {
+const tidyFile = (tree: string, file: string) => {
   try {
-    return fs.readFileSync(path.join(tree, 'workflows', 'skills', 'tidy', file), 'utf8');
+    return fs.readFileSync(path.join(tree, 'workflows', 'skills', 'tidy', file), 'utf8') satisfies string | undefined;
   } catch {
-    return undefined;
+    return undefined satisfies string | undefined;
   }
 };
 
@@ -372,9 +372,9 @@ describe("a Skill proposal carries its folder's other text files: read at any de
 });
 
 /** The Factory `name` read now, proposed with its parts `spec` names over it, at the version it was read. */
-async function factoryChanged(name: string, spec: { rules?: string; instruction?: string }): Promise<ProposedObject> {
+async function factoryChanged(name: string, spec: { rules?: string; instruction?: string }) {
   const now = await run(currentOf(PLACE, name, 'Factory', name));
-  return { kind: 'Factory', metadata: { name, resourceVersion: now.version ?? undefined }, spec };
+  return { kind: 'Factory', metadata: { name, resourceVersion: now.version ?? undefined }, spec } satisfies ProposedObject;
 }
 
 /** The person's rules of the factory `name` written, as `nemia factory rules` writes them. */

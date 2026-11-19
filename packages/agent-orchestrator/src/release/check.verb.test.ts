@@ -20,15 +20,16 @@ fs.mkdirSync(path.join(BASE, 'latest', 'download'), { recursive: true });
 fs.writeFileSync(path.join(BASE, 'latest', 'download', 'latest.json'), JSON.stringify({ tag: 'v1.3.0', version: '1.3.0' }));
 
 /** An install of `v1.2.0` whose release came as `from`, its download base `source`. */
-const install = (from: 'archive' | 'build', source = pathToFileURL(BASE).href): Running => ({
-  kind: 'install',
-  root: '/r/v1.2.0',
-  tag: 'v1.2.0',
-  commit: 'c0ffee',
-  source,
-  builtAt: '',
-  from,
-});
+const install = (from: 'archive' | 'build', source = pathToFileURL(BASE).href) =>
+  ({
+    kind: 'install',
+    root: '/r/v1.2.0',
+    tag: 'v1.2.0',
+    commit: 'c0ffee',
+    source,
+    builtAt: '',
+    from,
+  }) satisfies Running;
 
 /** One check of a fresh store, with the settings `env` names. */
 const checked = (running: Running, env: Record<string, string> = {}) => {

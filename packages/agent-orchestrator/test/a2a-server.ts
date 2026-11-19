@@ -32,27 +32,27 @@ export type A2AServer = {
   close: () => Promise<void>;
 };
 
-const textPart = (text: string): Part => ({
-  content: { $case: 'text', value: text },
-  metadata: undefined,
-  filename: '',
-  mediaType: 'text/plain',
-});
+const textPart = (text: string) =>
+  ({
+    content: { $case: 'text', value: text },
+    metadata: undefined,
+    filename: '',
+    mediaType: 'text/plain',
+  }) satisfies Part;
 
-const agentSaid = (taskId: string, contextId: string, id: string, words: string): Message => ({
-  messageId: id,
-  contextId,
-  taskId,
-  role: Role.ROLE_AGENT,
-  parts: [textPart(words)],
-  metadata: undefined,
-  extensions: [],
-  referenceTaskIds: [],
-});
+const agentSaid = (taskId: string, contextId: string, id: string, words: string) =>
+  ({
+    messageId: id,
+    contextId,
+    taskId,
+    role: Role.ROLE_AGENT,
+    parts: [textPart(words)],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
+  }) satisfies Message;
 
-export async function a2aServer(
-  o: { token?: string; answer?: (text: string) => Answer; streaming?: boolean; held?: Promise<void> } = {},
-): Promise<A2AServer> {
+export async function a2aServer(o: { token?: string; answer?: (text: string) => Answer; streaming?: boolean; held?: Promise<void> } = {}) {
   const answer = o.answer ?? (() => ({ text: 'done' }));
   const sent: string[] = [];
   const headers: http.IncomingHttpHeaders[] = [];
@@ -133,24 +133,27 @@ export async function a2aServer(
     cancelTask: async () => {},
   };
 
-  const card = (): AgentCard => ({
-    name: 'reviewer',
-    description: 'A remote A2A agent a test started.',
-    version: '1.0.0',
-    supportedInterfaces: [{ url: `${base}/a2a/jsonrpc`, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' }],
-    provider: undefined,
-    documentationUrl: undefined,
-    iconUrl: undefined,
-    capabilities: { streaming: o.streaming === true, pushNotifications: false, extensions: [], extendedAgentCard: false },
-    securitySchemes: o.token
-      ? { token: { scheme: { $case: 'httpAuthSecurityScheme', value: { description: '', scheme: 'Bearer', bearerFormat: '' } } } }
-      : {},
-    securityRequirements: o.token ? [{ schemes: { token: { list: [] } } }] : [],
-    defaultInputModes: ['text/plain'],
-    defaultOutputModes: ['text/plain', 'application/json'],
-    skills: [],
-    signatures: [],
-  });
+  const card = () => {
+    const made: AgentCard = {
+      name: 'reviewer',
+      description: 'A remote A2A agent a test started.',
+      version: '1.0.0',
+      supportedInterfaces: [{ url: `${base}/a2a/jsonrpc`, protocolBinding: 'JSONRPC', tenant: '', protocolVersion: '1.0' }],
+      provider: undefined,
+      documentationUrl: undefined,
+      iconUrl: undefined,
+      capabilities: { streaming: o.streaming === true, pushNotifications: false, extensions: [], extendedAgentCard: false },
+      securitySchemes: o.token
+        ? { token: { scheme: { $case: 'httpAuthSecurityScheme', value: { description: '', scheme: 'Bearer', bearerFormat: '' } } } }
+        : {},
+      securityRequirements: o.token ? [{ schemes: { token: { list: [] } } }] : [],
+      defaultInputModes: ['text/plain'],
+      defaultOutputModes: ['text/plain', 'application/json'],
+      skills: [],
+      signatures: [],
+    };
+    return made;
+  };
 
   const app = express();
   app.get('/.well-known/agent-card.json', (_req, res) => {
@@ -183,5 +186,5 @@ export async function a2aServer(
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
-  };
+  } satisfies A2AServer;
 }

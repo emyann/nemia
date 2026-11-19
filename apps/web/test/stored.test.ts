@@ -26,7 +26,7 @@ function memory(kept: Map<string, string>) {
 }
 
 /** A number read from what is kept, or nothing for words that are not one. */
-const number = (raw: string): number | undefined => (Number.isFinite(Number(raw)) ? Number(raw) : undefined);
+const number = (raw: string) => (Number.isFinite(Number(raw)) ? Number(raw) : undefined);
 
 describe('stored: what this browser keeps, under one door', () => {
   test('a value kept is read back through its parse, and forgotten', (t) => {

@@ -38,16 +38,14 @@ const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 /** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
-const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>): Promise<A> =>
-  Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
-const versionOf = (dir: string): string =>
-  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+const inRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Effect.runPromise(program.pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('objects').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -87,7 +85,7 @@ for (const workflow of ['good', 'broken']) attachWorkflow({ factory: 'bench', wo
  * The repository's implementer hired into each step of `good` in `bench`, so a start of it there is filled: from the first start on, the
  * step's page in the default factory names `bench` among those that hire into it.
  */
-const benchHires = (): void => {
+const benchHires = () => {
   for (const step of ['implement', 'review']) hireAgent({ factory: 'bench', agent: 'implementer', step: `good/${step}` });
 };
 
@@ -97,7 +95,7 @@ write(path.join(mine, 'plan.md'), '---\nplace: git\nharness: codex\ncheck: test 
 write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields` and the `place: git` every step says. */
-const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
+const spec = (fields: Partial<WorkflowStepSpec>) => ({
   harness: null,
   model: null,
   effort: null,
@@ -141,7 +139,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
 });
 
 /** What the loader refuses `dir` with. */
-const loaderRefusal = (dir: string): string => {
+const loaderRefusal = (dir: string) => {
   try {
     loadWorkflows(dir);
   } catch (err) {
@@ -158,17 +156,16 @@ const post = (body: unknown) =>
   });
 
 /** That a refusal's words open with `head` and name each of `facts`: the facts it is about, never its sentence. */
-const tells = (said: string, head: string, facts: string[]): void => {
+const tells = (said: string, head: string, facts: string[]) => {
   assert.ok(said.startsWith(head), said);
   for (const fact of facts) assert.ok(said.includes(fact), `${fact}: ${said}`);
 };
 
 /** The files in the store's runs directory: a record per run, and anything else anyone wrote there. */
-const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
+const runFiles = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
 
 /** The tasks filed with the engine: a journal each. */
-const filedTasks = (): string[] =>
-  fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : [];
+const filedTasks = () => (fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : []);
 
 test("a condition's keys and a workflow node's are listed on the spec, the route as its line writes it", () => {
   const condition = (route: NonNullable<Parameters<typeof specOf>[0]['route']>) =>
@@ -533,7 +530,7 @@ const rows = (set: Record<string, string | null>) =>
   }));
 
 /** A folder as it is: each file's name and text, to show a read wrote nothing. */
-const filesOf = (dir: string): Array<[string, string]> =>
+const filesOf = (dir: string) =>
   fs
     .readdirSync(dir)
     .sort()
@@ -605,7 +602,7 @@ describe('a person starts runs from the board: the record as `nemia start` write
   s.test(
     "a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site",
     async () => {
-      const records = (): number => runFiles().filter((f) => f.endsWith('.json')).length;
+      const records = () => runFiles().filter((f) => f.endsWith('.json')).length;
       const before = records();
       for (const headers of [
         { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
@@ -725,7 +722,7 @@ const sentWith = (headers: Record<string, string>) =>
   });
 
 /** The key a 400 of `RunStart`'s decode names, `payload.<key>…`. */
-const fieldOf = async (res: Response): Promise<string> => ((await res.json()) as { field?: string }).field ?? '';
+const fieldOf = async (res: Response) => ((await res.json()) as { field?: string }).field ?? '';
 
 describe('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', () => {
   beforeAll(() => {
@@ -840,7 +837,7 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
   test('a run `nemia start --after` will not wait on is a 422 naming it — no such run, a cancelled one, one given twice — and nothing is written', async () => {
     parents();
     const before = runFiles();
-    const refusedBy = async (after: string[]): Promise<string> => {
+    const refusedBy = async (after: string[]) => {
       const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
       assert.equal(res.status, 422, JSON.stringify(after));
       const { error } = (await res.json()) as { error: string };
@@ -906,7 +903,7 @@ describe('POST /api/namespaces/default/runs: what a start refuses, writing nothi
 });
 
 /** A run of the repository's `good` as `nemia start` records one, never filed — and called off, when `cancelledAt` says when. */
-function parentRun(id: string, cancelledAt?: string): void {
+function parentRun(id: string, cancelledAt?: string) {
   if (fs.existsSync(path.join(root, 'runs', `${id}.json`))) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
   write(
@@ -929,7 +926,7 @@ function parentRun(id: string, cancelledAt?: string): void {
 }
 
 /** The runs a start below waits on: written by the first test that needs them, since the tests above count the store's files from empty. */
-function parents(): void {
+function parents() {
   parentRun('p-running');
   parentRun('p-cancelled', '2026-09-14T00:30:00.000Z');
 }

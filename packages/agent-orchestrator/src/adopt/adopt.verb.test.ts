@@ -35,18 +35,18 @@ const { exportTemplate, reconciled } = programsAt(ROOT);
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 /** Every file under `dir`, by its path in it, with its bytes, so a verb is seen to have written nothing there. */
-const bytesUnder = (dir: string): Record<string, string> =>
-  fs.existsSync(dir)
+const bytesUnder = (dir: string) =>
+  (fs.existsSync(dir)
     ? Object.fromEntries(
         (fs.readdirSync(dir, { recursive: true }) as string[])
           .filter((f) => fs.statSync(path.join(dir, f)).isFile())
           .sort()
           .map((f) => [f, fs.readFileSync(path.join(dir, f), 'base64')]),
       )
-    : {};
+    : {}) satisfies Record<string, string>;
 
 /** What `argv` printed, as `nemia` prints it, line by line. */
-async function printedBy(...argv: string[]): Promise<string[]> {
+async function printedBy(...argv: string[]) {
   const printed: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
   try {
@@ -58,7 +58,7 @@ async function printedBy(...argv: string[]): Promise<string[]> {
 }
 
 /** The id of the run `nemia start <argv>` answered. */
-const startedId = async (...argv: string[]): Promise<string> => ((await stage.main(['start', ...argv])) as StartedAnswer).id;
+const startedId = async (...argv: string[]) => ((await stage.main(['start', ...argv])) as StartedAnswer).id;
 
 /** Refused by kind and exit 2, its message matching each of `patterns`. */
 const refusedWith =
@@ -75,22 +75,21 @@ const previewed = async (name: string, dir: string) =>
   };
 
 /** The file of the factory `name`, as JSON. */
-const fileOf = (name: string): Record<string, unknown> =>
-  JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')) as Record<string, unknown>;
+const fileOf = (name: string) => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')) as Record<string, unknown>;
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, and the team exported from it as a template. */
-function repoAndTemplate(): { repo: string; dir: string } {
+function repoAndTemplate() {
   const repo = scratch('wf-adopt-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stage.place().world.repository(repo, {});
   stage.place().world.commit(repo, 'base');
   const dir = path.join(scratch('wf-adopt-template-'), 'team');
   exportTemplate({ dir, from: repo });
-  return { repo, dir };
+  return { repo, dir } satisfies { repo: string; dir: string };
 }
 
 /** A hand-made factory `name` on `repo`, offering the team's `dev`. */
-async function madeByHand(name: string, repo: string): Promise<void> {
+async function madeByHand(name: string, repo: string) {
   await printedBy('factory', 'add', name, '--volume', `${repo}:rw`, '--no-trust');
   await printedBy('factory', 'attach', name, 'dev');
 }
@@ -99,7 +98,7 @@ async function madeByHand(name: string, repo: string): Promise<void> {
  * A run of `factory` that finished, as an intake's does: its one step signed off, no commit landed. Started on a folder of its own,
  * its record then naming `factory`, as a run started there names it.
  */
-async function aFinished(repo: string, factory: string): Promise<string> {
+async function aFinished(repo: string, factory: string) {
   const steps = scratch('wf-adopt-once-');
   fs.writeFileSync(path.join(steps, 'work.md'), '---\nplace: git\n---\nname it\n');
   const board = stage.board();
@@ -113,7 +112,7 @@ async function aFinished(repo: string, factory: string): Promise<string> {
 }
 
 /** A card filed for the factory `factory` and the workflow `workflow`, by its file in the inbox. */
-function card(name: string, factory: string, workflow: string): string {
+function card(name: string, factory: string, workflow: string) {
   fs.mkdirSync(INBOX, { recursive: true });
   const file = path.join(INBOX, `${name}.md`);
   fs.writeFileSync(file, `---\nworkflow: ${workflow}\nfactory: ${factory}\n---\n\nCache the views.\n`);

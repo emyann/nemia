@@ -37,10 +37,11 @@ import {
 import type { GraphEdge, RunGraph } from '../src/lib/api/graph.ts';
 import type { StepState } from '../src/lib/status.ts';
 
-const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
-const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, kind: 'loop', rounds });
-const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
-const step = (name: string, state: StepState, note: string | null = null, roundDue = false): EdgeStep => ({ name, state, note, roundDue });
+const after = (from: string, to: string) => ({ from, to, kind: 'after' }) satisfies GraphEdge;
+const loop = (from: string, to: string, rounds = 3) => ({ from, to, kind: 'loop', rounds }) satisfies GraphEdge;
+const graphOf = (...edges: GraphEdge[]) => ({ roots: [], edges }) satisfies RunGraph;
+const step = (name: string, state: StepState, note: string | null = null, roundDue = false) =>
+  ({ name, state, note, roundDue }) satisfies EdgeStep;
 
 describe("attemptLine: an attempt's time", () => {
   test('an attempt that runs counts its time; one that is over says when it started', () => {
@@ -144,7 +145,7 @@ describe("edgesOf, loopLabel and edgeState: a run's edges, done, running or to c
     );
   });
   test('a route edge is labelled with its route, untaken where its condition took another or its target was skipped', () => {
-    const route = (from: string, to: string, r: string): GraphEdge => ({ from, to, kind: 'route', route: r });
+    const route = (from: string, to: string, r: string) => ({ from, to, kind: 'route', route: r }) satisfies GraphEdge;
     const edges = edgesOf(
       graphOf(
         route('triage', 'web', 'web'),

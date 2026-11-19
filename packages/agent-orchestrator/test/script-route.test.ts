@@ -37,14 +37,16 @@ type Board = ReturnType<typeof stage.board>;
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `cli`.
  */
-const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : cli(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'the plan: a page', artifacts: [], needs: null };
 
 /** plan, then the condition `pick` (a script over web and docs), then web and docs, each on its route. */
-const folder = (): string => {
+const folder = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   const write = (name: string, lines: string[]) =>
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${['place: git', ...lines].join('\n')}\n---\n${name} it\n`);
@@ -70,7 +72,7 @@ async function atTheCondition() {
 }
 
 /** Each step's word on a pass now, as the tick reads it (`runWords`, over the closeouts the pass reads). */
-const wordsOf = async (b: Board, id: string): Promise<Record<string, string>> => {
+const wordsOf = async (b: Board, id: string) => {
   const run = runRecord(ROOT, id);
   const steps = run.workflow ?? [];
   const { views, phaseOf } = await stage.runWith(b.e, taskPhasesRead(run).pipe(over(b.e)));

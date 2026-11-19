@@ -158,7 +158,7 @@ const STORE = 'src/factory/factory.store.ts';
  * Each file of `sources` that imports the factories' store or calls a store the door is over, in the words a break says: the door is
  * the only way to the factories, so a file that reaches past it is refused with no baseline to hold it.
  */
-const seamBreaks = (sources: Readonly<Record<string, string>>): string[] => [
+const seamBreaks = (sources: Readonly<Record<string, string>>) => [
   ...Object.entries(sources)
     .filter(([file, text]) => importsIn(text).some(({ spec }) => resolved(file, spec) === STORE))
     .map(([file]) => `${file} imports ${STORE}: import from src/factory/door/factories.store.ts, the Factory door, instead`),
@@ -200,11 +200,11 @@ test('a folder placed, refused or failing, leaves no hidden staging folder besid
 });
 
 /** How many changes `write` counts on the file of `acme`, a factory filed with a level file at manual. */
-const after = (write: (door: ReturnType<typeof store>['door']) => void): number => {
+const after = (write: (door: ReturnType<typeof store>['door']) => void) => {
   const { door, file } = store();
   done(door.factories.create(aFactory('acme', { workflows: ['build'] })));
   done(door.level.write(FactoryName.read('acme'), { level: 'manual', since: '2026-11-01T00:00:00.000Z' }));
-  const held = (): number => (JSON.parse(fs.readFileSync(file, 'utf8')) as { generation: number }).generation;
+  const held = () => (JSON.parse(fs.readFileSync(file, 'utf8')) as { generation: number }).generation;
   const before = held();
   write(door);
   return held() - before;

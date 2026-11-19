@@ -53,7 +53,7 @@ test('REFUSED: the footer, the gauges, the factory bar and the bell name the sam
 });
 
 /** `text` from the declaration of `from` up to the next exported declaration, or its end. */
-function declared(text: string, from: string): string {
+function declared(text: string, from: string) {
   const start = text.indexOf(`export const ${from}`);
   assert.notEqual(start, -1, `${from} is declared`);
   const next = text.indexOf('\nexport ', start + 1);
@@ -61,7 +61,8 @@ function declared(text: string, from: string): string {
 }
 
 /** Each use of the whole list's rule in `text`, called or handed on: its name where it is no key of an answer or of a record. */
-const wholeListRule = (text: string): string[] => [...text.matchAll(/(?<![.\w'"])(?:inFlight|waitsOnYou)\b(?!\s*[:?])/g)].map((m) => m[0]);
+const wholeListRule = (text: string) =>
+  [...text.matchAll(/(?<![.\w'"])(?:inFlight|waitsOnYou)\b(?!\s*[:?])/g)].map((m) => m[0]) satisfies string[];
 
 test("REFUSED: no reader of the frame applies the whole list's rule to the light answer", () => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');
@@ -93,7 +94,8 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
 });
 
 /** The name `text` binds to the data of `useQuery(frameRunsQuery(path))`, where it reads that query. */
-const frameRunsRead = (text: string): string | undefined => /const (\w+) = useQuery\(\s*frameRunsQuery\(path\)\s*\)\.data;/.exec(text)?.[1];
+const frameRunsRead = (text: string) =>
+  /const (\w+) = useQuery\(\s*frameRunsQuery\(path\)\s*\)\.data;/.exec(text)?.[1] satisfies string | undefined;
 
 describe("REFUSED: Nemia's cue, the pane's Runs line and the Runs page's count chip count the runs waiting off one query", () => {
   const read = (file: string) => fs.readFileSync(path.join(SRC, file), 'utf8');

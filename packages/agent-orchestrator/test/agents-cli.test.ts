@@ -43,14 +43,14 @@ heldUnasked(engine);
 const noEngine = () => engineOf(engine().layer);
 
 /** What the handler of the entry `argv` names answers, read by its words (`typed`) over this test's engine and store. */
-const asked = <D>(...argv: string[]): Promise<D> => typed(argv, noEngine(), undefined, undefined, ENV) as Promise<D>;
+const asked = <D>(...argv: string[]) => typed(argv, noEngine(), undefined, undefined, ENV) as Promise<D>;
 
 /** What `nemia agents custom`'s handler answers to `input`, words given as the client sends them. */
 const custom = (input: { name: string; repo?: string; words?: string; clear?: true }) =>
   handled(AGENTS_CUSTOM, input, { e: noEngine(), env: ENV });
 
 /** `work` refused with exit 2 (and as `tag`, where given), its words naming each of `facts`; the words. */
-const refusedBy = async (work: () => Promise<unknown>, tag: string | undefined, ...facts: string[]): Promise<string> => {
+const refusedBy = async (work: () => Promise<unknown>, tag: string | undefined, ...facts: string[]) => {
   let said = '';
   await assert.rejects(work, (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.equal(err.exitCode, 2, err.message);

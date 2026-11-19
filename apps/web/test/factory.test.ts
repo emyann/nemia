@@ -51,13 +51,13 @@ import type { Point } from '../src/lib/layout.ts';
  * A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them; its `waitingOnYouWords`,
  * `wf ls`'s words for who it waits on, is the steps `waitingOnYou` names unless `extra` gives it.
  */
-const run = (statuses: readonly Word[], extra: Partial<RunView> = {}): RunView =>
+const run = (statuses: readonly Word[], extra: Partial<RunView> = {}) =>
   summary([], {
     moving: false,
     steps: statuses.map((status, i) => listedStep(`step-${i}`, status, i, { taskId: status === 'waiting' ? null : `t-${i}` })),
     waitingOnYouWords: extra.waitingOnYou ?? [],
     ...extra,
-  });
+  }) satisfies RunView;
 
 const cancelledAt = '2026-09-13T01:00:00.000Z';
 
@@ -80,7 +80,7 @@ describe("titleOf and repoName: a card's title and its repo", () => {
  * Pairs of runs whose boxes on the floor overlap: a card's cell, or an open run's cells across and down.
  * Measured in the floor's coordinates, not in cells, so it does not share `placeRuns`' arithmetic.
  */
-function overlapping(at: ReadonlyMap<string, Point>, spans: ReadonlyMap<string, Span> = new Map()): string[] {
+function overlapping(at: ReadonlyMap<string, Point>, spans: ReadonlyMap<string, Span> = new Map()) {
   const boxes = [...at].map(([id, { x, y }]) => {
     const { columns, rows } = spans.get(id) ?? ONE_CELL;
     return { id, x, y, right: x + columns * CELL_WIDTH, bottom: y + rows * CELL_HEIGHT };
@@ -90,7 +90,7 @@ function overlapping(at: ReadonlyMap<string, Point>, spans: ReadonlyMap<string, 
       .slice(i + 1)
       .filter((b) => a.x < b.right && b.x < a.right && a.y < b.bottom && b.y < a.bottom)
       .map((b) => `${a.id}/${b.id}`),
-  );
+  ) satisfies string[];
 }
 
 describe('placeRuns: where a closed card goes, fresh or as last left, and what is kept of it', () => {
@@ -497,42 +497,46 @@ describe("placeRuns: an open run's graph moves the cards it covers, and never on
 });
 
 /** What the api says a run waiting on `p` waits on: a run that may still land, or one that was cancelled and never will. */
-const waitingOn = (onYou: boolean): RunView['waiting'] => ({
-  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [] }],
-  word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
-  advice: onYou
-    ? `p was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: wf cancel r-1, or start the work again without --after p`
-    : 'nothing of r-1 is filed until wf decide says p has landed onto main; nothing to decide yet',
-  waitingOnYou: onYou,
-});
+const waitingOn = (onYou: boolean) =>
+  ({
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [] }],
+    word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
+    advice: onYou
+      ? `p was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: wf cancel r-1, or start the work again without --after p`
+      : 'nothing of r-1 is filed until wf decide says p has landed onto main; nothing to decide yet',
+    waitingOnYou: onYou,
+  }) satisfies RunView['waiting'];
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toISOString();
 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`). */
-const waitsOn = (...runs: string[]): RunView['waiting'] => ({
-  runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
-  word: `waiting on ${runs.join(', ')}`,
-  advice: '',
-  waitingOnYou: false,
-});
+const waitsOn = (...runs: string[]) =>
+  ({
+    runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
+    word: `waiting on ${runs.join(', ')}`,
+    advice: '',
+    waitingOnYou: false,
+  }) satisfies RunView['waiting'];
 
 /** What a person has to decide, as the api words it (`RunToDecide`): an ending step's gate, or a branch nobody merged. */
-const approve = (id: string, step: string): RunView['toDecide'] => ({
-  kind: 'approve',
-  step,
-  says: 'Merge it onto the base branch.',
-  filed: false,
-  back: [step],
-  onto: 'main',
-  said: `Merge it onto the base branch. — wf approve ${id} ${step}`,
-  command: `wf approve ${id} ${step}`,
-});
-const merge = (id: string, branch: string): RunView['toDecide'] => ({
-  kind: 'result',
-  branches: [branch],
-  said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
-  command: `wf decide ${id}`,
-});
+const approve = (id: string, step: string) =>
+  ({
+    kind: 'approve',
+    step,
+    says: 'Merge it onto the base branch.',
+    filed: false,
+    back: [step],
+    onto: 'main',
+    said: `Merge it onto the base branch. — wf approve ${id} ${step}`,
+    command: `wf approve ${id} ${step}`,
+  }) satisfies RunView['toDecide'];
+const merge = (id: string, branch: string) =>
+  ({
+    kind: 'result',
+    branches: [branch],
+    said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
+    command: `wf decide ${id}`,
+  }) satisfies RunView['toDecide'];
 
 /** The diamond: a, then b and c together, then d. */
 const DIAMOND = new Map([
@@ -542,11 +546,11 @@ const DIAMOND = new Map([
 ]);
 
 /** Each `after` edge between placed cards whose parent does not stand a column or more left of its child, as `parent->child`. */
-function backwards(at: ReadonlyMap<string, Point>, after: ReadonlyMap<string, readonly string[]>): string[] {
+function backwards(at: ReadonlyMap<string, Point>, after: ReadonlyMap<string, readonly string[]>) {
   const column = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
   return [...after].flatMap(([child, parents]) =>
     parents.filter((p) => at.has(p) && at.has(child) && column(p) >= column(child)).map((p) => `${p}->${child}`),
-  );
+  ) satisfies string[];
 }
 
 /** The triangle: a; then b; then d, after both — `api` after `schema`, `web` after the two. */
@@ -880,15 +884,16 @@ describe("runClock and clockCounts: a card's and a row's clock, and what its hov
 });
 
 /** What the api says of a run a person holds until `p` lands (`wf hold`): a hold that lifts on its own, or one only a person lifts. */
-const holdingOn = (onYou: boolean): NonNullable<RunView['holding']> => ({
-  at: '2026-09-13T00:30:00.000Z',
-  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], landed: false }],
-  word: 'held until p lands',
-  advice: onYou
-    ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
-    : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
-  waitingOnYou: onYou,
-});
+const holdingOn = (onYou: boolean) =>
+  ({
+    at: '2026-09-13T00:30:00.000Z',
+    runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], landed: false }],
+    word: 'held until p lands',
+    advice: onYou
+      ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
+      : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
+    waitingOnYou: onYou,
+  }) satisfies NonNullable<RunView['holding']>;
 
 describe('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who it waits on', () => {
   test('a run is in flight, and on the Factory by default, while the api says it is running', () => {
@@ -1410,10 +1415,11 @@ describe('runEdges and contextEdges: the edges drawn between cards', () => {
     assert.deepEqual(runEdges(runs), [], 'and none of it is a wait');
   });
   test('an edge from each run a card is held until that has not landed, both on the floor, drawn as an `after` edge — and none where an `after` edge already joins the two', () => {
-    const held = (...runs: string[]): RunView['holding'] => ({
-      ...holdingOn(false),
-      runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], landed: false })),
-    });
+    const held = (...runs: string[]) =>
+      ({
+        ...holdingOn(false),
+        runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], landed: false })),
+      }) satisfies RunView['holding'];
     const edges = runEdges([
       run(['verified ✓'], { id: 'a' }),
       run(['running (working)'], { id: 'b' }),

@@ -28,7 +28,7 @@ describe('sayable: the box is open while a session is in flight, and closed, say
     }
   });
   test('REFUSED: the box is closed, saying why and where to go instead, for a run called off, a step not filed, a task the engine has no record of, one filed and not started, and every session that has ended', () => {
-    const why = (run: { cancelledAt: string | null }, s: ReturnType<typeof step>): string => {
+    const why = (run: { cancelledAt: string | null }, s: ReturnType<typeof step>) => {
       const said: Sayable = sayable(run, s);
       if (said.open) return assert.fail(`the box is open for ${JSON.stringify(s)}${run.cancelledAt ? ' on a run called off' : ''}`);
       return said.why;
@@ -65,16 +65,17 @@ describe('sayable: the box is open while a session is in flight, and closed, say
   });
 });
 
-const said = (at: string, text: string, attempt = 1, after: Said['after'] = null): Said => ({ at, attempt, text, after });
+const said = (at: string, text: string, attempt = 1, after: Said['after'] = null) => ({ at, attempt, text, after }) satisfies Said;
 const at = (s: number) => new Date(Date.UTC(2026, 8, 14, 16, 0, s)).toISOString();
 
-const event = (id: string, s: number, kind: TranscriptEvent['kind'], more: Partial<TranscriptEvent> = {}): TranscriptEvent => ({
-  id,
-  at: at(s),
-  role: 'assistant',
-  kind,
-  ...more,
-});
+const event = (id: string, s: number, kind: TranscriptEvent['kind'], more: Partial<TranscriptEvent> = {}) =>
+  ({
+    id,
+    at: at(s),
+    role: 'assistant',
+    kind,
+    ...more,
+  }) satisfies TranscriptEvent;
 /** The prompt, words, two calls with nothing said between them, and words. */
 const EVENTS: TranscriptEvent[] = [
   event('u-1', 1, 'text', { role: 'user', text: 'Implement it.' }),
@@ -85,7 +86,7 @@ const EVENTS: TranscriptEvent[] = [
 ];
 
 /** The session's own line for words it was handed, as the engine reads Claude Code's: a system event. */
-const arrival = (id: string, s: number, text: string): TranscriptEvent => event(id, s, 'system', { role: 'system', text });
+const arrival = (id: string, s: number, text: string) => event(id, s, 'system', { role: 'system', text }) satisfies TranscriptEvent;
 
 describe("mergeSaid, withSaid and heardIn: what was said, shown once, laid among the turns, and its arrival taken out of the session's lines", () => {
   test('what the page has just said is shown beside what the api read, once each, in the order said — and once the read has it, once', () => {

@@ -9,21 +9,27 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The labels chosen on the question titled `title`, in `where`. */
-const chosenOn = (where: Locator, title: string): Promise<string[]> =>
+const chosenOn = (where: Locator, title: string) =>
   where
     .locator(`fieldset[data-question="${title}"] input:checked`)
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)) satisfies Promise<string[]>;
 
 /** The JSON of the ask `file`, or nothing where it is not there. */
-const askIn = (file: string): { message?: string; mode?: string; step?: string; try?: number; actor?: Actor } =>
-  fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+const askIn = (file: string) =>
+  (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as {
+    message?: string;
+    mode?: string;
+    step?: string;
+    try?: number;
+    actor?: Actor;
+  };
 
 /** Whether `r` is the POST of `verb` on the gated step. */
 const posted = (verb: string) => (r: { request: () => { method: () => string }; url: () => string }) =>
   r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, ASKING.id, `/steps/${ASKING.gated}/${verb}`);
 
 /** The gate's questions answered as a person would: the recommended answers chosen, and the question with none answered by a click. */
-async function answer(page: Page, gate: Locator): Promise<void> {
+async function answer(page: Page, gate: Locator) {
   const { cut, where } = ASKING;
   const asked = gate.locator(`section[aria-label="What ${ASKING.gated} asks"]`);
   await asked.getByRole('button', { name: 'Choose the recommended answers' }).click();

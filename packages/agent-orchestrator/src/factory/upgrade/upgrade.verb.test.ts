@@ -52,7 +52,7 @@ const refusedWith =
     err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, so a start has a base to record. */
-function repoWithTeam(): string {
+function repoWithTeam() {
   const repo = scratch('wf-upgrade-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stand().world.repository(repo, {});
@@ -61,7 +61,7 @@ function repoWithTeam(): string {
 }
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
@@ -71,7 +71,7 @@ function edit(dir: string, file: string, change: (spec: Record<string, any>) => 
  * The tests' team exported as a template at 0.1.0, `budget` a parameter of the review step, applied as `name` and rendered once; with
  * `rules`, the template holds them as its `RULES.md`.
  */
-async function applied(name: string, rules?: string): Promise<{ dir: string; repo: string }> {
+async function applied(name: string, rules?: string) {
   const repo = repoWithTeam();
   const dir = path.join(scratch('wf-upgrade-template-'), 'team');
   exportTemplate({ dir, from: repo });
@@ -88,7 +88,7 @@ async function applied(name: string, rules?: string): Promise<{ dir: string; rep
 }
 
 /** The template `dir` moved to `version`, its review step's rounds `rounds`. */
-function released(dir: string, version: string, rounds: number): void {
+function released(dir: string, version: string, rounds: number) {
   edit(dir, 'nemia.yaml', (spec) => {
     spec.version = version;
   });
@@ -102,7 +102,7 @@ const templated = (name: string) =>
   readFactoryAt(ROOT, name) as ReturnType<typeof readFactoryAt> & { template: NonNullable<ReturnType<typeof readFactoryAt>['template']> };
 
 /** Every file under `dir`, by its path in it, with its bytes, so a refusal is seen to have written nothing. */
-const bytesUnder = (dir: string): Record<string, string> =>
+const bytesUnder = (dir: string) =>
   Object.fromEntries(
     (fs.readdirSync(dir, { recursive: true }) as string[])
       .filter((f) => fs.statSync(path.join(dir, f)).isFile())
@@ -111,7 +111,7 @@ const bytesUnder = (dir: string): Record<string, string> =>
   );
 
 /** The text of `file` in the factory `name`'s `folder`, its tree or its base. */
-const textIn = (folder: string, file: string): string => fs.readFileSync(path.join(folder, file), 'utf8');
+const textIn = (folder: string, file: string) => fs.readFileSync(path.join(folder, file), 'utf8');
 
 /** The review step's file, as a factory's tree or base holds it. */
 const REVIEW = 'workflows/dev/review.md';
@@ -121,7 +121,7 @@ const README = 'workflows/dev/README.md';
 const RULES = 'RULES.md';
 
 /** `file` in `folder` with `from` replaced by `to`. */
-const rewrite = (folder: string, file: string, from: string, to: string): void => {
+const rewrite = (folder: string, file: string, from: string, to: string) => {
   const text = textIn(folder, file);
   assert.ok(text.includes(from), `${file} holds ${from}`);
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
@@ -137,7 +137,7 @@ type Previewed = {
 };
 
 /** The upgrade `nemia factory diff <args>` previews. */
-const previewOf = async (...args: string[]): Promise<Previewed> => (await main(['factory', 'diff', ...args], noEngine())) as Previewed;
+const previewOf = async (...args: string[]) => (await main(['factory', 'diff', ...args], noEngine())) as Previewed;
 
 test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -461,7 +461,7 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
 });
 
 /** The plan's digest `nemia factory diff` previewed in `preview`, and the line that files it. */
-const planIn = (preview: Previewed): { plan: string; line: string } => ({ plan: preview.next.digest, line: preview.next.line });
+const planIn = (preview: Previewed) => ({ plan: preview.next.digest, line: preview.next.line });
 
 describe('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', () => {
   test("it merges with no conflict, and the factory's file records the new value", async () => {

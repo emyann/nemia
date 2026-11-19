@@ -8,12 +8,13 @@ import type { MilestoneRead } from 'objects';
 import { keepStarterDismissed, readStarterDismissed, starterShown } from '../src/lib/gettingStarted.ts';
 
 /** The four milestones, the change one in `landed`'s state and the rest done. */
-const read = (landed: MilestoneRead['state']): MilestoneRead[] => [
-  { name: 'harness', state: 'done', message: '' },
-  { name: 'factory', state: 'done', message: '' },
-  { name: 'volume', state: 'done', message: '' },
-  { name: 'landed', state: landed, message: '' },
-];
+const read = (landed: MilestoneRead['state']) =>
+  [
+    { name: 'harness', state: 'done', message: '' },
+    { name: 'factory', state: 'done', message: '' },
+    { name: 'volume', state: 'done', message: '' },
+    { name: 'landed', state: landed, message: '' },
+  ] satisfies MilestoneRead[];
 
 describe('Getting started: shown until a change is merged, or the person dismisses it', () => {
   describe('each row: whether the list is shown', () => {

@@ -63,14 +63,14 @@ const ENV: Env = {
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, { 'a.txt': 'one\n' });
   return repo;
 };
 
 /** A workflow folder of these files, by name. */
-const folderOf = (files: Record<string, string>): string => {
+const folderOf = (files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
   return dir;
@@ -102,7 +102,7 @@ const taskOf = (id: string) => {
   assert.ok(t, `${id} was filed`);
   return t;
 };
-const briefOf = (id: string): string => taskOf(id).spec.brief;
+const briefOf = (id: string) => taskOf(id).spec.brief;
 
 /** The task `id` settled in `phase`, its attempt then ended as `end` says: how the runtime records the session's end. */
 const ended = (id: string, phase: EnginePhase, end: Record<string, unknown>, closeout?: unknown) => {
@@ -129,14 +129,14 @@ const awaiting = async (id: string) => {
 };
 
 /** What the run refuses of step `name`'s closeout in `decided` (`closeoutRefusals`), as the run object's tries say it. */
-const refusalsOf = (decided: Decided, name: string): string[] => {
+const refusalsOf = (decided: Decided, name: string) => {
   const c = decided.closeouts[name];
   assert.ok(c && !('error' in c), JSON.stringify(c));
   return closeoutRefusals(
     decided.steps.find((x) => x.name === name),
     c,
     decided.steps,
-  );
+  ) satisfies string[];
 };
 
 /** What `nemia` printed, line by line, over the stage's engine. */

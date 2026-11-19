@@ -43,7 +43,7 @@ const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file),
 const shipped = () => read('.mcp.json') as { mcpServers: Record<string, { command: string; args: string[] }> };
 
 /** Why `config` is not this repository's browser, one sentence each — none when it is. */
-const refusals = (config: unknown, repo: string): string[] => {
+const refusals = (config: unknown, repo: string) => {
   const servers = (config as { mcpServers?: unknown } | null)?.mcpServers;
   if (!servers || typeof servers !== 'object' || Array.isArray(servers)) return ['names no map of servers under `mcpServers`'];
   const names = Object.keys(servers);
@@ -71,7 +71,7 @@ const refusals = (config: unknown, repo: string): string[] => {
  * expands it from the inline map an attached session's `Options.mcpServers` becomes as well as from a config file (measured on
  * Claude Code 2.1.306, `agent-runtime/test/live.test.ts`), so this rule holds on every road.
  */
-const outputDirRefusals = (dir: string | undefined, repo: string): string[] => {
+const outputDirRefusals = (dir: string | undefined, repo: string) => {
   if (dir === undefined) return ['writes its files to .playwright-mcp, relative to the workspace, where the run commits them'];
   const read = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}$/.exec(dir);
   if (!read)
@@ -89,7 +89,7 @@ const outputDirRefusals = (dir: string | undefined, repo: string): string[] => {
 };
 
 /** `args` as Claude Code spawns the server in an environment `env`: each `${NAME:-default}` read from it, else its default. */
-const expanded = (args: string[], env: Record<string, string | undefined>): string[] =>
+const expanded = (args: string[], env: Record<string, string | undefined>) =>
   args.map((a) => a.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*):-([^}]*)\}/g, (_, name: string, fallback: string) => env[name] || fallback));
 
 /** Where `command` is found on PATH, as the harness finds it. */
@@ -289,7 +289,7 @@ test('the server starts as configured, from the repository root, and offers brow
  * A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`, and
  * answers `auth status` signed in, as the runtime asks before a job's spawn.
  */
-const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>): Promise<T> => {
+const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>) => {
   const bin = scratch('wf-mcp-bin-');
   const args = path.join(bin, 'args');
   fs.writeFileSync(
@@ -315,7 +315,7 @@ const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>
 };
 
 /** The MCP configs Claude Code is named on the argv `args`: every value after `--mcp-config` up to the next flag. */
-const mcpConfigsOf = (args: string[]): string[] => {
+const mcpConfigsOf = (args: string[]) => {
   const at = args.indexOf('--mcp-config');
   if (at === -1) return [];
   const rest = args.slice(at + 1);
@@ -328,7 +328,7 @@ const mcpConfigsOf = (args: string[]): string[] => {
  * the lines `agent`, in a checkout whose `.mcp.json` names the servers `repo` and `other`: the step resolved and frozen as a start does,
  * filed as the tick files it.
  */
-const sessionArgv = async (t: Parameters<typeof until>[0], agent: string, own = ''): Promise<{ cwd: string; args: string[] }> => {
+const sessionArgv = async (t: Parameters<typeof until>[0], agent: string, own = '') => {
   const cwd = scratch('wf-mcp-checkout-');
   fs.writeFileSync(
     path.join(cwd, '.mcp.json'),
@@ -388,7 +388,7 @@ test("a session of an agent that names one of its checkout's servers is started 
  * The one MCP config named on `args`, parsed: the Agent SDK hands a job's servers inline, as the JSON of the config itself, and a file
  * named there is read as well, so this says what the session loads whichever it is given.
  */
-const loadedConfig = (args: string[]): { mcpServers: Record<string, unknown> } => {
+const loadedConfig = (args: string[]) => {
   const configs = mcpConfigsOf(args);
   assert.equal(configs.length, 1, JSON.stringify(configs));
   const one = configs[0];
@@ -396,7 +396,7 @@ const loadedConfig = (args: string[]): { mcpServers: Record<string, unknown> } =
 };
 
 /** The servers the one MCP config named on `args` holds, by name, in its order. */
-const serversLoaded = (args: string[]): string[] => Object.keys(loadedConfig(args).mcpServers);
+const serversLoaded = (args: string[]) => Object.keys(loadedConfig(args).mcpServers);
 
 test('a session of a step that names a server, filled by an agent that names none, is started with that one alone', WAITED, async (t) => {
   const { cwd, args } = await sessionArgv(t, 'description: Looks.\n', 'mcp: repo\n');

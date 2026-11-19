@@ -57,38 +57,40 @@ import {
   type CardRefusal,
 } from '../src/lib/inbox.ts';
 
-const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
-  labels: {},
-  name,
-  file: `${name}.md`,
-  title: name,
-  workflow: null,
-  repo: null,
-  factory: null,
-  from: [],
-  startedAs: [],
-  state: 'filed',
-  error: null,
-  body: name,
-  filedAt,
-  factoryRepo: null,
-  ...extra,
-});
+const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}) =>
+  ({
+    labels: {},
+    name,
+    file: `${name}.md`,
+    title: name,
+    workflow: null,
+    repo: null,
+    factory: null,
+    from: [],
+    startedAs: [],
+    state: 'filed',
+    error: null,
+    body: name,
+    filedAt,
+    factoryRepo: null,
+    ...extra,
+  }) satisfies InboxEntry;
 
-const listing = (name: string, from: 'repo' | 'user', dir: string, error: string | null = null): WorkflowListing => ({
-  name,
-  from,
-  dir,
-  description: null,
-  readme: null,
-  steps: [],
-  graph: { roots: [], edges: [] },
-  schemas: [],
-  folderTeam: false,
-  version: '0',
-  error,
-  unfilled: null,
-});
+const listing = (name: string, from: 'repo' | 'user', dir: string, error: string | null = null) =>
+  ({
+    name,
+    from,
+    dir,
+    description: null,
+    readme: null,
+    steps: [],
+    graph: { roots: [], edges: [] },
+    schemas: [],
+    folderTeam: false,
+    version: '0',
+    error,
+    unfilled: null,
+  }) satisfies WorkflowListing;
 
 const WORKFLOWS = [
   listing('dev', 'repo', '/code/app/workflows/dev'),
@@ -282,7 +284,7 @@ const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
 
 describe('fileCard, dropCard, startCard, queueCard: what the board sends the api for a card, through the Card verbs', () => {
   test("a card is filed in its factory's namespace as JSON, its factory carried by the path, and resolves with its name; a refusal rejects with the api's words", async (t) => {
-    let answer = (): Response => answered(201, cardAnswer('cache-the-views-k2q9', 'pair'), 'Created');
+    let answer = () => answered(201, cardAnswer('cache-the-views-k2q9', 'pair'), 'Created') satisfies Response;
     const sent = sending(t, () => answer());
     const card = { body: 'Cache the views', workflow: 'dev', factory: 'pair' };
     assert.deepEqual(await fileCard(card), { name: 'cache-the-views-k2q9' });
@@ -324,7 +326,7 @@ describe('fileCard, dropCard, startCard, queueCard: what the board sends the api
     );
   });
   test("a card is dropped by its namespace and name in the path, sent as `{}` in JSON; a refusal rejects with the api's words", async (t) => {
-    let answer = (): Response => answered(200, cardAnswer('a b'));
+    let answer = () => answered(200, cardAnswer('a b')) satisfies Response;
     const sent = sending(t, () => answer());
     await dropCard({ name: 'a b', factory: null });
     await dropCard({ name: 'c', factory: 'pair' });
@@ -346,7 +348,8 @@ describe('fileCard, dropCard, startCard, queueCard: what the board sends the api
     );
   });
   test('a card is started by its own verb, with the workflow and the brief, and resolves with the run: the card stays', async (t) => {
-    let answer = (): Response => answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created');
+    let answer = () =>
+      answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created') satisfies Response;
     const sent = sending(t, () => answer());
     const asked = { workflow: 'dev', brief: "Show each step's cost", after: ['p-1'] };
     const card = { name: 'show-what-a-step-cost-c3cw', factory: null };
@@ -358,7 +361,7 @@ describe('fileCard, dropCard, startCard, queueCard: what the board sends the api
     await assert.rejects(startCard(card, asked), (err: Error) => err instanceof WriteRefusal && err.status === 404);
   });
   test("a card is queued and taken off the queue by its own verbs, POST, each sent as `{}` in JSON; a refusal rejects with the api's words", async (t) => {
-    let answer = (): Response => answered(200, cardAnswer('a b'));
+    let answer = () => answered(200, cardAnswer('a b')) satisfies Response;
     const sent = sending(t, () => answer());
     assert.equal((await queueCard({ name: 'a b', factory: 'pair' })).metadata.name, 'a b');
     await queueCard({ name: 'a b', factory: 'pair' }, { off: true });
@@ -564,28 +567,29 @@ describe('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page
 const FILE_FACTORY = 'nemia factory add <name> --volume <path|url>:rw';
 
 /** A factory as the api lists it, on `repos`. */
-const factoryOn = (name: string, repos: string[], error: string | null = null): Factory => ({
-  name,
-  default: name === 'default',
-  worksOn: repos,
-  workflows: name === 'default' ? null : ['good'],
-  hires: {},
-  error,
-  schedules: [],
-  commands: {
-    attach: `nemia factory attach ${name} <workflow>`,
-    rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --volume <path|url>:rw`,
-    schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
-    trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
-  },
-  untrusted: [],
-  volumes: [],
-  costLines: {},
-  workflowRepos: {},
-  template: null,
-});
+const factoryOn = (name: string, repos: string[], error: string | null = null) =>
+  ({
+    name,
+    default: name === 'default',
+    worksOn: repos,
+    workflows: name === 'default' ? null : ['good'],
+    hires: {},
+    error,
+    schedules: [],
+    commands: {
+      attach: `nemia factory attach ${name} <workflow>`,
+      rm: `nemia factory rm ${name}`,
+      add: `nemia factory add ${name} --volume <path|url>:rw`,
+      schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+      trust: `nemia factory trust ${name}`,
+      volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
+    },
+    untrusted: [],
+    volumes: [],
+    costLines: {},
+    workflowRepos: {},
+    template: null,
+  }) satisfies Factory;
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];
 
 const SOLO = { name: 'solo', repos: ['/r/a'] };

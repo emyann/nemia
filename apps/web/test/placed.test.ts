@@ -17,7 +17,7 @@ const factory = (name: string, repos: string[]) =>
  * Answers every fetch of the test `t`: the factories with `factories`, each factory's lines and schedules, a namespace's workflows with
  * none; returns the routes asked but a factory's lines and schedules, which the factories' read asks beside its list.
  */
-function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, factories: Factory[]) {
   const asked: string[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -38,7 +38,7 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, factories: F
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies string[];
 }
 
 test("REFUSED: a write of a folder of yours reads again the list read with no factory and every factory's — never a step's page keyed under it", async () => {

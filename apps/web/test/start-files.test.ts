@@ -17,7 +17,7 @@ const kept = (id: string, name: string) => ({ id, name, mediaType: 'image/png', 
  * @param t The test, whose end puts the fetch back.
  * @param answers What each request is answered, in order.
  */
-function answering(t: { onTestFinished: (fn: () => void) => void }, answers: Array<[number, unknown]>): string[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, answers: Array<[number, unknown]>) {
   const before = globalThis.fetch;
   const asked: string[] = [];
   globalThis.fetch = async (url: string | URL | Request) => {

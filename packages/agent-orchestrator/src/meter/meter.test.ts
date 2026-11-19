@@ -24,14 +24,13 @@ import {
   type PassCost,
   type Phase,
   type PhaseCost,
-  type RecentPass,
 } from './meter.ts';
 
 /** The rows of the meter's math, each a claim of one function of meter.ts, told by the one test at the end. */
 const ROWS: Array<[string, () => void]> = [];
 const row = (name: string, claim: () => void) => ROWS.push([name, claim]);
 
-const phase = (ms: number, over: Partial<PhaseCost> = {}): PhaseCost => ({ ms, calls: 1, bytes: 0, reads: 0, spawned: 0, ...over });
+const phase = (ms: number, over: Partial<PhaseCost> = {}) => ({ ms, calls: 1, bytes: 0, reads: 0, spawned: 0, ...over });
 const phases = (ms: Partial<Record<Phase, number>>, over: Partial<Record<Phase, Partial<PhaseCost>>> = {}) =>
   Object.fromEntries(PHASES.map((p) => [p, phase(ms[p] ?? 0, over[p])])) as Record<Phase, PhaseCost>;
 
@@ -70,7 +69,7 @@ row('the heaviest phases, longest first, three at most, none that took no time',
 });
 
 /** `nemia up`'s loop, as it keeps the interval: a pass every `everyMs`, and the lines it says. */
-const loop = (passes: number, everyMs: number): string[] => {
+const loop = (passes: number, everyMs: number) => {
   const said: string[] = [];
   let interval: Interval | undefined;
   for (let k = 0; k < passes; k++) {
@@ -177,7 +176,7 @@ row('a pass keeps its wait and load among the recent, and the quota and checks o
   assert.deepEqual([also.quota, also.checks], [{ h: { w: 40 } }, [check]]);
 });
 
-const recent = (ms: number, phases: Partial<Record<Phase, number>> = {}): RecentPass => ({
+const recent = (ms: number, phases: Partial<Record<Phase, number>> = {}) => ({
   ...recentOf(COST),
   ms,
   phases: Object.fromEntries(PHASES.map((p) => [p, phases[p] ?? 0])) as Record<Phase, number>,

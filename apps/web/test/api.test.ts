@@ -32,8 +32,7 @@ function starting(t: { onTestFinished: (fn: () => void) => void }, answer: () =>
 }
 
 /** A request's body as text: the objects' client sends its JSON as bytes. */
-const text = (body: BodyInit | null | undefined): string =>
-  typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array);
+const text = (body: BodyInit | null | undefined) => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
 
 const answered = (status: number, body: object, statusText = '') =>
   new Response(JSON.stringify(body), { status, statusText, headers: { 'content-type': 'application/json' } });

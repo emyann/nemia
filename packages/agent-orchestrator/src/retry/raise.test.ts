@@ -16,16 +16,15 @@ import { aRead, phases, run, step } from '../../test/assessed.ts';
 const asked = () => true;
 const nothingShipped = () => false;
 /** What each task's sessions cost, in dollars, every one measured. */
-const spends =
-  (usd: Record<string, number>): SpendOf =>
-  (id) =>
-    id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined;
-const reads = (phaseOf: (id: string) => TaskPhase, closeoutOf: (name: string) => Closeout | undefined, verdict?: 0): RaiseReads => ({
-  phaseOf,
-  closeoutOf,
-  askedCloseout: asked,
-  verdictOf: () => verdict,
-});
+const spends = (usd: Record<string, number>) =>
+  ((id) => (id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined)) satisfies SpendOf;
+const reads = (phaseOf: (id: string) => TaskPhase, closeoutOf: (name: string) => Closeout | undefined, verdict?: 0) =>
+  ({
+    phaseOf,
+    closeoutOf,
+    askedCloseout: asked,
+    verdictOf: () => verdict,
+  }) satisfies RaiseReads;
 
 describe('decide names the raise the run page shows: one judgement, read by both', () => {
   test('a try over its budget, signed off blocked: the answer line asks for a budget above the raise', () => {
@@ -33,8 +32,10 @@ describe('decide names the raise the run page shows: one judgement, read by both
     const r = run({ implement: 't1', review: null });
     const spent = spends({ t1: 4 });
     const settled = phases({ t1: 'succeeded' });
-    const stuck = (name: string): Closeout | undefined =>
-      name === 'implement' ? { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag name ships' } : undefined;
+    const stuck = (name: string) =>
+      (name === 'implement' ? { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag name ships' } : undefined) satisfies
+        | Closeout
+        | undefined;
     const raise = stepRaise(steps[0], r, steps, reads(settled, stuck), spent);
     assert.deepEqual(raise, { by: 'retry', above: 4, said: '$4.00', modes: ['continue', 'fresh'], own: 'blocked' });
     const d = decision(
@@ -55,13 +56,13 @@ describe('decide names the raise the run page shows: one judgement, read by both
       { steps: { implement: { taskId: 'i1', check: { taskId: 'c1' } }, review: { taskId: 'r1' }, ship: { taskId: null } } },
     );
     const spent = spends({ i1: 4.25, r1: 0.5 });
-    const all = (): TaskPhase => 'succeeded';
-    const said = (name: string): Closeout | undefined =>
-      name === 'review'
+    const all = () => 'succeeded' as const satisfies TaskPhase;
+    const said = (name: string) =>
+      (name === 'review'
         ? { outcome: 'done', summary: 's', artifacts: [], needs: undefined, output: { findings: [], again: true } }
         : name === 'implement'
           ? { outcome: 'done', summary: 's', artifacts: [], needs: undefined }
-          : undefined;
+          : undefined) satisfies Closeout | undefined;
     const raise = stepRaise(steps[1], r, steps, reads(all, said, 0), spent);
     assert.deepEqual(raise, { by: 'round', above: 4.25, said: '$4.25', modes: [], own: null });
     const d = decision(
@@ -82,7 +83,7 @@ describe('decide names the raise the run page shows: one judgement, read by both
   });
   test('none on a run called off: cancelled, pruned or held', () => {
     const steps: StepSpec[] = [{ ...step('implement'), budget: 3 }];
-    const stuck = (): Closeout => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which' });
+    const stuck = () => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which' }) satisfies Closeout;
     const settled = phases({ t1: 'succeeded' });
     const spent = spends({ t1: 4 });
     const offs: Array<Partial<Run>> = [

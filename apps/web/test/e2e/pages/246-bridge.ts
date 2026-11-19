@@ -60,7 +60,7 @@ const bridgedLevel = (bridge: typeof UP | typeof DOWN) => (body: Record<string, 
  * Why `where`'s bridge is not up, read whole on a phone's 390 pixels: `why` drawn, no link beside it, and inside `frame`, however long a
  * word it quotes; pictured as `bridge-<what>-down-<theme>.png`, then the page put back to its size.
  */
-async function expectWhy(page: Page, why: Locator, frame: Locator, where: string, what: string): Promise<void> {
+async function expectWhy(page: Page, why: Locator, frame: Locator, where: string, what: string) {
   const size = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
   try {
@@ -78,7 +78,7 @@ async function expectWhy(page: Page, why: Locator, frame: Locator, where: string
 }
 
 /** `link` is the bridge's web link, opened in a tab of its own with no referrer. */
-async function expectLink(link: Locator, where: string): Promise<void> {
+async function expectLink(link: Locator, where: string) {
   await expectVisible(link, `${where} draws the web link`);
   const [href, target, rel] = await Promise.all(['href', 'target', 'rel'].map((name) => link.getAttribute(name)));
   if (href !== LINK || target !== '_blank' || rel !== 'noreferrer')
@@ -89,7 +89,7 @@ async function expectLink(link: Locator, where: string): Promise<void> {
  * The run's page, its object answered bridged for `FAKE.unverified` with `bridge`: that step's spec, in its part's Detail, opened once
  * loaded.
  */
-async function onRun(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locator> {
+async function onRun(page: Page, bridge: typeof UP | typeof DOWN) {
   await page.route(isDetail, answered(bridgedStep(bridge)));
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
@@ -101,7 +101,7 @@ async function onRun(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locat
  * The step's facts draw a `reach` row: the link while its bridge is up, why not while it is not. The run's object is routed for each, and
  * let go after.
  */
-async function expectStep(page: Page): Promise<void> {
+async function expectStep(page: Page) {
   try {
     const section = await onRun(page, UP);
     await expectLink(section.locator('[data-fact="reach"] a[data-step-bridge]'), `${FAKE.unverified}'s section`);
@@ -117,7 +117,7 @@ async function expectStep(page: Page): Promise<void> {
 }
 
 /** Nemia's section, her level answered with `bridge`: her reach, once read. */
-async function onSettings(page: Page, bridge: typeof UP | typeof DOWN): Promise<Locator> {
+async function onSettings(page: Page, bridge: typeof UP | typeof DOWN) {
   await page.route(isLevel, answered(bridgedLevel(bridge)));
   await page.reload({ waitUntil: 'load' });
   await idle(page);

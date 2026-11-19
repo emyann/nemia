@@ -20,7 +20,7 @@ import { Refused } from '../src/refused.ts';
 import { clientRelease, releaseAt } from '../src/release.ts';
 
 /** A daemon whose `GET /api/health` answers `body`. */
-const healthOf = (body: unknown): http.Server =>
+const healthOf = (body: unknown) =>
   http.createServer((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify(body));
@@ -44,7 +44,7 @@ afterAll(() => {
 const urlOf = (server: http.Server) => `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
 /** An install's root at `root`: its `package.json` naming the daemon, and its `release.json` saying `tag` where one is given. */
-function install(root: string, tag?: string): string {
+function install(root: string, tag?: string) {
   fs.mkdirSync(path.join(root, 'apps', 'cli', 'src'), { recursive: true });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'nemia', nemia: { daemon: 'apps/api/src/main.ts' } }));
   if (tag !== undefined) fs.writeFileSync(path.join(root, 'release.json'), JSON.stringify({ tag, commit: 'abc' }));
@@ -52,7 +52,7 @@ function install(root: string, tag?: string): string {
 }
 
 /** A store whose lease names `url`, the start off: what `served` reads under this machine's context. */
-function storeAt(url: string): NodeJS.ProcessEnv {
+function storeAt(url: string) {
   const root = path.join(scratch('nemia-release-'), 'store');
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url }));

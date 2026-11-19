@@ -137,7 +137,7 @@ export default {
 async function takeBack(
   page: Page,
   { id, repo, lane, files, marker }: { id: string; repo: string; lane: string; files: string; marker: string },
-): Promise<void> {
+) {
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   if (fs.existsSync(lane)) git('worktree', 'remove', '--force', lane);
   git('worktree', 'prune');

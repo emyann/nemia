@@ -11,12 +11,7 @@ import { OUT, store } from '../world.ts';
  * Press `control`, or pick the level `word` in the Select it opens, wait for the api's answer to the level's write, and refuse any but a
  * 200: the levels it answered.
  */
-async function wrote(
-  page: Page,
-  control: Locator,
-  what: string,
-  word?: 'Manual' | 'Semi-auto' | 'Auto',
-): Promise<{ factories: { factory: string; level: string }[] }> {
+async function wrote(page: Page, control: Locator, what: string, word?: 'Manual' | 'Semi-auto' | 'Auto') {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === '/api/level', { timeout: WAIT_MS }),
     word === undefined ? control.click() : pickLevel(page, control, word),

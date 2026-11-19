@@ -25,11 +25,10 @@ export const SEATS = [
 export const ENV_SEATS = ['packages/agent-orchestrator/test/ambient.ts', 'apps/api/test/harness.ts'] as const;
 
 /** Whether `file`, a path from the root, is a test's: under a `test/` folder, or a `.test.ts` beside its source. */
-const isTestFile = (file: string): boolean => /\.tsx?$/.test(file) && (/(^|\/)test\//.test(file) || /\.test\.tsx?$/.test(file));
+const isTestFile = (file: string) => /\.tsx?$/.test(file) && (/(^|\/)test\//.test(file) || /\.test\.tsx?$/.test(file));
 
 /** `text` with its comments blanked, line for line, so a name in prose is not read as code. */
-const codeOf = (text: string): string =>
-  text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 
 /**
  * The orchestrator's lists a seat drops, each by its name, with two of its names a copy of it would hold: the daemon's per-session
@@ -45,7 +44,7 @@ export const LISTS = [
  * both names of its `copy`, its copy of the list; no import of the list (static, or awaited once the seat has set what the package reads
  * as it loads); or an import of it unread.
  */
-export function seatLists(text: string): string[] {
+export function seatLists(text: string) {
   const code = codeOf(text);
   const why: string[] = [];
   for (const { list, copy, what } of LISTS) {
@@ -69,7 +68,7 @@ export function seatLists(text: string): string[] {
  * `WF_` name on it, dotted or bracketed, its `delete`, or an `Object.assign(process.env, …)` naming one, at column 0. One indented
  * inside a test's body, a copy of the environment (`{ ...process.env, WF_X }`), and a name in a comment are passed over.
  */
-export function moduleEnvWrites(text: string): string[] {
+export function moduleEnvWrites(text: string) {
   const lines = codeOf(text).split('\n');
   const named = String.raw`process\.env(?:\.(WF_\w+)|\[\s*['"](WF_\w+)['"]\s*\])`;
   const assigned = new RegExp(String.raw`^${named}\s*(?:\?\?|\|\||&&)?=(?!=)`);

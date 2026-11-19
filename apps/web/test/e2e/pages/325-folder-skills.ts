@@ -10,19 +10,19 @@ import { OUT, store } from '../world.ts';
 /** The checkout is read in FACTORIES' `hiring`, the one factory on it: the default factory works on no repository. */
 const IN = `?factory=${FACTORIES.hiring.name}`;
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
 
 /** A picture of `what`, named for this page, in the theme it is visited in. */
-const picture = async (page: Page, target: Page | Locator, what: string): Promise<void> => {
+const picture = async (page: Page, target: Page | Locator, what: string) => {
   await settled(page);
   await photograph(target, path.join(OUT, `folder-skills-${what}-${await themeOf(page)}.png`));
 };
 
 /** Refuses unless the page links no skill named with its folder to a skill's page, which would be refused. */
-async function expectNoPage(page: Page, where: string): Promise<void> {
+async function expectNoPage(page: Page, where: string) {
   await expectCount(
     page.locator('a[href*="/agents/skills/"][href*=":"], a[href*="/agents/skills/"][href*="%3A" i]'),
     0,
@@ -31,7 +31,7 @@ async function expectNoPage(page: Page, where: string): Promise<void> {
 }
 
 /** Refuses unless the chip of `skill` under `layer` reads as its line writes it, the repository's, with the folder it was found in. */
-async function expectChip(told: Locator, layer: string, skill: { id: string }): Promise<void> {
+async function expectChip(told: Locator, layer: string, skill: { id: string }) {
   const { written, foundIn } = folderSkill(skill);
   const chip = told.locator(`[data-layer="${layer}"] [data-skill="${written}"]`);
   await expectVisible(chip, `${written}, under the ${layer} layer`);
@@ -42,7 +42,7 @@ async function expectChip(told: Locator, layer: string, skill: { id: string }): 
 }
 
 /** The step's page of yours: each skill named with its folder is a chip as written, found, under the layer that gives it. */
-async function expectStep(page: Page): Promise<void> {
+async function expectStep(page: Page) {
   const { workflow, step, agentSkill, stepSkill } = FOLDER_SKILLS;
   await goto(page, `/workflows/user/${workflow}/${step}${IN}`);
   const told = page.locator('details[data-will-be-told]');
@@ -53,7 +53,7 @@ async function expectStep(page: Page): Promise<void> {
 }
 
 /** The agent's page: the skill's row as written, the repository's, read from its folder, described, unlinked; and not in the picker. */
-async function expectAgent(page: Page): Promise<void> {
+async function expectAgent(page: Page) {
   const { agent, agentSkill } = FOLDER_SKILLS;
   const { written, foundIn } = folderSkill(agentSkill);
   await goto(page, `/agents/user/${agent}${IN}`);
@@ -78,7 +78,7 @@ async function expectAgent(page: Page): Promise<void> {
  * none there, so the folder does not read and offers no builder, its refusal naming the repository it needs. (The builder writes a folder
  * of yours in the default factory alone: a save that keeps such a `skills:` line as written waits on the api reading one there.)
  */
-async function expectNoBuilder(page: Page): Promise<void> {
+async function expectNoBuilder(page: Page) {
   const { workflow } = FOLDER_SKILLS;
   await goto(page, `/workflows/user/${workflow}?build=true`);
   await expectCount(page.locator(`section[data-builder="${workflow}"]`), 0, 'in the default factory, no builder opens');
@@ -90,7 +90,7 @@ async function expectNoBuilder(page: Page): Promise<void> {
  * The repository's skills that are links, read in FACTORIES' `hiring`: one that stays inside reads, with its page; one that leaves is
  * refused, in its words. The Agents page, in the default factory, lists no skill of a repository's.
  */
-async function expectLinks(page: Page): Promise<void> {
+async function expectLinks(page: Page) {
   const { inside, apart } = FOLDER_SKILLS;
   await goto(page, '/agents');
   await expectCount(page.locator('section[data-skill-place="repo"]'), 0, "the Agents page lists no repository's skills");

@@ -68,17 +68,17 @@ const stage = staged({ runWith, main: told, engineOf, env: ENV });
 const filesStore = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
 };
 
 /** The commit a run's branch is at in the test place: what a check filed on it records (`CheckTask.tip`). */
-const filedOn = (r: RepositoryRun): string | null => stage.place().world.tip(r.repo, r.branch);
+const filedOn = (r: RepositoryRun) => stage.place().world.tip(r.repo, r.branch) satisfies string | null;
 
 /** A workflow folder of one step `implement`, with the frontmatter lines it is given. */
-const implementOnly = (lines: string[] = []): string => {
+const implementOnly = (lines: string[] = []) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${['place: git', ...lines].join('\n')}\n---\nimplement it\n`);
   return dir;
@@ -94,11 +94,11 @@ const startedOn = async (workflowDir: string, brief: string) => {
 /** That `err` is a refusal of kind `tag` with exit 2, naming each of `facts`. */
 const refusedAs =
   (tag: string, ...facts: string[]) =>
-  (err: Error & { exitCode?: number; _tag?: string }): true => {
+  (err: Error & { exitCode?: number; _tag?: string }) => {
     assert.equal(err._tag, tag, err.message);
     assert.equal(err.exitCode, 2, err.message);
     names(err.message, ...facts);
-    return true;
+    return true as const satisfies true;
   };
 
 describe('a person tries a failed step again, fresh, on another model', () => {
@@ -139,7 +139,7 @@ const pauseAskOf = (id: string) => {
   fs.writeFileSync(askFile(ROOT, id, 'implement', 2), JSON.stringify(ask));
   return ask;
 };
-const onDisk = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'));
+const onDisk = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
 
 describe("a retry over a void pause ask waits for the pass that sets it aside, then is written at the ask's name", () => {
   let pauseAsk!: unknown;
@@ -210,7 +210,7 @@ const where: Question = {
 };
 
 /** A workflow folder of `plan → implement`, plan declaring `open`, a field of questions, gated where `gate` says so. */
-const planned = (gate: boolean): string => {
+const planned = (gate: boolean) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   const plan = ['place: git', 'output: plan.schema.json', ...(gate ? ['gate: true'] : [])];
   fs.writeFileSync(path.join(dir, 'plan.md'), `---\n${plan.join('\n')}\n---\nplan it\n`);
@@ -228,7 +228,7 @@ const planned = (gate: boolean): string => {
 };
 
 /** A run whose plan signed off — blocked, or done at its gate — asking `open`, on the stage's engine. */
-const asking = async ({ gate = false, open = [cut, where] as unknown[] } = {}): Promise<string> => {
+const asking = async ({ gate = false, open = [cut, where] as unknown[] } = {}) => {
   const id = await startedOn(planned(gate), 'plan the flag');
   const outcome = gate ? 'done' : 'blocked';
   stage
@@ -437,7 +437,7 @@ describe('REFUSED: `nemia retry --answer` that does not fit the questions the st
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
 /** A workflow folder: `implement`, with the frontmatter lines it is given, and `review` after it. */
-const implementThenReview = (lines: string[] = []): string => {
+const implementThenReview = (lines: string[] = []) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${['place: git', ...lines].join('\n')}\n---\nimplement it\n`);
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nplace: git\n---\nreview it\n');
@@ -445,7 +445,7 @@ const implementThenReview = (lines: string[] = []): string => {
 };
 
 /** `nemia start` of `workflowDir` over a fresh repository, the steps in its checkout: a repository run, unticked. */
-const startedRun = async (workflowDir: string, labels?: readonly string[]): Promise<RepositoryRun> => {
+const startedRun = async (workflowDir: string, labels?: readonly string[]) => {
   const run = await stage.runPlaced(
     startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, isolate: false, ...(labels ? { labels: { edits: labels } } : {}) }),
   );
@@ -459,7 +459,7 @@ const standingPass = () => stage.runWith(stage.board().e, passStanding(listRuns(
 const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(filesStore.runs.read(id)));
 
 /** The attempt of `id` ended in `phase` with what `end` says — its closeout, exit code, reason, cost, denials, what it printed. */
-const ended = (id: string, phase: EnginePhase, end: TestEnd = {}): void => {
+const ended = (id: string, phase: EnginePhase, end: TestEnd = {}) => {
   stage.board().end(id, phase, end);
 };
 
@@ -482,9 +482,9 @@ const recordText = (id: string) => fs.readFileSync(path.join(ROOT, 'runs', `${id
  * A step's record without what every filing writes of the revisions it took — the agent and skill pins and the digest of its closeout
  * schema and the fields it declared, whose subject is `revisions.test.ts`.
  */
-const filedAs = (record: StepRecord | undefined): Partial<StepRecord> => {
+const filedAs = (record: StepRecord | undefined) => {
   const { pinned: _, closeoutHash: __, declared: ___, ...rest } = record ?? { taskId: null };
-  return rest;
+  return rest satisfies Partial<StepRecord>;
 };
 
 /** The JSON under a brief's `heading`. */
@@ -493,7 +493,7 @@ const dataUnder = (brief: string, heading: string) =>
 
 /** What `nemia` printed, joined, over the stage's engine. */
 /** Run `id`'s plan questions as its decision's closeout numbers them (`questionLines`), then the `--answer` its reading offers. */
-const questionsSaid = async (id: string): Promise<string[]> => {
+const questionsSaid = async (id: string) => {
   const decided = await decidedOn(stage, id);
   const c = decided.closeouts.plan;
   assert.ok(c && !('error' in c), JSON.stringify(c));
@@ -868,7 +868,7 @@ describe('a session cut off at its budget before its check ran: `nemia retry --r
   const s = story(test);
   const session = () => `${run.id}-implement`;
   const check2 = () => `${run.id}-implement-try2-check`;
-  const cutOff = async (checked = true): Promise<RepositoryRun> => {
+  const cutOff = async (checked = true) => {
     const started = await startedRun(implementThenReview(['harness: claude', ...(checked ? ['check: npm test'] : []), 'budget: 3']));
     await tick(started.id);
     ended(`${started.id}-implement`, 'failed', { exitCode: 1, reason: 'harness', limit: 'budget', usage: { costUsd: 3.02 } });
@@ -1915,7 +1915,7 @@ describe("a claude job's cap, shared by its tries and raised by a person", () =>
 });
 
 /** Every task a run's record names, viewed once, as the tick views them. */
-const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
+const viewsOf = async (e: Engine, run: Run) => {
   const views = new Map<string, TaskView>();
   for (const { taskId, check } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await Effect.runPromise(e.view(taskId)));
@@ -1958,7 +1958,7 @@ describe('a check killed at its memory limit is told to the step tried again, ou
     b = stage.board();
     GI = 1024 ** 3;
   });
-  const toldAfter = async (end: TestEnd): Promise<string> => {
+  const toldAfter = async (end: TestEnd) => {
     const { id } = await throughCheck(['check: npm test', 'retries: 1'], 'failed', end);
     assert.deepEqual((await tick(id)).tried, ['implement']);
     const brief = b.tasks.get(`${id}-implement-try2`)!.spec.brief;
@@ -2040,7 +2040,7 @@ describe("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, 
   beforeAll(() => {
     b = stage.board();
   });
-  const endOf = (word: string): TestEnd =>
+  const endOf = (word: string) =>
     (word === 'unsigned' ? { reason: 'harness', closedOut: false, former: 'unsigned' } : { reason: word }) as TestEnd;
   const wordOf = (a: { reason: string | null; former?: string }) => a.former ?? a.reason;
   const rows = [

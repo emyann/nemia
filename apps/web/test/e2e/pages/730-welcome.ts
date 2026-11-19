@@ -39,7 +39,8 @@ const signIn = (state: 'met' | 'missing') => ({
 const NO_FACTORY = { name: 'factory', area: 'factory', state: 'missing', message: 'no factory is filed', fixes: [], cost: 'run' };
 
 /** A check named `name` in `state`. */
-const check = (name: Check['name'], state: Check['state']): Check => ({ name, state, message: `the ${name} check, ${state}`, fixes: [] });
+const check = (name: Check['name'], state: Check['state']) =>
+  ({ name, state, message: `the ${name} check, ${state}`, fixes: [] }) satisfies Check;
 
 /** The reads the page answers in place of the api's, by what it is showing: fresh, then the harness's two checks one way or another. */
 const READS = {
@@ -49,7 +50,7 @@ const READS = {
 } as const;
 
 /** Activate starts the install's first fix, held here as `660-setup` holds it: the start answered, its output streamed and ended. */
-async function holdInstall(page: Page, sent: unknown[]): Promise<() => Promise<void>> {
+async function holdInstall(page: Page, sent: unknown[]) {
   const made = (phase: 'pending' | 'succeeded') => ({ id: 'fix-e2e-welcome', need: 'claude', phase, output: '' });
   const start = (route: Route) => {
     if (route.request().method() !== 'POST') return route.fallback();
@@ -64,23 +65,23 @@ async function holdInstall(page: Page, sent: unknown[]): Promise<() => Promise<v
     });
   await page.route('**/api/readiness/fixes', start);
   await page.route('**/api/readiness/fixes/*/output', output);
-  return async () => {
+  return (async () => {
     await page.unroute('**/api/readiness/fixes', start);
     await page.unroute('**/api/readiness/fixes/*/output', output);
-  };
+  }) satisfies () => Promise<void>;
 }
 
 /**
  * The board's reads made again as a person coming back to its tab makes them (TanStack Query's refetch on focus): the welcome, once a
  * harness is installed, is no longer asked, so a reload would leave it.
  */
-async function readAgain(page: Page): Promise<void> {
+async function readAgain(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
   await idle(page);
 }
 
 /** The two ticks drawn on the welcome, the version's and the turn's, in `states`. */
-async function drawsTicks(page: Page, states: readonly [Check['state'], Check['state']]): Promise<void> {
+async function drawsTicks(page: Page, states: readonly [Check['state'], Check['state']]) {
   const checks = page.locator('article[data-welcome] [data-harness-checks="claude"]');
   await expectVisible(checks, 'the welcome draws the harness’s checks under it');
   await expectVisible(checks.locator(`[data-harness-check="version"][data-check-state="${states[0]}"]`), `the version tick, ${states[0]}`);

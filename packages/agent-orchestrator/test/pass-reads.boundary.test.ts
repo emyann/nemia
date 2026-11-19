@@ -23,7 +23,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { Invalid } from '../src/refusal/refusal.ts';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { TaskPhase } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
@@ -81,7 +81,7 @@ const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 /** A repository with one file committed on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'add.ts'), 'export const add = (a, b) => a + b;\n');
@@ -173,7 +173,7 @@ const board = () => {
 };
 
 /** A run of `implement → ship` on `repo`, implement committed and signed: at the ending's gate. */
-const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run> => {
+const atTheGate = async (b: ReturnType<typeof board>, repo: string) => {
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   const work = runRecord(ROOT, run.id).steps.implement;
@@ -186,7 +186,7 @@ const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run
 };
 
 /** A run of one step on `repo`, filed and settled `phase`. */
-const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: TaskPhase): Promise<Run> => {
+const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: TaskPhase) => {
   const run = await runPlaced(startRun({ brief: 'one', repo, workflowDir: oneStep }));
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
   b.settle(`${run.id}-implement`, phase, phase === 'succeeded' ? SIGNED : undefined);
@@ -680,7 +680,7 @@ test(
     const pass = runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung), Effect.provide(clock.layer))).then(
       () => void (ended = true),
     );
-    const drained = async (): Promise<void> => {
+    const drained = async () => {
       if (ended) return;
       await clock.adjust(1_000);
       return drained();

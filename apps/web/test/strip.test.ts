@@ -28,49 +28,52 @@ const at = (ms: number) => new Date(ms).toISOString();
  * A run the list of the finished answers: its work stopped at `end`, it ended as `outcome` says, costing `usd`. Its status is `succeeded`
  * unless it failed, so a reader of the status in place of the outcome would count one called off or undecided as landed.
  */
-const ended = (id: string, outcome: RunOutcome, end: number, usd: number, extra: Partial<RunView> = {}): FinishedRun => ({
-  ...summary([['work', 'succeeded']], {
-    id,
-    status: outcome === 'failed' ? 'failed' : 'succeeded',
-    moving: false,
-    atWork: { ms: 10 * MIN, since: null, endedAt: at(end) },
-    cost: { usd, measured: 1, unmeasured: 0, said: `$${usd}` },
-    ...extra,
-  }),
-  wallMs: 0,
-  finishedAt: at(end),
-  outcome,
-  clock: null,
-});
+const ended = (id: string, outcome: RunOutcome, end: number, usd: number, extra: Partial<RunView> = {}) =>
+  ({
+    ...summary([['work', 'succeeded']], {
+      id,
+      status: outcome === 'failed' ? 'failed' : 'succeeded',
+      moving: false,
+      atWork: { ms: 10 * MIN, since: null, endedAt: at(end) },
+      cost: { usd, measured: 1, unmeasured: 0, said: `$${usd}` },
+      ...extra,
+    }),
+    wallMs: 0,
+    finishedAt: at(end),
+    outcome,
+    clock: null,
+  }) satisfies FinishedRun;
 
 /** A factory of `name` hiring the agents `hires` names. */
-const factory = (name: string, hires: Record<string, string>): Factory => ({
-  name,
-  default: name === 'default',
-  worksOn: [],
-  workflows: null,
-  hires,
-  error: null,
-  schedules: [],
-  commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '' },
-  untrusted: [],
-  volumes: [],
-  costLines: {},
-  workflowRepos: {},
-  template: null,
-});
+const factory = (name: string, hires: Record<string, string>) =>
+  ({
+    name,
+    default: name === 'default',
+    worksOn: [],
+    workflows: null,
+    hires,
+    error: null,
+    schedules: [],
+    commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '' },
+    untrusted: [],
+    volumes: [],
+    costLines: {},
+    workflowRepos: {},
+    template: null,
+  }) satisfies Factory;
 
 /** A step of `run` at work by `agent` since `since`. */
-const atWorkBy = (run: RunView, step: string, agent: string, since: number): RunView => ({
-  ...run,
-  steps: [
-    ...run.steps.filter((s) => s.name !== step),
-    { ...run.steps[0], name: step, message: 'running', spec: givenAgent(agent), timeline: atWorkSince(at(since)) },
-  ],
-});
+const atWorkBy = (run: RunView, step: string, agent: string, since: number) =>
+  ({
+    ...run,
+    steps: [
+      ...run.steps.filter((s) => s.name !== step),
+      { ...run.steps[0], name: step, message: 'running', spec: givenAgent(agent), timeline: atWorkSince(at(since)) },
+    ],
+  }) satisfies RunView;
 
 /** A run the list could not judge, of no factory. */
-const unjudged = (id: string): UnjudgedRun => ({ id, factory: null, unjudged: 'its journal does not read' });
+const unjudged = (id: string) => ({ id, factory: null, unjudged: 'its journal does not read' }) satisfies UnjudgedRun;
 
 const landedToday = ended('r-landed', 'succeeded', DAY + 10 * MIN, 6);
 const landedYesterday = ended('r-old', 'succeeded', DAY - 10 * MIN, 100);
@@ -121,20 +124,18 @@ const kitFlying = listed(
 );
 
 /** The light answer of `waiting` and `inFlight`, as the list puts each run. */
-const open = (waitingRuns: OpenRuns['waiting'] = [], inFlightRuns: OpenRuns['inFlight'] = []): Pick<OpenRuns, 'waiting' | 'inFlight'> => ({
-  waiting: waitingRuns,
-  inFlight: inFlightRuns,
-});
+const open = (waitingRuns: OpenRuns['waiting'] = [], inFlightRuns: OpenRuns['inFlight'] = []) =>
+  ({
+    waiting: waitingRuns,
+    inFlight: inFlightRuns,
+  }) satisfies Pick<OpenRuns, 'waiting' | 'inFlight'>;
 
 const OPEN = open([waiting, movesAndWaits], [flying, kitFlying]);
 const FINISHED = [undecided, cancelledToday, landedToday, failedAtMidnight, landedYesterday];
 const FACTORIES = [factory('default', {}), factory('kit', { 'build/land': 'otto', 'build/implement': 'ada', 'build/review': 'ada' })];
 
 /** Of the factory `name` (null the default), as its reads answer it: `openRunsQuery(factory)` and `finishedTodayQuery(factory, …)`. */
-const of =
-  (name: string | null) =>
-  (run: { factory: string | null }): boolean =>
-    run.factory === name;
+const of = (name: string | null) => (run: { factory: string | null }) => run.factory === name;
 
 /** The strip off the fixtures' reads: of every factory, or narrowed as the reads of the factory in view are. */
 const strip = (factory?: string) => {
@@ -234,15 +235,16 @@ test("the day starts at midnight in the process's time zone", () => {
 });
 
 /** A window `extra` says, 50% used of five hours, resetting in an hour. */
-const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
-  key: 'five_hour',
-  label: '5-hour',
-  usedPercentage: 50,
-  resetsAt: at(NOW + 60 * MIN),
-  reset: false,
-  marked: false,
-  ...extra,
-});
+const win = (extra: Partial<QuotaWindow> = {}) =>
+  ({
+    key: 'five_hour',
+    label: '5-hour',
+    usedPercentage: 50,
+    resetsAt: at(NOW + 60 * MIN),
+    reset: false,
+    marked: false,
+    ...extra,
+  }) satisfies QuotaWindow;
 
 describe("runsOutAt and quotaLineOf: when a window runs out, and the quota's line", () => {
   test('a window runs out when its pace so far uses it up before it resets, and never after the reset', () => {
@@ -269,19 +271,20 @@ describe("runsOutAt and quotaLineOf: when a window runs out, and the quota's lin
 });
 
 /** Tokens of a run: `total` split over the four kinds, `unmeasured` sessions besides. */
-const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunView['tokens']>> = {}): RunView['tokens'] => ({
-  total,
-  input: total / 2,
-  output: total / 2,
-  cacheRead: total / 4,
-  cacheWrite: total / 8,
-  uncached: total / 8,
-  measured: 1,
-  unmeasured,
-  said: '',
-  split: '',
-  ...more,
-});
+const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunView['tokens']>> = {}) =>
+  ({
+    total,
+    input: total / 2,
+    output: total / 2,
+    cacheRead: total / 4,
+    cacheWrite: total / 8,
+    uncached: total / 8,
+    measured: 1,
+    unmeasured,
+    said: '',
+    split: '',
+    ...more,
+  }) satisfies RunView['tokens'];
 
 describe('stripOf: what counts today, landed, failed, waiting and spent', () => {
   test("a run finished at or after the day's start counts today, landed or failed; one before it counts for nothing", () => {

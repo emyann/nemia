@@ -79,542 +79,567 @@ export const CODES = {
 export type Word = keyof typeof CODES;
 
 /** A step's codes and its word, as a row of the api carries them: `message`. */
-export const coded = (word: Word): Codes & { message: string } => ({ ...CODES[word], message: word });
+export const coded = (word: Word) => {
+  const made: Codes & { message: string } = { ...CODES[word], message: word };
+  return made;
+};
 
 /** A try's codes and its word: as `coded`, with no verdict, which a try carries on its check. */
-export const triedAs = (word: Word): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'> => ({
-  phase: CODES[word].phase,
-  reason: CODES[word].reason,
-  on: CODES[word].on,
-  via: CODES[word].via,
-  message: word,
-});
+export const triedAs = (word: Word) =>
+  ({
+    phase: CODES[word].phase,
+    reason: CODES[word].reason,
+    on: CODES[word].on,
+    via: CODES[word].via,
+    message: word,
+  }) satisfies Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'>;
 
 /** What a try's session consumed, measured in part: a count nobody measured is absent. */
-export const used = (extra: Partial<StepUsed> = {}): StepUsed => ({
-  usage: { responses: 12, costUsd: 1.25, inputTokens: 9_000 },
-  used: '12 responses',
-  cost: '$1.25',
-  costUsd: 1.25,
-  apiMs: 42_000,
-  toolMs: null,
-  read: 'read 21.4M · wrote 412k · peak 167k',
-  peak: 'large',
-  rebuilt: 0,
-  ...extra,
-});
+export const used = (extra: Partial<StepUsed> = {}) =>
+  ({
+    usage: { responses: 12, costUsd: 1.25, inputTokens: 9_000 },
+    used: '12 responses',
+    cost: '$1.25',
+    costUsd: 1.25,
+    apiMs: 42_000,
+    toolMs: null,
+    read: 'read 21.4M · wrote 412k · peak 167k',
+    peak: 'large',
+    rebuilt: 0,
+    ...extra,
+  }) satisfies StepUsed;
 
 /** The run's time on the clock, or a round's with `loop`. */
-const total = (extra: Partial<TimelineTotal> = {}): TimelineTotal => ({
-  loop: null,
-  round: null,
-  tasks: 2,
-  inFlight: 0,
-  queuedMs: 1_000,
-  ranMs: 60_000,
-  wallMs: 61_000,
-  queued: '1s',
-  ran: '1m',
-  wall: '1m 1s',
-  cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
-  ...extra,
-});
+const total = (extra: Partial<TimelineTotal> = {}) =>
+  ({
+    loop: null,
+    round: null,
+    tasks: 2,
+    inFlight: 0,
+    queuedMs: 1_000,
+    ranMs: 60_000,
+    wallMs: 61_000,
+    queued: '1s',
+    ran: '1m',
+    wall: '1m 1s',
+    cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
+    ...extra,
+  }) satisfies TimelineTotal;
 
 /** A step of a run's detail signed off after a try replaced by a nudge: a closeout naming each kind of file, a check that refused. */
-export const step = (extra: Partial<Step> = {}): Step => ({
-  name: 'implement',
-  spec: {
-    harness: 'claude',
-    model: 'opus',
-    effort: 'high',
-    context: null,
-    after: ['design'],
-    workspace: null,
-    place: null,
-    resume: null,
-    fence: 'dontAsk',
-    sandbox: null,
-    tools: ['Read', 'Edit'],
-    deadlineSeconds: 3600,
-    loop: null,
-    rounds: null,
-  },
-  filed: {
-    model: 'opus',
-    askedModel: null,
-    effort: 'high',
-    contextTokens: null,
-    fence: 'dontAsk',
-    runsIn: { mode: 'dontAsk', by: 'filed' },
-    tools: null,
-    deadlineSeconds: 3600,
-    remote: { name: 'far', address: 'https://far.example/a2a' },
-    bridge: null,
-  },
-  body: 'Build it.',
-  told: null,
-  layers: null,
-  taskParts: null,
-  taskId: 't-2',
-  workspace: '/work/tree',
-  files: [{ path: 'out/report.md', name: 'report.md', url: '/api/runs/r-1/steps/implement/files/report.md', kind: 'text', size: 12 }],
-  filesError: null,
-  branch: 'wf/r-1/implement',
-  phase: 'failed',
-  reason: 'CheckFailed',
-  on: null,
-  via: null,
-  message: 'failed (check)',
-  verdict: EXIT_1,
-  note: 'try 2',
-  roundDue: false,
-  commands: { approve: 'nemia approve r-1 implement', retry: 'nemia retry r-1 implement', say: 'nemia say r-1 implement' },
-  needs: null,
-  waitingFor: null,
-  approve: 'approve implement',
-  denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
-  sessionUnread: null,
-  gate: { awaiting: false, approval: { try: 2, at: '2026-09-30T05:10:00.000Z', message: 'Go.' } },
-  lastLine: null,
-  said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.', after: null }],
-  asked: { try: 3, mode: 'recheck', model: null, message: null, stopFirst: false },
-  closeout: {
-    outcome: 'done',
-    summary: 'Built.',
+export const step = (extra: Partial<Step> = {}) =>
+  ({
+    name: 'implement',
+    spec: {
+      harness: 'claude',
+      model: 'opus',
+      effort: 'high',
+      context: null,
+      after: ['design'],
+      workspace: null,
+      place: null,
+      resume: null,
+      fence: 'dontAsk',
+      sandbox: null,
+      tools: ['Read', 'Edit'],
+      deadlineSeconds: 3600,
+      loop: null,
+      rounds: null,
+    },
+    filed: {
+      model: 'opus',
+      askedModel: null,
+      effort: 'high',
+      contextTokens: null,
+      fence: 'dontAsk',
+      runsIn: { mode: 'dontAsk', by: 'filed' },
+      tools: null,
+      deadlineSeconds: 3600,
+      remote: { name: 'far', address: 'https://far.example/a2a' },
+      bridge: null,
+    },
+    body: 'Build it.',
+    told: null,
+    layers: null,
+    taskParts: null,
+    taskId: 't-2',
+    workspace: '/work/tree',
+    files: [{ path: 'out/report.md', name: 'report.md', url: '/api/runs/r-1/steps/implement/files/report.md', kind: 'text', size: 12 }],
+    filesError: null,
+    branch: 'wf/r-1/implement',
+    phase: 'failed',
+    reason: 'CheckFailed',
+    on: null,
+    via: null,
+    message: 'failed (check)',
+    verdict: EXIT_1,
+    note: 'try 2',
+    roundDue: false,
+    commands: { approve: 'nemia approve r-1 implement', retry: 'nemia retry r-1 implement', say: 'nemia say r-1 implement' },
     needs: null,
-    apiVersion: null,
-    body: null,
-    values: [],
-    refused: [],
-    artifacts: [
-      { path: 'shot.png', name: 'shot.png', url: '/api/runs/r-1/steps/implement/files/shot.png', kind: 'image', size: 2048 },
-      { path: 'old.log', pruned: 'removed by wf prune --artifacts', prunedAt: '2026-09-30T06:00:00.000Z' },
-      { path: 'RESPONSE.md' },
-    ],
-    output: { notes: [], noNotes: 'none' },
-    missing: ['replies'],
-    replies: [{ finding: 'a.ts:1', answer: 'fixed', why: 'Cut.' }],
-    schema: { notes: { type: 'array' } },
-    questions: [
+    waitingFor: null,
+    approve: 'approve implement',
+    denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
+    sessionUnread: null,
+    gate: { awaiting: false, approval: { try: 2, at: '2026-09-30T05:10:00.000Z', message: 'Go.' } },
+    lastLine: null,
+    said: [{ at: '2026-09-30T05:05:00.000Z', attempt: 1, text: 'Widen it.', after: null }],
+    asked: { try: 3, mode: 'recheck', model: null, message: null, stopFirst: false },
+    closeout: {
+      outcome: 'done',
+      summary: 'Built.',
+      needs: null,
+      apiVersion: null,
+      body: null,
+      values: [],
+      refused: [],
+      artifacts: [
+        { path: 'shot.png', name: 'shot.png', url: '/api/runs/r-1/steps/implement/files/shot.png', kind: 'image', size: 2048 },
+        { path: 'old.log', pruned: 'removed by wf prune --artifacts', prunedAt: '2026-09-30T06:00:00.000Z' },
+        { path: 'RESPONSE.md' },
+      ],
+      output: { notes: [], noNotes: 'none' },
+      missing: ['replies'],
+      replies: [{ finding: 'a.ts:1', answer: 'fixed', why: 'Cut.' }],
+      schema: { notes: { type: 'array' } },
+      questions: [
+        {
+          field: 'open',
+          questions: [
+            { title: 'Which?', body: 'Pick.', options: [{ label: 'A', meaning: 'the first' }], recommended: 'A', multiple: false },
+          ],
+        },
+      ],
+      raw: { outcome: 'done' },
+    },
+    unreadable: null,
+    check: {
+      command: 'npm test',
+      taskId: 't-3',
+      verdict: EXIT_1,
+      refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['boom'], truncated: false }, unreadable: null },
+    },
+    attempts: {
+      count: 1,
+      latest: {
+        startedAt: '2026-09-30T05:02:00.000Z',
+        ended: 'failed',
+        endedAt: '2026-09-30T05:09:00.000Z',
+        reason: null,
+        release: null,
+        harness: null,
+      },
+    },
+    used: used(),
+    spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
+    budget: { usd: 3, said: '$3', of: '$1.25 of $3', over: false },
+    raise: { by: 'retry', above: 1.25, said: 'raise it', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' },
+    tries: [
       {
-        field: 'open',
-        questions: [{ title: 'Which?', body: 'Pick.', options: [{ label: 'A', meaning: 'the first' }], recommended: 'A', multiple: false }],
+        try: 1,
+        round: 1,
+        cause: 'continue',
+        current: false,
+        taskId: 't-1',
+        note: null,
+        phase: 'failed',
+        reason: 'Failed',
+        on: null,
+        via: null,
+        message: 'failed',
+        attempts: { count: 1, latest: null },
+        check: null,
+        closeout: null,
+        unreadable: { error: 'no closeout', raw: 'what it said' },
+        answer: 'try harder',
+      },
+      {
+        try: 2,
+        round: 1,
+        cause: null,
+        current: true,
+        taskId: 't-2',
+        note: 'nudged',
+        phase: 'failed',
+        reason: 'CheckFailed',
+        on: null,
+        via: null,
+        message: 'failed (check)',
+        attempts: { count: 1, latest: null },
+        check: { command: 'npm test', taskId: 't-3', verdict: EXIT_1, refused: null },
+        closeout: null,
+        unreadable: null,
+        answer: null,
       },
     ],
-    raw: { outcome: 'done' },
-  },
-  unreadable: null,
-  check: {
-    command: 'npm test',
-    taskId: 't-3',
-    verdict: EXIT_1,
-    refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['boom'], truncated: false }, unreadable: null },
-  },
-  attempts: {
-    count: 1,
-    latest: {
-      startedAt: '2026-09-30T05:02:00.000Z',
-      ended: 'failed',
-      endedAt: '2026-09-30T05:09:00.000Z',
-      reason: null,
-      release: null,
-      harness: null,
+    shown: 2,
+    timeline: [
+      {
+        try: 1,
+        round: 1,
+        session: {
+          taskId: 't-1',
+          at: 'ended',
+          filedAt: '2026-09-30T05:01:00.000Z',
+          spawnedAt: '2026-09-30T05:02:00.000Z',
+          endedAt: '2026-09-30T05:03:00.000Z',
+          attempts: 1,
+          queuedMs: 60_000,
+          ranMs: 60_000,
+          queued: '1m',
+          ran: '1m',
+        },
+        sessionOf: null,
+        check: null,
+        used: null,
+      },
+      { try: 2, round: 1, session: null, sessionOf: 1, check: null, used: used({ usage: null, peak: null }) },
+    ],
+    ...extra,
+  }) satisfies Step;
+
+/** A run's detail, as `GET /api/runs/r-1` answers it: from an inbox card, pruned, waiting and held, its steps `step`'s. */
+export const detail = (extra: Partial<RunDetail> = {}) =>
+  ({
+    labels: {},
+    id: 'r-1',
+    factory: null,
+    brief: 'Decode the reads',
+    decide: 'nemia decide r-1',
+    repo: '/work/repo',
+    place: 'git',
+    work: null,
+    workflowDir: '/work/workflows/build',
+    workflowPage: null,
+    try: null,
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    createdAt: '2026-09-30T05:00:00.000Z',
+    startedAt: '2026-09-30T05:01:00.000Z',
+    cancelledAt: null,
+    pruned: {
+      at: '2026-09-30T06:00:00.000Z',
+      worktrees: [{ path: '/work/tree', bytes: 1024 }],
+      artifacts: { at: '2026-09-30T06:00:00.000Z', bytes: 2048 },
     },
-  },
-  used: used(),
-  spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
-  budget: { usd: 3, said: '$3', of: '$1.25 of $3', over: false },
-  raise: { by: 'retry', above: 1.25, said: 'raise it', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' },
-  tries: [
-    {
-      try: 1,
-      round: 1,
-      cause: 'continue',
-      current: false,
-      taskId: 't-1',
-      note: null,
-      phase: 'failed',
-      reason: 'Failed',
-      on: null,
-      via: null,
-      message: 'failed',
-      attempts: { count: 1, latest: null },
-      check: null,
-      closeout: null,
-      unreadable: { error: 'no closeout', raw: 'what it said' },
-      answer: 'try harder',
+    onDisk: { worktrees: false, files: true },
+    after: ['r-0'],
+    from: { inbox: 'decode-reads' },
+    fromNote: 'from the inbox card decode-reads',
+    waiting: {
+      runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [] }],
+      word: 'waiting on r-0',
+      advice: 'wait',
+      waitingOnYou: false,
     },
-    {
-      try: 2,
-      round: 1,
-      cause: null,
-      current: true,
-      taskId: 't-2',
-      note: 'nudged',
-      phase: 'failed',
-      reason: 'CheckFailed',
-      on: null,
-      via: null,
-      message: 'failed (check)',
-      attempts: { count: 1, latest: null },
-      check: { command: 'npm test', taskId: 't-3', verdict: EXIT_1, refused: null },
-      closeout: null,
-      unreadable: null,
-      answer: null,
+    context: [],
+    holdUntil: ['r-0'],
+    holding: {
+      at: '2026-09-30T05:00:00.000Z',
+      runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
+      word: 'held until r-0 lands',
+      advice: 'wf hold r-1 --off',
+      waitingOnYou: true,
     },
-  ],
-  shown: 2,
-  timeline: [
+    status: 'running',
+    phase: 'pending',
+    reason: 'Waiting',
+    on: 'run',
+    via: null,
+    moving: true,
+    cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
+    atWork: null,
+    tokens: null,
+    read: { said: 'read 21.4M', peak: 'cap', rebuilt: 1 },
+    waitingOnYou: ['implement'],
+    waitingOnYouWords: ['approve implement'],
+    toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
+    gates: ['implement'],
+    warning: null,
+    kinds: [],
+    refresh: 'nemia refresh r-1',
+    graph: {
+      roots: ['implement'],
+      edges: [
+        { from: 'implement', to: 'review', kind: 'after' },
+        { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+      ],
+    },
+    steps: [step()],
+    timeline: { rounds: [total({ loop: 'review', round: 1 })], run: total() },
+    ...extra,
+  }) satisfies RunDetail;
+
+/** A run's decision with every fact of it: a branch in each standing, a radius and a git error, a sensitive diff. */
+export const decidable = (extra: Partial<Decidable> = {}) =>
+  ({
+    standings: [
+      { branch: 'wf/r-1/a', where: 'on', said: 'on main', stat: null, merge: null },
+      {
+        branch: 'wf/r-1/b',
+        where: 'ahead',
+        commits: 2,
+        said: 'ahead by 2',
+        stat: '2 files: +3 −1',
+        merge: { clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
+      },
+      { branch: 'wf/r-1/c', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { clean: true, said: 'merges clean' } },
+      { branch: 'wf/r-1/d', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { error: 'no git', said: 'cannot tell' } },
+      { branch: 'wf/r-1/e', where: 'gone', said: 'gone', stat: null, merge: null },
+      {
+        branch: 'wf/r-1/f',
+        where: 'unread',
+        why: 'the place was not heard: timed out',
+        said: 'wf/r-1/f: where it stands is not read (the place was not heard: timed out)',
+        stat: null,
+        merge: null,
+      },
+    ],
+    touched: [
+      {
+        branch: 'wf/r-1/b',
+        radius: {
+          changes: [
+            { path: 'a.ts', added: 2, removed: 1 },
+            { path: 'b.png', from: 'old.png', added: null, removed: null },
+          ],
+          groups: [{ name: '(root)', files: 2, added: 2, removed: 1, binary: 1 }],
+          agentFacing: ['CLAUDE.md'],
+          checkAffecting: ['package.json'],
+          lessons: [{ path: 'CLAUDE.md', added: 2, removed: 0 }],
+        },
+      },
+      { branch: 'wf/r-1/e', radius: { error: 'no such branch' } },
+    ],
+    lesson: { said: 'CLAUDE.md +2 −0', state: 'written' },
+    sensitive: [{ branch: 'wf/r-1/b', files: [{ path: 'package.json', lines: ['+x'], cut: 0 }], error: null }],
+    used: { implement: used() },
+    total: used(),
+    cost: '$1.25',
+    overBudget: null,
+    commands: [{ label: 'land it', command: 'git merge wf/r-1/b', said: null, step: null }],
+    awaiting: { branches: ['wf/r-1/b'], direct: false },
+    collisions: {
+      onto: 'main',
+      base: [
+        { branch: 'wf/r-1/b', clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
+        { branch: 'wf/r-1/c', clean: true, said: 'merges clean' },
+        { branch: 'wf/r-1/d', error: 'no git', said: 'cannot tell' },
+      ],
+      inFlight: ['r-2', 'r-3', 'r-4'],
+      colliding: [
+        { run: 'r-2', branch: 'wf/r-2/x', ours: 'wf/r-1/b', merge: { clean: false, conflicts: ['a.ts'] }, said: "conflicts with r-2's x" },
+        {
+          run: 'r-4',
+          branch: 'wf/r-4/x',
+          ours: 'wf/r-1/c',
+          merge: { error: 'no git' },
+          said: "whether it merges onto r-4's x is not known",
+        },
+      ],
+      semantic: { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" },
+      said: 'collides with 1 of the 3 runs in flight on main: r-2; whether it collides with r-4 is not known',
+    },
+    ...extra,
+  }) satisfies Decidable;
+
+/** A step's conversation: a line said, a tool called and its result. */
+export const transcript = (extra: Partial<StepTranscript> = {}) =>
+  ({
+    events: [
+      { id: 'e-1', at: '2026-09-30T05:02:00.000Z', role: 'assistant', kind: 'text', text: 'Reading.' },
+      { id: 'e-2', at: '2026-09-30T05:02:01.000Z', role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: { path: 'a.ts' } } },
+      { id: 'e-2', at: '2026-09-30T05:02:02.000Z', role: 'user', kind: 'tool_result', result: { text: 'x', isError: false } },
+    ],
+    cursor: 'c-3',
+    live: true,
+    open: true,
+    ...extra,
+  }) satisfies StepTranscript;
+
+/** The lifecycle a path walks, one edge under a guard and one without, and a verb a person writes from outside it. */
+export const machine = (extra: Partial<MachineGraph> = {}) =>
+  ({
+    initial: 'queued',
+    states: ['queued', 'running', 'done'],
+    final: ['done'],
+    edges: [
+      { from: 'queued', event: 'start', guard: 'hasSlot', to: 'running', action: 'spawn' },
+      { from: 'running', event: 'exit', to: 'done', action: 'record' },
+    ],
+    verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['running'], to: 'done', guard: 'awaitsWord' }],
+    ...extra,
+  }) satisfies MachineGraph;
+
+/** A try's task, its path through the runtime's lifecycle, and the lifecycle it walks. */
+export const stepPath = (extra: Partial<StepPath> = {}) =>
+  ({
+    taskId: 't-2',
+    try: 2,
+    path: [
+      { state: 'queued', event: 'filed', at: '2026-09-30T05:01:00.000Z' },
+      { state: 'running', event: 'spawned', at: '2026-09-30T05:02:00.000Z' },
+    ],
+    lifecycle: machine(),
+    ...extra,
+  }) satisfies StepPath;
+
+/** A step as a list's run carries it, with `word`'s codes, its task `t-<i>`, nothing frozen of it and nothing asked of a person. */
+export const listedStep = (name: string, word: Word, i: number, extra: Partial<RunStep> = {}) =>
+  ({
+    name,
+    ...coded(word),
+    raise: null,
+    timeline: [],
+    filed: null,
+    spec: null,
+    taskId: `t-${i}`,
+    workspace: null,
+    branch: null,
+    files: [],
+    filesError: null,
+    note: null,
+    roundDue: false,
+    needs: null,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+    sessionUnread: null,
+    lastLine: null,
+    gate: null,
+    said: [],
+    asked: null,
+    check: null,
+    attempts: { count: 0, latest: null },
+    used: null,
+    spent: null,
+    budget: null,
+    ...extra,
+  }) satisfies RunStep;
+
+/** A step as the run froze it, given the agent `agent`: what `agentOf` reads. */
+export const givenAgent = (agent: string) => ({ ...step().spec!, agent }) satisfies NonNullable<RunStep['spec']>;
+
+/** The tries on the clock of a step whose session started at `at` and still runs: what `sinceOf` reads. */
+export const atWorkSince = (at: string) =>
+  [
     {
       try: 1,
       round: 1,
       session: {
-        taskId: 't-1',
-        at: 'ended',
-        filedAt: '2026-09-30T05:01:00.000Z',
-        spawnedAt: '2026-09-30T05:02:00.000Z',
-        endedAt: '2026-09-30T05:03:00.000Z',
+        taskId: 't-0',
+        at: 'running',
+        filedAt: at,
+        spawnedAt: at,
+        endedAt: null,
         attempts: 1,
-        queuedMs: 60_000,
-        ranMs: 60_000,
-        queued: '1m',
-        ran: '1m',
+        queuedMs: 0,
+        ranMs: 0,
+        queued: '0s',
+        ran: '0s',
       },
       sessionOf: null,
       check: null,
       used: null,
     },
-    { try: 2, round: 1, session: null, sessionOf: 1, check: null, used: used({ usage: null, peak: null }) },
-  ],
-  ...extra,
-});
-
-/** A run's detail, as `GET /api/runs/r-1` answers it: from an inbox card, pruned, waiting and held, its steps `step`'s. */
-export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
-  labels: {},
-  id: 'r-1',
-  factory: null,
-  brief: 'Decode the reads',
-  decide: 'nemia decide r-1',
-  repo: '/work/repo',
-  place: 'git',
-  work: null,
-  workflowDir: '/work/workflows/build',
-  workflowPage: null,
-  try: null,
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  createdAt: '2026-09-30T05:00:00.000Z',
-  startedAt: '2026-09-30T05:01:00.000Z',
-  cancelledAt: null,
-  pruned: {
-    at: '2026-09-30T06:00:00.000Z',
-    worktrees: [{ path: '/work/tree', bytes: 1024 }],
-    artifacts: { at: '2026-09-30T06:00:00.000Z', bytes: 2048 },
-  },
-  onDisk: { worktrees: false, files: true },
-  after: ['r-0'],
-  from: { inbox: 'decode-reads' },
-  fromNote: 'from the inbox card decode-reads',
-  waiting: {
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [] }],
-    word: 'waiting on r-0',
-    advice: 'wait',
-    waitingOnYou: false,
-  },
-  context: [],
-  holdUntil: ['r-0'],
-  holding: {
-    at: '2026-09-30T05:00:00.000Z',
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
-    word: 'held until r-0 lands',
-    advice: 'wf hold r-1 --off',
-    waitingOnYou: true,
-  },
-  status: 'running',
-  phase: 'pending',
-  reason: 'Waiting',
-  on: 'run',
-  via: null,
-  moving: true,
-  cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
-  atWork: null,
-  tokens: null,
-  read: { said: 'read 21.4M', peak: 'cap', rebuilt: 1 },
-  waitingOnYou: ['implement'],
-  waitingOnYouWords: ['approve implement'],
-  toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' },
-  gates: ['implement'],
-  warning: null,
-  kinds: [],
-  refresh: 'nemia refresh r-1',
-  graph: {
-    roots: ['implement'],
-    edges: [
-      { from: 'implement', to: 'review', kind: 'after' },
-      { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
-    ],
-  },
-  steps: [step()],
-  timeline: { rounds: [total({ loop: 'review', round: 1 })], run: total() },
-  ...extra,
-});
-
-/** A run's decision with every fact of it: a branch in each standing, a radius and a git error, a sensitive diff. */
-export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
-  standings: [
-    { branch: 'wf/r-1/a', where: 'on', said: 'on main', stat: null, merge: null },
-    {
-      branch: 'wf/r-1/b',
-      where: 'ahead',
-      commits: 2,
-      said: 'ahead by 2',
-      stat: '2 files: +3 −1',
-      merge: { clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
-    },
-    { branch: 'wf/r-1/c', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { clean: true, said: 'merges clean' } },
-    { branch: 'wf/r-1/d', where: 'ahead', commits: 1, said: 'ahead by 1', stat: null, merge: { error: 'no git', said: 'cannot tell' } },
-    { branch: 'wf/r-1/e', where: 'gone', said: 'gone', stat: null, merge: null },
-    {
-      branch: 'wf/r-1/f',
-      where: 'unread',
-      why: 'the place was not heard: timed out',
-      said: 'wf/r-1/f: where it stands is not read (the place was not heard: timed out)',
-      stat: null,
-      merge: null,
-    },
-  ],
-  touched: [
-    {
-      branch: 'wf/r-1/b',
-      radius: {
-        changes: [
-          { path: 'a.ts', added: 2, removed: 1 },
-          { path: 'b.png', from: 'old.png', added: null, removed: null },
-        ],
-        groups: [{ name: '(root)', files: 2, added: 2, removed: 1, binary: 1 }],
-        agentFacing: ['CLAUDE.md'],
-        checkAffecting: ['package.json'],
-        lessons: [{ path: 'CLAUDE.md', added: 2, removed: 0 }],
-      },
-    },
-    { branch: 'wf/r-1/e', radius: { error: 'no such branch' } },
-  ],
-  lesson: { said: 'CLAUDE.md +2 −0', state: 'written' },
-  sensitive: [{ branch: 'wf/r-1/b', files: [{ path: 'package.json', lines: ['+x'], cut: 0 }], error: null }],
-  used: { implement: used() },
-  total: used(),
-  cost: '$1.25',
-  overBudget: null,
-  commands: [{ label: 'land it', command: 'git merge wf/r-1/b', said: null, step: null }],
-  awaiting: { branches: ['wf/r-1/b'], direct: false },
-  collisions: {
-    onto: 'main',
-    base: [
-      { branch: 'wf/r-1/b', clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
-      { branch: 'wf/r-1/c', clean: true, said: 'merges clean' },
-      { branch: 'wf/r-1/d', error: 'no git', said: 'cannot tell' },
-    ],
-    inFlight: ['r-2', 'r-3', 'r-4'],
-    colliding: [
-      { run: 'r-2', branch: 'wf/r-2/x', ours: 'wf/r-1/b', merge: { clean: false, conflicts: ['a.ts'] }, said: "conflicts with r-2's x" },
-      { run: 'r-4', branch: 'wf/r-4/x', ours: 'wf/r-1/c', merge: { error: 'no git' }, said: "whether it merges onto r-4's x is not known" },
-    ],
-    semantic: { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" },
-    said: 'collides with 1 of the 3 runs in flight on main: r-2; whether it collides with r-4 is not known',
-  },
-  ...extra,
-});
-
-/** A step's conversation: a line said, a tool called and its result. */
-export const transcript = (extra: Partial<StepTranscript> = {}): StepTranscript => ({
-  events: [
-    { id: 'e-1', at: '2026-09-30T05:02:00.000Z', role: 'assistant', kind: 'text', text: 'Reading.' },
-    { id: 'e-2', at: '2026-09-30T05:02:01.000Z', role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: { path: 'a.ts' } } },
-    { id: 'e-2', at: '2026-09-30T05:02:02.000Z', role: 'user', kind: 'tool_result', result: { text: 'x', isError: false } },
-  ],
-  cursor: 'c-3',
-  live: true,
-  open: true,
-  ...extra,
-});
-
-/** The lifecycle a path walks, one edge under a guard and one without, and a verb a person writes from outside it. */
-export const machine = (extra: Partial<MachineGraph> = {}): MachineGraph => ({
-  initial: 'queued',
-  states: ['queued', 'running', 'done'],
-  final: ['done'],
-  edges: [
-    { from: 'queued', event: 'start', guard: 'hasSlot', to: 'running', action: 'spawn' },
-    { from: 'running', event: 'exit', to: 'done', action: 'record' },
-  ],
-  verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['running'], to: 'done', guard: 'awaitsWord' }],
-  ...extra,
-});
-
-/** A try's task, its path through the runtime's lifecycle, and the lifecycle it walks. */
-export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
-  taskId: 't-2',
-  try: 2,
-  path: [
-    { state: 'queued', event: 'filed', at: '2026-09-30T05:01:00.000Z' },
-    { state: 'running', event: 'spawned', at: '2026-09-30T05:02:00.000Z' },
-  ],
-  lifecycle: machine(),
-  ...extra,
-});
-
-/** A step as a list's run carries it, with `word`'s codes, its task `t-<i>`, nothing frozen of it and nothing asked of a person. */
-export const listedStep = (name: string, word: Word, i: number, extra: Partial<RunStep> = {}): RunStep => ({
-  name,
-  ...coded(word),
-  raise: null,
-  timeline: [],
-  filed: null,
-  spec: null,
-  taskId: `t-${i}`,
-  workspace: null,
-  branch: null,
-  files: [],
-  filesError: null,
-  note: null,
-  roundDue: false,
-  needs: null,
-  waitingFor: null,
-  approve: null,
-  denied: null,
-  sessionUnread: null,
-  lastLine: null,
-  gate: null,
-  said: [],
-  asked: null,
-  check: null,
-  attempts: { count: 0, latest: null },
-  used: null,
-  spent: null,
-  budget: null,
-  ...extra,
-});
-
-/** A step as the run froze it, given the agent `agent`: what `agentOf` reads. */
-export const givenAgent = (agent: string): NonNullable<RunStep['spec']> => ({ ...step().spec!, agent });
-
-/** The tries on the clock of a step whose session started at `at` and still runs: what `sinceOf` reads. */
-export const atWorkSince = (at: string): RunStep['timeline'] => [
-  {
-    try: 1,
-    round: 1,
-    session: {
-      taskId: 't-0',
-      at: 'running',
-      filedAt: at,
-      spawnedAt: at,
-      endedAt: null,
-      attempts: 1,
-      queuedMs: 0,
-      ranMs: 0,
-      queued: '0s',
-      ran: '0s',
-    },
-    sessionOf: null,
-    check: null,
-    used: null,
-  },
-];
+  ] satisfies RunStep['timeline'];
 
 /**
  * A run as a list answers it, in flight, with one step per `[name, word]` carrying that word's codes (`listedStep`), and `extra` over
  * it.
  */
-export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunView> = {}): RunView => ({
-  labels: {},
-  id: 'r-1',
-  repo: '/code/app',
-  factory: null,
-  place: 'git',
-  work: null,
-  brief: 'Do the thing',
-  workflowDir: '/code/app/workflows/dev',
-  try: null,
-  baseRef: null,
-  branch: null,
-  isolate: null,
-  createdAt: '2026-09-13T00:00:00.000Z',
-  startedAt: null,
-  cancelledAt: null,
-  pruned: null,
-  onDisk: { worktrees: true, files: true },
-  status: 'running',
-  phase: 'running',
-  reason: 'Running',
-  on: null,
-  via: null,
-  moving: true,
-  cost: null,
-  atWork: null,
-  tokens: null,
-  read: null,
-  steps: steps.map(([name, word], i) => listedStep(name, word, i)),
-  graph: { roots: [], edges: [] },
-  waitingOnYou: [],
-  waitingOnYouWords: [],
-  gates: [],
-  warning: null,
-  kinds: [],
-  after: [],
-  waiting: null,
-  context: [],
-  holdUntil: [],
-  holding: null,
-  toDecide: null,
-  timeline: { rounds: [], run: total({ tasks: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '0s', ran: '0s', wall: '0s', cost: null }) },
-  ...extra,
-});
+export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunView> = {}) =>
+  ({
+    labels: {},
+    id: 'r-1',
+    repo: '/code/app',
+    factory: null,
+    place: 'git',
+    work: null,
+    brief: 'Do the thing',
+    workflowDir: '/code/app/workflows/dev',
+    try: null,
+    baseRef: null,
+    branch: null,
+    isolate: null,
+    createdAt: '2026-09-13T00:00:00.000Z',
+    startedAt: null,
+    cancelledAt: null,
+    pruned: null,
+    onDisk: { worktrees: true, files: true },
+    status: 'running',
+    phase: 'running',
+    reason: 'Running',
+    on: null,
+    via: null,
+    moving: true,
+    cost: null,
+    atWork: null,
+    tokens: null,
+    read: null,
+    steps: steps.map(([name, word], i) => listedStep(name, word, i)),
+    graph: { roots: [], edges: [] },
+    waitingOnYou: [],
+    waitingOnYouWords: [],
+    gates: [],
+    warning: null,
+    kinds: [],
+    after: [],
+    waiting: null,
+    context: [],
+    holdUntil: [],
+    holding: null,
+    toDecide: null,
+    timeline: {
+      rounds: [],
+      run: total({ tasks: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '0s', ran: '0s', wall: '0s', cost: null }),
+    },
+    ...extra,
+  }) satisfies RunView;
 
 /** `run` as the light answer lists one in flight: its wall time, no end, and no clock but the one `clock` gives. */
-export const listed = (run: RunView, wallMs = 0, clock: ListedRun['clock'] = null): ListedRun => ({
-  ...run,
-  wallMs,
-  finishedAt: null,
-  clock,
-});
+export const listed = (run: RunView, wallMs = 0, clock: ListedRun['clock'] = null) =>
+  ({
+    ...run,
+    wallMs,
+    finishedAt: null,
+    clock,
+  }) satisfies ListedRun;
 
 /**
  * `run` as the light answer lists one that waits on a person: listed, with the breakdowns and the start of its present wait `extra`
  * gives, none by default.
  */
-export const waitingRun = (
-  run: RunView,
-  extra: Partial<Pick<WaitingRun, 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince'>> = {},
-): WaitingRun => ({
-  ...listed(run),
-  stepCosts: null,
-  waitingSince: null,
-  ...extra,
-});
+export const waitingRun = (run: RunView, extra: Partial<Pick<WaitingRun, 'wallMs' | 'clock' | 'stepCosts' | 'waitingSince'>> = {}) =>
+  ({
+    ...listed(run),
+    stepCosts: null,
+    waitingSince: null,
+    ...extra,
+  }) satisfies WaitingRun;
 
 /** A run behind on an agent, and on a skill a step already ran on the older one of: what the run page draws the drift from. */
-export const behind = (): RunDetail =>
+export const behind = () =>
   detail({
     kinds: [
       { kind: 'agent', name: 'coder', pinned: 5, now: 6 },
       { kind: 'skill', name: 'look', pinned: 1, now: 2, step: 'implement' },
     ],
-  });
+  }) satisfies RunDetail;
 
 /** A run behind no revision: no `kinds`, and nothing drawn. */
-export const unpinned = (): RunDetail => ({ ...detail(), kinds: [] });
+export const unpinned = () => ({ ...detail(), kinds: [] }) satisfies RunDetail;
 
 /**
  * The reads a run's detail is composed from (`runDetailOf`), each under the key its query reads it by: the object, the lines, and each
  * step's tries and told at its stamp — what a reader with no loader (`useRunRead`) finds in the cache for `view`. A step's closeout is
  * its current try's, so a view whose closeout no try carries reads back without one.
  */
-export function readsOf(view: RunDetail): Array<[readonly unknown[], unknown]> {
+export function readsOf(view: RunDetail) {
   const { id, factory, createdAt, decide, refresh, workflowPage, from, fromNote, graph, steps, timeline, ...rest } = view;
   const { brief, repo, place, work, workflowDir, try: tried, baseRef, branch, isolate, after, context, ...judged } = rest;
-  const statusOf = (s: StepView): RunObject.RunStepStatus => {
+  const statusOf = (s: StepView) => {
     const {
       spec: _spec,
       commands: _c,
@@ -628,7 +653,7 @@ export function readsOf(view: RunDetail): Array<[readonly unknown[], unknown]> {
       ...own
     } = s;
     const filed = s.filed;
-    return { ...own, status: 'pending', filed, current: s.current ?? null };
+    return { ...own, status: 'pending', filed, current: s.current ?? null } satisfies RunObject.RunStepStatus;
   };
   const object = {
     apiVersion: 'nemia/v1',
@@ -661,32 +686,29 @@ export function readsOf(view: RunDetail): Array<[readonly unknown[], unknown]> {
   return [
     [['runs', id], object],
     [['runs', id, 'lines'], lines],
-    ...steps.flatMap((s): Array<[readonly unknown[], unknown]> => {
+    ...steps.flatMap((s) => {
       const stamp = stepStamp(statusOf(s));
       return [
         [['runs', id, 'steps', s.name, 'tries', stamp], s.tries],
         [['runs', id, 'steps', s.name, 'told', stamp], { body: s.body, told: s.told, layers: s.layers, taskParts: s.taskParts }],
-      ];
+      ] satisfies Array<[readonly unknown[], unknown]>;
     }),
-  ];
+  ] satisfies Array<[readonly unknown[], unknown]>;
 }
 
 /**
  * A run's object as a list answers it, off `view`'s reads (`readsOf`), in `namespace` where one is given, with `status` over its own:
  * the frame's parts a list asked by state carries.
  */
-export function runObject(view: RunDetail = detail(), status: Partial<RunObject.Run['status']> = {}, namespace?: string): RunObject.Run {
+export function runObject(view: RunDetail = detail(), status: Partial<RunObject.Run['status']> = {}, namespace?: string) {
   const object = readsOf(view)[0][1] as RunObject.Run;
   return {
     ...object,
     metadata: { ...object.metadata, ...(namespace === undefined ? {} : { namespace }) },
     status: { ...object.status, ...status },
-  };
+  } satisfies RunObject.Run;
 }
 
 /** A RunList as the api answers one: its runs, its metadata, and the runs it could not judge where there are any. */
-export const runList = (
-  items: RunObject.Run[],
-  metadata: RunObject.RunList['metadata'] = {},
-  unjudged?: RunObject.RunUnjudged[],
-): RunObject.RunList => ({ apiVersion: 'nemia/v1', kind: 'RunList', metadata, items, ...(unjudged ? { unjudged } : {}) });
+export const runList = (items: RunObject.Run[], metadata: RunObject.RunList['metadata'] = {}, unjudged?: RunObject.RunUnjudged[]) =>
+  ({ apiVersion: 'nemia/v1', kind: 'RunList', metadata, items, ...(unjudged ? { unjudged } : {}) }) satisfies RunObject.RunList;

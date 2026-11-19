@@ -18,13 +18,17 @@ export const AGO = /^(?:just now|\d+ (?:seconds?|minutes?|hours?|days?|months?|y
  * What is wrong with `times`, or null: words in no form the column writes (an absolute date, a distance of two units, date-fns's
  * `about`), or a time wider than the room its cell leaves it, which is the overlap a reader sees.
  */
-export function agosRefused(times: DrawnAgo[]): string | null {
+export function agosRefused(times: DrawnAgo[]) {
   const said = (time: DrawnAgo) => JSON.stringify(time.words);
   const wrong = times.filter((time) => !AGO.test(time.words.trim()));
   if (wrong.length > 0)
-    return `each time of the finished table says how long ago it was, as \`just now\` or one unit and \`ago\` — ${wrong.map(said).join(', ')}`;
+    return `each time of the finished table says how long ago it was, as \`just now\` or one unit and \`ago\` — ${wrong.map(said).join(', ')}` satisfies
+      | string
+      | null;
   const over = times.filter((time) => time.width > time.room);
   if (over.length > 0)
-    return `each time has the room of its own cell — ${over.map((time) => `${said(time)} is ${time.width}px in ${time.room}px`).join(', ')}`;
-  return null;
+    return `each time has the room of its own cell — ${over.map((time) => `${said(time)} is ${time.width}px in ${time.room}px`).join(', ')}` satisfies
+      | string
+      | null;
+  return null satisfies string | null;
 }

@@ -35,14 +35,14 @@ import { answerIn, deniedWords, harnessWaitLine, waitingWords } from '../list/li
 import { names, phases, run, step, STEPS } from '../../test/assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
-const signedDone = (): Closeout => ({ outcome: 'done', summary: 's', artifacts: [], needs: undefined });
-const signedBlocked = (): Closeout => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag name ships' });
+const signedDone = () => ({ outcome: 'done', summary: 's', artifacts: [], needs: undefined }) satisfies Closeout;
+const signedBlocked = () => ({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'which flag name ships' }) satisfies Closeout;
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
 /** `implement` checked, with `retries: 2`; `review` waits on it. */
 const RETRIED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
 /** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
-const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<Run> = {}): Run =>
+const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<Run> = {}) =>
   run(
     {},
     {
@@ -52,15 +52,16 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
       },
       ...(extra as object),
     },
-  );
+  ) satisfies Run;
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'continue', model?: string): RetryAsk => ({
-  step: 'implement',
-  try: n,
-  mode,
-  ...(model ? { model } : {}),
-  at: '2026-09-13T10:00:00.000Z',
-});
+const askFor = (n: number, mode: RetryMode = 'continue', model?: string) =>
+  ({
+    step: 'implement',
+    try: n,
+    mode,
+    ...(model ? { model } : {}),
+    at: '2026-09-13T10:00:00.000Z',
+  }) satisfies RetryAsk;
 /** Two tries `retries: 2` filed. */
 const SPENT: EarlierTry[] = [
   { taskId: 't-a', check: { taskId: 'c-a' }, cause: 'retries' },
@@ -93,7 +94,7 @@ describe('continuesFrom: the session a try continues (open issue 5)', () => {
 
 describe("sessionModel: a continued try runs on the model its session was started on, and a `--fresh` one goes back to the step's", () => {
   const OPUS: StepSpec = { ...step('implement'), model: 'opus' };
-  const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
+  const on = (...tries: EarlierTry[]) => ({ taskId: 'now', tries }) satisfies StepRecord;
   const rows: Array<[string, StepSpec, StepRecord | undefined, string | undefined]> = [
     ["the first try: the step's model", OPUS, undefined, 'opus'],
     ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', cause: 'continue' }), undefined],
@@ -163,30 +164,33 @@ describe('nextTry: the try a step moves behind', () => {
 const IMPLEMENT: StepSpec = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
 
 /** A run whose implement is on its first try: its session `taskId`, and its check's where one is given. */
-const pauseRun = (taskId: string, check?: string): Run => ({
-  id: 'r-1',
-  repo: '/repo',
-  workspace: '/wt',
-  baseRef: 'abc',
-  branch: 'main',
-  isolate: true,
-  brief: 'b',
-  workflowDir: '/wf',
-  createdAt: '2026-10-04T00:00:00Z',
-  steps: { implement: { taskId, ...(check ? { check: { taskId: check } } : {}) } },
-});
+const pauseRun = (taskId: string, check?: string) =>
+  ({
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc',
+    branch: 'main',
+    isolate: true,
+    brief: 'b',
+    workflowDir: '/wf',
+    createdAt: '2026-10-04T00:00:00Z',
+    steps: { implement: { taskId, ...(check ? { check: { taskId: check } } : {}) } },
+  }) satisfies Run;
 
 /** The ask a pause writes for try 2 of implement: a nudge of the session it stopped, or a recheck of the check. */
-const pauseAsk = (interrupted: string, mode: 'continue' | 'recheck' = 'continue'): RetryAsk => ({
-  step: 'implement',
-  try: 2,
-  mode,
-  interrupted,
-  at: '2026-10-04T12:00:00Z',
-});
+const pauseAsk = (interrupted: string, mode: 'continue' | 'recheck' = 'continue') =>
+  ({
+    step: 'implement',
+    try: 2,
+    mode,
+    interrupted,
+    at: '2026-10-04T12:00:00Z',
+  }) satisfies RetryAsk;
 
 /** A person's ask of the same try and mode: what is due where a pause's is not, so each fixture refuses on the rule alone. */
-const ownAsk = (mode: 'continue' | 'recheck' = 'continue'): RetryAsk => ({ step: 'implement', try: 2, mode, at: '2026-10-04T12:00:00Z' });
+const ownAsk = (mode: 'continue' | 'recheck' = 'continue') =>
+  ({ step: 'implement', try: 2, mode, at: '2026-10-04T12:00:00Z' }) satisfies RetryAsk;
 
 const pauseDue = (r: Run, phaseOf: (id: string) => TaskPhase, ask: RetryAsk, spendOf?: SpendOf, verdict?: number) =>
   retriesDue(
@@ -660,9 +664,7 @@ describe('retriesDue of a check the machine killed: run again as its check by `r
   const machine: OutOfMemoryKill = { by: 'machine', kills: 1, limitBytes: 8 * GI, peakBytes: 3 * GI };
   const limit: OutOfMemoryKill = { by: 'limit', kills: 1, limitBytes: 8 * GI, peakBytes: 8 * GI, raise: 'default' };
   const ONE: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 1 }, step('review', ['implement'])];
-  const due = (
-    o: { steps?: StepSpec[]; tries?: EarlierTry[]; verdict?: Verdict; kill?: OutOfMemoryKill; extra?: Partial<Run> } = {},
-  ): Retry[] =>
+  const due = (o: { steps?: StepSpec[]; tries?: EarlierTry[]; verdict?: Verdict; kill?: OutOfMemoryKill; extra?: Partial<Run> } = {}) =>
     retriesDue(
       o.steps ?? ONE,
       onTry(o.tries, 'c1', o.extra),
@@ -674,7 +676,7 @@ describe('retriesDue of a check the machine killed: run again as its check by `r
       () => false,
       undefined,
       (s) => (s === 'implement' ? o.kill : undefined),
-    );
+    ) satisfies Retry[];
   const [implement, review] = ONE;
   const policy: StepSpec[] = [
     { ...implement, checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [1] } }] } },

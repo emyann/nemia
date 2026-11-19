@@ -11,7 +11,7 @@ import { approvePairing, askPairing, claimLink, claimPairing } from '../src/lib/
 type Sent = { method: string; path: string; body: unknown };
 
 /** Every request answered `body` as JSON, for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown): Sent[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown) {
   const before = globalThis.fetch;
   const sent: Sent[] = [];
   globalThis.fetch = async (input, init) => {

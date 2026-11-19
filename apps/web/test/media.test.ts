@@ -14,12 +14,12 @@ const { useSheetPreview } = await import('../src/lib/useSheetPreview.ts');
 const { useReducedMotion } = await import('../src/lib/useReducedMotion.ts');
 
 /** What `hook` answers in a render. */
-function answer(hook: () => boolean): string {
+function answer(hook: () => boolean) {
   return renderToStaticMarkup(createElement(() => String(hook())));
 }
 
 /** While the test runs, a browser whose media queries match where `matches` says, and the queries it was asked; none for `undefined`. */
-function withMedia(t: { onTestFinished: (fn: () => void) => void }, matches: ((query: string) => boolean) | undefined): string[] {
+function withMedia(t: { onTestFinished: (fn: () => void) => void }, matches: ((query: string) => boolean) | undefined) {
   const asked: string[] = [];
   const before = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
   if (matches === undefined) Reflect.deleteProperty(globalThis, 'matchMedia');

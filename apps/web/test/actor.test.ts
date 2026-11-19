@@ -30,8 +30,11 @@ const ACTORS = [
 ] as const;
 
 /** The actor lines of `html`: each one's kind and its words. */
-const actorsIn = (html: string): Array<[string, string]> =>
-  [...html.matchAll(/<span data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [m[1], textsOf(m[2]).join(' ')]);
+const actorsIn = (html: string) =>
+  [...html.matchAll(/<span data-actor="(\w+)"[^>]*>([\s\S]*?)<\/span><\/span>/g)].map((m) => [
+    m[1],
+    textsOf(m[2]).join(' '),
+  ]) satisfies Array<[string, string]>;
 
 test("an actor is drawn in objects' words, its kind marked, whole on hover; none is drawn where the object carries none", () => {
   for (const actor of ACTORS) {
@@ -86,7 +89,7 @@ test("a token's holder and reach in the board's words: yours or the agent's name
 type Sent = { method: string; path: string };
 
 /** Every request answered `body` as JSON with `status` for the length of the test; what each was sent as is kept in the list returned. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200): Sent[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const before = globalThis.fetch;
   const sent: Sent[] = [];
   globalThis.fetch = async (input, init) => {
@@ -96,7 +99,7 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknow
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return sent;
+  return sent satisfies Sent[];
 }
 
 const LISTED = { name: 'ops', holder: 'agent', agent: 'operator', narrowed: 'read', createdAt: at } as const;

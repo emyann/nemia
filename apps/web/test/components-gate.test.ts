@@ -58,12 +58,12 @@ const Gates = await import('../src/components/gate/Gate.tsx');
 const { Gate } = await import('../src/components/gate/Gate.tsx');
 
 /** Each bar's added and removed widths, in the order the bars are drawn. */
-const barsOf = (html: string): Array<[number, number]> =>
+const barsOf = (html: string) =>
   [
     ...html.matchAll(
       /<span data-added="true"[^>]*style="width:([\d.]+)%"[^>]*><\/span><span data-removed="true"[^>]*style="width:([\d.]+)%"/g,
     ),
-  ].map((m) => [Number(m[1]), Number(m[2])]);
+  ].map((m) => [Number(m[1]), Number(m[2])]) satisfies Array<[number, number]>;
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 
@@ -260,14 +260,13 @@ test('the Decide section copies its commands and runs none: a button per command
 });
 
 /** Whether the class list `cls` carries every class of the drawn form `form`. */
-const holds = (cls: string, form: string): boolean => form.split(' ').every((c) => cls.split(' ').includes(c));
+const holds = (cls: string, form: string) => form.split(' ').every((c) => cls.split(' ').includes(c));
 
 /** Whether the class list `cls` carries any class of the drawn form `form`. */
-const touches = (cls: string, form: string): boolean => form.split(' ').some((c) => cls.split(' ').includes(c));
+const touches = (cls: string, form: string) => form.split(' ').some((c) => cls.split(' ').includes(c));
 
 /** Whether `cls` is drawn as a wait on a person: the yours container whole, and nothing of an amount's or a failure's. */
-const drawnYours = (cls: string): boolean =>
-  holds(cls, container.yours) && !touches(cls, container.money) && !touches(cls, container.failure);
+const drawnYours = (cls: string) => holds(cls, container.yours) && !touches(cls, container.money) && !touches(cls, container.failure);
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
   const html = offersMarkup(
@@ -536,7 +535,7 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
 });
 
 /** What a piece of markup reads as, its tags gone: `textContent`, as the e2e's `hasText` reads it. */
-const textContentOf = (html: string): string => unescaped(html.replace(/<[^>]+>/g, ''));
+const textContentOf = (html: string) => unescaped(html.replace(/<[^>]+>/g, ''));
 
 test("Continue asks the tick for another try of a session the harness blocked: a box for anything to tell it, optional, and the step's retry line", () => {
   const html = withClient(createElement(Answering.Continue, { runId: 'r-1', step: 'review', line: 'nemia retry r-1 review' }));
@@ -677,8 +676,10 @@ const decidedAs = (standings: unknown[]) => ({
 });
 
 /** What an ending's gate would act on, drawn in a router (each work step a link to its part) with the run's decision already read. */
-const actsOn = (run: RunDetail, decision: unknown): Promise<string> =>
-  routedWith(createElement(Gates.ActsOn, { run, step: run.steps[1] }), [[['runs', run.id, 'decision', decisionStamp(run)], decision]]);
+const actsOn = (run: RunDetail, decision: unknown) =>
+  routedWith(createElement(Gates.ActsOn, { run, step: run.steps[1] }), [
+    [['runs', run.id, 'decision', decisionStamp(run)], decision],
+  ]) satisfies Promise<string>;
 
 test('the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off', async () => {
   const [implement, ship] = endingRun().steps;

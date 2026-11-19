@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 for (const [name, walk] of walksOn(() => ({ place: gitPlace({ env: GIT_ENV }), world: gitWorld }))) test(name, walk);
 
 /** Runs git with `args` in `cwd`, under the tests' own identity, a local path allowed as a submodule's source. */
-const git = (cwd: string, ...args: string[]): string =>
+const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'protocol.file.allow=always', ...args], { cwd, env: GIT_ENV, encoding: 'utf8' }).trim();
 
 test('root: a repository whose git folder is kept apart answers its checkout, never the git folder; a bare one answers itself', () => {

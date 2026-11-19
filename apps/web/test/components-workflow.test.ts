@@ -23,11 +23,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
  * The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder
  * again.
  */
-async function refusedMarkup(
-  message: string,
-  steps: string[],
-  status: number | null,
-): Promise<{ head: string; reread: boolean; said: string }> {
+async function refusedMarkup(message: string, steps: string[], status: number | null) {
   const { SaveRefused } = await import('../src/components/workflow/WorkflowBuilder.tsx');
   const { BuildRefusal } = await import('../src/lib/api/workflows.ts');
   const html = renderToStaticMarkup(

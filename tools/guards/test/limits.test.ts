@@ -42,7 +42,7 @@ type Config = {
 type Measures = Record<string, Partial<Record<Rule, number>>>;
 
 /** `.oxlintrc.json`, read as oxlint reads it: JSON with comments. */
-function readConfig(): Config {
+function readConfig() {
   const parsed = ts.parseConfigFileTextToJson('.oxlintrc.json', fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'));
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Config;
@@ -51,15 +51,16 @@ function readConfig(): Config {
 const isLimit = (rule: string): rule is Rule => (RULES as readonly string[]).includes(rule);
 
 /** The four limits as the top level of `config` sets them: the thresholds every file is measured at. */
-const thresholdsOf = (config: Config): Record<Rule, unknown> =>
-  Object.fromEntries(RULES.map((rule) => [rule, config.rules[rule]])) as Record<Rule, unknown>;
+const thresholdsOf = (config: Config) => Object.fromEntries(RULES.map((rule) => [rule, config.rules[rule]])) as Record<Rule, unknown>;
 
 /** The blocks of `config` that turn a limit off. */
-const offBlocks = (config: Config): Block[] =>
-  config.overrides.filter((block) => Object.entries(block.rules).some(([rule, setting]) => isLimit(rule) && setting === 'off'));
+const offBlocks = (config: Config) =>
+  config.overrides.filter((block) =>
+    Object.entries(block.rules).some(([rule, setting]) => isLimit(rule) && setting === 'off'),
+  ) satisfies Block[];
 
 /** A file the limits are off in by its kind: a test, a list of cases whose length is its coverage. */
-const isTest = (file: string): boolean => /(?:^|\/)test\//.test(file) || /\.test\.tsx?$/.test(file);
+const isTest = (file: string) => /(?:^|\/)test\//.test(file) || /\.test\.tsx?$/.test(file);
 
 /** The number each rule's message reports: the file's code lines, or the offending function's lines, cyclomatic or cognitive value. */
 const MEASURED: Record<Rule, RegExp> = {
@@ -70,22 +71,22 @@ const MEASURED: Record<Rule, RegExp> = {
 };
 
 /** A rule as the config names it, from the code oxlint reports: `eslint(complexity)` or `sonarjs(cognitive-complexity)`. */
-const ruleOf = (code: string): string => code.replace(/^eslint\((.*)\)$/, '$1').replace(/^(\w[\w-]*)\((.*)\)$/, '$1/$2');
+const ruleOf = (code: string) => code.replace(/^eslint\((.*)\)$/, '$1').replace(/^(\w[\w-]*)\((.*)\)$/, '$1/$2');
 
 /** Each jsPlugins specifier made absolute, as a config in another folder needs it: a path from the root, or a package the root installs. */
-const resolvedPlugins = (config: Config): Config['jsPlugins'] =>
+const resolvedPlugins = (config: Config) =>
   config.jsPlugins.map((entry) => ({
     ...entry,
     specifier: entry.specifier.startsWith('.')
       ? path.join(ROOT, entry.specifier)
       : createRequire(path.join(ROOT, 'package.json')).resolve(entry.specifier),
-  }));
+  })) satisfies Config['jsPlugins'];
 
 /**
  * Oxlint run from `cwd` on `files` with `config`, written to `configPath`: the limits it reports, file by file, with the worst measure
  * per rule. A limit's message this test cannot read a number from fails it, since a measure read wrong passes for nothing.
  */
-function measure(cwd: string, configPath: string, config: object, files: string[]): Measures {
+function measure(cwd: string, configPath: string, config: object, files: string[]) {
   fs.writeFileSync(configPath, JSON.stringify(config));
   const ran = spawnSync(OXLINT, ['-c', configPath, '-f', 'json', ...files], {
     cwd,
@@ -105,31 +106,38 @@ function measure(cwd: string, configPath: string, config: object, files: string[
     const file = (out[d.filename] ??= {});
     file[rule] = Math.max(file[rule] ?? 0, Number(found[1]));
   }
-  return out;
+  return out satisfies Measures;
 }
 
 /** The files with a ceiling, each measured at the config's four thresholds alone: no ceiling, no other rule, no type-aware pass. */
-function measureTree(config: Config, files: string[]): Measures {
+function measureTree(config: Config, files: string[]) {
   const sonarjs = resolvedPlugins(config).filter((entry) => entry.name === 'sonarjs');
   const limits = { jsPlugins: sonarjs, plugins: [], rules: thresholdsOf(config) };
-  return measure(ROOT, path.join(scratch('limits-'), 'limits.json'), limits, files);
+  return measure(ROOT, path.join(scratch('limits-'), 'limits.json'), limits, files) satisfies Measures;
 }
 
 /** The `max` a ceiling sets, when it is its top-level setting with only `max` changed; `undefined` for any other setting. */
-function ceilingOf(setting: unknown, top: unknown): number | undefined {
-  if (!Array.isArray(setting) || !Array.isArray(top) || setting.length !== top.length || setting[0] !== top[0]) return undefined;
+function ceilingOf(setting: unknown, top: unknown) {
+  if (!Array.isArray(setting) || !Array.isArray(top) || setting.length !== top.length || setting[0] !== top[0])
+    return undefined satisfies number | undefined;
   const [, option] = setting as [unknown, unknown];
   const [, base] = top as [unknown, unknown];
-  if (typeof option === 'number' && typeof base === 'number') return option;
-  if (typeof option !== 'object' || option === null || typeof base !== 'object' || base === null) return undefined;
+  if (typeof option === 'number' && typeof base === 'number') return option satisfies number | undefined;
+  if (typeof option !== 'object' || option === null || typeof base !== 'object' || base === null)
+    return undefined satisfies number | undefined;
   const { max } = option as { max?: unknown };
-  return typeof max === 'number' && isDeepStrictEqual({ ...option, max: (base as { max?: unknown }).max }, base) ? max : undefined;
+  return (
+    typeof max === 'number' && isDeepStrictEqual({ ...option, max: (base as { max?: unknown }).max }, base) ? max : undefined
+  ) satisfies number | undefined;
 }
 
 /** `setting`, a rule's top-level setting, with its `max` set to `max`. */
-const withMax = (setting: unknown, max: number): unknown => {
+const withMax = (setting: unknown, max: number) => {
   const [level, option] = setting as [string, unknown];
-  return typeof option === 'number' ? [level, max] : [level, { ...(option as object), max }];
+  {
+    const made: unknown = typeof option === 'number' ? [level, max] : [level, { ...(option as object), max }];
+    return made;
+  }
 };
 
 /** What `refusals` reads besides the config and the measures: whether a file is on disk, and the files a glob covers that are ours. */
@@ -141,7 +149,7 @@ type World = { exists: (file: string) => boolean; oursUnder: (glob: string) => s
  * the four, a ceiling block for more than one file or set otherwise than its rule, a ceiling on `max-lines`, a ceiling for a file that
  * is gone, a ceiling on a rule the file no longer breaks, and a ceiling above the measure.
  */
-function refusals(config: Config, measures: Measures, world: World): string[] {
+function refusals(config: Config, measures: Measures, world: World) {
   const out: string[] = [];
   const top = thresholdsOf(config);
   for (const rule of RULES)
@@ -182,14 +190,14 @@ function refusals(config: Config, measures: Measures, world: World): string[] {
         out.push(`${file}'s ${rule} ceiling is ${max}, above its measure ${worst}: lower it to ${worst} in .oxlintrc.json`);
     }
   }
-  return out;
+  return out satisfies string[];
 }
 
 /** The files git lists under `packages`, `apps` and `lint`, by path from the root, that are on disk: the code the limits read. */
-const codeFiles = (): string[] =>
+const codeFiles = () =>
   execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint'], { cwd: ROOT, encoding: 'utf8' })
     .split('\n')
-    .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file) && fs.existsSync(path.join(ROOT, file)));
+    .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file) && fs.existsSync(path.join(ROOT, file))) satisfies string[];
 
 test('no ceiling in .oxlintrc.json is looser than the measured worst of its file, and the limits are off only in tests and what is not ours', () => {
   const config = readConfig();
@@ -217,23 +225,26 @@ const TOP: Record<Rule, unknown> = {
   'sonarjs/cognitive-complexity': ['error', 10],
 };
 
-const clean = (): { config: Config; measures: Measures } => ({
-  config: {
-    jsPlugins: [],
-    rules: { ...TOP },
-    overrides: [
-      { files: ['**/test/**', '**/*.test.ts'], rules: Object.fromEntries(RULES.map((rule) => [rule, 'off'])) },
-      {
-        files: ['a.ts'],
-        rules: {
-          'max-lines-per-function': withMax(TOP['max-lines-per-function'], 90),
-          complexity: withMax(TOP.complexity, 30),
+const clean = () => {
+  const made: { config: Config; measures: Measures } = {
+    config: {
+      jsPlugins: [],
+      rules: { ...TOP },
+      overrides: [
+        { files: ['**/test/**', '**/*.test.ts'], rules: Object.fromEntries(RULES.map((rule) => [rule, 'off'])) },
+        {
+          files: ['a.ts'],
+          rules: {
+            'max-lines-per-function': withMax(TOP['max-lines-per-function'], 90),
+            complexity: withMax(TOP.complexity, 30),
+          },
         },
-      },
-    ],
-  },
-  measures: { 'a.ts': { 'max-lines-per-function': 90, complexity: 30 } },
-});
+      ],
+    },
+    measures: { 'a.ts': { 'max-lines-per-function': 90, complexity: 30 } },
+  };
+  return made;
+};
 
 /** The fixture's repository: `gone.ts` is not on disk, `src/**` covers a file of ours, `vendor/**` only one that is not ours. */
 const WORLD: World = {
@@ -242,7 +253,7 @@ const WORLD: World = {
 };
 
 /** The refusals of the clean fixture after `change`, which must be exactly one, and match `expected`. */
-function refusedOnce(change: (fixture: ReturnType<typeof clean>) => void, expected: RegExp): void {
+function refusedOnce(change: (fixture: ReturnType<typeof clean>) => void, expected: RegExp) {
   const fixture = clean();
   change(fixture);
   const refused = refusals(fixture.config, fixture.measures, WORLD);
@@ -250,7 +261,10 @@ function refusedOnce(change: (fixture: ReturnType<typeof clean>) => void, expect
   assert.match(refused[0], expected);
 }
 
-const ceilingBlock = (fixture: ReturnType<typeof clean>): Block => fixture.config.overrides[1];
+const ceilingBlock = (fixture: ReturnType<typeof clean>) => {
+  const made: Block = fixture.config.overrides[1];
+  return made;
+};
 
 test('the clean fixture is refused nothing, and a block turning the limits off over tests or what is not ours neither', () => {
   const fixture = clean();
@@ -313,18 +327,18 @@ test('REFUSED: a limit the top level does not set, or a limit turned off over a 
 });
 
 /** A file of `n` code lines. */
-const lines = (n: number): string => Array.from({ length: n }, (_, i) => `export const a${i} = ${i};`).join('\n');
+const lines = (n: number) => Array.from({ length: n }, (_, i) => `export const a${i} = ${i};`).join('\n');
 
 /** The `max` each limit of `config`'s top level sets: the thresholds the plants are cut against. */
-const maxOf = (config: Config, rule: Rule): number => {
+const maxOf = (config: Config, rule: Rule) => {
   const max = ceilingOf(config.rules[rule], config.rules[rule]);
   assert.ok(max !== undefined, `the top level of .oxlintrc.json sets no max for ${rule}: set it as an error with its threshold as the max`);
   return max;
 };
 
 /** A plant one over each of `config`'s thresholds, with the measure its rule must report: built from the threshold, never a copy of it. */
-const plantsOf = (config: Config): Record<Rule, { file: string; text: string; measure: number }> => {
-  const max = (rule: Rule): number => maxOf(config, rule);
+const plantsOf = (config: Config) => {
+  const max = (rule: Rule) => maxOf(config, rule);
   return {
     'max-lines': { file: 'long.ts', text: lines(max('max-lines') + 1), measure: max('max-lines') + 1 },
     'max-lines-per-function': {
@@ -360,11 +374,11 @@ const plantsOf = (config: Config): Record<Rule, { file: string; text: string; me
       ].join('\n'),
       measure: max('sonarjs/cognitive-complexity') + 1,
     },
-  };
+  } satisfies Record<Rule, { file: string; text: string; measure: number }>;
 };
 
 /** A path under `glob` for a plant: `**\/` dropped, then each `**` and `*` filled with a name. */
-const plantUnder = (glob: string): string => {
+const plantUnder = (glob: string) => {
   const file = glob.replaceAll('**/', '').replaceAll('**', 'all.ts').replaceAll('*', 'all');
   assert.ok(path.matchesGlob(file, glob), `no plant path read from the glob ${glob}: widen plantUnder for its shape`);
   return file;
@@ -374,7 +388,7 @@ const plantUnder = (glob: string): string => {
  * `config`'s limits run on a plant over each threshold, one under a ceiling a step below its measure, one under a ceiling at it, a file
  * at `max-lines` exactly, and every plant again in a file each of the config's exempting globs covers: the measures oxlint reports.
  */
-function plantsMeasured(config: Config): { measures: Measures; plants: ReturnType<typeof plantsOf> } {
+function plantsMeasured(config: Config) {
   const plants = plantsOf(config);
   const dir = scratch('limits-');
   const exemptions = offBlocks(config);
@@ -399,14 +413,17 @@ function plantsMeasured(config: Config): { measures: Measures; plants: ReturnTyp
   }
   const { options: _options, $schema: _schema, ignorePatterns: _ignored, ...rest } = config;
   const used = { ...rest, jsPlugins: resolvedPlugins(config), overrides: [...exemptions, ...ceilings] };
-  return { measures: measure(dir, path.join(dir, '.oxlintrc.json'), used, ['on', 'under', 'at', ...exempt]), plants };
+  return { measures: measure(dir, path.join(dir, '.oxlintrc.json'), used, ['on', 'under', 'at', ...exempt]), plants } satisfies {
+    measures: Measures;
+    plants: ReturnType<typeof plantsOf>;
+  };
 }
 
 /** That `config`'s limits refuse each plant with its measure, read each ceiling, and refuse nothing at a ceiling, at the stop or exempt. */
-function assertPlantsHeld(config: Config): void {
+function assertPlantsHeld(config: Config) {
   const { measures, plants } = plantsMeasured(config);
-  const expected = (side: string, rules: readonly Rule[] = RULES): Measures =>
-    Object.fromEntries(rules.map((rule) => [`${side}/${plants[rule].file}`, { [rule]: plants[rule].measure }]));
+  const expected = (side: string, rules: readonly Rule[] = RULES) =>
+    Object.fromEntries(rules.map((rule) => [`${side}/${plants[rule].file}`, { [rule]: plants[rule].measure }])) satisfies Measures;
   assert.deepEqual(
     Object.fromEntries(Object.entries(measures).filter(([file]) => file.startsWith('on/'))),
     expected('on'),
@@ -443,7 +460,7 @@ test('a threshold changed in the config is followed: the plants are cut against 
  * The directives in `text` that turn a limit off: one that names a limit, and one that names no rule, which turns every rule off. A
  * directive's reason, after `--`, names no rule.
  */
-function limitDirectives(text: string): string[] {
+function limitDirectives(text: string) {
   return [...text.matchAll(/(?:oxlint|eslint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)/g)]
     .filter(([, rest]) => {
       const rules = rest
@@ -452,7 +469,7 @@ function limitDirectives(text: string): string[] {
         .trim();
       return rules === '' || rules.split(/[\s,]+/).some((rule) => isLimit(rule));
     })
-    .map(([directive]) => directive.trim());
+    .map(([directive]) => directive.trim()) satisfies string[];
 }
 
 test('REFUSED: a directive that names a limit, or no rule at all, is found', () => {

@@ -72,7 +72,7 @@ const called = (name: string, options: Partial<ApiClientOptions> = {}) => {
 };
 
 /** The failure `exit` ended with. */
-const failureOf = (exit: Exit.Exit<unknown, unknown>): unknown =>
+const failureOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
 /** Every endpoint of the `Api` by `<group>.<endpoint>` that writes (no GET, no HEAD) and whose payload takes no key and is no form. */

@@ -25,7 +25,7 @@ const ENV: Env = {
 };
 
 /** A JSON Schema of an object whose `names` are each a required string. */
-const fields = (...names: string[]): string =>
+const fields = (...names: string[]) =>
   JSON.stringify({
     type: 'object',
     properties: Object.fromEntries(names.map((n) => [n, { type: 'string' }])),
@@ -34,7 +34,7 @@ const fields = (...names: string[]): string =>
   });
 
 /** A folder `twice` beside an `agents/` whose `judger` declares `findings`, with one step `judge` hiring it that declares it too. */
-function twice(): string {
+function twice() {
   const workflows = path.join(ROOT, 'workflows');
   const dir = path.join(workflows, 'twice');
   fs.mkdirSync(path.join(workflows, 'agents'), { recursive: true });

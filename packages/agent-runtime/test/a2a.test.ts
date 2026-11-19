@@ -388,7 +388,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
             }),
         }),
   };
-  function answer<A>(verb: string, args: unknown, value: A): Effect.Effect<A, RunnerError> {
+  function answer<A>(verb: string, args: unknown, value: A) {
     return Effect.suspend(() => {
       asked.push([verb, args]);
       if (o.fails instanceof RunnerError) return Effect.fail(o.fails);

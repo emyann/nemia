@@ -28,7 +28,7 @@ const aRecord = (id: string) => ({
   createdAt: '2026-10-16T12:00:00.000Z',
 });
 
-const put = (id: string, record: unknown = aRecord(id)): void =>
+const put = (id: string, record: unknown = aRecord(id)) =>
   fs.writeFileSync(runFile(ROOT, id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
 
 beforeEach(() => {
@@ -109,7 +109,7 @@ test('a run whose record is rewritten is read again, and one removed leaves the 
 });
 
 /** What `body` wrote to stderr while it ran, line by line, and what it answered. */
-const stderrOf = <T>(body: () => T): { lines: string[]; value: T } => {
+const stderrOf = <T>(body: () => T) => {
   const lines: string[] = [];
   const write = process.stderr.write.bind(process.stderr);
   process.stderr.write = (chunk: string | Uint8Array) => {

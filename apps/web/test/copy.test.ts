@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { COPY_REST_MS, copyAndSay, type CopySaid } from '../src/lib/useCopy.ts';
 
 /** While the test runs, a clipboard that takes every write, refuses every write, or (`undefined`) none at all. */
-function withClipboard(t: { onTestFinished: (fn: () => void) => void }, takes: boolean | undefined): string[] {
+function withClipboard(t: { onTestFinished: (fn: () => void) => void }, takes: boolean | undefined) {
   const written: string[] = [];
   const before = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
   const clipboard =

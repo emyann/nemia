@@ -280,7 +280,7 @@ const npmLockfile = (cwd: string) =>
  * leaves it: the run does not read it, since it can name what is not there, and a check that did would be
  * fooled by it. Then a worktree cut from it, in which `packages/x` says something else.
  */
-function aCheckout(): { main: string; wt: string } {
+function aCheckout() {
   const main = fs.mkdtempSync(path.join(ROOT, 'main-'));
   write(path.join(main, 'package.json'), JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*', 'apps/*'] }));
   write(path.join(main, 'packages/x/package.json'), JSON.stringify({ name: 'x', version: '1.0.0', bin: { xbin: 'bin.js' } }));
@@ -313,11 +313,11 @@ function aCheckout(): { main: string; wt: string } {
   const wt = path.join(fs.mkdtempSync(path.join(ROOT, 'wt-')), 'implement');
   git('worktree', 'add', '-q', '-b', `wt-${path.basename(main)}`, wt, 'HEAD');
   write(path.join(wt, 'packages/x/index.js'), "module.exports = 'branch-x';\n");
-  return { main, wt };
+  return { main, wt } satisfies { main: string; wt: string };
 }
 
 /** What `require(name)` gives from a directory, asked of a fresh node: the real path it resolved, and the export. */
-const required = (dir: string, name: string): { real: string; value: unknown } =>
+const required = (dir: string, name: string) =>
   JSON.parse(
     execFileSync(
       process.execPath,
@@ -327,10 +327,10 @@ const required = (dir: string, name: string): { real: string; value: unknown } =
       ],
       { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     ),
-  );
+  ) satisfies { real: string; value: unknown };
 
 /** Everything under a directory, without following a link: kind, link target, bytes, mtime. A write anywhere shows. */
-function snapshot(dir: string): Record<string, string> {
+function snapshot(dir: string) {
   const out: Record<string, string> = {};
   const walk = (p: string) => {
     const st = fs.lstatSync(p);
@@ -342,7 +342,7 @@ function snapshot(dir: string): Record<string, string> {
     } else out[rel] = `file ${st.mtimeMs} ${fs.readFileSync(p, 'utf8')}`;
   };
   walk(dir);
-  return out;
+  return out satisfies Record<string, string>;
 }
 
 test("a workspace package resolves to the worktree's own copy: what the worktree's app imports is the branch's packages/x", async () => {
@@ -373,6 +373,7 @@ test('every path under a provisioned node_modules is inside the worktree: a fenc
   const { wt, main } = aCheckout();
   await provisionDeps(main, wt);
   const real = fs.realpathSync(wt) + path.sep;
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const walk = (p: string): string[] => {
     const st = fs.lstatSync(p);
     const here = [p];
@@ -604,7 +605,7 @@ test("the checkout against the merge staged in it: a package nested in a workspa
  * `aCheckout`, with a package npm installed nested in the app's own `node_modules`, as it does when a workspace needs its own copy: named
  * in both lockfiles, and on main's disk at `version` (absent when null) beside a cache of vite's.
  */
-function aNestedCheckout(version: string | null): { main: string; wt: string } {
+function aNestedCheckout(version: string | null) {
   const { main, wt } = aCheckout();
   for (const root of [main, wt]) {
     const file = path.join(root, 'package-lock.json');
@@ -618,7 +619,7 @@ function aNestedCheckout(version: string | null): { main: string; wt: string } {
     write(path.join(nested, 'nested/index.js'), "module.exports = 'main-nested';\n");
   }
   write(path.join(nested, '.vite/cache'), 'main\n');
-  return { main, wt };
+  return { main, wt } satisfies { main: string; wt: string };
 }
 
 test("a package nested in a workspace's node_modules at the version main has is hardlinked into the worktree's own, never installed", async () => {
@@ -664,7 +665,7 @@ test('a workspace folder of the worktree that leads outside it, or whose node_mo
 });
 
 /** A checkout of npm workspaces alone, `packages/x` and its lockfile, so npm installs it reaching no registry, under `at`, uninstalled. */
-function anUninstalled(at: string): string {
+function anUninstalled(at: string) {
   fs.mkdirSync(at, { recursive: true });
   const repo = fs.mkdtempSync(path.join(at, 'r-'));
   write(path.join(repo, 'package.json'), JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
@@ -694,7 +695,7 @@ test("a clone the store keeps is installed when it has no node_modules, and left
  * A checkout as `aCheckout` makes one, and a worktree of a run's cut where the store keeps its worktrees (`<home>/worktrees/<run>/run`),
  * provisioned as the cut provisions it.
  */
-async function aRunWorktree(): Promise<{ home: string; run: string; main: string; wt: string }> {
+async function aRunWorktree() {
   const { main } = aCheckout();
   const home = fs.mkdtempSync(path.join(ROOT, 'home-'));
   const run = 'r-deps';
@@ -702,7 +703,7 @@ async function aRunWorktree(): Promise<{ home: string; run: string; main: string
   fs.mkdirSync(path.dirname(wt), { recursive: true });
   execFileSync('git', ['worktree', 'add', '-q', '-b', `run-${path.basename(home)}`, wt, 'HEAD'], { cwd: main, stdio: 'ignore' });
   assert.equal((await provisionDeps(main, wt)).tree, 'hardlinked');
-  return { home, run, main, wt };
+  return { home, run, main, wt } satisfies { home: string; run: string; main: string; wt: string };
 }
 
 /** The branch's lockfile moved under the worktree, as a merge of a base that added a workspace package moves it. */

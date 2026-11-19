@@ -12,7 +12,7 @@ import { asked, engineOf, HARNESSES, quotaHarnesses, runWith } from '../src/runt
 import { HARNESSES as STEP_HARNESSES } from '../src/harness/harness.ts';
 
 /** What `run` was rejected or thrown with: the error, and the exit code it carries. */
-const failure = async (run: () => unknown): Promise<Error & { exitCode?: number }> => {
+const failure = async (run: () => unknown) => {
   try {
     await run();
   } catch (e) {

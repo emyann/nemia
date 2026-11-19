@@ -66,17 +66,17 @@ const QUALIFIED = {
 type Named = Exclude<StepReason, 'Waiting' | 'AwaitingAnswer'> | keyof typeof QUALIFIED;
 
 /** The codes of the step `named` names, at the phase of its reason. */
-const codesOf = (named: Named): StepCodes => {
+const codesOf = (named: Named) => {
   const qualified: Omit<StepCodes, 'phase'> =
     named in QUALIFIED ? QUALIFIED[named as keyof typeof QUALIFIED] : { reason: named as StepReason, on: null, via: null };
   return { phase: PHASE[qualified.reason], ...qualified };
 };
 
 /** The state of the step `named` names, at its phase, on a run called off or not and held or not. */
-const stateAt = (named: Named, runCancelled = false, runHeld = false): StepState => stepState(codesOf(named), runCancelled, runHeld);
+const stateAt = (named: Named, runCancelled = false, runHeld = false) => stepState(codesOf(named), runCancelled, runHeld);
 
 /** The codes of a step whose reason is `reason` at `phase`, qualified by nothing. */
-const plain = (phase: StepPhase, reason: StepReason): StepCodes => ({ phase, reason, on: null, via: null });
+const plain = (phase: StepPhase, reason: StepReason) => ({ phase, reason, on: null, via: null });
 
 describe('stepState: each reason the api carries, read as the state a person acts on', () => {
   test('a qualified reason reads by what qualifies it: an answer by where it is asked, a wait by what it waits on', () => {
@@ -276,17 +276,17 @@ describe('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work do
 });
 
 const web = path.resolve(import.meta.dirname, '..');
-const given = (state: StepState, drawn: Drawn): Record<StepState, Drawn> => ({ ...stateDrawn, [state]: drawn });
+const given = (state: StepState, drawn: Drawn) => ({ ...stateDrawn, [state]: drawn });
 
 const ROLE_OF = { yours: 'primary', alive: 'secondary', money: 'tertiary', failure: 'error' } as const;
 
-const readsRole = (css: string, meaning: keyof typeof ROLE_OF): boolean =>
+const readsRole = (css: string, meaning: keyof typeof ROLE_OF) =>
   new RegExp(`--meaning-${meaning}:\\s*var\\(\\s*--md-sys-color-${ROLE_OF[meaning]}\\s*\\)\\s*;`).test(css);
 
 const WRITTEN = { primary: '#f5e61a', secondary: '#c4a8ff', tertiary: '#e0a15e', error: '#ff7676' } as const;
 
 /** The roles of `WRITTEN` a look's front matter does not write at their value, by name. */
-const unwritten = (look: string): string[] => {
+const unwritten = (look: string) => {
   const front = look.slice(0, look.indexOf('\n---', 4));
   return Object.entries(WRITTEN)
     .filter(([role, value]) => !front.includes(`\n  ${role}: "${value}"\n`))
@@ -374,7 +374,7 @@ describe("the meanings of a state's colour: one thing each, read from the look's
     const { routedWith } = await import('./markup-fixtures.ts');
     const { RunWait } = await import('../src/components/run/RunWait.tsx');
     const { LiftHold } = await import('../src/components/run/LiftHold.tsx');
-    const tokensOf = (html: string): Set<string> => new Set(/<section[^>]*class="([^"]*)"/.exec(html)![1].split(/\s+/));
+    const tokensOf = (html: string) => new Set(/<section[^>]*class="([^"]*)"/.exec(html)![1].split(/\s+/));
     const wears = (tokens: Set<string>, drawn: string) => drawn.split(' ').every((token) => tokens.has(token));
     const runs = [
       { run: 'a-1', missing: false },

@@ -47,14 +47,14 @@ const HISTORY = [
 ];
 
 /** Whether a file is under one entry of `HISTORY`: the whole path, never a part of it. */
-const under = (entry: string, file: string): boolean =>
+const under = (entry: string, file: string) =>
   entry.endsWith('/')
     ? file.startsWith(entry)
     : entry.includes('*')
       ? new RegExp(`^${entry.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(file)
       : file === entry;
 
-const inHistory = (file: string): boolean => HISTORY.some((entry) => under(entry, file));
+const inHistory = (file: string) => HISTORY.some((entry) => under(entry, file));
 
 /** What the note at the top of a history file says, beside `MARK`, and how far down it may sit: a reader meets it before the old words. */
 const NOTE = 'keeps the names it was written with';
@@ -64,10 +64,10 @@ const NOTE_WITHIN = 5;
  * Only a `.md` file on history is asked for a note: a JSON fixture is read by a test, and a line added to it would change what the test
  * reads.
  */
-const asksForNote = (file: string): boolean => file.endsWith('.md') && inHistory(file);
+const asksForNote = (file: string) => file.endsWith('.md') && inHistory(file);
 
 /** Whether a history file that names a former package says, near its top, that it keeps the old names: `undefined` when it does. */
-function unnoted(text: string): string | undefined {
+function unnoted(text: string) {
   if (!text.match(NAME)) return undefined;
   if (
     text
@@ -80,7 +80,7 @@ function unnoted(text: string): string | undefined {
 }
 
 /** Each line of `text` that names a former package, as `<line>: <text>`, where it is not allowed. */
-function formerNames(text: string): string[] {
+function formerNames(text: string) {
   return text
     .split('\n')
     .flatMap((line, i) => (!line.includes(MARK) && line.match(NAME) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
@@ -121,10 +121,10 @@ const LEFT_IN_BROWSER = new RegExp(`'${OLD}:(?:factory-layout|canvas-layout:[^':
  */
 const BOARD = ['apps/web/index.html', 'apps/web/src/'];
 const BARE = new RegExp(`(?<![\\w/.-])${OLD}(?![\\w:-])`, 'i');
-const onBoard = (file: string): boolean => BOARD.some((entry) => under(entry, file));
+const onBoard = (file: string) => BOARD.some((entry) => under(entry, file));
 
 /** Whether one line calls the project by its former name where it is not allowed, `board` for a line of the board's own files. */
-function namesOldProject(said: string, board: boolean): boolean {
+function namesOldProject(said: string, board: boolean) {
   if (said.includes(PROJECT_MARK)) return false;
   const line = said.replace(LEFT_IN_BROWSER, "''");
   const [word, versioned, prefix, brand] = PROJECT_FORMS as [RegExp, RegExp, RegExp, RegExp];
@@ -134,7 +134,7 @@ function namesOldProject(said: string, board: boolean): boolean {
 }
 
 /** Each line of `text` that calls the project by its former name where it is not allowed, as `<line>: <text>`. */
-function projectNames(text: string, board = false): string[] {
+function projectNames(text: string, board = false) {
   return text.split('\n').flatMap((line, i) => (namesOldProject(line, board) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 

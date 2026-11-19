@@ -34,7 +34,7 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
   stand().world.repository(repo, { 'README.md': 'readme\n' });

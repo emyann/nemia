@@ -61,7 +61,7 @@ beforeEach(() => {
 });
 
 /** A run of one step, `work`, started in a repository of its own and advanced one pass, so its step is filed; gated where asked. */
-const started = async (gates: string[] = []): Promise<string> => {
+const started = async (gates: string[] = []) => {
   const dir = scratch('wf-informer-team-');
   fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\n---\nwork it\n');
   const repo = scratch('wf-informer-repo-');
@@ -72,7 +72,7 @@ const started = async (gates: string[] = []): Promise<string> => {
 };
 
 /** A run whose step signed off and now waits at its gate for a person's approval: at rest. */
-const atItsGate = async (): Promise<string> => {
+const atItsGate = async () => {
   const id = await started(['work']);
   engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
   await runWith(e(), advanceRun(runRecord(ROOT, id)));
@@ -80,7 +80,7 @@ const atItsGate = async (): Promise<string> => {
 };
 
 /** A run whose step's session is at work: a run still moving. */
-const atWork = async (): Promise<string> => {
+const atWork = async () => {
   const id = await started();
   engine().settle(`${id}-work`, 'working', { startedAt: AT, spawnedAt: AT });
   return id;
@@ -116,7 +116,7 @@ const listOf = (informer: InformerMemo, wrap: Wrap = asIs) =>
   runWith(e(), wrap(runsSummarized(e(), { home: ROOT, memo: informer, verify: false })));
 
 /** `f` with `WF_VERIFY_REST` off: what the informer alone answers, no answer judged afresh beside it. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   ENV.WF_VERIFY_REST = '0';
   try {
     return await f();

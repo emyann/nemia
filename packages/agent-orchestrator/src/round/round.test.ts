@@ -65,13 +65,14 @@ const [IMPLEMENT, LOOPING_REVIEW] = [LOOP[0], LOOP[1]];
 /** implement checked with a $3 budget, in the loop. */
 const BUDGETED_LOOP: StepSpec[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
 const FOUND = [{ file: 'src/run.ts', line: 183, what: 'a producer with no findings reads as done' }];
-const reviewed = (again: unknown): Closeout => ({
-  outcome: 'done',
-  summary: 'REVIEWER-SUMMARY',
-  artifacts: [],
-  needs: undefined,
-  output: { findings: FOUND, again },
-});
+const reviewed = (again: unknown) =>
+  ({
+    outcome: 'done',
+    summary: 'REVIEWER-SUMMARY',
+    artifacts: [],
+    needs: undefined,
+    output: { findings: FOUND, again },
+  }) satisfies Closeout;
 const answered: Closeout = {
   outcome: 'done',
   summary: 'IMPLEMENTER-SUMMARY',
@@ -80,42 +81,42 @@ const answered: Closeout = {
   output: { replies: [{ finding: 'src/run.ts:183', answer: "won't fix", why: 'nothing worth changing' }] },
 };
 /** The loop on round `n`: implement's `i<n>` checked by `c<n>`, review's `r<n>`, each with its earlier rounds behind it. */
-const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
-  const earlier = (prefix: string, checked: boolean): EarlierTry[] =>
+const inRound = (n: number, extra: Partial<RepositoryRun> = {}) => {
+  const earlier = (prefix: string, checked: boolean) =>
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
       cause: 'round' as const,
-    }));
+    })) satisfies EarlierTry[];
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {
     implement: { taskId: `i${n}`, check: { taskId: `c${n}` }, ...tries(earlier('i', true)) },
     review: { taskId: `r${n}`, ...tries(earlier('r', false)) },
     ship: { taskId: null },
   };
-  return run({}, { steps, ...extra });
+  return run({}, { steps, ...extra }) satisfies Run;
 };
 /** Round `n` with review not filed yet. */
-const reviewDue = (n: number): Run => {
+const reviewDue = (n: number) => {
   const r = inRound(n);
-  return { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  const due: Run = { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
+  return due;
 };
-const ALL_SUCCEEDED = (): TaskPhase => 'succeeded';
-const saidIn =
-  (n: number, again: unknown) =>
-  (name: string): Closeout | undefined =>
-    name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined;
-const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
+const ALL_SUCCEEDED = () => 'succeeded' as const satisfies TaskPhase;
+const saidIn = (n: number, again: unknown) => (name: string) =>
+  (name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined) satisfies
+    | Closeout
+    | undefined;
+const roundAskFor = (round: number) => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' }) satisfies RoundAsk;
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
-const acceptedTry = (t: number): Partial<RepositoryRun> => ({
-  acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message: ENOUGH }],
-});
-const spends =
-  (usd: Record<string, number>): SpendOf =>
-  (id) =>
-    id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined;
+const acceptedTry = (t: number) =>
+  ({
+    acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message: ENOUGH }],
+  }) satisfies Partial<RepositoryRun>;
+const spends = (usd: Record<string, number>) =>
+  ((id) => (id in usd ? { usd: usd[id], measured: 1, unmeasured: 0, budgetEnded: false } : undefined)) satisfies SpendOf;
 /** The words of an answer that refused, failing where it was taken. */
-const refusalOf = (a: { refusal: string } | object): string =>
+const refusalOf = (a: { refusal: string } | object) =>
   'refusal' in a && typeof a.refusal === 'string' ? a.refusal : assert.fail(`taken, and should not have been: ${JSON.stringify(a)}`);
 
 describe('acceptAsk: what `nemia approve` takes', () => {

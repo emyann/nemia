@@ -20,7 +20,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { Markdown } = await import('../src/components/markdown/Markdown.tsx');
 
 /** A text, as the board renders it. */
-const md = (text: string): string => renderToStaticMarkup(createElement(Markdown, null, text));
+const md = (text: string) => renderToStaticMarkup(createElement(Markdown, null, text));
 
 test('markdown is drawn as GFM: headings two levels down, lists, a table, a task list, strikethrough, an autolink and a footnote', () => {
   const html = md(

@@ -26,7 +26,7 @@ function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknow
 type TimelineTry = StepView['timeline'][number];
 
 /** A try of a step whose session started at `spawnedAt` and ended at `endedAt`, null while it runs; a check where `check` gives one. */
-const tried = (n: number, spawnedAt: string, endedAt: string | null, check?: [string, string | null]): TimelineTry => {
+const tried = (n: number, spawnedAt: string, endedAt: string | null, check?: [string, string | null]) => {
   const span = (from: string, to: string | null) => ({
     taskId: `t-${n}`,
     at: to === null ? ('running' as const) : ('ended' as const),
@@ -39,7 +39,14 @@ const tried = (n: number, spawnedAt: string, endedAt: string | null, check?: [st
     queued: '0s',
     ran: '',
   });
-  return { try: n, round: 1, session: span(spawnedAt, endedAt), sessionOf: null, check: check ? span(...check) : null, used: null };
+  return {
+    try: n,
+    round: 1,
+    session: span(spawnedAt, endedAt),
+    sessionOf: null,
+    check: check ? span(...check) : null,
+    used: null,
+  } satisfies TimelineTry;
 };
 
 /** The run `runViewOf` is shown: two steps, the first given an agent, its tries `timeline`, in `namespace`. */

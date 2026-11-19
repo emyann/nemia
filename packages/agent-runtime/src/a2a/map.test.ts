@@ -20,30 +20,33 @@ import {
 } from './map.ts';
 import type { SessionState } from '../core/session.ts';
 
-const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
-const data = (value: Record<string, unknown>): Part => ({
-  content: { $case: 'data', value },
-  metadata: undefined,
-  filename: '',
-  mediaType: '',
-});
-const artifact = (...parts: Part[]): Artifact => ({
-  artifactId: `a${parts.length}`,
-  name: '',
-  description: '',
-  parts,
-  metadata: undefined,
-  extensions: [],
-});
+const text = (value: string) => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' }) satisfies Part;
+const data = (value: Record<string, unknown>) =>
+  ({
+    content: { $case: 'data', value },
+    metadata: undefined,
+    filename: '',
+    mediaType: '',
+  }) satisfies Part;
+const artifact = (...parts: Part[]) =>
+  ({
+    artifactId: `a${parts.length}`,
+    name: '',
+    description: '',
+    parts,
+    metadata: undefined,
+    extensions: [],
+  }) satisfies Artifact;
 
-const taskIn = (state: TaskState, artifacts: Artifact[] = []): Task => ({
-  id: 't-1',
-  contextId: 'c-1',
-  status: { state, message: undefined, timestamp: undefined },
-  artifacts,
-  history: [],
-  metadata: undefined,
-});
+const taskIn = (state: TaskState, artifacts: Artifact[] = []) =>
+  ({
+    id: 't-1',
+    contextId: 'c-1',
+    status: { state, message: undefined, timestamp: undefined },
+    artifacts,
+    history: [],
+    metadata: undefined,
+  }) satisfies Task;
 
 describe("the map: a remote agent's Task in the runtime's words, and a spawn, words and logs in A2A's", () => {
   test('each A2A state is passed through as its own name, an interrupted one says what it waits for, and no state or one no version of A2A this runtime knows is working, which the deadline bounds', () => {
@@ -154,16 +157,17 @@ describe("the map: a remote agent's Task in the runtime's words, and a spawn, wo
     assert.equal(logsOfTask(t), 'user: do it\nartifact a1: {"ok":true}\nCOMPLETED — finished');
   });
   describe("a remote agent's logs are bounded, say when they were cut, and end on the Task's state", () => {
-    const message = (role: Role, words: string, id = 'm'): Message => ({
-      messageId: id,
-      contextId: 'c-1',
-      taskId: 't-1',
-      role,
-      parts: [text(words)],
-      metadata: undefined,
-      extensions: [],
-      referenceTaskIds: [],
-    });
+    const message = (role: Role, words: string, id = 'm') =>
+      ({
+        messageId: id,
+        contextId: 'c-1',
+        taskId: 't-1',
+        role,
+        parts: [text(words)],
+        metadata: undefined,
+        extensions: [],
+        referenceTaskIds: [],
+      }) satisfies Message;
     const flood = 'x'.repeat(100_000);
     const done = TaskState.TASK_STATE_COMPLETED;
     const ROWS: Array<{ name: string; task: Task; asked?: number; cut: boolean; last: string }> = [

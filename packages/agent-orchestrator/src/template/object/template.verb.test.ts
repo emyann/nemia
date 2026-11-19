@@ -27,7 +27,7 @@ const { exportTemplate } = templated(ROOT);
  * A builtin folder holding `mill`, the tests' team exported; `asks`, the same with a parameter that has no default; `odd`, the same with
  * a revisions policy that is none; and `torn`, whose manifest does not parse.
  */
-function builtins(): string {
+function builtins() {
   const folder = scratch('wf-template-builtins-');
   const repo = scratch('wf-template-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
@@ -54,21 +54,21 @@ const exitOf = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: str
   );
 
 /** The tag `program` failed with, run as `uid` over the renders under `renders`. */
-const failedAs = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: string, uid: number): string | undefined => {
+const failedAs = <A, E>(program: Effect.Effect<A, E>, folder: string, renders: string, uid: number) => {
   const exit = exitOf(Effect.provideService(program, RenderOwner, uid), folder, renders);
   if (Exit.isSuccess(exit)) return undefined;
   return (Cause.squash(exit.cause) as { _tag?: string })._tag;
 };
 
 /** What `program` answers, or a throw of what it failed with. */
-const run = <A, E>(program: Effect.Effect<A, E>, folder: string, renders = scratch('wf-template-renders-')): A => {
+const run = <A, E>(program: Effect.Effect<A, E>, folder: string, renders = scratch('wf-template-renders-')) => {
   const exit = exitOf(program, folder, renders);
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
 };
 
 /** The tag `program` failed with. */
-const failedWith = <A, E>(program: Effect.Effect<A, E>, folder: string): string | undefined => {
+const failedWith = <A, E>(program: Effect.Effect<A, E>, folder: string) => {
   const exit = exitOf(program, folder, scratch('wf-template-renders-'));
   if (Exit.isSuccess(exit)) return undefined;
   return (Cause.squash(exit.cause) as { _tag?: string })._tag;

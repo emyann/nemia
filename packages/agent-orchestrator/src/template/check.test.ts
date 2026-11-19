@@ -19,7 +19,7 @@ const doc = (kind: string, name: string, spec: Record<string, unknown>) => ({
 });
 
 /** Draft 3's `software-team/`, its documents by file: no imports, no lock, no fetch, and designer and grilling carried in the folder. */
-const documents = (): Record<string, any> => ({
+const documents = () => ({
   'nemia.yaml': {
     ...doc('FactoryTemplate', 'software-team', {
       version: '1.0.0',
@@ -113,7 +113,7 @@ function refusalsOf(
   packageSkills: readonly string[] = ['git'],
   texts: Readonly<Record<string, string>> = {},
   placeNeeds: readonly string[] = [],
-): Refusal[] {
+) {
   const docs = documents();
   edit(docs);
   return checkTemplate(
@@ -126,11 +126,11 @@ function refusalsOf(
 }
 
 /** Whether `refusals` hold one in `file` at `at` whose words include `words`. */
-const refuses = (refusals: Refusal[], file: string, at: ReadonlyArray<string | number>, words: string): boolean =>
+const refuses = (refusals: Refusal[], file: string, at: ReadonlyArray<string | number>, words: string) =>
   refusals.some((r) => r.file === file && JSON.stringify(r.at) === JSON.stringify(at) && r.message.includes(words));
 
 /** Asserts `refusals` hold the one described, printing them all when they do not. */
-function assertRefused(refusals: Refusal[], file: string, at: ReadonlyArray<string | number>, words: string): void {
+function assertRefused(refusals: Refusal[], file: string, at: ReadonlyArray<string | number>, words: string) {
   assert.ok(
     refuses(refusals, file, at, words),
     `no refusal in ${file} at ${JSON.stringify(at)} saying "${words}":\n${JSON.stringify(refusals, null, 1)}`,

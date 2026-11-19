@@ -122,7 +122,7 @@ const PLACES = [
 ];
 
 /** An agent's form of yours with the skill list read already, as the picker reads it, inside a router: a given skill links to its page. */
-async function agentFormWith(listing: Record<string, unknown>, readOnly = false): Promise<string> {
+async function agentFormWith(listing: Record<string, unknown>, readOnly = false) {
   const { AgentForm } = await import('../src/components/agent/AgentForm.tsx');
   const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
@@ -332,7 +332,7 @@ const SKILL_DETAIL = {
   copyHint: "mkdir -p '/repo/.claude/skills' && cp -r '/store/workflows/skills/write-a-note' '/repo/.claude/skills/'",
 };
 
-async function skillForm(props: Record<string, unknown>): Promise<string> {
+async function skillForm(props: Record<string, unknown>) {
   const { SkillForm } = await import('../src/components/agent/SkillForm.tsx');
   return renderToStaticMarkup(createElement(SkillForm, { saving: false, refusal: null, onSave: () => {}, ...props } as never));
 }
@@ -377,37 +377,44 @@ const tried = (id: string, fields: Record<string, unknown> = {}) => ({
  * The reads the Try panel looks for the latest try in, seeded: the runs not finished (`openRunsQuery`, `['runs-open']`), in flight, and
  * the first page of the finished (`finishedPagesQuery`, `['runs-finished', null, 'pages']`).
  */
-const triesRead = (open: unknown[], finished: unknown[] = []): Array<[readonly unknown[], unknown]> => [
-  [['runs-open'], { asOf: at, counts: { waiting: 0, inFlight: open.length, finished: finished.length }, waiting: [], inFlight: open }],
-  [['runs-finished', null, 'pages'], { pages: [{ asOf: at, total: finished.length, runs: finished, continue: null }], pageParams: [null] }],
-];
+const triesRead = (open: unknown[], finished: unknown[] = []) =>
+  [
+    [['runs-open'], { asOf: at, counts: { waiting: 0, inFlight: open.length, finished: finished.length }, waiting: [], inFlight: open }],
+    [
+      ['runs-finished', null, 'pages'],
+      { pages: [{ asOf: at, total: finished.length, runs: finished, continue: null }], pageParams: [null] },
+    ],
+  ] satisfies Array<[readonly unknown[], unknown]>;
 
 /** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
-function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
+function tryDetail(fields: Record<string, unknown> = {}) {
   const run = runWith(null);
-  return {
-    ...run,
-    id: 'r-t',
-    repo: null,
-    place: 'folder',
-    status: 'succeeded',
-    try: { agent: 'scribe' },
-    holding: null,
-    cancelledAt: null,
-    steps: [
-      {
-        ...run.steps[0],
-        name: 'try',
-        status: 'done',
-        taskId: 't-t',
-        filesError: null,
-        files: [{ path: 'note.md', name: 'note.md', url: '/api/runs/r-t/steps/try/files/note.md', kind: 'text', size: 120 }],
-        spent: { said: '$0.12', usd: 0.12, measured: 1, unmeasured: 0 },
-        budget: { usd: 1, said: '$1', of: '$0.12 of $1', over: false },
-      },
-    ],
-    ...fields,
-  } as never;
+  {
+    const made: RunDetail = {
+      ...run,
+      id: 'r-t',
+      repo: null,
+      place: 'folder',
+      status: 'succeeded',
+      try: { agent: 'scribe' },
+      holding: null,
+      cancelledAt: null,
+      steps: [
+        {
+          ...run.steps[0],
+          name: 'try',
+          status: 'done',
+          taskId: 't-t',
+          filesError: null,
+          files: [{ path: 'note.md', name: 'note.md', url: '/api/runs/r-t/steps/try/files/note.md', kind: 'text', size: 120 }],
+          spent: { said: '$0.12', usd: 0.12, measured: 1, unmeasured: 0 },
+          budget: { usd: 1, said: '$1', of: '$0.12 of $1', over: false },
+        },
+      ],
+      ...fields,
+    } as never;
+    return made;
+  }
 }
 
 test('an agent of yours is tried from its page: the fence said in one line, and Try it held until there is a brief', async () => {

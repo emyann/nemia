@@ -15,7 +15,7 @@ import { animationFrames, CLOSED, END_GRACE_MS, follow, type Followed, type Foll
 class Stream implements StreamLike {
   readyState = 1;
   readonly #target = new EventTarget();
-  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
     this.#target.addEventListener(type, listener as EventListener);
   }
   close() {
@@ -30,7 +30,7 @@ class Stream implements StreamLike {
 }
 
 /** The api ends a stream's response: an EventSource fires `error` as it would before reconnecting. */
-const endsResponse = (stream: Stream): void => {
+const endsResponse = (stream: Stream) => {
   stream.readyState = 0;
   stream.fire('error');
 };
@@ -41,7 +41,10 @@ type Talk = Followed & { words: string[]; marks: number; ended: boolean };
 /** What one of its events brings: words, or a mark. */
 type Arrival = { kind: 'words'; words: string[] } | { kind: 'mark' };
 
-const blank = (): Talk => ({ words: [], marks: 0, ended: false, live: true, error: null, retrying: null });
+const blank = () => {
+  const made: Talk = { words: [], marks: 0, ended: false, live: true, error: null, retrying: null };
+  return made;
+};
 
 /** A conversation whose `said` carries words, whose `marked` carries nothing, and whose `done` is the end of it. */
 const talker: Follower<Talk, Arrival> = {
@@ -237,14 +240,15 @@ const EXEMPT = new Map([
 ]);
 
 /** Each `.ts` file of `src/lib` by its name, with its source. */
-const libFiles = (): Map<string, string> => {
+const libFiles = () => {
   const dir = new URL('../src/lib/', import.meta.url);
   const names = fs.readdirSync(dir).filter((name) => name.endsWith('.ts'));
-  return new Map(names.map((name) => [name, fs.readFileSync(new URL(name, dir), 'utf8')]));
+  return new Map(names.map((name) => [name, fs.readFileSync(new URL(name, dir), 'utf8')])) satisfies Map<string, string>;
 };
 
 /** The names of `files` that listen for `unreadable` themselves. */
-const listeners = (files: Map<string, string>): string[] => [...files].filter(([, source]) => LISTENS.test(source)).map(([name]) => name);
+const listeners = (files: Map<string, string>) =>
+  [...files].filter(([, source]) => LISTENS.test(source)).map(([name]) => name) satisfies string[];
 
 test('the one follower: no file of `src/lib` listens for `unreadable` itself but `follow.ts`, and `feed.ts`, exempt by name', () => {
   const files = libFiles();

@@ -142,7 +142,7 @@ describe("get, the Factory's and the inbox's reads: each decodes what the api gi
 type Sent = { method: string; url: string; body: unknown };
 
 /** Every request answered by `answer` of its path, its JSON with a 200, for the length of the test; what each sent, in `sent`. */
-function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: string, method: string) => unknown): Sent[] {
+function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: string, method: string) => unknown) {
   const sent: Sent[] = [];
   const before = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -160,7 +160,7 @@ function serving(t: { onTestFinished: (fn: () => void) => void }, answer: (url: 
   t.onTestFinished(() => {
     globalThis.fetch = before;
   });
-  return sent;
+  return sent satisfies Sent[];
 }
 
 const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;

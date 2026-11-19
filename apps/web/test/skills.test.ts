@@ -19,42 +19,45 @@ import {
   skillFormOf,
 } from '../src/lib/skills.ts';
 
-const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
-  name: 'write-a-note',
-  from: 'user',
-  dir: '/store/workflows/skills/write-a-note',
-  entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] },
-  error: null,
-  preload: false,
-  cost: { preload: false, listed: 10, body: 200, perTurn: 10 },
-  usedBy: [],
-  found: null,
-  ...fields,
-});
-
-const places = (yours: SkillRow[], repo: SkillRow[] = [], builtin: SkillRow[] = []): SkillPlace[] => [
-  { from: 'user', dir: '/store/workflows/skills', skills: yours },
-  { from: 'repo', dir: '/repo/.claude/skills', skills: repo },
-  { from: 'builtin', dir: '/hkb/workflows/skills', skills: builtin },
-];
-
-const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
-  skill: row(),
-  version: 'v1',
-  draft: {
+const row = (fields: Partial<SkillRow> = {}) =>
+  ({
     name: 'write-a-note',
-    title: 'Write a note',
-    description: 'Writes the notes of a change.',
-    tags: ['note', 'docs'],
-    examples: null,
+    from: 'user',
+    dir: '/store/workflows/skills/write-a-note',
+    entry: { id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] },
+    error: null,
     preload: false,
+    cost: { preload: false, listed: 10, body: 200, perTurn: 10 },
+    usedBy: [],
+    found: null,
+    ...fields,
+  }) satisfies SkillRow;
+
+const places = (yours: SkillRow[], repo: SkillRow[] = [], builtin: SkillRow[] = []) =>
+  [
+    { from: 'user', dir: '/store/workflows/skills', skills: yours },
+    { from: 'repo', dir: '/repo/.claude/skills', skills: repo },
+    { from: 'builtin', dir: '/hkb/workflows/skills', skills: builtin },
+  ] satisfies SkillPlace[];
+
+const detail = (fields: Partial<SkillDetail> = {}) =>
+  ({
+    skill: row(),
+    version: 'v1',
+    draft: {
+      name: 'write-a-note',
+      title: 'Write a note',
+      description: 'Writes the notes of a change.',
+      tags: ['note', 'docs'],
+      examples: null,
+      preload: false,
+      body: 'Write it.\n',
+    },
     body: 'Write it.\n',
-  },
-  body: 'Write it.\n',
-  users: [],
-  copyHint: null,
-  ...fields,
-});
+    users: [],
+    copyHint: null,
+    ...fields,
+  }) satisfies SkillDetail;
 
 describe('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, and what a change reaches', () => {
   test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {

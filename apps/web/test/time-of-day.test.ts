@@ -74,7 +74,7 @@ export interface Found {
 }
 
 /** Everything `families` find in `text`, in the order written. */
-export function foundAt(text: string, families: Record<string, RegExp>): Found[] {
+export function foundAt(text: string, families: Record<string, RegExp>) {
   return Object.values(families)
     .flatMap((family) => [...text.matchAll(family)])
     .sort((a, b) => a.index - b.index)
@@ -101,7 +101,7 @@ export const NUMBERS: Numbers[] = [
  * `file:line:column (words)`; a formatter built by hand in any file, `WRITER` included; date-fns imported outside `WRITERS`; a file
  * with more calls that write in a locale than `numbers` gives it; and an entry of `numbers` whose file holds fewer.
  */
-export function refusals(files: Record<string, string>, numbers: Numbers[] = NUMBERS): string[] {
+export function refusals(files: Record<string, string>, numbers: Numbers[] = NUMBERS) {
   const options = Object.entries(files)
     .filter(([file]) => file !== WRITER)
     .flatMap(([file, text]) =>
@@ -135,7 +135,7 @@ export function refusals(files: Record<string, string>, numbers: Numbers[] = NUM
 }
 
 /** Every `.ts` and `.tsx` of `root`'s `src` outside the kit, as its text by its path from `root`. */
-function sources(root: string): Record<string, string> {
+function sources(root: string) {
   return Object.fromEntries(
     fs
       .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })

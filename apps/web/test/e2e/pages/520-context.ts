@@ -27,13 +27,13 @@ const READER = {
   reads: [`${FAKE.id} — ${FAKE.title}`, `${DIAMOND.landed.id} — ${DIAMOND.landed.title}`],
 } as const;
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
 
 /** A picture of `target` as `what`, in the page's theme. */
-const shoot = async (page: Page, target: Locator, what: string): Promise<void> => {
+const shoot = async (page: Page, target: Locator, what: string) => {
   await settled(page);
   await photograph(target, path.join(OUT, `context-${what}-${await themeOf(page)}.png`));
 };
@@ -85,7 +85,7 @@ const TASK = [
  * `filed`, after the diamond's top, which landed, its step filed with TASK, its journal and its line on the engine's feed written as the
  * runtime writes them. Each file it writes is returned, to be taken back.
  */
-function written(filed: boolean): string[] {
+function written(filed: boolean) {
   const runs = path.join(store!, 'runs');
   const bottom = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.bottom.id}.json`), 'utf8')) as {
     repo: string;
@@ -108,19 +108,19 @@ function written(filed: boolean): string[] {
     steps: { implement: filed ? { taskId: task, workspace: bottom.repo } : { taskId: null } },
   };
   fs.writeFileSync(record, JSON.stringify(run, null, 2));
-  if (!filed) return [record];
+  if (!filed) return [record] satisfies string[];
   const event = { kind: 'filed', at: new Date().toISOString(), brief: TASK, cwd: bottom.repo, maxAttempts: 1 };
   const journal = path.join(store!, 'engine', 'tasks', `${task}.jsonl`);
   fs.writeFileSync(journal, `${JSON.stringify(event)}\n`);
   fs.appendFileSync(path.join(store!, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId: task, event })}\n`);
-  return [record, journal];
+  return [record, journal] satisfies string[];
 }
 
 /**
  * The Factory: READER's card says it reads two runs in a chip, each by its id and title on hover, and draws no line of them at rest; its
  * wait on `running` is drawn. Hovered, a faint line comes from FAKE, the one on the floor; with the finished shown, from `landed` too.
  */
-async function onTheFactory(page: Page): Promise<void> {
+async function onTheFactory(page: Page) {
   await goto(page, '/factories/default');
   const card = cardOf(page, READER.id);
   const chip = card.locator('[data-context]');
@@ -155,7 +155,7 @@ async function onTheFactory(page: Page): Promise<void> {
  * The lines the api's `concluded` section for `id` quotes in its fences — what the run was asked, what its steps said — which the preview
  * must say each of: it draws the section the api answers, not an account of it.
  */
-async function quotedOf(page: Page, id: string): Promise<string[]> {
+async function quotedOf(page: Page, id: string) {
   const answer = await page.request.get(new URL(`/api/runs/${id}/concluded`, page.url()).href);
   const { section } = (await answer.json()) as { section: string };
   const quoted: string[] = [];
@@ -171,7 +171,7 @@ async function quotedOf(page: Page, id: string): Promise<string[]> {
 }
 
 /** The start form's Reads list: a run picked shows what it would hand, badged where it has not landed. */
-async function onTheStartForm(page: Page, what: string): Promise<void> {
+async function onTheStartForm(page: Page, what: string) {
   const form = page.locator(`article[aria-label="Workflow ${WORKFLOWS.good.name}"] [data-context-picker]`);
   for (const id of [DIAMOND.running.id, DIAMOND.landed.id]) {
     const box = form.locator(`li[data-run="${id}"] input[type="checkbox"]`);
@@ -195,7 +195,7 @@ async function onTheStartForm(page: Page, what: string): Promise<void> {
 }
 
 /** The inbox's bare card: no run read, then `landed` picked through Change and written, photographed as `what`, and taken back off. */
-async function onTheCard(page: Page, what: string): Promise<void> {
+async function onTheCard(page: Page, what: string) {
   const name = CARDS.bare.name;
   const item = page.locator(`li[data-card="${name}"]`);
   const from = item.locator('[data-card-from]');
@@ -217,7 +217,7 @@ async function onTheCard(page: Page, what: string): Promise<void> {
  * READER's run page: its task in its parts, in implement's Detail fold, the run it waited on and each it read a block headed by how, linked
  * to its run.
  */
-async function onTheRunPage(page: Page, what: string): Promise<void> {
+async function onTheRunPage(page: Page, what: string) {
   const section = await openFold(partOf(page, 'implement').locator('[data-part-detail]'), 'detail');
   const fold = section.locator('details[data-told]');
   if (!(await fold.evaluate((el) => (el as HTMLDetailsElement).open))) await fold.locator('summary').click();
@@ -234,7 +234,7 @@ async function onTheRunPage(page: Page, what: string): Promise<void> {
 }
 
 /** Each of `look` on a wide screen, then on a phone's. */
-async function wideThenPhone(page: Page, look: (what: string) => Promise<void>): Promise<void> {
+async function wideThenPhone(page: Page, look: (what: string) => Promise<void>) {
   await look('wide');
   await page.setViewportSize(PHONE);
   try {

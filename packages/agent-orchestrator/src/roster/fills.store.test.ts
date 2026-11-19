@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
 import { agentFileOf, factoriesFilling, stepsFilled } from './fills.store.ts';
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -29,9 +29,9 @@ for (const name of ['iris', 'ada']) write(path.join(repo, 'workflows', 'agents',
 for (const name of ['ada', 'zed']) write(path.join(home, 'workflows', 'agents', `${name}.md`), `You are your ${name}.\n`);
 write(path.join(home, 'workflows', 'omega', 'step.md'), '---\nagent: zed\n---\nStep it.\n');
 
-const theirs = (name: string): string => path.resolve(repo, 'workflows', 'agents', `${name}.md`);
-const yours = (name: string): string => path.resolve(home, 'workflows', 'agents', `${name}.md`);
-const factory = (name: string, workflows: string[], hires: Factory['hires'] = {}): Factory => ({
+const theirs = (name: string) => path.resolve(repo, 'workflows', 'agents', `${name}.md`);
+const yours = (name: string) => path.resolve(home, 'workflows', 'agents', `${name}.md`);
+const factory = (name: string, workflows: string[], hires: Factory['hires'] = {}) => ({
   name,
   volumes: [{ path: repo, readOnly: false }],
   workflows,

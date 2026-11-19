@@ -55,47 +55,47 @@ const WORKSPACE_INPUTS = {
 export type Picture = { id: string; theme: Theme };
 
 /** A picture's name in the keys (`keysOf`): `<id>-<theme>`. */
-export const keyName = ({ id, theme }: Picture): string => `${id}-${theme}`;
+export const keyName = ({ id, theme }: Picture) => `${id}-${theme}`;
 
 /** A picture's file name under `prefix`: `<prefix><id>-<theme>.png`. */
-export const pictureName = (prefix: string, picture: Picture): string => `${prefix}${keyName(picture)}.png`;
+export const pictureName = (prefix: string, picture: Picture) => `${prefix}${keyName(picture)}.png`;
 
 /**
  * The folder the pictures are kept in: the one `STORIES_CACHE` names, else the board's `node_modules/.cache/stories` in the workspace.
  * @param root The workspace root.
  */
-export const cacheDirOf = (root: string): string =>
+export const cacheDirOf = (root: string) =>
   process.env[STORIES_CACHE] || path.join(root, 'apps', 'web', 'node_modules', '.cache', 'stories');
 
 /** Each file under `dir`, from `root`, sorted; none where it is no folder. */
-const filesUnder = (root: string, dir: string): string[] => {
+const filesUnder = (root: string, dir: string) => {
   const at = path.join(root, dir);
-  if (!fs.statSync(at, { throwIfNoEntry: false })?.isDirectory()) return [];
+  if (!fs.statSync(at, { throwIfNoEntry: false })?.isDirectory()) return [] satisfies string[];
   return fs
     .readdirSync(at, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.posix.join(dir, path.relative(at, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')))
-    .sort();
+    .sort() satisfies string[];
 };
 
 /**
  * The files, from `root`, every story of the tree there is drawn from, past those its imports reach.
  * @param root The root of the tree: the workspace, or the base's extracted board's.
  */
-export const sharedInputs = (root: string): string[] => [
-  ...SHARED_FOLDERS.flatMap((dir) => filesUnder(root, dir)),
-  ...SHARED_FILES.filter((file) => fs.existsSync(path.join(root, file))),
-];
+export const sharedInputs = (root: string) =>
+  [
+    ...SHARED_FOLDERS.flatMap((dir) => filesUnder(root, dir)),
+    ...SHARED_FILES.filter((file) => fs.existsSync(path.join(root, file))),
+  ] satisfies string[];
 
 /** The SHA-256 of `file`'s bytes, `absent` where there is none. */
-const digestOf = (file: string): string =>
-  fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : 'absent';
+const digestOf = (file: string) => (fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : 'absent');
 
 /**
  * Each file, from `workspace`, every picture is drawn from in it (`WORKSPACE_INPUTS`), with its digest, a line each.
  * @param workspace The workspace root.
  */
-export const workspaceDigest = (workspace: string): string =>
+export const workspaceDigest = (workspace: string) =>
   [...WORKSPACE_INPUTS.folders.flatMap((dir) => filesUnder(workspace, dir)), ...WORKSPACE_INPUTS.files]
     .map((file) => `workspace:${file}\t${digestOf(path.join(workspace, file))}\n`)
     .join('');
@@ -107,14 +107,9 @@ export const workspaceDigest = (workspace: string): string =>
  * @param reaches Each story id's files, from `root`, its imports reach (`reachOf`).
  * @param pictures The pictures to key.
  */
-export function keysOf(
-  root: string,
-  workspace: string,
-  reaches: ReadonlyMap<string, readonly string[]>,
-  pictures: readonly Picture[],
-): Map<string, string> {
+export function keysOf(root: string, workspace: string, reaches: ReadonlyMap<string, readonly string[]>, pictures: readonly Picture[]) {
   const digests = new Map<string, string>();
-  const digest = (file: string): string => {
+  const digest = (file: string) => {
     const known = digests.get(file);
     if (known !== undefined) return known;
     const made = digestOf(path.join(root, file));
@@ -131,11 +126,11 @@ export function keysOf(
     for (const file of files) hash.update(`${file}\t${digest(file)}\n`);
     keys.set(keyName(picture), hash.digest('hex'));
   }
-  return keys;
+  return keys satisfies Map<string, string>;
 }
 
 /** Each picture of `ids`, in each theme, theme by theme. */
-export const picturesOf = (ids: readonly string[]): Picture[] => THEMES.flatMap((theme) => ids.map((id) => ({ id, theme })));
+export const picturesOf = (ids: readonly string[]) => THEMES.flatMap((theme) => ids.map((id) => ({ id, theme }))) satisfies Picture[];
 
 /**
  * Copies each picture of `pictures` the cache holds into `out` under `prefix`; the pictures it did not hold, to draw.
@@ -151,14 +146,14 @@ export function takenFromCache(
   pictures: readonly Picture[],
   out: string,
   prefix: string,
-): Picture[] {
-  if (cache === undefined) return [...pictures];
+) {
+  if (cache === undefined) return [...pictures] satisfies Picture[];
   return pictures.filter((picture) => {
     const kept = path.join(cache, `${keys.get(keyName(picture))}.png`);
     if (!fs.existsSync(kept)) return true;
     fs.copyFileSync(kept, path.join(out, pictureName(prefix, picture)));
     return false;
-  });
+  }) satisfies Picture[];
 }
 
 /**
@@ -176,7 +171,7 @@ export function keptInCache(
   pictures: readonly Picture[],
   out: string,
   prefix: string,
-): void {
+) {
   if (cache === undefined) return;
   fs.mkdirSync(cache, { recursive: true });
   for (const picture of pictures) {

@@ -19,7 +19,7 @@ type Manifest = Partial<Record<(typeof LISTS)[number], Record<string, unknown>>>
 type Spec = { where: string; list: string; spec: string };
 
 /** Every `effect` entry in a manifest's dependency lists, and in its `overrides`, by the workspace that names it. */
-const effectSpecs = (manifests: Record<string, Manifest>): Spec[] =>
+const effectSpecs = (manifests: Record<string, Manifest>) =>
   Object.entries(manifests).flatMap(([where, m]) =>
     LISTS.flatMap((list) => {
       const spec = m[list]?.[EFFECT];
@@ -28,7 +28,7 @@ const effectSpecs = (manifests: Record<string, Manifest>): Spec[] =>
   );
 
 /** What is wrong with the specs, one sentence each saying what to do: a range, or exact pins that differ. */
-function pinProblems(specs: Spec[]): string[] {
+function pinProblems(specs: Spec[]) {
   const ranges = specs
     .filter((s) => !EXACT.test(s.spec))
     .map((s) => `${s.where} gives effect ${s.spec} in ${s.list}, a range: pin it exactly, the same version as every other package`);
@@ -44,7 +44,7 @@ function pinProblems(specs: Spec[]): string[] {
 }
 
 /** The root's manifest and every workspace's, by `packages/<name>`, `apps/<name>` or `(root)`. */
-const manifests = (): Record<string, Manifest> => {
+const manifests = () => {
   const found: Record<string, Manifest> = Object.fromEntries(
     ['packages', 'apps'].flatMap((top) =>
       fs
@@ -130,7 +130,7 @@ test('REFUSED: a range in any list or workspace, and two exact pins that differ'
 const SKILL = '.claude/skills/effect/SKILL.md';
 
 /** Whether `effect`'s barrel has a name as the skill writes it: `Either`, or `Context.Tag` for `Tag` on the `Context` module. */
-const has = (barrel: Record<string, unknown>, name: string): boolean => {
+const has = (barrel: Record<string, unknown>, name: string) => {
   const [mod, member] = name.split('.');
   const at = barrel[mod];
   return member === undefined ? at !== undefined : typeof at === 'object' && at !== null && member in at;
@@ -140,7 +140,7 @@ const has = (barrel: Record<string, unknown>, name: string): boolean => {
  * What the skill's table of Effect 3 names gets wrong about the version it is read against, one sentence each: a version other
  * than the one the table names, a name on the left the version has, a name on the right it lacks, or a table with no row read.
  */
-function renameProblems(skill: string, barrel: Record<string, unknown>, pin: string): string[] {
+function renameProblems(skill: string, barrel: Record<string, unknown>, pin: string) {
   const section = /## Effect 3 names this version does not have\s*\n([\s\S]*?)\n## Services and layers/.exec(skill)?.[1];
   if (section === undefined) return [`${SKILL} has no table of Effect 3 names before its Services and layers: put it back`];
   const measured = /Measured on `([^`]+)`/.exec(section)?.[1];
@@ -218,7 +218,7 @@ const PRIMITIVES = [
  * installed docs and the Effect 3 names; a name the pinned `barrel` does not export; a page `exists` says is not installed; a primitive
  * of `PRIMITIVES` no row names.
  */
-function primitiveProblems(skill: string, barrel: Record<string, unknown>, exists: (file: string) => boolean): string[] {
+function primitiveProblems(skill: string, barrel: Record<string, unknown>, exists: (file: string) => boolean) {
   const at = skill.indexOf(`\n${REACH}\n`);
   if (at < 0) return [`${SKILL} has no section ${REACH}: put it back, between its installed docs and its Effect 3 names`];
   const docs = skill.indexOf('\n## Read the installed docs first\n');
@@ -252,7 +252,7 @@ function primitiveProblems(skill: string, barrel: Record<string, unknown>, exist
 const installed = (file: string) => fs.existsSync(path.join(ROOT, file));
 
 /** The names a row of the primitives table may give: `effect`'s barrel, and its door to the exporters, `effect/observability`. */
-const primitivesBarrel = async (): Promise<Record<string, unknown>> => ({
+const primitivesBarrel = async () => ({
   ...(await import(EFFECT)),
   ...(await import('effect/observability')),
 });

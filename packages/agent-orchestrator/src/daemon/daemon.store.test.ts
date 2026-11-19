@@ -101,14 +101,14 @@ const seeded = () => vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 const at = (ms: number) => new Date(NOW + ms).toISOString();
 
 /** A holder's file, written as `nemia up` writes one — its process's start with its pid — over what is there. */
-const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
+const holdBy = (pid: number, over: Record<string, unknown> = {}) => {
   const text = `${JSON.stringify({ pid, startedAt: minutesAgo(30), cwd: '/elsewhere', every: 4000, passedAt: minutesAgo(0.05), procStart: procStartOf(pid), ...over }, null, 2)}\n`;
   fs.writeFileSync(FILE, text);
   return text;
 };
 
 /** A duration as `durationWord` prints it (3s, 16m11s, 1h05m, 2d03h) in milliseconds; NaN for a word that is not wholly such pairs. */
-const msOfWord = (word: string): number => {
+const msOfWord = (word: string) => {
   if (!/^(?:\d+[dhms])+$/.test(word)) return NaN;
   const unit = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 } as const;
   return [...word.matchAll(/(\d+)([dhms])/g)].reduce((ms, [, n, u]) => ms + Number(n) * unit[u as keyof typeof unit], 0);
@@ -121,7 +121,7 @@ const STALE = '15m00s';
  * Whether `line` is `nemia up`'s takeover of a stale holder `pid` at every 4000ms: that pid, a silence over the bound it names, and the
  * fixture's own, `silent`.
  */
-const saysStale = (line: string, pid: number, silent: string): boolean => {
+const saysStale = (line: string, pid: number, silent: string) => {
   const silence = new RegExp(
     `^ {3}took ${ROOT} over from pid ${pid}, alive but silent for (\\S+), over the ${STALE} that is stale at every 4000ms — `,
   ).exec(line)?.[1];
@@ -152,7 +152,7 @@ const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9
 
 /** An engine whose tick counts the passes and runs `each` on each, which may throw to stop the daemon. */
 /** A pass's report that did nothing, with what a test says of it. */
-const pass = (said: Partial<TickReport> = {}): TickReport => ({
+const pass = (said: Partial<TickReport> = {}) => ({
   tasks: 0,
   actions: 0,
   running: {},
@@ -172,7 +172,7 @@ const engineOf = (
 ) => {
   const state = {
     passes: 0,
-    tick: async (): Promise<TickReport> => {
+    tick: async () => {
       state.passes++;
       each(state.passes);
       return pass();
@@ -208,7 +208,7 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
 };
 
 /** What `nemia ls` answers (`RunsListed`), and its line on who ticks the store, in the daemon's own words (`daemonLine`), now. */
-const listed = async (e: Engine): Promise<{ runs: RunsListed['runs']; daemon: string }> => {
+const listed = async (e: Engine) => {
   const answered = (await told(['ls'], e, undefined, stand().place, ENV)) as RunsListed;
   return { runs: answered.runs, daemon: daemonLine(answered.daemon, Date.now()) };
 };
@@ -1386,10 +1386,10 @@ describe('REFUSED at start: a daemon with WF_MEMORY_LIMIT set on a host that can
   });
   let env: Env = { ...ENV, WF_MEMORY_LIMIT: '4Gi', WF_CGROUP_PARENT: 'agents.slice' };
   const asked: Array<string | undefined> = [];
-  const noted = (parent?: string): void => void asked.push(parent);
+  const noted = (parent?: string) => void asked.push(parent);
   const refusing = (parent?: string) => (noted(parent), 'this host has no systemd user manager.');
   test('a host that holds one starts, and so does any host with WF_MEMORY_LIMIT unset, never probed', async () => {
-    const holding = (parent?: string): undefined => {
+    const holding = (parent?: string) => {
       noted(parent);
       return undefined;
     };

@@ -142,7 +142,7 @@ const world = () => {
     STUB_LOG: path.join(root, 'gh.log'),
     STUB_STATE: path.join(root, 'state.json'),
   };
-  const git = (cwd: string, ...args: string[]): string => {
+  const git = (cwd: string, ...args: string[]) => {
     const ran = spawnSync('git', args, { cwd, env, encoding: 'utf8', timeout: 30_000 });
     assert.equal(ran.status, 0, `git ${args.join(' ')}: ${ran.stderr}`);
     return ran.stdout.trim();
@@ -158,7 +158,7 @@ const world = () => {
   git(seed, 'add', '.');
   git(seed, 'commit', '--quiet', '-m', 'the last release');
   git(seed, 'tag', 'v0.3.0');
-  const commit = (message: string): string => {
+  const commit = (message: string) => {
     fs.writeFileSync(path.join(seed, `${message.replace(/\W/g, '-')}.txt`), message);
     git(seed, 'add', '.');
     git(seed, 'commit', '--quiet', '-m', message);
@@ -171,14 +171,14 @@ const world = () => {
   git(seed, 'push', '--quiet', 'origin', 'main', '--tags');
   git(root, 'clone', '--quiet', origin, clone);
   git(clone, 'tag', 'nemia-2026.11.03');
-  const land = (message: string): string => {
+  const land = (message: string) => {
     const sha = commit(message);
     git(seed, 'push', '--quiet', 'origin', 'main');
     return sha;
   };
   const state = (value: State) => fs.writeFileSync(env.STUB_STATE, JSON.stringify(value));
-  const read = (): State => JSON.parse(fs.readFileSync(env.STUB_STATE, 'utf8')) as State;
-  const calls = (): Call[] =>
+  const read = () => JSON.parse(fs.readFileSync(env.STUB_STATE, 'utf8')) as State;
+  const calls = () =>
     fs.existsSync(env.STUB_LOG)
       ? fs
           .readFileSync(env.STUB_LOG, 'utf8')
@@ -195,7 +195,7 @@ const world = () => {
 };
 
 /** A merged pull request of `number` labelled `labels`, merged as `sha`. */
-const merged = (number: number, labels: string[], sha: string | null): Pull => ({
+const merged = (number: number, labels: string[], sha: string | null) => ({
   number,
   title: `change ${number}`,
   labels: labels.map((name) => ({ name })),
@@ -205,27 +205,27 @@ const merged = (number: number, labels: string[], sha: string | null): Pull => (
 });
 
 /** The dispatches made, each as the arguments after `gh workflow run`. */
-const dispatched = (calls: Call[]): string[][] =>
+const dispatched = (calls: Call[]) =>
   calls.filter((call) => call.args[0] === 'workflow' && call.args[1] === 'run').map((call) => call.args.slice(2));
 
 /** The reads of a workflow's dispatched runs. */
-const runReads = (calls: Call[]): Call[] => calls.filter((call) => call.args.some((arg) => arg.includes('/actions/workflows/')));
+const runReads = (calls: Call[]) => calls.filter((call) => call.args.some((arg) => arg.includes('/actions/workflows/')));
 
 /** The two dispatches on `release`, `release-label.yml` given the pull request's number. */
-const BOTH = (number: number): string[][] => [
+const BOTH = (number: number) => [
   ['ci.yml', '--ref', 'release'],
   ['release-label.yml', '--ref', 'release', '-f', `pr=${number}`],
 ];
 
 /** Where `word` stands in `body`, refusing a body that lacks it. */
-const at = (body: string, word: string): number => {
+const at = (body: string, word: string) => {
   const index = body.indexOf(word);
   assert.ok(index >= 0, `the body holds ${JSON.stringify(word)}`);
   return index;
 };
 
 /** More than a page of pull requests merged before the last release, whose commits are not in the range. */
-const older = (): Pull[] => Array.from({ length: 130 }, (_, i) => merged(1000 + i, ['feature'], `${'0'.repeat(39)}${i % 10}`));
+const older = () => Array.from({ length: 130 }, (_, i) => merged(1000 + i, ['feature'], `${'0'.repeat(39)}${i % 10}`));
 
 const has = (calls: Call[], ...words: string[]) => calls.some((call) => words.every((word) => call.args.includes(word)));
 const named = (calls: Call[], ...words: string[]) => calls.filter((call) => words.every((word) => call.args.includes(word)));

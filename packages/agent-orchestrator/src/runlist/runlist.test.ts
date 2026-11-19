@@ -11,7 +11,7 @@ import { runWatchVersion } from './runlist.ts';
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
 
 /** A Run as a watch reads it, its status `status`. */
-const watched = (status: unknown): WatchedObject => ({
+const watched = (status: unknown) => ({
   apiVersion: 'nemia/v1',
   kind: 'Run',
   metadata: { name: 'r-1', namespace: 'default', creationTimestamp: at(10), resourceVersion: '1' },

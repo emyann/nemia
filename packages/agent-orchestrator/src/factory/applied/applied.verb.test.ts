@@ -75,7 +75,7 @@ const refusedNaming =
     err._tag === tag && err.exitCode === 2 && tokens.every((token) => err.message.includes(token));
 
 /** A repository holding the tests' team as its `workflows/`, in one commit, so a start has a base to record. */
-function repoWithTeam(): string {
+function repoWithTeam() {
   const repo = scratch('wf-applied-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   stand().world.repository(repo, {});
@@ -84,7 +84,7 @@ function repoWithTeam(): string {
 }
 
 /** The tests' team exported as a template, `budget` a parameter of the review step with no default, and `model` one with a default. */
-function template(): { dir: string; repo: string } {
+function template() {
   const repo = repoWithTeam();
   const dir = path.join(scratch('wf-applied-template-'), 'team');
   exportTemplate({ dir, from: repo });
@@ -104,14 +104,14 @@ function template(): { dir: string; repo: string } {
 }
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** Every file under the factories folder, by its path in it, so a refusal is seen to have written nothing. */
-const filed = (): string[] => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
+const filed = () => (fs.existsSync(FACTORIES) ? (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).sort() : []);
 
 /** `nemia factory apply` of the template `dir` as `name`, in the repository `repo`, with `rest` after. */
 const apply = (name: string, dir: string, repo: string, ...rest: string[]) =>
@@ -345,7 +345,7 @@ describe("the controller stamps each condition with when its status last moved, 
 });
 
 /** The status of `name` rewritten as the controller wrote it before it named templates: with no `template`, changed by `change`. */
-function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}): void {
+function unnamed(name: string, change: (status: Record<string, unknown>) => void = () => {}) {
   const { template: _named, ...status } = JSON.parse(fs.readFileSync(statusFile(ROOT, name), 'utf8'));
   change(status);
   fs.writeFileSync(statusFile(ROOT, name), JSON.stringify(status));
@@ -564,7 +564,7 @@ describe("what a templated factory's verbs read and write: its tree's wiring, in
 });
 
 /** The folders the harness's file in `dir` says are trusted, in order. */
-const trustedIn = (dir: string): string[] => {
+const trustedIn = (dir: string) => {
   const file = path.join(dir, '.claude.json');
   if (!fs.existsSync(file)) return [];
   const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };

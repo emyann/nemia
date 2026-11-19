@@ -28,11 +28,11 @@ import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testin
 type LibraryAgent = import('./agents.ts').LibraryAgent;
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
-const agentText = (does: string): string => `---\nharness: claude\n---\n${does}\n`;
+const agentText = (does: string) => `---\nharness: claude\n---\n${does}\n`;
 
 const repoR = scratch('nemia-api-fills-r-');
 const ON_REPO = `repo=${encodeURIComponent(repoR)}`;
@@ -71,9 +71,9 @@ write(path.join(TREE, 'workflows', 'press', 'review.md'), '---\nplace: git\n---\
 write(path.join(TREE, 'workflows', 'agents', 'proof.md'), agentText('You review, as the tree says.'));
 
 /** The agents of the namespace `ns`, every origin's, as the Agents page reads them: in the default factory, on `repoR`. */
-const agents = (ns = 'default'): Promise<LibraryAgent[]> => everyOrigin<LibraryAgent>(app, 'agents', ns, ns === 'default' ? ON_REPO : '');
-const who = (listed: LibraryAgent[]): string[] => listed.map((a) => `${a.from}:${a.name}`);
-const one = (listed: LibraryAgent[], from: string, name: string): LibraryAgent => {
+const agents = (ns = 'default') => everyOrigin<LibraryAgent>(app, 'agents', ns, ns === 'default' ? ON_REPO : '');
+const who = (listed: LibraryAgent[]) => listed.map((a) => `${a.from}:${a.name}`);
+const one = (listed: LibraryAgent[], from: string, name: string) => {
   const found = listed.find((a) => a.from === from && a.name === name);
   assert.ok(found, `${from}:${name} is listed: ${who(listed).join(', ')}`);
   return found;
@@ -175,7 +175,7 @@ test('REFUSED: a step whose `agent:` holds a path separator credits no agent, no
 
 test("a factory's own agent, read in that factory, fills each step the factory hires it into, and names that factory", async () => {
   type Status = { origin: string; fills: unknown[]; factories: string[] };
-  const read = async (url: string): Promise<Status> => {
+  const read = async (url: string) => {
     const res = await app.request(url);
     assert.equal(res.status, 200, url);
     return ((await res.json()) as { status: Status }).status;

@@ -111,6 +111,7 @@ test("each of a card's keys has one meaning, and the Card's spec fields carry th
   assert.deepEqual(Object.keys(CARD_KEY_MEANINGS), [...CARD_KEYS]);
   for (const key of CARD_KEYS) assert.ok(CARD_KEY_MEANINGS[key].length > 0, key);
   const schemas = OpenApi.fromApi(Api).components.schemas as Record<string, any>;
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const resolve = (s: any): any => (s?.$ref ? resolve(schemas[s.$ref.split('/').pop()]) : s);
   const spec = resolve(resolve(schemas['Card']).properties.spec);
   for (const key of ['workflow', 'repo', 'gate', 'model', 'from', 'queued'] as const)

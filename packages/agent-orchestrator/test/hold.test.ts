@@ -91,20 +91,20 @@ const tick = (b: Board, run: Run | string) => stage.runWith(b.e, advanceRun(type
  * The hold on `id` made one that code older than `nemia hold --by` wrote: its file without `by`, which every screen says as the plain
  * `held until <run> lands`.
  */
-const asOlder = (id: string): void => {
+const asOlder = (id: string) => {
   const { by, ...older } = JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { by?: string };
   assert.equal(by, os.userInfo().username, `a hold put with no --by is put by the OS user`);
   fs.writeFileSync(holdFileOf(id), JSON.stringify(older, null, 2));
 };
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   world().repository(repo, { 'README.md': 'readme\n' });
   return repo;
 };
 /** A workflow folder of these files, by name. */
-const folderOf = (prefix: string, files: Record<string, string>): string => {
+const folderOf = (prefix: string, files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, prefix));
   for (const [file, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, file), text);
   return dir;
@@ -150,7 +150,7 @@ const committed = (wt: string, file: string) => {
   world().commit(wt, `add ${file}`);
 };
 /** `branch` merged into `repo`'s checkout and committed, as a person merges a result by hand. */
-const mergedByHand = (repo: string, branch: string): void => {
+const mergedByHand = (repo: string, branch: string) => {
   world().stage(repo, branch);
   world().commit(repo, 'merge');
 };
@@ -194,19 +194,19 @@ const typed = async (t: Finishes, ...argv: string[]) => {
 type Held = { id: string; lifted: boolean; hold: { until: string[]; why?: string; by?: string } };
 
 /** `nemia hold <argv>` on its entry's handler, as the api runs it: what it answers. */
-const holdTyped = async (...argv: string[]): Promise<Held> => (await stage.main(['hold', ...argv])) as Held;
+const holdTyped = async (...argv: string[]) => (await stage.main(['hold', ...argv])) as Held;
 
 /** `nemia <verb>` answered, refused by nothing. */
-const said = async (t: TestContext, ...argv: string[]): Promise<void> => {
+const said = async (t: TestContext, ...argv: string[]) => {
   const { error } = await typed(t, ...argv);
   assert.equal(error, undefined, `nemia ${argv.join(' ')}: ${error?.message}`);
 };
 
 /** `nemia ls <id>` on its entry's handler, as the api runs it: run `id`'s record and its listing, out of what it answers (`RunsListed`). */
-const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+const listed = async (id: string) => {
   const all = (await stage.main(['ls', id])) as RunsListed;
   const listing = listedRow(all, id);
-  return { run: all.runs.find((r) => r.run.id === id)!.run, listing };
+  return { run: all.runs.find((r) => r.run.id === id)!.run, listing } satisfies { run: Run; listing: Listing };
 };
 /**
  * What a run's listing says of its hold: its word (`holdWord`, which says too when every run it names has landed) and whether it is on
@@ -215,14 +215,14 @@ const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
 const holdSaid = ({ run, listing }: { run: Run; listing: Listing }) =>
   listing.holding && { word: holdWord(listing.holding, run.hold), onYou: holdNeedsYou(listing.holding) };
 /** What a run's listing asks of a person, by name (`onYouWords`, `approve <step>` at a gate). */
-const onYou = async (id: string): Promise<string[]> => onYouWords((await listed(id)).listing);
+const onYou = async (id: string) => onYouWords((await listed(id)).listing);
 /** Each step's word and note in a run's listing, as a person reads them beside its name (`shownStatus`, `shownNote`). */
-const stepWords = (listing: Listing): string => JSON.stringify(listing.steps.map((row) => [row.name, shownStatus(row), shownNote(row)]));
+const stepWords = (listing: Listing) => JSON.stringify(listing.steps.map((row) => [row.name, shownStatus(row), shownNote(row)]));
 /**
  * A run's listing asks nothing of anyone and offers no verb: no step waiting on you, no run it waits on that would make it so, nothing to
  * decide, and no `nemia approve|retry|round|accept` in any step's word or note.
  */
-const asksNothing = (listing: Listing): void => {
+const asksNothing = (listing: Listing) => {
   assert.deepEqual([listing.waitingOnYou, listing.waiting, listing.toDecide], [[], [], undefined], stepWords(listing));
   assert.doesNotMatch(stepWords(listing), VERBS);
 };
@@ -241,15 +241,15 @@ const VERBS = /nemia (approve|retry|round|accept) /;
 /** Run `id`'s decision on this file's stage, as the api serves it (`RunDecision`). */
 const decision = async (id: string) => (await decisionOn(stage, id)).decision;
 /** Run `id`'s decision as one text, for what it says and does not say. */
-const decisionText = async (id: string): Promise<string> => JSON.stringify(await decision(id));
+const decisionText = async (id: string) => JSON.stringify(await decision(id));
 /** The looping steps of run `id` out of rounds, waiting on you (`Decided`'s `exhausted`); none where it awaits nobody. */
-const exhaustedOf = async (id: string): Promise<string[]> => {
+const exhaustedOf = async (id: string) => {
   const d = (await decidedOn(stage, id)).decision;
-  return d.kind === 'awaiting' ? d.exhausted : [];
+  return (d.kind === 'awaiting' ? d.exhausted : []) satisfies string[];
 };
 
 /** `text` as a pattern that matches it and nothing else inside a line. */
-const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** A run at its gate on `b`: `implement` signed, `review` held back by the gate. */
 const atItsGate = async (b: Board, repo: string, brief: string) => {
@@ -753,13 +753,13 @@ describe('REFUSED by name at shipped defaults: what `nemia hold` refuses — its
     u = ['hold', id, '--until', target.id];
     return t.end;
   });
-  const holdFiles = (): string[] =>
-    fs.existsSync(path.join(ROOT, 'runs'))
+  const holdFiles = () =>
+    (fs.existsSync(path.join(ROOT, 'runs'))
       ? fs
           .readdirSync(path.join(ROOT, 'runs'))
           .filter((f) => f.includes('.hold'))
           .sort()
-      : [];
+      : []) satisfies string[];
   const rows: Array<[string, () => [string[], string, string[]]]> = [
     ['both', () => [['hold', 'r-x', '--until', 'a', '--off'], 'Invalid', ['nemia hold takes --until or --off, not both']]],
     ['a flag it does not take', () => [['hold', 'r-x', '--after', 'a'], 'Invalid', ['nemia hold does not take --after']]],

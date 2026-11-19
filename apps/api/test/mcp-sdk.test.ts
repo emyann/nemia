@@ -18,10 +18,10 @@ const API = path.join(import.meta.dirname, '..');
 const V1 = '@modelcontextprotocol/sdk';
 
 /** Whether `spec` names the v1 package or a path inside it. */
-const isV1 = (spec: string): boolean => spec === V1 || spec.startsWith(`${V1}/`);
+const isV1 = (spec: string) => spec === V1 || spec.startsWith(`${V1}/`);
 
 /** The modules of the v1 line a piece of source names. */
-const v1In = (text: string): string[] => specifiersIn(text).filter(isV1);
+const v1In = (text: string) => specifiersIn(text).filter(isV1);
 
 test('the scanner refuses a planted import of the v1 SDK', () => {
   assert.deepEqual(v1In("import { Client } from '@modelcontextprotocol/sdk/client/index.js';"), [

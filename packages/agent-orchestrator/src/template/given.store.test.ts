@@ -18,7 +18,7 @@ import { sentTemplatesDir, templateGiven, withTemplateTaken } from './given.stor
 const ROOT = scratch('wf-template-given-');
 
 /** A template's folder named `name` of two files, one executable. */
-function folder(name: string): string {
+function folder(name: string) {
   const at = path.join(scratch('wf-template-given-folder-'), name);
   fs.mkdirSync(path.join(at, 'workflows', 'press'), { recursive: true });
   fs.writeFileSync(path.join(at, 'nemia.yaml'), `kind: FactoryTemplate\nmetadata:\n  name: ${name}\n`);
@@ -30,10 +30,10 @@ function folder(name: string): string {
 const exitOf = <A, E>(effect: Effect.Effect<A, E, StoreRoot>) => Effect.runPromiseExit(Effect.provideService(effect, StoreRoot, ROOT));
 
 /** The archives the store keeps of the templates sent to it. */
-const sent = (): string[] => (fs.existsSync(sentTemplatesDir(ROOT)) ? fs.readdirSync(sentTemplatesDir(ROOT)).sort() : []);
+const sent = () => (fs.existsSync(sentTemplatesDir(ROOT)) ? fs.readdirSync(sentTemplatesDir(ROOT)).sort() : []);
 
 /** The tag of the refusal `exit` failed with. */
-const refusedAs = (exit: Exit.Exit<unknown, unknown>): string | undefined =>
+const refusedAs = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isFailure(exit) ? (exit.cause.reasons[0] as { error?: { _tag?: string } } | undefined)?.error?._tag : undefined;
 
 test("a --template word is made the request's: a name as it is, a folder packed as pack packs it, an archive's bytes; REFUSED: a place that is neither", async () => {

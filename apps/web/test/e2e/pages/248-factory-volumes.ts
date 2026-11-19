@@ -1,4 +1,3 @@
-import type { Factory } from '../../../src/lib/api/factories.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
@@ -13,34 +12,34 @@ const FACTORY = FACTORIES.hiring.name;
 const NONE = 'unmounted';
 
 /** `factory` as the board draws it from the api's Factory and its lines (`factoriesAnswered`): its volumes and the line that adds one. */
-async function listed(page: Page, factory: string): Promise<Factory> {
+async function listed(page: Page, factory: string) {
   const found = (await factoriesAnswered(page)).find((f) => f.name === factory);
   if (!found) throw new Refused(`GET /api/factories answers ${factory} — it answers no factory of that name`);
   return found;
 }
 
 /** Go to `factory`'s settings page and wait for it to settle. */
-async function settingsOf(page: Page, factory: string): Promise<void> {
+async function settingsOf(page: Page, factory: string) {
   await page.goto(new URL(`/factories/${factory}/settings`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Whether `before` is drawn before `after` in the document. */
-const drawnBefore = (page: Page, before: string, after: string): Promise<boolean> =>
+const drawnBefore = (page: Page, before: string, after: string) =>
   page.evaluate(
     ([a, b]) => {
       const [x, y] = [document.querySelector(a), document.querySelector(b)];
       return Boolean(x && y && x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING);
     },
     [before, after],
-  );
+  ) satisfies Promise<boolean>;
 
 /**
  * The Volumes card of FACTORY, given a read-only folder beside its repository: each path in the api's order, its
  * mark, a writable one worked on and a read-only one read, and the api's line that takes each back; drawn after the trust caution's
  * place and before the rules.
  */
-async function expectListed(page: Page, ...given: string[]): Promise<void> {
+async function expectListed(page: Page, ...given: string[]) {
   const { volumes } = await listed(page, FACTORY);
   const paths = volumes.map((v) => v.path);
   if (!given.every((p) => paths.includes(p)) || paths.length !== given.length + 1)
@@ -72,7 +71,7 @@ async function expectListed(page: Page, ...given: string[]): Promise<void> {
 }
 
 /** The card of a factory with no volume: an empty state that shows the api's line to add one. */
-async function expectNone(page: Page): Promise<void> {
+async function expectNone(page: Page) {
   const line = (await listed(page, NONE)).commands.volume;
   await settingsOf(page, NONE);
   const empty = page.locator(`[data-factory-volumes="${NONE}"] [data-no-volumes]`);
@@ -85,7 +84,7 @@ async function expectNone(page: Page): Promise<void> {
  * The form of FACTORY's card: `folder` typed, read only picked and Add pressed gives it, drawn as a row marked `:ro`; its Remove takes
  * it back, its row gone, the api answering the factory without it.
  */
-async function expectAddedThenRemoved(page: Page, folder: string): Promise<void> {
+async function expectAddedThenRemoved(page: Page, folder: string) {
   await settingsOf(page, FACTORY);
   const card = page.locator(`[data-factory-volumes="${FACTORY}"]`);
   await card.getByRole('textbox', { name: 'Path or git URL' }).fill(folder);

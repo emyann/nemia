@@ -32,7 +32,7 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 type Step = RunDetail['steps'][number];
 
 /** A step as a run's detail gives it, saying `word` with its codes, cut to what these read. */
-const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
+const step = (name: string, word: Word, over: Partial<Step> = {}) =>
   ({
     name,
     ...coded(word),

@@ -70,80 +70,81 @@ export type AsyncRunner = {
  * An `AsyncRunner` as the engine's verbs. A rejected `spawn` is not taken as proof that nothing started: it is a
  * refusal (`refused`) only when the error it rejects with says `refused: true`.
  */
-export const asyncOps = (h: AsyncRunner): RunnerOps => ({
-  spawn: (r: SpawnRequest) =>
-    Effect.tryPromise({
-      try: () => h.spawn(r),
-      catch: (cause) =>
-        new RunnerError({
-          verb: 'spawn',
-          message: cause instanceof Error ? cause.message : String(cause),
-          ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
-        }),
-    }),
-  observe: wrap(
-    () => h.observe(),
-    (m) => new RunnerError({ verb: 'observe', message: m }),
-  ).pipe(Effect.flatMap(inNames)),
-  ...(h.find
-    ? {
-        find: (name: string) =>
-          wrap(
-            () => h.find!(name),
-            (m) => new RunnerError({ verb: 'find', message: m }),
-          ),
-      }
-    : {}),
-  stop: (id: string) =>
-    wrap(
-      () => h.stop(id),
-      (m) => new RunnerError({ verb: 'stop', message: m }),
-    ),
-  logs: (id: string) =>
-    wrap(
-      () => h.logs(id),
-      (m) => new RunnerError({ verb: 'logs', message: m }),
-    ),
-  ...(h.output
-    ? {
-        output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
-          wrap(
-            () => h.output!(name, stream, lastBytes),
-            (m) => new RunnerError({ verb: 'output', message: m }),
-          ),
-      }
-    : {}),
-  ...(h.release
-    ? {
-        release: (session: Sighting, task: { worktree?: string | boolean }) =>
-          wrap(
-            () => h.release!(session, task),
-            (m) => new RunnerError({ verb: 'release', message: m }),
-          ).pipe(Effect.map((used) => used || undefined)),
-      }
-    : {}),
-  ...(h.transcript
-    ? {
-        transcript: (id: string, after?: TranscriptCursor) =>
-          wrap(
-            () => h.transcript!(id, after),
-            (m) => new RunnerError({ verb: 'transcript', message: m }),
-          ),
-      }
-    : {}),
-  ...(h.say
-    ? {
-        say: (session: { name: string; sessionId: string }, text: string) =>
-          wrap(
-            () => h.say!(session, text),
-            (m) => new RunnerError({ verb: 'say', message: m }),
-          ),
-      }
-    : {}),
-});
+export const asyncOps = (h: AsyncRunner) =>
+  ({
+    spawn: (r: SpawnRequest) =>
+      Effect.tryPromise({
+        try: () => h.spawn(r),
+        catch: (cause) =>
+          new RunnerError({
+            verb: 'spawn',
+            message: cause instanceof Error ? cause.message : String(cause),
+            ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+          }),
+      }),
+    observe: wrap(
+      () => h.observe(),
+      (m) => new RunnerError({ verb: 'observe', message: m }),
+    ).pipe(Effect.flatMap(inNames)),
+    ...(h.find
+      ? {
+          find: (name: string) =>
+            wrap(
+              () => h.find!(name),
+              (m) => new RunnerError({ verb: 'find', message: m }),
+            ),
+        }
+      : {}),
+    stop: (id: string) =>
+      wrap(
+        () => h.stop(id),
+        (m) => new RunnerError({ verb: 'stop', message: m }),
+      ),
+    logs: (id: string) =>
+      wrap(
+        () => h.logs(id),
+        (m) => new RunnerError({ verb: 'logs', message: m }),
+      ),
+    ...(h.output
+      ? {
+          output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
+            wrap(
+              () => h.output!(name, stream, lastBytes),
+              (m) => new RunnerError({ verb: 'output', message: m }),
+            ),
+        }
+      : {}),
+    ...(h.release
+      ? {
+          release: (session: Sighting, task: { worktree?: string | boolean }) =>
+            wrap(
+              () => h.release!(session, task),
+              (m) => new RunnerError({ verb: 'release', message: m }),
+            ).pipe(Effect.map((used) => used || undefined)),
+        }
+      : {}),
+    ...(h.transcript
+      ? {
+          transcript: (id: string, after?: TranscriptCursor) =>
+            wrap(
+              () => h.transcript!(id, after),
+              (m) => new RunnerError({ verb: 'transcript', message: m }),
+            ),
+        }
+      : {}),
+    ...(h.say
+      ? {
+          say: (session: { name: string; sessionId: string }, text: string) =>
+            wrap(
+              () => h.say!(session, text),
+              (m) => new RunnerError({ verb: 'say', message: m }),
+            ),
+        }
+      : {}),
+  }) satisfies RunnerOps;
 
 /** What an `AsyncRunner` observed, every state in A2A's names — or refused, naming the session and the words it takes. */
-const inNames = (seen: Map<string, AsyncSighting>): Effect.Effect<Map<string, Sighting>, RunnerError> => {
+const inNames = (seen: Map<string, AsyncSighting>) => {
   const out = new Map<string, Sighting>();
   for (const [name, s] of seen) {
     const state = isSessionState(s.state) ? s.state : formerStateOf(s.state);
@@ -153,11 +154,11 @@ const inNames = (seen: Map<string, AsyncSighting>): Effect.Effect<Map<string, Si
           verb: 'observe',
           message: `the harness reported session \`${name}\` as \`${String(s.state)}\`, which is no session state: report one of A2A's, ${SESSION_STATES.join(', ')} (or a former word, working, blocked, done, failed, stopped).`,
         }),
-      );
+      ) satisfies Effect.Effect<Map<string, Sighting>, RunnerError>;
     }
     out.set(name, { ...s, state });
   }
-  return Effect.succeed(out);
+  return Effect.succeed(out) satisfies Effect.Effect<Map<string, Sighting>, RunnerError>;
 };
 
 /** A Promise a fake answers becomes an Effect with the engine's error type on it. */
@@ -173,24 +174,25 @@ export type AsyncJournal = {
 };
 
 /** An `AsyncJournal` as a store of whole events: each rejection a `JournalError`, on the task it was asked of, or `*`. */
-export const asyncStore = (j: AsyncJournal): Exclude<StoreOps, BodiedJournalOps> => ({
-  append: (taskId, event) =>
-    wrap(
-      () => j.append(taskId, event),
-      (m) => new JournalError({ taskId, message: m }),
-    ),
-  read: (taskId) =>
-    wrap(
-      () => j.read(taskId),
-      (m) => new JournalError({ taskId, message: m }),
-    ),
-  list: wrap(
-    () => j.list(),
-    (m) => new JournalError({ taskId: '*', message: m }),
-  ),
-  feed: (after) =>
-    wrap(
-      () => j.feed(after),
+export const asyncStore = (j: AsyncJournal) =>
+  ({
+    append: (taskId, event) =>
+      wrap(
+        () => j.append(taskId, event),
+        (m) => new JournalError({ taskId, message: m }),
+      ),
+    read: (taskId) =>
+      wrap(
+        () => j.read(taskId),
+        (m) => new JournalError({ taskId, message: m }),
+      ),
+    list: wrap(
+      () => j.list(),
       (m) => new JournalError({ taskId: '*', message: m }),
     ),
-});
+    feed: (after) =>
+      wrap(
+        () => j.feed(after),
+        (m) => new JournalError({ taskId: '*', message: m }),
+      ),
+  }) satisfies Exclude<StoreOps, BodiedJournalOps>;

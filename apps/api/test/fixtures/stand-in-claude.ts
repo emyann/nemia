@@ -25,7 +25,7 @@ const mode = process.env.STANDIN_MODE;
 const calls = process.env.STANDIN_CALLS;
 
 /** What it answered, noted where the seat gave it a file to note on; a session the seat did not spawn through its `claude` has none. */
-const note = (line: string): void => {
+const note = (line: string) => {
   if (calls !== undefined) fs.appendFileSync(calls, `${line}\n`);
 };
 
@@ -34,15 +34,15 @@ if (mode !== undefined && fs.readFileSync(mode, 'utf8').trim() === 'exit') {
   process.exit(3);
 }
 
-const print = (line: object): void => void process.stdout.write(`${JSON.stringify(line)}\n`);
+const print = (line: object) => void process.stdout.write(`${JSON.stringify(line)}\n`);
 
 /**
  * The whole control response the seat recorded for a usage request, under `id`, the request's own, as one line: a text left without a
  * line break of its own gains one, since the SDK reads its child's stdout line by line.
  */
-const usageAnswered = (id: string): string => {
+const usageAnswered = (id: string) => {
   const text = fs.readFileSync(answer, 'utf8').replaceAll('@ID@', id);
-  return text.endsWith('\n') ? text : `${text}\n`;
+  return (text.endsWith('\n') ? text : `${text}\n`);
 };
 
 let answered = 0;
@@ -68,11 +68,11 @@ const sessionId = argv.find((a) => a.startsWith('--resume='))?.slice('--resume='
 const SAID = ['Half ', 'a thought'];
 
 /** One `stream_event` line, as `claude -p --include-partial-messages` prints it. */
-const streamEvent = (event: object): void =>
+const streamEvent = (event: object) =>
   print({ type: 'stream_event', uuid: `stream-${sessionId}`, session_id: sessionId, parent_tool_use_id: null, event });
 
 /** Waits until `file` appears in the stand-in's folder, and takes it, so a second turn waits for its own. */
-const appears = async (file: string): Promise<void> => {
+const appears = async (file: string) => {
   const at = path.join(process.env.STANDIN_DIR ?? '.', file);
   for (;;) {
     if (fs.existsSync(at)) {
@@ -84,7 +84,7 @@ const appears = async (file: string): Promise<void> => {
 };
 
 /** What it said, written as a line of Claude Code's own transcript, where a follow and `transcript` read it. */
-const wrote = (): void => {
+const wrote = () => {
   const at = path.join(process.env.CLAUDE_CONFIG_DIR ?? '', 'projects', 'stand-in');
   fs.mkdirSync(at, { recursive: true });
   fs.appendFileSync(
@@ -99,7 +99,7 @@ const wrote = (): void => {
 };
 
 /** One turn of the plan: the session begun, its text written in two pieces, its transcript line, and the result that ends the turn. */
-const work = async (): Promise<void> => {
+const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   if (plan!.stream && argv.includes('--include-partial-messages')) {
     streamEvent({ type: 'message_start', message: { id: `msg_${sessionId}` } });

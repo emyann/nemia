@@ -72,7 +72,7 @@ const stage = staged({ runWith, main: onHandler, engineOf, env: ENV });
 type World = { layer: Layer.Layer<never>; subs: SubscriptionDoorShape; feed: FeedDoorShape };
 
 /** The world over `layer`: its doors yielded once, so the story's reads and writes are on the very doors its programs are given. */
-const worldOf = (layer: Layer.Layer<never>): World => {
+const worldOf = (layer: Layer.Layer<never>) => {
   const [subs, feed] = Effect.runSync(
     Effect.provide(
       Effect.gen(function* () {
@@ -81,48 +81,48 @@ const worldOf = (layer: Layer.Layer<never>): World => {
       layer,
     ),
   );
-  return { layer, subs, feed };
+  return { layer, subs, feed } satisfies World;
 };
 
 /** A store of a story's own, in memory: the doors' memory layers, made new, holding no subscription and no feed. */
-const inMemory = (): World => worldOf(Layer.mergeAll(subscriptionDoorMemory(), feedDoorMemory()));
+const inMemory = () => worldOf(Layer.mergeAll(subscriptionDoorMemory(), feedDoorMemory())) satisfies World;
 
 /**
  * The store on the files at `ROOT`, the root the file's synchronous spellings are handed and every deliverer's `StoreRoot`: for what only
  * a file can hold.
  */
-const onFiles = (): World => worldOf(Layer.mergeAll(subscriptionDoorFiles(ROOT), feedDoorFiles(ROOT)));
+const onFiles = () => worldOf(Layer.mergeAll(subscriptionDoorFiles(ROOT), feedDoorFiles(ROOT))) satisfies World;
 
 /** An act of a door, run at once: a refusal thrown as it is. */
-const done = <A>(act: Effect.Effect<A, unknown>): A => Effect.runSync(act);
+const done = <A>(act: Effect.Effect<A, unknown>) => Effect.runSync(act) satisfies A;
 
 /** Where `w`'s feed ends: the cursor after its last byte, 0 for a feed not written. */
-const feedSize = (w: World): number => done(w.feed.lines.end())?.cursor ?? 0;
+const feedSize = (w: World) => done(w.feed.lines.end())?.cursor ?? 0;
 
 /** `lines` written at the end of `w`'s feed, as the tick writes them. */
-const appended = (w: World, ...lines: object[]): void => void done(w.feed.lines.append(lines as FeedLine[]));
+const appended = (w: World, ...lines: object[]) => void done(w.feed.lines.append(lines as FeedLine[]));
 
 /** Where the deliverer is with the subscription `name` of `w`, or undefined. */
-const readDelivery = (w: World, name: string): KeptDelivery | undefined => {
+const readDelivery = (w: World, name: string) => {
   const read = done(w.subs.deliveries.read(SubscriptionName.read(name)));
-  return read !== null && 'kept' in read ? read.kept : undefined;
+  return (read !== null && 'kept' in read ? read.kept : undefined) satisfies KeptDelivery | undefined;
 };
 
 /** Where the deliverer is with the subscription `name` of `w`, written by the story as a deliverer gone would have left it. */
-const writeDelivery = (w: World, name: string, delivery: KeptDelivery): void =>
+const writeDelivery = (w: World, name: string, delivery: KeptDelivery) =>
   done(w.subs.deliveries.write(SubscriptionName.read(name), delivery));
 
 /** The names of `w`'s subscriptions. */
-const listedIn = (w: World): string[] => done(w.subs.subscriptions.list()).listed.map((s) => s.name);
+const listedIn = (w: World) => done(w.subs.subscriptions.list()).listed.map((s) => s.name) satisfies string[];
 
 /** The subscription `name` taken away from `w`, as a story does between deliverers. */
-const dropSubscription = (w: World, name: string): void => done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
+const dropSubscription = (w: World, name: string) => done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
 
 /**
  * The command line `argv` of `command` read and checked as the CLI reads it, decoded through its `input`, then handed to its handler over
  * the stage's engine on `w`.
  */
-const typed = async (w: World, command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]): Promise<unknown> => {
+const typed = async (w: World, command: typeof SUBSCRIBE | typeof UNSUBSCRIBE, argv: string[]) => {
   const args = parseArgv(command.spec, argv);
   assert.ok(args, `${argv.join(' ')} reads`);
   assert.equal(command.check?.(args) ?? null, null, `${argv.join(' ')} is refused by no check`);
@@ -159,42 +159,43 @@ const engineFor = () => {
 };
 
 /** A long-lived task at work on the stand-in, as a subscription is put for: filed `restartPolicy: Always`, its attempt started. */
-const longLived = async (id: string): Promise<string> => {
+const longLived = async (id: string) => {
   await Effect.runPromise(stage.board().e.file({ id, brief: `the task ${id}`, cwd: ROOT, restartPolicy: 'Always' }));
   stage.board().settle(id, 'working');
   return id;
 };
 
 /** What the task `id` was told, in order: each message the stand-in's `say` took. */
-const toldTo = (id: string): string[] =>
+const toldTo = (id: string) =>
   stage
     .board()
     .said.filter((s) => s.taskId === id)
-    .map((s) => s.text);
+    .map((s) => s.text) satisfies string[];
 
 /** The lines of a message told, each a line of the feed, between its heading and the digest riding it. */
-const wakesIn = (message: string): string[] => message.split('\n\n')[0].split('\n').slice(1);
+const wakesIn = (message: string) => message.split('\n\n')[0].split('\n').slice(1) satisfies string[];
 
 /** The fields of each line of a message after its time, joined by a space. */
-const fieldsOf = (message: string, from = 2, to?: number): string[] => wakesIn(message).map((l) => l.split('  ').slice(from, to).join(' '));
+const fieldsOf = (message: string, from = 2, to?: number) =>
+  wakesIn(message).map((l) => l.split('  ').slice(from, to).join(' ')) satisfies string[];
 
 /** A line of the feed about `run`, at its `build` step. */
 const line = (run: string, word: string) => ({ at: new Date().toISOString(), run, step: 'build', word });
 
 /** A gate's two lines at one instant, as the tick writes them: the run's, waiting on a person, then its step's at `land`. */
-const gate = (run: string): object[] => {
+const gate = (run: string) => {
   const at = new Date().toISOString();
   return [
     { at, run, word: 'awaiting approval', note: 'waiting on you: approve land' },
     { at, run, step: 'land', word: 'awaiting approval', note: `approve it: nemia approve ${run} land` },
-  ];
+  ] satisfies object[];
 };
 
 /**
  * `subscription` put under `name` on `w` for test `t`, and dropped once it ends, whatever its verdict, unless the test dropped it: a test
  * on the files that fails leaves no subscription for the next one's deliverer to follow.
  */
-const kept = (t: Finishes, w: World, name: string, subscription: Subscription): void => {
+const kept = (t: Finishes, w: World, name: string, subscription: Subscription) => {
   done(w.subs.subscriptions.put(SubscriptionName.read(name), subscription));
   t.onTestFinished(() => {
     if (listedIn(w).includes(name)) done(w.subs.subscriptions.drop(SubscriptionName.read(name)));
@@ -202,14 +203,14 @@ const kept = (t: Finishes, w: World, name: string, subscription: Subscription): 
 };
 
 /** A subscription of `task`'s on `w` for test `t`, by the default selector, from the feed's end, which it answers (`kept`). */
-const subscribed = (t: Finishes, w: World, name: string, task: string): number => {
+const subscribed = (t: Finishes, w: World, name: string, task: string) => {
   const from = feedSize(w);
   kept(t, w, name, { task, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
   return from;
 };
 
 /** The digest checks the deliverers have done. */
-const digestChecks = (): number => Effect.runSync(Metric.value(SUBSCRIPTION_DIGEST_CHECKS)).count;
+const digestChecks = () => Effect.runSync(Metric.value(SUBSCRIPTION_DIGEST_CHECKS)).count;
 
 /**
  * The deliverer over `e` on `w`'s doors and the stage's clock, in a runtime of `rt`'s where one is given: started, and stopped once test
@@ -863,7 +864,7 @@ describe(
  * Of a test file's `source`: how many subscriptions it puts through a door outside its helper `kept`, and whether `kept` drops what it
  * put in a `t.onTestFinished`. Refuses a source with no `kept` before its `subscribed`.
  */
-const unkept = (source: string): { puts: number; drops: boolean } => {
+const unkept = (source: string) => {
   const begin = source.indexOf('const kept = ');
   const end = source.indexOf('const subscribed = ', begin);
   assert.ok(begin >= 0 && end > begin, 'the helper kept, then subscribed, in the file');
@@ -872,7 +873,7 @@ const unkept = (source: string): { puts: number; drops: boolean } => {
   return {
     puts: outside.match(/subscriptions\s*\.\s*put\s*\(/g)?.length ?? 0,
     drops: /t\.onTestFinished\(\s*\(\)\s*=>\s*\{[^}]*subscriptions\s*\.\s*drop\(\s*SubscriptionName\.read\(\s*name\s*\)\s*\)/.test(body),
-  };
+  } satisfies { puts: number; drops: boolean };
 };
 
 test('REFUSED: every subscription a story here puts is put through kept, which drops it once the test ends, whatever its verdict', () => {

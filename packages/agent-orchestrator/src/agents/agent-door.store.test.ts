@@ -107,7 +107,7 @@ const OWN = [
 const PKG = path.join(import.meta.dirname, '..', '..');
 
 /** Every file of `src` but the tests and the stores, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
+const sourcesOfSrc = () => sourcesUnder(PKG, 'src', OWN);
 
 /**
  * A call of a `SEAM` name, not a method of the same name (`x.loadAgents(`). `src`'s count passes over a spread call too
@@ -120,7 +120,7 @@ const SPREAD_TOO = `(?<![\\w$]|[^.]\\.)(?:${SEAM.join('|')})\\s*\\(`;
  * Each file of `sources` that calls the agent and skill stores rather than yielding the doors, with how many times: a refusal, since every
  * caller is converted and none may come back.
  */
-function seamRefusals(sources: Record<string, string>, calls = SEAM_CALL): string[] {
+function seamRefusals(sources: Record<string, string>, calls = SEAM_CALL) {
   return [...usesOf(sources, new RegExp(calls, 'g'))].map(
     ([file, n]) => `${file} calls the agent and skill stores ${n} time(s): yield AgentDoor or SkillDoor instead`,
   );
@@ -139,7 +139,7 @@ test('REFUSED: a file that calls a store again', () => {
 const API = path.join(PKG, '..', '..', 'apps', 'api');
 
 /** Every file of the api's `src` but its tests, by its path from the api. */
-const sourcesOfApi = (): Record<string, string> => sourcesUnder(API, 'src');
+const sourcesOfApi = () => sourcesUnder(API, 'src');
 
 test("no file of the api's src calls the agent and skill stores: its handlers read them through AgentDoor and SkillDoor, its debt none", () => {
   assert.deepEqual(seamRefusals(sourcesOfApi(), SPREAD_TOO), []);

@@ -21,30 +21,34 @@ const TASK = 't-1';
 const V1 = '/store/releases/v1.2.0/packages/agent-runtime';
 const V2 = '/store/releases/v1.3.0/packages/agent-runtime';
 
-const inFlight = (...more: Event[]): Event[] => [
-  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-  ...more,
-];
-const imaged = (image?: string, harnessVersion?: string, attempt = 1): Event => ({
-  kind: 'image',
-  at: at(10),
-  attempt,
-  ...(image ? { image } : {}),
-  ...(harnessVersion ? { harnessVersion } : {}),
-});
-const seen = (image?: string, harnessVersion?: string): Sighting => ({
-  sessionId: 's1',
-  state: 'working',
-  ...(image ? { image } : {}),
-  ...(harnessVersion ? { harnessVersion } : {}),
-});
+const inFlight = (...more: Event[]) =>
+  [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    ...more,
+  ] satisfies Event[];
+const imaged = (image?: string, harnessVersion?: string, attempt = 1) =>
+  ({
+    kind: 'image',
+    at: at(10),
+    attempt,
+    ...(image ? { image } : {}),
+    ...(harnessVersion ? { harnessVersion } : {}),
+  }) satisfies Event;
+const seen = (image?: string, harnessVersion?: string) =>
+  ({
+    sessionId: 's1',
+    state: 'working',
+    ...(image ? { image } : {}),
+    ...(harnessVersion ? { harnessVersion } : {}),
+  }) satisfies Sighting;
 const ended: Event = { kind: 'ended', at: at(30), attempt: 1, sessionId: 's1', observed: 'succeeded', reason: 'harness' };
 /** An `image` entry naming the mode `ranIn`, and the code `image` where given. */
-const moded = (ranIn: string, image?: string): Event => ({ kind: 'image', at: at(10), attempt: 1, ...(image ? { image } : {}), ranIn });
+const moded = (ranIn: string, image?: string) =>
+  ({ kind: 'image', at: at(10), attempt: 1, ...(image ? { image } : {}), ranIn }) satisfies Event;
 /** An end that says the mode `ranIn`. */
-const endedIn = (ranIn: string): Event => ({ ...ended, kind: 'ended', ranIn });
+const endedIn = (ranIn: string) => ({ ...ended, kind: 'ended', ranIn }) satisfies Event;
 
 describe('imageFacts: the code and harness version of an attempt in flight, journalled whenever its sighting says other than the record', () => {
   test('IMAGE: an unended attempt sighted with both is written one image entry with both', () => {

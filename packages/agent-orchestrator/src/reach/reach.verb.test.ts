@@ -34,7 +34,7 @@ const stage = staged({ runWith, main, engineOf, env: ENV });
 const door = eachTest(runDoorMemory);
 
 /** A repository whose `workflows/` holds the tests' team and `plain`, one gated step with no check. */
-function repoWithWorkflows(): string {
+function repoWithWorkflows() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const workflows = path.join(repo, 'workflows');
   fs.cpSync(TEAM, workflows, { recursive: true });
@@ -48,7 +48,7 @@ const reach = (args: Record<string, unknown>) =>
   stage.runWith(stage.board().e, Effect.provide(POLICY_REACH.handler({ name: 'nemia', ...args }), door()));
 
 /** The kind a read is refused with. */
-const refusedKind = async (args: Record<string, unknown>): Promise<string> => {
+const refusedKind = async (args: Record<string, unknown>) => {
   try {
     await reach(args);
   } catch (err) {

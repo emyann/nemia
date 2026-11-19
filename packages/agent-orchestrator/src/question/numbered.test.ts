@@ -40,7 +40,7 @@ const asked: Asked[] = [
 const questions = asked.flatMap((a) => a.questions);
 
 /** What `numberedAnswers` says refusing `typed`, or a failure where it resolves them. */
-const unresolved = (typed: string[]): string => {
+const unresolved = (typed: string[]) => {
   const read = numberedAnswers(questions, typed, 'nemia decide r-1');
   assert.ok(!Array.isArray(read), `${JSON.stringify(typed)} was resolved: ${JSON.stringify(read)}`);
   return read.error;

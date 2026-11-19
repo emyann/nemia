@@ -14,21 +14,21 @@ if (process.env.HKB_TEST_STARTS) fs.appendFileSync(process.env.HKB_TEST_STARTS, 
 type Message = { id?: number | string; method?: string };
 
 /** What this server answers `message` with, or nothing where it is a notification. */
-const answerOf = (message: Message): object | undefined => {
-  if (message.id === undefined) return undefined;
+const answerOf = (message: Message) => {
+  if (message.id === undefined) return undefined satisfies object | undefined;
   if (message.method === 'initialize')
-    return {
+    return ({
       jsonrpc: '2.0',
       id: message.id,
       result: { protocolVersion: '2025-11-25', capabilities: { tools: {} }, serverInfo: { name: 'fixture-legacy', version: '1.0.0' } },
-    };
+    }) satisfies object | undefined;
   if (message.method === 'tools/list')
-    return {
+    return ({
       jsonrpc: '2.0',
       id: message.id,
       result: { tools: [{ name: 'recall', description: 'Say what was.', inputSchema: { type: 'object' } }] },
-    };
-  return { jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `Method not found: ${message.method}` } };
+    }) satisfies object | undefined;
+  return ({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `Method not found: ${message.method}` } }) satisfies object | undefined;
 };
 
 readline.createInterface({ input: process.stdin }).on('line', (line) => {

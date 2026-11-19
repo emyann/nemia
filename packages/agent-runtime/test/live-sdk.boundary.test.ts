@@ -61,7 +61,7 @@ import { CLAUDE_AUTO_DROPPED, fenceReach } from '../src/vocabulary.ts';
 const skip = process.env.AE_LIVE === '1' ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 
 /** `what` handed over where the step that runs this has a files directory, so its reader is not this test's stdout alone. */
-const handOver = (file: string, what: string): void => {
+const handOver = (file: string, what: string) => {
   const dir = process.env.WF_ARTIFACTS;
   if (dir) fs.writeFileSync(path.join(dir, file), what);
 };
@@ -125,14 +125,14 @@ test.skipIf(skip)(
  * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
  */
 type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string; permissionMode?: string };
-const linesOf = (out: string): Line[] =>
+const linesOf = (out: string) =>
   out.split('\n').flatMap((text) => {
     try {
       return [JSON.parse(text) as Line];
     } catch {
       return [];
     }
-  });
+  }) satisfies Line[];
 
 const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-claude-job.ts');
 
@@ -140,14 +140,14 @@ const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin',
  * Runs the process the worker spawns for a step, `bin/ae-claude-job.ts`, on `config` and the SDK's own Claude Code (no
  * `AE_CLAUDE_EXECUTABLE`), and keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`).
  */
-const jobRun = async (name: string, config: object): Promise<{ stdout: string; code: number | null; err: string }> => {
+const jobRun = async (name: string, config: object) => {
   const dir = scratch('ae-live-sdk-bin-');
   const at = path.join(dir, 'spawn.request.json');
   const brief = 'Answer with the single word ok. Do nothing else.';
   fs.writeFileSync(at, JSON.stringify({ request: { name, brief, cwd: dir, config }, io: {} }));
   const env = { ...process.env };
   delete env.AE_CLAUDE_EXECUTABLE;
-  return new Promise((done) => {
+  return new Promise<{ stdout: string; code: number | null; err: string }>((done) => {
     const child = spawn(process.execPath, [BIN, at], { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     let errs = '';
@@ -161,7 +161,8 @@ const jobRun = async (name: string, config: object): Promise<{ stdout: string; c
   });
 };
 
-const initOf = (stdout: string): Line | undefined => linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init');
+const initOf = (stdout: string) =>
+  linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init') satisfies Line | undefined;
 
 test.skipIf(skip)(
   "a step's job process, asked for `opus`, says on its `init` line the model and the Claude Code it started on, and its reader records that model",

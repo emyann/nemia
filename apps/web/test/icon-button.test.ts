@@ -17,7 +17,7 @@ const OPENING = /<IconButton(?![\w$])/g;
 const RENAMED = /\bIconButton\s+as\s+[\w$]+/;
 
 /** The text of the opening tag that starts at `from`, up to its closing `>` outside every brace and quote. */
-function tagAt(text: string, from: number): string {
+function tagAt(text: string, from: number) {
   let depth = 0;
   let quote = '';
   for (let i = from + 1; i < text.length; i++) {
@@ -33,7 +33,7 @@ function tagAt(text: string, from: number): string {
 }
 
 /** Where `text` first draws an icon button with no colour style, or imports one renamed, as `line:column` and why; or null. */
-export function unstyledAt(text: string): string | null {
+export function unstyledAt(text: string) {
   const where = (index: number, why: string) => {
     const before = text.slice(0, index).split('\n');
     return `${before.length}:${before.at(-1)!.length + 1} (${why})`;
@@ -47,7 +47,7 @@ export function unstyledAt(text: string): string | null {
 }
 
 /** Every file of `root`'s `src` outside the kit that draws an icon button with no colour style, as its path from `root` and where. */
-export function unstyledIn(root: string): string[] {
+export function unstyledIn(root: string) {
   return fs
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx)$/.test(e.name))

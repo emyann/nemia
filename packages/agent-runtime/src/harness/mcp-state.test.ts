@@ -43,7 +43,7 @@ const asking = (said: readonly McpServerStatus[] | Error) => {
   return { ask, opened, at };
 };
 
-const statusOf = (name: string, status: McpServerStatus['status'], more: Partial<McpServerStatus> = {}): McpServerStatus => ({
+const statusOf = (name: string, status: McpServerStatus['status'], more: Partial<McpServerStatus> = {}) => ({
   name,
   status,
   ...more,

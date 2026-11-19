@@ -18,38 +18,40 @@ import type { KeptDelivery, Subscription } from '../src/subscription/subscriptio
 type Walk = DoorWalk<SubscriptionDoorShape>;
 type Door = SubscriptionDoorShape;
 
-const nameOf = (name: string): SubscriptionName => SubscriptionName.read(name);
+const nameOf = (name: string) => SubscriptionName.read(name) satisfies SubscriptionName;
 
 /** A subscription as `nemia subscribe` puts one. */
-export const aSubscription = (task = 'nemia-1', more: Partial<Subscription> = {}): Subscription => ({
-  task,
-  selectors: ['reason=Blocked'],
-  digestEvery: 60,
-  from: 120,
-  ...more,
-});
+export const aSubscription = (task = 'nemia-1', more: Partial<Subscription> = {}) =>
+  ({
+    task,
+    selectors: ['reason=Blocked'],
+    digestEvery: 60,
+    from: 120,
+    ...more,
+  }) satisfies Subscription;
 
 const AT = '2026-10-05T12:00:00.000Z';
 
 /** A delivery as the deliverer keeps one: a run's line and a step's folded, from the time the first was. */
-export const aDelivery = (cursor = 300, task = 'nemia-1'): KeptDelivery => ({
-  of: { task, from: 120 },
-  cursor,
-  digest: [
-    upgraded({ at: AT, run: 'r-1', word: 'running' }),
-    upgraded({ at: AT, run: 'r-1', step: 'plan', word: 'awaiting approval' }),
-  ] as FeedLine[],
-  since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
-});
+export const aDelivery = (cursor = 300, task = 'nemia-1') =>
+  ({
+    of: { task, from: 120 },
+    cursor,
+    digest: [
+      upgraded({ at: AT, run: 'r-1', word: 'running' }),
+      upgraded({ at: AT, run: 'r-1', step: 'plan', word: 'awaiting approval' }),
+    ] as FeedLine[],
+    since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
+  }) satisfies KeptDelivery;
 
 /** `name` put on `door`. */
-const put = (door: Door, name: string, subscription = aSubscription()): void => done(door.subscriptions.put(nameOf(name), subscription));
+const put = (door: Door, name: string, subscription = aSubscription()) => done(door.subscriptions.put(nameOf(name), subscription));
 
 /** The names of the subscriptions `door` lists. */
-const listed = (door: Door): string[] => done(door.subscriptions.list()).listed.map((s) => s.name);
+const listed = (door: Door) => done(door.subscriptions.list()).listed.map((s) => s.name) satisfies string[];
 
 /** The names of the deliveries `door` holds. */
-const delivered = (door: Door): string[] => done(door.deliveries.list());
+const delivered = (door: Door) => done(door.deliveries.list()) satisfies string[];
 
 export const SUBSCRIPTION_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   'subscriptions.list': [

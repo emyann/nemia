@@ -39,21 +39,22 @@ describe('filedAllows', () => {
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
 const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'base', gate: true, check: 'npm test' };
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
-const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
-  ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
-  steps: {
-    implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
-    ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
-  },
-});
+const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) =>
+  ({
+    ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
+    steps: {
+      implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
+      ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
+    },
+  }) satisfies Run;
 const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], tip: 'base000' };
 const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], tip: 'merged0', landedBy: 'merged0' };
 const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], tip: 'base000' };
 const CALLED_OFF = { cancelledAt: '2026-01-01T01:00:00Z' };
 /** The run `r` with ship's check unfiled where `check` is not given: its record has none. */
-const filedTo = (r: Run, check: TaskPhase | undefined): Run => {
+const filedTo = (r: Run, check: TaskPhase | undefined) => {
   const { check: _filed, ...unfiled } = r.steps.ship;
-  return check ? r : { ...r, steps: { ...r.steps, ship: unfiled } };
+  return (check ? r : { ...r, steps: { ...r.steps, ship: unfiled } }) satisfies Run;
 };
 /** `landingDue` of `r`, ship's own status `own`, its phase and its check's, the checkout read as `merge` (or by `read`). */
 const due = (
@@ -77,13 +78,14 @@ const due = (
     read,
   );
 /** A read of the checkout that fails the test: where `landingDue` must not ask git at all. */
-const UNREAD = (): MergeState => {
+const UNREAD = () => {
   throw new Error('the checkout was read');
 };
 const abort = (why: string) => ({ act: 'abort', why });
 const record = (landed: object) => ({ act: 'record', landed });
 const ENDED = ['blocked', 'unsigned', 'failed', 'stopped', 'denied', 'budget exhausted'] as const;
-const phaseOfEnded = (own: (typeof ENDED)[number]): TaskPhase => (own === 'failed' || own === 'stopped' ? own : 'succeeded');
+const phaseOfEnded = (own: (typeof ENDED)[number]) =>
+  (own === 'failed' || own === 'stopped' ? own : ('succeeded' as const)) satisfies TaskPhase;
 
 describe('landingDue commits, aborts, waits or records', () => {
   test('commits only a merge that is ours, clean and whole, on a check that passed, with a message', () => {
@@ -174,16 +176,22 @@ describe('landingDue commits, aborts, waits or records', () => {
       () => due(atLanding({ hold: { at: '2026-01-01T01:00:00Z', until: ['r-0'] } }), 'checking', 'succeeded', undefined, STAGED),
       abort('the run was held before its check was filed'),
     ],
-    ...ENDED.map((own): [string, () => unknown, object] => [
-      `a step that ended ${own} with its merge staged`,
-      () => due(atLanding(), own, phaseOfEnded(own), undefined, STAGED),
-      abort(`ship ended ${own} with its merge staged`),
-    ]),
-    ...ENDED.map((own): [string, () => unknown, object] => [
-      `${own}, with nothing staged: its own word stands, and nothing is taken back`,
-      () => due(atLanding(), own, 'succeeded', undefined, NOT_STAGED),
-      record({ untouched: `ship ended ${own}, and nothing of it was staged` }),
-    ]),
+    ...ENDED.map(
+      (own) =>
+        [
+          `a step that ended ${own} with its merge staged`,
+          () => due(atLanding(), own, phaseOfEnded(own), undefined, STAGED),
+          abort(`ship ended ${own} with its merge staged`),
+        ] satisfies [string, () => unknown, object],
+    ),
+    ...ENDED.map(
+      (own) =>
+        [
+          `${own}, with nothing staged: its own word stands, and nothing is taken back`,
+          () => due(atLanding(), own, 'succeeded', undefined, NOT_STAGED),
+          record({ untouched: `ship ended ${own}, and nothing of it was staged` }),
+        ] satisfies [string, () => unknown, object],
+    ),
   ];
   for (const [name, landing, expected] of aborts)
     test(`REFUSED: aborts a merge it is not to commit — ${name}`, () => assert.deepEqual(landing(), expected));

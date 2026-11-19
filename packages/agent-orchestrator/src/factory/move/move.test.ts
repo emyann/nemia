@@ -6,7 +6,6 @@
 import { beforeAll, describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { Factory } from '../factory.ts';
-import type { TreeFile } from '../../archive/archive.ts';
 import { parseInboxCard } from '../../inbox/inbox.ts';
 import { cardMoved, factoryOnTarget, fileTextOf, folderOnTarget, volumeKey, type OnTarget } from './move.ts';
 
@@ -138,7 +137,7 @@ describe('fileTextOf: the factory as its file holds it, and no more', () => {
 });
 
 /** A file of a folder holding `text`. */
-const fileOf = (path: string, text: string): TreeFile => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
+const fileOf = (path: string, text: string) => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
 
 describe('folderOnTarget: the folder as the target places it', () => {
   test('its tree’s wiring follows a repository whose folder name changed', () => {

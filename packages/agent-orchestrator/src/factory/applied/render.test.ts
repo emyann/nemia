@@ -19,7 +19,7 @@ const ROOT = scratch('wf-render-');
 const { exportTemplate, openTemplate } = templated(ROOT);
 
 /** The tests' team exported into a template folder, and the repository it came from. */
-function exported(): { repo: string; dir: string } {
+function exported() {
   const repo = scratch('wf-render-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   const dir = path.join(scratch('wf-render-out-'), 'team');
@@ -28,7 +28,7 @@ function exported(): { repo: string; dir: string } {
 }
 
 /** The template `dir` rendered with `sets`, written into a new tree. */
-function rendered(dir: string, sets: string[] = []): { tree: string; out: ReturnType<typeof renderFactory> } {
+function rendered(dir: string, sets: string[] = []) {
   const read = openTemplate(dir);
   const manifest = read.folder.documents.get('nemia.yaml') as { spec: { parameters?: Record<string, never> } };
   const out = renderFactory(read, resolveParams(manifest.spec.parameters ?? {}, sets).params);
@@ -45,7 +45,7 @@ function rendered(dir: string, sets: string[] = []): { tree: string; out: Return
  * The steps of a loaded workflow, each without where its hire came from, which the team names in its step file and the tree in its
  * wiring, and its schema's file unnamed: the tree names it after its agent, and its schema is compared whole.
  */
-const stepsOf = (workflows: ReturnType<typeof loadWorkflows>): unknown =>
+const stepsOf = (workflows: ReturnType<typeof loadWorkflows>) =>
   JSON.parse(
     JSON.stringify(workflows, (key, value) => {
       if (key === 'hire') return undefined;
@@ -54,7 +54,7 @@ const stepsOf = (workflows: ReturnType<typeof loadWorkflows>): unknown =>
   );
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));

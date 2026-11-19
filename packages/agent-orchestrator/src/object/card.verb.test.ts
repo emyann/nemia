@@ -59,11 +59,11 @@ const listed = Effect.gen(function* () {
 const list = (query: CardQuery) => Effect.flatMap(listed, (l) => cardListOf(l, query));
 
 /** What an exit holds, or the kind of the refusal it failed with. */
-const valueOf = <A, E>(exit: Exit.Exit<A, E>): A => {
+const valueOf = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return exit.value;
   throw new Error(`failed: ${String(exit.cause)}`);
 };
-const kindOf = <A, E>(exit: Exit.Exit<A, E>): string => {
+const kindOf = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return 'ok';
   const failed = exit.cause.reasons.find((r) => r._tag === 'Fail');
   return failed && 'error' in failed ? String((failed.error as { _tag?: unknown })._tag) : 'defect';

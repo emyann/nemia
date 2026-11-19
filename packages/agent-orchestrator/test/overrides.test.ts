@@ -18,8 +18,7 @@ import { scratch } from 'test-kit/scratch';
 const ROOT = scratch('wf-overrides-');
 
 /** The agents a step may name, each parsed from its file's text. */
-const agentsOf = (files: Record<string, string>): Map<string, Agent | WorkflowError> =>
-  new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
+const agentsOf = (files: Record<string, string>) => new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
 /** Step `review`, from `text`, over `agents`, hired its agent by a factory where `hired` names one. */
 const step = (text: string, agents: Map<string, Agent | WorkflowError>, hired?: string) =>
@@ -33,7 +32,7 @@ const step = (text: string, agents: Map<string, Agent | WorkflowError>, hired?: 
   );
 
 /** What `run` threw, as a refusal of the package: its message. Fails the test where it did not throw one. */
-function refusal(run: () => unknown): string {
+function refusal(run: () => unknown) {
   try {
     run();
   } catch (err) {
@@ -102,7 +101,7 @@ describe('REFUSED at load: a fence block the file cannot hold', () => {
 });
 
 /** An agent that offers what `offers` says on its `overridable:` line, or everything with no line. */
-const offering = (offers?: string): Map<string, Agent | WorkflowError> =>
+const offering = (offers?: string) =>
   agentsOf({
     reviewer: `---\n${offers === undefined ? '' : `overridable: ${offers}\n`}model: opus\nclaude:\n  fence:\n    permissionMode: dontAsk\n    allowedTools: Bash(git log:*), Bash(git diff:*)\n---\nYou review.\n`,
   });

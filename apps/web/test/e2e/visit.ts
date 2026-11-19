@@ -33,7 +33,7 @@ const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.r
  * visited; every run then reads 404, the board says each was removed with `wf rm`, and the page being visited fails on what it never drew,
  * which is not the branch's fault. The message names the store, says to run the e2e again, and names the sweep that removes it.
  */
-export const storeGone = (store: string): string =>
+export const storeGone = (store: string) =>
   `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again` +
   '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
 
@@ -59,14 +59,7 @@ class PageFailure extends Error {
  * phase took (`PHASES`, timing.ts) by `performance.now()`; rejects with a `PageFailure` and a picture of the page as it failed, which is
  * taken whether or not the page is pictured. A page that is not pictured keeps the picture an earlier run took of it, failed or not.
  */
-async function visit(
-  context: BrowserContext,
-  base: string,
-  spec: PageSpec,
-  theme: Theme,
-  out: string,
-  store?: string,
-): Promise<{ shot?: string; phases: Record<Phase, number> }> {
+async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme, out: string, store?: string) {
   const page = await context.newPage();
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
@@ -91,7 +84,7 @@ async function visit(
     await timed('picture', () => photograph(page, shot, { fullPage: true }));
     const seen = problems();
     if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-    return { shot: photographing ? shot : undefined, phases };
+    return { shot: photographing ? shot : undefined, phases } satisfies { shot?: string; phases: Record<Phase, number> };
   } catch (err) {
     if (photographing) fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
@@ -131,7 +124,7 @@ export async function visitAll(
     measured = false,
     worker = 0,
   }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean; measured?: boolean; worker?: number },
-): Promise<{ shots: string[]; timings: PageTiming[] }> {
+) {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
     for (const theme of THEMES) fs.rmSync(path.join(out, `${spec.name}-${theme}-failed.png`), { force: true });
@@ -169,7 +162,7 @@ export async function visitAll(
       await context.close();
     }
   }
-  return { shots, timings };
+  return { shots, timings } satisfies { shots: string[]; timings: PageTiming[] };
 }
 
 /**
@@ -179,13 +172,13 @@ export async function visitAll(
  * in the first hour after the machine's own midnight they fell on the day before. Placed at midday,
  * the browser's day began twelve hours before the seed, and the visits have eleven hours before it ends, at every hour of the run.
  */
-export function middayZone(now: number): string {
+export function middayZone(now: number) {
   const offset = 12 - new Date(now).getUTCHours();
   return offset === 0 ? 'Etc/GMT' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
 }
 
 /** The time of day `now` reads in its midday zone, `12:01`, as the e2e says where its browser is. */
-const middayClock = (now: number): string => `12:${String(new Date(now).getUTCMinutes()).padStart(2, '0')}`;
+const middayClock = (now: number) => `12:${String(new Date(now).getUTCMinutes()).padStart(2, '0')}`;
 
 /** The kind of scroll bar a browser of the e2e draws: one that takes room beside what scrolls, or one that floats over it. */
 export type Bars = 'classic' | 'overlay';
@@ -203,9 +196,9 @@ const DRAWN: Record<Bars, { ignoreDefaultArgs: string[]; args?: string[] }> = {
  *
  * @throws when Chromium does not start, saying how it is installed
  */
-export async function launch(bars?: Bars): Promise<Browser> {
+export async function launch(bars?: Bars) {
   try {
-    return await chromium.launch(bars ? DRAWN[bars] : {});
+    return (await chromium.launch(bars ? DRAWN[bars] : {})) satisfies Browser;
   } catch (err) {
     throw new Error(
       `Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`,
@@ -226,7 +219,7 @@ const RETRYING =
  * that is not it trying again — what was in the way; and the picture. The whole of it runs to dozens of lines of call log, and each
  * server's last lines follow it. The colour Playwright dims its call log with, whether or not a terminal reads it, is taken out.
  */
-export function headlineOf(message: string): string[] {
+export function headlineOf(message: string) {
   // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
   const lines = message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
   const clip = (line: string) => (line.length > HEADLINE_WIDTH ? `${line.slice(0, HEADLINE_WIDTH - 1)}…` : line);
@@ -243,7 +236,7 @@ export function headlineOf(message: string): string[] {
   }
   const picture = lines.find((line) => line.trim().startsWith('what it looked like:'));
   if (picture) said.push(picture.trim());
-  return said.map(clip);
+  return said.map(clip) satisfies string[];
 }
 
 /**
@@ -251,7 +244,7 @@ export function headlineOf(message: string): string[] {
  * then whatever `explain` adds — and then, last, what failed again in a few lines (`headlineOf`), on stderr and on stdout both: a check
  * shows the tail of what it printed and logs its stdout alone, so the reason ends both streams.
  */
-export function exitOn(main: Promise<void>, cleanUp: () => void, explain: () => string = () => ''): void {
+export function exitOn(main: Promise<void>, cleanUp: () => void, explain: () => string = () => '') {
   main.then(
     () => {
       cleanUp();

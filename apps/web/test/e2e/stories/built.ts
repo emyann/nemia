@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import type { Browser, Page } from 'playwright';
+import type { Browser } from 'playwright';
 
 /** The variable that names a static build of Storybook made before the look's tests, which each reads instead of building one. */
 export const LOOK_STORYBOOK = 'LOOK_STORYBOOK';
@@ -29,7 +29,7 @@ const WEB = path.join(ROOT, 'apps', 'web');
  * @param web The board's folder to build, this checkout's or another tree's.
  * @param out The folder the build is written into.
  */
-export async function buildStorybook(root: string, web: string, out: string): Promise<string | undefined> {
+export async function buildStorybook(root: string, web: string, out: string) {
   const bin = path.join(root, 'node_modules', 'storybook', 'dist', 'bin', 'dispatcher.js');
   const child = spawn(process.execPath, [bin, 'build', '-o', out, '--quiet', '--disable-telemetry'], {
     cwd: web,
@@ -39,7 +39,9 @@ export async function buildStorybook(root: string, web: string, out: string): Pr
   let said = '';
   child.stderr.on('data', (chunk: Buffer) => (said += chunk));
   const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
-  return code === 0 ? undefined : `Storybook did not build at ${web} (exit ${code}): ${said.trim().split('\n').slice(-5).join(' / ')}`;
+  return (
+    code === 0 ? undefined : `Storybook did not build at ${web} (exit ${code}): ${said.trim().split('\n').slice(-5).join(' / ')}`
+  ) satisfies string | undefined;
 }
 
 /**
@@ -47,7 +49,7 @@ export async function buildStorybook(root: string, web: string, out: string): Pr
  * into `scratch`. Throws with why where it would not build.
  * @param scratch An empty folder of the caller's, where a build is written when none was made before.
  */
-export async function storybookFor(scratch: string): Promise<string> {
+export async function storybookFor(scratch: string) {
   const named = process.env[LOOK_STORYBOOK];
   if (named && fs.existsSync(path.join(named, 'iframe.html'))) return named;
   const out = path.join(scratch, 'static');
@@ -72,7 +74,7 @@ const TYPES: Readonly<Record<string, string>> = {
  * Answers the static build in `dir` on loopback: a file the folder has as it is, every other address with its index.
  * @param dir The folder of a static build.
  */
-export async function serveBuilt(dir: string): Promise<{ at: string; close: () => void }> {
+export async function serveBuilt(dir: string) {
   const server = http.createServer((request, response) => {
     const asked = path.join(dir, decodeURIComponent(new URL(`http://stories${request.url ?? '/'}`).pathname));
     const file = asked.startsWith(dir) && fs.existsSync(asked) && fs.statSync(asked).isFile() ? asked : path.join(dir, 'index.html');
@@ -86,16 +88,16 @@ export async function serveBuilt(dir: string): Promise<{ at: string; close: () =
       server.close();
       server.closeAllConnections();
     },
-  };
+  } satisfies { at: string; close: () => void };
 }
 
 /**
  * The story ids the static build in `dir` holds, in its index's order.
  * @param dir The folder of a static build.
  */
-export const builtIds = (dir: string): string[] => {
+export const builtIds = (dir: string) => {
   const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')) as { entries: Record<string, { type: string }> };
-  return Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : []));
+  return Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : [])) satisfies string[];
 };
 
 /**
@@ -117,7 +119,7 @@ export type Look = { scale?: number; still?: boolean; toolbar?: 'light' | 'dark'
  *   `still`, whether the page is told nothing may move, so that a colour is read with no transition to wait out; and `toolbar`, the
  *   theme Storybook's toolbar is set to, where it is not `theme`
  */
-export async function openStory(browser: Browser, at: string, theme: 'light' | 'dark', id: string, look: Look = {}): Promise<Page> {
+export async function openStory(browser: Browser, at: string, theme: 'light' | 'dark', id: string, look: Look = {}) {
   const context = await browser.newContext({
     colorScheme: theme,
     viewport: { width: 1280, height: 800 },

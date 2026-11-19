@@ -17,24 +17,26 @@ import {
 } from '../src/lib/api/nemia.ts';
 import { clockWord } from '../src/lib/quota.ts';
 import { factoryWords, freshLevel, LEVELS, PRUNE_WORDS, RAISE_STRETCHES, raisesOver, sessionOf, spendWords } from '../src/lib/nemia.ts';
+import { apiAnswers } from './network.ts';
 
 /** Where she is, as the api answers it: off, never set, unless `over` says otherwise. */
-const nemiaLevel = (over: Partial<NemiaLevel> = {}): NemiaLevel => ({
-  level: 'manual',
-  since: null,
-  task: null,
-  phase: null,
-  sessionId: null,
-  reach: [],
-  bridge: null,
-  stopped: false,
-  rests: true,
-  spend: null,
-  allows: [],
-  factories: [],
-  untrusted: null,
-  ...over,
-});
+const nemiaLevel = (over: Partial<NemiaLevel> = {}) =>
+  ({
+    level: 'manual',
+    since: null,
+    task: null,
+    phase: null,
+    sessionId: null,
+    reach: [],
+    bridge: null,
+    stopped: false,
+    rests: true,
+    spend: null,
+    allows: [],
+    factories: [],
+    untrusted: null,
+    ...over,
+  }) satisfies NemiaLevel;
 
 /** A factory at Manual by default, the store's, raised to Semi-auto until 18:00 UTC. */
 const raised: FactoryLevel = {
@@ -146,11 +148,7 @@ describe("LEVELS, freshLevel, raisesOver, factoryWords, spendWords: her levels, 
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
-  });
+  apiAnswers(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
 }
 
 const readLevel = levelQuery.queryFn as unknown as () => Promise<NemiaLevel>;

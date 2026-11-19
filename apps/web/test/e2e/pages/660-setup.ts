@@ -16,7 +16,7 @@ const NEED = 'e2e-device-sign-in';
 const PRINTED = { link: 'https://example.com/login/device', code: 'K7QM-3XRP', pattern: '[A-Z0-9]{4}-[A-Z0-9]{4}' } as const;
 
 /** The README of the checkout's `dev` with NEED declared in its frontmatter, over the README as the seed wrote it. */
-const plantedReadme = (found: string): string =>
+const plantedReadme = (found: string) =>
   [
     '---',
     'needs:',
@@ -38,11 +38,13 @@ const CLIENT = 'e2e-laptop';
 const WRITTEN = ['person-tokens', 'pairings', 'links'] as const;
 
 /** What each of WRITTEN holds now, by folder. */
-const heldIn = (): Map<string, Set<string>> =>
-  new Map(WRITTEN.map((dir) => [dir, new Set(fs.existsSync(path.join(store!, dir)) ? fs.readdirSync(path.join(store!, dir)) : [])]));
+const heldIn = () =>
+  new Map(
+    WRITTEN.map((dir) => [dir, new Set(fs.existsSync(path.join(store!, dir)) ? fs.readdirSync(path.join(store!, dir)) : [])]),
+  ) satisfies Map<string, Set<string>>;
 
 /** Each file added under WRITTEN since `before` removed, and each folder that did not exist then. */
-function takeBack(before: Map<string, Set<string>>): void {
+function takeBack(before: Map<string, Set<string>>) {
   for (const [dir, files] of before) {
     const full = path.join(store!, dir);
     if (!fs.existsSync(full)) continue;
@@ -55,7 +57,7 @@ function takeBack(before: Map<string, Set<string>>): void {
  * A first-visit link minted on the worker's store under `base`, asked of the worker's api through the board `page` is on (`POST
  * /api/links`), the call `nemia board link --base` makes at the server's shell.
  */
-async function mintedLink(page: Page, base: string): Promise<string> {
+async function mintedLink(page: Page, base: string) {
   const answer = await page.request.post(new URL('/api/links', page.url()).href, { data: { base } });
   const body = await answer.text();
   const url = answer.ok() ? (JSON.parse(body) as { url?: unknown }).url : undefined;
@@ -80,7 +82,7 @@ const fixOf = (phase: 'pending' | 'succeeded', output: string, exitCode?: number
 const CHUNKS = [`Open ${PRINTED.link} and type`, ` ${PRINTED.code}\n`] as const;
 
 /** One server-sent event named `event`, its data `data` written a line each. */
-const sse = (event: string, data: string): string =>
+const sse = (event: string, data: string) =>
   `event: ${event}\n${data
     .split('\n')
     .map((line) => `data: ${line}`)
@@ -97,13 +99,15 @@ async function holdFix(
   made: (phase: 'pending' | 'succeeded', output: string, exitCode?: number) => object,
   chunks: readonly string[],
   sent: unknown[] = [],
-): Promise<() => Promise<void>> {
+) {
   const start = (route: Route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     sent.push(route.request().postDataJSON());
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a start answered: no harness runs in the e2e's store
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(made('pending', '')) });
   };
   const output = (route: Route) =>
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- its output answered: no harness runs in the e2e's store
     route.fulfill({
       status: 200,
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
@@ -111,10 +115,10 @@ async function holdFix(
     });
   await page.route('**/api/readiness/fixes', start);
   await page.route('**/api/readiness/fixes/*/output', output);
-  return async () => {
+  return (async () => {
     await page.unroute('**/api/readiness/fixes', start);
     await page.unroute('**/api/readiness/fixes/*/output', output);
-  };
+  }) satisfies () => Promise<void>;
 }
 
 /** A fix of a piece, as the api answers it: the keys the page reads. */
@@ -130,11 +134,8 @@ type Piece = {
   harness?: { name: string; part: 'install' | 'sign-in' };
 };
 
-/** A harness the read declares: its install piece and its sign-in piece, as the api answers them. */
-type Harness = { name: string; install: Piece; signIn: Piece };
-
 /** The harnesses the api's read declares, each with its two pieces; refused where it declares none, as every release declares one. */
-async function harnessesRead(page: Page): Promise<Harness[]> {
+async function harnessesRead(page: Page) {
   const { pieces } = await answered<{ pieces: Piece[] }>(page, '/api/readiness');
   const of = (name: string, part: 'install' | 'sign-in') => pieces.find((p) => p.harness?.name === name && p.harness.part === part);
   const harnesses = [...new Set(pieces.flatMap((p) => (p.harness ? [p.harness.name] : [])))].flatMap((name) => {
@@ -147,7 +148,7 @@ async function harnessesRead(page: Page): Promise<Harness[]> {
 }
 
 /** The readiness read: every piece drawn with the state the api answered, a piece not in place with each of its fixes, and NEED's. */
-async function readsPieces(page: Page): Promise<void> {
+async function readsPieces(page: Page) {
   await expectVisible(page.locator('article[data-setup] [data-readiness]'), 'Setup draws the readiness read');
   const { pieces } = await answered<{ pieces: Piece[] }>(page, '/api/readiness');
   if (!pieces.some((piece) => piece.name === NEED)) throw new Refused(`the api lists the planted need ${NEED} — it lists none`);
@@ -194,12 +195,13 @@ const PLANTED_READS = {
  * The banner over every other page: raised by a missing piece a run waits on, never saying "first run" on a server whose runs have
  * started nor "not ready", and raising none where the only missing piece is advised; then back to Setup.
  */
-async function raisesBanner(page: Page): Promise<void> {
+async function raisesBanner(page: Page) {
   const setup = page.url();
   let planted: keyof typeof PLANTED_READS = 'waits';
   const answer = (route: Route) =>
     route.request().method() === 'GET'
-      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
+      ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
       : route.fallback();
   await page.route(READINESS_ROUTE, answer);
   try {
@@ -226,7 +228,7 @@ async function raisesBanner(page: Page): Promise<void> {
 }
 
 /** NEED's fix started: its output drawn as it comes, its link a link that opens a new tab, its code large over it, and its end. */
-async function runsFix(page: Page): Promise<void> {
+async function runsFix(page: Page) {
   const unroute = await holdFix(page, fixOf, CHUNKS);
   try {
     await page.locator(`li[data-piece="${NEED}"] [data-fix-press]`).click();
@@ -256,7 +258,7 @@ const INSTALLED = ['added 1 package in 2s\n', 'linked into the tools folder\n'] 
  * `holdFix`: nothing ticks the store) with the install's need and its first fix, its output drawn in the question as it comes, and once
  * done the harness's sign-in fixes are shown there, a command to type with the control that copies it. A reload forgets the activation.
  */
-async function asksAndActivates(page: Page): Promise<void> {
+async function asksAndActivates(page: Page) {
   const harnesses = await harnessesRead(page);
   for (const harness of harnesses)
     if (harness.install.state === 'met') throw new Refused(`a fresh seed has no harness installed — ${harness.name} is in place`);
@@ -325,7 +327,7 @@ async function asksAndActivates(page: Page): Promise<void> {
  * Skip keeps the skip in this browser (`lib/stored.ts`): the question goes, a line says it is skipped, and a reload does not ask it
  * again; the skip forgotten, it is asked again.
  */
-async function skipsTheQuestion(page: Page): Promise<void> {
+async function skipsTheQuestion(page: Page) {
   const asked = page.locator('section[data-harness-choice="asked"]');
   try {
     await asked.locator('[data-harness-skip]').click();
@@ -351,7 +353,7 @@ async function skipsTheQuestion(page: Page): Promise<void> {
  * a second page of the browser answers it with the first harness's install in place, its one fix the removal the api offers on a met
  * install (index 1, `removes`); the start itself is the api's. That page's watch expects the 409 and nothing else.
  */
-async function deactivateRefused(page: Page): Promise<void> {
+async function deactivateRefused(page: Page) {
   const [first] = await harnessesRead(page);
   const install = first.install;
   const other = await page.context().newPage();
@@ -407,7 +409,7 @@ async function deactivateRefused(page: Page): Promise<void> {
 }
 
 /** A pairing asked for by a client, listed under Setup with its name, and approved there by the code the client shows. */
-async function approvesPairing(page: Page): Promise<void> {
+async function approvesPairing(page: Page) {
   const asked = await page.request.post(new URL('/api/pairings', page.url()).href, { data: { client: CLIENT } });
   if (!asked.ok()) throw new Refused(`POST /api/pairings asks a pairing — it answered ${asked.status()}`);
   const { code } = (await asked.json()) as { code: string };
@@ -435,12 +437,12 @@ async function approvesPairing(page: Page): Promise<void> {
  * On a store marked exposed, a first-visit link signs the browser that opens it in, and the address loses its secret; opened a second
  * time, in a browser with no cookie, the link is refused as used, said on the sign-in, and the address loses it all the same.
  */
-async function signsInByLink(page: Page): Promise<void> {
+async function signsInByLink(page: Page) {
   const seat = await serveExposed();
   const context = await page
     .context()
     .browser()!
-    .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
+    .newContext({ colorScheme: await themeOf(page), viewport: { width: 1280, height: 800 } });
   try {
     const url = await mintedLink(page, seat.base);
     const other = await context.newPage();

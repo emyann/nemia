@@ -12,18 +12,20 @@ import type { TestContext } from 'vitest';
  * Step this process's wall clock by `ms` until the test ends: `Date.now()` and an argless `new Date()` read `ms` later, or
  * earlier when `ms` is negative. A file's mtime is the kernel's and does not move with it.
  */
-export const stepClock = (t: TestContext, ms: number): void => {
+export const stepClock = (t: TestContext, ms: number) => {
   const Real = Date;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the stepped clock, the runtime's seam for a wall time
   globalThis.Date = class extends Real {
     constructor(...args: ConstructorParameters<DateConstructor> | []) {
       if (args.length === 0) super(Real.now() + ms);
       else super(...args);
     }
-    static override now(): number {
+    static override now() {
       return Real.now() + ms;
     }
   } as DateConstructor;
   t.onTestFinished(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- puts the real clock back
     globalThis.Date = Real;
   });
 };
@@ -35,7 +37,7 @@ export const stepClock = (t: TestContext, ms: number): void => {
  * clock does not move with it: a worker beating now reads as beaten `ms` ago, so a step is taken back once the pass that reads past
  * the bound has run.
  */
-export const stepMono = (t: TestContext, ms: number): (() => void) => {
+export const stepMono = (t: TestContext, ms: number) => {
   const real = Object.getOwnPropertyDescriptor(process.hrtime, 'bigint');
   const read = process.hrtime.bigint.bind(process.hrtime);
   const by = BigInt(ms) * 1_000_000n;
@@ -44,5 +46,5 @@ export const stepMono = (t: TestContext, ms: number): (() => void) => {
     if (real) Object.defineProperty(process.hrtime, 'bigint', real);
   };
   t.onTestFinished(undo);
-  return undo;
+  return undo satisfies () => void;
 };

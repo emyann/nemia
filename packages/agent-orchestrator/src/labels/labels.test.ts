@@ -20,7 +20,7 @@ import {
 } from './labels.ts';
 
 /** The edits `texts` spell, which the test means to be taken. */
-const edits = (...texts: string[]): readonly LabelChange[] => {
+const edits = (...texts: string[]) => {
   const parsed = parseLabelEdits(texts);
   assert.ok('edits' in parsed, `${texts.join(' ')} is taken`);
   return parsed.edits;

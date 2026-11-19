@@ -13,7 +13,7 @@ import { cursorFileStart, cutCursorFile, keepCursor } from './cursor.store.ts';
 const ROOT = scratch('wf-cursor-file-');
 
 /** A path of this test's own under `ROOT`, its directory there, the file not written. */
-const at = (name: string): string => path.join(ROOT, `${name}.cursor`);
+const at = (name: string) => path.join(ROOT, `${name}.cursor`);
 
 describe('the cursor file: none starts a watch where it was told, a write is read back whole, a cut rewrites 0, and what cannot be one is refused by name', () => {
   test('a cursor file that is not there starts the watch where it was told to', () => {

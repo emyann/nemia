@@ -24,11 +24,11 @@ type FactoryListing = import('agent-orchestrator').FactoryListing;
 type Running = import('agent-orchestrator').Running;
 
 /** A factory as `placeFor` gives it, on `repos`. */
-const factoryOn = (name: string, repos: string[]): Factory =>
+const factoryOn = (name: string, repos: string[]) =>
   ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })), workflows: [], hires: {} }) as unknown as Factory;
 
 /** A listing of the store's factory `name` on `repos`, as `listedAtOnce` gives it. */
-const listedOn = (name: string, repos: string[]): FactoryListing =>
+const listedOn = (name: string, repos: string[]) =>
   ({ name, volumes: repos.map((at) => ({ path: at, readOnly: false })) }) as unknown as FactoryListing;
 
 describe('pageRead: the repository the page reads, or why none', () => {
@@ -124,13 +124,13 @@ describe('pageRead: the repository the page reads, or why none', () => {
     });
 });
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A repository folder with one skill, `<name>-skill`. */
-const repoWithSkill = (name: string): string => {
+const repoWithSkill = (name: string) => {
   const repo = scratch(`nemia-api-page-${name}-`);
   write(
     path.join(repo, '.claude', 'skills', `${name}-skill`, 'SKILL.md'),
@@ -180,12 +180,12 @@ describe('an install unpacked from an archive, its source an address: the page r
   });
   const s = story(test);
   const SOURCE = 'https://github.com/emyann/nemia/releases';
-  const page = async (query = ''): Promise<CapabilitiesWithSteps> => {
+  const page = async (query = '') => {
     const res = await app.request(`/api/capabilities${query}`);
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as CapabilitiesWithSteps;
   };
-  const namesNoAddress = (answer: unknown): void =>
+  const namesNoAddress = (answer: unknown) =>
     assert.ok(!JSON.stringify(answer).includes('https:'), `the source's address is never a path: ${JSON.stringify(answer)}`);
   s.test('with no factory, the page reads no repository, says so, and names the lines that file one', async () => {
     const answer = await page();

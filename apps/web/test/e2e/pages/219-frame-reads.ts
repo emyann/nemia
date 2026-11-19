@@ -18,13 +18,13 @@ const FACTORY = FACTORIES.hiring.name;
 const [WHOLE, LIGHT] = [`/api/runs?limit=${LIST_PAGE.most}`, `/api/runs?limit=${LIST_PAGE.most}&fieldSelector=${OPEN_SELECTOR}`];
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** The rail's Waiting badge counts what `open`, the api's light answer across every factory, says waits; none for none. */
-async function railCounts(page: Page, open: OpenRuns, where: string): Promise<void> {
+async function railCounts(page: Page, open: OpenRuns, where: string) {
   await expectTexts(
     railPlace(page, 'Waiting').locator('[data-slot="badge"]'),
     open.counts.waiting ? [String(open.counts.waiting)] : [],

@@ -9,7 +9,7 @@ import type { WaitOn } from 'objects';
 import type { NowStands } from '../contracts/now-chip.contract.ts';
 import { nowStandsOf, waitersOf } from '../src/lib/nowChip.ts';
 import type { StepState } from '../src/lib/status.ts';
-import { summary } from './run-fixtures.ts';
+import { summary } from './run.fixture.ts';
 
 /** Where each state stands on a run nobody holds, waiting on no thing. */
 const STANDS: Record<StepState, NowStands> = {

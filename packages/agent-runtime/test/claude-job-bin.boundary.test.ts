@@ -34,7 +34,7 @@ const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin',
  * A stand-in Claude Code in `dir` that writes the argv it was started with to `argv.json` and then runs `after`, a line of
  * JavaScript. The Agent SDK spawns it with node, so its shebang is this node, and its argv is read the same either way.
  */
-const standIn = (dir: string, after: string): string => {
+const standIn = (dir: string, after: string) => {
   const at = path.join(dir, 'claude.js');
   fs.writeFileSync(
     at,
@@ -51,7 +51,7 @@ const standIn = (dir: string, after: string): string => {
 };
 
 /** The spawn request `request` written where the bin reads one, as the runner writes it, with the files it named (`io`). */
-const requestFile = (dir: string, request: object, io: object = {}): string => {
+const requestFile = (dir: string, request: object, io: object = {}) => {
   const at = path.join(dir, 'spawn.request.json');
   fs.writeFileSync(at, JSON.stringify({ request, io }));
   return at;
@@ -70,7 +70,7 @@ const ranBin = (at: string, env: Record<string, string>, onPid?: (pid: number) =
   });
 
 /** Whether the process `pid` is still there, as a signal of 0 answers. */
-const alive = (pid: number): boolean => {
+const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
     return true;

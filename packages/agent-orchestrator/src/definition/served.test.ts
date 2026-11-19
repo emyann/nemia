@@ -13,7 +13,7 @@ const ITEMS: DefinitionFound[] = NAMES.flatMap((name) => LOOKUP.map((origin) => 
 const MOST = 4;
 
 /** Every list of up to `most` distinct items of `items`, in every order. */
-function listsOf(items: readonly DefinitionFound[], most: number): DefinitionFound[][] {
+function listsOf(items: readonly DefinitionFound[], most: number) {
   const out: DefinitionFound[][] = [[]];
   const grow = (list: DefinitionFound[]) => {
     if (list.length === most) return;

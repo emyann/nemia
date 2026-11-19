@@ -37,8 +37,8 @@ const THEMES = ['light', 'dark'] as const;
 const KINDS = ['classic', 'overlay'] as const;
 
 /** A framed table of the cut frame's stories, by its name, and the box that scrolls it. */
-const framed = (name: string): string => `[data-framed="${name}"]`;
-const boxOf = (name: string): string => `${framed(name)} [data-table-box]`;
+const framed = (name: string) => `[data-framed="${name}"]`;
+const boxOf = (name: string) => `${framed(name)} [data-table-box]`;
 
 /** The story of each framed table, by the table's name. */
 const TABLES = {
@@ -53,7 +53,7 @@ const MARKED = 'look-scrollbars--marked';
 const UNMARKED = 'look-scrollbars--unmarked';
 
 /** The story `id` opened alone in the browser of `kind`, in `theme`. */
-const open = (kind: Bars, id: string, theme: 'light' | 'dark' = 'dark', look: Look = {}): Promise<Page> =>
+const open = (kind: Bars, id: string, theme: 'light' | 'dark' = 'dark', look: Look = {}) =>
   openStory(browsers[kind], served.at, theme, id, look);
 
 /** The colours of the named `points` in a picture of the window taken now, as `name`. */
@@ -61,7 +61,7 @@ const read = <K extends string>(kind: Bars, page: Page, name: string, points: Re
   coloursOf(browsers[kind], page, path.join(built, `${name}.png`), points);
 
 /** The line under each row of the framed table `name`, as its computed width, top to bottom. */
-const linesOf = (page: Page, name: string): Promise<string[]> =>
+const linesOf = (page: Page, name: string) =>
   page.locator(`${framed(name)} tbody tr`).evaluateAll((rows) => rows.map((row) => getComputedStyle(row).borderBottomWidth));
 
 /** The framed tables with the line under their last row put back. */
@@ -90,7 +90,7 @@ test(
  * the pointer on its last row: two columns of pixels through the bottom-left cut, down to the frame's last row of pixels, where the
  * last row's line was, and a column through the top-right cut, beside the header.
  */
-async function cutSpills(kind: Bars, page: Page, name: string, shot: string): Promise<string[]> {
+async function cutSpills(kind: Bars, page: Page, name: string, shot: string) {
   const { out } = await edgesOf(page, `${framed(name)} [data-cut-frame]`);
   await page
     .locator(`${framed(name)} tbody tr`)
@@ -155,7 +155,7 @@ for (const theme of THEMES) {
 }
 
 /** What is wrong with the room the framed table `name` takes in its box, none when no bar is drawn that nothing scrolls. */
-const roomFaultsOf = (page: Page, name: 'one' | 'several' | 'narrow'): Promise<string[]> =>
+const roomFaultsOf = (page: Page, name: 'one' | 'several' | 'narrow') =>
   page.evaluate((name) => {
     const faults: string[] = [];
     const at = document.querySelector<HTMLElement>(`[data-framed="${name}"] [data-table-box]`)!;
@@ -174,7 +174,7 @@ const roomFaultsOf = (page: Page, name: 'one' | 'several' | 'narrow'): Promise<s
   }, name);
 
 /** What is wrong with the room each framed table takes, each in its own story's page of `pages`. */
-const roomFaults = async (pages: Record<keyof typeof TABLES, Page>): Promise<string[]> =>
+const roomFaults = async (pages: Record<keyof typeof TABLES, Page>) =>
   (await Promise.all((['one', 'several', 'narrow'] as const).map((name) => roomFaultsOf(pages[name], name)))).flat();
 
 /** The framed tables laid out as a table is by default: what it holds runs past its box. */
@@ -204,7 +204,7 @@ test(
 );
 
 /** A role of the theme as the page computes it, or what it computed when that is no plain colour. */
-const inkOf = (page: Page, role: string): Promise<Rgb> =>
+const inkOf = (page: Page, role: string) =>
   page.evaluate((role) => {
     const probe = document.createElement('i');
     probe.style.backgroundColor = `var(--md-sys-color-${role})`;
@@ -217,7 +217,7 @@ const inkOf = (page: Page, role: string): Promise<Rgb> =>
   }, role);
 
 /** Writes the mark of what scrolls on what `selector` finds, as the board's listener does while it scrolls, or takes it off. */
-const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null): Promise<void> =>
+const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null) =>
   page
     .locator(selector)
     .evaluate((found, word) => (word ? found.setAttribute('data-scroll-bar', word) : found.removeAttribute('data-scroll-bar')), word);
@@ -226,7 +226,7 @@ const mark = (page: Page, selector: string, word: 'shown' | 'rest' | null): Prom
  * Waits until the page, brought to a part by a scroll of the test's own, is marked as scrolling no more: two frames, in which a scroll
  * just made is heard, then for as long as the root's mark reads shown.
  */
-async function pageAtRest(page: Page): Promise<void> {
+async function pageAtRest(page: Page) {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
   await expectNone(
     async () => ((await page.locator('html').getAttribute('data-scroll-bar')) === 'shown' ? 'its root is still marked shown' : null),
@@ -240,7 +240,7 @@ async function pageAtRest(page: Page): Promise<void> {
  * thumb in `outline` while marked, 4 pixels wide, in `on-surface-variant` under the pointer and `on-surface` while held, the lane's
  * whole width. Read with nothing moving, each mark placed by hand.
  */
-async function barFaults(kind: Bars, page: Page, shot: string): Promise<string[]> {
+async function barFaults(kind: Bars, page: Page, shot: string) {
   const faults: string[] = [];
   const says = (what: string, found: Rgb, wanted: Rgb) => {
     if (apart(found, wanted) > 3) faults.push(`${what}: ${found.join(' ')}, not ${wanted.join(' ')}`);
@@ -321,14 +321,14 @@ for (const kind of KINDS) {
 }
 
 /** The mark on what `selector` finds, awaited until it reads `word`. */
-const marked = (page: Page, selector: string, word: string, what: string): Promise<void> =>
+const marked = (page: Page, selector: string, word: string, what: string) =>
   expectNone(async () => {
     const found = await page.locator(selector).getAttribute('data-scroll-bar');
     return found === word ? null : `its mark reads ${found}`;
   }, what);
 
 /** Turns the wheel over the middle of what `selector` finds, and waits until it has scrolled. */
-async function wheelOver(page: Page, selector: string): Promise<void> {
+async function wheelOver(page: Page, selector: string) {
   const box = await page.locator(selector).boundingBox();
   assert.ok(box, `${selector} is drawn`);
   await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height, 800) / 2);
@@ -373,7 +373,7 @@ test(
 );
 
 /** Where the sideways thumb of the narrow framed table, at its left end and marked as scrolling, is painted in the bottom-left cut. */
-async function thumbInCut(page: Page, shot: string): Promise<string[]> {
+async function thumbInCut(page: Page, shot: string) {
   await mark(page, boxOf('narrow'), 'shown');
   const spills = await cutSpills('classic', page, 'narrow', shot);
   const { out } = await edgesOf(page, boxOf('narrow'));
@@ -386,7 +386,7 @@ async function thumbInCut(page: Page, shot: string): Promise<string[]> {
 }
 
 /** Lays what `selector` finds out again from nothing: a scroll bar already laid out keeps the track it had under a style added since. */
-const laidOutAgain = (page: Page, selector: string): Promise<void> =>
+const laidOutAgain = (page: Page, selector: string) =>
   page.locator(selector).evaluate((found) => {
     const box = found as HTMLElement;
     box.style.display = 'none';

@@ -12,7 +12,7 @@
  * the switch out of `ENV` for a checkpoint.
 
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -58,7 +58,7 @@ const { runPlaced } = stage;
 type Refusal = Error & { exitCode?: number; _tag?: string };
 
 /** What `act` was refused with: its kind, exit 2 and each of `facts` named, never its sentence. */
-async function refusedBy(act: () => unknown, tag: 'Missing' | 'Invalid' | 'Conflict', ...facts: string[]): Promise<string> {
+async function refusedBy(act: () => unknown, tag: 'Missing' | 'Invalid' | 'Conflict', ...facts: string[]) {
   let caught: Refusal | undefined;
   try {
     await act();
@@ -72,10 +72,10 @@ async function refusedBy(act: () => unknown, tag: 'Missing' | 'Invalid' | 'Confl
 }
 
 /** The runs written under the store: none after a refusal. */
-const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
+const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []) satisfies string[];
 
 /** `refusedBy`, and no run written by it. */
-async function startRefused(act: () => unknown, tag: 'Missing' | 'Invalid', ...facts: string[]): Promise<string> {
+async function startRefused(act: () => unknown, tag: 'Missing' | 'Invalid', ...facts: string[]) {
   const before = runsWritten();
   const said = await refusedBy(act, tag, ...facts);
   assert.deepEqual(runsWritten(), before, 'no run written');
@@ -83,7 +83,7 @@ async function startRefused(act: () => unknown, tag: 'Missing' | 'Invalid', ...f
 }
 
 /** A repository with one commit on `main`, for a run with no worktree to stand on. */
-function aRepo(): string {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, { 'README.md': 'x\n' });
   return repo;
@@ -93,7 +93,7 @@ function aRepo(): string {
  * The tests' team with one more workflow, `build`: `implement` and `review` name no agent, and `named` names its own, `reviewer`; no
  * factory filed.
  */
-function aTeam(): { build: string; dev: string } {
+function aTeam() {
   fs.rmSync(FACTORIES, { recursive: true, force: true });
   const team = teamCopy();
   const build = path.join(team, 'build');
@@ -101,46 +101,44 @@ function aTeam(): { build: string; dev: string } {
   fs.writeFileSync(path.join(build, 'implement.md'), '---\nplace: git\n---\nBuild what was asked.\n');
   fs.writeFileSync(path.join(build, 'review.md'), '---\nafter: implement\nplace: git\n---\nReview it.\n');
   fs.writeFileSync(path.join(build, 'named.md'), '---\nafter: review\nplace: git\nagent: reviewer\n---\nSay what you found.\n');
-  return { build, dev: path.join(team, 'dev') };
+  return { build, dev: path.join(team, 'dev') } satisfies { build: string; dev: string };
 }
 
 /** `aTeam`, and the factory `pipao` filed on a repository of its own, hiring no one, with `attached` attached. */
-function fresh(attached: readonly string[] = ['build']): { repo: string; build: string; dev: string } {
+function fresh(attached: readonly string[] = ['build']) {
   const team = aTeam();
   const repo = aRepo();
   addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   for (const workflow of attached) attachWorkflowAt(ROOT, { factory: 'pipao', workflow });
-  return { repo, ...team };
+  return { repo, ...team } satisfies { repo: string; build: string; dev: string };
 }
 
 /** Every step of `build` filled in `factory`: `implement` and `review` hired, `named` naming its own. */
-function hired(factory = 'pipao'): void {
+function hired(factory = 'pipao') {
   hireAgentAt(ROOT, { factory, agent: 'implementer', step: 'build/implement' });
   hireAgentAt(ROOT, { factory, agent: 'reviewer', step: 'build/review' });
 }
 
 /** A factory `name` filed on `repos`, with `build` attached and every step of it hired. */
-function filed(name: string, ...repos: string[]): void {
+function filed(name: string, ...repos: string[]) {
   addFactoryAt(ROOT, { name, volumes: repos.map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: name, workflow: 'build' });
   hired(name);
 }
 
 /** What `nemia <argv>` prints, typed from `cwd`, a line each. */
-async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
+async function typedFrom(cwd: string, argv: string[]) {
   if (argv[0] === 'start') throw new Error('a start answers its facts, not lines: call startTypedFrom');
   const lines: string[] = [];
-  const log = console.log;
+  const log = vi.spyOn(console, 'log');
   const was = process.cwd();
-  console.log = (...args: unknown[]) => {
-    lines.push(args.join(' '));
-  };
   process.chdir(cwd);
   try {
     await stage.main(argv);
   } finally {
     process.chdir(was);
-    console.log = log;
+    lines.push(...log.mock.calls.map((args) => args.join(' ')));
+    log.mockRestore();
   }
   return lines.join('\n').split('\n');
 }
@@ -153,7 +151,7 @@ async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
  * workflow (`wiredRepoFor`), a `--repo` that names another said to have only found the factory. What it answers, with the facts the
  * client words.
  */
-async function startTypedFrom(cwd: string, argv: string[]): Promise<StartedAnswer> {
+async function startTypedFrom(cwd: string, argv: string[]) {
   const args = parseArgv(START.spec, argv.slice(1)) ?? {};
   const text = (key: string) => (typeof args[key] === 'string' ? args[key] : undefined);
   const named = text('repo') === undefined ? undefined : path.resolve(cwd, text('repo') ?? '');
@@ -196,10 +194,10 @@ async function startTypedFrom(cwd: string, argv: string[]): Promise<StartedAnswe
 }
 
 /** The id of the run `nemia start` answered. */
-const startedId = (answer: StartedAnswer): string => answer.id;
+const startedId = (answer: StartedAnswer) => answer.id;
 
 /** The switch off, as shipped, for the test or checkpoint `t`: put back as it was once it ends. */
-function asShipped(t: { onTestFinished: (fn: () => void) => void }): void {
+function asShipped(t: { onTestFinished: (fn: () => void) => void }) {
   const was = ENV.WF_DEFAULT_FACTORY_STARTS;
   ENV.WF_DEFAULT_FACTORY_STARTS = undefined;
   t.onTestFinished(() => {
@@ -208,20 +206,20 @@ function asShipped(t: { onTestFinished: (fn: () => void) => void }): void {
 }
 
 /** The factory `name`'s file, as JSON. */
-const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8'));
+const fileOf = (name: string) => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8')) as Record<string, unknown>;
 
 /** The files in the factories folder, hidden ones too, by name. */
 const factoryFiles = () => (fs.existsSync(FACTORIES) ? fs.readdirSync(FACTORIES).sort() : []);
 
 /** The workspaces the place lists under the store's worktrees for `repo`, as a string to compare. */
-const worktrees = (repo: string): string => {
+const worktrees = (repo: string) => {
   const read = stand().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in read, 'the place answered');
   return JSON.stringify(read.answer.workspaces.map((w) => w.path));
 };
 
 /** A plan folder of two cards on `build`, `b` after `a`. */
-function aPlanOf(build: string): string {
+function aPlanOf(build: string) {
   const dir = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(dir, 'a.md'), `---\nworkflow: ${build}\n---\nThe first.\n`);
   fs.writeFileSync(path.join(dir, 'b.md'), `---\nworkflow: ${build}\nafter: a\n---\nThe second.\n`);
@@ -229,7 +227,7 @@ function aPlanOf(build: string): string {
 }
 
 /** A card filed in the inbox as `<name>.md`, with `text` whole: its path. */
-function aCard(name: string, text: string): string {
+function aCard(name: string, text: string) {
   fs.mkdirSync(inboxDir(ROOT), { recursive: true });
   const card = path.join(inboxDir(ROOT), `${name}.md`);
   fs.writeFileSync(card, text);
@@ -237,7 +235,7 @@ function aCard(name: string, text: string): string {
 }
 
 /** What `nemia factory ls` lists of the store's factories, as the orchestrator words a listing (`factoryLines`); the client's own. */
-const listedHere = (): string[] => factoryLines(readFactoriesAt(ROOT));
+const listedHere = () => factoryLines(readFactoriesAt(ROOT)) satisfies string[];
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
 describe('a factory from nothing to a run: filed, given workflows, hires and a schedule, listed, started in, and removed', () => {
@@ -847,7 +845,7 @@ describe('an inbox card started in its factory, or refused with the card kept', 
     return t.end;
   });
   const s = story(test);
-  const teamIn = (at: string): string => {
+  const teamIn = (at: string) => {
     fs.cpSync(path.dirname(build), path.join(at, 'workflows'), { recursive: true });
     return at;
   };
@@ -1042,7 +1040,7 @@ describe("a card and a brief work on the repository the factory's wiring names, 
     return t.end;
   });
   const s = story(test);
-  const withTeam = (repo: string): string => {
+  const withTeam = (repo: string) => {
     fs.cpSync(path.dirname(dev), path.join(repo, 'workflows'), { recursive: true });
     return repo;
   };

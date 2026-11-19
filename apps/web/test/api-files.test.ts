@@ -45,7 +45,7 @@ const sibling = (s: string) => /^\.\/[^/]+\.ts$/.test(s) && !SHARED.has(s.slice(
  * What the files under src/lib/api/ import that they may not, given each file's text: a line each, `<file> imports <specifier>`. A sibling
  * may be imported only where it imports values from no sibling itself; read.ts and namespace.ts import only what `SHARED` gives each.
  */
-export function importFaults(texts: ReadonlyMap<string, string>): string[] {
+export function importFaults(texts: ReadonlyMap<string, string>) {
   const values = new Map([...texts].map(([f, text]) => [f, valueImports(text)]));
   const leaf = (s: string) => !(values.get(s.slice(2)) ?? []).some(sibling);
   return [...values].flatMap(([f, specs]) =>
@@ -59,7 +59,7 @@ export function importFaults(texts: ReadonlyMap<string, string>): string[] {
 }
 
 /** The specifiers `text` imports or re-exports values from: every `import`/`export … from` but `import type` and `export type`. */
-export function valueImports(text: string): string[] {
+export function valueImports(text: string) {
   return [
     ...text.matchAll(/^(import|export)\s+(type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?|\w+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm),
   ]
@@ -125,7 +125,7 @@ const CLIENT = 'src/lib/api/objects.ts';
 const SHAPED = 3;
 
 /** Every `.ts` and `.tsx` file under `dir`, by its path under apps/web, to its text. */
-const sourceTexts = (dir = SRC): Map<string, string> =>
+const sourceTexts = (dir = SRC) =>
   new Map(
     fs
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
@@ -137,16 +137,16 @@ const sourceTexts = (dir = SRC): Map<string, string> =>
   );
 
 /** The key set of a struct, as a shape is compared: its keys sorted and joined. */
-const shapeOf = (keys: readonly string[]): string => [...keys].sort().join(',');
+const shapeOf = (keys: readonly string[]) => [...keys].sort().join(',');
 
 /**
  * Every struct an exported schema of `objects` holds, however deep, by its shape (`shapeOf`), with the export it was found under: what the
  * api answers, which the board reads through the objects' client rather than spells again.
  */
-export function objectsShapes(): Map<string, string> {
+export function objectsShapes() {
   const found = new Map<string, string>();
   const seen = new Set<SchemaAST.AST>();
-  const walk = (ast: SchemaAST.AST, under: string): void => {
+  const walk = (ast: SchemaAST.AST, under: string) => {
     if (seen.has(ast)) return;
     seen.add(ast);
     if (SchemaAST.isObjects(ast)) {
@@ -167,12 +167,12 @@ export function objectsShapes(): Map<string, string> {
  * `fetch`, bare or off an object, anywhere but the client (`CLIENT`); and a `Schema.Struct` whose keys are the keys of a struct `objects`
  * answers (`shapes`, `objectsShapes`), whatever it is named. A line each, `<file>:<line> …`, saying the fix.
  */
-export function clientBreaks(texts: ReadonlyMap<string, string>, shapes: ReadonlyMap<string, string>): string[] {
+export function clientBreaks(texts: ReadonlyMap<string, string>, shapes: ReadonlyMap<string, string>) {
   const out: string[] = [];
   for (const [file, text] of texts) {
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
     const at = (node: ts.Node) => `${file}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
-    const visit = (node: ts.Node): void => {
+    const visit = (node: ts.Node) => {
       if (ts.isCallExpression(node)) {
         const callee = node.expression;
         const fetches =

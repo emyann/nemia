@@ -8,7 +8,7 @@ import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import './tsx.ts';
-import { coded } from './run-fixtures.ts';
+import { coded } from './run.fixture.ts';
 
 const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
 const { CutCue } = await import('../src/components/look/CutCue.tsx');
@@ -22,7 +22,7 @@ const { Sticker } = await import('../src/components/look/Sticker.tsx');
 const { TextLink } = await import('../src/components/look/TextLink.tsx');
 
 /** The markup of `element` under a router whose address is `at`. */
-async function drawn(element: ReactElement, at = '/'): Promise<string> {
+async function drawn(element: ReactElement, at = '/') {
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory({ initialEntries: [at] }) });
   await router.load();
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
@@ -30,7 +30,7 @@ async function drawn(element: ReactElement, at = '/'): Promise<string> {
 }
 
 /** The opening tag in `html` that holds `mark`, an attribute of it. */
-function tagWith(html: string, mark: string): string {
+function tagWith(html: string, mark: string) {
   const tag = html.match(new RegExp(`<[a-z0-9]+\\b[^>]*\\b${mark}[^>]*>`))?.[0];
   assert.ok(tag, `a tag with ${mark} in ${html}`);
   return tag;
@@ -66,16 +66,16 @@ const BARS = {
 } as const;
 
 /** The hues whose plate, as `barcodeOf` draws it, carries another barcode than the canvas gives it. */
-const wrongBarcodes = (barcodeOf: (hue: keyof typeof BARS) => string): string[] =>
+const wrongBarcodes = (barcodeOf: (hue: keyof typeof BARS) => string) =>
   (Object.keys(BARS) as (keyof typeof BARS)[]).filter(
     (hue) => !barcodeOf(hue).includes(`background-image:repeating-linear-gradient(90deg, ${BARS[hue]})`),
   );
 
 /** How many elements of `markup` name a grain. */
-const grains = (markup: string): number => markup.split('data-grain=').length - 1;
+const grains = (markup: string) => markup.split('data-grain=').length - 1;
 
 /** Each way `markup` would cut what an element holds off: a clip path, or an overflow that hides or clips. */
-const clips = (markup: string): string[] => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
+const clips = (markup: string) => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 
 describe('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears, and no clip on what a frame holds', () => {
   test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
@@ -412,7 +412,7 @@ describe("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and
 });
 
 /** A row of the runs table in the kit's table, its four columns, as `FlightTable` draws it. */
-async function inTable(row: ReactElement): Promise<ReactElement> {
+async function inTable(row: ReactElement) {
   const { Column, Table, TableBody, TableHeader } = await import('../src/components/ui/ds/index.ts');
   const columns = ['Run', 'Now', 'Clock', 'Cost'].map((name, i) =>
     createElement(Column, { key: name, id: name, isRowHeader: i === 0 } as never, name),
@@ -448,8 +448,7 @@ describe('Run: each size draws what its ladder says and no more, in its tone, an
     run = among.find((one) => one.id.endsWith('1sw7'))!;
     none = new Set(['words']);
   });
-  const said = (html: string): string[] =>
-    [...new Set([...html.matchAll(/data-run-says="([^"]+)"/g)].flatMap((m) => m[1].split(' ')))].sort();
+  const said = (html: string) => [...new Set([...html.matchAll(/data-run-says="([^"]+)"/g)].flatMap((m) => m[1].split(' ')))].sort();
   const sizes = [
     ['xs', 'card'],
     ['sm', 'card'],

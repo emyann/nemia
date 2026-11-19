@@ -92,7 +92,7 @@ export default {
       await refused.close();
     }
 
-    const versionOfScribe = async (): Promise<string> => {
+    const versionOfScribe = async () => {
       const answer = await page.request.get(new URL(`/api/namespaces/default/agents/${seeded.name}?origin=user`, page.url()).href);
       return ((await answer.json()) as { metadata: { resourceVersion: string } }).metadata.resourceVersion;
     };

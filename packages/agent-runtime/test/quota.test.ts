@@ -31,7 +31,7 @@ import { builtEngine } from './engine.ts';
 import { story } from 'test-kit/checkpoints';
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`): the control response it printed. */
-const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): { response?: unknown; error?: string } =>
+const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered') =>
   (
     JSON.parse(
       fs.readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8'),
@@ -39,13 +39,13 @@ const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): { re
   ).response;
 
 /** The usage of a recorded answer, as the SDK resolves it and `quotaOfUsage` is handed it. */
-const usageOf = (name: 'plan' | 'no-plan' | 'unanswered'): unknown => recorded(name).response;
+const usageOf = (name: 'plan' | 'no-plan' | 'unanswered') => recorded(name).response;
 
 /**
  * An error the SDK throws, as it carries how it went: the class it names it, and a child's exit code or the signal that ended it
  * where it read one.
  */
-const thrown = (message: string, more: { errorClass?: string; exitCode?: number; signal?: string } = {}): Error =>
+const thrown = (message: string, more: { errorClass?: string; exitCode?: number; signal?: string } = {}) =>
   Object.assign(new Error(message), more);
 
 /** A stand-in for the SDK's usage call: what `answer` says, what it was asked, and that the ask closed its query. */

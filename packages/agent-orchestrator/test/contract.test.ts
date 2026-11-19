@@ -65,7 +65,7 @@ const SPAWNER = 'apps/cli/src/local.ts';
 const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts', 'packages/templates/released.ts'];
 
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
-function breaches(file: string, text: string, guarded: Guarded): string[] {
+function breaches(file: string, text: string, guarded: Guarded) {
   const code = withoutComments(text);
   const out: string[] = [];
   const instead = `reach it through ${guarded.entries.join(' or ')}`;
@@ -89,7 +89,7 @@ function breaches(file: string, text: string, guarded: Guarded): string[] {
 }
 
 /** Every source file git lists outside the guarded package, tracked or not yet added, that is on disk. */
-function workspaceFiles(guarded: Guarded): string[] {
+function workspaceFiles(guarded: Guarded) {
   const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -214,7 +214,7 @@ test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow, ./testi
 });
 
 /** Each string of `text`'s code that names an entry of `SPAWNED`, with its line, and whether it is a module an import loads. */
-function spawnedNames(text: string): { line: number; spec: string; imported: boolean }[] {
+function spawnedNames(text: string) {
   return withoutComments(text)
     .split('\n')
     .flatMap((row, i) =>
@@ -230,7 +230,7 @@ function spawnedNames(text: string): { line: number; spec: string; imported: boo
  * Where `file` names the CLI's entries other than as the client spawns them: an import of one, from any file, since the CLI is a process
  * and never a module; and a name of one outside `SPAWNER`, which alone resolves it.
  */
-function binBreaches(file: string, text: string): string[] {
+function binBreaches(file: string, text: string) {
   return spawnedNames(text).flatMap(({ line, spec, imported }) => {
     if (imported) return [`${file}:${line} imports ${spec}, the orchestrator's CLI: spawn it from ${SPAWNER} (spawned), never import it`];
     if (!SPAWNERS.includes(file))
@@ -288,7 +288,7 @@ test('REFUSED: a CLI entry resolved outside apps/cli/src/local.ts, and one impor
 const TESTING = 'agent-orchestrator/testing';
 
 /** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */
-function testingBreaches(file: string, text: string): string[] {
+function testingBreaches(file: string, text: string) {
   if (isTestFile(file) || !specifiersIn(withoutComments(text)).includes(TESTING)) return [];
   return [
     `${file} imports ${TESTING}, which is for tests alone: a program that runs is given its place where it is composed ` +
@@ -331,7 +331,7 @@ test('no file that is no test imports the testing entry, in this package or outs
 const TEMPLATES = { name: 'templates', dir: 'packages/templates' } as const;
 
 /** Where `file`, of this package, imports the templates workspace, by its name or by a relative path into its folder. */
-function templateBreaches(file: string, text: string): string[] {
+function templateBreaches(file: string, text: string) {
   const instead = `find a builtin template by path, through BuiltinTemplates (src/template/door/templates.store.ts)`;
   return specifiersIn(withoutComments(text)).flatMap((spec) => {
     const named = spec === TEMPLATES.name || spec.startsWith(`${TEMPLATES.name}/`);
@@ -375,7 +375,7 @@ const READERS = [
   'workflowsIn',
 ];
 
-function readerBreaches(root: readonly string[], format: readonly string[]): string[] {
+function readerBreaches(root: readonly string[], format: readonly string[]) {
   return READERS.flatMap((name) => [
     ...(format.includes(name)
       ? [
@@ -412,7 +412,7 @@ test('./workflow is the pure format, and what reads a folder from disk is export
 type Manifest = { dir: string; name: string; dependencies: Record<string, string>; devDependencies: Record<string, string> };
 
 /** Every workspace package: each workspace the root package.json names (`workspaces`), read from its package.json. */
-function manifests(): Manifest[] {
+function manifests() {
   return workspaces()
     .sort()
     .map((dir) => {
@@ -422,13 +422,13 @@ function manifests(): Manifest[] {
 }
 
 /** Whether a file is a test's: under a `test/` folder, or named `*.test.ts` or `*.test.tsx`. */
-const isTestFile = (file: string): boolean => file.split('/').includes('test') || /\.test\.tsx?$/.test(file);
+const isTestFile = (file: string) => file.split('/').includes('test') || /\.test\.tsx?$/.test(file);
 
 /**
  * What in `file`, a file of the package `manifest` describes, imports a workspace package by a name in `names` that the package does not
  * declare: in `dependencies`, or for a test's file in `devDependencies` too. A package's own name is never refused.
  */
-function undeclared(file: string, text: string, manifest: Manifest, names: readonly string[]): string[] {
+function undeclared(file: string, text: string, manifest: Manifest, names: readonly string[]) {
   const test = isTestFile(file);
   const declared = (name: string) => name in manifest.dependencies || (test && name in manifest.devDependencies);
   const list = test ? 'devDependencies' : 'dependencies';
@@ -440,7 +440,7 @@ function undeclared(file: string, text: string, manifest: Manifest, names: reado
 }
 
 /** Every source file git lists under each workspace package, tracked or not yet added, that is on disk, with its package. */
-function packageFiles(all: readonly Manifest[]): { file: string; manifest: Manifest }[] {
+function packageFiles(all: readonly Manifest[]) {
   const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard', ...all.map((m) => m.dir)], {
     cwd: ROOT,
     encoding: 'utf8',

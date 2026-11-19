@@ -33,14 +33,14 @@ const gate = () => {
  * A driver a test moves by hand: one session listed working, and a follow that says its state, writes a piece, waits at
  * `held` and then ends the turn. The wait is what makes a buffered stream fail: the first frame must arrive before the last.
  */
-const handOps = (held: Promise<void>): RunnerOps => {
+const handOps = (held: Promise<void>) => {
   const sessions = new Map<string, Sighting>([[NAME, { sessionId: 's-1', state: 'working', busy: true }]]);
-  const moments = async function* (): AsyncGenerator<Followed> {
-    yield { kind: 'state', state: 'working' };
-    yield { kind: 'partial', key: 'b0', text: 'Rivers', append: false, last: false };
+  const moments = async function* () {
+    yield { kind: 'state', state: 'working' } satisfies Followed;
+    yield { kind: 'partial', key: 'b0', text: 'Rivers', append: false, last: false } satisfies Followed;
     await held;
-    yield { kind: 'partial', key: 'b0', text: ' run.', append: true, last: true };
-    yield { kind: 'state', state: 'completed' };
+    yield { kind: 'partial', key: 'b0', text: ' run.', append: true, last: true } satisfies Followed;
+    yield { kind: 'state', state: 'completed' } satisfies Followed;
   };
   return {
     spawn: () => Effect.void,
@@ -49,33 +49,35 @@ const handOps = (held: Promise<void>): RunnerOps => {
     logs: () => Effect.succeed('printed'),
     transcript: (sessionId: string) => Effect.succeed({ events: [], cursor: `${sessionId}@0` }),
     follow: () => Stream.fromAsyncIterable(moments(), (cause) => cause as never),
-  };
+  } satisfies RunnerOps;
 };
 
 /**
  * The same driver with nothing left to follow: its `follow` says a terminal state first, which is what `subscription` refuses
  * before it has yielded anything (`a2a/follow.ts`). What makes the first answer of a stream fail.
  */
-const endedOps = (): RunnerOps => ({
-  ...handOps(Promise.resolve()),
-  follow: () => Stream.succeed<Followed>({ kind: 'state', state: 'completed' }),
-});
+const endedOps = () =>
+  ({
+    ...handOps(Promise.resolve()),
+    follow: () => Stream.succeed<Followed>({ kind: 'state', state: 'completed' }),
+  }) satisfies RunnerOps;
 
 /**
  * The same driver following a session that says nothing: its state, then silence, as an attached follow is while its session is
  * quiet — its `next` pending, so nothing asking this generator to return can reach it. `letGo` is set as the stream is let go of.
  */
-const silentOps = (letGo: { done: boolean }): RunnerOps => ({
-  ...handOps(Promise.resolve()),
-  follow: () =>
-    Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'working' }), Stream.never).pipe(
-      Stream.onExit(() =>
-        Effect.sync(() => {
-          letGo.done = true;
-        }),
+const silentOps = (letGo: { done: boolean }) =>
+  ({
+    ...handOps(Promise.resolve()),
+    follow: () =>
+      Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'working' }), Stream.never).pipe(
+        Stream.onExit(() =>
+          Effect.sync(() => {
+            letGo.done = true;
+          }),
+        ),
       ),
-    ),
-});
+  }) satisfies RunnerOps;
 
 /** A holder listening for the length of the test, its scope closed by hand. */
 const holding = async (ops: RunnerOps) => {

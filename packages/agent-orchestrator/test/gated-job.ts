@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** The text of the fake, its shebang this process's node. */
-export const gatedJobScript = (gates: string, head = ''): string => `#!${process.execPath}
+export const gatedJobScript = (gates: string, head = '') => `#!${process.execPath}
 const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
@@ -54,7 +54,7 @@ input.on('line', (text) => {
  * Writes the fake as `claude` in `bin` and names it the job's Claude Code (`AE_CLAUDE_EXECUTABLE`) for the rest of this process,
  * whose engine's workers inherit it; answers its path.
  */
-export const gatedJob = (bin: string, gates: string, head = ''): string => {
+export const gatedJob = (bin: string, gates: string, head = '') => {
   const claude = path.join(bin, 'claude');
   fs.writeFileSync(claude, gatedJobScript(gates, head), { mode: 0o755 });
   process.env.AE_CLAUDE_EXECUTABLE = claude;

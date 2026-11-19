@@ -22,7 +22,7 @@ const API = path.join(REPO, 'apps', 'api');
  * of the person's named `local`, kept as its record by its sha-256 digest under `person-tokens/`, and itself in `credential` (0600),
  * which the client presents on this machine with nothing typed.
  */
-function credentialIn(root: string): void {
+function credentialIn(root: string) {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(root, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -37,7 +37,7 @@ function credentialIn(root: string): void {
  * The api served on the store `env` names, `--no-tick` on a free port, its lease written where the client reads it (`daemon.json`) and
  * the store's credential put in place (`credentialIn`): its url, once it listens, and stopped as the test ends.
  */
-async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
+async function served(t: TestContext, env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
   let said = '';
   const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
@@ -63,7 +63,7 @@ async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
  * A scratch world: its store's environment, served by the api, with `nemia` first on the PATH as a factory has it — the client, which
  * files a card through the api under this machine's context, its daemon never started on demand.
  */
-export async function world(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; root: string }> {
+export async function world(t: TestContext) {
   const at = scratch('nemia-janitor-');
   const env = storeEnv(at);
   for (const name of ['NEMIA_CONTEXT', 'XDG_CONFIG_HOME']) delete env[name];
@@ -82,27 +82,27 @@ export async function world(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; r
     nemia(env, ['factory', 'add', factory, '--volume', `${repo}:rw`, '--no-trust']);
     for (const workflow of workflows) nemia(env, ['factory', 'attach', factory, workflow]);
   }
-  return { env, root: env.WF_ROOT! };
+  return { env, root: env.WF_ROOT! } satisfies { env: NodeJS.ProcessEnv; root: string };
 }
 
 /** The factories the cards are filed in, each with the workflows it attaches: a card names its factory, which offers its workflow. */
 export const FACTORIES: Readonly<Record<string, readonly string[]>> = { acme: ['build'], pipao: ['intake'] };
 
 /** `nemia` typed in the world `env`, as a person sets the factory up: refused, the test fails with what it said. */
-export function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]): void {
+export function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]) {
   const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
   assert.equal(ran.status, 0, `nemia ${argv.join(' ')}: ${ran.stdout}${ran.stderr}`);
 }
 
 /** The inbox's cards in `root`, by file name, with their text. */
-export const inbox = (root: string): Record<string, string> => {
+export const inbox = (root: string) => {
   const dir = path.join(root, 'inbox');
-  if (!fs.existsSync(dir)) return {};
+  if (!fs.existsSync(dir)) return {} satisfies Record<string, string>;
   return Object.fromEntries(
     fs
       .readdirSync(dir)
       .filter((f) => f.endsWith('.md'))
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
-  );
+  ) satisfies Record<string, string>;
 };

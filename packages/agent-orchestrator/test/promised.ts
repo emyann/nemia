@@ -33,7 +33,7 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
  * @param fake The methods a test gives the engine, each sync or async, each answering what the Promise engine answered.
  * @returns The engine whose every verb is an Effect over `fake`'s method of that name.
  */
-export const promised = (fake: object): Engine =>
+export const promised = (fake: object) =>
   Object.fromEntries(
     Object.entries({ hold: () => undefined, ...fake }).map(([name, value]) => [
       name,
@@ -57,13 +57,13 @@ export const promised = (fake: object): Engine =>
  * @param layer A layer that provides the runtime's `Engine` service, over an in-memory journal and the harnesses a test signs by hand.
  * @returns The engine, every verb an Effect.
  */
-export const plainEngine = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine =>
+export const plainEngine = <E>(layer: Layer.Layer<RuntimeEngine, E>) =>
   Effect.runSync(
     Layer.build(layer).pipe(
       Effect.map((context) => Context.get(context, RuntimeEngine)),
       Effect.provideService(Scope.Scope, Scope.makeUnsafe()),
     ),
-  );
+  ) satisfies Engine;
 
 /** A hand harness, in async methods, every session's state in A2A's names: what `asyncOps` makes a `RunnerOps` of. */
 export type AsyncRunner = {
@@ -94,50 +94,51 @@ const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
  * @param h The hand harness.
  * @returns Its `RunnerOps`, with an `output` and a `say` only where `h` has them.
  */
-export const asyncOps = (h: AsyncRunner): RunnerOps => ({
-  spawn: (r) =>
-    Effect.tryPromise({
-      try: () => h.spawn(r),
-      catch: (cause) =>
-        new RunnerError({
-          verb: 'spawn',
-          message: cause instanceof Error ? cause.message : String(cause),
-          ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
-        }),
-    }),
-  observe: wrap(
-    () => h.observe(),
-    (message) => new RunnerError({ verb: 'observe', message }),
-  ),
-  stop: (id) =>
-    wrap(
-      () => h.stop(id),
-      (message) => new RunnerError({ verb: 'stop', message }),
+export const asyncOps = (h: AsyncRunner) =>
+  ({
+    spawn: (r) =>
+      Effect.tryPromise({
+        try: () => h.spawn(r),
+        catch: (cause) =>
+          new RunnerError({
+            verb: 'spawn',
+            message: cause instanceof Error ? cause.message : String(cause),
+            ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+          }),
+      }),
+    observe: wrap(
+      () => h.observe(),
+      (message) => new RunnerError({ verb: 'observe', message }),
     ),
-  logs: (id) =>
-    wrap(
-      () => h.logs(id),
-      (message) => new RunnerError({ verb: 'logs', message }),
-    ),
-  ...(h.output
-    ? {
-        output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
-          wrap(
-            () => h.output!(name, stream, lastBytes),
-            (message) => new RunnerError({ verb: 'output', message }),
-          ),
-      }
-    : {}),
-  ...(h.say
-    ? {
-        say: (session: { name: string; sessionId: string }, text: string) =>
-          wrap(
-            () => h.say!(session, text),
-            (message) => new RunnerError({ verb: 'say', message }),
-          ),
-      }
-    : {}),
-});
+    stop: (id) =>
+      wrap(
+        () => h.stop(id),
+        (message) => new RunnerError({ verb: 'stop', message }),
+      ),
+    logs: (id) =>
+      wrap(
+        () => h.logs(id),
+        (message) => new RunnerError({ verb: 'logs', message }),
+      ),
+    ...(h.output
+      ? {
+          output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
+            wrap(
+              () => h.output!(name, stream, lastBytes),
+              (message) => new RunnerError({ verb: 'output', message }),
+            ),
+        }
+      : {}),
+    ...(h.say
+      ? {
+          say: (session: { name: string; sessionId: string }, text: string) =>
+            wrap(
+              () => h.say!(session, text),
+              (message) => new RunnerError({ verb: 'say', message }),
+            ),
+        }
+      : {}),
+  }) satisfies RunnerOps;
 
 /**
  * `j` as the runtime's store: each rejection a `JournalError`, on the task it was asked of, or `*`.
@@ -145,24 +146,25 @@ export const asyncOps = (h: AsyncRunner): RunnerOps => ({
  * @param j The hand store.
  * @returns Its `StoreOps`.
  */
-export const asyncStore = (j: AsyncJournal): StoreOps => ({
-  append: (taskId, event) =>
-    wrap(
-      () => j.append(taskId, event),
-      (message) => new JournalError({ taskId, message }),
-    ),
-  read: (taskId) =>
-    wrap(
-      () => j.read(taskId),
-      (message) => new JournalError({ taskId, message }),
-    ),
-  list: wrap(
-    () => j.list(),
-    (message) => new JournalError({ taskId: '*', message }),
-  ),
-  feed: (after) =>
-    wrap(
-      () => j.feed(after),
+export const asyncStore = (j: AsyncJournal) =>
+  ({
+    append: (taskId, event) =>
+      wrap(
+        () => j.append(taskId, event),
+        (message) => new JournalError({ taskId, message }),
+      ),
+    read: (taskId) =>
+      wrap(
+        () => j.read(taskId),
+        (message) => new JournalError({ taskId, message }),
+      ),
+    list: wrap(
+      () => j.list(),
       (message) => new JournalError({ taskId: '*', message }),
     ),
-});
+    feed: (after) =>
+      wrap(
+        () => j.feed(after),
+        (message) => new JournalError({ taskId: '*', message }),
+      ),
+  }) satisfies StoreOps;

@@ -112,31 +112,35 @@ const DISCOVERY = {
 };
 
 /** What the stand-in answers `method` `url` with `body`, by `authorization`: a status and a JSON body. */
-function answer(method: string, url: string, body: unknown, authorization: string | undefined): [number, unknown] {
-  if (authorization === 'Bearer stale') return [401, { error: 'refused', reason: 'session-ended' }];
-  if (method === 'GET' && url === '/api') return [200, DISCOVERY];
+function answer(method: string, url: string, body: unknown, authorization: string | undefined) {
+  if (authorization === 'Bearer stale') return [401, { error: 'refused', reason: 'session-ended' }] satisfies [number, unknown];
+  if (method === 'GET' && url === '/api') return [200, DISCOVERY] satisfies [number, unknown];
   const hired = /^\/api\/namespaces\/f1\/hires\/([^/]+)$/.exec(url);
   if (method === 'GET' && hired) {
     const one = HIRES[hired[1] ?? ''];
-    return one ? [200, one] : [404, { error: 'none' }];
+    return (one ? [200, one] : [404, { error: 'none' }]) satisfies [number, unknown];
   }
-  if (method === 'POST' && url === '/api/namespaces/f1/proposals') return [201, proposal('implementer-ab12c', 'waiting', body)];
-  if (method === 'GET' && url === '/api/namespaces/f1/proposals/implementer-old01') return [200, APPLIED];
-  if (method === 'GET' && url.startsWith('/api/namespaces/f1/proposals/')) return [404, { error: 'none' }];
+  if (method === 'POST' && url === '/api/namespaces/f1/proposals')
+    return [201, proposal('implementer-ab12c', 'waiting', body)] satisfies [number, unknown];
+  if (method === 'GET' && url === '/api/namespaces/f1/proposals/implementer-old01') return [200, APPLIED] satisfies [number, unknown];
+  if (method === 'GET' && url.startsWith('/api/namespaces/f1/proposals/')) return [404, { error: 'none' }] satisfies [number, unknown];
   const judged = /^\/api\/namespaces\/f1\/proposals\/([^/]+)\/(approve|decline)$/.exec(url);
   if (method === 'POST' && judged) {
-    if (judged[1] === 'implementer-nope1') return [403, { error: 'refused', reason: 'person-only' }];
-    return [200, proposal(judged[1] ?? '', judged[2] === 'approve' ? 'applied' : 'declined', { objects: [] })];
+    if (judged[1] === 'implementer-nope1') return [403, { error: 'refused', reason: 'person-only' }] satisfies [number, unknown];
+    return [200, proposal(judged[1] ?? '', judged[2] === 'approve' ? 'applied' : 'declined', { objects: [] })] satisfies [number, unknown];
   }
   const delegated = /^\/api\/namespaces\/f1\/delegations\/([^/]+)$/.exec(url);
   if (delegated) {
     const agent = delegated[1] ?? '';
     if (method === 'PUT') delegations.set(agent, body);
     const spec = delegations.get(agent);
-    if (spec === undefined) return [404, { error: 'none' }];
-    return [200, { apiVersion: 'nemia/v1', kind: 'Delegation', metadata: meta(agent, 'f1', String(took.length)), spec }];
+    if (spec === undefined) return [404, { error: 'none' }] satisfies [number, unknown];
+    return [200, { apiVersion: 'nemia/v1', kind: 'Delegation', metadata: meta(agent, 'f1', String(took.length)), spec }] satisfies [
+      number,
+      unknown,
+    ];
   }
-  return [404, {}];
+  return [404, {}] satisfies [number, unknown];
 }
 
 const stub = http.createServer((req, res) => {
@@ -165,7 +169,7 @@ fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url: `http://1
 const NO_CONFIG = scratch('nemia-propose-config-');
 
 /** `nemia argv` on the stand-in, with `token` as `WF_SESSION_TOKEN` where given, else none in its environment; `stdin` its input. */
-function nemia(argv: readonly string[], { token, stdin }: { token?: string; stdin?: string } = {}): Promise<Said> {
+function nemia(argv: readonly string[], { token, stdin }: { token?: string; stdin?: string } = {}) {
   const env = {
     ...ambient(),
     WF_ROOT: root,
@@ -182,14 +186,14 @@ function nemia(argv: readonly string[], { token, stdin }: { token?: string; stdi
   return new Promise((resolve, reject) => {
     run.on('error', reject);
     run.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** The requests `run` sent, of those the stand-in took. */
-async function sent(run: () => Promise<Said>): Promise<{ said: Said; requests: Took[] }> {
+async function sent(run: () => Promise<Said>) {
   const from = took.length;
   const said = await run();
-  return { said, requests: took.slice(from) };
+  return { said, requests: took.slice(from) } satisfies { said: Said; requests: Took[] };
 }
 
 const HIRES_FILE = [

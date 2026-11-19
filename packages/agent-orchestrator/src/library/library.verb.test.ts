@@ -12,7 +12,7 @@ import { addedServers, addTemplateBuiltins, factoryAdds, libraryAddObject, libra
 import { addedOf, libraryAddsFile, readLibraryAdds, writeLibraryAdds, writeLibraryServers } from './library.store.ts';
 
 /** A store whose library is a copy of the tests' team. */
-const store = (): string => {
+const store = () => {
   const home = scratch('wf-library-');
   fs.cpSync(TEAM, path.join(home, 'workflows'), { recursive: true });
   return home;

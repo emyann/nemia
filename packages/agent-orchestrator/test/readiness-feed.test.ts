@@ -27,14 +27,15 @@ const stage = staged({ runWith, main, engineOf, env: ENV });
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 
 /** A piece of the git place a run waits on, in the state given. */
-const mise = (state: ReadinessPiece['state']): ReadinessPiece => ({
-  name: 'mise',
-  area: 'place',
-  state,
-  message: 'mise is not installed',
-  fixes: state === 'missing' ? [{ message: 'install it', command: 'nemia doctor fix mise', startable: true }] : [],
-  cost: 'run',
-});
+const mise = (state: ReadinessPiece['state']) =>
+  ({
+    name: 'mise',
+    area: 'place',
+    state,
+    message: 'mise is not installed',
+    fixes: state === 'missing' ? [{ message: 'install it', command: 'nemia doctor fix mise', startable: true }] : [],
+    cost: 'run',
+  }) satisfies ReadinessPiece;
 
 /** The feed's readiness lines: each one's reason and note. */
 const readinessSaid = () =>

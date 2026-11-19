@@ -19,7 +19,7 @@ const PHONE = { width: 390, height: 844 };
 const cardOf = (page: Page) => page.locator(`article[aria-label="Workflow ${GOING}"]`);
 
 /** What the confirm says goes, and what becomes of what names the folder. */
-const asked = (dir: string): string =>
+const asked = (dir: string) =>
   `Remove ${dir}, its 2 steps and every file in it? A run started on it goes on from the steps it froze at its start; a card that names it and is not queued is refused when it starts.`;
 
 export default {

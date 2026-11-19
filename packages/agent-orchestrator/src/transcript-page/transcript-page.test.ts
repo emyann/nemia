@@ -8,14 +8,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { SaidAfter } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';
-import {
-  type TranscriptAt,
-  transcriptCursorOf,
-  transcriptCursorRead,
-  transcriptKindsOf,
-  transcriptPaged,
-  type TranscriptPaged,
-} from './transcript-page.ts';
+import { transcriptCursorOf, transcriptCursorRead, transcriptKindsOf, transcriptPaged, type TranscriptPaged } from './transcript-page.ts';
 
 const BOUNDS = { byDefault: 3, most: 5 };
 
@@ -23,13 +16,13 @@ const BOUNDS = { byDefault: 3, most: 5 };
 const KINDS: readonly SaidAfter[] = ['tool_use', 'tool_result', 'text'];
 const said = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `e-${i}`, kind: KINDS[i % KINDS.length] }));
 
-const at = (cursor: string | undefined): TranscriptAt => {
+const at = (cursor: string | undefined) => {
   const read = transcriptCursorRead(cursor);
   assert.ok(!(read instanceof Invalid), `cursor ${cursor} reads`);
   return read;
 };
 
-const page = <E extends { kind: SaidAfter }>(p: TranscriptPaged<E> | Invalid): TranscriptPaged<E> => {
+const page = <E extends { kind: SaidAfter }>(p: TranscriptPaged<E> | Invalid) => {
   assert.ok(!(p instanceof Invalid), 'the page is cut');
   return p;
 };

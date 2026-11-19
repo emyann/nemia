@@ -108,7 +108,7 @@ export default {
  * note each say the hold's why and who put it beside `held until`, in the package's words, the card clamped to its two lines and whole
  * on hover; the note names HELD off the hold alone, where it stands unread. The hold is then taken back, and the run's page says no hold.
  */
-async function heldWithWords(page: Page): Promise<void> {
+async function heldWithWords(page: Page) {
   const { id, gated } = GATED;
   const hold = path.join(store!, 'runs', `${id}.hold`);
   const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
@@ -171,7 +171,7 @@ async function heldWithWords(page: Page): Promise<void> {
  * come, never grey as if nearly done; on its page the step's chip is to come too, its hover saying the hold. The hold is then taken
  * back.
  */
-async function heldNotStarted(page: Page): Promise<void> {
+async function heldNotStarted(page: Page) {
   const { id } = DIAMOND.bottom;
   const hold = path.join(store!, 'runs', `${id}.hold`);
   try {

@@ -36,7 +36,7 @@ import { admissionOf, type EngineOptions } from '../src/service/options.ts';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 
-const memoryJournal = (): AsyncJournal => {
+const memoryJournal = () => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -53,22 +53,23 @@ const memoryJournal = (): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** A harness whose sessions work until the test says otherwise. */
-const fake = (sessions: Map<string, Sighting>): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    return new Map(sessions);
-  },
-  async stop() {},
-  async logs() {
-    return '';
-  },
-});
+const fake = (sessions: Map<string, Sighting>) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
+    async stop() {},
+    async logs() {
+      return '';
+    },
+  }) satisfies AsyncRunner;
 
 /** A board of harnesses `a` and `b`, each pooled as `pools` says, under `maxConcurrent`. */
 const board = (maxConcurrent: number | undefined, pools: { a?: string; b?: string } = {}, journal = memoryJournal()) => {
@@ -543,13 +544,14 @@ describe("the engine's defaults, as its admission holds them: a harness that run
 
 const T0 = Date.parse('2026-10-04T10:00:00.000Z');
 const at = (sec: number) => new Date(T0 + sec * 1000).toISOString();
-const queued = (id: string, filed: number, harness = 'a', priority?: number): AdmissionView => ({
-  id,
-  phase: 'pending',
-  admission: 'queued',
-  state: { harness, filedAt: at(filed), ...(priority !== undefined ? { priority } : {}) },
-});
-const live = (id: string, phase: TaskPhase, harness = 'a'): AdmissionView => ({ id, phase, state: { harness, filedAt: at(0) } });
+const queued = (id: string, filed: number, harness = 'a', priority?: number) =>
+  ({
+    id,
+    phase: 'pending',
+    admission: 'queued',
+    state: { harness, filedAt: at(filed), ...(priority !== undefined ? { priority } : {}) },
+  }) satisfies AdmissionView;
+const live = (id: string, phase: TaskPhase, harness = 'a') => ({ id, phase, state: { harness, filedAt: at(0) } }) satisfies AdmissionView;
 const under = (ceiling: number, poolOf = ownPool) => ({ ceiling, poolOf });
 /** The ids `toAdmit` admits, in turn. */
 const admittedIds = (views: readonly AdmissionView[], rule: AdmissionRule) => toAdmit(views, rule).admit;
@@ -591,14 +593,15 @@ describe('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, 
       needBytes: 3 * GI,
       roomBytes: GI,
     });
-    const started = (resources?: { limits: { memory: string } }): AdmissionView => ({
-      ...live('held', 'starting'),
-      state: {
-        harness: 'a',
-        resources: { limits: { memory: '512Mi' } },
-        attempts: [{ ended: null, ...(resources ? { resources } : {}) }],
-      },
-    });
+    const started = (resources?: { limits: { memory: string } }) =>
+      ({
+        ...live('held', 'starting'),
+        state: {
+          harness: 'a',
+          resources: { limits: { memory: '512Mi' } },
+          attempts: [{ ended: null, ...(resources ? { resources } : {}) }],
+        },
+      }) satisfies AdmissionView;
     const small = { ...queued('small', 2), state: { ...queued('small', 2).state, resources: { limits: { memory: '256Mi' } } } };
     assert.deepEqual(waitOf(small, [started({ limits: { memory: '1Gi' } })]), { for: 'memory', needBytes: GI / 4, roomBytes: 0 });
     assert.equal(waitOf(small, [started()]), undefined, 'counted at its filed 512Mi: 768Mi of 1Gi');
@@ -621,12 +624,13 @@ describe('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, 
       queued('f-1', 5, 'f'),
     ];
     assert.deepEqual(admittedIds(views, under(2)), ['a-1', 'k-2', 'f-1']);
-    const bare = (id: string, admission?: 'queued'): AdmissionView => ({
-      id,
-      phase: admission ? 'pending' : 'working',
-      ...(admission ? { admission } : {}),
-      state: {},
-    });
+    const bare = (id: string, admission?: 'queued') =>
+      ({
+        id,
+        phase: admission ? 'pending' : 'working',
+        ...(admission ? { admission } : {}),
+        state: {},
+      }) satisfies AdmissionView;
     assert.deepEqual(admittedIds([bare('d-1'), bare('d-2', 'queued'), queued('def', 1, 'default')], under(1)), [], '`default` is full');
     assert.deepEqual(admittedIds([bare('d-1'), queued('a-1', 1)], under(1)), ['a-1']);
   });
@@ -683,17 +687,17 @@ describe('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, 
  * decides of each waiter, and the verifier proves no sum over an array without a loop's invariant in the code, which imports nothing
  * of it. Each law here is one design wrote of `admitting`, but `admittedInTurn`, held on every pass `passes` builds.
  */
-const sumOf = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
-const admittedNeed = (pass: AdmissionPass, out: Admitted): number =>
+const sumOf = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+const admittedNeed = (pass: AdmissionPass, out: Admitted) =>
   sumOf(pass.waiting.filter((w) => out.admit.includes(w.id)).map((w) => w.needBytes));
-const promised = (pass: AdmissionPass): number => sumOf(pass.holders.map((h) => h.needBytes));
-const unseen = (pass: AdmissionPass): number => sumOf(pass.holders.filter((h) => !h.running).map((h) => h.needBytes));
-const heldInPool = (pass: AdmissionPass, pool: string): number => pass.holders.filter((h) => h.pool === pool).length;
-const inPoolAfter = (pass: AdmissionPass, out: Admitted, pool: string): number =>
+const promised = (pass: AdmissionPass) => sumOf(pass.holders.map((h) => h.needBytes));
+const unseen = (pass: AdmissionPass) => sumOf(pass.holders.filter((h) => !h.running).map((h) => h.needBytes));
+const heldInPool = (pass: AdmissionPass, pool: string) => pass.holders.filter((h) => h.pool === pool).length;
+const inPoolAfter = (pass: AdmissionPass, out: Admitted, pool: string) =>
   heldInPool(pass, pool) + pass.waiting.filter((w) => w.pool === pool && out.admit.includes(w.id)).length;
-const roomAfter = (pass: AdmissionPass, m: MachineMemory, out: Admitted): number =>
+const roomAfter = (pass: AdmissionPass, m: MachineMemory, out: Admitted) =>
   Math.min(m.totalBytes - m.reservedBytes - promised(pass), m.availableBytes - m.reservedBytes - unseen(pass)) - admittedNeed(pass, out);
-const waitOf = (out: Admitted, id: string): AdmissionWait | undefined => out.waits.find((x) => x.id === id)?.wait;
+const waitOf = (out: Admitted, id: string) => out.waits.find((x) => x.id === id)?.wait satisfies AdmissionWait | undefined;
 
 /** Each law of a whole pass, by design's name: true where the pass keeps it. */
 const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean> = {
@@ -751,7 +755,7 @@ const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean>
 /** A generator of whole numbers from a seed (mulberry32): the same passes on every run. */
 const seeded = (seed: number) => {
   let a = seed >>> 0;
-  return (below: number): number => {
+  return (below: number) => {
     a = (a + 0x6d2b79f5) >>> 0;
     let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -764,15 +768,15 @@ const seeded = (seed: number) => {
  * Passes over two pools and a few needs, on a machine read or not: `count` of every shape, and as many of the shape
  * `stopsAtTheFloorOfAvailableOverTheLimit` speaks of (nothing held, alike waiters under a ceiling that leaves the memory to decide).
  */
-const passes = (seed: number, count: number): AdmissionPass[] => {
+const passes = (seed: number, count: number) => {
   const n = seeded(seed);
   const NEEDS = [0, 1, 2, 3, 5];
   const POOLS = ['a', 'b'];
-  const machine = (): MachineMemory => {
+  const machine = () => {
     const totalBytes = n(16);
-    return { totalBytes, availableBytes: n(totalBytes + 3), reservedBytes: n(4) };
+    return { totalBytes, availableBytes: n(totalBytes + 3), reservedBytes: n(4) } satisfies MachineMemory;
   };
-  const pick = <T>(xs: readonly T[]): T => xs[n(xs.length)];
+  const pick = <T>(xs: readonly T[]) => xs[n(xs.length)] satisfies T;
   const out: AdmissionPass[] = [];
   for (let i = 0; i < count; i++) {
     const holders: Holder[] = Array.from({ length: n(4) }, () => ({ pool: pick(POOLS), needBytes: pick(NEEDS), running: n(2) === 0 }));
@@ -789,7 +793,7 @@ const passes = (seed: number, count: number): AdmissionPass[] => {
       waiting: alike,
     });
   }
-  return out;
+  return out satisfies AdmissionPass[];
 };
 
 describe("admitting, the whole pass: each law design wrote of it, and the order it admits in, holds on 4000 passes from a seed, `admitOne`'s laws being proved by the contract", () => {
@@ -828,11 +832,12 @@ describe("admitting, the whole pass: each law design wrote of it, and the order 
 });
 
 describe('admitting and roomOf: the rows a person reads the whole pass by', () => {
-  const machine = (totalBytes: number, availableBytes: number, reservedBytes: number): MachineMemory => ({
-    totalBytes,
-    availableBytes,
-    reservedBytes,
-  });
+  const machine = (totalBytes: number, availableBytes: number, reservedBytes: number) =>
+    ({
+      totalBytes,
+      availableBytes,
+      reservedBytes,
+    }) satisfies MachineMemory;
   test('roomOf: the lesser of the total less the floor and every holder, and the available less the floor and the unseen', () => {
     const holders: Holder[] = [
       { pool: 'a', needBytes: 3, running: true },

@@ -47,7 +47,7 @@ type Side = {
 };
 
 /** A store of its own, `cards` the Card door's layer where a test gives one. */
-function side(prefix: string, cards: Layer.Layer<never> = cardDoorMemory()): Side {
+function side(prefix: string, cards: Layer.Layer<never> = cardDoorMemory()) {
   const factories = factoryDoorMemory();
   const runs = runDoorMemory();
   return {
@@ -60,17 +60,17 @@ function side(prefix: string, cards: Layer.Layer<never> = cardDoorMemory()): Sid
 }
 
 /** `program` run on the store `s` and this test's place: how it ended. */
-const on = <A, E>(s: Side, program: Effect.Effect<A, E, StoreRoot | PlaceService>): Promise<Exit.Exit<A, E>> =>
+const on = <A, E>(s: Side, program: Effect.Effect<A, E, StoreRoot | PlaceService>) =>
   Effect.runPromiseExit(program.pipe(Effect.provide(s.layer), Effect.provide(stand().layer), Effect.provideService(StoreRoot, s.root)));
 
 /** What `exit` answered; its failure fails the test. */
-const answer = <A, E>(exit: Exit.Exit<A, E>): A => {
+const answer = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return exit.value;
   return assert.fail(Cause.pretty(exit.cause));
 };
 
 /** The kind and the words of the refusal `exit` failed with. */
-const refusal = <A, E>(exit: Exit.Exit<A, E>): { kind: string; message: string } => {
+const refusal = <A, E>(exit: Exit.Exit<A, E>) => {
   if (Exit.isSuccess(exit)) return assert.fail('it was not refused');
   const failed = exit.cause.reasons.find(Cause.isFailReason);
   const error = failed?.error as { _tag?: string; message?: string } | undefined;
@@ -81,7 +81,7 @@ const refusal = <A, E>(exit: Exit.Exit<A, E>): { kind: string; message: string }
 const fileOf = (at: string, text: string) => ({ path: at, mode: 0o644, bytes: new TextEncoder().encode(text) });
 
 /** A template's folder, as `nemia template pack` packs one. */
-function templateFolder(): string {
+function templateFolder() {
   const at = path.join(scratch('wf-move-template-'), 'shop-template');
   fs.mkdirSync(path.join(at, 'workflows', 'press'), { recursive: true });
   fs.writeFileSync(path.join(at, 'nemia.yaml'), 'kind: FactoryTemplate\nmetadata:\n  name: shop-template\n');
@@ -94,7 +94,7 @@ function templateFolder(): string {
  * (a repository of the test place), its folder with its tree, its base, a proposal and a delegation, its level, and three cards: one to
  * follow, one a run was started from, one of another factory.
  */
-function planted(src: Side, template = templateFolder()): { factory: Factory; origin: string } {
+function planted(src: Side, template = templateFolder()) {
   const originDir = path.join(scratch('wf-move-origin-'), 'acme', 'shop');
   fs.mkdirSync(originDir, { recursive: true });
   stand().world.repository(originDir, { 'README.md': 'shop\n' });
@@ -128,7 +128,7 @@ function planted(src: Side, template = templateFolder()): { factory: Factory; or
 }
 
 /** The export of `shop` from `src`, cards as `cards` says. */
-const exported = async (src: Side, cards?: 'follow' | 'stay'): Promise<FactoryExport> =>
+const exported = async (src: Side, cards?: 'follow' | 'stay') =>
   answer(await on(src, factoryExported('shop', cards === undefined ? {} : { cards })));
 
 /** The import of `exp` into `dst`, as the api calls it: the template sent taken under the store, kept where the factory is made. */

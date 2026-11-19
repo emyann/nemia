@@ -47,7 +47,7 @@ const fakeBin = () => {
   return bin;
 };
 
-const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
+const onPath = async <T>(bin: string, f: () => Promise<T>) => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
   try {
@@ -214,7 +214,7 @@ describe("a task's MCP servers reach each runner strictly, the checkout's and th
 });
 
 /** A spawn of `task` refused before anything ran: no argv, an `unstartable` attempt, and the words it was refused in. */
-const unstartable = async (t: Waiter, task: Omit<TaskSpec, 'brief'>, codexHome?: string): Promise<string | undefined> => {
+const unstartable = async (t: Waiter, task: Omit<TaskSpec, 'brief'>, codexHome?: string) => {
   const { args, attempt } = await spawnAtDefaults(t, task, codexHome);
   assert.equal(args, undefined, 'the CLI never ran');
   assert.equal(attempt?.reason, 'unstartable');

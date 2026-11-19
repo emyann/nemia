@@ -53,34 +53,36 @@ const LIFECYCLE = JSON.parse(fs.readFileSync(new URL('./fixtures/lifecycle-graph
 type Box = { name: string; x: number; y: number; width: number; height: number };
 
 /** Every box the drawing puts down, states and labels, by their top-left corners. */
-const boxesOf = (drawing: Drawing): Box[] => [
-  ...drawing.states.map((s) => ({ name: s.id, x: s.x, y: s.y, width: s.width, height: s.height })),
-  ...drawing.routes.map((r) => ({
-    name: `label ${r.id}`,
-    x: r.label.x - r.label.width / 2,
-    y: r.label.y - r.label.height / 2,
-    width: r.label.width,
-    height: r.label.height,
-  })),
-];
+const boxesOf = (drawing: Drawing) =>
+  [
+    ...drawing.states.map((s) => ({ name: s.id, x: s.x, y: s.y, width: s.width, height: s.height })),
+    ...drawing.routes.map((r) => ({
+      name: `label ${r.id}`,
+      x: r.label.x - r.label.width / 2,
+      y: r.label.y - r.label.height / 2,
+      width: r.label.width,
+      height: r.label.height,
+    })),
+  ] satisfies Box[];
 
-const overlaps = (boxes: Box[]): string[] =>
+const overlaps = (boxes: Box[]) =>
   boxes.flatMap((a, i) =>
     boxes
       .slice(i + 1)
       .filter((b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height)
       .map((b) => `${a.name} and ${b.name}`),
-  );
+  ) satisfies string[];
 
 /** Where each edge and verb is written: `from->to` for a route, `from` for a box, with its event and its action, or the verb's line. */
-const written = (drawing: Drawing): string[] => [
-  ...drawing.routes.flatMap((r) => r.edges.flatMap((g) => g.events.map((e) => `${r.from}->${r.to} ${e} / ${g.action}`))),
-  ...drawing.routes.flatMap((r) => r.verbs.map((v) => `${r.from}->${r.to} ${v}`)),
-  ...drawing.states.flatMap((s) => s.stays.flatMap((g) => g.events.map((e) => `${s.id} ${e} / ${g.action}`))),
-];
+const written = (drawing: Drawing) =>
+  [
+    ...drawing.routes.flatMap((r) => r.edges.flatMap((g) => g.events.map((e) => `${r.from}->${r.to} ${e} / ${g.action}`))),
+    ...drawing.routes.flatMap((r) => r.verbs.map((v) => `${r.from}->${r.to} ${v}`)),
+    ...drawing.states.flatMap((s) => s.stays.flatMap((g) => g.events.map((e) => `${s.id} ${e} / ${g.action}`))),
+  ] satisfies string[];
 
 /** Points along an SVG path of absolute `M`, `L`, `Q` and `C` commands, every segment cut in `steps`: where its line is drawn. */
-function along(path: string, steps = 40): { x: number; y: number }[] {
+function along(path: string, steps = 40) {
   const tokens = path.match(/[MLQC]|-?[\d.]+(?:e-?\d+)?/g) ?? [];
   const points: { x: number; y: number }[] = [];
   let at = { x: 0, y: 0 };
@@ -98,13 +100,14 @@ function along(path: string, steps = 40): { x: number; y: number }[] {
     }
     at = given[given.length - 1];
   }
-  return points;
+  return points satisfies { x: number; y: number }[];
 }
 
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const binomial = (n: number, k: number): number => (k === 0 || k === n ? 1 : binomial(n - 1, k - 1) + binomial(n - 1, k));
 
 /** Each route whose line enters a box other than its own label, by a pixel or more: a state, or another route's label. */
-const crossings = (drawing: Drawing): string[] =>
+const crossings = (drawing: Drawing) =>
   drawing.routes.flatMap((route) =>
     boxesOf(drawing)
       .filter((box) => box.name !== `label ${route.id}`)
@@ -112,7 +115,7 @@ const crossings = (drawing: Drawing): string[] =>
         along(route.path).some((p) => p.x > box.x + 1 && p.x < box.x + box.width - 1 && p.y > box.y + 1 && p.y < box.y + box.height - 1),
       )
       .map((box) => `${route.id} through ${box.name}`),
-  );
+  ) satisfies string[];
 
 describe('drawMachine: every edge and verb written in one place, the pairs joined as one route, the ends marked, the boxes sized', () => {
   test('every edge is written once, on its route or, back to its own state, on its box; every verb once on each route it takes', () => {

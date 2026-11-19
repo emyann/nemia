@@ -7,7 +7,7 @@
  * folder (`argv.jsonl`, `said.jsonl`). Its plan rides the test process's environment, which the bin's `Options.env` carries down
  * to it.
  */
-import { beforeAll, describe, test } from 'vitest';
+import { beforeAll, describe, test, vi } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 
 import assert from 'node:assert/strict';
@@ -59,7 +59,7 @@ const fake = (plan: object = {}) => {
   return {
     dir,
     /** The lines the stand-in wrote into `file`, each parsed; `undefined` where it wrote none. */
-    said: (file: string): unknown[] | undefined => {
+    said: (file: string) => {
       try {
         return fs
           .readFileSync(path.join(dir, file), 'utf8')
@@ -140,17 +140,14 @@ describe(
         await done('ae/k/1', c);
         const runs = path.join(root, 'runs', 'claude');
         for (const log of fs.readdirSync(runs).filter((n) => n.endsWith('.log'))) fs.appendFileSync(path.join(runs, log), '\n');
-        const read: string[] = [];
-        const readFileSync = fs.readFileSync;
-        fs.readFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
-          read.push(String(file));
-          return (readFileSync as (...a: unknown[]) => unknown)(file, ...rest);
-        }) as typeof fs.readFileSync;
+        const reads = vi.spyOn(fs, 'readFileSync');
         let found;
+        let read: string[] = [];
         try {
           found = await Effect.runPromise(ops.find!('ae/j/1'));
         } finally {
-          fs.readFileSync = readFileSync;
+          read = reads.mock.calls.map(([file]) => String(file));
+          reads.mockRestore();
         }
         assert.deepEqual(found, { sessionId: 'ae/j/1' });
         assert.deepEqual(read, [path.join(runs, 'ae_j_1.json')], 'one file read, the run file of the job asked for');

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Effect, type Layer } from 'effect';
-import type { Decidable, DecideCommand, RunDecision } from 'objects';
+import type { DecideCommand } from 'objects';
 import { engine, runWith as runEngine } from '../runtime-client.ts';
 import { builtinGitPlace, gitPlaceLayer } from '../place/builtin.store.ts';
 import { PlaceService } from '../place/place.store.ts';
@@ -55,7 +55,7 @@ const write = (repo: string, file: string, text: string) => {
 };
 
 /** A repository whose base has a workspace package with a source file and its test, and a CLAUDE.md; returns it with its base's sha. */
-function aRepo(): { repo: string; base: string } {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   write(repo, 'package.json', `${JSON.stringify({ name: 'app', workspaces: ['packages/*'], scripts: { test: 'node --test' } })}\n`);
@@ -141,14 +141,14 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
  * The decision of the run `id` (`runDecision`), read over `env` — the app's environment, where the cap on runs in flight is read — and the
  * place `place` gives: the git place unless a test counts what it is asked.
  */
-const decisionOf = async (id: string, env: Env = ENV, place: Layer.Layer<PlaceService> = gitPlaceLayer): Promise<RunDecision> => {
+const decisionOf = async (id: string, env: Env = ENV, place: Layer.Layer<PlaceService> = gitPlaceLayer) => {
   const read = await runEngine(e, runDecision(id).pipe(Effect.provide(place), Effect.provide(storeConfigLayer({ ...env, WF_ROOT: root }))));
   assert.ok('decision' in read, JSON.stringify(read));
   return read.decision;
 };
 
 /** A decision there is to make: `nemia decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
-const decidable = async (id: string, env?: Env): Promise<Decidable> => {
+const decidable = async (id: string, env?: Env) => {
   const body = await decisionOf(id, env);
   assert.ok('commands' in body, JSON.stringify(body));
   return body;

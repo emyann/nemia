@@ -39,16 +39,17 @@ const SCHEMA = {
 };
 const CLAUDE = { settings: '/s.json', pluginDir: ['/p'], appendSystemPromptFile: '/a.md', remoteControl: 'name' };
 
-const filed = (brief: string, extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event => ({
-  kind: 'filed',
-  at: '2026-10-05T00:00:00Z',
-  brief,
-  cwd: '/r',
-  config: { model: 'opus', claude: CLAUDE },
-  closeoutSchema: SCHEMA,
-  queued: false,
-  ...extra,
-});
+const filed = (brief: string, extra: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+  ({
+    kind: 'filed',
+    at: '2026-10-05T00:00:00Z',
+    brief,
+    cwd: '/r',
+    config: { model: 'opus', claude: CLAUDE },
+    closeoutSchema: SCHEMA,
+    queued: false,
+    ...extra,
+  }) satisfies Event;
 const BRIEF_PARTS = [`# Task\n\n${long('the ask', 2000)}`, SHARED, '\n## When you are finished\n\nSay so.\n'];
 const BRIEF = BRIEF_PARTS.join('');
 const NUDGE = long('the answer', 1500);

@@ -19,7 +19,7 @@ const made: Factory = {
 };
 
 /** A template's render offering `a` and `c`, hiring `q` into `a/x` and `r` into `c/y`. */
-const adoption = (over: Partial<Adoption> = {}): Adoption => ({
+const adoption = (over: Partial<Adoption> = {}) => ({
   wiring: { workflows: ['a', 'c'], hires: { 'a/x': 'q', 'c/y': 'r' } },
   cards: [],
   leftovers: { base: null, tree: null },

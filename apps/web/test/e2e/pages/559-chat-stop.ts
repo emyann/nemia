@@ -22,7 +22,7 @@ const ANSWERING_WORDS = 'She is answering. Write the next one, or stop her';
 const OPEN_WORDS = 'Tell Nemia what to do, or ask';
 
 /** The composer's field says `words`. */
-async function expectInvites(page: Parameters<PageSpec['expect']>[0], words: string): Promise<void> {
+async function expectInvites(page: Parameters<PageSpec['expect']>[0], words: string) {
   await expectNone(
     async () => {
       const said = await chatFieldOf(page).getAttribute('placeholder');

@@ -13,14 +13,14 @@ const approving = (r: { request: () => { method: () => string }; url: () => stri
   r.request().method() === 'POST' && isRunAction(new URL(r.url()).pathname, BUDGETING.id, `/steps/${BUDGETING.gated}/approve`);
 
 /** The JSON of the approval file `file`, or nothing where it is not there. */
-const approvalIn = (file: string): { budgets?: Record<string, number> } =>
-  fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+const approvalIn = (file: string) =>
+  (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as { budgets?: Record<string, number> };
 
 /**
  * The run whose caps' bound stays under the cost line it was started under: its gate draws its budgets and the run's line, and says
  * nothing of the cost line.
  */
-async function expectUnderTheLine(page: Page): Promise<void> {
+async function expectUnderTheLine(page: Page) {
   const { underId, gated } = BUDGETING;
   await page.goto(new URL(`/runs/${underId}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
@@ -30,7 +30,7 @@ async function expectUnderTheLine(page: Page): Promise<void> {
 }
 
 /** The rows of `budgets`, the one above its step's own budget saying so and the other not. */
-async function expectRows(budgets: Locator, usd: { above: string; under: string }, when: string): Promise<void> {
+async function expectRows(budgets: Locator, usd: { above: string; under: string }, when: string) {
   const { above, under } = BUDGETING;
   await expectCount(budgets.locator('[data-budget]'), 2, `${when}: a row for each step the gate budgets`);
   const high = budgets.locator(`[data-budget="${above.step}"]`);

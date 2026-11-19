@@ -21,7 +21,7 @@ afterAll(() => setStore(undefined));
  * A token of the person's kept in `store` as the store keeps one, its record under `person-tokens/` named by its sha-256 digest: every
  * route of the api takes a token, loopback included. Answers the token, to present as `Authorization: Bearer <token>`.
  */
-function personToken(store: string): string {
+function personToken(store: string) {
   const token = crypto.randomBytes(32).toString('base64url');
   const dir = path.join(store, 'person-tokens');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -37,7 +37,7 @@ function personToken(store: string): string {
  * --once 0` asks, under a token of the person's. The web imports nothing of the packages, so the store is asked as the board asks it.
  * Answers each line's run, step (`—` for a run's own line) and word, and the cursor.
  */
-async function apiFeed(t: TestContext, store: string): Promise<{ said: string[]; cursor: number }> {
+async function apiFeed(t: TestContext, store: string) {
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], {
     cwd: API,
     env: { ...process.env, WF_ROOT: store, PORT: '0', OTEL_EXPORTER_OTLP_ENDPOINT: '', NEMIA_BIND: '', WF_EXPOSED: '' },

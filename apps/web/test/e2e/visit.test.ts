@@ -17,10 +17,10 @@ import { PHASES, type PageTiming } from './timing.ts';
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };
 
 /** broken-page.ts, run to its end with `flags` after its two arguments, with the screenshots it wrote. */
-const e2eOn = (how: string, ...flags: string[]): Promise<Ended> => e2eIn(scratch('nemia-e2e-refusal-'), how, ...flags);
+const e2eOn = (how: string, ...flags: string[]) => e2eIn(scratch('nemia-e2e-refusal-'), how, ...flags);
 
 /** A folder of pictures an earlier run left: each of `names`, holding `PLANTED`. */
-function planted(...names: string[]): string {
+function planted(...names: string[]) {
   const out = scratch('nemia-e2e-planted-');
   for (const name of names) fs.writeFileSync(path.join(out, name), PLANTED);
   return out;
@@ -30,14 +30,14 @@ function planted(...names: string[]): string {
 const PLANTED = 'an earlier run took this';
 
 /** The files of `out` that still hold what was planted. */
-const stillPlanted = (out: string): string[] =>
+const stillPlanted = (out: string) =>
   fs
     .readdirSync(out)
     .sort()
     .filter((name) => fs.readFileSync(path.join(out, name), 'utf8') === PLANTED);
 
 /** broken-page.ts, run to its end into the folder `out`, with `flags` after its two arguments, and the files `out` then holds. */
-async function e2eIn(out: string, how: string, ...flags: string[]): Promise<Ended> {
+async function e2eIn(out: string, how: string, ...flags: string[]) {
   const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out, ...flags], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -50,10 +50,10 @@ async function e2eIn(out: string, how: string, ...flags: string[]): Promise<Ende
 }
 
 /** What a visit that passed says each page took, from its `e2e: timings` line. */
-const timingsOf = (ended: Ended): PageTiming[] => JSON.parse(/^e2e: timings (.*)$/m.exec(ended.stdout)?.[1] ?? 'null') as PageTiming[];
+const timingsOf = (ended: Ended) => JSON.parse(/^e2e: timings (.*)$/m.exec(ended.stdout)?.[1] ?? 'null') as PageTiming[];
 
 /** Each timing has every phase, and its phases add up to no more than its whole: an identity, never a bound on a time. */
-function phasesWithin(timings: readonly PageTiming[], said: string): void {
+function phasesWithin(timings: readonly PageTiming[], said: string) {
   for (const t of timings) {
     assert.deepEqual(Object.keys(t.phases), [...PHASES], said);
     const sum = PHASES.reduce((total, phase) => total + t.phases[phase], 0);
@@ -64,14 +64,14 @@ function phasesWithin(timings: readonly PageTiming[], said: string): void {
 const said = (ended: Ended) => `exit ${ended.code}\n--- stdout\n${ended.stdout}\n--- stderr\n${ended.stderr}`;
 
 /** The lines a stream ends with, from the last `e2e: FAILED` on: what a check that shows a tail, or logs stdout alone, reads. */
-const lastSaid = (stream: string): string[] => {
+const lastSaid = (stream: string) => {
   const lines = stream.trimEnd().split('\n');
   const from = lines.map((line) => line.startsWith('e2e: FAILED — ')).lastIndexOf(true);
   return from < 0 ? [] : lines.slice(from);
 };
 
 /** Stdout and stderr both end with the same few lines, naming the failure: `first`, then `more`, then the picture of `shot`. */
-function endsSaying(ended: Ended, first: RegExp, more: RegExp[], shot: string): void {
+function endsSaying(ended: Ended, first: RegExp, more: RegExp[], shot: string) {
   for (const stream of [ended.stdout, ended.stderr]) {
     const last = lastSaid(stream);
     assert.match(last[0] ?? '', first, said(ended));

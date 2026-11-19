@@ -39,8 +39,10 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
  * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
  * api runs it; any other through this CLI's `main`.
  */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env) =>
+  (COMMAND_WORDS.some((w) => w.name === argv[0])
+    ? typed(argv, e, undefined, place, env)
+    : main(argv, e, undefined, place, env)) satisfies Promise<unknown>;
 const stage = staged({ runWith: runEngine, main: typedOrMain, engineOf, env: ENV });
 
 const SKILL = (name: string, extra = '') =>
@@ -72,7 +74,7 @@ fs.writeFileSync(path.join(STORE, 'skills', 'write-a-note', 'SKILL.md'), SKILL('
 fs.writeFileSync(path.join(STORE, 'skills', 'write-a-note', 'template.md'), '# Title\n');
 
 /** A folder team in the store's own workflows, beside the store's agents and skills. */
-function storeTeam(name: string, steps: Record<string, string>): string {
+function storeTeam(name: string, steps: Record<string, string>) {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
   for (const [step, text] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${step}.md`), text);
@@ -80,15 +82,18 @@ function storeTeam(name: string, steps: Record<string, string>): string {
 }
 
 /** The person's custom instructions for `agent`, written by hand as the store keeps them. */
-function customFor(agent: string, text: string): void {
+function customFor(agent: string, text: string) {
   fs.mkdirSync(CUSTOM, { recursive: true });
   fs.writeFileSync(path.join(CUSTOM, `${agent}.md`), text);
 }
 
 /** The run `id`'s pass on the stage's engine, and the spec each task it filed was filed with, by its step. */
-async function tick(id: string): Promise<{ filed: string[]; spec: (step: string) => ReturnType<typeof specOf> }> {
+async function tick(id: string) {
   const { filed } = await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
-  return { filed, spec: (step) => specOf(`${id}-${step}`) };
+  return { filed, spec: (step) => specOf(`${id}-${step}`) } satisfies {
+    filed: string[];
+    spec: (step: string) => ReturnType<typeof specOf>;
+  };
 }
 const specOf = (id: string) => stage.board().specs.find((s) => s.id === id) ?? assert.fail(`${id} was never filed`);
 
@@ -325,7 +330,7 @@ describe('a step whose rendered folder is gone is told its layers and its skills
     }
     stage.place().world.repository(repo, { '.claude/skills/mind-the-tone/SKILL.md': tone, 'app/.claude/skills/y/SKILL.md': nested });
     const dir = storeTeam('lost-nested', { write: '---\nplace: git\nagent: scribe\nskills: app:y\n---\nWrite about tides.\n' });
-    const told = async (gone?: () => void): Promise<string> => {
+    const told = async (gone?: () => void) => {
       const run = await stage.runPlaced(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
       fs.rmSync(agentFilesDir(ROOT, run, 'write'), { recursive: true });
       gone?.();
@@ -349,7 +354,7 @@ describe('REFUSED at shipped defaults: a start that cannot tell a step its agent
     runs = path.join(ROOT, 'runs');
     fs.writeFileSync(outside, 'Words from elsewhere.\n');
   });
-  const runsIn = (): string[] => (fs.existsSync(runs) ? fs.readdirSync(runs).sort() : []);
+  const runsIn = () => (fs.existsSync(runs) ? fs.readdirSync(runs).sort() : []) satisfies string[];
   const outside = path.join(ROOT, 'elsewhere.md');
   const file = path.join(CUSTOM, 'implementer.md');
   const custom: Array<[string, () => void, string]> = [

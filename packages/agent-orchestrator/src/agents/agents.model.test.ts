@@ -17,7 +17,7 @@ import { splitFrontmatter } from '../step/step.ts';
 import { TEAM, TEAM_DEV } from '../../test/team.ts';
 
 /** The files of `dir` that end in `.md`, without it, the folder's README left out. */
-const named = (dir: string): string[] =>
+const named = (dir: string) =>
   fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.md') && f !== 'README.md')

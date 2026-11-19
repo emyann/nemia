@@ -147,7 +147,7 @@ export const SESSION = {
 } as const;
 
 /** SESSION's transcript, a line of JSON each as Claude Code 2.1.270 writes them, dated by `ago` (minutes before now). */
-function conversation(session: typeof SESSION, ago: (minutes: number) => string): object[] {
+function conversation(session: typeof SESSION, ago: (minutes: number) => string) {
   const line = {
     sessionId: session.sessionId,
     isSidechain: false,
@@ -232,7 +232,7 @@ function conversation(session: typeof SESSION, ago: (minutes: number) => string)
         content: [{ type: 'text', text: 'Structured output provided successfully' }],
       },
     ]),
-  ];
+  ] satisfies object[];
 }
 
 /**
@@ -277,16 +277,16 @@ export const SAYING = {
  * The files of the attached session under `name` in the store, as the runtime names them (`filesOf`, `attached-file.ts`): its run file,
  * and the words said to it, which its holder hands the session.
  */
-export const attachedFiles = (root: string, name: string): { run: string; say: string } => {
+export const attachedFiles = (root: string, name: string) => {
   const base = path.join(root, 'engine', 'runs', 'attached', name.replace(/[^A-Za-z0-9._-]/g, '_'));
-  return { run: `${base}.json`, say: `${base}.say.jsonl` };
+  return { run: `${base}.json`, say: `${base}.say.jsonl` } satisfies { run: string; say: string };
 };
 
 /**
  * An attached session's run file, as its holder writes it: `state` its holder's word, held by this process — alive while the pages run,
  * and not the api's, so the api's engine reads the session as another holder's and leaves it be.
  */
-export const attachedRun = (name: string, sessionId: string, state: 'working' | 'idle' | 'completed', startedAt: string): string =>
+export const attachedRun = (name: string, sessionId: string, state: 'working' | 'idle' | 'completed', startedAt: string) =>
   JSON.stringify({ name, state, owner: process.pid, startedAt, sessionId, request: {} });
 
 /** Where draft's conversation is kept, from the store: the file its session writes, and run.ts adds to when the session reads words. */
@@ -296,7 +296,7 @@ export const DRAFT_TRANSCRIPT = path.join('claude', 'projects', '-code-hkb-v2', 
  * The line a working Claude Code session writes into its transcript when it reads words another process posted to its inbox, between calls:
  * a `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-runtime's transcript test), for the words `prompt`, at `at`.
  */
-export function arrivalLine(prompt: string, at: string): string {
+export function arrivalLine(prompt: string, at: string) {
   const uuid = `draft-arrival-${Date.parse(at)}`;
   return `${JSON.stringify({
     parentUuid: 'draft-assistant-2',
@@ -643,7 +643,7 @@ export const FOLDER = {
  * ran in rather than the engine's default. Its journal puts the mode beside the task's fields rather than under `config`, a shape the
  * runtime reads in today's (`upgrade` in agent-runtime's journal.ts): the folder page's `dontAsk` proves such a journal reaches the board.
  */
-export function seedFolder(root: string, now = Date.now()): void {
+export function seedFolder(root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FOLDER;
   const workflowDir = path.join(root, FOLDER.workflow);
@@ -703,7 +703,7 @@ export function seedFolder(root: string, now = Date.now()): void {
     ),
   );
 
-  const signedOff = (step: string, brief: string, began: number, ended: number, closeout: object): void =>
+  const signedOff = (step: string, brief: string, began: number, ended: number, closeout: object) =>
     write(
       path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`),
       lines([
@@ -734,11 +734,7 @@ export function seedFolder(root: string, now = Date.now()): void {
  * engine's feed, which the api reads a filing off. Answers what takes it back: the record, the journal and the run's folder removed,
  * and the feed as it was.
  */
-export function seedFinished(
-  root: string,
-  run: { id: string; title: string; factory: string; finishedAgo: number },
-  now = Date.now(),
-): () => void {
+export function seedFinished(root: string, run: { id: string; title: string; factory: string; finishedAgo: number }, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = run;
   const work = path.join(root, 'runs', id, 'work');
@@ -783,12 +779,12 @@ export function seedFinished(
   ];
   write(journal, lines(events));
   fs.appendFileSync(feed, lines(events.map((event) => ({ taskId: `${id}-write`, event }))));
-  return () => {
+  return (() => {
     fs.rmSync(record, { force: true });
     fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
     fs.writeFileSync(feed, fedBefore);
-  };
+  }) satisfies () => void;
 }
 
 /**
@@ -842,7 +838,7 @@ const ROUTED_FILES: ReadonlyArray<readonly [string, string]> = [
  * events on the engine's feed; `triage`'s route kept on its record as the tick copies it, and `handoff`'s card on its. Times are minutes
  * before `now`. Answers what takes it back: the record, the journals and the run's folder removed, and the feed as it was.
  */
-export function seedRouted(root: string, now = Date.now()): () => void {
+export function seedRouted(root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = ROUTED;
   const work = path.join(root, 'runs', id, 'work');
@@ -921,13 +917,13 @@ export function seedRouted(root: string, now = Date.now()): () => void {
     fs.appendFileSync(feed, lines(events.map((event) => ({ taskId: `${id}-${step}`, event }))));
     return journal;
   });
-  return () => {
+  return (() => {
     fs.rmSync(record, { force: true });
     for (const journal of journals) fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'runs', id), { recursive: true, force: true });
     fs.rmSync(folder, { recursive: true, force: true });
     fs.writeFileSync(feed, fedBefore);
-  };
+  }) satisfies () => void;
 }
 
 /**
@@ -946,14 +942,15 @@ export const FACTORIES = {
  * The volumes of a factory's file that work on `paths`, each writable, as the store writes them.
  * @param paths The repositories, by their whole paths.
  */
-export const worked = (paths: readonly string[]): { path: string; readOnly: false }[] => paths.map((path) => ({ path, readOnly: false }));
+export const worked = (paths: readonly string[]) =>
+  paths.map((path) => ({ path, readOnly: false })) satisfies { path: string; readOnly: false }[];
 
 /**
  * Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with `volumes` no list;
  * and, in the harness's own file under the store's `claude/`, the trust of each place, as filing a factory gives it, so no page says a
  * place is untrusted but the one that takes a trust away.
  */
-export function seedFactories(root: string, repo: string): void {
+export function seedFactories(root: string, repo: string) {
   const dir = path.join(root, 'factories');
   const { hiring, bare, others, broken } = FACTORIES;
   const hires = { [hiring.hire]: WORKFLOWS.good.agent.name };
@@ -979,7 +976,7 @@ export const REVIEWER = 'reviewer-e2e';
  * file with REVIEWER hired into `review` in place of its hires. Returns the function that takes both back: the agent removed, and the
  * factory's file as it was found.
  */
-export function hiringStarts(root: string): () => void {
+export function hiringStarts(root: string) {
   const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
   const found = fs.readFileSync(file, 'utf8');
   const agent = path.join(root, 'checkout', 'workflows', 'agents', `${REVIEWER}.md`);
@@ -988,10 +985,10 @@ export function hiringStarts(root: string): () => void {
     file,
     JSON.stringify({ ...(JSON.parse(found) as object), hires: { [`${WORKFLOWS.good.name}/review`]: REVIEWER } }, null, 2),
   );
-  return () => {
+  return (() => {
     fs.rmSync(agent, { force: true });
     fs.writeFileSync(file, found);
-  };
+  }) satisfies () => void;
 }
 
 /**
@@ -1000,39 +997,39 @@ export function hiringStarts(root: string): () => void {
  * `dev/implement`, whose file names its agent, leaves it unread) and cannot start, `review` naming no agent. Returns the function that
  * writes the factory's file back as it was found.
  */
-export function checkoutIn(root: string, workflows: readonly string[], hires: Readonly<Record<string, string>> = {}): () => void {
+export function checkoutIn(root: string, workflows: readonly string[], hires: Readonly<Record<string, string>> = {}) {
   const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
   const found = fs.readFileSync(file, 'utf8');
   fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(found) as object), workflows, hires }, null, 2));
-  return () => fs.writeFileSync(file, found);
+  return (() => fs.writeFileSync(file, found)) satisfies () => void;
 }
 
 /**
  * Gives FACTORIES.hiring a second repository in the store at `root`, FACTORIES.bare's folder, after its own: a factory on several, which
  * the seed has none of. Returns the second repository and the function that writes the factory's file back as it was found.
  */
-export function onSeveralRepos(root: string): { second: string; back: () => void } {
+export function onSeveralRepos(root: string) {
   const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
   const found = fs.readFileSync(file, 'utf8');
   const read = JSON.parse(found) as { volumes: { path: string; readOnly: boolean }[] };
   const second = path.join(root, FACTORIES.bare);
   fs.writeFileSync(file, JSON.stringify({ ...read, volumes: [...read.volumes, ...worked([second])] }, null, 2));
-  return { second, back: () => fs.writeFileSync(file, found) };
+  return { second, back: () => fs.writeFileSync(file, found) } satisfies { second: string; back: () => void };
 }
 
 /**
  * Leaves the store at `root` with no factory on file: its `factories/` moved aside, and an empty one in its place. Returns the function
  * that puts the folder back.
  */
-export function noFactories(root: string): () => void {
+export function noFactories(root: string) {
   const dir = path.join(root, 'factories');
   const aside = path.join(root, 'factories.aside');
   fs.renameSync(dir, aside);
   fs.mkdirSync(dir);
-  return () => {
+  return (() => {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.renameSync(aside, dir);
-  };
+  }) satisfies () => void;
 }
 
 /** The diamond's runs, oldest first. */
@@ -1046,9 +1043,9 @@ export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.landed, DIAMOND.running, DIAMO
  * the pass after its parent lands: that minute is its wait, and its card does not count it. `cancelled` is marked as `wf cancel` marks a
  * run, in a file beside its record. Times are minutes before `now`.
  */
-export function seedDiamond(repo: string, root: string, now = Date.now()): void {
+export function seedDiamond(repo: string, root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
-  const git = (...args: string[]): string =>
+  const git = (...args: string[]) =>
     execFileSync(
       'git',
       ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
@@ -1175,7 +1172,7 @@ export const CHAINED = {
  * Write CHAINED's record into the store at `root`, as the diamond's are written (`seedDiamond`), on the checkout at `repo`, from its
  * `main`: in its factory, nothing of it filed. Returns the record's path, for the page to take it back.
  */
-export function seedChained(root: string, repo: string, now = Date.now()): string {
+export function seedChained(root: string, repo: string, now = Date.now()) {
   const base = execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim();
   const workflowDir = path.join(root, 'workflow-diamond');
   const file = path.join(root, 'runs', `${CHAINED.id}.json`);
@@ -1208,7 +1205,7 @@ export function seedChained(root: string, repo: string, now = Date.now()): strin
  * HELD's `implement`, as its session said it before the harness stopped it: the prompt, words, a call and its result, and the harness's
  * line, an assistant message the harness made up (`isApiErrorMessage`): no model wrote it.
  */
-function heldConversation(ago: (minutes: number) => string): object[] {
+function heldConversation(ago: (minutes: number) => string) {
   const line = {
     sessionId: HELD.sessionId,
     isSidechain: false,
@@ -1232,7 +1229,7 @@ function heldConversation(ago: (minutes: number) => string): object[] {
     said('assistant', 'held-assistant-2', 2.6, [{ type: 'tool_use', id: 'toolu_held_test', name: 'Bash', input: { command: 'npm test' } }]),
     said('user', 'held-user-2', 2.5, [{ type: 'tool_result', tool_use_id: 'toolu_held_test', content: '# tests 33\n# pass 33\n# fail 0' }]),
     said('assistant', 'held-assistant-3', 2.4, [{ type: 'text', text: HELD.line }], { isApiErrorMessage: true, error: 'server_error' }),
-  ];
+  ] satisfies object[];
 }
 
 const STEPS = [
@@ -1297,7 +1294,7 @@ export const CHECKOUT = {
 } as const;
 
 /** Write CHECKOUT into `repo`. `mcpServer` is the file of the stdio MCP server it declares, which node runs. */
-export function seedCheckout(repo: string, mcpServer: string): void {
+export function seedCheckout(repo: string, mcpServer: string) {
   const { skill, bareSkill, agent, server, missing, denied } = CHECKOUT;
   write(
     path.join(repo, '.claude', 'skills', skill.dir, 'SKILL.md'),
@@ -1448,7 +1445,7 @@ export const AGENTS = {
 } as const;
 
 /** Write WORKFLOWS: the checkout's into `repo`, and yours into the store at `root`, with AGENTS' seeded agent of yours. */
-export function seedWorkflows(repo: string, root: string): void {
+export function seedWorkflows(repo: string, root: string) {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\n${good.more}\n`);
@@ -1491,7 +1488,7 @@ export function seedWorkflows(repo: string, root: string): void {
 }
 
 /** A skill in `skills`, its SKILL.md's frontmatter the card entry `skill` is generated as: `title:` its name, the rest as A2A has them. */
-function writeSkill(skills: string, skill: { id: string; name: string; description: string; tags: readonly string[] }): void {
+function writeSkill(skills: string, skill: { id: string; name: string; description: string; tags: readonly string[] }) {
   write(
     path.join(skills, skill.id, 'SKILL.md'),
     `---\nname: ${skill.id}\ntitle: ${JSON.stringify(skill.name)}\ndescription: ${JSON.stringify(skill.description)}\ntags: ${JSON.stringify(skill.tags)}\n---\n${skill.description}\n`,
@@ -1515,13 +1512,14 @@ export const FOLDER_SKILLS = {
 } as const;
 
 /** A FOLDER_SKILLS skill as its line writes it, `folder:name`, and the folder it is read from, by its path in the checkout. */
-export const folderSkill = (skill: { id: string }): { written: string; foundIn: string } => ({
-  written: `${FOLDER_SKILLS.folder}:${skill.id}`,
-  foundIn: `${FOLDER_SKILLS.folder}/.claude/skills/${skill.id}`,
-});
+export const folderSkill = (skill: { id: string }) =>
+  ({
+    written: `${FOLDER_SKILLS.folder}:${skill.id}`,
+    foundIn: `${FOLDER_SKILLS.folder}/.claude/skills/${skill.id}`,
+  }) satisfies { written: string; foundIn: string };
 
 /** Every path `writeFolderSkills` makes in the store at `root`, files, links and folders: what the page removes, whatever was written. */
-export function folderSkillsPaths(root: string): string[] {
+export function folderSkillsPaths(root: string) {
   const { folder, agent, workflow, inside, apart } = FOLDER_SKILLS;
   const repo = path.join(root, 'checkout');
   return [
@@ -1532,11 +1530,11 @@ export function folderSkillsPaths(root: string): string[] {
     path.join(repo, '.claude', 'skills', apart.id),
     path.join(root, 'workflows', 'agents', `${agent}.md`),
     path.join(root, 'workflows', workflow),
-  ];
+  ] satisfies string[];
 }
 
 /** Writes FOLDER_SKILLS into the store at `root` and its checkout (`folderSkillsPaths`). */
-export function writeFolderSkills(root: string): void {
+export function writeFolderSkills(root: string) {
   const { folder, agentSkill, stepSkill, agent, workflow, step, inside, apart } = FOLDER_SKILLS;
   const repo = path.join(root, 'checkout');
   const own = path.join(repo, '.claude', 'skills');
@@ -1617,7 +1615,7 @@ export const CARDS = {
 } as const;
 
 /** Write CARDS into the store at `root`, `planned` about the checkout at `repo`, each file dated when it was filed. */
-export function seedInbox(root: string, repo: string, now = Date.now()): void {
+export function seedInbox(root: string, repo: string, now = Date.now()) {
   const { planned, bare, rich } = CARDS;
   const cards = [
     { card: planned, text: `---\nworkflow: ${planned.workflow}\nrepo: ${repo}\n---\n${planned.body}\n` },
@@ -1685,14 +1683,14 @@ export const QUEUED_IN = { hiring: [QUEUE.first, QUEUE.refused], default: [QUEUE
  * Why the tick's start of QUEUE.refused was refused, in the package's words for a card whose workflow is no folder in the inbox, in its
  * factory's tree or in its repository (`workflowFolder`'s sentence, after the card's file and line as `cardWorkflow` says them).
  */
-export const refusedWhy = (root: string, repo: string): string =>
+export const refusedWhy = (root: string, repo: string) =>
   `${QUEUE.refused.name}.md: \`workflow: ${QUEUE.refused.workflow}\` — no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
 
 /**
  * Why the tick's start of QUEUE.third was refused, in the package's words for a queued card that names no factory
  * (`unfactoredCardRefusal`, with no start's flag): its file in the store at `root`, and the factories that read, by name.
  */
-export const unfactoredWhy = (root: string): string => {
+export const unfactoredWhy = (root: string) => {
   const names = [FACTORIES.hiring.name, FACTORIES.bare, ...FACTORIES.others].sort().join(', ');
   return `${path.join(root, 'inbox', `${QUEUE.third.name}.md`)}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — one of ${names}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
 };
@@ -1701,7 +1699,7 @@ export const unfactoredWhy = (root: string): string => {
  * A queued card's text, as `wf inbox queue` writes it: its workflow and its repository, then `queued:`, then its factory when it names
  * one.
  */
-export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string): string =>
+export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string, factory?: string) =>
   `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n${factory ? `factory: ${factory}\n` : ''}---\n${card.body}\n`;
 
 /**
@@ -1744,7 +1742,7 @@ export const PASS = {
  * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the two refused tries, `tick.json`,
  * and what the pass that wrote it cost (`tick-stats.json`, PASS).
  */
-export function seedQueue(root: string, repo: string, now = Date.now()): void {
+export function seedQueue(root: string, repo: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { first, refused, third } = QUEUE;
   const cards = [
@@ -1782,7 +1780,7 @@ export const QUOTA = {
 };
 
 /** Write QUOTA's answer into `root`, as a subscriber's Claude Code would give it, and answer with the file. */
-export function seedQuota(root: string, now = Date.now()): string {
+export function seedQuota(root: string, now = Date.now()) {
   const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString().replace('Z', '+00:00');
   const response = {
     subtype: 'success',
@@ -1803,7 +1801,7 @@ export function seedQuota(root: string, now = Date.now()): string {
   return file;
 }
 
-export const write = (file: string, text: string | Buffer): void => {
+export const write = (file: string, text: string | Buffer) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -1812,30 +1810,35 @@ export const write = (file: string, text: string | Buffer): void => {
  * A PNG, `width` by `height`, each pixel the colour `colour` gives it: encoded here, since the e2e installs nothing to draw one. 8 bits a
  * channel, RGB, each row with no filter, and the one compression, filter method and interlace a PNG has.
  */
-export function png(width: number, height: number, colour: (x: number, y: number) => readonly [number, number, number]): Buffer {
+export function png(width: number, height: number, colour: (x: number, y: number) => readonly [number, number, number]) {
   const stride = width * 3 + 1;
   const rows = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) rows.set(colour(x, y), y * stride + 1 + x * 3);
   }
-  const chunk = (type: string, data: Buffer): Buffer => {
+  const chunk = (type: string, data: Buffer) => {
     const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
     const out = Buffer.alloc(body.length + 8);
     out.writeUInt32BE(data.length, 0);
     body.copy(out, 4);
     out.writeUInt32BE(crc32(body), body.length + 4);
-    return out;
+    return out satisfies Buffer;
   };
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
   header.set([8, 2, 0, 0, 0], 8);
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([
+    signature,
+    chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]) satisfies Buffer;
 }
 
 /** CRC-32, as a PNG's chunks carry it. */
-function crc32(bytes: Buffer): number {
+function crc32(bytes: Buffer) {
   let crc = 0xffffffff;
   for (const byte of bytes) {
     crc ^= byte;
@@ -1857,15 +1860,16 @@ const PALETTE: ReadonlyArray<readonly [number, number, number]> = [
   [20, 184, 166],
   [244, 63, 94],
 ];
-const palette = (): Buffer => png(480, 96, (x, y) => (y < 8 || y >= 88 || x % 48 < 4 ? [250, 250, 250] : PALETTE[Math.floor(x / 48)]));
+const palette = () =>
+  png(480, 96, (x, y) => (y < 8 || y >= 88 || x % 48 < 4 ? [250, 250, 250] : PALETTE[Math.floor(x / 48)])) satisfies Buffer;
 
 /**
  * FAKE's repository, at `repo`: a base on `main`, and `branch` off it with the work committed — a source file and a test
  * of 420 lines in the `apps/web` workspace, two lines in CLAUDE.md, a script changed in package.json. The base's sha.
  */
-function seedRepo(repo: string, branch: string): string {
+function seedRepo(repo: string, branch: string) {
   fs.mkdirSync(repo, { recursive: true });
-  const git = (...args: string[]): string =>
+  const git = (...args: string[]) =>
     execFileSync(
       'git',
       ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
@@ -1922,9 +1926,9 @@ function seedRepo(repo: string, branch: string): string {
  * marks a run: its record and branch kept, the worktree and its files gone. UNMERGED's folder says nothing about shipping, so git is what
  * ends it: one step, signed off, and a branch nobody took.
  */
-function seedDecisions(root: string, repo: string, base: string, now: number): void {
+function seedDecisions(root: string, repo: string, base: string, now: number) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
-  const git = (...args: string[]): string =>
+  const git = (...args: string[]) =>
     execFileSync(
       'git',
       ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
@@ -1983,7 +1987,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     true,
   );
 
-  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object): void =>
+  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object) =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
@@ -2140,7 +2144,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
 }
 
 /** SAYING's session so far, as Claude Code 2.1.270 writes it: the prompt, words, and a Read with no result yet. */
-function draftConversation(ago: (minutes: number) => string): object[] {
+function draftConversation(ago: (minutes: number) => string) {
   const line = {
     sessionId: SAYING.sessionId,
     isSidechain: false,
@@ -2163,11 +2167,11 @@ function draftConversation(ago: (minutes: number) => string): object[] {
     said('assistant', 'draft-assistant-2', 2.2, [
       { type: 'tool_use', id: SAYING.mark.id, name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } },
     ]),
-  ];
+  ] satisfies object[];
 }
 
 /** Events as the engine journals them: a line of JSON each. */
-export const lines = (events: object[]): string => events.map((event) => `${JSON.stringify(event)}\n`).join('');
+export const lines = (events: object[]) => events.map((event) => `${JSON.stringify(event)}\n`).join('');
 
 /**
  * The engine's feed, as its journal keeps one beside the tasks: every event of every task's journal in the store, in the order they
@@ -2175,7 +2179,7 @@ export const lines = (events: object[]): string => events.map((event) => `${JSON
  * entry at the time the pages read as the task's filing (each view's `State.filedAt`), and the feed is written last, over them all, so
  * what follows it (the events' stream, a page's watch) reads the same events.
  */
-export function seedFeed(root: string): void {
+export function seedFeed(root: string) {
   const tasks = path.join(root, 'engine', 'tasks');
   const entries = fs
     .readdirSync(tasks)
@@ -2192,19 +2196,20 @@ export function seedFeed(root: string): void {
 }
 
 /** Each path `writeRegated` makes in `root`, a folder or a file, for the page that takes them back, whether or not all were made. */
-export const regatedFiles = (root: string): string[] => [
-  path.join(root, 'workflow-regated'),
-  path.join(root, 'runs', `${REGATED.id}.json`),
-  path.join(root, 'runs', `${REGATED.id}.asks`),
-  path.join(root, 'engine', 'tasks', `${REGATED.id}-plan.jsonl`),
-  path.join(root, 'engine', 'tasks', `${REGATED.id}-build.jsonl`),
-];
+export const regatedFiles = (root: string) =>
+  [
+    path.join(root, 'workflow-regated'),
+    path.join(root, 'runs', `${REGATED.id}.json`),
+    path.join(root, 'runs', `${REGATED.id}.asks`),
+    path.join(root, 'engine', 'tasks', `${REGATED.id}-plan.jsonl`),
+    path.join(root, 'engine', 'tasks', `${REGATED.id}-build.jsonl`),
+  ] satisfies string[];
 
 /**
  * REGATED into `root`, its times minutes before `now`: its workflow folder, its record, plan's approval beside it, and the journals of
  * its two tasks (`regatedFiles`).
  */
-export function writeRegated(root: string, now: number): void {
+export function writeRegated(root: string, now: number) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id, title, planEnded, approved, buildEnded } = REGATED;
   const dir = path.join(root, 'workflow-regated');
@@ -2296,7 +2301,7 @@ export function writeRegated(root: string, now: number): void {
  * (`lookupRoots`): their bytes are none of the hashes their ledgers and the run's pins hold, so the run page's band says each behind,
  * at the number its next filing would take (`driftNow`), the last of its ledger plus one.
  */
-export function seed(root: string, now = Date.now()): void {
+export function seed(root: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FAKE;
   const workflowDir = path.join(root, FAKE.workflow);
@@ -2311,7 +2316,7 @@ export function seed(root: string, now = Date.now()): void {
   const check = `${id}-theme-check`;
   const repo = path.join(root, 'hkb-v2');
   const baseRef = seedRepo(repo, laneBranch);
-  const ledger = (kind: string, name: string, upTo: number): void =>
+  const ledger = (kind: string, name: string, upTo: number) =>
     write(
       path.join(root, 'revisions', kind, `${name}.json`),
       JSON.stringify(
@@ -2377,7 +2382,7 @@ export function seed(root: string, now = Date.now()): void {
     denials?: readonly object[],
     skills?: readonly string[],
     ranIn?: string,
-  ): void =>
+  ) =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
@@ -2621,7 +2626,7 @@ export function seed(root: string, now = Date.now()): void {
     artifacts: [],
     again: true,
   });
-  const ranOnce = (task: string, harness: string, brief: string, began: number, ended: number, closeout: object): void =>
+  const ranOnce = (task: string, harness: string, brief: string, began: number, ended: number, closeout: object) =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
@@ -2856,7 +2861,7 @@ export function seed(root: string, now = Date.now()): void {
     closeout: object,
     usage: object,
     resumeFrom?: string,
-  ): void =>
+  ) =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
@@ -2867,7 +2872,7 @@ export function seed(root: string, now = Date.now()): void {
         { kind: 'settled', at: ago(at[2]), outcome: 'succeeded' },
       ]),
     );
-  const refused = (task: string, cwd: string, at: readonly [number, number]): void => {
+  const refused = (task: string, cwd: string, at: readonly [number, number]) => {
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
@@ -3114,7 +3119,7 @@ export const ASKING = {
  * Writes ASKING into the store at `root` — its record, its folder and its two tasks, each ended once with the closeout it gave, flat as a
  * harness writes it, palette's with what it cost — and answers every path written, to take back.
  */
-export function writeAsking(root: string, now = Date.now()): string[] {
+export function writeAsking(root: string, now = Date.now()) {
   const { id, gated, raised } = ASKING;
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const dir = path.join(root, 'workflow-gate-questions');
@@ -3199,7 +3204,7 @@ export function writeAsking(root: string, now = Date.now()): string[] {
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task(gated), task(raised)];
+  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task(gated), task(raised)] satisfies string[];
 }
 
 /**
@@ -3240,7 +3245,7 @@ export const SHAPED = {
  * writes it, and `build`'s artifacts folder — and answers every path written, to take back. Given `tried`, an agent's name, its folder is
  * that agent's try's (`tries/<agent>`), so the run is a try of the agent, as `nemia agent try` starts one.
  */
-export function writeShaped(root: string, { now = Date.now(), tried }: { now?: number; tried?: string } = {}): string[] {
+export function writeShaped(root: string, { now = Date.now(), tried }: { now?: number; tried?: string } = {}) {
   const { id, giver, step } = SHAPED;
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const dir = tried ? path.join(root, 'tries', tried) : path.join(root, 'workflow-shaped-output');
@@ -3382,7 +3387,7 @@ export function writeShaped(root: string, { now = Date.now(), tried }: { now?: n
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), task(giver), task(step)];
+  return [record, dir, path.join(root, 'runs', id), task(giver), task(step)] satisfies string[];
 }
 
 /**
@@ -3444,11 +3449,7 @@ export const BUDGETING = {
  * harness writes it, with what it cost — and answers every path written, to take back. `id` names the run, `costLine` the line it was
  * started under, written on its record as the start writes it, none where it is not given.
  */
-export function writeBudgeting(
-  root: string,
-  { id = BUDGETING.id, costLine }: { id?: string; costLine?: number } = {},
-  now = Date.now(),
-): string[] {
+export function writeBudgeting(root: string, { id = BUDGETING.id, costLine }: { id?: string; costLine?: number } = {}, now = Date.now()) {
   const { gated, above, under } = BUDGETING;
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const home = path.join(root, `workflow-${id}`);
@@ -3538,5 +3539,5 @@ export function writeBudgeting(
       2,
     ),
   );
-  return [record, home, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task];
+  return [record, home, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task] satisfies string[];
 }

@@ -25,7 +25,7 @@ fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(root, 'workflows', 'agents', 'archivist.md'), '---\ndescription: Files it away.\n---\nFile it away.\n');
 
 /** The query parameters the api's document declares on `method` of `route`. */
-function declared(route: string, method: 'get' | 'put' | 'post' | 'delete'): string[] {
+function declared(route: string, method: 'get' | 'put' | 'post' | 'delete') {
   const doc = OpenApi.fromApi(Api) as unknown as {
     paths: Record<string, Record<string, { parameters?: { name: string; in: string }[] }>>;
   };

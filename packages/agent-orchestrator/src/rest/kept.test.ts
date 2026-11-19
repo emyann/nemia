@@ -10,7 +10,7 @@ import type { Run } from '../record/record.ts';
 import { keptRecords, recordMemo } from './kept.ts';
 
 /** A record as the reader hands one back: only the fields the projections here read. */
-const aRun = (id: string, brief: string): Run => ({ id, brief }) as Run;
+const aRun = (id: string, brief: string) => ({ id, brief }) as Run;
 
 /**
  * A reader over `briefs`, by id, counting every read it is asked for: what `find` is in the store, and what a test counts record reads

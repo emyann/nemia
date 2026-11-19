@@ -45,7 +45,7 @@ export type WorkerResult = {
 };
 
 /** The worker's command line: its number, its store, its result file, and the rest for `planOf`. */
-function argsOf(argv: readonly string[]): { worker: number; store: string; result: string; rest: string[] } {
+function argsOf(argv: readonly string[]) {
   const rest: string[] = [];
   const own: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -57,14 +57,19 @@ function argsOf(argv: readonly string[]): { worker: number; store: string; resul
     throw new Error(
       'usage: node test/e2e/worker.ts --worker <i> --store <empty dir> --result <file> [--pages <name,…>] [--photos [--light] [--contrast]]',
     );
-  return { worker, store: own['--store'], result: own['--result'], rest };
+  return { worker, store: own['--store'], result: own['--result'], rest } satisfies {
+    worker: number;
+    store: string;
+    result: string;
+    rest: string[];
+  };
 }
 
 /**
  * The next page run.ts hands this worker, or null when it has none left: asked over the channel run.ts opened with it. A channel run.ts
  * closed, as it does when it ends, has none left either.
  */
-const handed = (): Promise<string | null> =>
+const handed = () =>
   new Promise((resolve) => {
     const answer = (said: { page?: unknown }) => {
       process.off('disconnect', gone);
@@ -77,13 +82,13 @@ const handed = (): Promise<string | null> =>
     process.once('message', answer);
     process.once('disconnect', gone);
     process.send!({ next: true });
-  });
+  }) satisfies Promise<string | null>;
 
 /**
  * The pages worker `worker` visits, one at a time, from `own`, every page its plan names: each asked of run.ts as the last is done
  * (`queueOf`, workers.ts), or, started by hand with no channel to it, all of `own` in their order. A name that is none of `own` is refused.
  */
-async function* pagesOf(own: Iterable<PageSpec>, worker: number): AsyncGenerator<PageSpec> {
+async function* pagesOf(own: Iterable<PageSpec>, worker: number) {
   const pages = [...own];
   if (!process.send) return yield* pages;
   const byName = new Map(pages.map((page) => [page.name, page]));
@@ -98,7 +103,7 @@ async function* pagesOf(own: Iterable<PageSpec>, worker: number): AsyncGenerator
  * Seeds the store and serves it (`serveStore`, served.ts), and visits the worker's pages. `seat` is filled in as the worker learns where
  * it serves, for the result a failure writes.
  */
-async function main(seat: WorkerResult, rest: readonly string[]): Promise<void> {
+async function main(seat: WorkerResult, rest: readonly string[]) {
   const started = performance.now();
   const plan = planOf(rest, await loadPages());
   const root = seat.store;

@@ -22,7 +22,7 @@ const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const HERE = scratch('nemia-remote-here-');
 
 /** `nemia <argv>` on `env`, typed in `HERE`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { cwd: HERE, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -31,7 +31,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 const exposed = await servedStore('nemia-remote-', () => {}, { WF_EXPOSED: '1' });
@@ -43,7 +43,7 @@ assert.equal(minted.code, 0, minted.err);
 const TOKEN = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);
 
 /** A laptop with no store of its own, its config naming the exposed store's api with `token`. */
-function laptop(token: string = TOKEN): NodeJS.ProcessEnv {
+function laptop(token: string = TOKEN) {
   const folder = scratch('nemia-remote-laptop-');
   const env: NodeJS.ProcessEnv = {
     ...ambient('NEMIA_ON_INSTALLED'),
@@ -54,12 +54,12 @@ function laptop(token: string = TOKEN): NodeJS.ProcessEnv {
     NEMIA_DAEMON_START: 'off',
   };
   configWritten({ contexts: [{ name: 'vps', server: exposed.url, token }], current: 'vps' }, env);
-  return env;
+  return env satisfies NodeJS.ProcessEnv;
 }
 
 /** Every file under `dir`, by its path from it, with its text: what a store holds. */
-function filesOf(dir: string): Record<string, string> {
-  if (!fs.existsSync(dir)) return {};
+function filesOf(dir: string) {
+  if (!fs.existsSync(dir)) return {} satisfies Record<string, string>;
   return Object.fromEntries(
     fs
       .readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -68,12 +68,12 @@ function filesOf(dir: string): Record<string, string> {
         const at = path.join(e.parentPath, e.name);
         return [path.relative(dir, at), fs.readFileSync(at, 'utf8')];
       }),
-  );
+  ) satisfies Record<string, string>;
 }
 
 /** The keys of `after` whose text is not `before`'s: what a command changed in a store. */
-const changed = (before: Record<string, string>, after: Record<string, string>): string[] =>
-  Object.keys(after).filter((k) => before[k] !== after[k]);
+const changed = (before: Record<string, string>, after: Record<string, string>) =>
+  Object.keys(after).filter((k) => before[k] !== after[k]) satisfies string[];
 
 /** The repository the factory `mill` works on, with a `workflows/` folder an export reads. */
 const MILL = scratch('nemia-remote-mill-');
@@ -81,7 +81,7 @@ fs.mkdirSync(path.join(MILL, 'workflows'), { recursive: true });
 execFileSync('git', ['init', '-q'], { cwd: MILL });
 
 /** `nemia <argv>` on the laptop `env`, its exit code asserted `code`. */
-async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0): Promise<Said> {
+async function typed(env: NodeJS.ProcessEnv, argv: readonly string[], code = 0) {
   const said = await nemia(argv, env);
   assert.equal(said.code, code, `nemia ${argv.join(' ')}: ${said.err}${said.out}`);
   return said;
@@ -137,7 +137,7 @@ test("REFUSED: a card of the daemon's inbox that names no workflow, started with
 });
 
 /** The line the api serving `url` says of its daemon (`GET /api/daemon`), asked with `token` where one is given. */
-async function daemonLine(url: string, token?: string): Promise<string> {
+async function daemonLine(url: string, token?: string) {
   const answer = await fetch(`${url}/api/daemon`, token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } });
   assert.equal(answer.status, 200);
   const { line } = (await answer.json()) as { line: string };

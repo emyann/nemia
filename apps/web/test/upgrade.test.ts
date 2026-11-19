@@ -16,7 +16,7 @@ const VERSION: VersionAnswer = {
 };
 
 /** An upgrade to v0.4.0 in `phase`. */
-const upgrade = (phase: Upgrade['phase']): Upgrade => ({
+const upgrade = (phase: Upgrade['phase']) => ({
   id: 'u-1',
   tag: 'v0.4.0',
   from: 'v0.3.0',

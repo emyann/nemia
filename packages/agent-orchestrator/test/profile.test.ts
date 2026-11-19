@@ -32,7 +32,7 @@ const FAKE = [
 ].join('\n');
 
 /** A scratch folder holding `preload` as `preload.ts`, the shipped `profiling.ts`, and the fake profiler where the preload imports it. */
-function preloadFolder(preload: string): string {
+function preloadFolder(preload: string) {
   const dir = fs.mkdtempSync(path.join(ROOT, 'profile-'));
   fs.writeFileSync(path.join(dir, 'preload.ts'), preload);
   fs.copyFileSync(path.join(PROFILE, 'profiling.ts'), path.join(dir, 'profiling.ts'));
@@ -53,7 +53,7 @@ const CHILD =
   'console.log(JSON.stringify({ endpoint: process.env.PYROSCOPE_SERVER_ADDRESS ?? null, resources: process.getActiveResourcesInfo() }))';
 
 /** Runs a child under `vars` alone of the profiler's variables, preloading `preload` written beside the fake, or nothing when null. */
-function childSeen(preload: string | null, vars: Record<string, string>): Seen {
+function childSeen(preload: string | null, vars: Record<string, string>) {
   const dir = preloadFolder(preload ?? PRELOAD);
   const record = path.join(dir, 'record.jsonl');
   const env: Record<string, string | undefined> = { ...process.env, ...vars, PROFILE_RECORD: record };
@@ -66,7 +66,7 @@ function childSeen(preload: string | null, vars: Record<string, string>): Seen {
 }
 
 /** Why `seen` is not a child that loaded nothing and opened nothing, beside `bare`, the same child run with no preload: each a line. */
-function startedWithout(seen: Seen, bare: Seen): string[] {
+function startedWithout(seen: Seen, bare: Seen) {
   const faults = seen.record.map((r) => `the profiler saw ${r.call}`);
   if (JSON.stringify(seen.said.resources) !== JSON.stringify(bare.said.resources))
     faults.push(`it holds ${seen.said.resources.join(', ')}, not ${bare.said.resources.join(', ')}`);
@@ -117,14 +117,14 @@ test('profilingOf answers nothing for no endpoint, and the options for one', () 
 });
 
 /** Each of `files` that names the profiler or its folder: a file the repository ships must name neither. */
-const naming = (files: { file: string; text: string }[]): string[] =>
+const naming = (files: { file: string; text: string }[]) =>
   files.filter(({ text }) => text.includes(PROFILER) || text.includes('tools/observe/profile')).map(({ file }) => file);
 
 /**
  * The files the repository ships: the `package.json` of every workspace the root's names, the root's and its lockfile, and every source
  * under a workspace's `src`. `tools/guards`, never shipped, is read with them: no guard of the repository's names the profiler either.
  */
-function shippedFiles(): { file: string; text: string }[] {
+function shippedFiles() {
   const folders = workspaces().map((dir) => path.join(REPO_ROOT, dir));
   const manifests = [REPO_ROOT, ...folders].map((dir) => path.join(dir, 'package.json')).filter((f) => fs.existsSync(f));
   const sources = folders

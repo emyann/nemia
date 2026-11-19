@@ -7,17 +7,17 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { broughtFacts } from '../src/lib/brought.ts';
 import type { RunDetail } from '../src/lib/runView.ts';
-import { coded, detail, step as fixtureStep, type Word } from './run-fixtures.ts';
+import { coded, detail, step as fixtureStep, type Word } from './run.fixture.ts';
 
 type Step = RunDetail['steps'][number];
 
 /** A step named `name` saying `word`, with no gate words, no raise, no denial and no try asked unless `over` gives one. */
-const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
-  fixtureStep({ name, ...coded(word), approve: null, raise: null, denied: null, asked: null, needs: null, ...over });
+const step = (name: string, word: Word, over: Partial<Step> = {}) =>
+  fixtureStep({ name, ...coded(word), approve: null, raise: null, denied: null, asked: null, needs: null, ...over }) satisfies Step;
 
 /** A run nobody holds or called off, holding `steps`, waiting on the person for `waiting`. */
-const run = (steps: Step[], waiting: string[], over: Partial<RunDetail> = {}): RunDetail =>
-  detail({ holding: null, cancelledAt: null, steps, waitingOnYou: waiting, ...over });
+const run = (steps: Step[], waiting: string[], over: Partial<RunDetail> = {}) =>
+  detail({ holding: null, cancelledAt: null, steps, waitingOnYou: waiting, ...over }) satisfies RunDetail;
 
 const ASKED = { try: 2, mode: 'continue', model: null, message: null, stopFirst: false } as const;
 

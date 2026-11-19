@@ -36,7 +36,7 @@ export interface Found {
 }
 
 /** Every hand-written size in `text`, in the order written, by the `families` given (all of them unless told). */
-export function sizesAt(text: string, families: Record<string, RegExp> = FAMILIES): Found[] {
+export function sizesAt(text: string, families: Record<string, RegExp> = FAMILIES) {
   return Object.values(families)
     .flatMap((family) => [...text.matchAll(family)])
     .sort((a, b) => a.index - b.index)
@@ -69,7 +69,7 @@ export const OUTSIDE: Outside[] = [
 ];
 
 /** The files of `root`'s `src` the rule reads: every `.ts`, `.tsx` and `.css` outside the kit, as its path from `root`. */
-function sources(root: string): string[] {
+function sources(root: string) {
   return fs
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))
@@ -79,7 +79,7 @@ function sources(root: string): string[] {
 }
 
 /** Every hand-written size in `root`'s `src` outside the kit that `outside` does not list for its file, as `file:line:column (size)`. */
-export function sizesIn(root: string, outside: Outside[] = OUTSIDE): string[] {
+export function sizesIn(root: string, outside: Outside[] = OUTSIDE) {
   return sources(root).flatMap((file) =>
     sizesAt(fs.readFileSync(path.join(root, file), 'utf8'))
       .filter(({ size }) => !outside.some((o) => o.file === file && o.size === size))
@@ -88,7 +88,7 @@ export function sizesIn(root: string, outside: Outside[] = OUTSIDE): string[] {
 }
 
 /** The entries of `outside` that hold nothing: no reason given, or a size its file under `root` no longer writes. */
-export function idle(root: string, outside: Outside[] = OUTSIDE): string[] {
+export function idle(root: string, outside: Outside[] = OUTSIDE) {
   return outside
     .filter(({ file, size, why }) => {
       const at = path.join(root, file);
@@ -100,7 +100,7 @@ export function idle(root: string, outside: Outside[] = OUTSIDE): string[] {
 const WEIGHTED = /(?<![\w-])text-(?:label|title|headline|display)-(?:small|medium|large)(?![\w-])/;
 
 /** Each class string of `text` that sets mono text in a role carrying a weight: the face has one, and the browser would draw the rest. */
-export function monoWeighted(text: string): string[] {
+export function monoWeighted(text: string) {
   return [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)]
     .map(([, , classes]) => classes ?? '')
     .filter((classes) => /(?<![\w-])font-mono(?![\w-])/.test(classes) && WEIGHTED.test(classes));
@@ -110,7 +110,7 @@ const LABELLED = /(?<![\w-])text-(?:label|title)-(?:small|medium|large)(?![\w-])
 const BY_HAND = /(?<![\w-])(?:font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)|tracking-[\w.[\]-]+)(?![\w-])/;
 
 /** Each class string of `text` that writes a weight or a tracking beside a label or title role: the role gives both. */
-export function dressed(text: string): string[] {
+export function dressed(text: string) {
   return [...text.matchAll(/(["'`])([^"'`\n]*)\1/g)]
     .map(([, , classes]) => classes ?? '')
     .filter((classes) => LABELLED.test(classes) && BY_HAND.test(classes));
@@ -126,7 +126,7 @@ export const DRESSED: { file: string; classes: string; why: string }[] = [
 ];
 
 /** Every class string of `root`'s `src` outside the kit that `dressed` finds and `kept` lists not for its file, as `file (classes)`. */
-export function dressedIn(root: string, kept = DRESSED): string[] {
+export function dressedIn(root: string, kept = DRESSED) {
   return sources(root).flatMap((file) =>
     dressed(fs.readFileSync(path.join(root, file), 'utf8'))
       .filter((classes) => !kept.some((k) => k.file === file && k.classes === classes))
@@ -135,7 +135,7 @@ export function dressedIn(root: string, kept = DRESSED): string[] {
 }
 
 /** Whether `text` takes a merge function that does not know the roles: the package's own, which reads `text-body-small` as an ink. */
-export const roleBlind = (text: string): boolean => /from\s*['"]cn['"]/.test(text);
+export const roleBlind = (text: string) => /from\s*['"]cn['"]/.test(text);
 
 const REFUSED: [string, string, string][] = [
   ['text-sm', 'text-sm', 'named'],
@@ -194,7 +194,7 @@ test('every family is needed: the rule built without one finds nothing of what t
 });
 
 /** A board's root in a scratch folder, holding each of `files` by its path from that root. */
-function boardOf(files: Record<string, string>): string {
+function boardOf(files: Record<string, string>) {
   const root = scratch('type-');
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true });

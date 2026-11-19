@@ -48,20 +48,21 @@ const signed = (sessions: Map<string, Sighting>, name: string, summary: string, 
   });
 
 /** A first attempt that started, spawned and ended signed: a held-open task waiting for its answer. */
-const signedJournal = (): Event[] => [
-  { kind: 'starting', at: new Date().toISOString(), attempt: 1 },
-  { kind: 'spawned', at: new Date().toISOString(), attempt: 1 },
-  {
-    kind: 'ended',
-    at: new Date().toISOString(),
-    attempt: 1,
-    sessionId: 's-1',
-    observed: 'succeeded',
-    reason: 'harness',
-    nativeId: 's-1',
-    closeout: { ok: true },
-  },
-];
+const signedJournal = () =>
+  [
+    { kind: 'starting', at: new Date().toISOString(), attempt: 1 },
+    { kind: 'spawned', at: new Date().toISOString(), attempt: 1 },
+    {
+      kind: 'ended',
+      at: new Date().toISOString(),
+      attempt: 1,
+      sessionId: 's-1',
+      observed: 'succeeded',
+      reason: 'harness',
+      nativeId: 's-1',
+      closeout: { ok: true },
+    },
+  ] satisfies Event[];
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
@@ -333,11 +334,14 @@ describe('answer and close: what each refuses — InputRefused, and nothing jour
   const answering: Array<[string, () => Promise<unknown>, RegExp]> = [
     ['empty words', () => Effect.runPromise(b.engine.answer('t-w', '')), /^`text` is empty\. Give the words/],
     ['words that are only whitespace', () => Effect.runPromise(b.engine.answer('t-w', '  \n')), /^`text` is empty/],
-    ...[0, -1, Number.NaN, Infinity, '5' as unknown as number].map((budgetUsd): [string, () => Promise<unknown>, RegExp] => [
-      `a budget that is not dollars: ${String(budgetUsd)}`,
-      () => Effect.runPromise(b.engine.answer('t-w', 'go', { config: { budgetUsd } })),
-      /^`budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/,
-    ]),
+    ...[0, -1, Number.NaN, Infinity, '5' as unknown as number].map(
+      (budgetUsd) =>
+        [
+          `a budget that is not dollars: ${String(budgetUsd)}`,
+          () => Effect.runPromise(b.engine.answer('t-w', 'go', { config: { budgetUsd } })),
+          /^`budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/,
+        ] satisfies [string, () => Promise<unknown>, RegExp],
+    ),
     [
       'a budget beside config',
       () => Effect.runPromise(b.engine.answer('t-w', 'go', { budgetUsd: 1 } as never)),

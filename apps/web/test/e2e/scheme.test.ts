@@ -35,7 +35,7 @@ const BACKGROUND = (() => {
 })();
 
 /** The colour a value computes to, read off a probe that paints with it. */
-function computed(page: Page, value: string): Promise<string> {
+function computed(page: Page, value: string) {
   return page.evaluate((colour) => {
     const probe = document.createElement('div');
     probe.style.backgroundColor = colour;
@@ -47,7 +47,7 @@ function computed(page: Page, value: string): Promise<string> {
 }
 
 /** What the page draws the background role with, and the first row's ground of the run. */
-async function drawnOf(page: Page): Promise<{ background: string; ground: string }> {
+async function drawnOf(page: Page) {
   return {
     background: await computed(page, 'var(--md-sys-color-background)'),
     ground: await page

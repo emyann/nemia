@@ -13,6 +13,7 @@ export default defineConfig({
     maxWorkers: 2,
     testTimeout: 120_000,
     hookTimeout: 120_000,
+    silent: 'passed-only',
     setupFiles: ['../../tools/test-kit/seat.ts'],
   },
 });

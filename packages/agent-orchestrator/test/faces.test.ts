@@ -80,23 +80,23 @@ const { runWith, runPlaced } = stage;
 /** `program` given the place of the test running now, and still to be run. */
 const placed = <A, E, R>(program: EffectOf<A, E, R>) => givenPlace(() => stage.place().layer, ENV)(program);
 /** `program` over the engine `e` given as the service, and the test's place: a program run as an edge runs it. */
-const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
-  Effect.runPromise(placed(program).pipe(Effect.provide(Service.layer(e))));
+const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService | PlaceService | StoreRoot>) =>
+  Effect.runPromise(placed(program).pipe(Effect.provide(Service.layer(e)))) satisfies Promise<A>;
 
 /** What `p` rejects with, or a failed test when it resolves. */
-const rejection = (p: Promise<unknown>, what: string): Promise<unknown> =>
+const rejection = (p: Promise<unknown>, what: string) =>
   p.then(
     () => assert.fail(`${what} resolved`),
     (x: unknown) => x,
-  );
+  ) satisfies Promise<unknown>;
 /** What `fn` threw, or a failure of the test when it returned. */
-const thrown = (fn: () => unknown, what: string): unknown => {
+const thrown = (fn: () => unknown, what: string) => {
   try {
     fn();
   } catch (err) {
-    return err;
+    return err satisfies unknown;
   }
-  return assert.fail(`${what} returned`);
+  return assert.fail(`${what} returned`) satisfies unknown;
 };
 /** `program` answered `'answered'`, or the message of its failure tagged `tag`. */
 const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService | PlaceService | StoreRoot>, tag: Refusal['_tag']) =>
@@ -123,7 +123,7 @@ const ticking = (b: Board) => {
 };
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
@@ -192,9 +192,9 @@ const toReview = async (b: Board, id: string, n: number, again: boolean) => {
 };
 
 /** A run this file started on a repository. */
-const repositoryRunOf = (run: Run): RepositoryRun => {
+const repositoryRunOf = (run: Run) => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
-  return run;
+  return run satisfies RepositoryRun;
 };
 /** `nemia start` over a fresh repository, the steps working in the checkout itself. */
 const started = async (dir: string) =>
@@ -570,7 +570,7 @@ describe("each verb's program, given its services, answers what its plain face a
       ROOT,
       (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }))).id,
     );
-    const failed = (): TaskPhase => 'failed';
+    const failed = () => 'failed' as const satisfies TaskPhase;
     const live = await v.live([parent.run.id]);
     const reads = (err: unknown) => {
       const refuse = () => Effect.fail(err);

@@ -80,7 +80,7 @@ const holder = async (root: string) => {
 };
 
 /** The lines of the stand-in's `file`, each parsed. */
-const lines = (dir: string, file: string): unknown[] => {
+const lines = (dir: string, file: string) => {
   const at = path.join(dir, file);
   return fs.existsSync(at)
     ? fs
@@ -92,7 +92,7 @@ const lines = (dir: string, file: string): unknown[] => {
 };
 
 /** What the SDK answered the stand-in's control requests, the latest first. */
-const answered = (dir: string): { event: string; answer: unknown }[] => lines(dir, 'answers.jsonl') as { event: string; answer: unknown }[];
+const answered = (dir: string) => lines(dir, 'answers.jsonl') as { event: string; answer: unknown }[];
 
 /** Waits until the session under `root` holds an ask open, and answers it. */
 const waiting = (t: Waiter, root: string) => until(t, () => openAsks(root, NAME)[0], 'the session holding a question', { everyMs: 50 });

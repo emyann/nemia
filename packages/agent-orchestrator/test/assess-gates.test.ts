@@ -54,17 +54,14 @@ const blockedOn = () => ({ outcome: 'blocked' as const, summary: 's', artifacts:
 /** Every task here was filed asking for a closeout — which is what the runner does. */
 const asked = () => true;
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
-const said = (outcome: Closeout['outcome']): Closeout => ({
+const said = (outcome: Closeout['outcome']) => ({
   outcome,
   summary: 'rewrote the parser\nand the three tests that pinned it',
   artifacts: [],
   needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
 });
 /** The engine's own phase words, which are free text. */
-const shown =
-  (m: Record<string, ListedPhase>) =>
-  (id: string): ListedPhase =>
-    m[id] ?? 'unknown';
+const shown = (m: Record<string, ListedPhase>) => (id: string) => m[id] ?? 'unknown';
 /** How each step signed off, by name. */
 const signedOff = (m: Record<string, Closeout>) => (name: string) => m[name];
 const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);

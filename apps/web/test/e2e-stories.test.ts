@@ -20,7 +20,7 @@ import { matchesOf, targetsOf, type Match } from './e2e/stories/targets.ts';
 const CHANGED = path.join(import.meta.dirname, 'e2e', 'stories', 'changed.ts');
 
 /** Writes `files` under `root`, each by its path from it. */
-const write = (root: string, files: Record<string, string>): void => {
+const write = (root: string, files: Record<string, string>) => {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), text);
@@ -28,14 +28,14 @@ const write = (root: string, files: Record<string, string>): void => {
 };
 
 /** Runs git in `root`, as a fixed author, its output trimmed. */
-const git = (root: string, ...args: string[]): string =>
+const git = (root: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     cwd: root,
     encoding: 'utf8',
   }).trim();
 
 /** Commits every file under `root` with `message`, and its id. */
-const commit = (root: string, message: string): string => {
+const commit = (root: string, message: string) => {
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', message);
   return git(root, 'rev-parse', 'HEAD');
@@ -61,7 +61,7 @@ const PLAIN_LIGHT = 'apps/web/test/approved/light/look-tag--plain.png';
  * A repository with a part, its story, a lib file it imports, a story of the look reaching nothing, two parts with no story, and the
  * approved pictures of two stories, one of them a light canary's too.
  */
-function planted(): { root: string; base: string } {
+function planted() {
   const root = scratch('stories-shoot-');
   git(root, 'init', '-q', '-b', 'main');
   write(root, {

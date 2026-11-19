@@ -15,7 +15,7 @@ const pickedFrom = (page: Page) =>
     .evaluateAll((items) => items.map((item) => item.getAttribute('data-factory')));
 
 /** Opens the pane's switcher, and refuses unless it lists `names`, in their order, then a new factory to come, which it does not offer. */
-async function pickerLists(page: Page, names: readonly string[], assertion: string): Promise<void> {
+async function pickerLists(page: Page, names: readonly string[], assertion: string) {
   await pickerOf(page).locator('button').first().click();
   const last = page.getByRole('option').last();
   await expectVisible(last.getByText('New factory · to come', { exact: true }), `${assertion}: a new factory to come last`);

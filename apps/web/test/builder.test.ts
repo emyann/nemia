@@ -40,24 +40,26 @@ import {
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
 /** A spec with every key unset but `fields` and the `place: git` every step says. */
-const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  ...UNSET,
-  place: 'git',
-  after: [],
-  input: [],
-  disallowedTools: [],
-  allowedTools: [],
-  ...fields,
-});
-const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({
-  name,
-  spec: spec(fields),
-  body,
-  own: null,
-  hired: null,
-  layers: null,
-  mcp: [],
-});
+const spec = (fields: Partial<WorkflowStepSpec> = {}) =>
+  ({
+    ...UNSET,
+    place: 'git',
+    after: [],
+    input: [],
+    disallowedTools: [],
+    allowedTools: [],
+    ...fields,
+  }) satisfies WorkflowStepSpec;
+const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`) =>
+  ({
+    name,
+    spec: spec(fields),
+    body,
+    own: null,
+    hired: null,
+    layers: null,
+    mcp: [],
+  }) satisfies ListedStep;
 
 /** implement ⇄ review, as the listing has a folder of yours. */
 const folder: Pick<WorkflowListing, 'steps'> = {
@@ -68,7 +70,8 @@ const folder: Pick<WorkflowListing, 'steps'> = {
 };
 
 /** Listed steps as their files write them, as a save puts them back: without the factory's `hired`. */
-const written = (steps: readonly ListedStep[]): StepWritten[] => steps.map(({ name, spec, body, own }) => ({ name, spec, body, own }));
+const written = (steps: readonly ListedStep[]) =>
+  steps.map(({ name, spec, body, own }) => ({ name, spec, body, own })) satisfies StepWritten[];
 
 const specOf = (steps: readonly DraftStep[], name: string) => steps.find((s) => s.name === name)!.spec;
 
@@ -257,20 +260,21 @@ describe('orderOf, listUnsetWords, listOf, listedWith, readmeSent: the steps pla
     );
   });
   test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {
-    const w = (name: string, from: 'repo' | 'user'): WorkflowListing => ({
-      name,
-      from,
-      dir: `/${from}/${name}`,
-      description: null,
-      readme: null,
-      steps: [],
-      graph: { roots: [], edges: [] },
-      schemas: [],
-      folderTeam: false,
-      version: '0',
-      error: null,
-      unfilled: null,
-    });
+    const w = (name: string, from: 'repo' | 'user') =>
+      ({
+        name,
+        from,
+        dir: `/${from}/${name}`,
+        description: null,
+        readme: null,
+        steps: [],
+        graph: { roots: [], edges: [] },
+        schemas: [],
+        folderTeam: false,
+        version: '0',
+        error: null,
+        unfilled: null,
+      }) satisfies WorkflowListing;
     const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'user')];
     assert.deepEqual(
       listedWith(list, w('built', 'user')).map((x) => `${x.from}:${x.name}`),
@@ -438,9 +442,10 @@ describe("a step with an agent: what it owns, what its agent gives it, and the k
     );
   });
   test("REFUSED: a listing read in a factory that hires into a step is not drafted — a save would write the hire into the step's file", () => {
-    const hiredIn = (hired: string | null): Pick<WorkflowListing, 'steps'> => ({
-      steps: [{ ...listed('implement', { agent: 'ada', harness: 'claude' }), hired }],
-    });
+    const hiredIn = (hired: string | null) =>
+      ({
+        steps: [{ ...listed('implement', { agent: 'ada', harness: 'claude' }), hired }],
+      }) satisfies Pick<WorkflowListing, 'steps'>;
     assert.throws(
       () => draftOf(hiredIn('ada')),
       (err: Error) =>

@@ -34,19 +34,17 @@ const TASK = 't-1';
 const N1 = nameFor(TASK, 1);
 const HOUR = 3_600_000;
 
-const filed = (longLived: boolean): Event => ({
-  kind: 'filed',
-  at: at(0),
-  brief: 'b',
-  cwd: '/r',
-  queued: false,
-  ...(longLived ? { restartPolicy: 'Always' as const } : {}),
-});
-const inFlight = (longLived: boolean): Event[] => [
-  filed(longLived),
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-];
+const filed = (longLived: boolean) =>
+  ({
+    kind: 'filed',
+    at: at(0),
+    brief: 'b',
+    cwd: '/r',
+    queued: false,
+    ...(longLived ? { restartPolicy: 'Always' as const } : {}),
+  }) satisfies Event;
+const inFlight = (longLived: boolean) =>
+  [filed(longLived), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }] satisfies Event[];
 const seen = (s: Omit<Sighting, 'sessionId'>) => new Map([[N1, { sessionId: 's1', ...s }]]);
 
 /** The sightings of a session open between turns: a held process doing nothing, which a job would end or hand to a person. */
@@ -58,11 +56,12 @@ const IDLE: Record<string, Omit<Sighting, 'sessionId'>> = {
 
 const GAP = 10_000;
 /** A session held under pid 100, then seen with no process from `GAP` on: a gap Claude Code's own respawn closes, or not. */
-const inGap = (longLived: boolean): Event[] => [
-  ...inFlight(longLived),
-  { kind: 'process', at: at(3), attempt: 1, pid: 100 },
-  { kind: 'gap', at: at(GAP), attempt: 1 },
-];
+const inGap = (longLived: boolean) =>
+  [
+    ...inFlight(longLived),
+    { kind: 'process', at: at(3), attempt: 1, pid: 100 },
+    { kind: 'gap', at: at(GAP), attempt: 1 },
+  ] satisfies Event[];
 /** Claude Code's listing of a session it is respawning: blocked, no pid. */
 const RESPAWNING: Omit<Sighting, 'sessionId'> = { state: 'input-required', busy: false, held: false, nativeId: 'native-1' };
 
@@ -266,21 +265,23 @@ describe('LONG-LIVED: a session through its life — idle between turns, a crash
 
 const REFUSAL = "claude --bg: error: option '--permission-mode <mode>' argument 'yolo' is invalid.";
 /** Attempt `n`'s spawn its harness refused at `END`: nothing started, in the harness's words. */
-const refusedEnd = (n: number): Event => ({
-  kind: 'ended',
-  at: at(END),
-  attempt: n,
-  sessionId: '(never started)',
-  observed: 'failed',
-  reason: 'unstartable',
-  error: REFUSAL,
-});
+const refusedEnd = (n: number) =>
+  ({
+    kind: 'ended',
+    at: at(END),
+    attempt: n,
+    sessionId: '(never started)',
+    observed: 'failed',
+    reason: 'unstartable',
+    error: REFUSAL,
+  }) satisfies Event;
 
 /** A spawn that failed on the short-lived OS error `code`, recorded as spawned with its words, and nothing seen since. */
-const spawnedWith = (code: string): Event[] => [
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1, error: `claude --bg: spawn claude ${code}` },
-];
+const spawnedWith = (code: string) =>
+  [
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1, error: `claude --bg: spawn claude ${code}` },
+  ] satisfies Event[];
 const neverSeen: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
 
 describe('LONG-LIVED: what each end leads to — restarted after the backoff, resumed or told the brief, or settled — where a job settles on its end', () => {
@@ -364,13 +365,13 @@ describe('LONG-LIVED: what each end leads to — restarted after the backoff, re
   test('LONG-LIVED: a cold restart — no session recorded on any attempt — is told the brief, continuing what the task was filed against', () => {
     const cold: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
     assert.deepEqual(decide(fold(TASK, [...inFlight(true), cold]), new Map(), now(END + 10_000)), { do: 'start', attempt: 2 });
-    const against: Event[] = [{ ...filed(true), resumeFrom: 'native-0' } as Event, ...inFlight(true).slice(1), cold];
+    const against: Event[] = [{ ...filed(true), resumeFrom: 'native-0' }, ...inFlight(true).slice(1), cold];
     assert.deepEqual(decide(fold(TASK, against), new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'native-0' });
   });
 });
 
 /** `k` attempts in a row, each ended `ran` ms after it started, the last ending at `END`. */
-const endedRuns = (...ran: number[]): Event[] => {
+const endedRuns = (...ran: number[]) => {
   const events: Event[] = [filed(true)];
   let t = END - ran.reduce((sum, r) => sum + r + 1_000, 0);
   ran.forEach((r, i) => {
@@ -387,7 +388,7 @@ const endedRuns = (...ran: number[]): Event[] => {
       nativeId: `n${i + 1}`,
     });
   });
-  return events;
+  return events satisfies Event[];
 };
 
 const SHORT = 5_000;
@@ -421,17 +422,18 @@ const mono = (ms: number, boot = 'b-1') => ({ boot, ms });
 /** Now at `wallMs` on the wall clock and `monoMs` on the monotonic clock of `boot`. */
 const nowOn = (wallMs: number, monoMs: number, boot = 'b-1') => ({ ...now(wallMs), mono: mono(monoMs, boot) });
 /** Two attempts that ended on their own: the first ran `firstWall` on the wall clock and `firstMono` on the monotonic one. */
-const twoRuns = (firstWall: number, firstMono: number): Event[] => {
-  const ran = (n: number, wall: number, ms: number, wallEnd: number, msEnd: number): Event[] => [
-    { kind: 'starting', at: at(wall), attempt: n, mono: mono(ms) },
-    { kind: 'spawned', at: at(wall), attempt: n, mono: mono(ms) },
-    { kind: 'ended', at: at(wallEnd), attempt: n, sessionId: `s${n}`, observed: 'failed', reason: 'harness', mono: mono(msEnd) },
-  ];
+const twoRuns = (firstWall: number, firstMono: number) => {
+  const ran = (n: number, wall: number, ms: number, wallEnd: number, msEnd: number) =>
+    [
+      { kind: 'starting', at: at(wall), attempt: n, mono: mono(ms) },
+      { kind: 'spawned', at: at(wall), attempt: n, mono: mono(ms) },
+      { kind: 'ended', at: at(wallEnd), attempt: n, sessionId: `s${n}`, observed: 'failed', reason: 'harness', mono: mono(msEnd) },
+    ] satisfies Event[];
   return [
     filed(true),
     ...ran(1, 0, 0, firstWall, firstMono),
     ...ran(2, firstWall + 1_000, firstMono + 1_000, firstWall + 6_000, firstMono + 6_000),
-  ];
+  ] satisfies Event[];
 };
 
 describe('LONG-LIVED: each wait runs on the monotonic clock within a boot — a wall clock stepped either way moves none — and on the wall clock across one', () => {
@@ -477,10 +479,10 @@ describe('LONG-LIVED: each wait runs on the monotonic clock within a boot — a 
   });
 });
 
-const heldIn = (pid: number): Sighting => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, pid });
+const heldIn = (pid: number) => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, pid }) satisfies Sighting;
 const GONE: Sighting = { sessionId: 's1', ...RESPAWNING };
 const WHEN = at(HOUR);
-const holding = (): Event[] => [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 }];
+const holding = () => [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 }] satisfies Event[];
 
 describe('LONG-LIVED: what a sighting journals — the first gap once, a process at each new pid or the end of a gap — and nothing for a job, an ended attempt or a session not seen', () => {
   const rows: [string, Event[], Sighting | undefined, Event[]][] = [

@@ -24,7 +24,7 @@ const measured = (page: Page, selector: string) =>
   });
 
 /** Each table's box is no taller inside than its content: nothing it holds makes it scroll upright. */
-async function boxesFit(page: Page): Promise<void> {
+async function boxesFit(page: Page) {
   for (const [selector, what] of BOXES) {
     const { inside, room } = await measured(page, selector);
     if (inside[1] > room[1]) throw new Refused(`${what} is no taller inside than its box — ${inside[1]} inside a box of ${room[1]}`);
@@ -32,7 +32,7 @@ async function boxesFit(page: Page): Promise<void> {
 }
 
 /** The last row of each table draws no line under it and the row before it does; the pager stands under a line of its own. */
-async function lastRowsClose(page: Page): Promise<void> {
+async function lastRowsClose(page: Page) {
   for (const [selector, what] of BOXES) {
     const lines = await page
       .locator(`${selector} tbody tr`)
@@ -50,7 +50,7 @@ async function lastRowsClose(page: Page): Promise<void> {
  * A page of the finished runs past the last, in a tab of its own: it holds no row, so no table is drawn, and the pager, which says
  * why, stands under no line: nothing is there to part it from.
  */
-async function noRowsNoLine(page: Page): Promise<void> {
+async function noRowsNoLine(page: Page) {
   const other = await page.context().newPage();
   try {
     const past = `f.${Buffer.from(JSON.stringify(['1970-01-01T00:00:00.000Z', ''])).toString('base64url')}`;
@@ -66,14 +66,14 @@ async function noRowsNoLine(page: Page): Promise<void> {
 }
 
 /** The mark on the page's root, awaited until it reads `word`. */
-const rootMarked = (page: Page, word: string, what: string): Promise<void> =>
+const rootMarked = (page: Page, word: string, what: string) =>
   expectNone(async () => {
     const found = await page.locator('html').getAttribute('data-scroll-bar');
     return found === word ? null : `the root's mark reads ${found}`;
   }, what);
 
 /** The page that scrolls is marked while it scrolls and at rest after, by the frame's own listener; then put back at its top. */
-async function pageIsMarked(page: Page): Promise<void> {
+async function pageIsMarked(page: Page) {
   await page.mouse.move(640, 400);
   await page.mouse.wheel(0, 200);
   await rootMarked(page, 'shown', 'the page that scrolls is marked shown');
@@ -83,8 +83,8 @@ async function pageIsMarked(page: Page): Promise<void> {
 }
 
 /** The page `from` is on, opened in a window of `browser` in the same theme, `scale` times as fine, once its reads are answered. */
-async function sameIn(browser: Browser, from: Page, width: number, height: number, scale = 1): Promise<Page> {
-  const theme = (await themeOf(from)) as 'light' | 'dark';
+async function sameIn(browser: Browser, from: Page, width: number, height: number, scale = 1) {
+  const theme = await themeOf(from);
   const context = await browser.newContext({
     colorScheme: theme,
     viewport: { width, height },
@@ -104,7 +104,7 @@ async function sameIn(browser: Browser, from: Page, width: number, height: numbe
  * 8-pixel lane; the sidebar's list, in a window shorter than it, keeps the same lane; and 390 wide, the table in flight is narrower
  * than its columns and scrolls sideways, still with no upright bar.
  */
-async function barsTakeTheLooksRoom(from: Page): Promise<void> {
+async function barsTakeTheLooksRoom(from: Page) {
   const browser = await launch('classic');
   try {
     const page = await sameIn(browser, from, 1280, 800);
@@ -137,7 +137,7 @@ async function barsTakeTheLooksRoom(from: Page): Promise<void> {
 }
 
 /** Marks what `selector` finds as scrolling, as the frame's listener does, once any mark of its own has come to rest. */
-async function shown(page: Page, selector: string): Promise<void> {
+async function shown(page: Page, selector: string) {
   await expectNone(
     async () =>
       (await page.locator(selector).getAttribute('data-scroll-bar')) === 'shown' ? 'it is still marked by a scroll of its own' : null,
@@ -151,7 +151,7 @@ async function shown(page: Page, selector: string): Promise<void> {
  * page's own bar; 390 wide, the table in flight with its sideways bar; in a window 300 tall, the sidebar's list with its bar; and the
  * window's top-right corner four times as large, the thumb and the lane beside the scan lines.
  */
-async function pictured(from: Page, kind: Bars): Promise<void> {
+async function pictured(from: Page, kind: Bars) {
   const browser = await launch(kind);
   const theme = await themeOf(from);
   const fileOf = (what: string) => path.join(OUT, `runs-bars-${what}-${kind}-${theme}.png`);

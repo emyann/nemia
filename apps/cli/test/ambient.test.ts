@@ -27,11 +27,11 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
 };
 
 /** What a child spawned with `env` reads of each of `DROPPED`. */
-const seenBy = (env: NodeJS.ProcessEnv): unknown => {
+const seenBy = (env: NodeJS.ProcessEnv) => {
   const read = `console.log(JSON.stringify(Object.fromEntries(${JSON.stringify(DROPPED)}.map((n) => [n, process.env[n] ?? null]))))`;
   const ran = spawnSync(process.execPath, ['-e', read], { env, encoding: 'utf8', timeout: 60_000 });
   assert.equal(ran.status, 0, ran.stderr);
-  return JSON.parse(ran.stdout);
+  return JSON.parse(ran.stdout) as unknown;
 };
 
 test("REFUSED under the daemon's environment: a child given `ambient()` reads none of its per-session variables, one given process.env does", (t) => {

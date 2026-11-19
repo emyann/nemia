@@ -20,7 +20,7 @@ const API = path.join(import.meta.dirname, '..', '..', 'api');
 export type Said = { code: number | null; out: string; err: string };
 
 /** A file written whole, its folder made. */
-export const write = (file: string, text: string): void => {
+export const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -59,7 +59,7 @@ export async function servedStore(prefix: string, seed: (root: string) => void, 
     void ended.then(() => reject(new Error(`the api ended before it listened:\n${said}`)));
   });
   write(path.join(root, 'daemon.json'), JSON.stringify({ url }));
-  const nemia = (argv: readonly string[], stdin?: string): Promise<Said> => {
+  const nemia = (argv: readonly string[], stdin?: string) => {
     const run = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     let err = '';
@@ -69,7 +69,7 @@ export async function servedStore(prefix: string, seed: (root: string) => void, 
     return new Promise((resolve, reject) => {
       run.on('error', reject);
       run.on('close', (code) => resolve({ code, out, err }));
-    });
+    }) satisfies Promise<Said>;
   };
   const stop = async () => {
     child.kill();

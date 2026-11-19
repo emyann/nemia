@@ -25,61 +25,62 @@ const at = '2026-09-30T09:00:00.000Z';
 /** Who acted, as the api hands each write its caller's actor: the person on a token, and an agent's session. */
 const ON_LAPTOP: Actor = { kind: 'person', token: 'laptop' };
 const REVIEWER: Actor = { kind: 'agent', agent: 'reviewer', run: 'r-1', step: 'review' };
-const idOf = (id: string): RunId => RunId.read(id);
+const idOf = (id: string) => RunId.read(id) satisfies RunId;
 
 /** A repository run's record as the tick writes one today, frozen steps and all. */
-export const aRun = (id: string): Run => ({
-  id,
-  repo: '/repo',
-  workspace: '/repo',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/repo/workflows/dev',
-  workflow: [
-    { name: 'implement', after: [], body: 'do it', harness: 'claude' },
-    { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
-  ],
-  steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
-  createdAt: '2026-09-01T00:00:00.000Z',
-});
+export const aRun = (id: string) =>
+  ({
+    id,
+    repo: '/repo',
+    workspace: '/repo',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: '/repo/workflows/dev',
+    workflow: [
+      { name: 'implement', after: [], body: 'do it', harness: 'claude' },
+      { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
+    ],
+    steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
+    createdAt: '2026-09-01T00:00:00.000Z',
+  }) satisfies Run;
 
 /** A run made through the door under `id`. */
-const made = (door: Door, id: string): Run => {
+const made = (door: Door, id: string) => {
   const run = aRun(id);
   act(door.runs.create(run));
-  return run;
+  return run satisfies Run;
 };
 
 /** What a read of `id` answers: its brief, or the refusal's kind. */
-const briefOf = (door: Door, id: string): unknown => {
+const briefOf = (door: Door, id: string) => {
   const read = act(door.runs.read(idOf(id)));
-  return 'refused' in read ? read : read.brief;
+  return ('refused' in read ? read : read.brief) satisfies unknown;
 };
 
 /** A run whose implement step's second try ran under a task no filing names. */
-const misnamed = (id: string): Run => {
+const misnamed = (id: string) => {
   const run = aRun(id);
   return {
     ...run,
     steps: { ...run.steps, implement: { ...run.steps.implement, taskId: 't-1', tries: [{ taskId: `${id}-implement`, cause: 'fresh' }] } },
-  };
+  } satisfies Run;
 };
 
 /** A run under `id` started out of the inbox's card `card`. */
-const fromCard = (id: string, card: string): Run => ({ ...aRun(id), from: { inbox: card } });
+const fromCard = (id: string, card: string) => ({ ...aRun(id), from: { inbox: card } }) satisfies Run;
 
 /** A run that waits on itself. */
-const selfWaiting = (id: string): Run => ({ ...aRun(id), after: [id] });
+const selfWaiting = (id: string) => ({ ...aRun(id), after: [id] }) satisfies Run;
 
 /** A run whose implement step landed both a commit and an abort. */
-const landedTwice = (id: string): Run => {
+const landedTwice = (id: string) => {
   const run = aRun(id);
   return {
     ...run,
     steps: { ...run.steps, implement: { ...run.steps.implement, landed: { commit: 'a'.repeat(40), aborted: 'conflict' } } },
-  };
+  } satisfies Run;
 };
 
 /** One ask of each kind a person writes, and its key's number. */
@@ -97,7 +98,7 @@ const ASKS: Array<{ asked: PersonRequest; n: number }> = [
     n: 3,
   },
 ];
-const stepOf = (asked: PersonRequest): string => (asked.of === 'base' ? asked.ask.merge.target : asked.ask.step);
+const stepOf = (asked: PersonRequest) => (asked.of === 'base' ? asked.ask.merge.target : asked.ask.step);
 
 const READ: Walk[] = [
   {

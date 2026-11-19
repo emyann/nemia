@@ -30,21 +30,21 @@ const TREES = await rendered([
 ]);
 
 /** The tree of the factory `name`, and an environment on the store it is in. */
-function factory(name: string): { tree: string; env: NodeJS.ProcessEnv } {
+function factory(name: string) {
   const at = TREES[name];
   assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
   return { tree: at.tree, env: storeEnv(path.dirname(at.store)) };
 }
 
 /** `file` of `folder` with `from` replaced by `to`, which it must hold once. */
-function rewrite(folder: string, file: string, from: string, to: string): void {
+function rewrite(folder: string, file: string, from: string, to: string) {
   const text = fs.readFileSync(path.join(folder, file), 'utf8');
   assert.equal(text.split(from).length - 1, 1, `${file} holds ${from} once`);
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
 }
 
 /** Each factory's tree as its operator left it: one spliced its own check into sdlc's line and sentence, one changed a line of its own. */
-function leftByOperators(): void {
+function leftByOperators() {
   const spliced = factory('spliced').tree;
   for (const workflow of ['build', 'quick'])
     rewrite(spliced, `workflows/${workflow}/implement.md`, PROBE_END, `${PROBE_END}{ own-check; } && `);
@@ -68,7 +68,7 @@ const NEXT = (() => {
 })();
 
 /** What `nemia factory diff <name> --to` the next version previews, run on its entry's handler: each conflict's place, and what merged. */
-async function diffOf(name: string): Promise<{ at: string[]; merged: string[]; said: string }> {
+async function diffOf(name: string) {
   const { env } = factory(name);
   const plan = await handled(env, FACTORY_PLAN, [name, '--to', NEXT]);
   if (plan.kind !== 'upgrade') return assert.fail(`nemia factory diff ${name} previews no upgrade: ${JSON.stringify(plan)}`);

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { Button } from '@/components/ui/ds';
 import { Pending } from './Pending';
-import { ON_CARD } from './stories.fixtures';
+import { ON_CARD } from './stories.fixture';
 
 /**
  * A wait still out: the kit's small circular ProgressIndicator, drawn in the ink of what holds it, a button's icon while its press is

@@ -89,7 +89,7 @@ describe('on an install, a card is placed by its factory, or filed with no repos
       const listed = (await (await app.request('/api/namespaces/default/cards')).json()) as CardList;
       const loose = listed.items.find((c) => c.spec.workflow === 'dev');
       assert.ok(loose, 'the card in no factory naming dev');
-      const runs = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []);
+      const runs = () => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []);
       const before = runs();
       const res = await send(`/api/namespaces/default/cards/${loose.metadata.name}/start`, 'POST', {});
       const answer = (await res.json()) as { error: string };

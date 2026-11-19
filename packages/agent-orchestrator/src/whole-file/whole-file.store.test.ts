@@ -13,7 +13,7 @@ import { writeWhole } from './whole-file.store.ts';
 const ROOT = scratch('wf-whole-file-');
 
 /** A folder of its own for one test, holding `name` with `text` in it. */
-const planted = (name: string, text: string): { dir: string; file: string } => {
+const planted = (name: string, text: string) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'case-'));
   const file = path.join(dir, name);
   fs.writeFileSync(file, text);

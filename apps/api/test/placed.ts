@@ -31,7 +31,7 @@ import { Engine } from '../src/store.ts';
 export type Given = Layer.Layer<PlaceService> | (() => Layer.Layer<PlaceService>);
 
 /** The layer `given` names now. */
-const layerOf = (given: Given): Layer.Layer<PlaceService> => (typeof given === 'function' ? given() : given);
+const layerOf = (given: Given) => (typeof given === 'function' ? given() : given) satisfies Layer.Layer<PlaceService>;
 
 /**
  * A `runWith` over `given`: `program` run over the engine `e`, given the place `given` holds then and the store root this test
@@ -39,21 +39,18 @@ const layerOf = (given: Given): Layer.Layer<PlaceService> => (typeof given === '
  */
 export const runOver =
   (given: Given) =>
-  <A, E>(
-    e: Parameters<typeof runEngine>[0],
-    program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-  ): Promise<A> =>
-    runEngine(e, program.pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(process.env))));
+  <A, E>(e: Parameters<typeof runEngine>[0], program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>) =>
+    runEngine(e, program.pipe(Effect.provide(layerOf(given)), Effect.provide(storeConfigLayer(process.env)))) satisfies Promise<A>;
 
 /** The engine a package program reads, over the stand-in `engine`: what `engine()` of the package is to the real one. */
-export const engineFor = (engine: TestEngine): ReturnType<typeof engineOf> => engineOf(engine.layer);
+export const engineFor = (engine: TestEngine) => engineOf(engine.layer) satisfies ReturnType<typeof engineOf>;
 
 /**
  * The api over the stand-ins: the app's own layer (`liveOf`), its engine `engine` and its place `stand` given after it, so they are the
  * ones its handlers read. A new app, with nothing kept between requests of another.
  */
-export const appOver = (engine: TestEngine, stand: TestPlace, ...more: Layer.Layer<never>[]): ReturnType<typeof appOf>['app'] =>
-  appOf(Layer.mergeAll(liveOf(), Engine.over(engine.layer), stand.layer, ...more)).app;
+export const appOver = (engine: TestEngine, stand: TestPlace, ...more: Layer.Layer<never>[]) =>
+  appOf(Layer.mergeAll(liveOf(), Engine.over(engine.layer), stand.layer, ...more)).app satisfies ReturnType<typeof appOf>['app'];
 
 /** The makers `eachTest` was given in this file, in order, each with what it made for the test or `describe` running now. */
 const makers: { make: () => unknown; now?: { readonly made: unknown } }[] = [];
@@ -69,7 +66,7 @@ const at: { head?: unknown; started: boolean; running: boolean; making: boolean;
 };
 
 /** Every maker made anew, in the order given, so a later one reads the earlier ones' new makes. */
-const makeAll = (): void => {
+const makeAll = () => {
   at.making = true;
   try {
     for (const m of makers) m.now = { made: m.make() };
@@ -79,10 +76,10 @@ const makeAll = (): void => {
 };
 
 /** The test or `describe` at the head of the file that `task` belongs to. */
-const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
+const headOf = (task: { suite?: unknown; file: unknown }) => {
   let top: { suite?: unknown } = task;
   while (top.suite && top.suite !== task.file) top = top.suite;
-  return top;
+  return top satisfies unknown;
 };
 
 /**
@@ -93,7 +90,7 @@ const headOf = (task: { suite?: unknown; file: unknown }): unknown => {
  *
  * @param make what is made anew for each test or `describe` at the head of the file
  */
-export function eachTest<A>(make: () => A): () => A {
+export function eachTest<A>(make: () => A) {
   const mine: { make: () => unknown; now?: { readonly made: unknown } } = { make };
   makers.push(mine);
   if (makers.length === 1) {
@@ -113,7 +110,7 @@ export function eachTest<A>(make: () => A): () => A {
       at.running = false;
     });
   }
-  return () => {
+  return (() => {
     if (!at.started) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
     if (!at.running && !at.making && !at.early) {
       makeAll();
@@ -121,13 +118,13 @@ export function eachTest<A>(make: () => A): () => A {
     }
     if (!mine.now) throw new Error('eachTest: asked before any test, where nothing is made yet: ask inside the test that uses it');
     return mine.now.made as A;
-  };
+  }) satisfies () => A;
 }
 
 /**
  * `seed` run before each test of the file that calls this at its head, after the stand-ins named above it are made: what every test of
  * the file reads (a task filed and settled, a run's record), set again on the test's own stand-ins.
  */
-export function beforeEachTest(seed: () => void): void {
+export function beforeEachTest(seed: () => void) {
   eachTest(seed);
 }

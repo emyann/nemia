@@ -13,8 +13,7 @@ import { releaseDir, switchCurrent } from './release.store.ts';
 import { currentNemia, toolsNeed, toolsNemia } from './nemia-link.store.ts';
 
 /** The exit of `command` run by `sh -c` in the store at `home`. */
-const ran = (home: string, command: string): number | null =>
-  spawnSync('sh', ['-c', command], { cwd: home, stdio: 'ignore', timeout: 10_000 }).status;
+const ran = (home: string, command: string) => spawnSync('sh', ['-c', command], { cwd: home, stdio: 'ignore', timeout: 10_000 }).status;
 
 test("nemia doctor fix tools's command fails with no pointer, and links the pointer's launcher where there is one", () => {
   const home = fs.realpathSync(scratch('wf-nemia-fix-'));

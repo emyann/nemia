@@ -24,14 +24,15 @@ const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
 const now = (ms = 0) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000 });
 const TASK = 't-q';
 
-const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event => ({
-  kind: 'filed',
-  at: at(0),
-  brief: 'b',
-  cwd: '/r',
-  ...extra,
-});
-const admitted = (ms = 1): Event => ({ kind: 'admitted', at: at(ms) });
+const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+  ({
+    kind: 'filed',
+    at: at(0),
+    brief: 'b',
+    cwd: '/r',
+    ...extra,
+  }) satisfies Event;
+const admitted = (ms = 1) => ({ kind: 'admitted', at: at(ms) }) satisfies Event;
 
 describe('decide and admissionOf: a queued task waits for the word, read off the record alone', () => {
   test('a task filed queued waits for the word, and starts once it is given', () => {
@@ -97,7 +98,7 @@ describe('decide and admissionOf: a queued task waits for the word, read off the
   });
 });
 
-const memoryJournal = (reads: { n: number } = { n: 0 }): AsyncJournal & { tasks: Map<string, Event[]> } => {
+const memoryJournal = (reads: { n: number } = { n: 0 }) => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -116,25 +117,26 @@ const memoryJournal = (reads: { n: number } = { n: 0 }): AsyncJournal & { tasks:
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal & { tasks: Map<string, Event[]> };
 };
 
 /** A harness that counts how often it is observed. */
-const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    observes.n++;
-    return new Map(sessions);
-  },
-  async stop(id) {
-    for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
-  },
-  async logs() {
-    return '';
-  },
-});
+const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      observes.n++;
+      return new Map(sessions);
+    },
+    async stop(id) {
+      for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
+    },
+    async logs() {
+      return '';
+    },
+  }) satisfies AsyncRunner;
 
 const board = () => {
   const sessions = new Map<string, Sighting>();

@@ -37,104 +37,111 @@ const TASK = 't-1';
 const N1 = nameFor(TASK, 1);
 const N2 = nameFor(TASK, 2);
 /** Sightings are keyed by the name WE chose, which is what makes adoption exact. */
-const seen = (...pairs: Array<[string, SessionState]>): Map<string, Sighting> =>
-  new Map(pairs.map(([name, state], i) => [name, { sessionId: `s${i}`, state }]));
+const seen = (...pairs: Array<[string, SessionState]>) =>
+  new Map(pairs.map(([name, state], i) => [name, { sessionId: `s${i}`, state }])) satisfies Map<string, Sighting>;
 
 /** A filing as `file` writes one: not queued, so the pass starts it with no word from above. */
-const filed = (): Event => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', queued: false });
+const filed = () => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', queued: false }) satisfies Event;
 
 /** The same filing as a journal an older runtime wrote has it: no `queued` key, which reads as queued (`admit.test.ts`). */
-const keyless = (): Event => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo' });
+const keyless = () => ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo' }) satisfies Event;
 
 /** The layer above's word that a queued task may start: what a filing with no `queued` key needs before it starts. */
-const admitted = (ms = 0): Event => ({ kind: 'admitted', at: at(ms) });
+const admitted = (ms = 0) => ({ kind: 'admitted', at: at(ms) }) satisfies Event;
 
 /**
  * A `filed` entry as a journal an older runtime wrote may carry it: with `maxAttempts` and a `resume` policy, which the type
  * does not name and `fold` reads past.
  */
-const legacyFiled = (extra: object = {}): Event =>
+const legacyFiled = (extra: object = {}) =>
   ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts: 3, resume: 'always', ...extra }) as Event;
 
 /** Attempt 1 in flight, and the task filed with a closing statement asked for, or not. */
-const inFlight = (schema: boolean, legacy = false): Event[] => [
-  {
-    kind: 'filed',
-    at: at(0),
-    brief: 'b',
-    cwd: '/r',
-    ...(legacy ? { maxAttempts: 3, resume: 'always' } : {}),
-    ...(schema ? { closeoutSchema: { type: 'object' } } : {}),
-  },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-];
-const quiet = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
-  new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'working' as const, busy: false, quietMs: 120_000, ...extra }]]);
+const inFlight = (schema: boolean, legacy = false) =>
+  [
+    {
+      kind: 'filed',
+      at: at(0),
+      brief: 'b',
+      cwd: '/r',
+      ...(legacy ? { maxAttempts: 3, resume: 'always' } : {}),
+      ...(schema ? { closeoutSchema: { type: 'object' } } : {}),
+    },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+  ] satisfies Event[];
+const quiet = (extra: Partial<Sighting> = {}) =>
+  new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'working' as const, busy: false, quietMs: 120_000, ...extra }]]) satisfies Map<
+    string,
+    Sighting
+  >;
 
 /**
  * A journal an older runtime wrote, whose engine judged attempt 1 by a reason of its own, as `upgrade` reads it: the harness's
  * end with no statement, the reason kept as `former`, which `decide` never records.
  */
-const formerEnd = (legacy = false): Event[] => [
-  ...inFlight(true, legacy),
-  {
-    kind: 'ended',
-    at: at(3),
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'failed',
-    reason: 'harness',
-    closedOut: false,
-    former: 'unsigned',
-    nativeId: 'n1',
-  },
-];
+const formerEnd = (legacy = false) =>
+  [
+    ...inFlight(true, legacy),
+    {
+      kind: 'ended',
+      at: at(3),
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'failed',
+      reason: 'harness',
+      closedOut: false,
+      former: 'unsigned',
+      nativeId: 'n1',
+    },
+  ] satisfies Event[];
 
 /** A reading of the monotonic clock `ms` into boot `boot`, as the engine stamps one. */
 const mono = (ms: number, boot = 'b-1') => ({ boot, ms });
 
 /** A spawn journalled at `at(2)`, its intent at `at(1)`, each stamped on the monotonic clock of `boot` when given one. */
-const spawnedIn = (boot?: string): Event[] => [
-  filed(),
-  { kind: 'starting', at: at(1), attempt: 1, ...(boot ? { mono: mono(1, boot) } : {}) },
-  { kind: 'spawned', at: at(2), attempt: 1, ...(boot ? { mono: mono(2, boot) } : {}) },
-];
+const spawnedIn = (boot?: string) =>
+  [
+    filed(),
+    { kind: 'starting', at: at(1), attempt: 1, ...(boot ? { mono: mono(1, boot) } : {}) },
+    { kind: 'spawned', at: at(2), attempt: 1, ...(boot ? { mono: mono(2, boot) } : {}) },
+  ] satisfies Event[];
 
-const ran = (outcome: Outcome, first: Event = filed()): Event[] => [
-  first,
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(2), attempt: 1 },
-  { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: outcome, reason: 'harness', nativeId: 'n1' },
-];
+const ran = (outcome: Outcome, first: Event = filed()) =>
+  [
+    first,
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: outcome, reason: 'harness', nativeId: 'n1' },
+  ] satisfies Event[];
 
-const withDeadline = (seconds: number): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', deadlineSeconds: seconds });
+const withDeadline = (seconds: number) =>
+  ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/repo', deadlineSeconds: seconds }) satisfies Event;
 
-const started = (extra: Event[] = []): Event[] => [
-  { kind: 'starting', at: at(1_000), attempt: 1 },
-  { kind: 'spawned', at: at(1_100), attempt: 1 },
-  ...extra,
-];
+const started = (extra: Event[] = []) =>
+  [{ kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 }, ...extra] satisfies Event[];
 
 /** An attempt started at `at(1_000)` and spawned at `at(1_100)`, both stamped on the monotonic clock of `boot`. */
-const startedIn = (boot: string): Event[] => [
-  { kind: 'starting', at: at(1_000), attempt: 1, mono: mono(1_000, boot) },
-  { kind: 'spawned', at: at(1_100), attempt: 1, mono: mono(1_100, boot) },
-];
+const startedIn = (boot: string) =>
+  [
+    { kind: 'starting', at: at(1_000), attempt: 1, mono: mono(1_000, boot) },
+    { kind: 'spawned', at: at(1_100), attempt: 1, mono: mono(1_100, boot) },
+  ] satisfies Event[];
 
-const endedWith = (observed: Outcome, reason: 'harness' | 'lost' | 'unstartable', first: Event = filed()): Event[] => [
-  first,
-  { kind: 'starting', at: at(1), attempt: 1 },
-  ...(reason === 'unstartable' ? [] : [{ kind: 'spawned', at: at(2), attempt: 1 } as Event]),
-  {
-    kind: 'ended',
-    at: at(3),
-    attempt: 1,
-    ...(reason === 'unstartable' ? { sessionId: '(never started)', error: 'refused' } : { sessionId: 's0', nativeId: 'native-1' }),
-    observed,
-    reason,
-  },
-];
+const endedWith = (observed: Outcome, reason: 'harness' | 'lost' | 'unstartable', first: Event = filed()) =>
+  [
+    first,
+    { kind: 'starting', at: at(1), attempt: 1 },
+    ...(reason === 'unstartable' ? [] : [{ kind: 'spawned', at: at(2), attempt: 1 } as Event]),
+    {
+      kind: 'ended',
+      at: at(3),
+      attempt: 1,
+      ...(reason === 'unstartable' ? { sessionId: '(never started)', error: 'refused' } : { sessionId: 's0', nativeId: 'native-1' }),
+      observed,
+      reason,
+    },
+  ] satisfies Event[];
 
 /** The note a task settles failed with after one attempt ended for `reason`: a refused spawn says its words and the fix. */
 const noteOf = (reason: 'lost' | 'unstartable' | 'harness') =>
@@ -143,16 +150,13 @@ const noteOf = (reason: 'lost' | 'unstartable' | 'harness') =>
     : '1 attempt(s), none succeeded';
 
 /** A continuation of `sess-1` whose first attempt ended as `then` says: `unstartable` with no spawn, or after one. */
-const continuation = (then: Event[], first: Event = { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1' }): Event[] => [
-  first,
-  { kind: 'starting', at: at(1), attempt: 1, resumeFrom: 'sess-1' },
-  ...then,
-];
+const continuation = (then: Event[], first: Event = { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', resumeFrom: 'sess-1' }) =>
+  [first, { kind: 'starting', at: at(1), attempt: 1, resumeFrom: 'sess-1' }, ...then] satisfies Event[];
 
 /** The same journal with words said to attempt 1 just after it spawned. */
-const told = (events: Event[], text = 'widen the scope to the api'): Event[] => {
+const told = (events: Event[], text = 'widen the scope to the api') => {
   const i = events.findIndex((e) => e.kind === 'spawned');
-  return [...events.slice(0, i + 1), { kind: 'said', at: at(1_500), attempt: 1, text }, ...events.slice(i + 1)];
+  return [...events.slice(0, i + 1), { kind: 'said', at: at(1_500), attempt: 1, text }, ...events.slice(i + 1)] satisfies Event[];
 };
 
 describe('A JOB, walked entry by entry as a pass meets it: filed, started, spawned, seen at work each way a harness says, ended and settled', () => {
@@ -308,21 +312,22 @@ describe('decide: how a job starts and settles — each end its harness, a perso
 
 describe("decide: a job parked under a sessions' drain — held while it stands, then continued as the next attempt of its task, resumed and told the call that did not finish; settled as today when stopped, unparked or long-lived", () => {
   const END = 200_000;
-  const job = (parked?: { calling?: { tool: string; since: string } }, longLived = false): Event[] => [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(longLived ? { restartPolicy: 'Always' as const } : {}) },
-    { kind: 'starting', at: at(1), attempt: 1 },
-    { kind: 'spawned', at: at(2), attempt: 1 },
-    {
-      kind: 'ended',
-      at: at(END),
-      attempt: 1,
-      sessionId: 's0',
-      observed: 'failed',
-      reason: 'harness',
-      nativeId: 'n1',
-      ...(parked ? { parked } : {}),
-    },
-  ];
+  const job = (parked?: { calling?: { tool: string; since: string } }, longLived = false) =>
+    [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...(longLived ? { restartPolicy: 'Always' as const } : {}) },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(2), attempt: 1 },
+      {
+        kind: 'ended',
+        at: at(END),
+        attempt: 1,
+        sessionId: 's0',
+        observed: 'failed',
+        reason: 'harness',
+        nativeId: 'n1',
+        ...(parked ? { parked } : {}),
+      },
+    ] satisfies Event[];
   const drained = (ms: number) => ({ ...now(ms), drained: true });
   const cut = { calling: { tool: 'Bash', since: at(END - 5) } };
   test('parked with a call cut, no drain: waits out the backoff, then starts attempt 2 resumed from its session, told the tool', () => {
@@ -459,8 +464,8 @@ describe('decide: what a closing statement records — a quiet session, the harn
     });
   });
   test("the HARNESS'S `done` without a statement is recorded as the harness said it, with `closedOut: false` — for a task that asked for one, and only for one", () => {
-    const done = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
-      new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'completed' as const, ...extra }]]);
+    const done = (extra: Partial<Sighting> = {}) =>
+      new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'completed' as const, ...extra }]]) satisfies Map<string, Sighting>;
     assert.deepEqual(decide(fold(TASK, inFlight(true)), done(), now(5)), {
       do: 'record-end',
       attempt: 1,
@@ -946,36 +951,38 @@ const N3 = nameFor(TASK, 3);
  * A task held open whose first attempt signed at 3 s, `extra` on the filing: held open, a signed end waits on a person, an answer is a
  * turn, and a close settles.
  */
-const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
-  {
-    kind: 'filed',
-    at: at(0),
-    brief: 'draft the plan',
-    cwd: '/r',
-    closeoutSchema: { type: 'object' },
-    holdOpen: true,
-    queued: false,
-    ...extra,
-  },
-  { kind: 'starting', at: at(1_000), attempt: 1 },
-  { kind: 'spawned', at: at(1_100), attempt: 1 },
-  {
-    kind: 'ended',
-    at: at(3_000),
-    attempt: 1,
-    sessionId: 's0',
-    observed: 'succeeded',
-    reason: 'harness',
-    nativeId: 'native-1',
-    closeout: { plan: 'v1' },
-  },
-];
-const answer = (ms: number, text = 'make it smaller', config?: HarnessArgs): Event => ({
-  kind: 'input',
-  at: at(ms),
-  text,
-  ...(config ? { config } : {}),
-});
+const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+  [
+    {
+      kind: 'filed',
+      at: at(0),
+      brief: 'draft the plan',
+      cwd: '/r',
+      closeoutSchema: { type: 'object' },
+      holdOpen: true,
+      queued: false,
+      ...extra,
+    },
+    { kind: 'starting', at: at(1_000), attempt: 1 },
+    { kind: 'spawned', at: at(1_100), attempt: 1 },
+    {
+      kind: 'ended',
+      at: at(3_000),
+      attempt: 1,
+      sessionId: 's0',
+      observed: 'succeeded',
+      reason: 'harness',
+      nativeId: 'native-1',
+      closeout: { plan: 'v1' },
+    },
+  ] satisfies Event[];
+const answer = (ms: number, text = 'make it smaller', config?: HarnessArgs) =>
+  ({
+    kind: 'input',
+    at: at(ms),
+    text,
+    ...(config ? { config } : {}),
+  }) satisfies Event;
 /** Turn 1's first attempt, started at `ms`, and its end if given. */
 const turn1 = (
   ms: number,
@@ -987,28 +994,30 @@ const turn1 = (
     former?: 'unsigned';
     limit?: string;
   },
-): Event[] => [
-  { kind: 'starting', at: at(ms), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' },
-  { kind: 'spawned', at: at(ms + 100), attempt: 2 },
-  ...(ended
-    ? [
-        {
-          kind: 'ended',
-          at: at(ms + 2_000),
-          attempt: 2,
-          sessionId: 's1',
-          observed: ended.observed,
-          reason: ended.reason ?? 'harness',
-          nativeId: ended.nativeId ?? 'native-1',
-          ...(ended.closedOut !== undefined ? { closedOut: ended.closedOut } : {}),
-          ...(ended.former ? { former: ended.former } : {}),
-          ...(ended.limit ? { limit: ended.limit } : {}),
-        } as Event,
-      ]
-    : []),
-];
+) =>
+  [
+    { kind: 'starting', at: at(ms), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' },
+    { kind: 'spawned', at: at(ms + 100), attempt: 2 },
+    ...(ended
+      ? [
+          {
+            kind: 'ended',
+            at: at(ms + 2_000),
+            attempt: 2,
+            sessionId: 's1',
+            observed: ended.observed,
+            reason: ended.reason ?? 'harness',
+            nativeId: ended.nativeId ?? 'native-1',
+            ...(ended.closedOut !== undefined ? { closedOut: ended.closedOut } : {}),
+            ...(ended.former ? { former: ended.former } : {}),
+            ...(ended.limit ? { limit: ended.limit } : {}),
+          } as Event,
+        ]
+      : []),
+  ] satisfies Event[];
 /** The same journal filed without `holdOpen`: the control every rule of a task held open is held beside. */
-const notHeld = (events: Event[]): Event[] => events.map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e));
+const notHeld = (events: Event[]) =>
+  events.map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e)) satisfies Event[];
 
 describe('HELD OPEN: a task held open signs and waits on a person, is answered into turns that continue its session, and is closed or stopped', () => {
   let journal!: Event[];
@@ -1298,12 +1307,13 @@ describe('decide: no pause ends a try by its deadline — held at its hook or un
   });
   const LONG_AGO = 0;
   const NOW = 1_000_000;
-  const job = (...more: Event[]): Event[] => [
-    { kind: 'filed', at: at(LONG_AGO), brief: 'b', cwd: '/r', queued: false, deadlineSeconds: 60 },
-    { kind: 'starting', at: at(LONG_AGO), attempt: 1 },
-    { kind: 'spawned', at: at(LONG_AGO + 1), attempt: 1 },
-    ...more,
-  ];
+  const job = (...more: Event[]) =>
+    [
+      { kind: 'filed', at: at(LONG_AGO), brief: 'b', cwd: '/r', queued: false, deadlineSeconds: 60 },
+      { kind: 'starting', at: at(LONG_AGO), attempt: 1 },
+      { kind: 'spawned', at: at(LONG_AGO + 1), attempt: 1 },
+      ...more,
+    ] satisfies Event[];
   const drained = (ms: number) => ({ ...now(ms), drained: true });
   const stopped = { do: 'stop', sessionId: 's0', why: 'deadline' };
   test('first started long ago and never held: stopped, as today', () => {
@@ -1383,12 +1393,13 @@ describe('decide: no pause ends a try by its deadline — held at its hook or un
 
 describe('sightingFacts: a hold once per attempt when its sighting first says heldBack, its release once when it goes, for any task', () => {
   const WHEN = at(50);
-  const job = (...more: Event[]): Event[] => [
-    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
-    { kind: 'starting', at: at(1), attempt: 1 },
-    { kind: 'spawned', at: at(2), attempt: 1 },
-    ...more,
-  ];
+  const job = (...more: Event[]) =>
+    [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(2), attempt: 1 },
+      ...more,
+    ] satisfies Event[];
   const longLived: Event[] = [
     { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, restartPolicy: 'Always' },
     { kind: 'starting', at: at(1), attempt: 1 },

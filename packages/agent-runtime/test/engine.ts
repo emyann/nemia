@@ -15,7 +15,7 @@ import { Engine, type EngineShape } from '../src/index.ts';
  * @returns The engine's verbs.
  * @throws What the layer failed with, as it failed: an `EngineRefused` for options the engine refuses.
  */
-export const builtEngine = <E>(layer: Layer.Layer<Engine, E>): EngineShape => {
+export const builtEngine = <E>(layer: Layer.Layer<Engine, E>) => {
   const built = Effect.runSyncExit(
     Layer.build(layer).pipe(
       Effect.map((context) => Context.get(context, Engine)),
@@ -23,5 +23,5 @@ export const builtEngine = <E>(layer: Layer.Layer<Engine, E>): EngineShape => {
     ),
   );
   if (Exit.isFailure(built)) throw Cause.squash(built.cause);
-  return built.value;
+  return built.value satisfies EngineShape;
 };

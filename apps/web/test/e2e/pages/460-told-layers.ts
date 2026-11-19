@@ -42,7 +42,7 @@ const LAYERED = {
   brief: `Told by layer\n\nA run written by the told-layers page: a step whose agent, person and policy each told it something.\n\n\`\`\`\nconst line = '${'a line that is longer than any panel, '.repeat(8)}';\n\`\`\``,
 } as const;
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
@@ -53,7 +53,7 @@ const goto = async (page: Page, to: string): Promise<void> => {
  * what it would be told now. Given `rules`, it is a run started in FACTORIES' `hiring` while the factory kept them: `write`'s agent froze
  * them, after the custom instructions, and `review`, with no agent, was told none.
  */
-function written(id: string = LAYERED.id, rules: string | null = null): string {
+function written(id: string = LAYERED.id, rules: string | null = null) {
   const record = path.join(store!, 'runs', `${id}.json`);
   const work = path.join(store!, 'runs', id, 'work');
   fs.mkdirSync(work, { recursive: true });
@@ -102,7 +102,7 @@ function written(id: string = LAYERED.id, rules: string | null = null): string {
 }
 
 /** Writes a record that froze no workflow, as one written before runs froze theirs: its key absent, so the api reads the folder's steps. */
-function unfrozen(): string {
+function unfrozen() {
   const record = path.join(store!, 'runs', `${LAYERED.unfrozen}.json`);
   const work = path.join(store!, 'runs', LAYERED.unfrozen, 'work');
   fs.mkdirSync(work, { recursive: true });
@@ -120,12 +120,12 @@ function unfrozen(): string {
 }
 
 /** Refuses unless the step section `write` says each of `words` once, fold and all. */
-async function expectOnce(section: Locator, words: Array<[string, string]>): Promise<void> {
+async function expectOnce(section: Locator, words: Array<[string, string]>) {
   for (const [what, said] of words) await expectCount(section.getByText(said), 1, `${what} once in the section, only in its fold`);
 }
 
 /** The detail of `step`'s part in the run's ledger, its Detail fold opened: where what it was told now lives. */
-const sectionOf = async (page: Page, step: string): Promise<Locator> => {
+const sectionOf = async (page: Page, step: string) => {
   const detail = partOf(page, step).locator('[data-part-detail]');
   await openFold(detail, 'detail');
   return detail;
@@ -135,7 +135,7 @@ const sectionOf = async (page: Page, step: string): Promise<Locator> => {
  * Refuses unless the open fold `fold` draws its layers as the markdown they are: the policy's bold and list drawn, no mark printed, its
  * hard-wrapped paragraph laid out as one; and the brief's long code line scrolling inside its block, the task's layer no wider than itself.
  */
-async function expectMarkdown(page: Page, fold: Locator): Promise<void> {
+async function expectMarkdown(page: Page, fold: Locator) {
   const policy = fold.locator('[data-layer="policy"] [data-markdown]');
   await expectVisible(policy.locator('strong', { hasText: 'plain' }), "the policy's bold, drawn bold");
   await expectCount(policy.locator('li'), 2, "the policy's list, drawn as one");
@@ -156,7 +156,7 @@ async function expectMarkdown(page: Page, fold: Locator): Promise<void> {
 }
 
 /** On a phone, `write`'s open layers are photographed, and the run's page is no wider than the phone; then the window is put back. */
-async function onPhone(page: Page, write: Locator): Promise<void> {
+async function onPhone(page: Page, write: Locator) {
   const was = page.viewportSize();
   await page.setViewportSize(PHONE);
   try {
@@ -175,7 +175,7 @@ const PHONE = { width: 390, height: 844 };
  * The run started in a factory that kept rules: `write`'s fold draws them as a layer of their own, between the custom instructions and
  * the step's policy, once, and says they went where the agent's words and the person's did; `review`, with no agent, was told none.
  */
-async function expectRules(page: Page): Promise<void> {
+async function expectRules(page: Page) {
   await goto(page, `/runs/${LAYERED.ruled}`);
   const write = await sectionOf(page, 'write');
   const fold = write.locator('details[data-told]');

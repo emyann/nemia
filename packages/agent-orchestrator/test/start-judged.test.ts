@@ -46,7 +46,7 @@ type Workflow = import('../src/step/step.ts').StepSpec;
 type Refusal = Error & { _tag?: string; exitCode?: number };
 
 /** A holder of the workflow folder `name` of `steps`, and of `agents` beside it: the folder's path. */
-function folder(name: string, steps: Record<string, string>, agents: Record<string, string> = {}): string {
+function folder(name: string, steps: Record<string, string>, agents: Record<string, string> = {}) {
   const dir = path.join(ROOT, 'trees', name, 'workflows', name);
   fs.mkdirSync(path.join(dir, '..', 'agents'), { recursive: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -60,13 +60,13 @@ const lone = (name: string, own: string, agents: Record<string, string> = {}) =>
   folder(name, { implement: `---\nplace: git\n${own}\n---\nBuild it.\n` }, agents);
 
 /** The repository's own harness settings, allowing `allow` and nothing else. */
-function settings(repo: string, allow: readonly string[]): void {
+function settings(repo: string, allow: readonly string[]) {
   fs.mkdirSync(path.join(repo, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(repo, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: [...allow] } }));
 }
 
 /** A repository with one commit, so a run has a base to record; with its own settings allowing `allow` where it is given. */
-function aRepo(allow?: readonly string[]): string {
+function aRepo(allow?: readonly string[]) {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   if (allow) settings(repo, allow);
@@ -74,7 +74,7 @@ function aRepo(allow?: readonly string[]): string {
 }
 
 /** The runs on disk, by id. */
-const runsWritten = (): string[] =>
+const runsWritten = () =>
   fs.existsSync(path.join(ROOT, 'runs'))
     ? fs
         .readdirSync(path.join(ROOT, 'runs'))
@@ -84,13 +84,13 @@ const runsWritten = (): string[] =>
     : [];
 
 /** Whether the run `id` is written to disk. */
-const written = (id: string): boolean => runsWritten().includes(id);
+const written = (id: string) => runsWritten().includes(id);
 
 /** `startRun` of `workflowDir` in `repo` (one of its own by default): the run's id, or the refusal it failed with, thrown. */
 function started(
   workflowDir: string,
   opts: { repo?: string; gates?: string[]; inputs?: string[]; refused?: ConfigRefused; isolate?: boolean; factory?: string } = {},
-): string {
+) {
   const program = startRun({
     brief: 'add a flag',
     repo: opts.repo ?? aRepo(),
@@ -107,7 +107,7 @@ function started(
 }
 
 /** That `act` is refused as `Invalid` with exit 2, naming each of `facts`, and writes no run: the refusal's words. */
-async function refused(act: () => unknown, ...facts: string[]): Promise<string> {
+async function refused(act: () => unknown, ...facts: string[]) {
   const before = runsWritten();
   let failed: Refusal | undefined;
   try {

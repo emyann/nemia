@@ -23,16 +23,15 @@ const GIT_ENV = {
   GIT_COMMITTER_EMAIL: 'guards@example.invalid',
 };
 
-const git = (cwd: string, ...args: string[]): string =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...GIT_ENV, HOME: cwd } }).trim();
+const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...GIT_ENV, HOME: cwd } }).trim();
 
-const write = (root: string, file: string, text: string): void => {
+const write = (root: string, file: string, text: string) => {
   fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
   fs.writeFileSync(path.join(root, file), text);
 };
 
 /** A repository with the three manifests committed, and its first commit's sha. */
-const planted = (): { root: string; first: string } => {
+const planted = () => {
   const root = scratch('guards-due-');
   git(root, 'init', '-q', '-b', 'main');
   write(root, 'package.json', JSON.stringify({ name: 'r', private: true, workspaces: ['packages/*', 'apps/*'] }));
@@ -50,7 +49,7 @@ const planted = (): { root: string; first: string } => {
 };
 
 /** A commit of `file` on top, and its sha. */
-const commit = (root: string, file: string): string => {
+const commit = (root: string, file: string) => {
   write(root, file, 'x\n');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', file);
@@ -58,7 +57,7 @@ const commit = (root: string, file: string): string => {
 };
 
 /** The CLI run in `root` with exactly `env` and a fresh GITHUB_OUTPUT: its exit code and what it appended. */
-const run = (root: string, env: Record<string, string>): { status: number | null; output: string } => {
+const run = (root: string, env: Record<string, string>) => {
   const output = path.join(scratch('guards-due-out-'), 'output');
   fs.writeFileSync(output, '');
   const child = spawnSync(process.execPath, [DUE], {

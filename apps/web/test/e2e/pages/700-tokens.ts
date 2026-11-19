@@ -17,10 +17,10 @@ const AGENT = { name: 'e2e-ops', agent: 'operator' } as const;
 const rowOf = (page: Page, name: string) => page.locator(`[data-tokens-page="loaded"] tr[data-token="${name}"]`);
 
 /** The token files under the store's `person-tokens/`, by name. */
-const tokenFiles = (): Set<string> => new Set(fs.readdirSync(path.join(store!, 'person-tokens')));
+const tokenFiles = () => new Set(fs.readdirSync(path.join(store!, 'person-tokens'))) satisfies Set<string>;
 
 /** Refuses unless the row of `name` says its holder, its factory and its narrowing as the board words them. */
-async function rowSays(page: Page, name: string, [holder, factory, narrowed]: readonly [string, string, string]): Promise<void> {
+async function rowSays(page: Page, name: string, [holder, factory, narrowed]: readonly [string, string, string]) {
   const row = rowOf(page, name);
   await expectVisible(row, `the token ${name} is listed`);
   await expectTexts(row.locator('[data-token-holder]'), [holder], `${name} is held by ${holder}`);
@@ -30,7 +30,7 @@ async function rowSays(page: Page, name: string, [holder, factory, narrowed]: re
 }
 
 /** The Retire of `name`, asked once and confirmed: `DELETE /api/tokens/{name}` answered 200, its row and its record gone. */
-async function retires(page: Page, name: string, before: ReadonlySet<string>): Promise<void> {
+async function retires(page: Page, name: string, before: ReadonlySet<string>) {
   await rowOf(page, name).locator(`[data-token-retire="${name}"]`).click();
   const confirm = page.locator(`[data-token-confirm="${name}"]`);
   await expectVisible(confirm, 'Retire asks once before anything is sent');

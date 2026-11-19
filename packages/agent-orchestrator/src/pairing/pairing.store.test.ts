@@ -17,7 +17,7 @@ import { LINK_TTL_MS, PAIRING_TTL_MS } from './ticket.ts';
 const ROOT = scratch('wf-pairings-');
 
 /** A store of its own under the scratch root, so each test reads only the tickets it made. */
-const aStore = (): string => fs.mkdtempSync(path.join(ROOT, 'store-'));
+const aStore = () => fs.mkdtempSync(path.join(ROOT, 'store-'));
 
 /** A moment of the clock, a whole number of ms. */
 const T0 = Date.parse('2026-11-12T09:00:00.000Z');
@@ -27,7 +27,7 @@ const refusedAs = (act: () => unknown, kind: typeof Conflict | typeof Missing | 
   assert.throws(act, (err: unknown) => err instanceof kind && err.exitCode === 2);
 
 /** Every file's text under `dir`, hidden ones included. */
-const textsUnder = (dir: string): string[] =>
+const textsUnder = (dir: string) =>
   fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => fs.readFileSync(path.join(dir, name), 'utf8')) : [];
 
 test('a pairing asked, approved by its code and claimed answers a token of the person, named after its client, once', () => {
@@ -35,7 +35,7 @@ test('a pairing asked, approved by its code and claimed answers a token of the p
   const asked = pairingAsked(home, 'laptop', T0);
   assert.match(asked.code, /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/, 'XXXX-XXXX, of an alphabet with no 0, O, 1, I or L');
   assert.equal(asked.expiresAt, new Date(T0 + PAIRING_TTL_MS).toISOString());
-  const atRest = (): string[] => [...textsUnder(pairingsDir(home)), ...textsUnder(linksDir(home))];
+  const atRest = () => [...textsUnder(pairingsDir(home)), ...textsUnder(linksDir(home))];
   assert.ok(!atRest().some((t) => t.includes(asked.secret) || t.includes(asked.code.replace('-', ''))), 'no code nor secret at rest');
   assert.deepEqual(pairingClaimed(home, asked.id, asked.secret, T0 + 1), { phase: 'waiting' }, 'unapproved, it waits');
   assert.deepEqual(

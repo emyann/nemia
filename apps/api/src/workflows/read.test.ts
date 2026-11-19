@@ -31,7 +31,7 @@ const filesIn = (dir: string) =>
     .map((name) => ({ path: name, text: fs.readFileSync(path.join(dir, name), 'utf8') }));
 
 /** Every file under the store, by its path there: what a read must leave as it was. */
-const storeNow = (): string[] => (fs.readdirSync(root, { recursive: true }) as string[]).sort();
+const storeNow = () => (fs.readdirSync(root, { recursive: true }) as string[]).sort();
 
 test('a folder sent as its files reads as the spec a GET of the same files in yours answers, and writes nothing', async () => {
   const dir = path.join(STORE, 'readback');

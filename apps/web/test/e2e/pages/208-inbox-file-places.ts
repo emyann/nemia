@@ -13,20 +13,20 @@ const NOWHERE = 'File an idea in a factory on two repositories\n\nIts workflow, 
 const SOMEWHERE = 'File an idea on a workflow its factory wires\n\nThe factory says where it runs; the card names no repository.';
 
 /** Open `route` of the board `page` shows, and wait for its reads. */
-async function open(page: Page, route: string): Promise<void> {
+async function open(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** A filing's body as it was sent, its factory read back from the namespace its path names (none for `default`), as the box chose it. */
-function sentOf(filed: Response): unknown {
+function sentOf(filed: Response) {
   const namespace = new URL(filed.url()).pathname.split('/')[3];
   const body = filed.request().postDataJSON() as Record<string, unknown>;
-  return namespace === 'default' ? body : { ...body, factory: namespace };
+  return (namespace === 'default' ? body : { ...body, factory: namespace }) satisfies unknown;
 }
 
 /** Type `idea` into the box and press File: the request's body as it was sent, and the card's file once the api took it. */
-async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; file: string }> {
+async function fileFrom(page: Page, idea: string) {
   const box = page.locator('form[aria-label="File a card"]');
   await box.getByRole('textbox', { name: 'An idea' }).fill(idea);
   const [filed] = await Promise.all([
@@ -37,11 +37,11 @@ async function fileFrom(page: Page, idea: string): Promise<{ sent: unknown; file
   const {
     metadata: { name },
   } = (await filed.json()) as { metadata: { name: string } };
-  return { sent: sentOf(filed), file: path.join(store!, 'inbox', `${name}.md`) };
+  return { sent: sentOf(filed), file: path.join(store!, 'inbox', `${name}.md`) } satisfies { sent: unknown; file: string };
 }
 
 /** Refuses unless `sent`, a filing's body, is exactly `expected`, key for key, and the card's `file` holds exactly `text`. */
-function expectFiled(filed: { sent: unknown; file: string }, expected: Record<string, string>, text: string, assertion: string): void {
+function expectFiled(filed: { sent: unknown; file: string }, expected: Record<string, string>, text: string, assertion: string) {
   const keyed = (o: object) => JSON.stringify(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
   if (typeof filed.sent !== 'object' || filed.sent === null || keyed(filed.sent) !== keyed(expected))
     throw new Refused(`${assertion} — it sent ${JSON.stringify(filed.sent)}, not ${JSON.stringify(expected)}`);
@@ -55,7 +55,7 @@ function expectFiled(filed: { sent: unknown; file: string }, expected: Record<st
  * to none: the box says it is not wired, naming the attach; wired to the checkout's folder, the box says the checkout as text, and a filing
  * sends the factory and the workflow, never a repository nor an origin. Both cards and the factory's file are taken back.
  */
-async function severalRepos(page: Page, theme: string): Promise<void> {
+async function severalRepos(page: Page, theme: string) {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
   const unhire = hiringStarts(store!);
@@ -123,7 +123,7 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
 }
 
 /** The box in a store with no factory on file: the one choice, no factory, and the line that files one, in the api's words. */
-async function noFactory(page: Page, theme: string): Promise<void> {
+async function noFactory(page: Page, theme: string) {
   const back = noFactories(store!);
   try {
     await open(page, '/inbox');
@@ -148,7 +148,7 @@ async function noFactory(page: Page, theme: string): Promise<void> {
  * The box while the factories are on their way, on a visit of its own whose read of them is held, at a factory's address: it says it is
  * reading them, beside the one choice, and never that the store has none; let go, the list fills and is preset to the address's factory.
  */
-async function reading(page: Page, theme: string): Promise<void> {
+async function reading(page: Page, theme: string) {
   const factory = FACTORIES.hiring.name;
   const other = await page.context().newPage();
   let release = () => {};

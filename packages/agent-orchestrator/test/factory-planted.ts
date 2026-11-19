@@ -12,17 +12,18 @@ import { wire } from '../src/factory/wiring/wire.verb.ts';
 import { Missing, type Refusal } from '../src/refusal/refusal.ts';
 
 /** `program` run at once at the store `home`, its refusal thrown. */
-const atOnce = <A>(home: string, program: Effect.Effect<A, Refusal>): A => Effect.runSync(Effect.provideService(program, StoreRoot, home));
+const atOnce = <A>(home: string, program: Effect.Effect<A, Refusal>) =>
+  Effect.runSync(Effect.provideService(program, StoreRoot, home)) satisfies A;
 
 /** The workflow `workflow` taken from the factory `factory`, as `nemia factory detach` takes it: the file written back. */
-export const detached = (home: string, factory: string, workflow: string): string =>
+export const detached = (home: string, factory: string, workflow: string) =>
   atOnce(
     home,
     Effect.map(wire(factory, { verb: 'detach', workflow }), ({ file }) => file),
   );
 
 /** The hire of the step `step` taken back from the factory `factory`, as `nemia factory fire` takes it: the agent fired. */
-export const fired = (home: string, factory: string, step: string): string =>
+export const fired = (home: string, factory: string, step: string) =>
   atOnce(
     home,
     Effect.gen(function* () {
@@ -33,7 +34,7 @@ export const fired = (home: string, factory: string, step: string): string =>
   );
 
 /** Whether the factory `factory`'s runs follow merged revisions, written as `nemia factory revisions` writes it: the file. */
-export const followed = (home: string, factory: string, revisions: RevisionsPolicy): string =>
+export const followed = (home: string, factory: string, revisions: RevisionsPolicy) =>
   atOnce(
     home,
     Effect.gen(function* () {

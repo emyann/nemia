@@ -8,13 +8,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The sheet, open on `step`'s file `file`. */
-const sheetOn = (page: Page, step: string, file: string): Locator => page.locator(`[data-viewer-sheet="${step}/${file}"]`);
+const sheetOn = (page: Page, step: string, file: string) => page.locator(`[data-viewer-sheet="${step}/${file}"]`) satisfies Locator;
 
 /**
  * Refuses unless the address names `step`'s file `file` as the one viewed (`?view=`), by its path from the step's folder, never the
  * store's.
  */
-function viewing(page: Page, step: string, file: string): void {
+function viewing(page: Page, step: string, file: string) {
   const view = new URL(page.url()).searchParams.get('view');
   if (view?.includes(store!))
     throw new Refused(`the address names a file by the server's path, ${view}: it names it from its step's folder`);

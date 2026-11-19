@@ -12,7 +12,7 @@ const said = (changes: readonly WatchChange[], type: WatchChange['type'], key: s
   changes.some((c) => c.type === type && c.key === key);
 
 /** Each law the contract leaves out, broken by `changes` between `sent` and `now`: what it misses, or nothing. */
-const misses = (sent: readonly Versioned[], now: readonly Versioned[], changes: readonly WatchChange[]): string[] => [
+const misses = (sent: readonly Versioned[], now: readonly Versioned[], changes: readonly WatchChange[]) => [
   ...now.filter((n) => !sent.some((s) => s.key === n.key) && !said(changes, 'ADDED', n.key)).map((n) => `${n.key} not ADDED`),
   ...now
     .filter((n) => sent.some((s) => s.key === n.key && s.version !== n.version) && !said(changes, 'MODIFIED', n.key))
@@ -21,7 +21,7 @@ const misses = (sent: readonly Versioned[], now: readonly Versioned[], changes: 
   ...changes.filter((c, i) => changes.slice(0, i).some((d) => d.key === c.key)).map((c) => `${c.key} said twice`),
 ];
 
-const v = (key: string, version: string): Versioned => ({ key, version });
+const v = (key: string, version: string) => ({ key, version });
 
 describe('the named cases: each new object ADDED, each moved MODIFIED, each gone DELETED, and one that stands not said', () => {
   const rows: [string, Versioned[], Versioned[], WatchChange[]][] = [
@@ -61,7 +61,7 @@ describe('the named cases: each new object ADDED, each moved MODIFIED, each gone
 });
 
 /** Every list of the keys a, b and c, each absent or at version 1 or 2: 27 lists. */
-const lists = (): Versioned[][] =>
+const lists = () =>
   ['a', 'b', 'c'].reduce<Versioned[][]>((acc, key) => acc.flatMap((list) => [list, [...list, v(key, '1')], [...list, v(key, '2')]]), [[]]);
 
 test('every pair of lists of three keys at two versions: nothing new, moved or gone goes unsaid', () => {

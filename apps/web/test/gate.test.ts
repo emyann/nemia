@@ -23,7 +23,7 @@ import type { RunDetail } from '../src/lib/runView.ts';
 
 type Step = RunDetail['steps'][number];
 
-const step = (name: string, over: Partial<Step> = {}): Step =>
+const step = (name: string, over: Partial<Step> = {}) =>
   ({
     name,
     status: 'succeeded',
@@ -77,7 +77,7 @@ const detail = (steps: Step[], over: Partial<RunDetail> = {}) =>
 const tried = (round: number, n = 1) => ({ try: n, round }) as Step['tries'][number];
 
 /** A decision at an ending's gate that read `collisions`, with `more` over them. */
-const colliding = (more: Partial<Collisions>): Decidable =>
+const colliding = (more: Partial<Collisions>) =>
   ({
     touched: [],
     standings: [],

@@ -35,6 +35,7 @@ const COST =
 type NowRead = { interrupts: Array<Interrupt & { taskId: string }>; cost: string };
 
 /** Every file under `dir`, by its path from the store, with its bytes; none where `dir` is not there. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function filesUnder(dir: string): Array<[string, Buffer]> {
   if (!fs.existsSync(dir)) return [];
   if (fs.statSync(dir).isFile()) return [[path.relative(store!, dir), fs.readFileSync(dir)]];
@@ -45,26 +46,26 @@ function filesUnder(dir: string): Array<[string, Buffer]> {
  * What a pause at once writes to: the runs, their asks beside them, the engine's journals and feed, the workflow feed, the pause and who
  * lifted it (`cordon.lifted`, which Resume leaves).
  */
-const written = (): string[] =>
+const written = () =>
   ['runs', path.join('engine', 'tasks'), path.join('engine', 'feed.jsonl'), 'feed.jsonl', 'cordon', 'cordon.lifted'].map((p) =>
     path.join(store!, p),
-  );
+  ) satisfies string[];
 
 /** The folders of asks beside the runs, by name. */
-const asksDirs = (): string[] => fs.readdirSync(path.join(store!, 'runs')).filter((name) => name.endsWith('.asks'));
+const asksDirs = () => fs.readdirSync(path.join(store!, 'runs')).filter((name) => name.endsWith('.asks')) satisfies string[];
 
 /** The store's files a pause at once writes to, as they stand, and the folders of asks there are. */
 const snapshot = () => ({ files: new Map(written().flatMap(filesUnder)), asks: new Set(asksDirs()) });
 
 /** Puts back every file of `before`, and removes every file and folder of asks written since. */
-function restore(before: ReturnType<typeof snapshot>): void {
+function restore(before: ReturnType<typeof snapshot>) {
   for (const [file] of written().flatMap(filesUnder)) if (!before.files.has(file)) fs.rmSync(path.join(store!, file));
   for (const [file, bytes] of before.files) fs.writeFileSync(path.join(store!, file), bytes);
   for (const dir of asksDirs().filter((name) => !before.asks.has(name))) fs.rmSync(path.join(store!, 'runs', dir), { recursive: true });
 }
 
 /** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed. */
-function writeLanding(): void {
+function writeLanding() {
   const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${ENDING.id}.json`), 'utf8')) as {
     steps: Record<string, object>;
   };
@@ -81,18 +82,18 @@ function writeLanding(): void {
 }
 
 /** What the api answers on `route`, read beside the board. */
-async function apiRead<T>(page: Page, route: string): Promise<T> {
+async function apiRead<T>(page: Page, route: string) {
   return (await (await page.request.get(new URL(route, page.url()).href)).json()) as T;
 }
 
 /** The pause's file, as the api wrote it. */
-const pauseFile = (): { at: string; by: string; why?: string } => JSON.parse(fs.readFileSync(path.join(store!, 'cordon'), 'utf8'));
+const pauseFile = () => JSON.parse(fs.readFileSync(path.join(store!, 'cordon'), 'utf8')) as { at: string; by: string; why?: string };
 
 /** The journal of `taskId`, as the engine keeps it. */
-const journalOf = (taskId: string): string => fs.readFileSync(path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`), 'utf8');
+const journalOf = (taskId: string) => fs.readFileSync(path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`), 'utf8');
 
 /** Opens the popover, then its Stop now…, and waits for what it would stop to be read: the api's own answer, which it returns. */
-async function confirmOpened(page: Page): Promise<NowRead> {
+async function confirmOpened(page: Page) {
   await pauseOf(page).click();
   await expectVisible(popoverOf(page), 'the button opens its popover');
   await popoverOf(page).getByRole('button', { name: 'Stop now…' }).click();

@@ -17,22 +17,23 @@ import type { MissedStart } from '../src/inbox/index.ts';
 type Walk = DoorWalk<CardDoorShape>;
 type Door = CardDoorShape;
 
-const nameOf = (name: string): CardName => CardName.read(name);
+const nameOf = (name: string) => CardName.read(name) satisfies CardName;
 
 /** A card's text as `nemia inbox add` files one (`ideaCard`): its keys as YAML frontmatter, where it has any, then its body. */
-export const aCard = (body: string, keys: Readonly<Record<string, string>> = {}): string => {
+export const aCard = (body: string, keys: Readonly<Record<string, string>> = {}) => {
   const pairs = Object.entries(keys);
   return pairs.length ? `---\n${pairs.map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\n${body}\n` : `${body}\n`;
 };
 
 /** `name` filed on `door`, with `text`. */
-const filed = (door: Door, name: string, text = aCard('An idea')): string => done(door.cards.add(nameOf(name), text));
+const filed = (door: Door, name: string, text = aCard('An idea')) => done(door.cards.add(nameOf(name), text));
 
 /** A try as the tick writes one. */
-const aTry = (why: string): MissedStart => ({ at: '2026-11-01T00:00:00.000Z', text: aCard('An idea'), repo: '/repo', why, refused: true });
+const aTry = (why: string) =>
+  ({ at: '2026-11-01T00:00:00.000Z', text: aCard('An idea'), repo: '/repo', why, refused: true }) satisfies MissedStart;
 
 /** The names of the cards filed on `door`. */
-const listed = (door: Door): string[] => done(door.cards.entries()).map((e) => e.file);
+const listed = (door: Door) => done(door.cards.entries()).map((e) => e.file) satisfies string[];
 
 export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
   'cards.entries': [

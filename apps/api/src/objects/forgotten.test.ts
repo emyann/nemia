@@ -5,17 +5,18 @@ import type { Forgot } from 'agent-orchestrator';
 import { forgottenOf } from './forgotten.ts';
 
 /** A run `nemia rm` forgot, with nothing done but what `more` says. */
-const forgot = (more: Partial<Forgot> = {}): Forgot => ({
-  id: 'r-1',
-  kind: 'forgotten',
-  removed: [],
-  handedOff: [],
-  gone: [],
-  left: [],
-  branches: [],
-  files: [],
-  ...more,
-});
+const forgot = (more: Partial<Forgot> = {}) =>
+  ({
+    id: 'r-1',
+    kind: 'forgotten',
+    removed: [],
+    handedOff: [],
+    gone: [],
+    left: [],
+    branches: [],
+    files: [],
+    ...more,
+  }) satisfies Forgot;
 
 describe('a removal answers each key of what `nemia rm` did with the run, and leaves out a key it has nothing for', () => {
   test('every key: worktrees, hand-offs, those gone, files, each branch’s fate, base, repository, isolate and why it never froze', () => {

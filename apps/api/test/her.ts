@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 export const T0 = Date.parse('2026-10-15T12:00:00.000Z');
 
 /** `s` seconds after `T0`, as a time is written. */
-export const at = (s: number): string => new Date(T0 + s * 1000).toISOString();
+export const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 
@@ -32,7 +32,7 @@ const herLine = (sessionId: string, uuid: string, s: number, text: string) => ({
 });
 
 /** Her session's transcript, `words` appended to it. */
-export const said = (sessionId: string, words: string[], from = 0): void => {
+export const said = (sessionId: string, words: string[], from = 0) => {
   const file = path.join(config, 'projects', '-code-app', `${sessionId}.jsonl`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.appendFileSync(file, jsonl(words.map((w, i) => herLine(sessionId, `e${from + i}`, from + i + 1, w))));
@@ -42,7 +42,7 @@ export const said = (sessionId: string, words: string[], from = 0): void => {
  * Her task at work: journalled as filed and spawned, its session's run file (`<engine>/runs/attached/ae_<task>_1.json`) saying it is at
  * work under this process and naming her session's id, its transcript `words`, and her level file naming it; her chat's files none.
  */
-export function withHer(words: string[]): { task: string; sessionId: string } {
+export function withHer(words: string[]) {
   const task = `nemia-${randomUUID().slice(0, 8)}`;
   const sessionId = randomUUID();
   const journal = path.join(root, 'engine', 'tasks', `${task}.jsonl`);
@@ -59,5 +59,5 @@ export function withHer(words: string[]): { task: string; sessionId: string } {
   fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
   fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0), task }));
   fs.rmSync(path.join(root, 'nemia', 'chat'), { recursive: true, force: true });
-  return { task, sessionId };
+  return { task, sessionId } satisfies { task: string; sessionId: string };
 }

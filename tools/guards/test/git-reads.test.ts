@@ -29,7 +29,7 @@ const READS = (
 ).filter((rule) => rule.startsWith('Bash(git'));
 
 /** Whether `rule` is a line of the read set, or the command alone of one that also takes what follows it. */
-const onTheReadSet = (rule: string): boolean => READS.includes(rule) || READS.includes(rule.replace(/\)$/, ':*)'));
+const onTheReadSet = (rule: string) => READS.includes(rule) || READS.includes(rule.replace(/\)$/, ':*)'));
 
 /**
  * What no allow may name: every verb that writes a file, the index, a ref or the config, or goes to the network; `grep`, whose
@@ -75,7 +75,7 @@ const NEVER = [
 ];
 
 /** Why a `Bash(git …)` allow is refused, or undefined for one on `READS` that names no verb on `NEVER`. Not a git rule: undefined. */
-function refusalOf(rule: string): string | undefined {
+function refusalOf(rule: string) {
   const body = /^Bash\((git(?:\s.*)?)\)$/.exec(rule)?.[1];
   if (body === undefined) return rule.startsWith('Bash(git') ? `${rule}: not one Bash rule` : undefined;
   const [, verb = '', ...rest] = body.replace(/:\*$/, '').split(/\s+/);

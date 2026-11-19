@@ -17,21 +17,22 @@ const MIN = 60_000;
 const at = (hm: string) => `2026-10-06T${hm}:00.000Z`;
 
 /** A task spawned and ended at those times, settled, having cost `costUsd` where given; `ended` null for one still running. */
-const task = (spawned: string, ended: string | null, costUsd?: number): TaskClock => ({
-  state: {
-    brief: 'Do it.',
-    settled: ended ? 'succeeded' : null,
-    attempts: [
-      {
-        startedAt: at(spawned),
-        spawnedAt: at(spawned),
-        endedAt: ended ? at(ended) : null,
-        reason: null,
-        usage: costUsd === undefined ? null : { costUsd },
-      },
-    ],
-  },
-});
+const task = (spawned: string, ended: string | null, costUsd?: number) =>
+  ({
+    state: {
+      brief: 'Do it.',
+      settled: ended ? 'succeeded' : null,
+      attempts: [
+        {
+          startedAt: at(spawned),
+          spawnedAt: at(spawned),
+          endedAt: ended ? at(ended) : null,
+          reason: null,
+          usage: costUsd === undefined ? null : { costUsd },
+        },
+      ],
+    },
+  }) satisfies TaskClock;
 
 const PLAN = { name: 'plan', gate: true, after: [] } as unknown as StepSpec;
 const BUILD = { name: 'build', after: ['plan'], check: 'npm test' } as unknown as StepSpec;

@@ -40,9 +40,9 @@ import { DENIED_SPAN, DENIED_SPAN_KEYS, recordStepMetrics, WAIT_SPANS } from './
 import { gateWaitOf, timeline, timelineRows } from '../timeline/index.ts';
 
 /** That a refusal is `Invalid` (its `_tag`) and exits 2, whatever its words. For `assert.throws` and `assert.rejects`. */
-const refusedInvalid = (err: unknown): true => {
+const refusedInvalid = (err: unknown) => {
   assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
-  return true;
+  return true as const satisfies true;
 };
 
 const WORK = { name: 'work', agent: { name: 'ada' } } as StepSpec;
@@ -59,37 +59,39 @@ const RUN = {
 } as unknown as Run;
 
 /** A task's view that ran from 10:00 to 10:05 and settled as `settled`, its last attempt's exit `exitCode`. */
-const view = (settled: 'succeeded' | 'failed' | 'stopped', exitCode?: number): FactView => ({
-  state: {
-    brief: 'Do it.',
-    settled,
-    attempts: [
-      {
-        startedAt: '2026-10-06T10:00:00.000Z',
-        spawnedAt: '2026-10-06T10:00:00.000Z',
-        endedAt: '2026-10-06T10:05:00.000Z',
-        reason: null,
-        usage: { inputTokens: 1200, outputTokens: 300, costUsd: 1.25 },
-        ...(exitCode === undefined ? {} : { exitCode }),
-      },
-    ],
-  },
-});
+const view = (settled: 'succeeded' | 'failed' | 'stopped', exitCode?: number) =>
+  ({
+    state: {
+      brief: 'Do it.',
+      settled,
+      attempts: [
+        {
+          startedAt: '2026-10-06T10:00:00.000Z',
+          spawnedAt: '2026-10-06T10:00:00.000Z',
+          endedAt: '2026-10-06T10:05:00.000Z',
+          reason: null,
+          usage: { inputTokens: 1200, outputTokens: 300, costUsd: 1.25 },
+          ...(exitCode === undefined ? {} : { exitCode }),
+        },
+      ],
+    },
+  }) satisfies FactView;
 
 const SPENT: TaskSpend = { usd: 1.25, measured: 1, unmeasured: 0, budgetEnded: false, denied: ['Bash(curl x)', 'Bash(git push)'] };
 
-const reads = (over: Partial<FactReads> = {}): FactReads => ({
-  views: new Map([
-    ['r-1-work-try2', view('succeeded')],
-    ['r-1-work-try2-check', view('failed', 1)],
-    ['r-1-work', view('stopped')],
-    ['r-1-review', view('succeeded')],
-  ]),
-  spendOf: (taskId) => (taskId === 'r-1-work-try2' ? SPENT : undefined),
-  signedOff: () => ({ outcome: 'blocked', summary: '', artifacts: [] }),
-  statusOf: () => 'running',
-  ...over,
-});
+const reads = (over: Partial<FactReads> = {}) =>
+  ({
+    views: new Map([
+      ['r-1-work-try2', view('succeeded')],
+      ['r-1-work-try2-check', view('failed', 1)],
+      ['r-1-work', view('stopped')],
+      ['r-1-review', view('succeeded')],
+    ]),
+    spendOf: (taskId) => (taskId === 'r-1-work-try2' ? SPENT : undefined),
+    signedOff: () => ({ outcome: 'blocked', summary: '', artifacts: [] }),
+    statusOf: () => 'running',
+    ...over,
+  }) satisfies FactReads;
 
 /** `program` over a registry of its own, and what it holds after. */
 const recorded = async (facts: readonly StepFact[]) => {
@@ -101,19 +103,20 @@ const recorded = async (facts: readonly StepFact[]) => {
 };
 
 /** A view like `view`'s, its attempts' usage measured by kind as `kinds` say: a missing kind on any attempt is measured on none. */
-const kindedView = (...kinds: Array<{ cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number }>): FactView => ({
-  state: {
-    brief: 'Do it.',
-    settled: 'succeeded',
-    attempts: kinds.map((k) => ({
-      startedAt: '2026-10-06T10:00:00.000Z',
-      spawnedAt: '2026-10-06T10:00:00.000Z',
-      endedAt: '2026-10-06T10:05:00.000Z',
-      reason: null,
-      usage: { inputTokens: (k.cacheReadTokens ?? 0) + (k.cacheWriteTokens ?? 0) + (k.uncachedTokens ?? 0), outputTokens: 300, ...k },
-    })),
-  },
-});
+const kindedView = (...kinds: Array<{ cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number }>) =>
+  ({
+    state: {
+      brief: 'Do it.',
+      settled: 'succeeded',
+      attempts: kinds.map((k) => ({
+        startedAt: '2026-10-06T10:00:00.000Z',
+        spawnedAt: '2026-10-06T10:00:00.000Z',
+        endedAt: '2026-10-06T10:05:00.000Z',
+        reason: null,
+        usage: { inputTokens: (k.cacheReadTokens ?? 0) + (k.cacheWriteTokens ?? 0) + (k.uncachedTokens ?? 0), outputTokens: 300, ...k },
+      })),
+    },
+  }) satisfies FactView;
 
 const DAY = '2026-10-06';
 
@@ -124,23 +127,26 @@ const clocked = (
   ended: string,
   settled: 'succeeded' | 'failed' | 'stopped' = 'succeeded',
   exitCode?: number,
-): FactView => ({
-  state: {
-    brief: 'Do it.',
-    settled,
-    filedAt: `${DAY}T${filed}:00.000Z`,
-    attempts: [
-      {
-        startedAt: `${DAY}T${spawned}:00.000Z`,
-        spawnedAt: `${DAY}T${spawned}:00.000Z`,
-        endedAt: `${DAY}T${ended}:00.000Z`,
-        reason: null,
-        usage: null,
-        ...(exitCode === undefined ? {} : { exitCode }),
-      },
-    ],
-  },
-});
+) => {
+  const made: FactView = {
+    state: {
+      brief: 'Do it.',
+      settled,
+      filedAt: `${DAY}T${filed}:00.000Z`,
+      attempts: [
+        {
+          startedAt: `${DAY}T${spawned}:00.000Z`,
+          spawnedAt: `${DAY}T${spawned}:00.000Z`,
+          endedAt: `${DAY}T${ended}:00.000Z`,
+          reason: null,
+          usage: null,
+          ...(exitCode === undefined ? {} : { exitCode }),
+        },
+      ],
+    },
+  };
+  return made;
+};
 
 const CLOCKED = new Map([
   ['r-1-work', clocked('09:50', '09:52', '09:55', 'stopped')],
@@ -229,7 +235,8 @@ const deniedAttempt = (
 });
 
 /** A task's view of `attempts`, not settled: a task held open between its turns. */
-const turns = (...attempts: ReturnType<typeof deniedAttempt>[]): FactView => ({ state: { brief: 'Do it.', settled: null, attempts } });
+const turns = (...attempts: ReturnType<typeof deniedAttempt>[]) =>
+  ({ state: { brief: 'Do it.', settled: null, attempts } }) satisfies FactView;
 
 const BASH = { tool: 'Bash', what: 'git push' };
 const DENIED_RUN = { ...RUN, deniedCounted: [] } as Run;
@@ -243,22 +250,23 @@ const denied = (run: Run, views: ReadonlyMap<string, FactView> = DENIED_VIEWS) =
   deniedCalls(run, [WORK, REVIEW], views, callOf).map((f) => [f.task, f.attempt, f.tool, f.call, f.at.slice(11, 19)]);
 
 /** A task filed, spawned and ended at those times on `DAY`; still running where `ended` is null. */
-const timed = (filed: string, spawned: string, ended: string | null): FactView => ({
-  state: {
-    brief: 'Do it.',
-    settled: ended ? 'succeeded' : null,
-    filedAt: `${DAY}T${filed}:00.000Z`,
-    attempts: [
-      {
-        startedAt: `${DAY}T${spawned}:00.000Z`,
-        spawnedAt: `${DAY}T${spawned}:00.000Z`,
-        endedAt: ended ? `${DAY}T${ended}:00.000Z` : null,
-        reason: null,
-        usage: null,
-      },
-    ],
-  },
-});
+const timed = (filed: string, spawned: string, ended: string | null) =>
+  ({
+    state: {
+      brief: 'Do it.',
+      settled: ended ? 'succeeded' : null,
+      filedAt: `${DAY}T${filed}:00.000Z`,
+      attempts: [
+        {
+          startedAt: `${DAY}T${spawned}:00.000Z`,
+          spawnedAt: `${DAY}T${spawned}:00.000Z`,
+          endedAt: ended ? `${DAY}T${ended}:00.000Z` : null,
+          reason: null,
+          usage: null,
+        },
+      ],
+    },
+  }) satisfies FactView;
 
 const TL_WORK = { name: 'work', after: [], agent: { name: 'worker' }, check: 'npm test' } as unknown as StepSpec;
 const TL_REVIEW = { name: 'review', after: ['work'], loop: 'work', rounds: 3 } as unknown as StepSpec;

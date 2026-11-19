@@ -15,7 +15,7 @@ import { identify, thisProcess } from '../daemon/daemon.store.ts';
 const ROOT = scratch('wf-pause-lapse-');
 
 /** The pid of a process spawned and waited to its exit: one the process table says is gone. */
-const gonePid = (): number => {
+const gonePid = () => {
   const { pid } = spawnSync(process.execPath, ['-e', '']);
   assert.ok(pid, 'a child was spawned and has exited');
   return pid;

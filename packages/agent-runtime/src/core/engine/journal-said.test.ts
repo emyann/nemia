@@ -16,7 +16,7 @@ type Logged = { level: string; text: string; annotations: Record<string, unknown
  * Runs `program` over the in-memory journal, logging at `Debug` to a logger that keeps what it is handed, and tracing to one that keeps
  * its spans.
  */
-async function traced(program: Effect.Effect<void, unknown, Journal>): Promise<{ logs: Logged[]; spans: Tracer.NativeSpan[] }> {
+async function traced(program: Effect.Effect<void, unknown, Journal>) {
   const logs: Logged[] = [];
   const spans: Tracer.NativeSpan[] = [];
   const keeper = Logger.make(({ message, logLevel, fiber }) => {

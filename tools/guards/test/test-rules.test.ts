@@ -44,7 +44,7 @@ import { PINNED_WORDS } from './test-rules.baseline.ts';
 const ALLOWED = ['tools/guards/test/test-rules.test.ts'];
 
 /** Every test file of the repository but this one, beside the code or under a `test/`, by its path from the root. */
-const testFiles = (): string[] =>
+const testFiles = () =>
   files()
     .filter((f) => /\.test\.tsx?$/.test(f) && !ALLOWED.includes(f) && ours(f) && fs.existsSync(path.join(REPO, f)))
     .sort();
@@ -54,7 +54,7 @@ const testFiles = (): string[] =>
  * an assertion wraps over as many lines as the formatter likes, and a slice that ended at the line break would read the expected
  * value of a one-line assertion and nothing else — an assertion of absence passing for nothing.
  */
-const callAt = (clean: string, open: number): string | undefined => {
+const callAt = (clean: string, open: number) => {
   let depth = 0;
   for (let i = open; i < clean.length; i++) {
     const c = clean[i];
@@ -71,7 +71,7 @@ const callAt = (clean: string, open: number): string | undefined => {
  * Each assertion of `clean`, as the text of its call: `assert(…)`, one of its verbs, and a `.includes(…)` of an expected value.
  * `refusal` marks an `assert.throws` or an `assert.rejects`, whose subject is the error by construction.
  */
-const assertions = (clean: string): Array<{ at: number; call: string; refusal: boolean }> => {
+const assertions = (clean: string) => {
   const heads =
     /\bassert(?:\.(equal|strictEqual|deepEqual|deepStrictEqual|match|doesNotMatch|notEqual|ok|throws|rejects))?\s*\(|\.includes\s*\(/g;
   const found: Array<{ at: number; call: string; refusal: boolean }> = [];
@@ -105,7 +105,7 @@ const LITERALS = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\$]|\\.|\
  * The assertion `call`'s own expression, its literals blanked: what it is asserting *about*. Read without them because a sentence
  * that happens to hold the word `refused` would otherwise name itself as what the code said.
  */
-const subjectOf = (call: string): string => call.replace(LITERALS, (found) => found.replace(/[^\n]/g, ' '));
+const subjectOf = (call: string) => call.replace(LITERALS, (found) => found.replace(/[^\n]/g, ' '));
 
 /**
  * Where the second argument of the call `call` begins and ends: what an `assert.throws` or an `assert.rejects` expects of the error —
@@ -113,7 +113,7 @@ const subjectOf = (call: string): string => call.replace(LITERALS, (found) => fo
  * which is what is run, nor the third, which is the assertion's own words. Read on the call with its literals blanked, so a comma or a
  * bracket inside a sentence divides nothing. `undefined` where the call has one argument.
  */
-const secondArg = (call: string): { from: number; to: number } | undefined => {
+const secondArg = (call: string) => {
   const blank = subjectOf(call);
   const commas: number[] = [];
   let depth = 0;
@@ -136,7 +136,7 @@ const secondArg = (call: string): { from: number; to: number } | undefined => {
  * One line, one entry: an `assert.deepEqual` of three sentences on one line is one line to unpin. So the count per file is the lines
  * that have to change, which is what makes the baseline's falling a measure of the work.
  */
-export const pinnedWords = (text: string): string[] => {
+export const pinnedWords = (text: string) => {
   const clean = withoutComments(text);
   const lineAt = (index: number) => clean.slice(0, index).split('\n').length;
   const found = new Map<number, string>();
@@ -164,7 +164,7 @@ export const pinnedWords = (text: string): string[] => {
  * a tenth of one the text does not say, and the rule does not ask: a floor at a bound the shipped code owns is paid for by every pass
  * whatever its value, and the answer — shorten it at the code's own seam — is the same either way.
  */
-const shippedBounds = (clean: string): string[] => {
+const shippedBounds = (clean: string) => {
   const names = new Set<string>();
   for (const m of clean.matchAll(/^[ \t]*import\s*(?:type\s+)?\{([\s\S]*?)\}\s*from\s*['"]([^'"]*)['"]/gm)) {
     if (!/(?:^|\/)src\//.test(m[2])) continue;
@@ -189,7 +189,7 @@ const shippedBounds = (clean: string): string[] => {
  * answer — nor is a floor against a bound the test itself declares, nor a wait on an event (`until`), nor a test marked `WAITED`,
  * which carries node's per-test timeout and measures no waiting at all.
  */
-export const waitedOut = (text: string): string[] => {
+export const waitedOut = (text: string) => {
   const clean = withoutComments(text);
   const bounds = shippedBounds(clean);
   if (!bounds.length) return [];
@@ -211,7 +211,7 @@ export const waitedOut = (text: string): string[] => {
  * outside every test and helper, whose stand-in every test of the file would share. `eachTest(testPlace)` names the maker without
  * calling it, and a call inside a test or a helper is indented.
  */
-export const sharedStandIns = (text: string): string[] => {
+export const sharedStandIns = (text: string) => {
   const clean = withoutComments(text);
   const found: string[] = [];
   clean.split('\n').forEach((line, i) => {
@@ -322,7 +322,7 @@ test('REFUSED: a floor at a bound the shipped code owns is found; a ceiling, a l
  * that was lowered while the lines are still there, and an entry whose lines are gone. `fix` is what a file that still holds some is
  * told to do about it.
  */
-export const owingOf = (held: Readonly<Record<string, number>>, owed: Readonly<Record<string, number>>, fix: string): string[] => {
+export const owingOf = (held: Readonly<Record<string, number>>, owed: Readonly<Record<string, number>>, fix: string) => {
   const refused: string[] = [];
   for (const [file, count] of Object.entries(held)) {
     const due = owed[file];
@@ -358,10 +358,10 @@ test('REFUSED: the baseline cannot grow, cannot be lowered while the lines are t
 });
 
 /** A test file's source, by its path from the root. */
-const readFile = (file: string): string => fs.readFileSync(path.join(REPO, file), 'utf8');
+const readFile = (file: string) => fs.readFileSync(path.join(REPO, file), 'utf8');
 
 /** What each of `files` holds under `rule`, each read by `read`, by its path from the root, the files that hold none left out. */
-const sweep = (files: readonly string[], rule: (text: string) => string[], read = readFile): Record<string, number> => {
+const sweep = (files: readonly string[], rule: (text: string) => string[], read = readFile) => {
   const held: Record<string, number> = {};
   for (const file of files) {
     const lines = rule(read(file));
@@ -389,7 +389,7 @@ test('no test of the repository pins a sentence of what the code said but those 
  * Each of `files` that floors a measured duration at a bound the shipped code owns, read by `read`, with the fix: no baseline names one,
  * so every floor is refused.
  */
-const floorsIn = (files: readonly string[], read = readFile): string[] =>
+const floorsIn = (files: readonly string[], read = readFile) =>
   Object.entries(sweep(files, waitedOut, read)).map(
     ([file, count]) =>
       `${file} floors ${count} measured durations at a bound the shipped code owns: shorten the bound at the seam the code gives for it and measure the floor there (\`packages/templates/sdlc/skills/implement-a-change/SKILL.md\`, step 2)`,

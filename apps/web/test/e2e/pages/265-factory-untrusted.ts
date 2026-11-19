@@ -18,7 +18,7 @@ const SETTINGS = `/factories/${FACTORY}/settings?bar=${encodeURIComponent(barVal
 const RUN = `/runs/${FAKE.id}`;
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }

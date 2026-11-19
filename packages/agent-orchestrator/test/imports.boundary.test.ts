@@ -153,21 +153,21 @@ const TESTS = [
 ];
 
 /** A plant's one line: a type-only re-export for a spec named `type:<spec>`, else a re-export of its values. */
-const plantText = (spec: string): string =>
+const plantText = (spec: string) =>
   spec.startsWith('type:') ? `export type { X } from '${spec.slice('type:'.length)}';\n` : `export * from '${spec}';\n`;
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };
 type Config = { rules?: Record<string, unknown>; overrides: Block[]; [key: string]: unknown };
 
 /** `.oxlintrc.json`, read as oxlint reads it: JSON with comments. */
-function readConfig(): Config {
+function readConfig() {
   const parsed = ts.parseConfigFileTextToJson('.oxlintrc.json', fs.readFileSync(path.join(ROOT, '.oxlintrc.json'), 'utf8'));
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n'));
   return parsed.config as Config;
 }
 
 /** The config's import rules alone: the top level's setting of the rule, and every override block that sets it, in order. */
-const importRules = (config: Config): object => ({
+const importRules = (config: Config) => ({
   plugins: [],
   categories: {},
   rules: RULE in (config.rules ?? {}) ? { [RULE]: config.rules?.[RULE] } : {},
@@ -177,7 +177,7 @@ const importRules = (config: Config): object => ({
 type Plant = { layer: string; file: string; spec: string; refuse: boolean };
 
 /** One file for each import of each layer, in each folder its block covers, and each refused import again in a test beside it. */
-function plants(): Plant[] {
+function plants() {
   const out: Plant[] = [];
   for (const layer of LAYERS)
     for (const dir of layer.at)
@@ -190,7 +190,7 @@ function plants(): Plant[] {
 }
 
 /** The planted files oxlint refuses with the import rule, run with `config` in a scratch folder laid out as the repository. */
-function refusedBy(config: object, planted: Plant[]): Set<string> {
+function refusedBy(config: object, planted: Plant[]) {
   const dir = scratch('imports-');
   for (const plant of planted) {
     fs.mkdirSync(path.join(dir, path.dirname(plant.file)), { recursive: true });
@@ -209,7 +209,7 @@ function refusedBy(config: object, planted: Plant[]): Set<string> {
 }
 
 /** Each plant whose verdict is not the one `LAYERS` gives it, as a sentence naming the block to fix. */
-function leaks(config: object): string[] {
+function leaks(config: object) {
   const planted = plants();
   const refused = refusedBy(config, planted);
   return planted.flatMap(({ layer, file, spec, refuse }) => {

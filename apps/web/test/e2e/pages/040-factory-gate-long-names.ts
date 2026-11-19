@@ -31,7 +31,7 @@ const LONG_NAMES = {
  * Writes LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to
  * take back.
  */
-function seedLongNames(root: string, createdAt: string, now = Date.now()): string[] {
+function seedLongNames(root: string, createdAt: string, now = Date.now()) {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id, ending, back, onto, asks } = LONG_NAMES;
   const [implement, notes] = LONG_NAMES.steps;
@@ -95,7 +95,7 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()): strin
       2,
     ),
   );
-  return [record, dir, ...[implement, notes, back].map(task)];
+  return [record, dir, ...[implement, notes, back].map(task)] satisfies string[];
 }
 
 export default {

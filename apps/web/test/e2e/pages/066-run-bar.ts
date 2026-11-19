@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page, Request } from 'playwright';
+import type { Page, Request } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, FOLDER } from '../seed.ts';
@@ -24,13 +24,13 @@ const nodeOf = (page: Page, step: string) => graphOf(page).locator(`.react-flow_
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Refuses unless no bar is drawn and the address names none, on the run's page. */
-async function expectClosed(page: Page, assertion: string): Promise<void> {
+async function expectClosed(page: Page, assertion: string) {
   await expectCount(page.locator('aside[data-bar]'), 0, assertion);
   const url = new URL(page.url());
   if (url.searchParams.has('bar') || url.pathname !== RUN)
@@ -38,7 +38,7 @@ async function expectClosed(page: Page, assertion: string): Promise<void> {
 }
 
 /** Refuses unless the bar shows `step`, and the address names it. */
-async function expectShows(page: Page, step: string, assertion: string): Promise<Locator> {
+async function expectShows(page: Page, step: string, assertion: string) {
   const bar = stepBar(page, FAKE.id, step);
   await expectVisible(bar, assertion);
   if (barInUrl(page) !== `step:${FAKE.id}/${step}`)
@@ -47,7 +47,7 @@ async function expectShows(page: Page, step: string, assertion: string): Promise
 }
 
 /** Refuses unless the page reaches `pathname` within the wait, with no bar named. */
-async function expectAt(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectAt(page: Page, pathname: string, assertion: string) {
   try {
     await page.waitForURL((url) => url.pathname === pathname, { timeout: WAIT_MS });
   } catch {
@@ -56,7 +56,7 @@ async function expectAt(page: Page, pathname: string, assertion: string): Promis
 }
 
 /** An old link to a step, `?step=`, lands on the bar that shows it, and the canvas is the section's whole width under it. */
-async function oldLink(page: Page): Promise<void> {
+async function oldLink(page: Page) {
   await visit(page, `${RUN}?step=${OTHER}`);
   await expectShows(page, OTHER, `an old link, ?step=${OTHER}, opens ${OTHER} in the bar`);
   if (new URL(page.url()).searchParams.has('step')) throw new Refused(`and the address keeps no step key — it is ${page.url()}`);
@@ -75,7 +75,7 @@ async function oldLink(page: Page): Promise<void> {
  * empty canvas closes it. In a window as wide as `WIDE`, where the sheet leaves the run's steps room beside it, the canvas narrows beside
  * it and is fitted whole.
  */
-async function presses(page: Page): Promise<void> {
+async function presses(page: Page) {
   const was = page.viewportSize();
   await page.setViewportSize(WIDE);
   try {
@@ -86,7 +86,7 @@ async function presses(page: Page): Promise<void> {
 }
 
 /** The presses of `presses`, in the window it sets. */
-async function pressed(page: Page): Promise<void> {
+async function pressed(page: Page) {
   await nodeOf(page, FIRST).scrollIntoViewIfNeeded();
   const scrolled = await page.evaluate(() => window.scrollY);
   await nodeOf(page, FIRST).click();
@@ -136,7 +136,7 @@ async function pressed(page: Page): Promise<void> {
 }
 
 /** Refuses unless the focus is on the node of the step `step`. */
-async function expectFocused(page: Page, step: string, assertion: string): Promise<void> {
+async function expectFocused(page: Page, step: string, assertion: string) {
   const focused = await page.evaluate(() => {
     const now = document.activeElement;
     return now?.classList.contains('react-flow__node') ? now.getAttribute('data-id') : (now?.tagName.toLowerCase() ?? null);
@@ -148,7 +148,7 @@ async function expectFocused(page: Page, step: string, assertion: string): Promi
  * Enter on a focused node shows it, and Escape closes it and gives the focus back to the node; after a switch by Enter to another node,
  * and the focus taken into the bar from there, Escape gives it back to the node switched from, not to the one that opened the bar.
  */
-async function keys(page: Page): Promise<void> {
+async function keys(page: Page) {
   await nodeOf(page, OTHER).focus();
   await page.keyboard.press('Enter');
   await expectShows(page, OTHER, `Enter on ${OTHER}'s node shows it in the bar`);
@@ -175,7 +175,7 @@ const TRANSCRIPT = /^\/api\/runs\/[^/]+\/steps\/[^/]+\/transcript(\/stream)?$/;
 const NO_SESSION = 'No session of it has started yet, so there is no conversation to show.';
 
 /** Refuses unless the session page says it has no conversation, in the family's empty shell, once its reads are done. */
-async function expectNoConversation(page: Page, assertion: string): Promise<void> {
+async function expectNoConversation(page: Page, assertion: string) {
   await idle(page);
   await expectVisible(page.locator('[data-session-empty]').getByText(NO_SESSION, { exact: true }), assertion);
 }
@@ -186,7 +186,7 @@ async function expectNoConversation(page: Page, assertion: string): Promise<void
  * session that started, so neither its conversation under its part nor its session page asks for its conversation, and each says it has
  * none.
  */
-async function opens(page: Page): Promise<void> {
+async function opens(page: Page) {
   const asked: string[] = [];
   const ask = (request: Request) => {
     if (TRANSCRIPT.test(new URL(request.url()).pathname)) asked.push(request.url());
@@ -201,7 +201,7 @@ async function opens(page: Page): Promise<void> {
 }
 
 /** The opens of `opens`, while it watches for a read of a conversation. */
-async function opened(page: Page): Promise<void> {
+async function opened(page: Page) {
   const session = `${RUN}/steps/${OTHER}`;
   await nodeOf(page, OTHER).click();
   const bar = await expectShows(page, OTHER, `a click on ${OTHER} shows it`);
@@ -229,7 +229,7 @@ async function opened(page: Page): Promise<void> {
 }
 
 /** With the start of a run open in the bar, a click on the empty canvas leaves it open, and it offers no Open. */
-async function keepsTheStart(page: Page): Promise<void> {
+async function keepsTheStart(page: Page) {
   const start = `start:${FOLDER.factory}`;
   await visit(page, `${RUN}?bar=${start}`);
   const bar = page.locator(`aside[data-bar="${start}"]`);
@@ -251,7 +251,7 @@ const SLOW_MS = 600;
  * Holds each read of a step's conversation `SLOW_MS` before it reaches the api, as a slow api would: the bar is closed on a step, and
  * switched off it, while its conversation is still read, and the watch counts a read the board then abandons as a failed request.
  */
-async function slowConversations(page: Page): Promise<void> {
+async function slowConversations(page: Page) {
   await page.route(
     (url) => TRANSCRIPT.test(url.pathname) && !url.pathname.endsWith('/stream'),
     async (route) => {

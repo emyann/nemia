@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CutCue } from './CutCue';
-import { ON_PLAIN, ROW } from './stories.fixtures';
+import { ON_PLAIN, ROW } from './stories.fixture';
 
 /** The look's cue: a few words in a small cut frame, in each hue a cue of Nemia's presence takes. */
 const meta: Meta = { title: 'Look/CutCue' };

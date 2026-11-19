@@ -18,7 +18,7 @@ import { scratch } from 'test-kit/scratch';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { runList, type RunQuery } from '../run-list/run-list.verb.ts';
-import type { RunList, RunStatus } from 'objects';
+import type { RunList } from 'objects';
 import { kindOf } from '../run-state/run-state.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { advanceRun, approveRun, startRun, runWith as runEngine } from '../runner.ts';
@@ -27,7 +27,7 @@ import { listRuns, runRecord } from '../record/record.store.ts';
 import { passStanding } from '../standing/standing.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { metered } from '../meter/tally.store.ts';
-import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
+import { informerMemo } from '../rest/informer.verb.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-runlist-');
@@ -57,7 +57,7 @@ const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 4, 10);
 
 /** A workflow folder of the steps named, each after those `after` gives it. */
-const folder = (steps: Record<string, string | null>): string => {
+const folder = (steps: Record<string, string | null>) => {
   const dir = scratch('wf-runlist-team-');
   for (const [name, after] of Object.entries(steps))
     fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${after ? `after: ${after}\n` : ''}place: git\n---\n${name} it\n`);
@@ -119,22 +119,18 @@ const aWaiting = async () => {
 };
 
 /** A person's cancellation of the run `id`, written beside its record as `nemia cancel` writes it. */
-const cancelled = (id: string, at: number): void => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
+const cancelled = (id: string, at: number) => fs.writeFileSync(path.join(RUNS_DIR, `${id}.cancelled`), new Date(at).toISOString());
 
-/** What a list keeps between requests: the informer; a fresh one for each read where none is given. */
-type Kept = { runs: InformerMemo };
-const cold = (): Kept => ({ runs: informerMemo() });
+const cold = () => ({ runs: informerMemo() });
 
 /** The RunList `query` asks, read through `kept`, verified as `env` says. */
-const list = async (query: RunQuery = {}, kept = cold(), env: Env = ENV): Promise<RunList> =>
+const list = async (query: RunQuery = {}, kept = cold(), env: Env = ENV) =>
   await runWith(
     e(),
     runList(e(), { home: ROOT, memo: kept.runs, verify: env.WF_VERIFY_REST === '1' }, { memo: { said: new Map() } }, query),
   );
 
-/** A run of a list as a row: its name as `id`, its creation as `createdAt`, and its status. */
-type Row = RunStatus & { id: string; createdAt: string };
-const rowsOf = (answer: RunList): Row[] =>
+const rowsOf = (answer: RunList) =>
   answer.items.map((item) => ({ ...item.status, id: item.metadata.name, createdAt: item.metadata.creationTimestamp }));
 
 /** The frame's list of the runs not finished, split by state as the board splits it, with its counts and the instant it is read at. */
@@ -150,8 +146,7 @@ const open = async () => {
 };
 
 /** A page of the finished runs, newest first, as the board asks it. */
-const finishedPage = async (query: RunQuery = {}): Promise<Row[]> =>
-  rowsOf(await list({ fieldSelector: 'status.state=finished', ...query }));
+const finishedPage = async (query: RunQuery = {}) => rowsOf(await list({ fieldSelector: 'status.state=finished', ...query }));
 
 /** The frame's seven keys of a run's status. */
 const FRAME = ['state', 'wallMs', 'clock', 'stepCosts', 'waitingSince', 'finishedAt', 'outcome'] as const;
@@ -476,7 +471,7 @@ test('the finished runs page by when their work stopped, not by when they were c
   );
 });
 
-const copies = (text: string, n: number): void => {
+const copies = (text: string, n: number) => {
   for (let i = 0; i < n; i++) {
     const id = `cp-${String(i).padStart(3, '0')}`;
     fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), `${JSON.stringify({ ...JSON.parse(text), id })}\n`);
@@ -491,7 +486,7 @@ test('a warm read by state costs the records of the runs still moving alone: as 
   const kept = cold();
   const unverified = { ...ENV, WF_VERIFY_REST: '0' };
   const asked = { fieldSelector: 'status.state!=finished' };
-  const warm = async (): Promise<number | undefined> => {
+  const warm = async () => {
     await list(asked, kept, unverified);
     return (await metered(() => list(asked, kept, unverified))).tallies?.records;
   };

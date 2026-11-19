@@ -27,7 +27,7 @@ const step = (
   { run, factory, workflow, name, agent }: { run: string; factory: string; workflow: string; name: string; agent: string },
   word = 'running',
   note?: string,
-): FeedLine =>
+) =>
   upgraded({
     at: AT,
     run,
@@ -42,7 +42,7 @@ const step = (
  * A step with no agent, its line's labels written by the one writer of a step's labels (`stepLabels` → `stepKeys`, `src/meter/step.ts`),
  * which says `agent: none` where a step has none: so what a selector does with such a line is held to what the tick actually signs.
  */
-const agentless = ({ run, factory, workflow, name }: { run: string; factory: string; workflow: string; name: string }): FeedLine =>
+const agentless = ({ run, factory, workflow, name }: { run: string; factory: string; workflow: string; name: string }) =>
   upgraded({
     at: AT,
     run,
@@ -53,7 +53,7 @@ const agentless = ({ run, factory, workflow, name }: { run: string; factory: str
   });
 
 /** A run's own line, which carries no step and no agent. */
-const runLine = (run: string, factory: string, workflow: string, word = 'running'): FeedLine =>
+const runLine = (run: string, factory: string, workflow: string, word = 'running') =>
   upgraded({ at: AT, run, word, involved: { kind: 'Run', name: run }, labels: { run, factory, workflow } });
 
 const ADA_IMPLEMENT = step({ run: 'r-1', factory: 'nemia', workflow: 'build', name: 'implement', agent: 'ada' });
@@ -68,7 +68,7 @@ const RUN_LINE = runLine('r-1', 'nemia', 'build');
 const DAEMON = startedLine(4242, { kind: 'none' }, AT, Date.parse(AT));
 
 /** The store's line of the feed, its pause put or lifted, built whole as the feed signs one: of no run, carrying no labels. */
-const storeLine = (word: string): FeedLine =>
+const storeLine = (word: string) =>
   upgraded({ at: AT, store: 'store', word, note: `since ${AT}`, involved: { kind: 'Store', name: 'store' }, labels: {} });
 const STORE_PAUSED = storeLine('store paused');
 const STORE_RESUMED = storeLine('store resumed');
@@ -109,7 +109,7 @@ const PERSON_LABELLED = {
 } as FeedLabels;
 
 /** The lines of `EVERY` the selectors `values` spell select, by what each line is about. */
-const selected = (values: readonly string[]): string[] => {
+const selected = (values: readonly string[]) => {
   assert.equal(selectorsRefusal(values), undefined, values.join(' | '));
   const sel = parseSelectors(values);
   return EVERY.filter((l) => selects(sel, l)).map((l) =>

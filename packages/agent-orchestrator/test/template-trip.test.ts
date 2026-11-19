@@ -48,43 +48,45 @@ const AT = '2026-11-01T09:00:00.000Z';
 const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
-function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
+function edit(dir: string, file: string, change: (spec: Record<string, any>) => void) {
   const doc = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
   change(doc.spec);
   fs.writeFileSync(path.join(dir, file), stringify(doc, { lineWidth: 0 }));
 }
 
 /** The files under `dir`, each with its mode and its bytes in hex, by path from it. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function filesOf(dir: string, under = ''): Array<[string, number, string]> {
   return fs
     .readdirSync(path.join(dir, under), { withFileTypes: true })
     .sort((a, b) => (a.name < b.name ? -1 : 1))
-    .flatMap((entry): Array<[string, number, string]> => {
+    .flatMap((entry) => {
       const file = under ? `${under}/${entry.name}` : entry.name;
       const at = path.join(dir, file);
-      if (entry.isDirectory()) return filesOf(dir, file);
-      return [[file, fs.statSync(at).mode & 0o777, fs.readFileSync(at).toString('hex')]];
+      if (entry.isDirectory()) return filesOf(dir, file) satisfies Array<[string, number, string]>;
+      return [[file, fs.statSync(at).mode & 0o777, fs.readFileSync(at).toString('hex')]] satisfies Array<[string, number, string]>;
     });
 }
 
 /** What `argv` printed, as `nemia` prints it, line by line. */
-async function printedBy(t: TestContext, ...argv: string[]): Promise<string[]> {
+async function printedBy(t: TestContext, ...argv: string[]) {
   const printed: string[] = [];
-  const log = vi.spyOn(console, 'log').mockImplementation((...words: unknown[]) => printed.push(words.join(' ')));
+  const log = vi.spyOn(console, 'log');
   try {
     await stage.main(argv);
   } finally {
+    printed.push(...log.mock.calls.flatMap((words) => [words.join(' ')]));
     log.mockRestore();
   }
   return printed.flatMap((p) => p.split('\n'));
 }
 
 /** The folders the harness's file says are trusted. */
-const trusted = (): string[] => {
+const trusted = () => {
   const file = path.join(CONFIG, '.claude.json');
-  if (!fs.existsSync(file)) return [];
+  if (!fs.existsSync(file)) return [] satisfies string[];
   const { projects } = JSON.parse(fs.readFileSync(file, 'utf8')) as { projects: Record<string, { hasTrustDialogAccepted?: boolean }> };
-  return Object.keys(projects).filter((key) => projects[key].hasTrustDialogAccepted === true);
+  return Object.keys(projects).filter((key) => projects[key].hasTrustDialogAccepted === true) satisfies string[];
 };
 
 /** The template at `source`, a folder or an archive, read through the Template door. */

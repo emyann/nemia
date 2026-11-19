@@ -35,15 +35,16 @@ const COMPARED = new RegExp(
 );
 
 /** The files among `sources`, by path from `src`, that compare a status to a run's word and are not in `listed`. */
-const unlistedReaders = (sources: ReadonlyMap<string, string>, listed: readonly string[]): string[] =>
-  [...sources].filter(([file, text]) => COMPARED.test(text) && !listed.includes(file)).map(([file]) => file);
+const unlistedReaders = (sources: ReadonlyMap<string, string>, listed: readonly string[]) =>
+  [...sources].filter(([file, text]) => COMPARED.test(text) && !listed.includes(file)).map(([file]) => file) satisfies string[];
 
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const sourcesOf = (dir: string, under = ''): Map<string, string> =>
   new Map(
-    fs.readdirSync(path.join(dir, under), { withFileTypes: true }).flatMap((entry): Array<[string, string]> => {
+    fs.readdirSync(path.join(dir, under), { withFileTypes: true }).flatMap((entry) => {
       const file = path.posix.join(under, entry.name);
-      if (entry.isDirectory()) return [...sourcesOf(dir, file)];
-      return /\.tsx?$/.test(entry.name) ? [[file, fs.readFileSync(path.join(dir, file), 'utf8')]] : [];
+      if (entry.isDirectory()) return [...sourcesOf(dir, file)] satisfies Array<[string, string]>;
+      return (/\.tsx?$/.test(entry.name) ? [[file, fs.readFileSync(path.join(dir, file), 'utf8')]] : []) satisfies Array<[string, string]>;
     }),
   );
 

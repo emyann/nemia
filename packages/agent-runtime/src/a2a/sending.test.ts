@@ -12,7 +12,7 @@ const sent = (mono?: { boot: string; ms: number }, taskId?: string) => ({
   ...(taskId ? { taskId } : {}),
   sending: mono ? { mono } : {},
 });
-const at = (wallMs: number, monoMs?: number, boot = 'b-1'): Instant => ({
+const at = (wallMs: number, monoMs?: number, boot = 'b-1') => ({
   at: T0 + wallMs,
   ...(monoMs !== undefined ? { mono: { boot, ms: monoMs } } : {}),
 });

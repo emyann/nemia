@@ -34,7 +34,7 @@ const runPlaced = runGiven(() => stand().layer, ENV);
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
 /** A repository with one commit. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
   stand().world.repository(repo, { 'README.md': 'readme\n' });
@@ -109,12 +109,14 @@ const typedIn =
   async (t: TestContext, e: Engine, ...argv: string[]) => {
     const out: string[] = [];
     const err: string[] = [];
-    const log = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => out.push(a.join(' ')));
-    const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => err.push(a.join(' ')));
+    const log = vi.spyOn(console, 'log');
+    const error = vi.spyOn(console, 'error');
     try {
       await main(argv, e, undefined, stand().place, env);
     } finally {
+      out.push(...log.mock.calls.flatMap((a) => [a.join(' ')]));
       log.mockRestore();
+      err.push(...error.mock.calls.flatMap((a) => [a.join(' ')]));
       error.mockRestore();
     }
     return { out, err };
@@ -123,13 +125,13 @@ const typedIn =
 const typed = typedIn(ENV);
 
 test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async () => {
-  const out: string[] = [];
-  const err: string[] = [];
-  vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => err.push(chunk) > 0) as never);
-  vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => out.push(a.join(' ')));
+  const errSpy = vi.spyOn(process.stderr, 'write');
+  const err = () => errSpy.mock.calls.flatMap(([chunk]) => [String(chunk)]);
+  const outSpy = vi.spyOn(console, 'log');
+  const out = () => outSpy.mock.calls.flatMap((a) => [a.join(' ')]);
   await aliased([]);
-  assert.deepEqual(err, [`${WF_HINT}\n`]);
-  assert.deepEqual(out, [HELP]);
+  assert.deepEqual(err(), [`${WF_HINT}\n`]);
+  assert.deepEqual(out(), [HELP]);
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
 });
 

@@ -43,7 +43,7 @@ const LINKS = [
 ];
 
 /** Her steps, as a Trace: the last call of the session she is answering in is the one running, and the composer offers the stop. */
-async function expectWorking(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
+async function expectWorking(panel: ReturnType<typeof chatPanelOf>) {
   const turn = panel.locator('[data-chat-turn="running"]');
   await expectVisible(turn, 'her steps stand as a Trace, the turn she is in drawn open');
   await expectVisible(
@@ -64,7 +64,7 @@ async function expectWorking(panel: ReturnType<typeof chatPanelOf>): Promise<voi
 }
 
 /** Her answer: the sentence plain, and each page she named a filled button under it. */
-async function expectAnswer(panel: ReturnType<typeof chatPanelOf>): Promise<void> {
+async function expectAnswer(panel: ReturnType<typeof chatPanelOf>) {
   const bubble = panel.locator('[data-chat-message="agent"]', { hasText: 'Both checks are green' });
   const words = (await bubble.locator('[data-chat-bubble="agent"]').textContent()) ?? '';
   if (!words.includes('on the runs page, and the factory is Nemia.'))

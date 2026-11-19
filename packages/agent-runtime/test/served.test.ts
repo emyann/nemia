@@ -40,7 +40,7 @@ const MOMENTS: readonly Followed[] = [
 ];
 
 /** A driver a test moves by hand, with the verbs a holder's harness has: a session listed working, a transcript and a follow. */
-const handOps = (): RunnerOps => {
+const handOps = () => {
   const sessions = new Map<string, Sighting>([[NAME, { sessionId: 's-1', state: 'working', busy: true }]]);
   return {
     spawn: () => Effect.void,

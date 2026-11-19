@@ -8,7 +8,7 @@ import type { Quota, QuotaWindow } from '../src/lib/api/quota.ts';
 import { clockWord, lastWords, quotaTitle, readingAge, windowWords } from '../src/lib/quota.ts';
 
 const NOW = new Date('2026-09-19T10:00:00.000Z');
-const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
+const win = (over: Partial<QuotaWindow> = {}) => ({
   key: 'five_hour',
   label: '5-hour',
   usedPercentage: 38.4,

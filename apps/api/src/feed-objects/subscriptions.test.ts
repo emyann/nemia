@@ -16,7 +16,7 @@ const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-orig
 const folder = path.join(root, 'subscriptions');
 
 /** A subscription's file, as `nemia subscribe` writes one. */
-const subscribe = (name: string, task: string, from = 0): void => {
+const subscribe = (name: string, task: string, from = 0) => {
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(path.join(folder, `${name}.json`), JSON.stringify({ task, selectors: ['reason=Failed'], digestEvery: 15, from }));
 };

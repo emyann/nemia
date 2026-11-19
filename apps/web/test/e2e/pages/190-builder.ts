@@ -26,7 +26,7 @@ const PASTED = JSON.stringify({
 });
 
 /** A schema pasted for `step`'s `output:` in its form, which is open: written beside the steps by the save, under `<step>.schema.json`. */
-async function pasteSchema(builder: Locator, step: string, text: string): Promise<void> {
+async function pasteSchema(builder: Locator, step: string, text: string) {
   const keys = builder.locator(`[data-step-form="${step}"]`);
   await expectVisible(keys, `${step}'s form, to paste a schema in`);
   await pickIn(builder.page(), keys.locator('[data-field="output"] [data-slot="select"]'), 'Paste a schema…');
@@ -39,7 +39,7 @@ async function pasteSchema(builder: Locator, step: string, text: string): Promis
 }
 
 /** A step added on a builder: its name and what it is told. */
-async function addStep(builder: Locator, name: string, body: string): Promise<void> {
+async function addStep(builder: Locator, name: string, body: string) {
   await builder.getByRole('button', { name: 'Add a step' }).click();
   const form = builder.getByRole('form', { name: 'Add a step' });
   await form.getByRole('textbox', { name: 'Step name' }).fill(name);
@@ -52,7 +52,7 @@ async function addStep(builder: Locator, name: string, body: string): Promise<vo
  * Refuses unless `keys`, the form of a step on the agent `agent` of the crew's, is read by layer: its agent's instructions folded, your
  * custom instructions (none), then the step's policy holding its words and the fence key its file sets, and its other keys after.
  */
-async function expectLayers(keys: Locator, agent: string): Promise<void> {
+async function expectLayers(keys: Locator, agent: string) {
   const layers = ['instructions', 'custom', 'folder', 'policy'];
   const drawn = await keys.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
   if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
@@ -80,7 +80,7 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
  * The README in the builder of the workflow `name`, made with none: a draft discarded goes back to none; one saved is written as
  * `README.md` beside the steps, and once the builder is closed, the page reads it as its README.
  */
-async function writesReadme(page: Page, builder: Locator, name: string, put: (r: Response) => boolean): Promise<void> {
+async function writesReadme(page: Page, builder: Locator, name: string, put: (r: Response) => boolean) {
   const readme = builder.getByRole('textbox', { name: /^README/ });
   await expectVisible(readme, 'the builder has a box for the README');
   await expectCount(page.getByRole('region', { name: 'README' }), 0, 'and the page shows it there alone, not again above the builder');

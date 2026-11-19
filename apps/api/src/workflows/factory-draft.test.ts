@@ -22,7 +22,7 @@ const STEP = '---\nplace: git\nskills: tidy\n---\nDo it.\n';
  * The factory `name`, made from a template on the repositories `repos`, the first holding the skill `tidy`: its tree the workflow
  * `hired`, its step `noted` filled by the agent `scribe` it hires. The folder of `hired` in its tree.
  */
-function planted(name: string, repos: readonly string[]): string {
+function planted(name: string, repos: readonly string[]) {
   for (const repo of repos) fs.mkdirSync(repo, { recursive: true });
   const skill = path.join(repos[0] ?? root, '.claude', 'skills', 'tidy');
   fs.mkdirSync(skill, { recursive: true });
@@ -68,7 +68,7 @@ const filesOf = (over: Readonly<Record<string, string>> = {}, dir = TREE) => {
 };
 
 /** The draft read for the factory, proposed to it at the version the workflow is read at now, and approved: the proposal approved. */
-async function writtenBack(files: ReturnType<typeof filesOf>): Promise<Proposal> {
+async function writtenBack(files: ReturnType<typeof filesOf>) {
   const read = await post(`/api/workflows/read?factory=${FACTORY}`, { name: 'hired', files });
   const drafted = (await read.json()) as WorkflowCreate;
   assert.equal(read.status, 200, JSON.stringify(drafted));

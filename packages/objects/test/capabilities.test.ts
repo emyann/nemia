@@ -95,7 +95,7 @@ const full = {
   steps: [reach],
 };
 
-const decodes = (value: unknown): boolean => Result.isSuccess(Schema.decodeUnknownResult(CapabilitiesWithSteps)(value));
+const decodes = (value: unknown) => Result.isSuccess(Schema.decodeUnknownResult(CapabilitiesWithSteps)(value));
 
 test('a full capabilities answer is answered as it was built, every list kept with its shape', () => {
   assert.deepEqual(answered('server', 'capabilities', full), full);

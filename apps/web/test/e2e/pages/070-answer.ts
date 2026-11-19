@@ -32,7 +32,7 @@ export default {
     fs.writeFileSync(file, '{}\n');
     const refused = await page.context().newPage();
     const decisionRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}/decision`;
-    let release = (): void => undefined;
+    let release: () => void = () => undefined;
     const released = new Promise<void>((resolve) => {
       release = resolve;
     });

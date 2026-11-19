@@ -30,7 +30,7 @@ const FRAME = 'src/routes/__root.tsx';
 const MAPPING: Record<string, string> = { sm: '@md/page', md: '@lg/page', lg: '@3xl/page', xl: '@5xl/page', '2xl': '@7xl/page' };
 
 /** What to write in place of `token`, a window breakpoint. */
-function insteadOf(token: string): string {
+function insteadOf(token: string) {
   const bp = breakpointOf(token);
   if (!bp.startsWith('max-')) return `write it as '${token.replace(`${bp}:`, `${MAPPING[bp]}:`)}' (the page column)`;
   const step = MAPPING[bp.slice('max-'.length)];
@@ -67,7 +67,7 @@ const KEPT: readonly Kept[] = [
  * The window breakpoints a text holds, each as its whole class token: a breakpoint begins a token or follows another variant (`hover:`,
  * `data-[side=right]:`), and is followed by its utility with no space (`md: 'markdown'` is a key, not a class).
  */
-function windowTokens(text: string): string[] {
+function windowTokens(text: string) {
   const found: string[] = [];
   const token = /[^\s"'`{}]+/g;
   for (const [whole] of text.matchAll(token)) {
@@ -77,10 +77,10 @@ function windowTokens(text: string): string[] {
 }
 
 /** The breakpoint a token names, its `max-` kept, to say the variant that replaces it. */
-const breakpointOf = (token: string): string => /(?:^|:)((?:max-)?(?:2xl|sm|md|lg|xl)):/.exec(token)?.[1] ?? '';
+const breakpointOf = (token: string) => /(?:^|:)((?:max-)?(?:2xl|sm|md|lg|xl)):/.exec(token)?.[1] ?? '';
 
 /** What the rule refuses in the files given (path from `apps/web` to text): one line each, saying what to write instead. */
-function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]): string[] {
+function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]) {
   const refused: string[] = [];
   for (const [file, text] of files) {
     for (const token of windowTokens(text)) {
@@ -106,7 +106,7 @@ function judge(files: ReadonlyMap<string, string>, kept: readonly Kept[]): strin
 }
 
 /** Every `.ts` and `.tsx` of `src` outside the vendored folders, by its path from `apps/web`. */
-function sources(): Map<string, string> {
+function sources() {
   const files = new Map<string, string>();
   for (const entry of fs.readdirSync(SRC, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue;

@@ -25,7 +25,7 @@ const NAMES = ['aGVybWVz', 'bm91c3Jlc2VhcmNo', 'Z29vZ2xlL2F4', 'c3Vic3RyYXRl', '
 const NAMED = new RegExp(NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|'), 'i');
 
 /** Each line of `text` that names another project, as `<line>: <text>`. */
-function othersNamed(text: string): string[] {
+function othersNamed(text: string) {
   return text.split('\n').flatMap((line, i) => (NAMED.test(line) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 

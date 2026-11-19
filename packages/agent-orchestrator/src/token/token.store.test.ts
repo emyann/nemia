@@ -27,7 +27,7 @@ import {
 const ROOT = scratch('wf-person-tokens-');
 
 /** A store of its own under the scratch root, so each test reads only the tokens it minted. */
-const aStore = (): string => fs.mkdtempSync(path.join(ROOT, 'store-'));
+const aStore = () => fs.mkdtempSync(path.join(ROOT, 'store-'));
 
 /** Whether `act` throws the refusal `kind`, exit 2. */
 const refusedAs = (act: () => unknown, kind: typeof Conflict | typeof Missing | typeof Invalid) =>
@@ -94,10 +94,10 @@ test('a token removed by its name is gone; REFUSED: a name the store holds no to
 const CREDENTIAL_ROOT = scratch('wf-credential-');
 
 /** A store of its own under the scratch root. */
-const aCredentialStore = (): string => fs.mkdtempSync(path.join(CREDENTIAL_ROOT, 'store-'));
+const aCredentialStore = () => fs.mkdtempSync(path.join(CREDENTIAL_ROOT, 'store-'));
 
 /** The token the credential file holds. */
-const held = (home: string): string => fs.readFileSync(credentialFile(home), 'utf8').trim();
+const held = (home: string) => fs.readFileSync(credentialFile(home), 'utf8').trim();
 
 /** The name and holder of the kept token whose value is `token`, or null where the store keeps none. */
 const keptAs = (home: string, token: string) => {

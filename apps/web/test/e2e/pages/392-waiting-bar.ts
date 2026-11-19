@@ -9,13 +9,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
 /** The button under the runs that wait on you, on the Runs page. */
-const openerOf = (page: Page): Locator => page.locator('[data-section="waiting"] [data-waiting-opener]');
+const openerOf = (page: Page) => page.locator('[data-section="waiting"] [data-waiting-opener]') satisfies Locator;
 
 /** The bar of the runs waiting on you, in the frame's side sheet. */
-const waitingBar = (page: Page): Locator => page.getByRole('complementary', { name: 'Waiting on you' });
+const waitingBar = (page: Page) => page.getByRole('complementary', { name: 'Waiting on you' }) satisfies Locator;
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
@@ -24,7 +24,7 @@ async function visit(page: Page, to: string): Promise<void> {
  * The board's own rule (`waitsOnYou`), which the pages still on the whole list keep, names the runs the api says wait: the one place the
  * two rules are compared, on the seeded store.
  */
-async function agrees(page: Page, rows: readonly BellRow[]): Promise<void> {
+async function agrees(page: Page, rows: readonly BellRow[]) {
   if (!rows.length) throw new Refused('the seeded store has runs waiting on you: the api lists none');
   const own = bellRows((await rowsAnswered(page)).filter(waitsOnYou)).map((row) => row.run);
   const said = rows.map((row) => row.run);
@@ -36,7 +36,7 @@ async function agrees(page: Page, rows: readonly BellRow[]): Promise<void> {
  * Pressed, the button under what waits on the Runs page `to` opens the runs waiting on you in every factory in the frame's side sheet,
  * named in the address: a row each, oldest first, with its factory's tag; pressed again, it closes.
  */
-async function opens(page: Page, to: string, rows: readonly BellRow[]): Promise<void> {
+async function opens(page: Page, to: string, rows: readonly BellRow[]) {
   await visit(page, to);
   await openerOf(page).click();
   await page.waitForURL((url) => url.searchParams.get('bar') === 'waiting', { timeout: WAIT_MS });
@@ -57,7 +57,7 @@ async function opens(page: Page, to: string, rows: readonly BellRow[]): Promise<
 }
 
 /** A row at a gate opens its run's page at that step's section, the bar closed; Back returns to the bar on the Runs page. */
-async function follows(page: Page, rows: readonly BellRow[]): Promise<void> {
+async function follows(page: Page, rows: readonly BellRow[]) {
   const row = rows.find((one) => one.gate !== null);
   if (!row?.gate) throw new Refused('the seeded store has a run waiting at its gate');
   await visit(page, '/runs');

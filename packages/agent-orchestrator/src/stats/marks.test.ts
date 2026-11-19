@@ -18,7 +18,7 @@ const SKILL = 'review-a-change';
 /** A review step filled by reviewer, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
 function review(
   more: { agent?: string; instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {},
-): StepSpec {
+) {
   const instructions = more.instructions === undefined ? 'You are Reviewer.' : more.instructions;
   const note = more.note ?? 'Review it.';
   const own = more.skills ?? [SKILL];
@@ -45,7 +45,7 @@ function review(
 const implement: StepSpec = { name: 'implement', after: [], body: 'Do it.' };
 
 /** What run `run`, created at `at` in `dir`, froze of `steps`, its review's skill rendered at `version` (none where null). */
-function frozen(run: string, at: string, steps: StepSpec[], version: string | null = 'v1', dir = BUILD): RunFrozen {
+function frozen(run: string, at: string, steps: StepSpec[], version: string | null = 'v1', dir = BUILD) {
   const head = {
     run,
     factory: 'default',
@@ -59,16 +59,16 @@ function frozen(run: string, at: string, steps: StepSpec[], version: string | nu
 }
 
 /** Each mark as `run kind name since`. */
-const said = (runs: RunFrozen[]): string[] => marksOf(runs).map((m) => `${m.run} ${m.kind} ${m.name} since ${m.since}`);
+const said = (runs: RunFrozen[]) => marksOf(runs).map((m) => `${m.run} ${m.kind} ${m.name} since ${m.since}`);
 
 /** `run` as a run of `factory`. */
-const inFactory = (factory: string, run: RunFrozen): RunFrozen => ({ ...run, factory });
+const inFactory = (factory: string, run: RunFrozen) => ({ ...run, factory });
 
 /** A morning of September 2026. */
 const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
 
 /** Two runs of build in the default factory, reviewer's skill changed by the second; between them one of another factory, last. */
-const history = (): RunFrozen[] => [
+const history = () => [
   frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'),
   frozen('r2', '2026-09-20T08:00:00.000Z', [implement, review()], 'v2'),
   inFactory('other', frozen('o1', '2026-09-15T08:00:00.000Z', [implement, review()], 'v2')),

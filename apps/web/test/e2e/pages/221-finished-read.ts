@@ -15,20 +15,23 @@ const FACTORY = FACTORIES.hiring.name;
  * page is served beside: the query's function, its address resolved against the page's, presenting the seat's token as the browser's
  * cookie would (`bearer`). Refused with why where the api refuses it or it does not decode.
  */
-async function finished(page: Page, factory: string | undefined, older: string[]): Promise<FinishedPage> {
+async function finished(page: Page, factory: string | undefined, older: string[]) {
   const before = globalThis.fetch;
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Node has no page: the board's read sent to the served api, with its token
   globalThis.fetch = (input, init) => {
     const headers = new Headers(init?.headers);
     for (const [name, value] of Object.entries(bearer())) headers.set(name, value);
-    return before(new URL(String(input), page.url()), { ...init, headers });
+    const { pathname, search } = new URL(String(input));
+    return before(new URL(`${pathname}${search}`, page.url()), { ...init, headers });
   };
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedRunsQuery(factory, older));
+    return (await client.fetchQuery(finishedRunsQuery(factory, older))) satisfies FinishedPage;
   } catch (err) {
     throw new Refused(`the page after ${older.length} of the finished runs is read off the RunList — ${(err as Error).message}`);
   } finally {
     client.clear();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- the board's own fetch, given back
     globalThis.fetch = before;
   }
 }

@@ -116,7 +116,7 @@ describe('a job denies what asks in each mode it was measured in, none given amo
 });
 
 /** The `names` the ledger's `bullet` does not write as a tool of its own, in backticks of their own. */
-const unnamedIn = (bullet: string, names: readonly string[]): string[] => names.filter((name) => !bullet.includes(`\`${name}\``));
+const unnamedIn = (bullet: string, names: readonly string[]) => names.filter((name) => !bullet.includes(`\`${name}\``));
 
 test("REFUSED: the measured set holds only what the ledger's measurement names, as a tool of its own — a tool it does not name is inferred, with why, or not there", () => {
   const plan = fs.readFileSync(path.join(REPO, 'docs', 'plan-hold-the-bar.md'), 'utf8');

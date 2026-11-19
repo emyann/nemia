@@ -116,7 +116,8 @@ import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read
 
 /**
  * The origin a request is made under where there is no page to resolve its path against — the node tests: effect makes every request's
- * URL whole, and the `fetch` of each call (`call`) sends its path and query alone, so this origin never leaves.
+ * URL whole, and the `fetch` of each call (`call`) sends it whole there, where no page could resolve a path, and its path and query alone
+ * in a browser, where the page's origin is the api's.
  */
 const NO_PAGE = 'http://board.invalid';
 
@@ -153,12 +154,15 @@ type How<A> = {
   boundMs?: number;
 };
 
-/** `input`'s path and query: a request of the board's goes to its own api, wherever it is served. */
-const pathOf = (input: RequestInfo | URL, query: Record<string, string> | undefined): string => {
+/** `input`'s URL with `query` set over its own keys. */
+const urlOf = (input: RequestInfo | URL, query: Record<string, string> | undefined) => {
   const url = new URL(input instanceof Request ? input.url : String(input), NO_PAGE);
   for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value);
-  return `${url.pathname}${url.search}`;
+  return url;
 };
+
+/** Where a request of the board's is sent: its path and query on a page, which go to its own api wherever it is served; whole with none. */
+const sentTo = (url: URL) => (typeof location === 'undefined' ? url.href : `${url.pathname}${url.search}`);
 
 /** `sent`, the headers the client made, with `more` set over them. */
 const withHeaders = (sent: HeadersInit | undefined, more: Record<string, string>): Headers => {
@@ -183,10 +187,10 @@ const Said = Schema.Struct({ error: Schema.String });
 export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: How<A>, signal?: AbortSignal): Promise<A> {
   let seen: Seen | undefined;
   const fetchSeen: typeof fetch = async (input, init) => {
-    const path = pathOf(input, how.query);
-    const res = await globalThis.fetch(path, how.headers ? { ...init, headers: withHeaders(init?.headers, how.headers) } : init);
+    const url = urlOf(input, how.query);
+    const res = await globalThis.fetch(sentTo(url), how.headers ? { ...init, headers: withHeaders(init?.headers, how.headers) } : init);
     seen = {
-      route: `${init?.method ?? 'GET'} ${path.split('?')[0]}`,
+      route: `${init?.method ?? 'GET'} ${url.pathname}`,
       status: res.status,
       statusText: res.statusText,
       body: res

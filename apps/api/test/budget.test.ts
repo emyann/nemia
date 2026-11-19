@@ -253,7 +253,7 @@ const nothingWritten = (why: string) => {
 };
 
 /** What the package's `retryRun` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
-const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<string> => {
+const retryRefuses = async (step: string, how: RetryHow, run = R) => {
   try {
     await runWith(engine(), retryRun(run, step, how, { stopBlocked: true }));
   } catch (err) {
@@ -263,7 +263,7 @@ const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<strin
 };
 
 /** What the package's `roundRun` refuses, word for word: what `nemia retry --round` prints. */
-const roundRefuses = async (step: string | undefined, budget: number | undefined): Promise<string> => {
+const roundRefuses = async (step: string | undefined, budget: number | undefined) => {
   try {
     await runWith(engine(), roundRun(R, step, budget));
   } catch (err) {

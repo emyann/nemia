@@ -18,19 +18,21 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 const DONE = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
 /** An attempt of `turn` spawned and ended at those times, having signed `closeout`; `ended` null for one still running. */
-const attempt = (turn: number, spawned: string, ended: string | null, closeout?: object): AttemptClock => ({
-  startedAt: at(spawned),
-  spawnedAt: at(spawned),
-  endedAt: ended ? at(ended) : null,
-  reason: null,
-  usage: null,
-  ended: ended ? 'succeeded' : null,
-  turn,
-  ...(closeout ? { closeout } : {}),
-});
+const attempt = (turn: number, spawned: string, ended: string | null, closeout?: object) =>
+  ({
+    startedAt: at(spawned),
+    spawnedAt: at(spawned),
+    endedAt: ended ? at(ended) : null,
+    reason: null,
+    usage: null,
+    ended: ended ? 'succeeded' : null,
+    turn,
+    ...(closeout ? { closeout } : {}),
+  }) satisfies AttemptClock;
 
 /** Tries on task `T`, each replaced as `causes` says, then the current try on `current`. */
-const tries = (causes: TryCause[], current = 'T'): TurnTry[] => [...causes.map((cause) => ({ taskId: 'T', cause })), { taskId: current }];
+const tries = (causes: TryCause[], current = 'T') =>
+  [...causes.map((cause) => ({ taskId: 'T', cause })), { taskId: current }] satisfies TurnTry[];
 
 describe("`turnOf`, `turnSpanOf` and `answerWaitOf`: which turn of a session a try is, that turn's span, and what it waited on an answer", () => {
   test('a try that answers an earlier try on its task is that many turns in', () => {

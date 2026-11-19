@@ -15,7 +15,7 @@ import { Runner, testOps } from '../../harness/seam.ts';
 import { nameFor, type Sighting } from '../domain.ts';
 
 /** The spans `program` made, traced to a tracer that keeps them. */
-const spansOf = async <A, E>(program: Effect.Effect<A, E>): Promise<Tracer.NativeSpan[]> => {
+const spansOf = async <A, E>(program: Effect.Effect<A, E>) => {
   const spans: Tracer.NativeSpan[] = [];
   const tracer = Tracer.make({
     span(options) {
@@ -29,7 +29,7 @@ const spansOf = async <A, E>(program: Effect.Effect<A, E>): Promise<Tracer.Nativ
 };
 
 /** The names of `spans`, sorted: what a pass traced, whatever order its fibers ended in. */
-const namesOf = (spans: readonly Tracer.NativeSpan[]): string[] => spans.map((s) => s.name).sort();
+const namesOf = (spans: readonly Tracer.NativeSpan[]) => spans.map((s) => s.name).sort();
 
 /**
  * `m` tasks filed, spawned and seen ended, on a harness that lists only what it is told to look for and lets a session go by forgetting

@@ -30,17 +30,17 @@ import { files, notOurs, REPO } from 'test-kit/repo';
 import { scratch } from 'test-kit/scratch';
 
 /** Every file of ours git lists in the repository at `root`, on disk, by its path from `root`, sorted. */
-const oursIn = (root: string): string[] => {
+const oursIn = (root: string) => {
   const listed = files(root).filter((file) => fs.existsSync(path.join(root, file)));
   const marked = notOurs(listed, root);
   return listed.filter((file) => !marked.has(file)).sort();
 };
 
 /** Every `CLAUDE.md` of the repository at `root`, by its path from `root`. */
-export const claudeFiles = (root: string): string[] => oursIn(root).filter((file) => path.posix.basename(file) === 'CLAUDE.md');
+export const claudeFiles = (root: string) => oursIn(root).filter((file) => path.posix.basename(file) === 'CLAUDE.md');
 
 /** Every test file of the repository at `root`, beside the code or under a `test/`, by its path from `root`. */
-export const testFiles = (root: string): string[] => oursIn(root).filter((file) => /\.test\.tsx?$/.test(file));
+export const testFiles = (root: string) => oursIn(root).filter((file) => /\.test\.tsx?$/.test(file));
 
 /** A test path a citation holds: a path of names ending `.test.ts`, with no glob, placeholder or space in it. */
 const PATH = /^[\w./-]+\.test\.tsx?$/;
@@ -55,11 +55,11 @@ export type Cite = { path: string; name?: string; line: number };
 const CITE = /`([^`\n]+\.test\.tsx?)`(?:[,:]?[ \n]*(?:\*([^*\n]+(?:\n[^*\n]+)?)\*|`([^`\n]+)`))?/g;
 
 /** Whether a quoted thing is a name a file holds rather than another path: a sentence of words, never a file or a folder. */
-const isName = (quoted: string): boolean => / /.test(quoted) && !/\.tsx?$|\//.test(quoted);
+const isName = (quoted: string) => / /.test(quoted) && !/\.tsx?$|\//.test(quoted);
 
 /** Every citation of `text`, in order: a glob or a placeholder, which names no one file, is left out. */
-export function citesOf(text: string): Cite[] {
-  const lineOf = (index: number): number => text.slice(0, index).split('\n').length;
+export function citesOf(text: string) {
+  const lineOf = (index: number) => text.slice(0, index).split('\n').length;
   return [...text.matchAll(CITE)].flatMap((match) => {
     if (!PATH.test(match[1])) return [];
     const quoted = match[2] ?? match[3];
@@ -69,14 +69,14 @@ export function citesOf(text: string): Cite[] {
 }
 
 /** The test files of `files` a cited path names: the ones ending with it, at a path boundary, read from the folder of `doc` too. */
-export function resolve(cite: string, doc: string, files: string[]): string[] {
+export function resolve(cite: string, doc: string, files: string[]) {
   const folder = path.posix.dirname(doc);
   const wanted = [cite, folder === '.' ? cite : `${folder}/${cite}`];
   return files.filter((file) => wanted.some((want) => file === want || file.endsWith(`/${want}`)));
 }
 
 /** Every name the tests and suites of a test file declare, as its text spells them: a template or a built name is left as it is. */
-export function declaredNames(text: string): string[] {
+export function declaredNames(text: string) {
   return [...text.matchAll(/\b(?:test|it|describe|suite)(?:\.\w+)*\(\s*(['"])((?:\\.|(?!\1)[^\n])*)\1/g)].map((match) =>
     match[2].replace(/\\(['"\\])/g, '$1').replace(/\s+/g, ' '),
   );
@@ -86,7 +86,7 @@ export function declaredNames(text: string): string[] {
  * Each citation of `doc` that no test of `root` holds, in order, as `<doc>:<line> cites …`: a path that resolves to no test file, and
  * a name no test of the files it resolves to declares.
  */
-export function brokenCites(root: string, doc: string, files: string[]): string[] {
+export function brokenCites(root: string, doc: string, files: string[]) {
   return citesOf(fs.readFileSync(path.join(root, doc), 'utf8')).flatMap((cite) => {
     const hits = resolve(cite.path, doc, files);
     const at = `${doc}:${cite.line} cites \`${cite.path}\``;
@@ -99,7 +99,7 @@ export function brokenCites(root: string, doc: string, files: string[]): string[
 }
 
 /** A fixture repository under a scratch root: a `CLAUDE.md` of `text`, and a test file holding one test, named `held`. */
-function fixture(text: string, held: string): string {
+function fixture(text: string, held: string) {
   const root = scratch('claude-cites-');
   execFileSync('git', ['init', '-q', root]);
   fs.mkdirSync(path.join(root, 'test'), { recursive: true });

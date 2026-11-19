@@ -38,7 +38,7 @@ const SENDS_FIRST = [
 const ROOT_PATH = /^(?:\.claude|apps|packages|docs|tools)\/[^\s<>?$*]*$/;
 
 /** Rule 1 broken in the skill `text`: the load missing, or ordered before the shell is moved. Empty when held. */
-function misordered(text: string): string[] {
+function misordered(text: string) {
   const { body } = splitFrontmatter(FILE, text);
   const load = LOADS_SHADCN.exec(body);
   if (!load) return ['no order to load `shadcn` with the Skill tool'];
@@ -46,7 +46,7 @@ function misordered(text: string): string[] {
 }
 
 /** Rule 2 broken in the skill `text` against the repository at `root`: a path it names that is not there, a file to read not named. */
-function misnamed(text: string, root: string): string[] {
+function misnamed(text: string, root: string) {
   const { body } = splitFrontmatter(FILE, text);
   const named = [...new Set([...body.matchAll(/`([^`\n]+)`/g)].map(([, span]) => span ?? '').filter((span) => ROOT_PATH.test(span)))];
   return [
@@ -56,13 +56,13 @@ function misnamed(text: string, root: string): string[] {
 }
 
 /** Rule 3 broken in the skill `text`: each of `SENDS_FIRST` its description does not say, by the pattern's source. */
-function unsent(text: string): string[] {
+function unsent(text: string) {
   const { description } = skillEntryOf(FILE, 'change-the-board', text);
   return SENDS_FIRST.filter((pattern) => !pattern.test(description)).map((pattern) => pattern.source);
 }
 
 /** The skill with `from` replaced by `to`, which must change it. */
-function planted(from: string | RegExp, to: string): string {
+function planted(from: string | RegExp, to: string) {
   const text = TEXT.replace(from, to);
   assert.notEqual(text, TEXT, `${FILE} holds what the fixture changes`);
   return text;

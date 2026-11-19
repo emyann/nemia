@@ -15,14 +15,13 @@
  */
 
 /** Whether `flag` is on `argv`, in either form. */
-export const sdkArgGiven = (argv: readonly string[], flag: string): boolean =>
-  argv.includes(flag) || argv.some((a) => a.startsWith(`${flag}=`));
+export const sdkArgGiven = (argv: readonly string[], flag: string) => argv.includes(flag) || argv.some((a) => a.startsWith(`${flag}=`));
 
 /**
  * The value `flag` carries on `argv`, from `--flag=value` or from the argument after `--flag`. Throws, naming the whole argv, where
  * the flag is not there: a flag the SDK stopped passing is a fact to see, never a value read off the wrong index.
  */
-export const sdkArgValue = (argv: readonly string[], flag: string): string => {
+export const sdkArgValue = (argv: readonly string[], flag: string) => {
   const joined = argv.find((a) => a.startsWith(`${flag}=`));
   if (joined !== undefined) return joined.slice(flag.length + 1);
   const at = argv.indexOf(flag);

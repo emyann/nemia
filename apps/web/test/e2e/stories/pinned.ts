@@ -33,7 +33,7 @@ const WEB = path.resolve(import.meta.dirname, '..', '..', '..');
  * @param platform The machine's platform and architecture, as Node names them.
  * @param browser Whether the lockfile's Chromium is installed.
  */
-const unpinnedBecause = (osRelease: string | undefined, platform: { os: string; arch: string }, browser: boolean): string | undefined => {
+const unpinnedBecause = (osRelease: string | undefined, platform: { os: string; arch: string }, browser: boolean) => {
   const field = (name: string) => new RegExp(`^${name}="?([^"\\n]*)"?$`, 'm').exec(osRelease ?? '')?.[1];
   if (platform.os !== 'linux' || platform.arch !== 'x64') return `this is ${platform.os} on ${platform.arch}, not Linux on x64`;
   if (field('ID') !== SYSTEM.id || field('VERSION_ID') !== SYSTEM.version)
@@ -51,15 +51,15 @@ type PlaceVerdict = 'compare' | 'uncompared' | 'refused';
  * @param why Why this machine is not the pinned place, or nothing where it is (`unpinnedBecause`).
  * @param ci Whether this runs under CI (`CI` set).
  */
-export const placeVerdict = (why: string | undefined, ci: boolean): PlaceVerdict => {
-  if (why === undefined) return 'compare';
-  return ci ? 'refused' : 'uncompared';
+export const placeVerdict = (why: string | undefined, ci: boolean) => {
+  if (why === undefined) return 'compare' satisfies PlaceVerdict;
+  return (ci ? 'refused' : 'uncompared') satisfies PlaceVerdict;
 };
 
 if (import.meta.main) run();
 
 /** Runs the stories as `process.argv` asks, where this machine stands. */
-function run(): void {
+function run() {
   const argv = process.argv.slice(2);
   const update = argv.includes('--update') || argv.includes('-u');
   const files = argv.filter((arg) => arg !== '--update' && arg !== '-u');

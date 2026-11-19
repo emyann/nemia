@@ -28,8 +28,8 @@ const ROOT = scratch('wf-version-root-');
 type Places = import('../skills/read.store.ts').Places;
 
 /** The version as the synchronous reader gave it before the doors: the oracle the program is held equal to. */
-function syncVersion(dir: string, places: Places): string {
-  const named = (text: string, key: 'agent' | 'skills'): string[] => {
+function syncVersion(dir: string, places: Places) {
+  const named = (text: string, key: 'agent' | 'skills') => {
     const value = frontmatterKey(text, key);
     return value && (key === 'skills' || !/[\\/]/.test(value)) ? [value] : [];
   };
@@ -83,7 +83,7 @@ function syncVersion(dir: string, places: Places): string {
 }
 
 /** The program's version over the files doors at a store's root. */
-const doorVersion = (dir: string, places: Places, root = ROOT): string =>
+const doorVersion = (dir: string, places: Places, root = ROOT) =>
   Effect.runSync(workflowVersion(dir, places).pipe(Effect.provide(Layer.mergeAll(agentDoorFiles(root), skillDoorFiles(root)))));
 
 /** A step file naming `agent`, and `skills` where given. */
@@ -185,7 +185,7 @@ test('the version reads the agents of the Agent door it is given, never the disk
 });
 
 /** A folder of a step that names no agent, a README and a schema, with `extra` beside them: its version reads no root's path. */
-function notesFolder(extra: Record<string, string | Uint8Array> = {}): string {
+function notesFolder(extra: Record<string, string | Uint8Array> = {}) {
   const dir = path.join(scratch('wf-version-notes-'), 'workflows', 'notes');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'README.md'), '# Notes\n\nTake notes.\n');

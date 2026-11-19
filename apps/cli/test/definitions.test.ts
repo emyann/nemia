@@ -28,7 +28,7 @@ const LOOSE = scratch('nemia-definitions-loose-');
 write(path.join(LOOSE, 'critic.md'), '---\ndescription: Critiques it.\n---\nCritique it.\n');
 
 /** The store: an agent of yours, a factory on `THEIRS`, and a workflow of yours to remove. */
-const seed = (root: string): void => {
+const seed = (root: string) => {
   write(path.join(root, 'workflows', 'agents', 'archivist.md'), '---\ndescription: Files it away.\n---\nFile it away.\n');
   write(path.join(root, 'workflows', 'errand', 'go.md'), '---\nplace: git\n---\nGo.\n');
   write(path.join(root, 'factories', 'elsewhere.json'), JSON.stringify({ volumes: [{ path: THEIRS, readOnly: false }] }));
@@ -38,7 +38,7 @@ const store = await servedStore('nemia-definitions-', seed);
 afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, `stdin` its input, typed in the folder `cwd` (this test's own where none is named), waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = '', cwd?: string): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = '', cwd?: string) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -48,17 +48,17 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = '', cwd?
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** `said` ended 0, and its stdout. */
-const ok = (said: Said, what: string): string => {
+const ok = (said: Said, what: string) => {
   assert.equal(said.code, 0, `${what}: ${said.err}`);
   return said.out;
 };
 
 /** The version the api serves `kind`'s `name` at, read through `nemia get`. */
-async function versionOf(kind: string, name: string): Promise<string> {
+async function versionOf(kind: string, name: string) {
   const read = JSON.parse(ok(await store.nemia(['get', kind, name, '-o', 'json']), `get ${kind} ${name}`)) as {
     metadata: { resourceVersion: string };
   };

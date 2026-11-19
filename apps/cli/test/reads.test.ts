@@ -50,7 +50,7 @@ const ENV: NodeJS.ProcessEnv = (() => {
   };
 })();
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -218,7 +218,7 @@ write(
 type Said = { code: number | null; out: string; err: string };
 
 /** `nemia <argv>` on the store, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -227,14 +227,14 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<S
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /**
  * The api on the store, `--no-tick`, on a free port: its url once it says it listens, and everything it said so far. The person's
  * credential is put in the store first, as a daemon's start puts it (`credentialKept`), which `--no-tick` does not run.
  */
-async function startApi(): Promise<{ url: string; said: () => string; stop: () => Promise<void> }> {
+async function startApi() {
   credentialKept(root);
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...ENV, PORT: '0' } });
   let said = '';
@@ -255,11 +255,11 @@ async function startApi(): Promise<{ url: string; said: () => string; stop: () =
       child.kill();
       await ended;
     },
-  };
+  } satisfies { url: string; said: () => string; stop: () => Promise<void> };
 }
 
 /** The lease the client reads: where the store is served, and nothing else of a holder. */
-const lease = (url: string | undefined): void => {
+const lease = (url: string | undefined) => {
   const file = path.join(root, 'daemon.json');
   if (url === undefined) fs.rmSync(file, { force: true });
   else write(file, JSON.stringify({ url }));
@@ -273,7 +273,7 @@ afterAll(() => api.stop());
  * A laptop whose context in use is a remote daemon, the api serving the seeded store, with a token the store minted: its own store root
  * is never made, so what it prints came over HTTP.
  */
-async function remote(): Promise<NodeJS.ProcessEnv> {
+async function remote() {
   const minted = await nemia(['token', 'add', 'reads-laptop']);
   assert.equal(minted.code, 0, minted.err);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);

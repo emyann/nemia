@@ -45,17 +45,20 @@ const forgetQuota = () => {
 
 const NOW = Date.parse('2026-09-19T10:00:00.000Z');
 /** The plan's limits as the engine answers them, in Claude Code's order: a key the board does not know among them. */
-const plan = (five = 38.4, week = 86): HarnessQuota => ({
-  kind: 'windows',
-  limits: [
-    { key: 'five_hour', usedPercentage: five, resetsAt: '2026-09-19T12:00:00.048Z' },
-    { key: 'seven_day', usedPercentage: week, resetsAt: '2026-09-22T10:00:00.000Z' },
-    { key: 'nimbus_quill', usedPercentage: 0, resetsAt: null },
-  ],
-  subscription: 'max',
-});
+const plan = (five = 38.4, week = 86) => {
+  const made: HarnessQuota = {
+    kind: 'windows',
+    limits: [
+      { key: 'five_hour', usedPercentage: five, resetsAt: '2026-09-19T12:00:00.048Z' },
+      { key: 'seven_day', usedPercentage: week, resetsAt: '2026-09-22T10:00:00.000Z' },
+      { key: 'nimbus_quill', usedPercentage: 0, resetsAt: null },
+    ],
+    subscription: 'max',
+  };
+  return made;
+};
 const UNANSWERED: HarnessQuota = { kind: 'unanswered', subscription: 'max' };
-const heard = (asked: HarnessQuota, at = NOW): Held => ({ asked, at });
+const heard = (asked: HarnessQuota, at = NOW) => ({ asked, at }) satisfies Held;
 /** When a session received the `rate_limit_event` measured on the server, five minutes before `NOW`. */
 const HEARD_AT = '2026-09-19T09:55:00.000Z';
 /**
@@ -64,21 +67,21 @@ const HEARD_AT = '2026-09-19T09:55:00.000Z';
  */
 const tokenHeard = (
   limits: HeardQuota['limits'] = [{ key: 'seven_day', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', status: 'allowed' }],
-): HarnessQuota => ({ kind: 'token', program: null, heard: { at: HEARD_AT, limits } });
+) => ({ kind: 'token', program: null, heard: { at: HEARD_AT, limits } }) satisfies HarnessQuota;
 
 /** What the fake ask answers next, and how many times it has been asked. */
-const fake = { next: plan(), asked: 0 };
+const fake: { next: HarnessQuota; asked: number } = { next: plan(), asked: 0 };
 /** A read through the fake ask, with `opts` beside it. */
-const read = (opts: Omit<Parameters<ReadQuota>[0], 'ask'> = {}): Promise<Quota> =>
+const read = (opts: Omit<Parameters<ReadQuota>[0], 'ask'> = {}) =>
   readQuota({
     ...opts,
     ask: async () => {
       fake.asked += 1;
       return fake.next;
     },
-  });
+  }) satisfies Promise<Quota>;
 
-const get = async (): Promise<Quota> => {
+const get = async () => {
   const res = await app.request('/api/quota');
   assert.equal(res.status, 200);
   return (await res.json()) as Quota;
@@ -445,7 +448,7 @@ describe('The board polls the quota: one ask through the harness, kept, asked ag
     const now = () => clock;
     const mono = () => clock - NOW;
     let rejected = 0;
-    const ask = async (): Promise<HarnessQuota> => {
+    const ask = async () => {
       rejected += 1;
       throw Object.assign(new Error('quota: the `claude` harness reports no quota.'), { exitCode: 2 });
     };
@@ -755,8 +758,10 @@ test('REFUSED: a read that waits past its wait says asking, then what the ask ca
 });
 
 /** Each way `text` could start a process of its own: node's child_process named, or a call of one of its functions. */
-const starts = (text: string): string[] =>
-  [...text.matchAll(/\bchild_process\b|\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/g)].map((m) => m[0]);
+const starts = (text: string) =>
+  [...text.matchAll(/\bchild_process\b|\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/g)].map(
+    (m) => m[0],
+  ) satisfies string[];
 
 test('REFUSED: the quota read starts no process: the engine asks', () => {
   assert.deepEqual(starts("import { spawn } from 'node:child_process';\nconst c = spawn ('claude', USAGE_ARGS);"), [

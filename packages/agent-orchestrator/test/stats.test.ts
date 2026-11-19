@@ -33,7 +33,7 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 const DAY = '2026-09-28';
-const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
+const at = (hour: number, day = DAY) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
 const SIGNED = { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] };
 
 /**

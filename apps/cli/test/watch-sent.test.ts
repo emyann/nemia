@@ -13,8 +13,8 @@ const asked: Asked = { once: true, how: {}, selectors: [] };
  * the same method is the first one, and would count the lines of the reads before it.
  */
 const read = (sent: Parameters<typeof onSent>[0], at: At = { cursor: 0, hinted: false }) => {
-  const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  const out = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const err = vi.spyOn(console, 'error');
+  const out = vi.spyOn(console, 'log');
   try {
     const answered = onSent(sent, asked, at);
     return { answered, err: err.mock.calls.map((c) => c.join(' ')), out: out.mock.calls.map((c) => c.join(' ')), at };

@@ -36,45 +36,47 @@ import {
 import { placeQuery } from '../src/lib/api/workflows.ts';
 
 /** A factory as the api lists it: attached to one repository and one workflow, with one hire. */
-const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
-  name,
-  default: false,
-  worksOn: ['/code/nemia'],
-  workflows: ['build'],
-  hires: { 'build/implement': 'implementer' },
-  error: null,
-  schedules: [],
-  commands: {
-    attach: `nemia factory attach ${name} <workflow>`,
-    rm: `nemia factory rm ${name}`,
-    add: `nemia factory add ${name} --volume <path|url>:rw`,
-    schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
-    trust: `nemia factory trust ${name}`,
-    volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
-  },
-  untrusted: [],
-  volumes: [],
-  costLines: {},
-  workflowRepos: {},
-  template: null,
-  ...extra,
-});
+const factory = (name: string, extra: Partial<Factory> = {}) =>
+  ({
+    name,
+    default: false,
+    worksOn: ['/code/nemia'],
+    workflows: ['build'],
+    hires: { 'build/implement': 'implementer' },
+    error: null,
+    schedules: [],
+    commands: {
+      attach: `nemia factory attach ${name} <workflow>`,
+      rm: `nemia factory rm ${name}`,
+      add: `nemia factory add ${name} --volume <path|url>:rw`,
+      schedule: `nemia factory schedule ${name} <workflow> --cron <expr> --brief <text>`,
+      trust: `nemia factory trust ${name}`,
+      volume: `nemia factory volume add ${name} <path|url>:ro|:rw`,
+    },
+    untrusted: [],
+    volumes: [],
+    costLines: {},
+    workflowRepos: {},
+    template: null,
+    ...extra,
+  }) satisfies Factory;
 
 /** The default factory as the api lists it: on the api's repository, offering every workflow and hiring no one. */
 const fallback = factory('default', { default: true, worksOn: ['/code/app'], workflows: null, hires: {} });
 
 /** A run finished in `factory`, which nothing moves and nobody is asked about; `extra` puts keys over it. */
-const run = (id: string, factoryName: string | null, extra: Partial<RunView> = {}): FactoryRun & { id: string } => ({
-  id,
-  factory: factoryName,
-  status: 'succeeded',
-  moving: false,
-  waitingOnYou: [],
-  cancelledAt: null,
-  waiting: null,
-  holding: null,
-  ...extra,
-});
+const run = (id: string, factoryName: string | null, extra: Partial<RunView> = {}) =>
+  ({
+    id,
+    factory: factoryName,
+    status: 'succeeded',
+    moving: false,
+    waitingOnYou: [],
+    cancelledAt: null,
+    waiting: null,
+    holding: null,
+    ...extra,
+  }) satisfies FactoryRun & { id: string };
 
 const names = (xs: readonly { name: string }[]) => xs.map((x) => x.name);
 

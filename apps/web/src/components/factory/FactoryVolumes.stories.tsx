@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { FactoryVolumes } from './FactoryVolumes';
 import { factoryView, FACTORY } from '../../../.storybook/fixtures/proposals';
 import { volumes } from '../../../.storybook/fixtures/factories';
+import { settled } from '../../../.storybook/play';
 
 const VOLUMES = '/api/factories/:factory/volumes';
 
@@ -63,6 +64,7 @@ export const Added: Story = {
     await userEvent.click(page.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(page.getByRole('button', { name: 'Add' })).toBeEnabled());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toBeNull();
+    await settled(canvasElement);
   },
 };
 
@@ -81,6 +83,7 @@ export const Refused: Story = {
     await userEvent.click(page.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(canvasElement.querySelector('[data-volume-refused]')).not.toBeNull());
     await expect(canvasElement.querySelector('[data-volume-refused]')).toHaveTextContent('in no git repository');
+    await settled(canvasElement);
   },
 };
 
@@ -92,5 +95,6 @@ export const Removing: Story = {
     const page = within(canvasElement);
     await userEvent.click(page.getByRole('button', { name: 'Remove /srv/notes' }));
     await waitFor(() => expect(page.getByRole('button', { name: 'Remove /srv/scratch' })).toBeDisabled());
+    await settled(canvasElement);
   },
 };

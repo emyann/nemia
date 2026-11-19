@@ -14,6 +14,20 @@ type User = { tab: (options?: { shift?: boolean }) => Promise<void> };
 /** Takes the focus off what has it, so the story a play function leaves behind is pictured at rest, as it was drawn. */
 export const atRest = (): void => (document.activeElement as HTMLElement | null)?.blur();
 
+/**
+ * Puts the focus down once a press has settled, as `atRest` does, and waits until nothing in `root` draws the focus ring: whether the
+ * ring of a button pressed by a script is drawn when the picture is taken is the browser's timing, and a person who presses it with the
+ * mouse sees none, nor one with the keyboard once its write took the button off and gave it back.
+ * @param root The story's canvas, read for what still draws the ring.
+ */
+export async function settled(root: HTMLElement): Promise<void> {
+  atRest();
+  await waitFor(() => {
+    if (document.activeElement !== document.body || root.querySelector(':focus-visible'))
+      throw new Error('the focus is still up: what holds it draws its ring');
+  });
+}
+
 /** What has the focus, as its marks say it: its `data-` attributes' names, and its text. */
 export const focused = (): { marks: string[]; text: string } => {
   const at = document.activeElement as HTMLElement | null;

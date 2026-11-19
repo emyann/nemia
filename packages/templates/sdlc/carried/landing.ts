@@ -7,25 +7,27 @@
  * `refresh.ts`, for the landing refresh: the run freezes the carried folder whole, so a script may import a sibling it holds. It is
  * told the name of the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
- * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
- *   person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's own
- *   green pull request — not a draft, based on the remote's default branch, its head the tip of the run's result branch and the sha the
- *   reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha, and every other `wf/<id>/*` branch taken by
- *   it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with a merge commit whose subject
- *   and body are the ones it was given (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository
- *   auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`).
- *   **Level-triggered**: it reads the world rather than what a last try left, so a retry after a merge that went through and a fast-forward
- *   that was then declined — the one failure between the two acts — does the fast-forward alone and merges nothing a second time.
- *   Given the factory's own command `--refresh <cmd>` and the paths it derives `--derives <paths>` (the factory's `landingRefresh` and
- *   `landingDerives`, each may be empty, and an empty `--refresh` is the merge above), where the pull request's head is the run's
- *   own and leaves no branch out but does not hold `origin/<base>` after a `git fetch origin`, it refreshes the branch first
- *   (`refresh.ts`): the base merged into it in the worktree that has it checked out, the command run there to derive its files again,
- *   the result committed and pushed with no force, and `refreshed.json` left in `$WF_STEP_FILES` for the check; it then merges nothing
- *   and exits 0, saying the check merges once CI is green at the pushed head. A refresh the command changed nothing of, on a merge
- *   that went clean, is taken back, and the merge goes on as above. **The landed commit differs from the reviewed head only in the
- *   files `landingDerives` names**, since review reads a head that no longer lands as is: the refreshed head is git's plain merge of the
- *   reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the derived paths, and a refresh with any
- *   other difference, any path left unmerged, or a command that exits non-zero is refused and taken back, nothing pushed.
+ * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on
+ *   a person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's
+ *   own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's result branch and the sha
+ *   the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha — or no context at all where neither that
+ *   sha's tree nor its base's declares a CI workflow under `.github/workflows` (`declaresCi`), which its round's local check judged —
+ *   and every other `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) —
+ *   then merges it with
+ *   a merge commit whose subject and body are the ones it was given (`gh pr merge --merge --match-head-commit <sha>`, never
+ *   `--delete-branch`: the repository auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge
+ *   --ff-only origin/<base>`). **Level-triggered**: it reads the world rather than what a last try left, so a retry after a merge that
+ *   went through and a fast-forward that was then declined — the one failure between the two acts — does the fast-forward alone and merges
+ *   nothing a second time. Given the factory's own command `--refresh <cmd>` and the paths it derives `--derives <paths>` (the factory's
+ *   `landingRefresh` and `landingDerives`, each may be empty, and an empty `--refresh` is the merge above), where the pull request's head
+ *   is the run's own and leaves no branch out but does not hold `origin/<base>` after a `git fetch origin`, it refreshes the branch first
+ *   (`refresh.ts`): the base merged into it in the worktree that has it checked out, the command run there to derive its files again, the
+ *   result committed and pushed with no force, and `refreshed.json` left in `$WF_STEP_FILES` for the check; it then merges nothing and
+ *   exits 0, saying the check merges once CI is green at the pushed head. A refresh the command changed nothing of, on a merge that went
+ *   clean, is taken back, and the merge goes on as above. **The landed commit differs from the reviewed head only in the files
+ *   `landingDerives` names**, since review reads a head that no longer lands as is: the refreshed head is git's plain merge of the
+ *   reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the derived paths, and a refresh with any other
+ *   difference, any path left unmerged, or a command that exits non-zero is refused and taken back, nothing pushed.
  * - `receipt --run <id> --check <name> --wait-on-ci <true|false>`, which the land step's `check:` runs: it refuses unless the pull request
  *   is `MERGED` with a merge commit that is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every
  *   commit of every `wf/<id>/*` branch has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record
@@ -34,7 +36,9 @@
  *   at that head (red refuses, naming the jobs and the `nemia retry <id> review --message "…"` that sends the work back), and only while
  *   the head holds `origin/<base>` (a base that moved past it refuses with the land step's retry line) — by `gh pr merge --merge
  *   --match-head-commit <head>` with the subject and body the session gave, and fast-forwards the checkout, then receipts as above.
- *   Then, last, so a receipt that refuses never waits, and only where `--wait-on-ci` is `true` (the factory's `landingWaitsOnCi`), it
+ *   Then, last, so a receipt that refuses never waits, and only where `--wait-on-ci` is `true` (the factory's `landingWaitsOnCi`) and the
+ *   merge commit's tree or its first parent's declares a CI workflow (`declaresCi`; a refreshed head that declares none, on a base that
+ *   declares none, is merged with no wait either), it
  *   waits on the CI context `--check` names at the merge commit on the base branch, read over REST (its check runs and its status
  *   contexts; the combined `state` is never a verdict): 1800 s for it to be reported
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
@@ -68,6 +72,7 @@ import {
   NOT_FAILED,
   PASSED,
   type Seen,
+  declaresCi,
   greenLater,
   latest,
   listing,
@@ -276,7 +281,8 @@ function sole(found: readonly Pr[], id: string, state: string, open: string): Pr
  * the latest run of each check (`latest`), as the round's wait reads it (`pull-request.ts`): a run re-run or run again on another event
  * of the head leaves its earlier one in the rollup, and that one is no verdict. Refuses a head nothing judged, or one it did not pass.
  */
-function green(pr: Pr, check: string): void {
+function green(pr: Pr, check: string): string[] {
+  if (!ciAtCommit(pr.headRefOid, pr.baseRefName)) return [noCi(pr.headRefOid, "its round was judged by the factory's local check")];
   const text = gh('pr', 'view', String(pr.number), '--json', 'statusCheckRollup');
   const entries = latest(parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${pr.number}`, text).statusCheckRollup ?? []);
   const ours = entries.filter((entry) => (entry.name ?? entry.context ?? '') === check);
@@ -293,18 +299,35 @@ function green(pr: Pr, check: string): void {
         `at ${pr.headRefOid.slice(0, 12)}, and only a green pull request lands. Read ${pr.url}/checks: the work goes round again, ` +
         'and nothing is merged here.',
     );
+  return [];
 }
 
+/**
+ * Whether the tree of `sha`, a commit of this checkout, or else the tree of `base`, the base it lands on, declares any CI workflow
+ * (`declaresCi`): where neither does, no context will come. The base counts too, so a change that removes the base's CI workflow is
+ * still judged by its context, never landed with none.
+ */
+const ciAtCommit = (sha: string, base: string): boolean => declaresCi(workflowsAt(sha)) || declaresCi(workflowsAt(base));
+
+/** The paths under `.github/workflows` in the tree of `rev`, a revision of this checkout. */
+const workflowsAt = (rev: string): string[] =>
+  git(`the files of ${rev.slice(0, 12)}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
+
+/** The line that says no CI context was waited on at `sha`, which with its base declares no CI workflow, and what judged it instead. */
+const noCi = (sha: string, instead: string): string =>
+  `${sha.slice(0, 12)} declares no CI workflow under .github/workflows, nor does its base, so no context was waited on there: ${instead}`;
+
 /** The pull request read as the merge requires it: this run's own, green, and at the sha the reviewer read. */
-function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): void {
+function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): string[] {
   own(pr, onto, named, check);
   if ((pr.mergeable ?? '').toUpperCase() !== MERGEABLE)
     throw new Refusal(
       `GitHub says #${pr.number} is \`${pr.mergeable ?? 'unknown'}\`, not \`${MERGEABLE}\`, so it cannot be merged as it stands: the ` +
         `work merges its base again and goes round, or a person reads ${pr.url}. Nothing is merged here.`,
     );
-  green(pr, check);
+  const said = green(pr, check);
   whole(pr, named);
+  return said;
 }
 
 /**
@@ -445,7 +468,7 @@ function merge(args: string[]): string[] {
       : undefined;
     if (said) return said;
   }
-  judged(pr, onto, named, check);
+  const judgedBy = judged(pr, onto, named, check);
   const merged = run('gh', [
     'pr',
     'merge',
@@ -464,7 +487,7 @@ function merge(args: string[]): string[] {
       `GitHub declined to merge #${pr.number} at ${pr.headRefOid.slice(0, 12)}: ${merged.err}\n` +
         `  Nothing landed and this checkout is untouched. Read ${pr.url}.\n${retryLine(id)}`,
     );
-  return [`#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`, ...forwarded(pr, onto, id)];
+  return [...judgedBy, `#${pr.number} merged at ${pr.headRefOid.slice(0, 12)} with a merge commit: ${pr.url}`, ...forwarded(pr, onto, id)];
 }
 
 /**
@@ -525,6 +548,7 @@ function receipt(args: string[]): string[] {
       ...proven,
       `\`${check}\` at ${oid.slice(0, 12)} on \`${onto}\` was not waited on: the factory's \`landingWaitsOnCi\` is false`,
     ];
+  if (!ciAtCommit(oid, `${oid}^1`)) return [...before, ...proven, noCi(oid, 'nothing will report a context on the base branch')];
   if (fresh && treeOf(oid) === treeOf(fresh.headRefOid))
     return [
       ...before,
@@ -634,6 +658,7 @@ function holds(pr: Pr, onto: string, id: string): void {
  */
 function greenAtHead(pr: Pr, check: string, id: string, began: number): string {
   const head = pr.headRefOid;
+  if (!ciAtCommit(head, pr.baseRefName)) return noCi(head, "the refresh is judged by the factory's local check of the round before it");
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const l: Landing = { number: pr.number, url: pr.url, oid: head, onto: pr.headRefName, check };

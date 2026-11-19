@@ -39,6 +39,7 @@ const commandsOf = (manifest: Manifest | null) => [
  */
 function checksOf(root: string) {
   const workflows = path.join(root, 'workflows');
+  const defaults = defaultsOf(root);
   return fs
     .readdirSync(workflows)
     .filter((name) => fs.existsSync(path.join(workflows, name, 'workflow.yaml')))
@@ -51,7 +52,7 @@ function checksOf(root: string) {
               {
                 workflow,
                 step: step.step,
-                scripts: [...step.check.matchAll(FROZEN)].map(([, bare, braced, name]) => ({
+                scripts: [...withDefaults(step.check, defaults).matchAll(FROZEN)].map(([, bare, braced, name]) => ({
                   folder: (bare ?? braced) === 'WF_CARRIED_FILES' ? 'carried' : `workflows/${workflow}`,
                   name: name ?? '',
                 })),
@@ -61,6 +62,18 @@ function checksOf(root: string) {
       );
     });
 }
+
+/** The default of each parameter the template `root` declares, by name, as its manifest writes it. */
+function defaultsOf(root: string) {
+  const manifest = yaml.load(fs.readFileSync(path.join(root, 'nemia.yaml'), 'utf8')) as {
+    spec?: { parameters?: Record<string, { default?: unknown }> };
+  } | null;
+  return Object.fromEntries(Object.entries(manifest?.spec?.parameters ?? {}).map(([name, p]) => [name, String(p.default ?? '')]));
+}
+
+/** `check` with each `${{ parameters.<name> }}` written as its default, so a script a default names is read as the check's. */
+const withDefaults = (check: string, defaults: Record<string, string>) =>
+  check.replace(/\$\{\{\s*parameters\.(\w+)\s*\}\}/g, (_, name: string) => defaults[name] ?? '');
 
 /** Each script a check of the template `root` names that its folder does not hold: `<workflow>/<step>: <folder>/<name>`. */
 function strays(root: string) {

@@ -652,3 +652,34 @@ describe('a builtin template, named: applied, recorded by its name, read whereve
     assert.deepEqual(filed(), before);
   });
 });
+
+/** The tests' team as a template whose `follow` defaults true and follows example.org, so a volume given by its path sets it false. */
+function following() {
+  const made = template();
+  edit(made.dir, 'nemia.yaml', (spec) => {
+    spec.parameters.follow = { type: 'boolean', description: 'whether it lands on the host', default: true, whenOrigin: 'example.org' };
+  });
+  return made;
+}
+
+describe("a boolean that follows a host (whenOrigin) is set by the factory's first writable volume, and by no later one", () => {
+  test('apply with a repository by its path files follow=false, a --set of the person wins, and a later writable volume sets nothing', async () => {
+    const { dir, repo } = following();
+    await apply('follows', dir, repo, '--set', 'budget=3');
+    assert.equal(templated('follows').template.params.follow, false, 'a folder of this machine is no clone of example.org');
+    await apply('overruled', dir, repoWithTeam(), '--set', 'budget=3', '--set', 'follow=true');
+    assert.equal(templated('overruled').template.params.follow, true, "the person's --set is written after the volume's");
+    const before = templated('overruled').template;
+    await main(['factory', 'volume', 'add', 'overruled', `${repoWithTeam()}:rw`], noEngine());
+    assert.deepEqual(templated('overruled').template, before, 'a second writable volume leaves the parameter as it was');
+  });
+  test("volume add of a factory's first writable volume files follow=false at the same version, and answers it", async () => {
+    const { dir } = following();
+    const notes = scratch('wf-applied-notes-');
+    await main(['factory', 'apply', 'later', '--template', dir, '--volume', `${notes}:ro`, '--set', 'budget=3'], noEngine());
+    const before = templated('later').template;
+    assert.equal(before.params.follow, true, 'a read-only volume sets nothing');
+    await main(['factory', 'volume', 'add', 'later', `${repoWithTeam()}:rw`], noEngine());
+    assert.deepEqual(templated('later').template, { ...before, params: { ...before.params, follow: false } });
+  });
+});

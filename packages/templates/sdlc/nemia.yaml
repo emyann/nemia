@@ -4,18 +4,19 @@ metadata:
   name: sdlc
   description: "For building software on a repository, each change reviewed before it lands. Four workflows: intake turns an idea into an intent with the person, build takes an intent through a written spec, the code and its review to the base branch, quick builds a change its card settles with no spec, and janitor reads how the work went and proposes corrections. Six agents fill their steps: a product engineer, an architect, a lead engineer, a code reviewer, a release engineer and a janitor. A person decides at intake's end, on build's spec and on build's landing; quick lands once its review passes."
 spec:
-  version: 4.9.1
+  version: 4.10.0
   rules:
     path: RULES.md
   parameters:
     github:
       type: boolean
-      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request, its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true."
+      description: "How the factory judges and lands its work. false (the default): with no remote, the implement step's check runs localCheck on each round's tree, and the landing merges the run's result in the repository's own checkout, judged by localCheck on the merged tree. true: the implement step pushes its branch and opens a pull request, its check runs roundCheck and waits on the CI context ciCheck names, and the landing merges that pull request on GitHub; set it with --set github=true. It follows the factory's first writable volume: true where that volume is cloned from github.com, false where it is a folder of the machine or another host's clone; a later volume leaves it as it is. Where neither the pull request's head nor the base branch declares a CI workflow in .github/workflows, the implement step's check runs localCheck in place of the wait, and the landing merges with no context."
       default: false
+      whenOrigin: github.com
     localCheck:
       type: string
-      description: "The command that judges the work where github is false, from the workspace's root: the implement step's check runs it on each round's tree, and the landing's check on the merged tree. It is the only judge there, so it runs the tests. Not read where github is true."
-      default: npm run --if-present lint && npm run --if-present typecheck && npm run --if-present test
+      description: "The command that judges the work where github is false, from the workspace's root: the implement step's check runs it on each round's tree, and the landing's check on the merged tree. It is the only judge there, so it runs the tests. Where github is true, it judges a round where neither the head nor the base branch declares a CI workflow. The default, carried local-check.ts, runs the repository's lint, typecheck and test scripts by the package manager its --runner names, each where its package.json declares it, leaving out the placeholder test a package manager's init writes, and runs nothing and passes where there is no package.json: it refuses nothing a repository of any kind does not refuse itself."
+      default: node "$WF_CARRIED_FILES/local-check.ts" --runner npm
     ciCheck:
       type: string
       description: "The CI status context branch protection requires of the base branch, which the implement step's check waits on and the landing merges on; where landingWaitsOnCi is true, the landing's check then waits on it at the merge commit on the base branch. Read only where github is true."

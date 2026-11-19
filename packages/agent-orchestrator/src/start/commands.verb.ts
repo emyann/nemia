@@ -22,7 +22,7 @@ import type { StepSpec } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
 import { modelsOf, type RunModels } from './models.ts';
-import { volumeMounts } from '../factory/volume/volume.ts';
+import { volumeMounts } from '../factory/volume/index.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import type { Paused } from '../pause/pause.ts';

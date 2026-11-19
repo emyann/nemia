@@ -158,9 +158,14 @@ function modulesLoaded(entry: string, more: readonly string[] = []) {
  * `gate.ts`; and `say/agent-frame/agent-frame.ts`, the frame an agent's words are said in, out of `say/say.ts`, which reads it and hands it
  * on, so the step speaker's contract reads it without reading `say.ts`. Both pure, importing nothing but files already loaded and
  * types, and neither touching a disk.
+ *
+ * `agent-orchestrator/run` is two more since the volume folder has a face (the layout rule, `test-kit/layout`):
+ * `factory/volume/index.ts`, through which `start/inputs.ts` reads `volumeMounts`, and `factory/volume/origin-params.ts`, the
+ * parameters a factory's first writable volume sets, which it exports beside it. Both pure, importing nothing but files already
+ * loaded and types, and neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 214, effect: 15 },
+  'agent-orchestrator/run': { all: 216, effect: 15 },
   'agent-orchestrator/workflow': { all: 152, effect: 15 },
 };
 

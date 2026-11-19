@@ -18,7 +18,13 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import vite from './vite.config.ts';
+import path from 'node:path';
 import { withoutTheRouter } from './.storybook/router.ts';
+import { APPROVED, pictureFile } from './.storybook/approved.ts';
+import { scheme, schemePlugins } from './.storybook/schemeBuild.ts';
+
+/** The variable the pinned place sets (`test/e2e/stories/pinned.ts`): the stories are compared against their approved pictures. */
+const PINNED = 'STORIES_PINNED';
 
 export default mergeConfig(
   { ...vite, plugins: withoutTheRouter(vite.plugins) },
@@ -52,15 +58,27 @@ export default mergeConfig(
         {
           extends: true,
           plugins: [storybookTest({ configDir: '.storybook', storybookScript: 'npm run storybook' })],
+          css: { postcss: { plugins: schemePlugins() } },
           test: {
             name: 'storybook',
             maxWorkers: 1,
+            setupFiles: ['.storybook/compare.ts'],
+            provide: { approvedCompare: process.env[PINNED] === '1' },
             browser: {
               enabled: true,
               headless: true,
-              provider: playwright({}),
+              provider: playwright({ contextOptions: { colorScheme: 'dark', reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' } }),
               instances: [{ browser: 'chromium' }],
               viewport: { width: 1280, height: 800 },
+              commands: { scheme },
+              expect: {
+                toMatchScreenshot: {
+                  comparatorName: 'pixelmatch',
+                  comparatorOptions: { threshold: 0.1, includeAA: false, allowedMismatchedPixels: 0 },
+                  resolveScreenshotPath: ({ arg, ext, root }) => path.join(root, APPROVED, `${pictureFile(arg)}${ext}`),
+                  resolveDiffPath: ({ arg, ext, root, attachmentsDir }) => path.join(root, attachmentsDir, 'approved', `${pictureFile(arg)}${ext}`),
+                },
+              },
             },
           },
         },

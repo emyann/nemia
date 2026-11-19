@@ -17,7 +17,7 @@ const themesOfSpec = spec<(asked: ThemesAsked) => readonly PageTheme[]>({
   ensures: {
     darkAlwaysLast: {
       description: 'Every run visits its pages in the dark theme, and last',
-      condition: ({ output }) => output.length > 0 && output[output.length - 1] === 'dark',
+      condition: ({ output }) => output.length > 0 && output.at(output.length - 1) === 'dark',
     },
     lightExactlyWhenAsked: {
       description: 'The light theme is visited exactly when --light or --contrast asks for it, never by --photos alone',
@@ -25,7 +25,7 @@ const themesOfSpec = spec<(asked: ThemesAsked) => readonly PageTheme[]>({
     },
     eachOnce: {
       description: 'No theme is visited twice',
-      condition: ({ output }) => output.length === new Set(output).size,
+      condition: ({ output }) => output.every((theme, at) => !output.slice(0, at).includes(theme)),
     },
   },
 });

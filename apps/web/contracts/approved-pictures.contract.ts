@@ -7,7 +7,7 @@
  * off each story file), the ids the dark pictures are named by, the ids the light pictures are named by, and the canaries
  * (`LIGHT_CANARIES`). `test/approved.test.ts` refuses the folder while any list of the answer holds a value.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { type Implementation, lemma, spec } from '@emyann/tsverify';
 
 /** What the approved folder owes or holds astray, each list of story ids once each, in the order of the list it comes from. */
 export type Unapproved = {
@@ -29,6 +29,21 @@ const once = (list: readonly string[]): boolean => list.every((one, at) => !list
 /** Whether `out` holds exactly the values of `from` that `keep` keeps, and nothing else. */
 const exactly = (out: readonly string[], from: readonly string[], keep: (one: string) => boolean): boolean =>
   from.every((one) => out.includes(one) === keep(one)) && out.every((one) => from.includes(one));
+
+/** The ids of a list another does not hold, kept by `filter`, are each once where the list's were: proved once, then known at each list. */
+export const outsideOnce = lemma(
+  (from: readonly string[], among: readonly string[]) => once(from.filter((id) => !among.includes(id))),
+  { requires: (from) => once(from) },
+);
+
+/** The ids of a list another does not hold, kept by `filter`, are exactly those: proved once, then known at each list. */
+export const outsideExactly = lemma((from: readonly string[], among: readonly string[]) =>
+  exactly(
+    from.filter((id) => !among.includes(id)),
+    from,
+    (id) => !among.includes(id),
+  ),
+);
 
 const unapprovedSpec = spec<(stories: readonly string[], dark: readonly string[], light: readonly string[], canaries: readonly string[]) => Unapproved>({
   requires: ({ input: [stories, dark, light, canaries] }) => once(stories) && once(dark) && once(light) && once(canaries),

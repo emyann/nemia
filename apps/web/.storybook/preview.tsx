@@ -1,6 +1,6 @@
 /**
- * What every story of the look is drawn in, in Storybook and in `npm run stories` alike: the board's styles, the look's
- * ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
+ * What every story of the look is drawn in, in Storybook and in `npm run stories` alike: the board's styles, in the theme the toolbar
+ * picks (dark, Nemia's default, unless a person switches it: the class it sets on `<html>`, `scheme.ts`), the look's ground, and a router of its own over a history kept in memory, so a link of a story leads somewhere and moves no address but its
  * own. Where that router stands is written on the story's wrapper (`data-at`), and how many times it moved (`data-moves`). A story's
  * parameters say `at`, the address it opens on, and `scrollMark: false`, for a story nothing marks the scrolls of.
  *
@@ -15,7 +15,8 @@
  */
 import { Component, createContext, useContext, useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react';
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider, useRouter, useRouterState } from '@tanstack/react-router';
-import type { Preview } from '@storybook/react-vite';
+import type { Preview, ReactRenderer } from '@storybook/react-vite';
+import { withThemeByClassName } from '@storybook/addon-themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { mswLoader } from 'msw-storybook-addon/csf3';
 import { STORY_FINISHED, type StoryFinishedPayload } from 'storybook/internal/core-events';
@@ -26,6 +27,7 @@ import '../src/styles.css';
 import { ScanLines } from '../src/components/look';
 import { useScrollMark } from '../src/lib/useScrollMark';
 import { undrawn } from './drawn';
+import { SCHEME_CLASSES } from './scheme';
 
 /** What a story's router draws: the story, and whether its scrolls are marked. */
 type Drawn = { Story: ComponentType; marked: boolean };
@@ -124,6 +126,7 @@ const preview: Preview = {
     if (faults.length) throw new Error(`the story did not draw as it should: ${faults.join('; ')}`);
   },
   decorators: [
+    withThemeByClassName<ReactRenderer>({ themes: { ...SCHEME_CLASSES }, defaultTheme: 'dark', parentSelector: 'html' }),
     (Story, { parameters }) => {
       markFinished();
       return <Routed Story={Story} at={typeof parameters.at === 'string' ? parameters.at : '/'} marked={parameters.scrollMark !== false} />;

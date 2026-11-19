@@ -14,7 +14,7 @@ export const HOLD_DEFAULT = 600;
 export const HOLD_MOST = 1800;
 
 /** The seconds `--hold` asks for: `HOLD_DEFAULT` when it says none; refuses anything but a whole number from 1 to `HOLD_MOST`. */
-export function boundOf(arg: string | undefined): number {
+export function boundOf(arg: string | undefined) {
   if (arg === undefined) return HOLD_DEFAULT;
   const seconds = Number(arg);
   if (!/^\d+$/.test(arg) || seconds < 1 || seconds > HOLD_MOST)
@@ -28,7 +28,7 @@ export function boundOf(arg: string | undefined): number {
  * `name`, once it is a render's own name and the stack `lock` records as held. Refuses any other: the live stack, a pattern, a render
  * still in flight, or a stack that has already ended.
  */
-export function heldName(name: string, lock: Lock | undefined): string {
+export function heldName(name: string, lock: Lock | undefined) {
   if (!NAME.test(name))
     throw refusal(`--stop ${name}: not a render's container (nemia-render-<pid>-<random>); only a held render is stopped here`);
   if (lock?.name !== name || lock.held !== true)
@@ -49,7 +49,7 @@ export function heldLines(
   collector: string,
   dashboards: readonly { name: string; uid: string }[],
   picks: Picks,
-): string[] {
+) {
   return [
     `held: ${name}, until ${until.toISOString()}`,
     `stop it with: ${stopCommand(name)}`,
@@ -63,7 +63,7 @@ export function heldLines(
  * Hand the container `name` to a reaper of its own, detached so it outlives this command, which removes it after `seconds`; the slot
  * is rewritten to the reaper. Answers when the hold ends.
  */
-export function handOver(name: string, seconds: number): Date {
+export function handOver(name: string, seconds: number) {
   const reaper = spawn(process.execPath, [path.join(import.meta.dirname, 'reap.ts'), name, String(seconds)], {
     detached: true,
     stdio: 'ignore',
@@ -76,6 +76,6 @@ export function handOver(name: string, seconds: number): Date {
 }
 
 /** Stop the held stack `name`: its container removed by that name, once `heldName` lets it through. Its reaper lets the slot go. */
-export function stop(name: string, lock: Lock | undefined): void {
+export function stop(name: string, lock: Lock | undefined) {
   remove(heldName(name, lock));
 }

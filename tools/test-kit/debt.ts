@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** Every `.ts` file under `pkg`'s `dir` but the tests and `own`, by its path from `pkg`, with its text. */
-export function sourcesUnder(pkg: string, dir: string, own: readonly string[] = []): Record<string, string> {
+export function sourcesUnder(pkg: string, dir: string, own: readonly string[] = []) {
   const out: Record<string, string> = {};
   for (const entry of fs.readdirSync(path.join(pkg, dir), { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
@@ -24,11 +24,7 @@ const BINDINGS = /^[ \t]*(?:import|export)\b[^;]*?\bfrom\s*['"][^'"]*['"]\s*;?/g
  * The uses of `seam`, a global pattern, in each file of `sources` that has any, comment lines left out. With `bindings`, an import or
  * a re-export is left out too, so a seam name handed on (`run(ledgerOf)`) counts and the line that brought it does not.
  */
-export function seamUses(
-  sources: Readonly<Record<string, string>>,
-  seam: RegExp,
-  { bindings = false }: { bindings?: boolean } = {},
-): Map<string, number> {
+export function seamUses(sources: Readonly<Record<string, string>>, seam: RegExp, { bindings = false }: { bindings?: boolean } = {}) {
   const uses = new Map<string, number>();
   for (const [file, text] of Object.entries(sources)) {
     const code = (bindings ? text.replace(BINDINGS, '') : text)
@@ -45,7 +41,7 @@ export function seamUses(
 export type DebtBreak = { file: string; uses: number; owed: number; kind: 'grown' | 'fallen' | 'gone' };
 
 /** Each file whose `uses` are not what `debt` names: a file it does not name or a count grown, a count fallen, a file with none left. */
-export function debtBreaks(uses: ReadonlyMap<string, number>, debt: Readonly<Record<string, number>>): DebtBreak[] {
+export function debtBreaks(uses: ReadonlyMap<string, number>, debt: Readonly<Record<string, number>>) {
   const out: DebtBreak[] = [];
   for (const [file, n] of uses) {
     const owed = debt[file] ?? 0;

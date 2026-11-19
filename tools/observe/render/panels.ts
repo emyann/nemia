@@ -39,7 +39,7 @@ const UNIT = 38;
 const LOAD_MS = 90_000;
 
 /** `at` as Grafana's time relative to `now`, to the second: `now-90s`, `now+300s`, or `now`. */
-const relative = (at: number, now: number): string => {
+const relative = (at: number, now: number) => {
   const seconds = Math.round((at - now) / 1000);
   return seconds === 0 ? 'now' : `now${seconds > 0 ? '+' : '-'}${Math.abs(seconds)}s`;
 };
@@ -50,7 +50,7 @@ const relative = (at: number, now: number): string => {
  * only under a dashboard range that is relative, and drops it under one of two instants. Without it the two instants are written, as a
  * held stack's lines are, which a person may open long after.
  */
-export function addressOf(base: string, uid: string, picks: Picks, now?: number): string {
+export function addressOf(base: string, uid: string, picks: Picks, now?: number) {
   const query = new URLSearchParams({
     orgId: '1',
     from: now === undefined ? String(picks.from) : relative(picks.from, now),
@@ -63,20 +63,20 @@ export function addressOf(base: string, uid: string, picks: Picks, now?: number)
 }
 
 /** Every panel of `panels` that draws, a row's own among them and no row. */
-export const drawing = (panels: readonly DashboardPanel[]): DashboardPanel[] =>
+export const drawing = (panels: readonly DashboardPanel[]) =>
   panels.flatMap((panel) => (panel.type === 'row' ? drawing(panel.panels ?? []) : [panel]));
 
 /**
  * The window's height that holds every panel of `dashboard` at once, in pixels: Grafana loads a panel's data only once the window
  * reaches it, so a window shorter than the page leaves the panels below it empty.
  */
-export function heightOf(dashboard: Dashboard): number {
+export function heightOf(dashboard: Dashboard) {
   const bottom = Math.max(0, ...dashboard.panels.map((panel) => (panel.gridPos?.y ?? 0) + (panel.gridPos?.h ?? 0)));
   return Math.max(900, bottom * UNIT + 400);
 }
 
 /** What a panel draws, as lines: its bars, its series, its rows, its log lines, or its text; none when it draws nothing. */
-function drawn(panel: Seen): string[] {
+function drawn(panel: Seen) {
   if (panel.bars.length) return panel.bars.map((bar) => `bar: ${bar.name || '(no name)'} = ${bar.value}`);
   if (panel.series.length) return panel.series.map((name) => `series: ${name || '(no name)'}`);
   if (panel.header.length) return [`columns: ${panel.header.join(' | ')}`, ...panel.rows.map((row) => `row: ${row.join(' | ')}`)];
@@ -90,7 +90,7 @@ function drawn(panel: Seen): string[] {
  * The text of a dashboard's panels as it is written to a file: each its title and kind, then its error, what it draws, or `no data`,
  * and for a panel `unseeded` names by its title, why no fixture meets it.
  */
-export function written(title: string, address: string, panels: readonly Seen[], unseeded: Readonly<Record<string, string>> = {}): string {
+export function written(title: string, address: string, panels: readonly Seen[], unseeded: Readonly<Record<string, string>> = {}) {
   const blocks = panels.map((panel) => {
     const why = unseeded[panel.title];
     const shown = panel.error === undefined ? drawn(panel) : [`error: ${panel.error}`];
@@ -115,12 +115,12 @@ type Element = {
 declare const document: Element;
 
 /** Read every panel off the page, in the browser: Grafana's markup, nothing of ours. */
-function readPanels(): Omit<Seen, 'error'>[] {
+function readPanels() {
   const VALUE = '[data-testid="data-testid Bar gauge value"]';
   const CONTENT = '[data-testid$="panel content"]';
-  const all = (root: Element, selector: string): Element[] => Array.from(root.querySelectorAll(selector));
-  const said = (element: Element): string => element.innerText.replace(/\s+/g, ' ').trim();
-  const barOf = (value: Element): Bar => {
+  const all = (root: Element, selector: string) => Array.from(root.querySelectorAll(selector));
+  const said = (element: Element) => element.innerText.replace(/\s+/g, ' ').trim();
+  const barOf = (value: Element) => {
     let box = value;
     while (box.parentElement && box.parentElement.querySelectorAll(VALUE).length === 1 && !box.parentElement.matches(CONTENT))
       box = box.parentElement;
@@ -148,7 +148,7 @@ function readPanels(): Omit<Seen, 'error'>[] {
 }
 
 /** The errors of one answer of Grafana's query API, each query's own, joined. */
-function errorsOf(answer: unknown): string | undefined {
+function errorsOf(answer: unknown) {
   const results = Object.values((answer as { results?: Record<string, { error?: string }> }).results ?? {});
   const errors = results.flatMap((result) => (result.error ? [result.error] : []));
   const whole = (answer as { message?: string }).message;
@@ -160,7 +160,7 @@ function errorsOf(answer: unknown): string | undefined {
  * take the full-page picture into `picture`, and answer its panels as seen, each with the error its queries answered. Refuses, in an
  * error naming the count, a page that does not draw every panel the dashboard's file has.
  */
-export async function seen(page: Page, dashboard: Dashboard, address: string, picture: string): Promise<Seen[]> {
+export async function seen(page: Page, dashboard: Dashboard, address: string, picture: string) {
   const errors = new Map<string, string>();
   page.on('response', (response) => {
     if (!response.url().includes('/api/ds/query')) return;

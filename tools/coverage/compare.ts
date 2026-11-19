@@ -12,15 +12,17 @@ const USAGE =
   'usage: node tools/coverage/compare.ts <before.json> <after.json>, or <before.json>... -- <after.json>... (each written by node tools/coverage/record.ts)';
 
 /** The records before and after that `argv` names: two files, or each side of one `--`, each of one file or more. */
-const sidesOf = (argv: string[]): [string[], string[]] | undefined => {
+const sidesOf = (argv: string[]) => {
   const at = argv.indexOf('--');
-  if (at === -1) return argv.length === 2 ? [[argv[0]], [argv[1]]] : undefined;
+  if (at === -1) return (argv.length === 2 ? [[argv[0]], [argv[1]]] : undefined) satisfies [string[], string[]] | undefined;
   const [before, after] = [argv.slice(0, at), argv.slice(at + 1)];
-  return before.length > 0 && after.length > 0 && !after.includes('--') ? [before, after] : undefined;
+  return (before.length > 0 && after.length > 0 && !after.includes('--') ? [before, after] : undefined) satisfies
+    | [string[], string[]]
+    | undefined;
 };
 
 /** The record in `file`, or a message saying what is wrong with it. */
-const recordIn = (file: string): CoverageRecord | string => {
+const recordIn = (file: string) => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -42,7 +44,7 @@ const totals = (record: CoverageRecord) =>
   });
 
 /** One file's fall, said on a line: the file gone, or the lines it lost and its hit counts before and after. */
-const said = (fall: Fall): string => {
+const said = (fall: Fall) => {
   if (fall.gone) return `${fall.file}: gone from after (it hit ${fall.lines.before} lines, ${fall.branches.before} branches)`;
   const lines = fall.linesLost.length > 0 ? `, lines lost: ${fall.linesLost.join(', ')}` : '';
   const lost = `${lines}${fall.armsLost.length > 0 ? `, branches no test takes any more, on lines: ${fall.armsLost.join(', ')}` : ''}`;
@@ -50,13 +52,13 @@ const said = (fall: Fall): string => {
 };
 
 /** What one file's records disagree on, said on a line. */
-const varied = (v: Varying): string => {
+const varied = (v: Varying) => {
   const arms = v.armLines.length > 0 ? `${v.lines.length > 0 ? ', ' : ''}branches on lines: ${v.armLines.join(', ')}` : '';
   return `${v.file}: ${v.lines.length > 0 ? `lines: ${v.lines.join(', ')}` : ''}${arms}`;
 };
 
 /** Compares the two records `argv` names, writing what it found through `write`, and answers the exit code. */
-export const main = (argv: string[], write: (line: string) => void = console.log): number => {
+export const main = (argv: string[], write: (line: string) => void = console.log) => {
   const sides = sidesOf(argv);
   if (!sides) {
     write(USAGE);

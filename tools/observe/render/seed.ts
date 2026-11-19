@@ -36,7 +36,7 @@ export type MetricSeed = {
 };
 
 /** `metric`, seeded across a restart of the daemon (`MetricSeed`'s `restarted`). */
-const restarted = (metric: MetricSeed): MetricSeed => ({ ...metric, restarted: true });
+const restarted = (metric: MetricSeed) => ({ ...metric, restarted: true });
 
 /** What one service says in the seed: its resource's attributes beside its name, its root spans, its logs and its metrics. */
 export type ServiceSeed = {
@@ -62,10 +62,10 @@ const REVIEW = { factory: 'nemia', workflow: 'build', step: 'review', agent: 'ag
 const DESIGN = { factory: 'nemia', workflow: 'build', step: 'design', agent: 'seldon' };
 
 /** The task a step's session of the seeded run runs as. */
-const taskOf = (step: { step: string }): string => `${RUN}-${step.step}`;
+const taskOf = (step: { step: string }) => `${RUN}-${step.step}`;
 
 /** A pass that began `ago` before the stamp, with the run it advanced. */
-const pass = (ago: number, took: number, run: string): SpanSeed => ({
+const pass = (ago: number, took: number, run: string) => ({
   name: 'pass',
   ago,
   took,
@@ -74,7 +74,7 @@ const pass = (ago: number, took: number, run: string): SpanSeed => ({
 });
 
 /** A filing of `step` in the seeded run, with the runtime's appends of `kinds` under it. */
-const filing = (step: typeof IMPLEMENT, ago: number, kinds: string[]): SpanSeed => ({
+const filing = (step: typeof IMPLEMENT, ago: number, kinds: string[]) => ({
   name: 'file',
   ago,
   took: 40,
@@ -88,7 +88,7 @@ const filing = (step: typeof IMPLEMENT, ago: number, kinds: string[]): SpanSeed 
 });
 
 /** A call a harness denied `step`'s session, as the daemon's span of it. */
-const denied = (step: typeof IMPLEMENT, ago: number, tool: string, call: string): SpanSeed => ({
+const denied = (step: typeof IMPLEMENT, ago: number, tool: string, call: string) => ({
   name: 'step.denied',
   ago,
   took: 0,
@@ -96,7 +96,7 @@ const denied = (step: typeof IMPLEMENT, ago: number, tool: string, call: string)
 });
 
 /** A wait of `step` in the seeded run that ended with `outcome`. */
-const wait = (name: string, step: typeof IMPLEMENT, ago: number, took: number, outcome: string): SpanSeed => ({
+const wait = (name: string, step: typeof IMPLEMENT, ago: number, took: number, outcome: string) => ({
   name,
   ago,
   took,
@@ -107,7 +107,7 @@ const wait = (name: string, step: typeof IMPLEMENT, ago: number, took: number, o
 const ENDED = { factory: 'nemia', workflow: 'build', outcome: 'succeeded' };
 
 /** One number of the seeded run's timeline, as the daemon's span of it: `value` of `part`, on `row`, with `own` beside the run's labels. */
-const number = (of: string, row: string, part: string, value: number, own: SpanAttributes = {}): SpanSeed => ({
+const number = (of: string, row: string, part: string, value: number, own: SpanAttributes = {}) => ({
   name: 'run.timeline',
   ago: 20_000,
   took: 0,
@@ -115,7 +115,7 @@ const number = (of: string, row: string, part: string, value: number, own: SpanA
 });
 
 /** The numbers of `step`'s row `row` in the seeded run's timeline: each try's wait, run and cost, and how many tries it took. */
-const stepNumbers = (step: typeof IMPLEMENT, row: string, tries: [queued: number, ran: number, cost: number][]): SpanSeed[] => {
+const stepNumbers = (step: typeof IMPLEMENT, row: string, tries: [queued: number, ran: number, cost: number][]) => {
   const labels = { step: step.step, agent: step.agent };
   return [
     ...tries.flatMap(([queued, ran, cost], i) => [
@@ -145,7 +145,7 @@ const TIMELINE: SpanSeed[] = [
 ];
 
 /** One of the largest runs of a sweep of the store's disk, as the daemon's span of it: the run and the bytes it holds. */
-const largest = (run: string, value: number): SpanSeed => ({
+const largest = (run: string, value: number) => ({
   name: 'disk.run',
   ago: 20_000,
   took: 0,
@@ -153,7 +153,7 @@ const largest = (run: string, value: number): SpanSeed => ({
 });
 
 /** A tool call of a session's turn, by its tool, with its command when it is a Bash call that says one, and its wait on a permission. */
-const tool = (labels: Record<string, string>, ago: number, took: number, name: string, command?: string): SpanSeed => ({
+const tool = (labels: Record<string, string>, ago: number, took: number, name: string, command?: string) => ({
   name: 'claude_code.tool',
   ago,
   took,
@@ -165,7 +165,7 @@ const tool = (labels: Record<string, string>, ago: number, took: number, name: s
 });
 
 /** One turn of `step`'s session in the seeded run: a model request and five tool calls, which leave some of the turn uncovered. */
-function turn(step: typeof IMPLEMENT): SpanSeed {
+function turn(step: typeof IMPLEMENT) {
   const labels = { ...step, run: RUN, task: taskOf(step) };
   return {
     name: 'claude_code.interaction',
@@ -184,7 +184,7 @@ function turn(step: typeof IMPLEMENT): SpanSeed {
 }
 
 /** A failed `tool_result` of `step`'s session: `count` of them, by `name` when the event says its tool, with its parameters when given. */
-const failed = (step: typeof IMPLEMENT, count: number, name?: string, parameters?: string): LogSeed[] =>
+const failed = (step: typeof IMPLEMENT, count: number, name?: string, parameters?: string) =>
   Array.from({ length: count }, (_, i) => ({
     body: 'claude_code.tool_result',
     ago: 40_000 - i * 1_000,
@@ -200,20 +200,20 @@ const failed = (step: typeof IMPLEMENT, count: number, name?: string, parameters
   }));
 
 /** A metric kept by step: each of `values` a series of `IMPLEMENT` or `REVIEW` with an outcome. */
-const bySteps = (name: string, kind: MetricSeed['kind'], values: [typeof IMPLEMENT, string, number][]): MetricSeed => ({
+const bySteps = (name: string, kind: MetricSeed['kind'], values: [typeof IMPLEMENT, string, number][]) => ({
   name,
   kind,
   series: values.map(([step, outcome, value]) => [{ ...step, outcome }, value]),
 });
 
 /** A metric with one series and no attribute. */
-const lone = (name: string, kind: MetricSeed['kind'], value: number): MetricSeed => ({ name, kind, series: [[{}, value]] });
+const lone = (name: string, kind: MetricSeed['kind'], value: number) => ({ name, kind, series: [[{}, value]] });
 
 /** A step whose sessions the seed counts by kind of token and by task beside the two it tells of: a third agent for the Spending bars. */
 const PLAN = { factory: 'nemia', workflow: 'intake', step: 'plan', agent: 'iris' };
 
 /** A count of what three steps' sessions settled `done`: IMPLEMENT's, REVIEW's and PLAN's, in that order. */
-const done = (name: string, values: [number, number, number]): MetricSeed =>
+const done = (name: string, values: [number, number, number]) =>
   bySteps(
     name,
     'total',
@@ -221,7 +221,7 @@ const done = (name: string, values: [number, number, number]): MetricSeed =>
   );
 
 /** A metric kept by a step's four labels and no outcome, as `step.tasks` is: each of `values` a series. */
-const byKeys = (name: string, values: [typeof IMPLEMENT, number][]): MetricSeed => ({ name, kind: 'total', series: values });
+const byKeys = (name: string, values: [typeof IMPLEMENT, number][]) => ({ name, kind: 'total', series: values });
 
 /** What the daemon says in the seed. */
 const DAEMON: ServiceSeed = {
@@ -376,7 +376,7 @@ const DAEMON: ServiceSeed = {
 };
 
 /** What `step`'s session says in the seed, and the failed `tool_result` events it is given. */
-const session = (step: typeof IMPLEMENT, logs: LogSeed[]): ServiceSeed => ({
+const session = (step: typeof IMPLEMENT, logs: LogSeed[]) => ({
   service: SESSIONS,
   resource: { ...step, run: RUN, task: taskOf(step) },
   spans: [turn(step)],
@@ -426,28 +426,28 @@ const POINT_GAP_MS = 15_000;
 const BOUNDS = [10, 100, 1_000, 10_000, 100_000, 1_000_000];
 
 /** `ms` since the epoch as OTLP's nanoseconds. */
-const nanos = (ms: number): string => `${Math.round(ms)}000000`;
+const nanos = (ms: number) => `${Math.round(ms)}000000`;
 
 /** `attributes` as OTLP's list of values: a word a string's, a number a double's. */
-const listed = (attributes: SpanAttributes): { key: string; value: { stringValue: string } | { doubleValue: number } }[] =>
+const listed = (attributes: SpanAttributes) =>
   Object.entries(attributes).map(([key, value]) => ({
     key,
     value: typeof value === 'number' ? { doubleValue: value } : { stringValue: value },
   }));
 
 /** A resource of `service`, with its own attributes. */
-const resourceOf = (seed: ServiceSeed): { attributes: ReturnType<typeof listed> } => ({
+const resourceOf = (seed: ServiceSeed) => ({
   attributes: listed({ 'service.name': seed.service, ...seed.resource }),
 });
 
 /** Hex ids that differ at each call, `width` characters, from a counter of the stamp's own. */
-const ids = (now: number): ((width: number) => string) => {
+const ids = (now: number) => {
   let next = 0;
   return (width) => (BigInt(now) * 1_000_000n + BigInt((next += 1))).toString(16).padStart(width, '0').slice(-width);
 };
 
 /** `span` and every span under it as OTLP spans of one trace, stamped against `now`. */
-function spansOf(span: SpanSeed, now: number, id: (width: number) => string, traceId = id(32), parentSpanId?: string): object[] {
+function spansOf(span: SpanSeed, now: number, id: (width: number) => string, traceId = id(32), parentSpanId?: string) {
   const spanId = id(16);
   const start = now - span.ago;
   const own = {
@@ -471,7 +471,7 @@ const RESTART = Math.floor(POINTS / 2);
  * history where it is `sampled`; a series `restarted` grows to it twice, from zero at the first sample and again at `RESTART`, its
  * second process started there.
  */
-function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value: number, now: number): object[] {
+function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value: number, now: number) {
   const { kind, sampled } = metric;
   if (sampled)
     return Array.from({ length: sampled.count }, (_, i) => {
@@ -497,7 +497,7 @@ function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value:
 }
 
 /** One metric of the seed as OTLP's, stamped against `now`. */
-function metricOf(metric: MetricSeed, now: number): object {
+function metricOf(metric: MetricSeed, now: number) {
   const dataPoints = metric.series.flatMap(([attributes, value]) => pointsOf(metric, attributes, value, now));
   if (metric.kind === 'gauge') return { name: metric.name, unit: '1', gauge: { dataPoints } };
   if (metric.kind === 'histogram') return { name: metric.name, histogram: { aggregationTemporality: 2, dataPoints } };
@@ -505,7 +505,7 @@ function metricOf(metric: MetricSeed, now: number): object {
 }
 
 /** The seed as the three OTLP/HTTP JSON bodies a collector takes, every time in it counted back from `now`, milliseconds. */
-export function stamped(seed: readonly ServiceSeed[], now: number): { traces: object; logs: object; metrics: object } {
+export function stamped(seed: readonly ServiceSeed[], now: number) {
   const id = ids(now);
   const scope = { name: 'seed' };
   return {
@@ -544,7 +544,7 @@ export function stamped(seed: readonly ServiceSeed[], now: number): { traces: ob
  * Post the seed, stamped now, to the collector at `otlp`, its histories first (`Sampled`), oldest sample first; the stamp, milliseconds
  * since the epoch.
  */
-export async function post(otlp: string, seed: readonly ServiceSeed[] = SEED): Promise<number> {
+export async function post(otlp: string, seed: readonly ServiceSeed[] = SEED) {
   const now = Date.now();
   const only = (history: boolean) => seed.map((s) => ({ ...s, metrics: s.metrics.filter((m) => (m.sampled !== undefined) === history) }));
   await asked(`${otlp}/v1/metrics`, stamped(only(true), now).metrics);
@@ -565,7 +565,7 @@ const LONGEST_STEP_MS = 5 * 60_000;
  * The picks of a seed stamped `seededAt` and looked at `now`: from a quarter of an hour before the stamp to the first multiple of
  * `LONGEST_STEP_MS` after now, so that a chart stepped that far has a point after the seed; the seeded run, every session.
  */
-export const picks = (seededAt: number, now: number): Picks => ({
+export const picks = (seededAt: number, now: number) => ({
   from: seededAt - 15 * 60_000,
   to: Math.ceil(now / LONGEST_STEP_MS) * LONGEST_STEP_MS,
   run: RUN,
@@ -579,11 +579,11 @@ export const ARRIVAL_SECONDS = 180;
 type Arrival = { what: string; path: () => string; there: (answer: unknown) => boolean };
 
 /** The first number an instant query's vector holds, 0 when it holds none. */
-const firstValue = (answer: unknown): number =>
+const firstValue = (answer: unknown) =>
   Number((answer as { data?: { result?: { value?: [number, string] }[] } }).data?.result?.[0]?.value?.[1] ?? 0);
 
 /** An instant query of the store `uid`, asked now. */
-const instant = (uid: string, api: string, query: string) => (): string => `${uid}/${api}?query=${encodeURIComponent(query)}`;
+const instant = (uid: string, api: string, query: string) => () => `${uid}/${api}?query=${encodeURIComponent(query)}`;
 
 /** The questions that say the seed arrived: a daemon's metric, its denied calls and its timeline, a log, and Tempo's span metrics. */
 const ARRIVALS: Arrival[] = [
@@ -627,13 +627,8 @@ const GREW: Arrival = {
  * panel reads its increase: so once the series is there, the sessions' turns are posted to `otlp` a second time, and the wait ends
  * when the increase is above zero.
  */
-export async function arrived(
-  grafana: string,
-  otlp: string,
-  seed: readonly ServiceSeed[] = SEED,
-  seconds = ARRIVAL_SECONDS,
-): Promise<void> {
-  const wait = ({ what, path, there }: Arrival): Promise<boolean> =>
+export async function arrived(grafana: string, otlp: string, seed: readonly ServiceSeed[] = SEED, seconds = ARRIVAL_SECONDS) {
+  const wait = ({ what, path, there }: Arrival) =>
     awaited(what, seconds, async () => (there(await asked(`${grafana}/api/datasources/proxy/uid/${path()}`)) ? true : undefined));
   for (const arrival of ARRIVALS) await wait(arrival);
   const sessions = seed.filter((s) => s.service === SESSIONS).map((s) => ({ ...s, logs: [], metrics: [] }));

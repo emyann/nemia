@@ -16,13 +16,13 @@ import { NAME, refusal, remove, sleep } from './stack.ts';
 export type Lock = { pid: number; name: string; held?: boolean; until?: string };
 
 /** The command a person or a step stops a held stack with. */
-export const stopCommand = (name: string): string => `node tools/observe/render/render.ts --stop ${name}`;
+export const stopCommand = (name: string) => `node tools/observe/render/render.ts --stop ${name}`;
 
 /** Where the lock is. */
-export const lockFile = (): string => process.env.NEMIA_RENDER_LOCK || path.join(os.tmpdir(), 'nemia-render.lock');
+export const lockFile = () => process.env.NEMIA_RENDER_LOCK || path.join(os.tmpdir(), 'nemia-render.lock');
 
 /** The lock the file at `file` holds, or undefined when there is none or it does not read. */
-function lockAt(file: string): Lock | undefined {
+function lockAt(file: string) {
   try {
     const lock = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Lock>;
     return typeof lock.pid === 'number' && typeof lock.name === 'string' ? (lock as Lock) : undefined;
@@ -32,10 +32,10 @@ function lockAt(file: string): Lock | undefined {
 }
 
 /** The lock as it is on disk, or undefined when there is none or it does not read. */
-export const locked = (): Lock | undefined => lockAt(lockFile());
+export const locked = () => lockAt(lockFile());
 
 /** Whether a process `pid` is there, one of another user's included. */
-function alive(pid: number): boolean {
+function alive(pid: number) {
   try {
     process.kill(pid, 0);
     return true;
@@ -45,7 +45,7 @@ function alive(pid: number): boolean {
 }
 
 /** Who holds the slot, said for a person: the container, the process, and for a held stack when it ends and how to stop it. */
-const holderOf = (lock: Lock): string =>
+const holderOf = (lock: Lock) =>
   lock.held
     ? `${lock.name}, a stack held up until ${lock.until ?? 'its bound'} (stop it with \`${stopCommand(lock.name)}\`)`
     : `${lock.name}, a render in flight (pid ${lock.pid})`;
@@ -54,7 +54,7 @@ const holderOf = (lock: Lock): string =>
  * Put back the lock of `moved`, a live holder's, from `aside`, where it was moved as stale. Refuses, leaving the lock in place, when
  * another render placed its own between the move and the put-back: it names the holder now without the slot and the one holding it.
  */
-function putBack(aside: string, moved: Lock): void {
+function putBack(aside: string, moved: Lock) {
   try {
     fs.linkSync(aside, lockFile());
   } catch (err) {
@@ -76,7 +76,7 @@ function putBack(aside: string, moved: Lock): void {
  * Returns undefined when the slot may be tried again at once (the lock moved, put back or already gone), else the code of the error
  * that kept the lock from being moved, which stays where it is. Refuses as `putBack` does.
  */
-export function dropStale(): string | undefined {
+export function dropStale() {
   const aside = `${lockFile()}.stale-${process.pid}`;
   try {
     fs.renameSync(lockFile(), aside);
@@ -98,7 +98,7 @@ export function dropStale(): string | undefined {
  * Put the lock there with `text` in it, in one step: written to a file of this process's own and linked to the lock's path, so the
  * lock is never there without its content and another render never reads one half written. False when a lock is there already.
  */
-function placed(text: string): boolean {
+function placed(text: string) {
   const own = `${lockFile()}.own-${process.pid}`;
   fs.writeFileSync(own, text);
   try {
@@ -116,7 +116,7 @@ function placed(text: string): boolean {
  * Why a wait of `waitSeconds` ended with the slot not taken: held by the live `lock`, or, when `stuck` names the code of a move that
  * failed, a lock this user cannot move, named with its holder and its file.
  */
-function unfreed(lock: Lock | undefined, stuck: string | undefined, waitSeconds: number): string {
+function unfreed(lock: Lock | undefined, stuck: string | undefined, waitSeconds: number) {
   if (stuck !== undefined || lock === undefined)
     return (
       `this machine's one render slot is held by a lock this user cannot move (${stuck ?? 'it does not read'}), at ${lockFile()}, ` +
@@ -134,7 +134,7 @@ function unfreed(lock: Lock | undefined, stuck: string | undefined, waitSeconds:
  * holder and how to wait longer, when the wait ends with the slot still held; naming the holder and the file, when it ends on a lock
  * this user cannot move.
  */
-export async function take(name: string, waitSeconds: number): Promise<void> {
+export async function take(name: string, waitSeconds: number) {
   const began = performance.now();
   const mine = JSON.stringify({ pid: process.pid, name } satisfies Lock);
   for (;;) {
@@ -151,7 +151,7 @@ export async function take(name: string, waitSeconds: number): Promise<void> {
 }
 
 /** Hand the slot of the container `name` to the reaper `pid` of its held stack, which ends at `until`; nothing when another holds it. */
-export function handTo(name: string, pid: number, until: Date): void {
+export function handTo(name: string, pid: number, until: Date) {
   if (locked()?.name !== name) return;
   const next = `${lockFile()}.next-${process.pid}`;
   fs.writeFileSync(next, JSON.stringify({ pid, name, held: true, until: until.toISOString() } satisfies Lock));
@@ -159,6 +159,6 @@ export function handTo(name: string, pid: number, until: Date): void {
 }
 
 /** Let the slot go, only when it is the container `name` that holds it. */
-export function release(name: string): void {
+export function release(name: string) {
   if (locked()?.name === name) fs.rmSync(lockFile(), { force: true });
 }

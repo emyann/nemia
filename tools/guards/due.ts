@@ -34,20 +34,20 @@ export type Due = { due: true; why: string } | { due: false; why: string };
 
 type Pattern = { input: string; negated: boolean; matches: (file: string) => boolean };
 
-const escape = (text: string): string => text.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+const escape = (text: string) => text.replace(/[.+^${}()|[\]\\]/g, '\\$&');
 
 /** A segment's regular expression, or `undefined` for a shape this file does not read. */
-const segmentOf = (segment: string, last: boolean): string | undefined => {
+const segmentOf = (segment: string, last: boolean) => {
   if (segment === '**') return last ? '.+' : undefined;
   if (segment === '' || segment === '.' || segment === '..' || /[?[\]{}!]/.test(segment) || segment.includes('**')) return undefined;
   return segment.split('*').map(escape).join('[^/]*');
 };
 
 /** An input as a pattern over the repository's paths; throws when its shape is one this file does not read. */
-export const patternOf = (input: string, folder = GUARDS): Pattern => {
+export const patternOf = (input: string, folder = GUARDS) => {
   const negated = input.startsWith('!');
   const body = negated ? input.slice(1) : input;
-  const refused = (): Error =>
+  const refused = () =>
     new Error(
       `${TASK}'s input ${JSON.stringify(input)} in turbo.json has a shape tools/guards/due.ts does not read. Rewrite it as ` +
         'a folder ending in /** (dir/**), a plain file, or with * inside one segment (apps/*/src/**); list two inputs instead of {a,b}.',
@@ -59,14 +59,14 @@ export const patternOf = (input: string, folder = GUARDS): Pattern => {
   if (parts.some((part) => part === undefined)) throw refused();
   const last = segments[segments.length - 1] === '**';
   const regex = last ? new RegExp(`^${parts.slice(0, -1).join('/')}${parts.length > 1 ? '/' : ''}.+$`) : new RegExp(`^${parts.join('/')}$`);
-  return { input, negated, matches: (file) => regex.test(file) };
+  return { input, negated, matches: (file) => regex.test(file) } satisfies Pattern;
 };
 
 /**
  * Whether `changed` is due the guards' suite: a path some positive input names and no negated one, or a path under one of `folders`
  * (the dependencies' folders, from the root). Throws on an input of a shape it does not read, before reading any path.
  */
-export const dueOf = (changed: readonly string[], inputs: readonly string[], folders: readonly string[], folder = GUARDS): Due => {
+export const dueOf = (changed: readonly string[], inputs: readonly string[], folders: readonly string[], folder = GUARDS) => {
   const patterns = inputs.map((input) => patternOf(input, folder));
   const positives = patterns.filter((p) => !p.negated);
   const negatives = patterns.filter((p) => p.negated);
@@ -85,10 +85,10 @@ export const dueOf = (changed: readonly string[], inputs: readonly string[], fol
 
 type Manifest = { name?: string; workspaces?: string[]; dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
 
-const readJson = <T>(file: string): T => JSON.parse(fs.readFileSync(file, 'utf8')) as T;
+const readJson = <T>(file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as T;
 
 /** The folders a root `package.json` workspace names: each folder of `dir` for `dir/*`, else the folder itself. */
-const foldersOf = (root: string, glob: string): string[] => {
+const foldersOf = (root: string, glob: string) => {
   const dir = glob.endsWith('/*') ? glob.slice(0, -2) : glob;
   if (/[*?[{]/.test(dir))
     throw new Error(`The root package.json's workspace ${JSON.stringify(glob)} is not a dir/* or a folder: write it as one.`);
@@ -97,7 +97,7 @@ const foldersOf = (root: string, glob: string): string[] => {
 };
 
 /** Each workspace package's folder by its name, from the root `package.json`'s `workspaces` (each `dir/*`). */
-const workspacesOf = (root: string): Map<string, string> => {
+const workspacesOf = (root: string) => {
   const folders = new Map<string, string>();
   for (const glob of readJson<Manifest>(path.join(root, 'package.json')).workspaces ?? []) {
     for (const candidate of foldersOf(root, glob)) {
@@ -110,9 +110,9 @@ const workspacesOf = (root: string): Map<string, string> => {
 };
 
 /** The folders of the workspace packages `tools/guards` depends on, followed through their own dependencies. */
-export const dependencyFolders = (root: string): string[] => {
+export const dependencyFolders = (root: string) => {
   const workspaces = workspacesOf(root);
-  const namesOf = (manifest: Manifest): string[] =>
+  const namesOf = (manifest: Manifest) =>
     [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})].filter((n) => workspaces.has(n));
   const seen = new Set<string>();
   const queue = namesOf(readJson<Manifest>(path.join(root, GUARDS, 'package.json')));
@@ -128,7 +128,7 @@ export const dependencyFolders = (root: string): string[] => {
 const SHA = /^[0-9a-f]{7,64}$/;
 
 /** The range the event names, or why it names none this file can trust (which makes it due). */
-export const rangeOf = (env: NodeJS.ProcessEnv): { range: string } | { none: string } => {
+export const rangeOf = (env: NodeJS.ProcessEnv) => {
   const event = env.GITHUB_EVENT_NAME ?? '';
   if (event === 'pull_request') {
     const base = env.BASE ?? '';
@@ -147,12 +147,12 @@ export const rangeOf = (env: NodeJS.ProcessEnv): { range: string } | { none: str
 };
 
 /** Throws on an input of a shape this file does not read, before any range is read: refused whatever the range is. */
-const refuseUnread = (inputs: readonly string[]): void => {
+const refuseUnread = (inputs: readonly string[]) => {
   for (const input of inputs) patternOf(input);
 };
 
 /** The answer for the repository at `root` under `env`: what git says changed, read against the guards' inputs. */
-const decide = (root: string, env: NodeJS.ProcessEnv): Due => {
+const decide = (root: string, env: NodeJS.ProcessEnv) => {
   const tasks = readJson<{ tasks?: Record<string, { inputs?: string[] }> }>(path.join(root, 'turbo.json')).tasks ?? {};
   const inputs = tasks[TASK]?.inputs;
   if (inputs === undefined)

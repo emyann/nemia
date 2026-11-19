@@ -7,7 +7,7 @@ import { Effect } from 'effect';
 import type { Fence } from './fence.ts';
 
 /** The run records (`runs/<id>.json`) read through `fs.readFileSync` while `read` ran, and what it answered. */
-export async function recordsReadBy<T>(read: () => Promise<T>): Promise<{ value: T; records: number }> {
+export async function recordsReadBy<T>(read: () => Promise<T>) {
   const original = fs.readFileSync;
   let records = 0;
   fs.readFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
@@ -47,7 +47,7 @@ const PASS_VERBS = new Set([
  * observed or stopped by it; and every verb but `PASS_VERBS` is refused, kept among the fence's refusals, since one may reach a live
  * session (`answer`, `say`, `close`) or run the runtime (`up`).
  */
-export function passEngine<E extends Record<string, unknown>>(e: E, fence: Fence): E {
+export function passEngine<E extends Record<string, unknown>>(e: E, fence: Fence) {
   const wrapped: Record<string, unknown> = { ...e };
   for (const [verb, value] of Object.entries(e)) {
     if (typeof value !== 'function' || PASS_VERBS.has(verb)) continue;

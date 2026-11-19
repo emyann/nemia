@@ -18,7 +18,7 @@ const REPO = path.resolve(import.meta.dirname, '..', '..');
 const USAGE = 'usage: node tools/coverage/record.ts <package-dir> --out <file.json>';
 
 /** The package folder and the record's path from the command's arguments, or undefined when they are not the two it takes. */
-const argsOf = (argv: string[]): { dir: string; out: string } | undefined => {
+const argsOf = (argv: string[]) => {
   const at = argv.indexOf('--out');
   if (at === -1 || at + 1 >= argv.length) return undefined;
   const rest = argv.filter((_, i) => i !== at && i !== at + 1);
@@ -26,7 +26,7 @@ const argsOf = (argv: string[]): { dir: string; out: string } | undefined => {
 };
 
 /** The `test` script and name of the package in `dir`, or a message saying what to fix. */
-const scriptOf = (dir: string): { name: string; script: string } | string => {
+const scriptOf = (dir: string) => {
   const file = path.join(dir, 'package.json');
   if (!fs.existsSync(file)) return `no package.json in ${dir}: give the folder of a package, as packages/agent-orchestrator`;
   const pkg = JSON.parse(fs.readFileSync(file, 'utf8')) as { name?: string; scripts?: { test?: string } };
@@ -36,7 +36,7 @@ const scriptOf = (dir: string): { name: string; script: string } | string => {
 };
 
 /** Runs the command for `argv` and answers its exit code: the suite's, or 2 when it could not be run as asked. */
-export const main = (argv: string[]): number => {
+export const main = (argv: string[]) => {
   const args = argsOf(argv);
   if (!args) {
     console.error(USAGE);

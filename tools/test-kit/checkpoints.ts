@@ -41,7 +41,7 @@ export type Story<T> = {
  */
 export function story(test: TestAPI): Story<TestContext>;
 export function story<T extends Skips>(test: Teller<T>): Story<T>;
-export function story<T extends Skips>(test: Teller<T>): Story<T> {
+export function story<T extends Skips>(test: Teller<T>) {
   let failed: string | undefined;
   return {
     test: (name, body) => {
@@ -59,7 +59,7 @@ export function story<T extends Skips>(test: Teller<T>): Story<T> {
       });
     },
     failed: () => failed,
-  };
+  } satisfies Story<T>;
 }
 
 /** What a helper that tears down what it made reads of a test, or of a `describe`'s setup (`Held`): where it files the teardown. */
@@ -77,7 +77,7 @@ export type Held = {
  * A holder for what a `describe`'s setup tears down: a test whose subtests became a `describe` filed its teardowns on its own
  * context, which a `beforeAll` has not; it files them here, and returns `end`, which Vitest runs after the describe's last test.
  */
-export function teardowns(): Held {
+export function teardowns() {
   const fns: ((...args: never[]) => unknown)[] = [];
   return {
     onTestFinished: (fn) => {
@@ -86,7 +86,7 @@ export function teardowns(): Held {
     end: async () => {
       for (const fn of fns.splice(0)) await fn();
     },
-  };
+  } satisfies Held;
 }
 
 /**
@@ -94,7 +94,7 @@ export function teardowns(): Held {
  * teardown filed on it runs once the describe's tests are done (its `afterAll`, which this files), and its `signal` aborts then.
  * Called in the describe's body.
  */
-export function outlived(): Held & { signal: AbortSignal } {
+export function outlived() {
   const held = teardowns();
   const control = new AbortController();
   afterAll(async () => {
@@ -110,7 +110,7 @@ export function outlived(): Held & { signal: AbortSignal } {
  * checkpoints, under `node:test` subtests of one test, shared one clock.
  * @param now the moment the describe's first test starts at, in milliseconds since the epoch.
  */
-export function heldDate(now: number): void {
+export function heldDate(now: number) {
   let at = now;
   beforeAll(() => {
     vi.useFakeTimers({ toFake: ['Date'], now: at });

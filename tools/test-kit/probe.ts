@@ -5,7 +5,7 @@
  *
  * Every workspace's tests take it from here, `test-kit/probe`.
  */
-import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { REPO } from './repo.ts';
@@ -24,7 +24,7 @@ const RUNNERS = ['VITEST', 'VITEST_MODE', 'VITEST_POOL_ID', 'VITEST_WORKER_ID', 
  * @param setupFiles the absolute paths of the setup files loaded before each file, in order: a workspace's seat
  * @param env the environment the probe runs under
  */
-export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessEnv): SpawnSyncReturns<string> {
+export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessEnv) {
   fs.writeFileSync(
     path.join(dir, 'vitest.config.mjs'),
     `export default { test: { include: ['*.test.mjs'], globals: true, pool: 'forks', setupFiles: ${JSON.stringify(setupFiles)} } };\n`,
@@ -39,7 +39,7 @@ export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessE
  *
  * @param env the environment a child Vitest is to run under
  */
-export function runnerless(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function runnerless(env: NodeJS.ProcessEnv) {
   const given = { ...env };
   for (const name of RUNNERS) delete given[name];
   delete given.FORCE_COLOR;
@@ -57,7 +57,7 @@ export function runnerless(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  * @param files the files to run, from `root`
  * @param setupFiles the setup files loaded before each, from `root`
  */
-export function vitestOver(configDir: string, root: string, files: string[], setupFiles: string[] = []): string[] {
+export function vitestOver(configDir: string, root: string, files: string[], setupFiles: string[] = []) {
   const config = path.join(configDir, 'vitest.config.mjs');
   fs.writeFileSync(
     config,

@@ -24,7 +24,7 @@ export interface Ran {
 }
 
 /** Runs one tsverify command from `root`, its report copied onto this process's output as it comes, and answers what it left. */
-const tsverify = (root: string, args: string[]): Promise<Ran> =>
+const tsverify = (root: string, args: string[]) =>
   new Promise((resolve) => {
     const child = spawn(path.join(root, 'node_modules', '.bin', 'tsverify'), args, { cwd: root, stdio: ['inherit', 'pipe', 'inherit'] });
     const chunks: Buffer[] = [];
@@ -34,19 +34,19 @@ const tsverify = (root: string, args: string[]): Promise<Ran> =>
     });
     child.on('error', () => resolve({ status: 3, output: Buffer.concat(chunks).toString('utf8') }));
     child.on('close', (code) => resolve({ status: code ?? 3, output: Buffer.concat(chunks).toString('utf8') }));
-  });
+  }) satisfies Promise<Ran>;
 
 /** tsverify's marks of a verdict that is not `proved` (its `docs/verdicts.md`, *A line per contract*): ✓ alone is proved. */
 const UNPROVED = '✗⊘◐○~?!';
 
-const indent = (line: string): number => line.length - line.trimStart().length;
+const indent = (line: string) => line.length - line.trimStart().length;
 
 /**
  * Every contract a tsverify report did not prove, each as the lines it printed for it: the file's line, then the contract's (two
  * spaces in, its mark first) and every line under it. A contract is not proved when its mark is not ✓, or when a line under it opens
  * on a mark of a verdict that is not proved (an obligation, a division); a note under a proved law opens on none.
  */
-export const unproved = (report: string): string[][] => {
+export const unproved = (report: string) => {
   const lines = report.split(/\r?\n/);
   const found: string[][] = [];
   let file: string | undefined;
@@ -66,7 +66,7 @@ export const unproved = (report: string): string[][] => {
 };
 
 /** The closing section: for each command that exited non-zero, the contracts it did not prove, repeated from above. */
-export const closing = (failed: readonly { readonly args: readonly string[]; readonly ran: Ran }[]): string[] => {
+export const closing = (failed: readonly { readonly args: readonly string[]; readonly ran: Ran }[]) => {
   if (failed.length === 0) return [];
   const out = ['', '── not proved, repeated from above: each contract tsverify did not prove, with its fix ──'];
   for (const { args, ran } of failed) {
@@ -87,7 +87,7 @@ export const main = async (
   root: string,
   write: (line: string) => void = console.log,
   run: (root: string, args: string[]) => Promise<Ran> = tsverify,
-): Promise<number> => {
+) => {
   const [leg, ...extra] = argv;
   if (extra.length > 0 || (leg !== undefined && !isLeg(leg))) {
     write(USAGE);

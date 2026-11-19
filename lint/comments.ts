@@ -56,10 +56,10 @@ const STATEMENTS = new Set(['FunctionDeclaration', 'TSDeclareFunction', 'ClassDe
 const MODULE_LEVEL = new Set(['Program', 'ExportNamedDeclaration', 'ExportDefaultDeclaration', 'TSModuleBlock']);
 
 /** Whether `comment` is a JSDoc: `/**` and at least one character before `*\/`. */
-const isJSDoc = (comment: Comment): boolean => comment.type === 'Block' && comment.value.startsWith('*') && comment.value !== '*';
+const isJSDoc = (comment: Comment) => comment.type === 'Block' && comment.value.startsWith('*') && comment.value !== '*';
 
 /** Whether a JSDoc sits where one documents something: at the head of the file, or on a declaration or a member. */
-function isPlaced(context: Context, comment: Comment): boolean {
+function isPlaced(context: Context, comment: Comment) {
   const { sourceCode } = context;
   if (!sourceCode.getTokenBefore(comment)) return true;
   const token = sourceCode.getTokenAfter(comment);
@@ -71,7 +71,7 @@ function isPlaced(context: Context, comment: Comment): boolean {
 }
 
 /** A comment's words on one line: a JSDoc's leading `*` taken off each line, and every run of white space made one space. */
-const prose = (comment: Comment): string => comment.value.replace(/\n\s*\*?/g, ' ').replace(/\s+/g, ' ');
+const prose = (comment: Comment) => comment.value.replace(/\n\s*\*?/g, ' ').replace(/\s+/g, ' ');
 
 /** The words that date a comment or tie it to a run's history, each with what it matched. */
 const HISTORY: { pattern: RegExp; what: string }[] = [

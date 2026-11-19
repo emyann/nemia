@@ -29,11 +29,11 @@ import { arrived, picks, post, UNSEEDED, type Picks } from './seed.ts';
 import { lateBind, nameOf, portsOf, ready, remove, runArgv, start, type Compose } from './stack.ts';
 
 /** The reasons `UNSEEDED` gives for the panels of the dashboard `name`, by a panel's title. */
-const unseededOf = (name: string): Record<string, string> =>
+const unseededOf = (name: string) =>
   Object.fromEntries(UNSEEDED.filter((entry) => entry.dashboard === name).map((entry) => [entry.panel, entry.why]));
 
 /** Open each of `dashboards` on the Grafana at `grafana` and write its picture and its text into `out`; the files written. */
-async function pictured(browser: Browser, grafana: string, dashboards: readonly Named[], at: Picks, out: string): Promise<string[]> {
+async function pictured(browser: Browser, grafana: string, dashboards: readonly Named[], at: Picks, out: string) {
   fs.mkdirSync(out, { recursive: true });
   const files: string[] = [];
   for (const { name, uid, file } of dashboards) {
@@ -53,7 +53,7 @@ async function pictured(browser: Browser, grafana: string, dashboards: readonly 
  * Start the stack `name` of the plan's checkout, seed it, and picture `dashboards`; then hold it when the plan says so. Whether it is
  * held.
  */
-async function rendered(plan: Plan, name: string, dashboards: readonly Named[], say: (line: string) => void): Promise<boolean> {
+async function rendered(plan: Plan, name: string, dashboards: readonly Named[], say: (line: string) => void) {
   const compose = yaml.load(fs.readFileSync(path.join(plan.observe, 'compose.yaml'), 'utf8')) as Compose;
   start(runArgv(compose, plan.observe, name, [lateBind(compose, name)]));
   const ports = portsOf(name);
@@ -80,7 +80,7 @@ async function rendered(plan: Plan, name: string, dashboards: readonly Named[], 
 }
 
 /** The whole command over `argv`: its exit code, every line said through `say`. */
-async function main(argv: readonly string[], say: (line: string) => void): Promise<number> {
+async function main(argv: readonly string[], say: (line: string) => void) {
   const plan = planOf(argv);
   if (plan.stop !== undefined) {
     stop(plan.stop, locked());
@@ -91,7 +91,7 @@ async function main(argv: readonly string[], say: (line: string) => void): Promi
   const name = nameOf();
   await take(name, plan.wait);
   let held = false;
-  const drop = (): void => {
+  const drop = () => {
     if (held) return;
     remove(name);
     release(name);

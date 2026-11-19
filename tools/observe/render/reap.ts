@@ -21,7 +21,7 @@ const waiting = spawn('docker', ['wait', name], { stdio: 'ignore' });
 let ended = false;
 
 /** End once: remove the container when `gone` does not say it already is, stop waiting, and let the slot go. */
-function end(gone: boolean): void {
+function end(gone: boolean) {
   if (ended) return;
   ended = true;
   if (!gone) remove(name);

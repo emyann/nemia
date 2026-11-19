@@ -25,7 +25,7 @@ const VALUED = ['--dashboards', '--out', '--observe', '--wait', '--stop'];
 const USAGE = 'render.ts [--dashboards <name,…>] [--out <dir>] [--observe <dir>] [--wait <seconds>] [--hold [<seconds>]] | --stop <name>';
 
 /** The flags of `argv` with their values; refuses a word that is no flag of the command, and a flag left without its value. */
-function flagsOf(argv: readonly string[]): Map<string, string | undefined> {
+function flagsOf(argv: readonly string[]) {
   const flags = new Map<string, string | undefined>();
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -39,7 +39,7 @@ function flagsOf(argv: readonly string[]): Map<string, string | undefined> {
 }
 
 /** The plan `argv` asks for, the files going to `env.WF_ARTIFACTS` when a run gives one; refuses what `flagsOf` and `boundOf` refuse. */
-export function planOf(argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Plan {
+export function planOf(argv: readonly string[], env: NodeJS.ProcessEnv = process.env) {
   const flags = flagsOf(argv);
   const observe = path.resolve(flags.get('--observe') ?? OBSERVE);
   const wait = flags.get('--wait') ?? String(WAIT_DEFAULT);
@@ -55,7 +55,7 @@ export function planOf(argv: readonly string[], env: NodeJS.ProcessEnv = process
 }
 
 /** The dashboards of `observe` the plan asks for, every one when it names none; refuses a name no file has, listing those there are. */
-export function dashboardsOf(observe: string, asked?: readonly string[]): Named[] {
+export function dashboardsOf(observe: string, asked?: readonly string[]) {
   const dir = path.join(observe, 'dashboards');
   const names = fs.readdirSync(dir).flatMap((file) => (file.endsWith('.json') ? [file.slice(0, -'.json'.length)] : []));
   const unknown = (asked ?? []).filter((name) => !names.includes(name));

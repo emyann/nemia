@@ -200,7 +200,7 @@ function aRefusedRun(id: string) {
  * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a poll costs whether or
  * not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
  */
-async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+async function journalsAsked<T>(f: () => Promise<T>) {
   const { view, list } = e;
   let asked = 0;
   Object.assign(e, {
@@ -240,7 +240,7 @@ const FINISHED = '/api/runs?fieldSelector=status.state%3Dfinished';
 const listed = async (id: string) => (await list()).find((r) => r.id === id);
 
 /** With the memo's check off: what the memo alone answers. */
-async function unverified<T>(f: () => Promise<T>): Promise<T> {
+async function unverified<T>(f: () => Promise<T>) {
   process.env.WF_VERIFY_REST = '0';
   try {
     return await f();
@@ -358,7 +358,7 @@ describe('a polled list keeps a run at rest and judges it afresh the moment anyt
  * How many child processes `f` started, by any of `node:child_process`'s ways, the named imports of every module included
  * (`syncBuiltinESMExports`): a count the package's own meter does not hold, so a reader that starts one it does not count is counted too.
  */
-async function processesOf(f: () => Promise<unknown>): Promise<string[]> {
+async function processesOf(f: () => Promise<unknown>) {
   const started: string[] = [];
   const kept = WAYS.map((way) => [way, childProcess[way]] as const);
   for (const [way, real] of kept)
@@ -557,7 +557,7 @@ describe("WF_VERIFY_REST: the memo's check fails a request it answered wrong, an
 describe('what a poll costs: the journals of the runs still moving, and no more, on the plain list and on a list asked by state', () => {
   const s = story(test);
   s.test("a poll's reads are counted into api.poll.reads under /api/runs as the engine counts them, every file it read", async () => {
-    const readsOf = async (): Promise<{ count: number; sum: number }> => {
+    const readsOf = async () => {
       const res = await app.request('/api/metrics');
       assert.equal(res.status, 200);
       const metric = ((await res.json()) as MetricRead[]).find((m) => m.name === 'api.poll.reads' && m.attributes.route === '/api/runs');

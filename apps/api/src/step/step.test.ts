@@ -18,7 +18,7 @@ const home = '/store';
 const served = '/own';
 
 /** A run of the folder `dir` made at `createdAt`, holding the step `implement`, in `factory` where one is given: the keys these read. */
-const runOf = (id: string, dir: string, createdAt: string, factory?: string, taskId: string | null = null): Run =>
+const runOf = (id: string, dir: string, createdAt: string, factory?: string, taskId: string | null = null) =>
   ({
     id,
     brief: `Brief ${id}`,
@@ -159,7 +159,7 @@ const agentOf = (name: string, from: 'repo' | 'user', error: string | null = nul
 });
 
 /** A reader of `agents` that counts how often it is read. */
-function readerOf(agents: readonly ReturnType<typeof agentOf>[]): { read: () => Promise<typeof agents>; reads: () => number } {
+function readerOf(agents: readonly ReturnType<typeof agentOf>[]) {
   let reads = 0;
   return {
     read: async () => {
@@ -232,7 +232,7 @@ test("REFUSED: agents that cannot be read offer none to hire, and say why in the
 
 test("each skill of a step's layers, the agent's then its own: one named with its folder as written, with where the repository has it", () => {
   const [repo, store] = [scratch('nemia-api-step-repo-'), scratch('nemia-api-step-store-')];
-  const skill = (dir: string, name: string): void => {
+  const skill = (dir: string, name: string) => {
     fs.mkdirSync(path.join(dir, name), { recursive: true });
     fs.writeFileSync(path.join(dir, name, 'SKILL.md'), `---\ndescription: Does ${name}.\n---\nDo it.\n`);
   };

@@ -11,9 +11,9 @@ import { agentDoorMemory } from '../agents/agent-memory.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { skillDoorMemory } from '../skills/skill-memory.store.ts';
 import { doorFrom, walksOn } from '../../test/door-walks.ts';
-import { WORKFLOW_WALKS, type WorkflowSide } from '../../test/workflow-walks.ts';
+import { WORKFLOW_WALKS } from '../../test/workflow-walks.ts';
 
-for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
+for (const [name, body] of walksOn(WORKFLOW_WALKS, () => {
   const defs = { agents: doorFrom(AgentDoor, agentDoorMemory()), skills: doorFrom(SkillDoor, skillDoorMemory()) };
   return { door: doorFrom(WorkflowDoor, workflowDoorMemory(defs)), root: MEMORY_ROOT, layer: 'memory', defs };
 }))

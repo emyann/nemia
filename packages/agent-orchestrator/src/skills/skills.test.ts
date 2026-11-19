@@ -30,7 +30,7 @@ const DRAFT: SkillDraft = {
 const keysOf = (text: string) => yaml.load(splitFrontmatter('SKILL.md', text).block!) as Record<string, unknown>;
 
 /** The refusal `fn` throws, a `WorkflowError`, by its message. */
-function refusal(fn: () => unknown): string {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {

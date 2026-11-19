@@ -59,7 +59,7 @@ const memoryOver = () => {
 };
 
 /** A folder of yours, `name`, with each step's file as given. */
-function folder(name: string, files: Record<string, string>): string {
+function folder(name: string, files: Record<string, string>) {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
   for (const [file, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, file), text);
@@ -124,7 +124,7 @@ test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Inva
 });
 
 /** The version a remove of the folder `dir` is handed: the one it is at, where it is a folder; none where it is not. */
-function versionAt(dir: string): { version?: string } {
+function versionAt(dir: string) {
   return fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()
     ? { version: Effect.runSync(Effect.provideService(workflowVersion(dir, { home: ROOT }), StoreRoot, ROOT)) }
     : {};
@@ -135,7 +135,7 @@ const remove = (dir: string) =>
   runWith(e(), WORKFLOWS_REMOVE.handler({ from: 'user', name: path.relative(path.join(ROOT, 'workflows'), dir), ...versionAt(dir) }));
 
 /** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
-async function refused(dir: string, kind: new (...args: never[]) => Error, message: string): Promise<void> {
+async function refused(dir: string, kind: new (...args: never[]) => Error, message: string) {
   await assert.rejects(remove(dir), (err: Error) => {
     assert.ok(err instanceof kind, `${err.name}: ${err.message}`);
     assert.equal(err.message, message);
@@ -145,7 +145,7 @@ async function refused(dir: string, kind: new (...args: never[]) => Error, messa
 }
 
 /** A run's record whose steps are read from `dir`: frozen at its start, or not. */
-function runOn(id: string, dir: string, frozen: boolean): void {
+function runOn(id: string, dir: string, frozen: boolean) {
   runFiles.runs.create({
     id,
     repo: dir,
@@ -162,14 +162,14 @@ function runOn(id: string, dir: string, frozen: boolean): void {
 }
 
 /** A card in the inbox naming `dir` as its workflow, queued or not. */
-function cardOn(name: string, dir: string, queued: boolean): void {
+function cardOn(name: string, dir: string, queued: boolean) {
   fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
   const queue = queued ? 'queued: 2026-10-01T00:00:00.000Z\n' : '';
   fs.writeFileSync(path.join(ROOT, 'inbox', `${name}.md`), `---\nworkflow: ${dir}\n${queue}---\nAn idea.\n`);
 }
 
 /** A factory's file: its repositories, the workflows it attaches and its hires. */
-function factoryOf(name: string, repos: string[], workflows: string[], hires: Record<string, string>): void {
+function factoryOf(name: string, repos: string[], workflows: string[], hires: Record<string, string>) {
   fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
   fs.writeFileSync(
     path.join(ROOT, 'factories', `${name}.json`),

@@ -63,14 +63,14 @@ const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: stri
   });
 
 /** A pairing asked for `client`, with no token. */
-const asked = async (client: string): Promise<PairingAsked> => {
+const asked = async (client: string) => {
   const res = await send('POST', '/api/pairings', { client });
   assert.equal(res.status, 200, await res.clone().text());
   return (await res.json()) as PairingAsked;
 };
 
 /** The `Set-Cookie` of `res`'s answer, split into its attributes, each in lower case but the first. */
-const setCookieOf = (res: Response): string[] =>
+const setCookieOf = (res: Response) =>
   (res.headers.get('set-cookie') ?? '').split(';').map((part, i) => (i === 0 ? part.trim() : part.trim().toLowerCase()));
 
 test('an exposed store: a pairing is asked with no token, and the pairings are listed with one alone', async () => {
@@ -154,7 +154,7 @@ const sentTo = (app: ReturnType<typeof servedApp>, host: string, url: string, bo
   });
 
 /** A first-visit link made by the person under `base`, its secret. */
-const linkUnder = async (base: string): Promise<string> => {
+const linkUnder = async (base: string) => {
   const made = await send('POST', '/api/links', { base }, personToken);
   assert.equal(made.status, 200, await made.clone().text());
   const secret = new URL(((await made.json()) as { url: string }).url).searchParams.get('link');
@@ -163,10 +163,7 @@ const linkUnder = async (base: string): Promise<string> => {
 };
 
 /** The status of `res` and the reason its answer gives, where it gives one. */
-const statusOf = async (res: Response): Promise<[number, string | undefined]> => [
-  res.status,
-  res.status === 200 ? undefined : ((await res.json()) as { reason?: string }).reason,
-];
+const statusOf = async (res: Response) => [res.status, res.status === 200 ? undefined : ((await res.json()) as { reason?: string }).reason];
 
 describe('an exposed store takes a pairing and a link claim at a name it is served at, and refuses them at any other name', () => {
   let app!: import('hono').Hono<import('../layer.ts').ApiEnv, import('hono/types').BlankSchema, '/'>;

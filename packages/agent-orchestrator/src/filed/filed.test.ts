@@ -19,7 +19,7 @@ import { configRefusal } from '../runtime-client.ts';
 import { filedRefusal, lineOf, type FiledFlags, type FiledStep } from '../keys/index.ts';
 import { names } from '../../test/assessed.ts';
 
-const stepOf = (lines = ''): StepSpec => parseWorkflow('look', `---\nplace: git\n${lines}---\nLook.\n`);
+const stepOf = (lines = '') => parseWorkflow('look', `---\nplace: git\n${lines}---\nLook.\n`);
 const filed = (step: StepSpec, servers?: FactoryServers, labels?: Run['labels']) =>
   filedConfig(
     step,
@@ -37,7 +37,7 @@ const filed = (step: StepSpec, servers?: FactoryServers, labels?: Run['labels'])
   );
 
 /** An agent on the step, with the `mcp:` names it was frozen with. */
-const withAgent = (mcp: string | undefined): StepSpec =>
+const withAgent = (mcp: string | undefined) =>
   ({
     ...stepOf(),
     agent: { name: 'ada', ...(mcp === undefined ? {} : { mcp: mcp.split(', ') }) },
@@ -216,7 +216,7 @@ describe('filedConfig: what a local step is filed beside its fence, its files di
 });
 
 /** The refusal of `config` on `harness`, said as the step `implement`'s, its lines read off `step` and `flags`. */
-const said = (harness: string, step: FiledStep, config: Parameters<typeof configRefusal>[1], flags?: FiledFlags): string | undefined =>
+const said = (harness: string, step: FiledStep, config: Parameters<typeof configRefusal>[1], flags?: FiledFlags) =>
   filedRefusal((c) => configRefusal(harness, c), 'implement', config, lineOf(step, flags));
 
 describe("filedConfig: a Claude Code step is given its factory's harness settings beneath its own", () => {
@@ -235,7 +235,7 @@ describe("filedConfig: a Claude Code step is given its factory's harness setting
         landingDenied: () => [],
       },
     );
-  const settingsOf = (config: object): unknown => {
+  const settingsOf = (config: object) => {
     const claude: unknown = Reflect.get(config, 'claude');
     const settings: unknown = typeof claude === 'object' && claude !== null ? Reflect.get(claude, 'settings') : undefined;
     return typeof settings === 'string' ? JSON.parse(settings) : undefined;

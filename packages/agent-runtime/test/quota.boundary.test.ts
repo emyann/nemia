@@ -48,7 +48,7 @@ const ANSWERS_IN_MS = 400;
 const NEVER_MS = 60_000;
 
 /** Whether the process `pid` is gone. */
-const gone = (pid: number): boolean => {
+const gone = (pid: number) => {
   try {
     process.kill(pid, 0);
     return false;
@@ -72,13 +72,13 @@ const aStandIn = (usageMs: number) => {
   return {
     bin,
     claude,
-    pidOf: (): number | null => (fs.existsSync(pid) ? Number(fs.readFileSync(pid, 'utf8')) : null),
-    starts: (): string[] => (fs.existsSync(argv) ? fs.readFileSync(argv, 'utf8').split('\n').filter(Boolean) : []),
+    pidOf: () => (fs.existsSync(pid) ? Number(fs.readFileSync(pid, 'utf8')) : null),
+    starts: () => (fs.existsSync(argv) ? fs.readFileSync(argv, 'utf8').split('\n').filter(Boolean) : []),
   };
 };
 
 /** `body` run with `env` set on this process, each variable put back as it was once it ends. */
-const withEnv = async <A>(env: Record<string, string>, body: () => Promise<A>): Promise<A> => {
+const withEnv = async <A>(env: Record<string, string>, body: () => Promise<A>) => {
   const before = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
   try {

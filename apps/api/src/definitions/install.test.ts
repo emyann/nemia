@@ -22,7 +22,7 @@ import { StoreRoot } from '../store.ts';
 const D = '/api/namespaces/default';
 const json = { 'content-type': 'application/json' };
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -43,7 +43,7 @@ write(path.join(builtins, 'mill', 'workflows', 'press', 'draft.md'), 'Draft the 
  * The factory `pmill` filed by hand in the store `home`, as `nemia factory apply` files one: on a folder of its own, its tree one workflow
  * `dev` with a step `plan`, attached.
  */
-function pmillIn(home: string): void {
+function pmillIn(home: string) {
   const repo = scratch('nemia-api-install-pmill-repo-');
   write(
     path.join(home, 'factories', 'pmill.json'),
@@ -88,7 +88,7 @@ describe('an install with no repository and no factory named: yours is created, 
   });
   const send = (method: 'POST' | 'PUT', url: string, body: unknown) =>
     app.request(url, { method, headers: json, body: JSON.stringify(body) });
-  const got = async <T>(url: string): Promise<T> => {
+  const got = async <T>(url: string) => {
     const res = await app.request(url);
     const body = (await res.json()) as T;
     assert.equal(res.status, 200, `GET ${url}: ${JSON.stringify(body)}`);

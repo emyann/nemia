@@ -71,7 +71,7 @@ const TRIES = ruleWords(proposalOf(PROPOSAL).rules[0]);
 const DEFAULT = ruleWords(DEFAULT_POLICY);
 
 /** A scratch store where nemia proposed `PROPOSAL` from no custom instruction. */
-function proposed(): string {
+function proposed() {
   const home = scratch('auto-store-');
   writeProposed(home, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
   return home;
@@ -87,7 +87,7 @@ const shown = (home = ROOT, agents?: Layer.Layer<never>) => {
 };
 
 /** The kind of what `fn` throws, and its message. */
-function refusal(fn: () => unknown): { kind: string; message: string } {
+function refusal(fn: () => unknown) {
   try {
     fn();
   } catch (err) {

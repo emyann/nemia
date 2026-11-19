@@ -6,6 +6,7 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/policy.ts';
+import { apiAnswers } from './network.ts';
 
 /** The builtin rule, as the api words it. */
 const DEFAULT = {
@@ -37,25 +38,17 @@ const LIST: PolicyList = {
 
 /** Every call answering `body` as JSON, with `status`, for the length of the test; the calls made, by method and path. */
 /** A body as the client sent it, as text: a string as it is, bytes decoded. */
-const textOf = (body: BodyInit | null): string => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
+const textOf = (body: BodyInit | null) => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
 
-function answering(
-  t: { onTestFinished: (fn: () => void) => void },
-  body: unknown,
-  status = 200,
-): { method: string; path: string; body: unknown }[] {
-  const before = globalThis.fetch;
+function answering(t: { onTestFinished: (fn: () => void) => void }, body: unknown, status = 200) {
   const calls: { method: string; path: string; body: unknown }[] = [];
-  globalThis.fetch = async (input, init) => {
+  apiAnswers(async (input, init) => {
     calls.push({
       method: init?.method ?? 'GET',
       path: String(input),
       body: init?.body === undefined ? undefined : JSON.parse(textOf(init.body)),
     });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   return calls;
 }

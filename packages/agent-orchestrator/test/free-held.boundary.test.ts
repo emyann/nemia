@@ -50,7 +50,7 @@ const git = (cwd: string, ...args: string[]) =>
   }).trim();
 
 /** A repository with one commit on main. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.writeFileSync(path.join(repo, 'README.md'), 'readme\n');
@@ -104,7 +104,7 @@ const e = plainEngine(
 );
 
 /** Whether a session of the run `id` is at work. */
-const atWork = (id: string): boolean => [...sessions].some(([name, s]) => name.startsWith(`ae/${id}-`) && s.state === 'working');
+const atWork = (id: string) => [...sessions].some(([name, s]) => name.startsWith(`ae/${id}-`) && s.state === 'working');
 
 /** Each session of the run `id` at work signs off, `done` unless told `blocked`. */
 const sign = (id: string, outcome: 'done' | 'blocked' = 'done') => {
@@ -142,7 +142,7 @@ const tick = (memo?: ReturnType<typeof freshRestMemo>) =>
   );
 
 /** Passes until `ok` holds of one, a dozen at most. */
-async function ticked(ok: (pass: Pass) => boolean, what: string): Promise<Pass> {
+async function ticked(ok: (pass: Pass) => boolean, what: string) {
   for (let k = 0; k < 12; k++) {
     const pass = await tick();
     if (ok(pass)) return pass;

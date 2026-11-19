@@ -48,7 +48,7 @@ const SIGNED_IN = path.join(ROOT, 'signed-in');
  * The default harness's program, a stand-in in the store's tools folder: signed in where `SIGNED_IN` is there or a token is given in its
  * variable, and printing a version to `--version`, which the read asks through `facts.run` instead.
  */
-const planted = (): void => {
+const planted = () => {
   fs.mkdirSync(toolsBinDir(ROOT), { recursive: true });
   fs.writeFileSync(
     path.join(toolsBinDir(ROOT), DEFAULT_HARNESS),
@@ -59,28 +59,30 @@ const planted = (): void => {
 planted();
 
 /** The place need the test place declares here: met, or missing, as `check` says. */
-const identity = (check: string): Need => ({
-  name: 'identity',
-  message: 'an identity is set',
-  check,
-  fixes: [{ command: 'set-identity', message: 'set it' }],
-});
+const identity = (check: string) =>
+  ({
+    name: 'identity',
+    message: 'an identity is set',
+    check,
+    fixes: [{ command: 'set-identity', message: 'set it' }],
+  }) satisfies Need;
 
 /**
  * Facts of a machine whose environment is `env`, each command answering as `answers` says (by default exit 0, nothing printed), and a
  * harness's version command, run through `sh -c`, printing `version`.
  */
-const facts = (env: Record<string, string>, answers: Record<string, CommandRead> = {}, version = CLAUDE_PIN): ReadinessFacts => ({
-  env,
-  user: 'someone',
-  exists: () => true,
-  run: (command, args) => {
-    if (command === 'env' && args.at(-1)?.endsWith('--version')) return { code: 0, out: `${version} (the stand-in)\n` };
-    const key = [command, ...args].join(' ');
-    return Object.hasOwn(answers, key) ? answers[key] : { code: 0, out: '' };
-  },
-  running: { kind: 'checkout', root: ROOT },
-});
+const facts = (env: Record<string, string>, answers: Record<string, CommandRead> = {}, version = CLAUDE_PIN) =>
+  ({
+    env,
+    user: 'someone',
+    exists: () => true,
+    run: (command, args) => {
+      if (command === 'env' && args.at(-1)?.endsWith('--version')) return { code: 0, out: `${version} (the stand-in)\n` };
+      const key = [command, ...args].join(' ');
+      return Object.hasOwn(answers, key) ? answers[key] : { code: 0, out: '' };
+    },
+    running: { kind: 'checkout', root: ROOT },
+  }) satisfies ReadinessFacts;
 
 /** The read, over `given` facts, the test place declaring `needs`. */
 const read = (given: ReadinessFacts, ...needs: Need[]) =>
@@ -533,11 +535,12 @@ test("an archive install's tools piece reads its nemia: missing with no link, na
     builtAt: '2026-11-01T00:00:00.000Z',
     from: 'archive',
   };
-  const onDisk = (running: ReadinessFacts['running']): ReadinessFacts => ({
-    ...facts({ PATH }),
-    exists: (file) => fs.existsSync(file),
-    running,
-  });
+  const onDisk = (running: ReadinessFacts['running']) =>
+    ({
+      ...facts({ PATH }),
+      exists: (file) => fs.existsSync(file),
+      running,
+    }) satisfies ReadinessFacts;
   const tools = async (running: ReadinessFacts['running']) =>
     (await read(onDisk(running), identity('exit 0'))).pieces.find((p) => p.name === 'tools');
 

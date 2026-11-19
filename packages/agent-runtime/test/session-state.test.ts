@@ -33,10 +33,11 @@ const RECORDED = JSON.parse(fs.readFileSync(new URL('./fixtures/decide-corpus.js
 
 /** A decision as JSON carries it: the fixture was written so, and a key holding `undefined` is no key there. */
 const asJson = (v: unknown) => JSON.parse(JSON.stringify(v)) as unknown;
-const read = (c: Case): Recorded => ({
-  event: observe(fold(TASK, c.events), c.observed, c.now).type,
-  action: decide(fold(TASK, c.events), c.observed, c.now),
-});
+const read = (c: Case) =>
+  ({
+    event: observe(fold(TASK, c.events), c.observed, c.now).type,
+    action: decide(fold(TASK, c.events), c.observed, c.now),
+  }) satisfies Recorded;
 
 /** The corpus's sightings in the five former words, word for word: the sightings `fixtures/decide-corpus.json` was recorded from. */
 type FormerSighting = Omit<Sighting, 'sessionId' | 'state'> & { state: string };
@@ -216,16 +217,17 @@ describe("a session's words, name by name: its journal and view words, the forme
   });
 });
 
-const reporting = (states: Record<string, string>): AsyncRunner => ({
-  async spawn() {},
-  async observe() {
-    return new Map(Object.entries(states).map(([name, state]) => [name, { sessionId: `s-${name}`, state } as never]));
-  },
-  async stop() {},
-  async logs() {
-    return '';
-  },
-});
+const reporting = (states: Record<string, string>) =>
+  ({
+    async spawn() {},
+    async observe() {
+      return new Map(Object.entries(states).map(([name, state]) => [name, { sessionId: `s-${name}`, state } as never]));
+    },
+    async stop() {},
+    async logs() {
+      return '';
+    },
+  }) satisfies AsyncRunner;
 
 describe("the helper asyncOps: a fake's words read as their names, and a word neither vocabulary has refused", () => {
   test("the helper asyncOps reads a fake's A2A names as they are, and the five former words as their names", async () => {

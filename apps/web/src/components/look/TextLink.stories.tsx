@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { ON_CARD } from './stories.fixtures';
+import { ON_CARD } from './stories.fixture';
 import { TextLink } from './TextLink';
 
 /** The board's text link: no line at rest, underlined under the pointer and with the keyboard on it, where it takes the kit's ring. */

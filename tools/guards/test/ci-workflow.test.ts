@@ -73,9 +73,9 @@ const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 type Reads = { contexts: string[]; calls: string[]; literals: string[]; operators: string[] };
 
 /** What the one expression `${{ … }}` that is all of `text` reads, or `undefined` where `text` is not one expression. */
-export function readsOf(text: unknown): Reads | undefined {
+export function readsOf(text: unknown) {
   const whole = /^\$\{\{([^}]*)\}\}$/.exec(String(text).trim());
-  if (!whole) return undefined;
+  if (!whole) return undefined satisfies Reads | undefined;
   const body = whole[1];
   const literals = [...body.matchAll(/'((?:[^']|'')*)'/g)].map(([, value]) => value.replaceAll("''", "'"));
   const bare = body.replace(/'(?:[^']|'')*'/g, ' ');
@@ -88,17 +88,17 @@ export function readsOf(text: unknown): Reads | undefined {
     calls: words.filter(([, , call]) => call).map(([, word]) => word),
     literals,
     operators: [...bare.matchAll(/[!=<>]=|&&|\|\||[<>!]/g)].map(([operator]) => operator),
-  };
+  } satisfies Reads | undefined;
 }
 
 /** The expression after `flag` in `run` (`--filter=${{ … }}`, `--shard ${{ … }}`), as what it reads. */
-const flagReads = (run: string, flag: string): Reads | undefined => {
+const flagReads = (run: string, flag: string) => {
   const found = new RegExp(`${flag}[ =](\\$\\{\\{[^}]*\\}\\})`).exec(run);
-  return found ? readsOf(found[1]) : undefined;
+  return (found ? readsOf(found[1]) : undefined) satisfies Reads | undefined;
 };
 
 /** Whether `reads` reads `context` and nothing else, through no function. */
-const readsOnly = (reads: Reads | undefined, context: string): boolean =>
+const readsOnly = (reads: Reads | undefined, context: string) =>
   reads !== undefined && reads.contexts.length === 1 && reads.contexts[0] === context && reads.calls.length === 0;
 
 /** What `cancel-in-progress` must read, as the sentence that refuses another value spells it out. */
@@ -133,7 +133,7 @@ type Workspace = { name: string; folder: string; suite: boolean; test?: string }
  * Every workspace the root `package.json` claims, expanded from its globs: the folders under a `<top>/*` that hold a `package.json`,
  * and a folder named whole (`tools/guards`) as itself.
  */
-function readWorkspaces(): Workspace[] {
+function readWorkspaces() {
   const root = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
     workspaces: string[];
     engines: { node: string };
@@ -148,22 +148,21 @@ function readWorkspaces(): Workspace[] {
       const pkg = JSON.parse(fs.readFileSync(file, 'utf8')) as { name: string; scripts?: Record<string, string> };
       return [{ name: pkg.name, folder, suite: pkg.scripts?.test !== undefined, test: pkg.scripts?.test }];
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name)) satisfies Workspace[];
 }
 
 /** What `engines.node` claims, as the root writes it. */
-const readEngine = (): string =>
+const readEngine = () =>
   (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { engines: { node: string } }).engines.node;
 
 /** The workspaces the matrix's own axis names: the legs that run a whole suite. */
-const legWorkspaces = (workflow: Workflow): unknown[] => workflow.jobs[LEGS]?.strategy?.matrix?.workspace ?? [];
+const legWorkspaces = (workflow: Workflow) => (workflow.jobs[LEGS]?.strategy?.matrix?.workspace ?? []) satisfies unknown[];
 
 /** The node versions the matrix's axis names, as YAML read them: a string, or a number where a quote was forgotten. */
-const legNodes = (workflow: Workflow): unknown[] => workflow.jobs[LEGS]?.strategy?.matrix?.node ?? [];
+const legNodes = (workflow: Workflow) => (workflow.jobs[LEGS]?.strategy?.matrix?.node ?? []) satisfies unknown[];
 
 /** The entries of the matrix's `include`, each of which `includeDrift` holds to the shape that makes a leg of its own. */
-const legIncludes = (workflow: Workflow): Record<string, unknown>[] =>
-  (workflow.jobs[LEGS]?.strategy?.matrix?.include ?? []) as Record<string, unknown>[];
+const legIncludes = (workflow: Workflow) => (workflow.jobs[LEGS]?.strategy?.matrix?.include ?? []) as Record<string, unknown>[];
 
 /** A leg of the test job: a workspace on a node, running the whole suite or the one shard of it the leg names. */
 type Leg = { workspace: unknown; node: unknown; shard: unknown };
@@ -173,21 +172,22 @@ type Leg = { workspace: unknown; node: unknown; shard: unknown };
  * own only because its `workspace` is a value the axis does not hold — GitHub adds an entry's keys to the matching combinations
  * otherwise — so this reading is true exactly while `includeDrift` is green, which is why that clause is beside this one.
  */
-const legs = (workflow: Workflow): Leg[] => [
-  ...legWorkspaces(workflow).flatMap((workspace) => legNodes(workflow).map((node) => ({ workspace, node, shard: undefined }))),
-  ...legIncludes(workflow).map((entry) => ({ workspace: entry.workspace, node: entry.node, shard: entry.shard })),
-];
+const legs = (workflow: Workflow) =>
+  [
+    ...legWorkspaces(workflow).flatMap((workspace) => legNodes(workflow).map((node) => ({ workspace, node, shard: undefined }))),
+    ...legIncludes(workflow).map((entry) => ({ workspace: entry.workspace, node: entry.node, shard: entry.shard })),
+  ] satisfies Leg[];
 
 /** The workspaces the legs run, each named once, in the order the legs name them. */
-const workedspaces = (workflow: Workflow): unknown[] => [...new Set(legs(workflow).map((leg) => leg.workspace))];
+const workedspaces = (workflow: Workflow) => [...new Set(legs(workflow).map((leg) => leg.workspace))] satisfies unknown[];
 
 /**
  * A workspace with a suite and no leg, and a leg naming a workspace this repository does not have. `OWN_JOB`'s workspace needs no leg
  * while the job of its own is in the file (`guardsDrift` holds that job); without the job it is refused as any other.
  */
-function legDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
+function legDrift(workflow: Workflow, workspaces: Workspace[]) {
   const named = workedspaces(workflow);
-  const ownJob = (workspace: Workspace): boolean =>
+  const ownJob = (workspace: Workspace) =>
     workspace.folder === OWN_JOB.folder && workspace.name === OWN_JOB.name && workflow.jobs[OWN_JOB.job] !== undefined;
   return [
     ...workspaces
@@ -202,7 +202,7 @@ function legDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
         (leg) =>
           `the ${LEGS} job's matrix in ${FILE} names ${String(leg)}, which is no workspace of this repository: take it off the matrix, or add the workspace it means`,
       ),
-  ];
+  ] satisfies string[];
 }
 
 /**
@@ -211,7 +211,7 @@ function legDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
  * already names would hand its shard to that workspace's existing legs rather than splitting them, and an entry with no node would be
  * added to every leg of the matrix instead.
  */
-function includeDrift(workflow: Workflow): string[] {
+function includeDrift(workflow: Workflow) {
   const axis = legWorkspaces(workflow);
   const nodes = legNodes(workflow);
   return legIncludes(workflow).flatMap((entry, i) => {
@@ -228,7 +228,7 @@ function includeDrift(workflow: Workflow): string[] {
         `the ${LEGS} job's matrix.include entry for ${String(entry.workspace)} in ${FILE} names no node: an entry that contradicts one axis and leaves another open is one leg, not one per node, so write node: '${String(nodes[0])}' on it — one entry per node the matrix names`,
       ];
     return [];
-  });
+  }) satisfies string[];
 }
 
 /**
@@ -237,7 +237,7 @@ function includeDrift(workflow: Workflow): string[] {
  * by hand, one per node, so a workspace that arrived through `include` can lose a node without a word — tested on one version while
  * the matrix claims two.
  */
-function nodeDrift(workflow: Workflow, engine: string): string[] {
+function nodeDrift(workflow: Workflow, engine: string) {
   const nodes = [...new Set(legs(workflow).map((leg) => leg.node))];
   const sentences = nodes
     .filter((node) => typeof node !== 'string')
@@ -261,7 +261,7 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
         sentences.push(
           `${String(workspace)}'s legs in ${FILE} do not run on node ${String(node)}, which the ${LEGS} job's matrix.node names: give it a leg on every node the matrix names, or a workspace is tested on one version while the matrix claims two`,
         );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /**
@@ -273,9 +273,9 @@ function nodeDrift(workflow: Workflow, engine: string): string[] {
  * Unheld, the file could claim `>=24.16.0` in `engines.node` and still run five jobs on 22.18.0, where `npm ci` refuses them with
  * `EBADENGINE` — which is what CI did on run 39349841691.
  */
-function pinDrift(workflow: Workflow, engine: string): string[] {
+function pinDrift(workflow: Workflow, engine: string) {
   const floor = /^>=(\d+\.\d+\.\d+)$/.exec(engine)?.[1];
-  if (floor === undefined) return [];
+  if (floor === undefined) return [] satisfies string[];
   return Object.entries(workflow.jobs).flatMap(([name, job]) =>
     (job.steps ?? [])
       .filter((step) => step.uses?.startsWith(SETUP_NODE))
@@ -292,7 +292,7 @@ function pinDrift(workflow: Workflow, engine: string): string[] {
               `the ${name} job in ${FILE} runs on node ${String(pin)}, not ${floor}, the floor engines.node claims in package.json: every job but the legs runs this repository's code on its floor, so write node-version: '${floor}', or npm ci refuses the job with EBADENGINE`,
             ];
       }),
-  );
+  ) satisfies string[];
 }
 
 /**
@@ -300,7 +300,7 @@ function pinDrift(workflow: Workflow, engine: string): string[] {
  * the e2e's `.e2e/` found nothing: with `if-no-files-found: error` that failed every shard whose pages had all passed, and with
  * `ignore` it would have dropped a failing page's pictures without a word. CI run 39349841691 is both.
  */
-function hiddenDrift(workflow: Workflow): string[] {
+function hiddenDrift(workflow: Workflow) {
   return Object.entries(workflow.jobs).flatMap(([name, job]) =>
     (job.steps ?? [])
       .filter((step) => step.uses?.startsWith(UPLOAD))
@@ -313,16 +313,16 @@ function hiddenDrift(workflow: Workflow): string[] {
               `the ${name} job in ${FILE} uploads ${kept}, a hidden path, without include-hidden-files: ${UPLOAD} skips a dotted path by default, so write include-hidden-files: true beside the path, or the upload keeps nothing`,
             ];
       }),
-  );
+  ) satisfies string[];
 }
 
 /** A gate that does not run whatever happens, or that does not need every other job of the file. */
-function gateDrift(workflow: Workflow): string[] {
+function gateDrift(workflow: Workflow) {
   const gate = workflow.jobs[GATE];
   if (gate === undefined)
     return [
       `${FILE} has no ${GATE} job: branch protection requires the one context ${GATE}, so add the gate job that needs every other job and fails unless each succeeded`,
-    ];
+    ] satisfies string[];
   const needs = gate.needs ?? [];
   return [
     ...((gate.if ?? '').includes('always()')
@@ -336,7 +336,7 @@ function gateDrift(workflow: Workflow): string[] {
         (job) =>
           `the ${GATE} job in ${FILE} does not need ${job}: branch protection names ${GATE} and nothing else, so add ${job} to the gate's needs, or its failure reports green`,
       ),
-  ];
+  ] satisfies string[];
 }
 
 /** The timezone every leg runs its suite under. */
@@ -352,10 +352,10 @@ const LOCAL_LEG = 'web';
  * What a leg's suite is conditioned on: every leg but the floor's on a pull request, whose suites main's push runs. The one condition a
  * suite run may carry, written off the floor `engines.node` claims, so no other leg can be left out by it.
  */
-const dueIf = (floor: string): string => `matrix.node != '${floor}' || github.event_name != 'pull_request'`;
+const dueIf = (floor: string) => `matrix.node != '${floor}' || github.event_name != 'pull_request'`;
 
 /** What the second zone's run step must be conditioned on, so it runs for that leg and no other, where the leg's suite is due. */
-const localIf = (floor: string): string => `matrix.workspace == '${LOCAL_LEG}' && (${dueIf(floor)})`;
+const localIf = (floor: string) => `matrix.workspace == '${LOCAL_LEG}' && (${dueIf(floor)})`;
 
 /** The environment variable the orchestrator's `test` script reads its shard out of. */
 const SHARD_ENV = 'WF_TEST_SHARD';
@@ -370,7 +370,7 @@ const SHARD_HOLE = '${WF_TEST_SHARD:+--shard=$WF_TEST_SHARD}';
 const FRACTION = /^(\d+)\/(\d+)$/;
 
 /** Each run of the suite in the leg, by the timezone it sets, what it is conditioned on, its shard, and whether it passes `--force`. */
-const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string; shard: string | undefined; forced: boolean }[] =>
+const suiteRuns = (workflow: Workflow) =>
   (workflow.jobs[LEGS]?.steps ?? [])
     .filter((step) => step.run?.includes('turbo run test') === true)
     .map((step) => ({
@@ -378,7 +378,7 @@ const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string;
       if: step.if,
       shard: step.env?.[SHARD_ENV],
       forced: step.run?.includes('--force') === true,
-    }));
+    })) satisfies { zone: string | undefined; if?: string; shard: string | undefined; forced: boolean }[];
 
 /**
  * The zones the legs run their suites under, which is two things rather than one: every leg under `UTC`, and the web alone a second
@@ -390,7 +390,7 @@ const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string;
  * A run that does not pass `--force` is the invisible one: `turbo.json` hashes no environment, so it replays the run before it from the
  * cache and that timezone is never tested at all.
  */
-function zoneDrift(workflow: Workflow, engine: string): string[] {
+function zoneDrift(workflow: Workflow, engine: string) {
   const floor = /^>=(\d+\.\d+\.\d+)$/.exec(engine)?.[1] ?? engine;
   const DUE_LEG = dueIf(floor);
   const LOCAL_IF = localIf(floor);
@@ -438,7 +438,7 @@ function zoneDrift(workflow: Workflow, engine: string): string[] {
           `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} does not pass --force: turbo hashes no environment, so it replays the run before it from the cache and that timezone is never tested`,
       ),
   );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /**
@@ -453,7 +453,7 @@ function zoneDrift(workflow: Workflow, engine: string): string[] {
  * are asked of a file that shards something and of no other, so a card that takes the shards off is not then held to a hole in a
  * script and a variable nothing reads.
  */
-function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
+function legShardDrift(workflow: Workflow, workspaces: Workspace[]) {
   const expanded = legs(workflow);
   const sentences: string[] = [];
   const sharded = new Set<unknown>();
@@ -488,7 +488,7 @@ function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
         `the legs for ${key} in ${FILE} are ${group.length}, of which ${named.length} name a shard: a leg beside the shards runs the whole suite again, so give every leg of that workspace and node a shard of its own, or none of them one`,
       );
   }
-  if (sharded.size === 0) return sentences;
+  if (sharded.size === 0) return sentences satisfies string[];
   for (const name of sharded) {
     const workspace = workspaces.find((each) => each.name === name);
     if (workspace === undefined) continue;
@@ -507,49 +507,51 @@ function legShardDrift(workflow: Workflow, workspaces: Workspace[]): string[] {
         `the ${LEGS} job's suite run under TZ=${String(run.zone)} in ${FILE} is given ${SHARD_ENV}: ${run.shard}, not ${SHARD_VALUE}: every leg would run that one shard, and the rest of each suite is run by nobody`,
       );
   }
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /**
  * A leg name that does not name the shard. Two halves of one workspace's suite on one node then read alike in the run's summary, and a
  * person reading a red `ci` cannot tell which half failed — nor the two apart in the timings this card was measured from.
  */
-function nameDrift(workflow: Workflow): string[] {
-  if (!legs(workflow).some((leg) => leg.shard !== undefined)) return [];
+function nameDrift(workflow: Workflow) {
+  if (!legs(workflow).some((leg) => leg.shard !== undefined)) return [] satisfies string[];
   const name = workflow.jobs[LEGS]?.name ?? '';
-  return name.includes(SHARD_VALUE)
-    ? []
-    : [
-        `the ${LEGS} job's name in ${FILE} does not name ${SHARD_VALUE}: two shards of one workspace on one node then read alike in the run's summary, and a person cannot tell which half failed`,
-      ];
+  return (
+    name.includes(SHARD_VALUE)
+      ? []
+      : [
+          `the ${LEGS} job's name in ${FILE} does not name ${SHARD_VALUE}: two shards of one workspace on one node then read alike in the run's summary, and a person cannot tell which half failed`,
+        ]
+  ) satisfies string[];
 }
 
 /**
  * A run of the suite that does not filter to the leg's own workspace. `legDrift` proves the matrix names every workspace; this proves the
  * leg runs the one it is named for, and without it twenty legs could run one package's suite while nineteen of them report another's.
  */
-function filterDrift(workflow: Workflow): string[] {
+function filterDrift(workflow: Workflow) {
   return (workflow.jobs[LEGS]?.steps ?? [])
     .filter((step) => step.run?.includes('turbo run test') === true && !readsOnly(flagReads(step.run, '--filter'), 'matrix.workspace'))
     .map(
       (step) =>
         `the ${LEGS} job's suite run under TZ=${String(step.env?.TZ)} in ${FILE} does not pass ${FILTERED}: every leg would run the same package's suite, and the legs report a workspace they never tested`,
-    );
+    ) satisfies string[];
 }
 
 /**
  * A gate whose verdict is not one step reading `toJSON(needs)` out of the environment. The results are a fork's to shape on a pull
  * request, so they must reach the step's shell through `env` and never be interpolated into its command line.
  */
-function verdictDrift(workflow: Workflow): string[] {
+function verdictDrift(workflow: Workflow) {
   const steps = gateSteps(workflow);
   if (steps.length !== 1)
     return [
       `the ${GATE} job in ${FILE} has ${steps.length} steps that run a command, not one: give it the single step that reads the results out of env and fails unless each is success`,
-    ];
+    ] satisfies string[];
   const [step] = steps as [Step];
   const sentences: string[] = [];
-  const givesResults = (value: string): boolean => {
+  const givesResults = (value: string) => {
     const reads = readsOf(value);
     return reads !== undefined && reads.calls.join() === 'toJSON' && reads.contexts.join() === 'needs';
   };
@@ -561,11 +563,11 @@ function verdictDrift(workflow: Workflow): string[] {
     sentences.push(
       `the ${GATE} job's step in ${FILE} interpolates an expression into its run: on a pull request a fork shapes what needs holds, so pass it through env and read it as a shell variable instead`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /** Whether `value` is the one expression that cancels a branch's superseded run and spares every run of main, as the owner chose. */
-const sparesMain = (value: unknown): boolean => {
+const sparesMain = (value: unknown) => {
   const reads = readsOf(value);
   return (
     reads !== undefined &&
@@ -577,13 +579,15 @@ const sparesMain = (value: unknown): boolean => {
 };
 
 /** A `cancel-in-progress` that does not spare main: `true` cancels a landing's run, and anything else cancels nothing or is unreadable. */
-function cancelDrift(workflow: Workflow): string[] {
+function cancelDrift(workflow: Workflow) {
   const value = workflow.concurrency?.['cancel-in-progress'];
-  return sparesMain(value)
-    ? []
-    : [
-        `concurrency.cancel-in-progress in ${FILE} reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ${GATE} gate reads a cancelled job as a failure and a landing that was never tested would report red`,
-      ];
+  return (
+    sparesMain(value)
+      ? []
+      : [
+          `concurrency.cancel-in-progress in ${FILE} reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ${GATE} gate reads a cancelled job as a failure and a landing that was never tested would report red`,
+        ]
+  ) satisfies string[];
 }
 
 /**
@@ -591,10 +595,11 @@ function cancelDrift(workflow: Workflow): string[] {
  * `!=` (case-insensitive, as Actions compares strings), `&&` and `||` (each giving back one of its operands) and parentheses.
  * `undefined` where the body holds anything else, so a group the clause cannot evaluate is drift rather than a pass.
  */
-export function evaluate(body: string, github: Record<string, string>): string | boolean | undefined {
+export function evaluate(body: string, github: Record<string, string>) {
   const tokens = [...body.matchAll(/\s*('(?:[^']|'')*'|[A-Za-z_][\w.-]*|==|!=|&&|\|\||\(|\)|\S)/g)].map(([, token]) => token);
   let at = 0;
-  const truthy = (value: string | boolean): boolean => value !== '' && value !== false;
+  const truthy = (value: string | boolean) => value !== '' && value !== false;
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const primary = (): string | boolean | undefined => {
     const token = tokens[at++];
     if (token === undefined) return undefined;
@@ -607,6 +612,7 @@ export function evaluate(body: string, github: Record<string, string>): string |
     const name = /^github\.([\w-]+)$/.exec(token)?.[1];
     return name !== undefined && name in github ? github[name] : undefined;
   };
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const equality = (): string | boolean | undefined => {
     const left = primary();
     if (tokens[at] !== '==' && tokens[at] !== '!=') return left;
@@ -616,6 +622,7 @@ export function evaluate(body: string, github: Record<string, string>): string |
     const same = String(left).toLowerCase() === String(right).toLowerCase();
     return operator === '==' ? same : !same;
   };
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const and = (): string | boolean | undefined => {
     let left = equality();
     while (tokens[at] === '&&') {
@@ -626,6 +633,7 @@ export function evaluate(body: string, github: Record<string, string>): string |
     }
     return left;
   };
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const or = (): string | boolean | undefined => {
     let left = and();
     while (tokens[at] === '||') {
@@ -637,18 +645,18 @@ export function evaluate(body: string, github: Record<string, string>): string |
     return left;
   };
   const value = or();
-  return at === tokens.length ? value : undefined;
+  return (at === tokens.length ? value : undefined) satisfies string | boolean | undefined;
 }
 
 /** The concurrency group `group` names for a run of `ref` at `sha`, or `undefined` where an expression in it cannot be evaluated. */
-export function groupOf(group: string, ref: string, sha: string): string | undefined {
+export function groupOf(group: string, ref: string, sha: string) {
   let unreadable = false;
   const named = group.replace(/\$\{\{([^}]*)\}\}/g, (_, body: string) => {
     const value = evaluate(body, { ref, sha });
     if (value === undefined) unreadable = true;
     return String(value);
   });
-  return unreadable ? undefined : named;
+  return (unreadable ? undefined : named) satisfies string | undefined;
 }
 
 /** Two commits and the refs the clause runs the group for: main's push, and a branch's pull request. */
@@ -661,7 +669,7 @@ const SHAS = ['1ae76136c0000000000000000000000000000000', '4d2da905e000000000000
  * pending per group and cancels the older pending one whatever `cancel-in-progress` says, so a group main's pushes share cancels a
  * landing's run before it starts; a branch's group that names the commit would never cancel a superseded run.
  */
-export function groupDrift(workflow: Workflow): string[] {
+export function groupDrift(workflow: Workflow) {
   const group = workflow.concurrency?.group ?? '';
   const [first, second] = SHAS;
   const main = SHAS.map((sha) => groupOf(group, MAIN_REF, sha));
@@ -669,7 +677,7 @@ export function groupDrift(workflow: Workflow): string[] {
   if ([...main, ...branch].includes(undefined))
     return [
       `concurrency.group in ${FILE} reads ${group}, which this guard cannot evaluate: write it from github.ref and github.sha alone, with ==, !=, && and ||, such as ci-\${{ github.ref == '${MAIN_REF}' && github.sha || github.ref }}`,
-    ];
+    ] satisfies string[];
   const drift: string[] = [];
   if (main[0] === main[1] || !main[0]?.includes(first) || !main[1]?.includes(second))
     drift.push(
@@ -679,7 +687,7 @@ export function groupDrift(workflow: Workflow): string[] {
     drift.push(
       `concurrency.group in ${FILE} gives two pushes to one branch the group ${branch[0]} and ${branch[1]}: leave the commit out of a branch's group, so its superseded run is cancelled`,
     );
-  return drift;
+  return drift satisfies string[];
 }
 
 /** The expression the shard's run must be given its shard by: the leg's own, never a literal, or every leg would run shard 1. */
@@ -692,19 +700,19 @@ const OF_FLAG = '--of ${{ strategy.job-total }}';
 const BOUND_COMMAND = 'apps/web/test/e2e/pages-bound.ts';
 
 /** The pages the e2e has, read off its own NAMES: a name a line, the blank lines left out. */
-const readPages = (): string[] =>
+const readPages = () =>
   fs
     .readFileSync(path.join(ROOT, 'apps', 'web', 'test', 'e2e', 'pages', NAMES_FILE), 'utf8')
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean) satisfies string[];
 
 /** Where the e2e says which pages there are, relative to the repository, as the sentences that refuse a shard count name it. */
 const NAMES_FILE = 'NAMES';
 const NAMES_PATH = 'apps/web/test/e2e/pages/NAMES';
 
 /** The shards the e2e job's matrix names, as YAML read them. */
-const shardLegs = (workflow: Workflow): unknown[] => workflow.jobs[E2E]?.strategy?.matrix?.shard ?? [];
+const shardLegs = (workflow: Workflow) => (workflow.jobs[E2E]?.strategy?.matrix?.shard ?? []) satisfies unknown[];
 
 /**
  * A shard matrix that is not 1..n contiguous, a run that does not take its shard off the leg or its count off the matrix, and more shards
@@ -712,7 +720,7 @@ const shardLegs = (workflow: Workflow): unknown[] => workflow.jobs[E2E]?.strateg
  * refuses, while shard 3's pages are visited by nobody — and a literal `--of 4` beside three legs would leave a quarter of the pages
  * unvisited, green.
  */
-function shardDrift(workflow: Workflow, pages: readonly string[]): string[] {
+function shardDrift(workflow: Workflow, pages: readonly string[]) {
   const shards = shardLegs(workflow);
   const sentences: string[] = [];
   const wanted = Array.from({ length: shards.length || 4 }, (_shard, i) => i + 1);
@@ -738,7 +746,7 @@ function shardDrift(workflow: Workflow, pages: readonly string[]): string[] {
     sentences.push(
       `the ${E2E} job's matrix.shard in ${FILE} names ${shards.length} shards and ${NAMES_PATH} names ${pages.length} pages: a shard of them would visit nothing, so cut the matrix to ${pages.length} shards at most`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /**
@@ -746,12 +754,12 @@ function shardDrift(workflow: Workflow, pages: readonly string[]): string[] {
  * `--shard` both silence the bound inside a run (`planOf`), so without this job nothing in CI holds the whole e2e's cost — and
  * `PAGES_BOUND_MS` has one writer, in `apps/web/test/e2e/timing.ts`, which is why the sum is this command's and no comparison in YAML.
  */
-function boundDrift(workflow: Workflow): string[] {
+function boundDrift(workflow: Workflow) {
   const job = workflow.jobs[BOUND];
   if (job === undefined)
     return [
       `${FILE} has no ${BOUND} job: a shard silences the e2e's bound the way --pages does, so add the job that needs ${E2E} and runs \`node ${BOUND_COMMAND} <dir>\` over the shards' page times, or nothing in CI holds the whole e2e's cost`,
-    ];
+    ] satisfies string[];
   return [
     ...((job.needs ?? []).includes(E2E)
       ? []
@@ -763,23 +771,23 @@ function boundDrift(workflow: Workflow): string[] {
       : [
           `the ${BOUND} job in ${FILE} does not run \`node ${BOUND_COMMAND}\`: it is the one place the shards' page times are summed against PAGES_BOUND_MS, whose only writer is apps/web/test/e2e/timing.ts, so run it rather than comparing a copy of the bound here`,
         ]),
-  ];
+  ] satisfies string[];
 }
 
 /** The look job's step that runs the e2e. */
-const lookRunStep = (workflow: Workflow): Step | undefined =>
-  runSteps(workflow, LOOK).find((step) => step.run?.includes(E2E_COMMAND) === true);
+const lookRunStep = (workflow: Workflow) =>
+  runSteps(workflow, LOOK).find((step) => step.run?.includes(E2E_COMMAND) === true) satisfies Step | undefined;
 
 /**
  * A look job that is not there or runs other than the look's tests alone, and a shard that runs them too. The look's tests run once per
  * push: in every shard they ran four times, each file with its own Chromium, and nowhere they would run not at all.
  */
-function lookDrift(workflow: Workflow): string[] {
+function lookDrift(workflow: Workflow) {
   const command = `${E2E_COMMAND} -- ${LOOK_FLAG}`;
   if (workflow.jobs[LOOK] === undefined)
     return [
       `${FILE} has no ${LOOK} job: add one that runs \`${command}\`, or nothing in CI runs the look's browser tests, which the shards do not`,
-    ];
+    ] satisfies string[];
   const sentences: string[] = [];
   const run = lookRunStep(workflow)?.run ?? '';
   const words = run.split(/\s+/);
@@ -791,7 +799,7 @@ function lookDrift(workflow: Workflow): string[] {
     sentences.push(
       `the ${E2E} job's run of \`${E2E_COMMAND}\` in ${FILE} passes ${LOOK_FLAG}: take it off, since the ${LOOK} job runs the look's tests once and every shard would run them again`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /** Where Playwright keeps the browsers it downloads, the one path the e2e job may cache. */
@@ -801,21 +809,21 @@ const BROWSERS = '~/.cache/ms-playwright';
 const PLAYWRIGHT_PIN = 'node_modules/playwright';
 
 /** The step of the e2e job that installs Chromium. */
-const installStep = (steps: Step[]): Step | undefined => steps.find((step) => step.run?.includes('playwright install') === true);
+const installStep = (steps: Step[]) => steps.find((step) => step.run?.includes('playwright install') === true) satisfies Step | undefined;
 
 /**
  * An e2e job whose browsers are not restored from a cache keyed on the Playwright the lockfile pins, or that installs them on a hit.
  * The install's `--with-deps` runs apt, which stalled shards for ten minutes on cache hits of a key the lockfile's hash made. And the
  * cache holds the browsers alone: a build or a page's result restored from one would be a verdict nothing in the run decided.
  */
-function browserDrift(workflow: Workflow, job: string): string[] {
+function browserDrift(workflow: Workflow, job: string) {
   const steps = workflow.jobs[job]?.steps ?? [];
   const caches = steps.filter((step) => step.uses?.startsWith('actions/cache') === true);
   const cache = caches[0];
   if (caches.length !== 1 || cache === undefined || cache.with?.path !== BROWSERS)
     return [
       `the ${job} job in ${FILE} does not cache ${BROWSERS} alone: give it one actions/cache step whose path is ${BROWSERS}, so Chromium is restored rather than installed, and cache nothing else, so no verdict is read from a cache`,
-    ];
+    ] satisfies string[];
   const sentences: string[] = [];
   const keyed = /^\$\{\{ steps\.([\w-]+)\.outputs\.key \}\}$/.exec(String(cache.with.key ?? ''));
   const reader = steps.findIndex((step) => keyed !== null && step.id === keyed[1]);
@@ -834,7 +842,7 @@ function browserDrift(workflow: Workflow, job: string): string[] {
     sentences.push(
       `the ${job} job in ${FILE} does not install Chromium on a cache miss alone: give the cache step an id and the install, after it, if: ${hit}, or every shard runs apt on a hit`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /** The two commands the build job must run, and what each writes, as the sentence that refuses its absence names it. */
@@ -847,7 +855,7 @@ const BUILT: { command: string; writes: string }[] = [
  * A build job that is not there, does not run a generator, or whose staleness step does not name a generated path — and a `GENERATED`
  * path this repository does not have, which would make the step guard nothing while reading as though it guarded everything.
  */
-function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED): string[] {
+function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED) {
   const sentences = generated
     .filter((generated) => !fs.existsSync(path.join(ROOT, generated)))
     .map(
@@ -858,7 +866,7 @@ function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED
     return [
       ...sentences,
       `${FILE} has no ${BUILD} job: add the job that runs ${BUILT.map((built) => `\`${built.command}\``).join(' and ')} and then refuses a diff of ${generated.join(' and ')}, or a generated file committed stale passes CI and fails a person's typecheck`,
-    ];
+    ] satisfies string[];
   const runs = runSteps(workflow, BUILD)
     .filter((step) => step.id !== STALE_STEP)
     .map((step) => step.run ?? '')
@@ -883,7 +891,7 @@ function buildDrift(workflow: Workflow, generated: readonly string[] = GENERATED
             `the ${BUILD} job's ${STALE_STEP} step in ${FILE} does not name ${path_}: a generator rewrites it, so add it to the paths the step diffs, or a stale ${path_} reports green`,
         ),
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /** Where the runtime writes its deliberate stub secrets, the one file the scan's allowlist may name. */
@@ -893,11 +901,13 @@ const STUBS = 'packages/agent-runtime/test/remote-agent.test.ts';
  * A stub secret of that file: a word, four hex digits and SECRET, which is how the runtime's test writes a token nobody can use. A bare
  * `'SECRET'` is not one — gitleaks flags a string by its entropy, and that has none.
  */
-const stubSecrets = (): string[] =>
-  [...fs.readFileSync(path.join(ROOT, STUBS), 'utf8').matchAll(/'([a-z]+-[\da-f]{4}-SECRET[^'\n]*)'/g)].map((found) => found[1]);
+const stubSecrets = () =>
+  [...fs.readFileSync(path.join(ROOT, STUBS), 'utf8').matchAll(/'([a-z]+-[\da-f]{4}-SECRET[^'\n]*)'/g)].map(
+    (found) => found[1],
+  ) satisfies string[];
 
 /** What the scan is configured by, or an empty string where the file is not there, which is a drift of its own. */
-const readConfig = (): string => {
+const readConfig = () => {
   const file = path.join(ROOT, SCAN_CONFIG);
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
 };
@@ -907,19 +917,19 @@ const readConfig = (): string => {
  * Each array is read greedily to the last bracket of its line, since a regex of its own holds brackets and a lazy or negated class
  * would end the array inside one.
  */
-function readAllowlist(text: string): { paths: string[]; regexes: string[] } {
-  const listed = (key: string): string[] => {
+function readAllowlist(text: string) {
+  const listed = (key: string) => {
     const array = new RegExp(`^${key} = \\[(.*)\\]$`, 'm').exec(text)?.[1] ?? '';
-    return [...array.matchAll(/'([^']*)'/g)].map((found) => found[1]);
+    return [...array.matchAll(/'([^']*)'/g)].map((found) => found[1]) satisfies string[];
   };
-  return { paths: listed('paths'), regexes: listed('regexes') };
+  return { paths: listed('paths'), regexes: listed('regexes') } satisfies { paths: string[]; regexes: string[] };
 }
 
 /** The one gitleaks rule the allowlist is scoped to: the rule that flags the stub secrets, by their entropy. */
 const RULE = 'generic-api-key';
 
 /** Each table of `SCAN_CONFIG` in order, by its header, with the key lines under it, the comments left out. */
-const blocks = (text: string): { header: string; lines: string[] }[] => {
+const blocks = (text: string) => {
   const found: { header: string; lines: string[] }[] = [];
   for (const line of text.split('\n').map((line) => line.trim())) {
     if (line === '' || line.startsWith('#')) continue;
@@ -927,7 +937,7 @@ const blocks = (text: string): { header: string; lines: string[] }[] => {
     if (header !== null) found.push({ header: header[1], lines: [] });
     else if (found.length > 0) found[found.length - 1].lines.push(line);
   }
-  return found;
+  return found satisfies { header: string; lines: string[] }[];
 };
 
 /**
@@ -941,29 +951,29 @@ const blocks = (text: string): { header: string; lines: string[] }[] => {
  * its criteria with OR, so `paths` alone allows a finding and `regexes` alone does too — the whole file allowed for that rule, and a
  * stub's shape allowed anywhere in the repository. The file would read exactly as it does now.
  */
-function formDrift(text: string): string[] {
+function formDrift(text: string) {
   const found = blocks(text);
   if (found.some((block) => block.header === 'allowlists'))
     return [
       `${SCAN_CONFIG} holds a top-level [[allowlists]]: a global allowlist's paths entry skips the whole file whatever its condition, so every secret in ${STUBS} is allowed and a real one pasted in beside the stubs goes through. Nest it instead as [[rules.allowlists]] under a [[rules]] block carrying id = "${RULE}", which scopes it to that one rule`,
-    ];
+    ] satisfies string[];
   const rules = found.filter((block) => block.header === 'rules');
   const rule = rules.find((block) => block.lines.includes(`id = "${RULE}"`));
   if (rules.length !== 1 || rule === undefined || found.filter((block) => block.header === 'rules.allowlists').length !== 1)
     return [
       `${SCAN_CONFIG} does not nest one [[rules.allowlists]] under one [[rules]] block carrying id = "${RULE}": write it that way, or the allowlist is global and skips every secret in the file its paths names rather than the two shapes it lists`,
-    ];
+    ] satisfies string[];
   if (found.find((block) => block.header === 'rules.allowlists')?.lines.includes('condition = "AND"') !== true)
     return [
       `${SCAN_CONFIG}'s [[rules.allowlists]] does not carry condition = "AND": a rule allowlist joins its criteria with OR by default, so paths alone allows a finding and regexes alone allows one too — every generic key in ${STUBS} allowed, and a stub's shape allowed anywhere in the repository. Write condition = "AND", which allows a finding only where its path and its shape both match`,
-    ];
+    ] satisfies string[];
   return rule.lines
     .map((line) => /^([\w-]+)\s*=/.exec(line)?.[1])
     .filter((key) => key !== undefined && key !== 'id')
     .map(
       (key) =>
         `${SCAN_CONFIG}'s [[rules]] block carries ${key} beside its id: gitleaks appends an allowlist array but replaces every other attribute of a rule, so the default ${RULE} rule becomes one that detects nothing and the scan goes blind to every generic key in the repository. Take ${key} out, leaving the id and the [[rules.allowlists]] block under it`,
-    );
+    ) satisfies string[];
 }
 
 /**
@@ -971,10 +981,10 @@ function formDrift(text: string): string[] {
  * on a stub nobody can use, and an unanchored shape allows a real secret that happens to hold one — the whole job reporting green over
  * a leak.
  */
-function allowDrift(text: string, stubs: readonly string[]): string[] {
-  if (text === '') return [];
+function allowDrift(text: string, stubs: readonly string[]) {
+  if (text === '') return [] satisfies string[];
   const form = formDrift(text);
-  if (form.length > 0) return form;
+  if (form.length > 0) return form satisfies string[];
   const { paths, regexes } = readAllowlist(text);
   const sentences: string[] = [];
   if (paths.length !== 1 || !paths[0].includes(STUBS.replaceAll('.', '\\.')))
@@ -995,7 +1005,7 @@ function allowDrift(text: string, stubs: readonly string[]): string[] {
         (stub) =>
           `${STUBS} writes the stub secret ${stub}, which no regex in ${SCAN_CONFIG} matches: add its shape to the allowlist, anchored at both ends, or the ${SCAN} job refuses every push over a secret nobody can use`,
       ),
-  ];
+  ] satisfies string[];
 }
 
 /** The flags the scan must carry: the range of new commits, the redaction a public log needs, and the allowlist above. */
@@ -1009,12 +1019,12 @@ const PINNED = /gitleaks\/releases\/download\/v\$\{VERSION\}\//;
  * checkout is shallow. The last reads as a scan and is none: the range names the commit before this push, which the shallow default has
  * not, so git refuses the range and the job that was to find a secret finds nothing.
  */
-function scanDrift(workflow: Workflow, config: string): string[] {
+function scanDrift(workflow: Workflow, config: string) {
   const job = workflow.jobs[SCAN];
   if (job === undefined)
     return [
       `${FILE} has no ${SCAN} job: add the job that downloads gitleaks at a pinned version, checks it against that release's sha256 and scans the push's new commits with --config ${SCAN_CONFIG}, or a secret committed to a public repository is noticed by nobody`,
-    ];
+    ] satisfies string[];
   const sentences: string[] = [];
   if (config === '')
     sentences.push(
@@ -1049,7 +1059,7 @@ function scanDrift(workflow: Workflow, config: string): string[] {
     sentences.push(
       `the ${SCAN} job's checkout in ${FILE} does not pass fetch-depth: 0: the range names the commit before this push, which the shallow default has not, so git refuses the range and the job fails having scanned nothing`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /**
@@ -1059,7 +1069,7 @@ function scanDrift(workflow: Workflow, config: string): string[] {
  * the range a push or a pull request changed, so the checkout must hold the history the range's first end is in. Its absence from the
  * gate's needs is `gateDrift`'s, which refuses any job the gate does not need.
  */
-function guardsDrift(workflow: Workflow): string[] {
+function guardsDrift(workflow: Workflow) {
   const job = workflow.jobs[OWN_JOB.job];
   const sentences: string[] = [];
   for (const [event, trigger] of Object.entries(workflow.on ?? {}))
@@ -1072,7 +1082,7 @@ function guardsDrift(workflow: Workflow): string[] {
     return [
       ...sentences,
       `${FILE} has no ${OWN_JOB.job} job: add the job that runs \`${DUE_COMMAND}\` as step id ${DUE_STEP} and then the ${OWN_JOB.name} suite under if: ${DUE_IF}, or the ${OWN_JOB.folder} workspace's suite runs in no CI at all`,
-    ];
+    ] satisfies string[];
   const steps = job.steps ?? [];
   const due = steps.find((step) => step.id === DUE_STEP);
   if (due?.run?.trim() !== DUE_COMMAND)
@@ -1092,7 +1102,7 @@ function guardsDrift(workflow: Workflow): string[] {
     sentences.push(
       `the ${OWN_JOB.job} job's checkout in ${FILE} does not pass fetch-depth: 0: the due step diffs the commit before this push, which the shallow default has not, so give the checkout fetch-depth: 0 or the suite runs on every event`,
     );
-  return sentences;
+  return sentences satisfies string[];
 }
 
 /** Every clause, over the shipped file. */
@@ -1104,34 +1114,35 @@ const drift = (
   pages: readonly string[],
   config: string,
   stubs: readonly string[],
-): string[] => [
-  ...legDrift(workflow, workspaces),
-  ...includeDrift(workflow),
-  ...nodeDrift(workflow, engine),
-  ...legShardDrift(workflow, workspaces),
-  ...nameDrift(workflow),
-  ...pinDrift(workflow, engine),
-  ...hiddenDrift(workflow),
-  ...gateDrift(workflow),
-  ...guardsDrift(workflow),
-  ...stallDrift(workflow),
-  ...actionDrift(workflow),
-  ...zoneDrift(workflow, engine),
-  ...filterDrift(workflow),
-  ...verdictDrift(workflow),
-  ...statusDrift(workflow, GATE, GATE, VERDICT),
-  ...cancelDrift(workflow),
-  ...groupDrift(workflow),
-  ...targetDrift(text),
-  ...shardDrift(workflow, pages),
-  ...boundDrift(workflow),
-  ...lookDrift(workflow),
-  ...browserDrift(workflow, E2E),
-  ...browserDrift(workflow, LOOK),
-  ...buildDrift(workflow),
-  ...scanDrift(workflow, config),
-  ...allowDrift(config, stubs),
-];
+) =>
+  [
+    ...legDrift(workflow, workspaces),
+    ...includeDrift(workflow),
+    ...nodeDrift(workflow, engine),
+    ...legShardDrift(workflow, workspaces),
+    ...nameDrift(workflow),
+    ...pinDrift(workflow, engine),
+    ...hiddenDrift(workflow),
+    ...gateDrift(workflow),
+    ...guardsDrift(workflow),
+    ...stallDrift(workflow),
+    ...actionDrift(workflow),
+    ...zoneDrift(workflow, engine),
+    ...filterDrift(workflow),
+    ...verdictDrift(workflow),
+    ...statusDrift(workflow, GATE, GATE, VERDICT),
+    ...cancelDrift(workflow),
+    ...groupDrift(workflow),
+    ...targetDrift(text),
+    ...shardDrift(workflow, pages),
+    ...boundDrift(workflow),
+    ...lookDrift(workflow),
+    ...browserDrift(workflow, E2E),
+    ...browserDrift(workflow, LOOK),
+    ...buildDrift(workflow),
+    ...scanDrift(workflow, config),
+    ...allowDrift(config, stubs),
+  ] satisfies string[];
 
 test('the shipped CI workflow agrees with the repository it checks', () => {
   const workspaces = readWorkspaces();
@@ -1183,13 +1194,13 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   const text = workflowText();
   const shipped = readWorkflow(text);
 
-  const matrixOf = (workflow: Workflow): Record<string, unknown[]> => {
+  const matrixOf = (workflow: Workflow) => {
     const matrix = workflow.jobs[LEGS]?.strategy?.matrix;
     assert.ok(matrix !== undefined, `the ${LEGS} job has a matrix today`);
-    return matrix;
+    return matrix satisfies Record<string, unknown[]>;
   };
 
-  const renode = (workflow: Workflow, to: unknown): void => {
+  const renode = (workflow: Workflow, to: unknown) => {
     const matrix = matrixOf(workflow);
     matrix.node = [to, '24'];
     for (const entry of matrix.include as { node?: unknown }[]) if (entry.node === '24.16.0') entry.node = to;
@@ -1247,10 +1258,10 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     'an include entry is written by hand, one per node, so a workspace that arrived through include can lose a node without a word',
   );
 
-  const setupOf = (workflow: Workflow, job: string): Step => {
+  const setupOf = (workflow: Workflow, job: string) => {
     const step = (workflow.jobs[job]?.steps ?? []).find((each) => each.uses?.startsWith(SETUP_NODE));
     assert.ok(step?.with !== undefined, `the ${job} job pins its node through setup-node today`);
-    return step;
+    return step satisfies Step;
   };
 
   const lowered = structuredClone(shipped);
@@ -1319,15 +1330,15 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     "the test job in .github/workflows/ci.yml takes a-third-party/setup@v1: this workflow takes GitHub's own actions by major tag alone, so write it actions/<name>@v<major>, and take a third party's code as a pinned download in a run step instead",
   ]);
 
-  const stepsOf = (workflow: Workflow): Step[] => {
+  const stepsOf = (workflow: Workflow) => {
     const steps = workflow.jobs[LEGS]?.steps;
     assert.ok(steps !== undefined, `the ${LEGS} job has steps today`);
-    return steps;
+    return steps satisfies Step[];
   };
-  const runOf = (workflow: Workflow, zone: string): Step => {
+  const runOf = (workflow: Workflow, zone: string) => {
     const step = stepsOf(workflow).find((each) => each.env?.TZ === zone);
     assert.ok(step !== undefined, `the ${LEGS} job runs its suite under TZ=${zone} today`);
-    return step;
+    return step satisfies Step;
   };
 
   assert.equal(suiteRuns(shipped).length, 2, 'the leg has two suite runs today, the second of them the web leg alone');
@@ -1430,10 +1441,10 @@ test('REFUSED: an include entry the axis already names, one with no node or no w
   );
   assert.deepEqual(nameDrift(shipped), [], "the leg's name names its shard today");
 
-  const includeOf = (workflow: Workflow): Record<string, unknown>[] => {
+  const includeOf = (workflow: Workflow) => {
     const include = workflow.jobs[LEGS]?.strategy?.matrix?.include as Record<string, unknown>[] | undefined;
     assert.equal(include?.length, 4, "the orchestrator's four shard legs arrive through include today");
-    return include;
+    return include satisfies Record<string, unknown>[];
   };
 
   const merged = structuredClone(shipped);
@@ -1562,11 +1573,11 @@ test('REFUSED: an include entry the axis already names, one with no node or no w
 test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a count written as a literal, more shards than the e2e has pages', () => {
   const shipped = readWorkflow();
   const pages = readPages();
-  const shardsOf = (workflow: Workflow): unknown[] => {
+  const shardsOf = (workflow: Workflow) => {
     const matrix = workflow.jobs[E2E]?.strategy?.matrix;
     assert.ok(matrix !== undefined, `the ${E2E} job has a matrix today`);
     matrix.shard ??= [];
-    return matrix.shard;
+    return matrix.shard satisfies unknown[];
   };
 
   assert.deepEqual(shardLegs(shipped), [1, 2, 3, 4], 'the e2e runs in four shards today');
@@ -1648,12 +1659,12 @@ test('REFUSED: no job that sums the shards, one that does not wait for them, and
 test("REFUSED: the e2e caching more than the browsers, keyed off the lockfile's hash, with restore-keys, and installing on a hit", () => {
   const shipped = readWorkflow();
   assert.deepEqual(browserDrift(shipped, E2E), [], 'the e2e restores its browsers from a cache keyed on the pinned Playwright today');
-  const cacheOf = (workflow: Workflow): Step => {
+  const cacheOf = (workflow: Workflow) => {
     const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.uses?.startsWith('actions/cache') === true);
     assert.ok(step?.with !== undefined, 'the e2e job caches its browsers today');
-    return step;
+    return step satisfies Step;
   };
-  const refused = (drift: string[], token: string, why: string): void => {
+  const refused = (drift: string[], token: string, why: string) => {
     assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
     assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
   };
@@ -1681,7 +1692,7 @@ test('REFUSED: no look job, one that runs other than the look alone, a shard tha
   const shipped = readWorkflow();
   assert.deepEqual(lookDrift(shipped), [], 'the look runs once, in its own job, and no shard runs it today');
   assert.deepEqual(browserDrift(shipped, LOOK), [], 'and restores its browsers as the shards do');
-  const refused = (drift: string[], token: string, why: string): void => {
+  const refused = (drift: string[], token: string, why: string) => {
     assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);
     assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
   };
@@ -1923,7 +1934,7 @@ test('REFUSED: the guards workspace with neither a leg nor a job of its own, a g
     `${OWN_JOB.folder} is a workspace with a suite today`,
   );
   assert.deepEqual(guardsDrift(shipped), [], 'the guards job is whole today');
-  const refused = (drift: string[], token: string, why: string): void => {
+  const refused = (drift: string[], token: string, why: string) => {
     assert.equal(drift.length, 1, why);
     assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
   };
@@ -1936,10 +1947,10 @@ test('REFUSED: the guards workspace with neither a leg nor a job of its own, a g
   unneeded.jobs[GATE].needs = (unneeded.jobs[GATE].needs ?? []).filter((job) => job !== OWN_JOB.job);
   refused(gateDrift(unneeded), `does not need ${OWN_JOB.job}`, 'the guards job dropped from the gate');
 
-  const suiteOf = (workflow: Workflow): Step => {
+  const suiteOf = (workflow: Workflow) => {
     const step = (workflow.jobs[OWN_JOB.job].steps ?? []).find((each) => each.run?.includes('turbo run test') === true);
     assert.ok(step !== undefined, 'the guards job runs its suite today');
-    return step;
+    return step satisfies Step;
   };
   const always = structuredClone(shipped);
   delete suiteOf(always).if;
@@ -1965,12 +1976,12 @@ test('REFUSED: the guards workspace with neither a leg nor a job of its own, a g
 test("REFUSED: a job with no bound, a step that reaches the network with none, and a step bounded at its job's bound", () => {
   const shipped = readWorkflow();
   assert.deepEqual(stallDrift(shipped), [], 'every job and every network step is bounded today');
-  const install = (workflow: Workflow): Step => {
+  const install = (workflow: Workflow) => {
     const step = (workflow.jobs[E2E].steps ?? []).find((each) => each.run?.includes('playwright install') === true);
     assert.ok(step !== undefined, 'the e2e job installs Chromium today');
-    return step;
+    return step satisfies Step;
   };
-  const refused = (drift: string[], token: string, why: string): void => {
+  const refused = (drift: string[], token: string, why: string) => {
     assert.equal(drift.length, 1, why);
     assert.ok(drift[0].includes(token), `${why}: the sentence names ${token}`);
   };
@@ -1991,7 +2002,7 @@ test("REFUSED: a job with no bound, a step that reaches the network with none, a
 test('REFUSED: the ci status posted on every event, under another name, granted to another job, and its result not the verdict', () => {
   const text = workflowText();
   assert.deepEqual(statusDrift(readWorkflow(text), GATE, GATE, VERDICT), [], 'a dispatched run posts the ci status today');
-  const refused = (from: string, to: string, token: string, why: string): void => {
+  const refused = (from: string, to: string, token: string, why: string) => {
     assert.ok(text.includes(from), `${FILE} holds ${JSON.stringify(from)} today`);
     const drift = statusDrift(readWorkflow(text.replace(from, to)), GATE, GATE, VERDICT);
     assert.equal(drift.length, 1, `${why}: ${drift.join(' | ')}`);

@@ -21,7 +21,7 @@ import { server as serverVerb } from '../src/server/upgrade.ts';
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
 /** An SSE block. */
-const sse = (event: string, data: string): string =>
+const sse = (event: string, data: string) =>
   `event: ${event}\n${data
     .split('\n')
     .map((l) => `data: ${l}`)
@@ -51,7 +51,7 @@ const upgradeOf = (tag: string, phase: string, exitCode?: number) => ({
 });
 
 /** The chunks a succeeding upgrade to `tag` prints: the daemon stopped, then the new release's own lines, its readiness among them. */
-const chunksOf = (tag: string): readonly string[] => ['stopping the daemon\n', `now ${tag}\nreadiness: claude-token met\n`];
+const chunksOf = (tag: string) => ['stopping the daemon\n', `now ${tag}\nreadiness: claude-token met\n`] satisfies readonly string[];
 
 /**
  * How long the build of `v2.2.0` holds its first stream open before the daemon restarts: four times the bound its test gives the follow,
@@ -60,7 +60,7 @@ const chunksOf = (tag: string): readonly string[] => ['stopping the daemon\n', `
 const BUILD_MS = 800;
 
 /** The output stream of `tag`'s upgrade, opened for the `open`th time: what each tag's stream does. */
-function streamOf(stand: Stand, tag: string, open: number, res: http.ServerResponse): void {
+function streamOf(stand: Stand, tag: string, open: number, res: http.ServerResponse) {
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   if (tag === 'v4.0.0') return void res.end();
   const [first = '', rest = ''] = chunksOf(tag);
@@ -77,7 +77,7 @@ function streamOf(stand: Stand, tag: string, open: number, res: http.ServerRespo
 }
 
 /** A stand-in of the api's upgrade routes, its routes answering from `stand`; where `upgrades` is false it serves no `/api/upgrades`. */
-function standIn(stand: Stand, upgrades = true): http.Server {
+function standIn(stand: Stand, upgrades = true) {
   return http.createServer((req, res) => {
     let text = '';
     req.on('data', (chunk) => (text += chunk));
@@ -113,7 +113,7 @@ function standIn(stand: Stand, upgrades = true): http.Server {
       if (one?.[1] !== undefined) return json(200, upgradeOf(one[1], 'running'));
       return json(404, {});
     });
-  });
+  }) satisfies http.Server;
 }
 
 const servers: http.Server[] = [];
@@ -125,7 +125,7 @@ afterAll(() => {
 });
 
 /** A stand-in started on a free port, `stand` its state; answers its url. */
-async function started(stand: Stand, upgrades = true): Promise<string> {
+async function started(stand: Stand, upgrades = true) {
   const s = standIn(stand, upgrades);
   servers.push(s);
   await new Promise<void>((resolve) => s.listen(0, '127.0.0.1', resolve));
@@ -133,17 +133,20 @@ async function started(stand: Stand, upgrades = true): Promise<string> {
 }
 
 /** A stand-in's fresh state: v1.0.0, v2.0.0 newer, v0.9.0 to go back to. */
-const freshStand = (more: Partial<Stand> = {}): Stand => ({
-  release: 'v1.0.0',
-  latest: { version: '2.0.0', newer: true, tag: 'v2.0.0' },
-  previous: { tag: 'v0.9.0' },
-  posted: [],
-  opens: new Map(),
-  ...more,
-});
+const freshStand = (more: Partial<Stand> = {}) => {
+  const made: Stand = {
+    release: 'v1.0.0',
+    latest: { version: '2.0.0', newer: true, tag: 'v2.0.0' },
+    previous: { tag: 'v0.9.0' },
+    posted: [],
+    opens: new Map(),
+    ...more,
+  };
+  return made;
+};
 
 /** A laptop whose context in use is the server at `at`. */
-function aLaptop(prefix: string, at: string): NodeJS.ProcessEnv {
+function aLaptop(prefix: string, at: string) {
   const folder = scratch(prefix);
   const env = {
     ...ambient(),
@@ -153,11 +156,11 @@ function aLaptop(prefix: string, at: string): NodeJS.ProcessEnv {
     NEMIA_DAEMON_START: 'off',
   };
   configWritten({ contexts: [{ name: 'vps', server: at, token: 'tok' }], current: 'vps' }, env);
-  return env;
+  return env satisfies NodeJS.ProcessEnv;
 }
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -166,7 +169,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /** `nemia server <args>` run in this process as a client of release `client`, its follow bounded by `backWithinMs`. */

@@ -20,7 +20,7 @@ import { forgottenLine } from '../src/commands/runs/forgotten.ts';
 import { FILE_LIMIT, type RunRemoved, type RunStarted } from 'objects';
 
 /** `act` refused, exit 2, its words naming each of `named`. */
-const refused = (act: () => unknown, ...named: (string | RegExp)[]): void =>
+const refused = (act: () => unknown, ...named: (string | RegExp)[]) =>
   assert.throws(act, (err: unknown) => {
     assert.ok(err instanceof Refused, String(err));
     assert.equal(err.code, 2);

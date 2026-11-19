@@ -20,11 +20,10 @@ import { scratch } from 'test-kit/scratch';
 const FIX = 'type it as a closed union of its words, named in its context’s glossary.json, and carry a sentence as `message`';
 
 /** Each field of `hits` refused, as a sentence naming the fix. */
-export const breaks = (hits: ReadonlyArray<{ key: string }>): string[] =>
-  hits.map(({ key }) => `${key} says a state or a kind as a string: ${FIX}`);
+export const breaks = (hits: ReadonlyArray<{ key: string }>) => hits.map(({ key }) => `${key} says a state or a kind as a string: ${FIX}`);
 
 /** A scratch root holding `files`, an ES module package; `effect` linked in for a fixture that imports it. */
-const fixture = (files: Record<string, string>): string => {
+const fixture = (files: Record<string, string>) => {
   const root = scratch('closed-state-');
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ type: 'module' }));
   fs.mkdirSync(path.join(root, 'node_modules'));
@@ -37,7 +36,7 @@ const fixture = (files: Record<string, string>): string => {
 };
 
 /** The keys of the open fields `door.ts` of a fixture of `files` reaches. */
-const openIn = (files: Record<string, string>): string[] =>
+const openIn = (files: Record<string, string>) =>
   openStates(['door.ts'], fixture(files))
     .hits.map(({ key }) => key)
     .sort();

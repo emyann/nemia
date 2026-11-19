@@ -12,13 +12,14 @@ import { bell, type Bell } from 'agent-runtime/testing';
 export type OwnVerbs = { readonly [V in PlaceVerb]?: (request: PlaceRequests[V]) => PlaceOutcome<V> };
 
 /** `verb` unread, in `said`. */
-export const unreadBy = <V extends PlaceVerb>(verb: V, said: string): PlaceOutcome<V> => ({
-  unread: { verb, said, at: new Date().toISOString() },
-});
+export const unreadBy = <V extends PlaceVerb>(verb: V, said: string) =>
+  ({
+    unread: { verb, said, at: new Date().toISOString() },
+  }) satisfies PlaceOutcome<V>;
 
 /** `place`, with each verb of `verbs` answered by its function. */
-export function placeOver(place: Place, verbs: OwnVerbs): Place {
-  const own = <V extends PlaceVerb>(verb: V): ((request: PlaceRequests[V]) => PlaceOutcome<V>) | undefined => verbs[verb];
+export function placeOver(place: Place, verbs: OwnVerbs) {
+  const own = <V extends PlaceVerb>(verb: V) => verbs[verb] satisfies ((request: PlaceRequests[V]) => PlaceOutcome<V>) | undefined;
   return {
     declared: place.declared,
     ask: (verb, request, options) => {
@@ -29,17 +30,17 @@ export function placeOver(place: Place, verbs: OwnVerbs): Place {
       const answer = own(verb);
       return answer ? answer(request) : place.askNow(verb, request, options);
     },
-  };
+  } satisfies Place;
 }
 
 /** `place`, with each verb of `verbs` asked of `other` instead, both ways of asking. */
-export function placeSplit(place: Place, other: Place, verbs: readonly PlaceVerb[]): Place {
-  const of = (verb: PlaceVerb): Place => (verbs.includes(verb) ? other : place);
+export function placeSplit(place: Place, other: Place, verbs: readonly PlaceVerb[]) {
+  const of = (verb: PlaceVerb) => (verbs.includes(verb) ? other : place) satisfies Place;
   return {
     declared: place.declared,
     ask: (verb, request, options) => of(verb).ask(verb, request, options),
     askNow: (verb, request, options) => of(verb).askNow(verb, request, options),
-  };
+  } satisfies Place;
 }
 
 /** A place whose asks of one verb wait on the test (`placeHeld`): the place, and what the test reads and does of those asks. */
@@ -61,7 +62,7 @@ export type HeldPlace<V extends PlaceVerb> = {
  * `place`, with each `ask` of `verb` held when it comes in, until the test lets it go (`letGo`), and then asked of `place`: a test
  * waits on the bell for the asks it counts, never on a length of time. Every other verb, and `askNow`, as `place` does.
  */
-export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace<V> {
+export function placeHeld<V extends PlaceVerb>(place: Place, verb: V) {
   const rung = bell();
   const one: PlaceVerb = verb;
   const requests: PlaceRequests[PlaceVerb][] = [];
@@ -93,5 +94,5 @@ export function placeHeld<V extends PlaceVerb>(place: Place, verb: V): HeldPlace
     waiting: () => held.length,
     most: () => most,
     letGo: (which = 'last') => (which === 'first' ? held.shift() : held.pop())?.(),
-  };
+  } satisfies HeldPlace<V>;
 }

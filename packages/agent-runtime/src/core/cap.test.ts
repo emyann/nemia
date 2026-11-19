@@ -13,7 +13,7 @@ const at = (ms: number) => new Date(Date.UTC(2026, 0, 1) + ms).toISOString();
 const TASK = 't-1';
 
 /** Attempt `n`, ended as said: `parked` or not, having cost `costUsd` where its runner priced it. */
-const ran = (n: number, end: { parked?: boolean; costUsd?: number; usage?: false }): Event[] => {
+const ran = (n: number, end: { parked?: boolean; costUsd?: number; usage?: false }) => {
   const usage: Usage | undefined = end.usage === false ? undefined : end.costUsd === undefined ? {} : { costUsd: end.costUsd };
   return [
     { kind: 'starting', at: at(n * 10), attempt: n },
@@ -29,16 +29,17 @@ const ran = (n: number, end: { parked?: boolean; costUsd?: number; usage?: false
       ...(usage ? { usage } : {}),
       ...(end.parked ? { parked: {} } : {}),
     },
-  ];
+  ] satisfies Event[];
 };
-const filed = (config?: HarnessArgs): Event => ({
-  kind: 'filed',
-  at: at(0),
-  brief: 'b',
-  cwd: '/r',
-  queued: false,
-  ...(config ? { config } : {}),
-});
+const filed = (config?: HarnessArgs) =>
+  ({
+    kind: 'filed',
+    at: at(0),
+    brief: 'b',
+    cwd: '/r',
+    queued: false,
+    ...(config ? { config } : {}),
+  }) satisfies Event;
 const cap5 = filed({ budgetUsd: 5 });
 
 describe('capLeft and capSpent: a cap less what was spent, at or below nothing a cap spent whole', () => {
@@ -74,7 +75,7 @@ describe("parkedCapLeft: a continuation's cap is its turn's, less what the parke
     });
   test("a later turn takes its input's cap, and its run does not reach back into the turn before", () => {
     const events: Event[] = [
-      { ...cap5, holdOpen: true } as Event,
+      { ...cap5, holdOpen: true },
       ...ran(1, { parked: true, costUsd: 1 }),
       { kind: 'input', at: at(100), text: 'more', config: { budgetUsd: 3 } },
       { kind: 'starting', at: at(110), attempt: 2 },
@@ -98,7 +99,7 @@ describe("parkedCapLeft: a continuation's cap is its turn's, less what the parke
 });
 
 describe('continuedCap and parkedEnd: a continuation is handed its cap left, and a park that spent it is no park', () => {
-  const started = (n: number): Event[] => [{ kind: 'starting', at: at(n * 10), attempt: n }];
+  const started = (n: number) => [{ kind: 'starting', at: at(n * 10), attempt: n }] satisfies Event[];
   const rows: [string, () => unknown, unknown][] = [
     [
       'a continuation of a parked attempt: its config with the cap left',

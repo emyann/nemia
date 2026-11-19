@@ -63,7 +63,7 @@ const said = (t: Waiter, got: readonly Followed[], text: string) =>
   until(t, () => partials(got).some((m) => m.kind === 'partial' && m.text === text), `the piece \`${text}\``, { bell: rung });
 
 /** Whether the session's capture holds the turn's result: what "before the turn's end" is read against. */
-const resulted = (root: string): boolean => {
+const resulted = (root: string) => {
   try {
     return fs.readFileSync(filesOf(root, NAME).out, 'utf8').includes('"type":"result"');
   } catch {
@@ -72,7 +72,7 @@ const resulted = (root: string): boolean => {
 };
 
 /** The kind of each line the session's capture holds, in order: its `type`, with its `subtype` where it has one. */
-const capturedKinds = (root: string): string[] => {
+const capturedKinds = (root: string) => {
   const { out } = filesOf(root, NAME);
   return lines(path.dirname(out), path.basename(out)).map((l) => {
     const { type, subtype } = l as { type: string; subtype?: string };

@@ -37,7 +37,7 @@ const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 type Guarded = { name: string; dir: string; entries: readonly string[] };
 
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
-function breaches(file: string, text: string, guarded: Guarded): string[] {
+function breaches(file: string, text: string, guarded: Guarded) {
   const code = withoutComments(text);
   const out: string[] = [];
   const instead = `reach it through ${guarded.entries.join(' or ')}`;
@@ -60,7 +60,7 @@ function breaches(file: string, text: string, guarded: Guarded): string[] {
 }
 
 /** Every source file git lists outside the guarded package, tracked or not yet added, that is on disk. */
-function workspaceFiles(guarded: Guarded): string[] {
+function workspaceFiles(guarded: Guarded) {
   const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -158,10 +158,10 @@ test('and what is not a route is not refused: the entries, the CLI spawned, and 
 const TESTING = 'agent-runtime/testing';
 
 /** Whether `file` is a test or a helper of tests: a `.test.` file anywhere, or any file under a `test/` folder. */
-const isTestFile = (file: string): boolean => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
+const isTestFile = (file: string) => /\.test\.[cm]?[jt]sx?$/.test(file) || file.split('/').includes('test');
 
 /** Where `file`, which is no test's, imports the testing entry: a file that runs is never given a stand-in. */
-function testingBreaches(file: string, text: string): string[] {
+function testingBreaches(file: string, text: string) {
   if (isTestFile(file) || !specifiersIn(withoutComments(text)).includes(TESTING)) return [];
   return [
     `${file} imports ${TESTING}, which is for tests alone: a file that runs asks the engine it is given, and only a test file ` +
@@ -221,7 +221,7 @@ test("agent-runtime's exports are . (index.ts), ./vocabulary (vocabulary.ts) and
  * `decide` is the runtime's judgement, pure and not for a consumer to call (src/index.ts says why); `fold` is exported beside it on
  * purpose.
  */
-function exportBreaches(entries: Record<string, readonly string[]>): string[] {
+function exportBreaches(entries: Record<string, readonly string[]>) {
   const out = Object.entries(entries)
     .filter(([, names]) => names.includes('decide'))
     .map(([entry]) => `${entry} exports decide, the runtime's judgement: export what it decided (fold, the events), never the function`);
@@ -272,7 +272,7 @@ test('decide is exported by no entry, and the stand-in by the testing entry alon
 const OBJECTS = { name: 'objects', dir: 'packages/objects' } as const;
 
 /** Where `file`, of this package, imports the objects: by their name or a subpath of it, or by a relative path into their folder. */
-function objectsBreaches(file: string, text: string): string[] {
+function objectsBreaches(file: string, text: string) {
   return specifiersIn(withoutComments(text)).flatMap((spec) => {
     const named = spec === OBJECTS.name || spec.startsWith(`${OBJECTS.name}/`);
     const into =

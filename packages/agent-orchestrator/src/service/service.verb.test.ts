@@ -65,27 +65,28 @@ const lease = (
   kind: 'ticking' | 'stopped' | 'gone' | 'stalled' = 'ticking',
   identity: 'same' | 'unknown' = 'same',
   passed = false,
-): DaemonStanding => ({
-  kind,
-  file: {
-    pid,
-    by: 'api',
-    url: 'http://127.0.0.1:8790',
-    startedAt: new Date().toISOString(),
-    cwd: '/',
-    every: 4000,
-    passedAt: passed ? new Date().toISOString() : null,
-  },
-  last: Date.now(),
-  quiet: 0,
-  identity,
-});
+) =>
+  ({
+    kind,
+    file: {
+      pid,
+      by: 'api',
+      url: 'http://127.0.0.1:8790',
+      startedAt: new Date().toISOString(),
+      cwd: '/',
+      every: 4000,
+      passedAt: passed ? new Date().toISOString() : null,
+    },
+    last: Date.now(),
+    quiet: 0,
+    identity,
+  }) satisfies DaemonStanding;
 
 /** A session in its call to Bash under the pause. */
 const CALL: Finishing = { run: 'r2', step: 'implement', kind: 'session', calling: 'Bash' };
 
 /** The lease of the service's new daemon `pid`, read once before its first pass and passed on every read after. */
-const passing = (world: World, pid: number): void => {
+const passing = (world: World, pid: number) => {
   world.lease = lease(pid);
   world.unitPid = pid;
   world.later = [lease(pid), lease(pid, 'ticking', 'same', true)];
@@ -115,7 +116,7 @@ type World = {
  * A host over `world` that logs, in order, every program it calls, the pause, the signal and what it says; and,
  * where `world.calls` is given, each calls read and each drain put or lifted.
  */
-function hostOf(world: World): { host: ServiceHost; events: string[] } {
+function hostOf(world: World) {
   const events: string[] = [];
   const host: ServiceHost = {
     machine: () => world.machine ?? { platform: 'linux', wsl: true, systemd: true },
@@ -177,7 +178,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     timeoutMs: 200,
     stopMs: world.stopMs ?? 300,
   };
-  return { host, events };
+  return { host, events } satisfies { host: ServiceHost; events: string[] };
 }
 
 const install = (args: Args, host: ServiceHost) => runWith(engineOf(engine().layer), installService(args, host));
@@ -196,15 +197,14 @@ const taking = (host: ServiceHost, clock?: Steered) => {
 };
 
 /** A rest of `by` that `clock` was asked and has not woken: the pass of `fiber`'s program that waits for the clock to move. */
-const resting = (clock: Steered, by: number): boolean =>
-  clock.asked.filter((ms) => ms === by).length > clock.woken.filter((ms) => ms === by).length;
+const resting = (clock: Steered, by: number) => clock.asked.filter((ms) => ms === by).length > clock.woken.filter((ms) => ms === by).length;
 
 /**
  * Moves `clock` by `by` for each rest of `by` `fiber`'s program is waiting on, waiting for the rest and never for a length of time,
  * until the program ends. Every rest a take-over asks but its bounds is its host's poll, so the clock moves by one poll a pass and a
  * program driven this way reaches none of those bounds: no length of real time decides what it does.
  */
-const stepped = async (t: Waiter, clock: Steered, fiber: { pollUnsafe: () => unknown }, by: number): Promise<void> => {
+const stepped = async (t: Waiter, clock: Steered, fiber: { pollUnsafe: () => unknown }, by: number) => {
   while (fiber.pollUnsafe() === undefined) {
     await until(t, () => resting(clock, by) || fiber.pollUnsafe() !== undefined, `a rest of ${by} ms outstanding, or the program ended`, {
       bell: clock.bell,
@@ -224,7 +224,7 @@ beforeEach(() => {
 });
 
 /** A unit written for the service, as install leaves it, so a restart finds it installed. */
-const installed = async (): Promise<void> => {
+const installed = async () => {
   await install({}, hostOf({ lease: { kind: 'none' }, unitPid: null }).host);
 };
 
@@ -627,11 +627,12 @@ test('a take-over whose daemon takes its own let-go to stop is not refused: the 
 type Listed = ListedTask;
 
 /** A task of `run`'s `step` at work, living in the daemon where `always`, in its call to `tool` where one is given. */
-const listedTask = (id: string, step: string, always: boolean, tool?: string): Listed => ({
-  id,
-  state: { settled: null, labels: { run: 'r2', step }, ...(always ? { restartPolicy: 'Always' as const } : {}) },
-  ...(tool ? { calling: { tool, since: '2026-11-03T10:00:00Z' } } : {}),
-});
+const listedTask = (id: string, step: string, always: boolean, tool?: string) =>
+  ({
+    id,
+    state: { settled: null, labels: { run: 'r2', step }, ...(always ? { restartPolicy: 'Always' as const } : {}) },
+    ...(tool ? { calling: { tool, since: '2026-11-03T10:00:00Z' } } : {}),
+  }) satisfies Listed;
 
 /**
  * The engine's list over `views`, as the take-over reads it: each read's ids (`undefined` for the whole store), and the views it answers,
@@ -648,13 +649,12 @@ const listOver = (views: Listed[]) => {
 };
 
 /** `host` with its calls read off `list` as the live host reads them (`attachedCalls`), each read logged as the fake's are. */
-const callsOver = (
-  host: ServiceHost,
-  events: string[],
-  list: (ids?: readonly string[]) => Effect.Effect<{ views: Listed[] }>,
-): ServiceHost => {
+const callsOver = (host: ServiceHost, events: string[], list: (ids?: readonly string[]) => Effect.Effect<{ views: Listed[] }>) => {
   const read = attachedCalls(list);
-  return { ...host, calls: () => Effect.tap(read(), (found) => Effect.sync(() => void events.push(`calls ${found.length}`))) };
+  return {
+    ...host,
+    calls: () => Effect.tap(read(), (found) => Effect.sync(() => void events.push(`calls ${found.length}`))),
+  } satisfies ServiceHost;
 };
 
 test('a take-over leaves the jobs running: a job in a call is not waited for, and with no attached call the signal comes at once', async () => {

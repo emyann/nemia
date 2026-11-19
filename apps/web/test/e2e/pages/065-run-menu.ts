@@ -11,7 +11,7 @@ import { OUT, store } from '../world.ts';
 const TRIED = 'menu-tried-e2e';
 
 /** Refuses unless the run's header holds one menu button, and it offers exactly `want`. */
-async function offers(page: Page, want: readonly string[], who: string): Promise<void> {
+async function offers(page: Page, want: readonly string[], who: string) {
   await expectCount(page.locator('header[data-run-header] button[data-run-menu]'), 1, `${who}'s actions are behind one button`);
   const actions = await runMenuActions(page);
   if (actions.join() !== want.join()) throw new Refused(`${who}'s menu offers ${want.join(', ')} — it offers ${actions.join(', ')}`);

@@ -33,16 +33,15 @@ const STORE = path.join(root, 'workflows');
 const json = { 'content-type': 'application/json' };
 
 /** A folder's version as the board reads it, its agents and skills looked for in the repository and in yours. */
-const versionOf = (dir: string): string =>
-  Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
+const versionOf = (dir: string) => Effect.runSync(versionIn(dir, { repo, home: root }).pipe(Effect.provideService(StoreRoot, root)));
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
 
 /** A workflow of yours, `plan` then `build`, with a README and a schema beside its steps. */
-function planned(name: string): string {
+function planned(name: string) {
   const dir = path.join(STORE, name);
   write(path.join(dir, 'README.md'), `# ${name}\n`);
   write(path.join(dir, 'plan.md'), '---\nplace: git\nharness: claude\n---\nWrite PLAN.md.\n');
@@ -52,7 +51,7 @@ function planned(name: string): string {
 }
 
 /** Every file under `dir`, with what it holds: what a refused removal must leave as it was. */
-const snapshot = (dir: string): Record<string, string> =>
+const snapshot = (dir: string) =>
   Object.fromEntries(
     fs
       .readdirSync(dir, { recursive: true, encoding: 'utf8' })
@@ -70,12 +69,12 @@ const remove = (name: string, version?: string | null, from = 'user', headers: R
 };
 
 /** Whether the namespace's workflows list `name` from `from`. */
-async function listed(name: string, from = 'user'): Promise<boolean> {
+async function listed(name: string, from = 'user') {
   const all = await listedIn<{ name: string; from: string }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   return all.some((w) => w.name === name && w.from === from);
 }
 
-const errorOf = async (res: Response): Promise<string> => ((await res.json()) as { error: string }).error;
+const errorOf = async (res: Response) => ((await res.json()) as { error: string }).error;
 
 describe("a person removes a folder of theirs: refused while it is stale, unsaid, still needed or the repository's, then removed whole at the version read", () => {
   let dir!: string;

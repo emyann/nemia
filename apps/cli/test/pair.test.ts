@@ -27,18 +27,21 @@ const claims = new Map<string, Array<[number, unknown]>>();
 const took: Array<{ method: string; path: string; authorization: string | undefined; body: unknown }> = [];
 
 /** The stand-in's answer to one request. */
-function answer(method: string, url: string, body: unknown): [number, unknown] {
+function answer(method: string, url: string, body: unknown) {
   if (method === 'POST' && url === '/api/pairings') {
     const client = (body as { client: string }).client;
     const id = client === 'gone' ? 'p-gone' : client === 'lapsed' ? 'p-lapsed' : 'p-ok';
-    return [200, { id, code: 'ABCD-EFGH', secret: `secret-${id}`, expiresAt: new Date(Date.now() + 600_000).toISOString() }];
+    return [200, { id, code: 'ABCD-EFGH', secret: `secret-${id}`, expiresAt: new Date(Date.now() + 600_000).toISOString() }] satisfies [
+      number,
+      unknown,
+    ];
   }
   const claim = /^\/api\/pairings\/([^/]+)\/claim$/.exec(url);
   if (method === 'POST' && claim) {
     const queue = claims.get(claim[1] ?? '') ?? [[404, { error: 'no such pairing' }]];
-    return queue.length > 1 ? (queue.shift() ?? [500, {}]) : (queue[0] ?? [500, {}]);
+    return (queue.length > 1 ? (queue.shift() ?? [500, {}]) : (queue[0] ?? [500, {}])) satisfies [number, unknown];
   }
-  return [404, {}];
+  return [404, {}] satisfies [number, unknown];
 }
 
 const stub = http.createServer((req, res) => {
@@ -61,7 +64,7 @@ afterAll(() => {
 const server = `http://127.0.0.1:${(stub.address() as AddressInfo).port}`;
 
 /** A laptop of its own: its config folder, and the environment `nemia` runs with on it. */
-function aLaptop(prefix: string): { env: NodeJS.ProcessEnv; file: string } {
+function aLaptop(prefix: string) {
   const folder = scratch(prefix);
   const env = {
     ...ambient(),
@@ -71,11 +74,11 @@ function aLaptop(prefix: string): { env: NodeJS.ProcessEnv; file: string } {
     NEMIA_DAEMON_START: 'off',
     NEMIA_PAIR_EVERY_MS: '20',
   };
-  return { env, file: path.join(folder, 'config', 'nemia', 'config.yaml') };
+  return { env, file: path.join(folder, 'config', 'nemia', 'config.yaml') } satisfies { env: NodeJS.ProcessEnv; file: string };
 }
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -84,7 +87,7 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 test('`nemia pair <url>` claims through a waiting answer, writes the context 0600 in use, and prints no token', async () => {

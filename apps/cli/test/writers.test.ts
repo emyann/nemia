@@ -30,7 +30,7 @@ const store = await servedStore('nemia-writers-', () => {});
 afterAll(store.stop);
 
 /** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -39,29 +39,29 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 }
 
 /**
  * `each` of `items`, four at a time: a test that asks every command the same thing spawns the client once a command, and waited on one
  * after another those spawns were the suite's longest test. Four keeps the file's children well inside what a suite is held to.
  */
-async function fourAtATime<T>(items: readonly T[], each: (item: T) => Promise<void>): Promise<void> {
+async function fourAtATime<T>(items: readonly T[], each: (item: T) => Promise<void>) {
   const left = [...items];
-  const worker = async (): Promise<void> => {
+  const worker = async () => {
     for (let item = left.shift(); item !== undefined; item = left.shift()) await each(item);
   };
   await Promise.all(Array.from({ length: 4 }, worker));
 }
 
 /** The version a write printed, `at version <v>`. */
-const versionIn = (said: string): string => /at version (\S+)$/m.exec(said)?.[1] ?? assert.fail(`no version in: ${said}`);
+const versionIn = (said: string) => /at version (\S+)$/m.exec(said)?.[1] ?? assert.fail(`no version in: ${said}`);
 
 /**
  * A draft workflow folder `name`: one step, a script it carries, a subfolder with a file in it, which a write never reads (`folderFiles`
  * reads the files directly in the folder), and the files of `more`.
  */
-function draftFolder(name: string, more: Readonly<Record<string, string>> = {}): string {
+function draftFolder(name: string, more: Readonly<Record<string, string>> = {}) {
   const folder = path.join(DRAFTS, 'workflows', name);
   write(path.join(folder, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   write(path.join(folder, 'pictures.ts'), 'process.exit(0);\n');
@@ -81,7 +81,7 @@ const SCHEMA = JSON.stringify({
 const TIDY = '---\nname: tidy\ndescription: Tidy a folder.\n---\nTidy it.\n';
 
 /** A laptop with no store of its own, its scratch home and config, the start off. */
-function laptop(prefix: string): NodeJS.ProcessEnv {
+function laptop(prefix: string) {
   const folder = scratch(prefix);
   return {
     ...ambient('NEMIA_ON_INSTALLED'),
@@ -90,7 +90,7 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
     HOME: path.join(folder, 'home'),
     XDG_CONFIG_HOME: path.join(folder, 'config'),
     NEMIA_DAEMON_START: 'off',
-  };
+  } satisfies NodeJS.ProcessEnv;
 }
 
 test('`--help` prints its manual where it has one, else its usage and help, from `COMMAND_WORDS`, exit 0, asking nothing', async () => {

@@ -6,23 +6,25 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import type { AgentSource, LibraryAdd, McpServer } from 'objects';
 import { addable, importablesOf, libraryCount, libraryItemsOf, type LibraryItem } from '../src/lib/api/storeLibrary.ts';
-import { agentObject, consistentSkill, listedAgent, skillObject, skillRow, workflow, workflowObject } from './library-fixtures.ts';
+import { agentObject, consistentSkill, listedAgent, skillObject, skillRow, workflow, workflowObject } from './library.fixture.ts';
 
-const server = (name: string, origin?: 'user' | 'builtin', factories?: string[]): McpServer => ({
-  apiVersion: 'nemia/v1',
-  kind: 'McpServer',
-  metadata: { name, creationTimestamp: '2026-11-15T00:00:00Z', resourceVersion: 'v1' },
-  spec: { type: 'http', url: `https://${name}.example` },
-  status: { ...(origin ? { origin } : {}), ...(factories ? { factories } : {}) },
-});
+const server = (name: string, origin?: 'user' | 'builtin', factories?: string[]) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'McpServer',
+    metadata: { name, creationTimestamp: '2026-11-15T00:00:00Z', resourceVersion: 'v1' },
+    spec: { type: 'http', url: `https://${name}.example` },
+    status: { ...(origin ? { origin } : {}), ...(factories ? { factories } : {}) },
+  }) satisfies McpServer;
 
-const add = (name: string): LibraryAdd => ({
-  apiVersion: 'nemia/v1',
-  kind: 'LibraryAdd',
-  metadata: { name, namespace: 'shop', creationTimestamp: '2026-11-15T00:00:00Z', resourceVersion: 'v1' },
-  spec: { kind: name.startsWith('Skill') ? 'Skill' : 'Agent', name: name.split('.')[1] ?? '' },
-  status: { state: 'resolved', recorded: true },
-});
+const add = (name: string) =>
+  ({
+    apiVersion: 'nemia/v1',
+    kind: 'LibraryAdd',
+    metadata: { name, namespace: 'shop', creationTimestamp: '2026-11-15T00:00:00Z', resourceVersion: 'v1' },
+    spec: { kind: name.startsWith('Skill') ? 'Skill' : 'Agent', name: name.split('.')[1] ?? '' },
+    status: { state: 'resolved', recorded: true },
+  }) satisfies LibraryAdd;
 
 test("the library's items, each kind in its order and each by name, with their origin, the factories that use them, and a changed builtin", () => {
   const skill = skillObject(consistentSkill({ skill: skillRow({ name: 'tidy', from: 'user', found: null }) }));
@@ -67,25 +69,27 @@ test('a factory may add each agent, skill or MCP server it has not added; a work
   );
 });
 
-const item = (kind: LibraryItem['kind'], name: string): LibraryItem => ({
-  kind,
-  name,
-  description: null,
-  origin: 'user',
-  factories: [],
-  builtinChanged: false,
-});
+const item = (kind: LibraryItem['kind'], name: string) =>
+  ({
+    kind,
+    name,
+    description: null,
+    origin: 'user',
+    factories: [],
+    builtinChanged: false,
+  }) satisfies LibraryItem;
 
-const source = (place: AgentSource['place'], name: string, error: string | null = null): AgentSource => ({
-  place,
-  repo: place === 'repository' ? '/code/app' : null,
-  dir: '/srv/agents',
-  file: `/srv/agents/${name}.md`,
-  name,
-  description: error === null ? `${name} things` : null,
-  version: error === null ? 'v1' : null,
-  error,
-});
+const source = (place: AgentSource['place'], name: string, error: string | null = null) =>
+  ({
+    place,
+    repo: place === 'repository' ? '/code/app' : null,
+    dir: '/srv/agents',
+    file: `/srv/agents/${name}.md`,
+    name,
+    description: error === null ? `${name} things` : null,
+    version: error === null ? 'v1' : null,
+    error,
+  }) satisfies AgentSource;
 
 test("a harness's own agents to import: its place alone, each said held where the library has its name, one that does not read with why", () => {
   const offered = importablesOf(

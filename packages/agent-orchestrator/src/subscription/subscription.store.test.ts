@@ -39,7 +39,7 @@ const store = () => {
     state: (name: string) => deliveryFileAt(root, name),
   };
 };
-const nameOf = (name: string): SubscriptionName => SubscriptionName.read(name);
+const nameOf = (name: string) => SubscriptionName.read(name);
 
 const SUB = aSubscription();
 
@@ -186,17 +186,16 @@ const SEAM = [
 const OWN = ['src/subscription/subscription.store.ts', 'src/subscription/memory.store.ts'];
 
 /** Every file of `src` but the tests and the door's, by its path from the package. */
-const sourcesOfSrc = (): Record<string, string> => sourcesUnder(PKG, 'src', OWN);
+const sourcesOfSrc = () => sourcesUnder(PKG, 'src', OWN);
 
 /** The seam's calls in each file, comment lines left out: what `seamRefusals` refuses. */
-const seamUses = (sources: Record<string, string>): Map<string, number> =>
-  usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
+const seamUses = (sources: Record<string, string>) => usesOf(sources, new RegExp(`(?<![\\w$.])(?:${SEAM.join('|')})\\s*\\(`, 'g'));
 
 /**
  * Each file of `sources` that calls the module's spellings rather than yielding the door, with how many times: a refusal, since every
  * caller is converted and none may come back.
  */
-const seamRefusals = (sources: Record<string, string>): string[] =>
+const seamRefusals = (sources: Record<string, string>) =>
   [...seamUses(sources)].map(
     ([file, n]) =>
       `${file} calls the subscriptions' module spellings ${n} time(s): yield SubscriptionDoor (src/subscription/subscription.store.ts) instead`,

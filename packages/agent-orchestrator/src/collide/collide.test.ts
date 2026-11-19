@@ -16,10 +16,10 @@ const STEPS: StepSpec[] = [
 ];
 
 /** The same shape with no gate anywhere, as `quick` is: its ending lands on its check all the same, filed by the review before it. */
-const UNGATED = (): RepositoryRun => ({ ...refused(SHA), gates: [] });
+const UNGATED = () => ({ ...refused(SHA), gates: [] });
 
 /** A repository run `id` on /code/app's main, gated at its ship, with `more` over it. */
-const run = (id: string, more: Partial<RepositoryRun> = {}): RepositoryRun => ({
+const run = (id: string, more: Partial<RepositoryRun> = {}) => ({
   id,
   workspace: '/code/app',
   brief: 'b',
@@ -38,7 +38,7 @@ const CLEAN: TrialMerge = { clean: true };
 const SHA = 'b'.repeat(40);
 
 /** `run` whose ship's landing was aborted, its check `t-check` having refused the merged tree on `refusedOn`. */
-const refused = (refusedOn: string | undefined, check = true): RepositoryRun =>
+const refused = (refusedOn: string | undefined, check = true) =>
   run('r-1', {
     steps: {
       implement: { taskId: 't-r-1', branch: 'wf/r-1/implement' },

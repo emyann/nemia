@@ -20,7 +20,6 @@ import type { Workflow } from 'objects';
 import { app } from '../app.ts';
 
 type Command = (typeof COMMANDS)[number];
-type Args = Parameters<NonNullable<Command['handler']>>[0];
 
 const STORE = path.join(root, 'workflows');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
@@ -31,27 +30,19 @@ const json = { 'content-type': 'application/json' };
 const sent = (method: string, url: string, body: unknown) => app.request(url, { method, headers: json, body: JSON.stringify(body) });
 
 /** The keys an entry's handler may be handed by either side: its positionals, and its flags but those the command line alone takes. */
-const handlerKeys = (command: Command): Set<string> =>
+const handlerKeys = (command: Command) =>
   new Set([
     ...command.spec.positionals.map((p) => p.key),
     ...command.spec.flags.flatMap((f) => (f.only?.side !== 'cli' && f.key !== undefined ? [f.key] : [])),
   ]);
 
 /** The answer to `request`, and the arguments each call of `name`'s handler was handed meanwhile, the handler run as it is. */
-async function watched(
-  t: TestContext,
-  name: string,
-  request: () => Response | Promise<Response>,
-): Promise<{ res: Response; handed: Args[] }> {
+async function watched(t: TestContext, name: string, request: () => Response | Promise<Response>) {
   const command = COMMANDS.find((c) => c.name === name)!;
-  const handler = command.handler.bind(command);
-  const handed: Args[] = [];
-  const watch = vi.spyOn(command, 'handler').mockImplementation((args: Args, kept?: Parameters<typeof handler>[1]) => {
-    handed.push(args);
-    return handler(args, kept);
-  });
+  const watch = vi.spyOn(command, 'handler');
   try {
-    return { res: await request(), handed };
+    const res = await request();
+    return { res, handed: watch.mock.calls.map(([args]) => args) };
   } finally {
     watch.mockRestore();
   }
@@ -64,12 +55,7 @@ async function watched(
 const OBJECTS_HAND = new Set(['draft', 'schema', 'repo', 'change', 'copy', 'builtin', 'readme', 'files']);
 
 /** The body `res` answered, its status `status`, and each call of `name`'s handler handed only keys its spec gives a handler. */
-async function heldToSpec(
-  t: TestContext,
-  name: string,
-  status: number,
-  request: () => Response | Promise<Response>,
-): Promise<Record<string, unknown>> {
+async function heldToSpec(t: TestContext, name: string, status: number, request: () => Response | Promise<Response>) {
   const { res, handed } = await watched(t, name, request);
   const body = (await res.json()) as Record<string, unknown>;
   assert.equal(res.status, status, `${name}: ${JSON.stringify(body)}`);
@@ -84,7 +70,7 @@ async function heldToSpec(
   return body;
 }
 
-const versionOf = (body: Record<string, unknown>): string => (body.metadata as { resourceVersion: string }).resourceVersion;
+const versionOf = (body: Record<string, unknown>) => (body.metadata as { resourceVersion: string }).resourceVersion;
 const D = '/api/namespaces/default';
 
 test("each writer's route hands its handler only the keys its one spec gives a handler, and is answered as it is", async (t) => {

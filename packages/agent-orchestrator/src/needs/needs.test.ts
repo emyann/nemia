@@ -65,7 +65,7 @@ describe('a check reads met on exit 0, missing on any other exit, and unknown pa
 });
 
 /** A workflow folder whose README holds `readme`. */
-const withReadme = (readme: string): string => {
+const withReadme = (readme: string) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'README.md'), readme);
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
@@ -125,7 +125,7 @@ test("a workflow's need that fills a place's goes before the place's own fixes, 
 });
 
 /** A workflow `dev` of a factory's own repository, under `home`, its README declaring one need checked by `check`. */
-const devRepo = (home: string, check: string): { repo: string; dir: string } => {
+const devRepo = (home: string, check: string) => {
   const repo = fs.mkdtempSync(path.join(home, 'repo-'));
   const dir = path.join(repo, 'workflows', 'dev');
   fs.mkdirSync(dir, { recursive: true });

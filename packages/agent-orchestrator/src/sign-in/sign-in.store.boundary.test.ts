@@ -26,7 +26,7 @@ const TOKEN = 'sk-ant-oat01-test-token-never-shown';
 const BIN = path.join(import.meta.dirname, '..', '..', 'bin', 'nemia.ts');
 
 /** `nemia <argv>` on the store `root` with `input` piped to it: its exit code and what it printed, waited on to its end. */
-function nemia(root: string, argv: string[], input: string): Promise<{ code: number | null; out: string }> {
+function nemia(root: string, argv: string[], input: string) {
   const child = spawn(process.execPath, [BIN, ...argv], { env: { ...process.env, WF_ROOT: root }, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   child.stdout.on('data', (d) => (out += d));
@@ -35,10 +35,10 @@ function nemia(root: string, argv: string[], input: string): Promise<{ code: num
   return new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('close', (code) => resolve({ code, out }));
-  });
+  }) satisfies Promise<{ code: number | null; out: string }>;
 }
 
-const mode = (file: string): number => fs.statSync(file).mode & 0o777;
+const mode = (file: string) => fs.statSync(file).mode & 0o777;
 
 test('nemia claude-token set keeps the piped token at 0600 and never prints it; status says set and its mode, never the token', async () => {
   const root = scratch('wf-claude-token-');

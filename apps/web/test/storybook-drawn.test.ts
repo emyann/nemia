@@ -33,7 +33,7 @@ test("the stories but the page bodies' are thirty and more, each of which npm ru
 });
 
 test("REFUSED: the router's plugin, alone or in a list, is left out of the board's config; every other plugin is kept", async () => {
-  const named = (name: string): PluginOption => ({ name });
+  const named = (name: string) => ({ name });
   assert.equal(ofTheRouter(named('tanstack-router:generator')), true);
   assert.equal(ofTheRouter([named('vite:react'), [named('tanstack-router:code-splitter')]]), true, 'in a list in a list');
   assert.equal(ofTheRouter(named('vite:react')), false);

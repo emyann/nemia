@@ -44,55 +44,59 @@ import {
 
 const at = (s: number) => new Date(Date.UTC(2026, 9, 15, 12, 0, s)).toISOString();
 
-const text = (id: string, s: number, words: string, role: SourceEvent['role'] = 'assistant'): SourceEvent => ({
-  id,
-  at: at(s),
-  role,
-  kind: 'text',
-  text: words,
-});
-const use = (id: string, s: number, name: string, input: unknown): SourceEvent => ({
-  id,
-  at: at(s),
-  role: 'assistant',
-  kind: 'tool_use',
-  tool: { name, input },
-});
-const result = (id: string, s: number, isError = false): SourceEvent => ({
-  id,
-  at: at(s),
-  role: 'user',
-  kind: 'tool_result',
-  result: { text: 'out', isError },
-});
+const text = (id: string, s: number, words: string, role: SourceEvent['role'] = 'assistant') =>
+  ({
+    id,
+    at: at(s),
+    role,
+    kind: 'text',
+    text: words,
+  }) satisfies SourceEvent;
+const use = (id: string, s: number, name: string, input: unknown) =>
+  ({
+    id,
+    at: at(s),
+    role: 'assistant',
+    kind: 'tool_use',
+    tool: { name, input },
+  }) satisfies SourceEvent;
+const result = (id: string, s: number, isError = false) =>
+  ({
+    id,
+    at: at(s),
+    role: 'user',
+    kind: 'tool_result',
+    result: { text: 'out', isError },
+  }) satisfies SourceEvent;
 
 /** Two sessions: the first says hello, runs a command and fails one; the second answers after a restart. */
-const twoSessions = (over: Partial<ChatSources> = {}): ChatSources => ({
-  sessions: [
-    {
-      attempt: 1,
-      startedAt: at(0),
-      events: [
-        text('a1', 1, 'Hello.'),
-        use('u1', 2, 'Bash', { command: 'nemia ls' }),
-        result('u1', 4),
-        use('u2', 5, 'Read', { file_path: '/x' }),
-        result('u2', 5, true),
-        text('h1', 6, 'the person wrote this', 'user'),
-      ],
-    },
-    { attempt: 2, startedAt: at(10), events: [text('a2', 11, 'Back.')] },
-  ],
-  said: [],
-  outbox: [],
-  delivered: [],
-  stops: [],
-  asks: [],
-  answers: [],
-  closed: [],
-  phase: 'idle',
-  ...over,
-});
+const twoSessions = (over: Partial<ChatSources> = {}) =>
+  ({
+    sessions: [
+      {
+        attempt: 1,
+        startedAt: at(0),
+        events: [
+          text('a1', 1, 'Hello.'),
+          use('u1', 2, 'Bash', { command: 'nemia ls' }),
+          result('u1', 4),
+          use('u2', 5, 'Read', { file_path: '/x' }),
+          result('u2', 5, true),
+          text('h1', 6, 'the person wrote this', 'user'),
+        ],
+      },
+      { attempt: 2, startedAt: at(10), events: [text('a2', 11, 'Back.')] },
+    ],
+    said: [],
+    outbox: [],
+    delivered: [],
+    stops: [],
+    asks: [],
+    answers: [],
+    closed: [],
+    phase: 'idle',
+    ...over,
+  }) satisfies ChatSources;
 
 const shape = (events: readonly ChatEvent[]) =>
   events.map((e) => (e.kind === 'message' ? `${e.from}:${e.text}` : e.kind === 'call' ? `call:${e.state}:${e.sentence}` : e.kind));
@@ -144,18 +148,19 @@ const PERMISSION = {
 };
 
 /** The sources of a chat holding nothing but `over`. */
-const sources = (over: Partial<ChatSources> = {}): ChatSources => ({
-  sessions: [],
-  said: [],
-  outbox: [],
-  delivered: [],
-  stops: [],
-  asks: [],
-  answers: [],
-  closed: [],
-  phase: 'idle',
-  ...over,
-});
+const sources = (over: Partial<ChatSources> = {}) =>
+  ({
+    sessions: [],
+    said: [],
+    outbox: [],
+    delivered: [],
+    stops: [],
+    asks: [],
+    answers: [],
+    closed: [],
+    phase: 'idle',
+    ...over,
+  }) satisfies ChatSources;
 
 /** That `f` refuses (`Invalid`), naming each of `facts`. */
 const refusedBy = (f: () => unknown, ...facts: string[]) =>
@@ -516,10 +521,11 @@ describe('her asks: what an ask is and which board draws it, the answer its held
 describe('`withEvents`: a session folded from pieces that overlap projects as the session read whole', () => {
   const whole = twoSessions();
   const [first, second] = whole.sessions;
-  const listed = (events: readonly SourceEvent[]): ChatSources => ({
-    ...whole,
-    sessions: [{ ...first, events }, ...(second ? [second] : [])],
-  });
+  const listed = (events: readonly SourceEvent[]) =>
+    ({
+      ...whole,
+      sessions: [{ ...first, events }, ...(second ? [second] : [])],
+    }) satisfies ChatSources;
   const rows: [string, ChatSources, SourceEvent[][]][] = [
     ['events in pieces, in order', listed([]), [first.events.slice(0, 2), first.events.slice(2, 4), first.events.slice(4)]],
     ["a call's result after the call, which carries its id", listed(first.events.slice(0, 2)), [first.events.slice(2)]],
@@ -550,7 +556,7 @@ describe('`speakerNameRefusal`: the names an agent speaks under, by their charac
  * delivered; the second's one attempt, which began at 20, holds the first's line again with its own time, then answers, and is told
  * words at 22; and a stop of each. `tasks` names how many of the three tasks are spanned.
  */
-const acrossTasks = (tasks = 2): ChatSources => {
+const acrossTasks = (tasks = 2) => {
   const first: TaskSpan = { task: 'nemia-1', offset: 0, attempts: [1], said: [{ at: at(3), attempt: 1, text: 'Hi', after: null }] };
   const second: TaskSpan = {
     task: 'nemia-2',
@@ -585,7 +591,7 @@ const acrossTasks = (tasks = 2): ChatSources => {
     closed: [],
     phase: 'idle',
     ...spanned(spans, delivered, stops),
-  };
+  } satisfies ChatSources;
 };
 
 describe('a chat across tasks: one history, a continued session drawn once, each task’s words and stops in their place', () => {

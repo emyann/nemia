@@ -56,7 +56,7 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
  * From round 2 its implement signs off with `replies`: a loop's target owes an answer to the findings it was handed (`owesReplies`), and
  * an empty list is no answer. Returns the record as written.
  */
-const loopingRun = (id: string, on: number, again: boolean): string => {
+const loopingRun = (id: string, on: number, again: boolean) => {
   const tries = (name: string) => Array.from({ length: on - 1 }, (_, i) => ({ taskId: `${id}-${name}-${i + 1}`, cause: 'round' }));
   const step = (name: string) => ({
     taskId: `${id}-${name}-${on}`,
@@ -130,7 +130,7 @@ const acceptOver = (step: string, body: unknown, headers: Record<string, string>
   });
 
 /** What the package's `acceptRun` refuses, word for word: what `nemia approve` prints of a loop out of rounds. */
-const acceptRefuses = async (step: string, message?: string, run = R): Promise<string> => {
+const acceptRefuses = async (step: string, message?: string, run = R) => {
   try {
     await runWith(engine(), acceptRun(run, step, message));
   } catch (err) {
@@ -140,7 +140,7 @@ const acceptRefuses = async (step: string, message?: string, run = R): Promise<s
 };
 
 /** Every file under a run's asks directory. */
-const asked = (run = R): string[] => {
+const asked = (run = R) => {
   const dir = path.join(root, 'runs', `${run}.asks`);
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
@@ -154,7 +154,7 @@ const nothingWritten = (why: string, run = R) => {
 const WHY = 'The findings are follow-up work.';
 
 /** The error a refused request answered with, its status `status`. */
-const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
+const refusedWith = async (res: Response, status: number, said: string) => {
   assert.equal(res.status, status, said);
   return ((await res.json()) as { error: string }).error;
 };

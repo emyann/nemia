@@ -31,10 +31,10 @@ const ASKED = [
 ];
 
 /** A place whose `open` answers `outcome`. */
-const opening = (outcome: PlaceOutcome<'open'>): Place => placeOver(UNASKED, { open: () => outcome });
+const opening = (outcome: PlaceOutcome<'open'>) => placeOver(UNASKED, { open: () => outcome });
 
 /** A place whose `trial` answers `outcome`. */
-const trying = (outcome: PlaceOutcome<'trial'>): Place => placeOver(UNASKED, { trial: () => outcome });
+const trying = (outcome: PlaceOutcome<'trial'>) => placeOver(UNASKED, { trial: () => outcome });
 
 test('REFUSED: a program that asks the place and is given none does not compile, and one run all the same dies naming the service', () => {
   const asks = Effect.gen(function* () {

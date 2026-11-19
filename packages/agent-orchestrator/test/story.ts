@@ -72,7 +72,7 @@ export type Stage = {
  * The stage of each top-level test of the file that calls this at its head, as `eachTest` makes it: a story's checkpoints, its
  * subtests, share their test's.
  */
-export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof engineOf; env?: Env }): Stage {
+export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof engineOf; env?: Env }) {
   const stand = eachTest(testPlace);
   const each = eachTest(() => {
     const made = testEngine();
@@ -81,7 +81,7 @@ export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof e
     const board: Board = { ...made, settle, end: made.settle, e: given.engineOf(made.layer) };
     return { board, clock: undefined as Steered | undefined };
   });
-  return {
+  const stage: Stage = {
     place: stand,
     board: () => each().board,
     runWith: runOver(given.runWith, () => stand().layer, given.env),
@@ -93,4 +93,5 @@ export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof e
       return now.clock;
     },
   };
+  return stage;
 }

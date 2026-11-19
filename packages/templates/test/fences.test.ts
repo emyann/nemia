@@ -47,7 +47,7 @@ const READ_ONLY = ['agora', 'argus', 'iris', 'seldon'];
 const WRITERS = ['grace', 'otto'];
 
 /** The lines of sdlc's fence file `file`, as shipped. */
-const linesOf = (file: string): string[] => yaml.load(fs.readFileSync(path.join(SDLC, 'fences', file), 'utf8')) as string[];
+const linesOf = (file: string) => yaml.load(fs.readFileSync(path.join(SDLC, 'fences', file), 'utf8')) as string[];
 
 /** A tool's help and version, which the read-only four take beside the read set; not counted as a read of gh's. */
 const HELP = linesOf('help.allow.yaml');
@@ -62,13 +62,13 @@ const READS_THE_PULL_REQUEST = 'agora';
  * The store's folders no agent edits or writes, under `root`: its factories, its workflows and its inbox. An `Edit` rule alone, since
  * Claude Code matches every file-editing tool, `Write` with it, against `Edit` rules, and the agent reader refuses a `Write(…)` rule.
  */
-const storeDenies = (root: string): string[] => ['factories', 'workflows', 'inbox'].map((folder) => `Edit(${root}/${folder}/**)`);
+const storeDenies = (root: string) => ['factories', 'workflows', 'inbox'].map((folder) => `Edit(${root}/${folder}/**)`);
 
 /** An agent's fence as its rendered file says it. */
 type Fence = { mode: unknown; skills: string[]; allowed: string[]; denied: string[] };
 
 /** A rule list as a rendered file writes it, one comma string: each rule, a comma inside parentheses kept. */
-const rulesOf = (line: unknown): string[] =>
+const rulesOf = (line: unknown) =>
   typeof line === 'string'
     ? line
         .split(/,(?![^()]*\))/)
@@ -77,7 +77,7 @@ const rulesOf = (line: unknown): string[] =>
     : [];
 
 /** The fence of each agent of the rendered tree `tree`, by name. */
-function fencesIn(tree: string): Record<string, Fence> {
+function fencesIn(tree: string) {
   const dir = path.join(tree, 'workflows', 'agents');
   return Object.fromEntries(
     fs
@@ -104,12 +104,12 @@ function fencesIn(tree: string): Record<string, Fence> {
 }
 
 /** Whether an agent allows a tool of the browser's, and so must deny those that write a file. */
-const allowsTheBrowser = (fence: Fence): boolean => fence.allowed.some((rule) => rule.startsWith('mcp__playwright__'));
+const allowsTheBrowser = (fence: Fence) => fence.allowed.some((rule) => rule.startsWith('mcp__playwright__'));
 
 /** What the fences `fences` fall short of, a line each, `<agent>: <what>`, the store being `root`. */
-function shortOf(fences: Record<string, Fence>, root: string): string[] {
-  const fence = (agent: string): Fence => fences[agent] ?? { mode: undefined, skills: [], allowed: [], denied: [] };
-  const lacks = (agent: string, rules: readonly string[], list: string[], what: string): string[] =>
+function shortOf(fences: Record<string, Fence>, root: string) {
+  const fence = (agent: string) => fences[agent] ?? { mode: undefined, skills: [], allowed: [], denied: [] };
+  const lacks = (agent: string, rules: readonly string[], list: string[], what: string) =>
     rules.filter((rule) => !list.includes(rule)).map((rule) => `${agent}: ${what} ${rule}`);
   return [
     ...READ_ONLY.flatMap((agent) => {
@@ -145,7 +145,7 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
 /** `text` less the line `- <rule>` of a fence file or an agent's list, for each of `rules`. */
 const cut =
   (...rules: string[]) =>
-  (text: string): string =>
+  (text: string) =>
     rules.reduce((left, rule) => left.replace(new RegExp(`^ *- ${rule.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n`, 'm'), ''), text);
 
 /**
@@ -171,7 +171,7 @@ const TREES = await rendered([
 ]);
 
 /** The fences of the rendered factory `name`. */
-const fencesOf = (name: string): Record<string, Fence> => {
+const fencesOf = (name: string) => {
   const tree = TREES[name]?.tree;
   assert.ok(tree, `${name} was rendered: ${JSON.stringify(TREES[name]?.conditions)}`);
   return fencesIn(tree);
@@ -345,11 +345,11 @@ test('REFUSED: on the fences with lines cut, a read-only agent writes a file by 
 const REFUSED_CALL = 'When a call your work needs is refused, do not route around it in silence';
 
 /** Which of `files` (a file's path in sdlc, its text) hold the refused-call paragraph: RULES.md alone should. */
-const refusedCallCopies = (files: Map<string, string>): string[] =>
+const refusedCallCopies = (files: Map<string, string>) =>
   [...files].filter(([, text]) => text.replace(/[\s*]+/g, ' ').includes(REFUSED_CALL)).map(([file]) => file);
 
 /** RULES.md and each agent's instructions, by their path in `template`. */
-const promptsOf = (template: string): Map<string, string> =>
+const promptsOf = (template: string) =>
   new Map(
     ['RULES.md', ...fs.readdirSync(path.join(template, 'agents')).map((agent) => `agents/${agent}/instructions.md`)]
       .filter((file) => fs.existsSync(path.join(template, file)))

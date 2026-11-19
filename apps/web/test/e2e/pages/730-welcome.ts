@@ -42,7 +42,8 @@ const signIn = (state: 'met' | 'missing') => ({
 const NO_FACTORY = { name: 'factory', area: 'factory', state: 'missing', message: 'no factory is filed', fixes: [], cost: 'run' };
 
 /** A check named `name` in `state`. */
-const check = (name: Check['name'], state: Check['state']): Check => ({ name, state, message: `the ${name} check, ${state}`, fixes: [] });
+const check = (name: Check['name'], state: Check['state']) =>
+  ({ name, state, message: `the ${name} check, ${state}`, fixes: [] }) satisfies Check;
 
 /** The reads the page answers in place of the api's, by what it is showing: fresh, then the harness's two checks one way or another. */
 const READS = {
@@ -75,12 +76,12 @@ const MILESTONES_ROUTE = '**/api/readiness/milestones';
 const MADE = 'first-factory';
 
 /** `method` of the api at `route`, from Node, presenting the seat's token: its status and its JSON, none where it answered none. */
-async function asked(page: Page, method: 'GET' | 'DELETE', route: string): Promise<{ status: number; body: unknown }> {
+async function asked(page: Page, method: 'GET' | 'DELETE', route: string) {
   const res = await fetch(
     new URL(route, page.url()),
     method === 'GET' ? { headers: bearer() } : { method, headers: { ...bearer(), 'content-type': 'application/json' }, body: '{}' },
   );
-  return { status: res.status, body: await res.json().catch(() => undefined) };
+  return { status: res.status, body: (await res.json().catch(() => undefined)) as unknown };
 }
 
 /**
@@ -88,7 +89,7 @@ async function asked(page: Page, method: 'GET' | 'DELETE', route: string): Promi
  * Make pressed applies it through the real api, and the step shows the factory made, with Next. The factory is read from the api: made
  * from sdlc, with no volume. Its skip leaves for `/`.
  */
-async function makesFromTemplate(page: Page): Promise<void> {
+async function makesFromTemplate(page: Page) {
   await page.locator('article[data-welcome] [data-welcome-next]').click();
   await page.waitForURL((url) => url.pathname === '/welcome/factory');
   await idle(page);
@@ -125,14 +126,14 @@ async function makesFromTemplate(page: Page): Promise<void> {
 }
 
 /** The folder the worker's api lists under (`WF_FOLDER_ROOTS`, `folderRootOf` in served.ts). */
-const folderRoot = (): string => {
+const folderRoot = () => {
   const root = apiEnv.WF_FOLDER_ROOTS;
   if (!root) throw new Refused("the worker's api lists folders under WF_FOLDER_ROOTS, which its environment does not set");
   return fs.realpathSync(root);
 };
 
 /** The folders the page plants under the listing's root: `plain`, no repository, and `work`, a repository with one commit. */
-function plantFolders(): { plain: string; work: string } {
+function plantFolders() {
   const root = folderRoot();
   const plain = path.join(root, 'plain');
   const work = path.join(root, 'work');
@@ -149,7 +150,7 @@ function plantFolders(): { plain: string; work: string } {
 }
 
 /** `path` typed into the folder way's field and used. */
-async function useFolder(page: Page, at: string): Promise<void> {
+async function useFolder(page: Page, at: string) {
   const step = page.locator('article[data-volume-step]');
   await step.getByRole('combobox', { name: /Folder/ }).fill(at);
   await step.locator('[data-folder-use]').click();
@@ -161,7 +162,7 @@ async function useFolder(page: Page, at: string): Promise<void> {
  * used, added writable to the factory, its trust asked (or, where no harness of the worker keeps one, the work in place at once), and
  * Not now leaving it waiting. The volume is read from the api. Trust is never pressed: it would write a harness's own trust file.
  */
-async function givesAFolder(page: Page): Promise<void> {
+async function givesAFolder(page: Page) {
   const { plain, work } = plantFolders();
   const step = page.locator('article[data-volume-step]');
   await expectVisible(step, 'Next leads to the volume step, at /welcome/volume');
@@ -202,19 +203,21 @@ async function givesAFolder(page: Page): Promise<void> {
 }
 
 /** The planted folders taken away. */
-function takeBackFolders(): void {
+function takeBackFolders() {
   for (const name of ['plain', 'work']) fs.rmSync(path.join(folderRoot(), name), { recursive: true, force: true });
 }
 
 /** Activate starts the install's first fix, held here as `660-setup` holds it: the start answered, its output streamed and ended. */
-async function holdInstall(page: Page, sent: unknown[]): Promise<() => Promise<void>> {
+async function holdInstall(page: Page, sent: unknown[]) {
   const made = (phase: 'pending' | 'succeeded') => ({ id: 'fix-e2e-welcome', need: 'claude', phase, output: '' });
   const start = (route: Route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     sent.push(route.request().postDataJSON());
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- a start answered: no harness runs in the e2e's store
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(made('pending')) });
   };
   const output = (route: Route) =>
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- its output answered: no harness runs in the e2e's store
     route.fulfill({
       status: 200,
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
@@ -222,23 +225,23 @@ async function holdInstall(page: Page, sent: unknown[]): Promise<() => Promise<v
     });
   await page.route('**/api/readiness/fixes', start);
   await page.route('**/api/readiness/fixes/*/output', output);
-  return async () => {
+  return (async () => {
     await page.unroute('**/api/readiness/fixes', start);
     await page.unroute('**/api/readiness/fixes/*/output', output);
-  };
+  }) satisfies () => Promise<void>;
 }
 
 /**
  * The board's reads made again as a person coming back to its tab makes them (TanStack Query's refetch on focus): the welcome, once a
  * harness is installed, is no longer asked, so a reload would leave it.
  */
-async function readAgain(page: Page): Promise<void> {
+async function readAgain(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
   await idle(page);
 }
 
 /** The two ticks drawn on the welcome, the version's and the turn's, in `states`. */
-async function drawsTicks(page: Page, states: readonly [Check['state'], Check['state']]): Promise<void> {
+async function drawsTicks(page: Page, states: readonly [Check['state'], Check['state']]) {
   const checks = page.locator('article[data-welcome] [data-harness-checks="claude"]');
   await expectVisible(checks, 'the welcome draws the harness’s checks under it');
   await expectVisible(checks.locator(`[data-harness-check="version"][data-check-state="${states[0]}"]`), `the version tick, ${states[0]}`);
@@ -259,7 +262,8 @@ export default {
     let planted: keyof typeof READS = 'fresh';
     const answer = (route: Route) =>
       route.request().method() === 'GET'
-        ? route.fulfill({
+        ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- readiness planted: the seat's machine has its own
+          route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({ ready: false, ran: false, pieces: READS[planted] }),
@@ -267,7 +271,8 @@ export default {
         : route.fallback();
     const milestones = (route: Route) =>
       route.request().method() === 'GET'
-        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTORY_NEXT) })
+        ? // oxlint-disable-next-line landmines-testing/no-test-doubles -- milestones planted: the seat's machine has its own
+          route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FACTORY_NEXT) })
         : route.fallback();
     await page.route(READINESS_ROUTE, answer);
     await page.route(MILESTONES_ROUTE, milestones);

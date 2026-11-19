@@ -127,7 +127,7 @@ export const ResourcesSchema = Schema.Struct({
 });
 
 /** A whole number of bytes, from nothing. */
-const Bytes = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Bytes = Schema.Natural;
 
 /** Why a pass left a queued task waiting (`AdmissionWait`, `contracts/admission.contract.ts`): its pool's slot, or the machine's memory. */
 export const AdmissionWaitSchema = Schema.Union([

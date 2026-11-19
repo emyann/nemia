@@ -14,7 +14,7 @@ const EMPTY = FACTORIES.others[0];
  * — the label field, two cards, three rows in flight and six finished, under three count chips' places — and says it is loading to a
  * screen reader alone, under the page's name in the top bar, and draws its three parts once they are let go.
  */
-async function loading(page: Page): Promise<void> {
+async function loading(page: Page) {
   const other = await page.context().newPage();
   let release = () => {};
   const held = new Promise<void>((resolve) => {

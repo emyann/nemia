@@ -7,17 +7,17 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { rawTar, type Entry } from '../../test/tar.ts';
-import { ARCHIVE_LIMIT, contentDigest, packArchive, unpackArchive, type TreeFile } from './archive.ts';
+import { ARCHIVE_LIMIT, contentDigest, packArchive, unpackArchive } from './archive.ts';
 
 /** A file of a tree. */
-const file = (path: string, text: string | Uint8Array, mode = 0o644): TreeFile => ({
+const file = (path: string, text: string | Uint8Array, mode = 0o644) => ({
   path,
   mode,
   bytes: typeof text === 'string' ? Buffer.from(text) : text,
 });
 
 /** The message `unpackArchive` refuses `entries` with, as a gzipped tar; it fails the test where they are not refused. */
-function refusal(entries: Entry[]): string {
+function refusal(entries: Entry[]) {
   try {
     unpackArchive(gzipSync(rawTar(entries)));
   } catch (err) {

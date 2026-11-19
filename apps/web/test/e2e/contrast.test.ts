@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 afterAll(() => browser.close());
 
-async function pairsOf(html: string, scheme: 'light' | 'dark' = 'light'): Promise<{ scheme: string; pairs: readonly Pair[] }> {
+async function pairsOf(html: string, scheme: 'light' | 'dark' = 'light') {
   const context = await browser.newContext({ colorScheme: scheme });
   try {
     const page = await context.newPage();
@@ -23,7 +23,7 @@ async function pairsOf(html: string, scheme: 'light' | 'dark' = 'light'): Promis
     await context.close();
   }
 }
-const said = (pairs: readonly Pair[], text: string): Pair => {
+const said = (pairs: readonly Pair[], text: string) => {
   const found = pairs.find((pair) => pair.text === text);
   assert.ok(found, `${text} is measured among ${pairs.map((pair) => pair.text).join(', ')}`);
   return found;
@@ -67,13 +67,13 @@ test('a ground drawn by a background-image is answered unmeasured, never passed 
   assert.equal(said(pairs, 'on its own ground').state, 'measured', 'an opaque ground over the image is read');
 });
 
-const tile = (frequency: number, matrix: string): string =>
+const tile = (frequency: number, matrix: string) =>
   `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><filter id="n" x="0" y="0" width="100%" ` +
   `height="100%"><feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="2" seed="7" stitchTiles="stitch"/>` +
   `<feColorMatrix type="matrix" values="${matrix}"/></filter><rect width="220" height="220" filter="url(%23n)"/></svg>')`;
 const INK_SPECKS = tile(0.9, '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.62 0 0 0 -0.24');
 const LIGHT_SPECKS = tile(0.8, '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.3 0 0 0 -0.12');
-const rowsOf = (pairs: readonly Pair[], text: string): Pair[] => pairs.filter((pair) => pair.text === text);
+const rowsOf = (pairs: readonly Pair[], text: string) => pairs.filter((pair) => pair.text === text);
 
 test('REFUSED: a text under the bar at the far end of a grain, its ground read plain and at the speck’s strongest 2%', async () => {
   const { pairs } = await pairsOf(
@@ -128,7 +128,7 @@ test('REFUSED: a far end carried through a translucent ground unpainted: it is t
     assert.ok(Math.abs(channel - (255 + (grain.ground[c] ?? 0)) / 2) <= 1, `half white over ${hex(grain.ground)}, not ${hex(far.ground)}`);
 });
 
-const framed = (ground: string, text: string): string =>
+const framed = (ground: string, text: string) =>
   '<div style="background:#000;padding:8px"><div data-cut-frame="none" style="position:relative">' +
   `<span data-cut-shape style="position:absolute;inset:0"><span data-cut-ground style="position:absolute;inset:0;${ground}"></span>` +
   `</span><div style="position:relative">${text}</div></div></div>`;

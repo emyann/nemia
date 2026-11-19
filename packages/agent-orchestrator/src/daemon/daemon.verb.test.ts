@@ -29,7 +29,7 @@ const engine = eachTest(testEngine);
 heldUnasked(engine);
 
 /** A host over the scratch store that keeps each spawn it is asked for and starts nothing, as `test/demand-cli.test.ts`'s. */
-function hostOf(): { host: () => DemandHost; spawns: string[] } {
+function hostOf() {
   const spawns: string[] = [];
   const host: DemandHost = {
     ...liveDemandHost(ROOT),
@@ -48,13 +48,14 @@ function hostOf(): { host: () => DemandHost; spawns: string[] } {
 }
 
 /** What `nemia <argv>` prints on stdout, over `host`. */
-async function printed(t: TestContext, argv: string[], host: () => DemandHost): Promise<string> {
-  const lines: string[] = [];
-  vi.spyOn(console, 'log').mockImplementation((line: unknown) => void lines.push(String(line)));
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+async function printed(t: TestContext, argv: string[], host: () => DemandHost) {
+  const linesSpy = vi.spyOn(console, 'log');
+  vi.spyOn(console, 'error');
+  let lines: string[] = [];
   try {
     await main(argv, engineOf(engine().layer), host);
   } finally {
+    lines = linesSpy.mock.calls.flatMap(([line]) => [String(line)]);
     vi.restoreAllMocks();
   }
   return lines.join('\n');

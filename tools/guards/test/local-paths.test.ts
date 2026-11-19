@@ -30,7 +30,7 @@ const PATHED = new RegExp(`(?<![\\w.])/(?:home|mnt/[a-z]/[Uu]sers)/(?!(?:${place
 const ENCODED = new RegExp(`(?<![\\w-])-home-(?!(?:${placeholder})(?!\\w))[A-Za-z0-9_]`);
 
 /** Each line of `text` that names a home or a user folder, as `<line>: <text>`. */
-function localPaths(text: string): string[] {
+function localPaths(text: string) {
   return text.split('\n').flatMap((line, i) => (PATHED.test(line) || ENCODED.test(line) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 

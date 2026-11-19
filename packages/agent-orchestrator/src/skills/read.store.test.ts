@@ -35,7 +35,7 @@ const SKILL = '---\nname: x\ndescription: Do the thing.\n---\nDo it.\n';
 const LEAVES = ['is a link', 'outside the folder of skills', 'a folder of its own'];
 
 /** The files `files`, each by its path under `dir`, written with its text; `dir`. */
-function written(dir: string, files: Record<string, string>): string {
+function written(dir: string, files: Record<string, string>) {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), text);
@@ -44,14 +44,14 @@ function written(dir: string, files: Record<string, string>): string {
 }
 
 /** A link at `at` to `to`, its folder made first; `at`. */
-function linked(to: string, at: string): string {
+function linked(to: string, at: string) {
   fs.mkdirSync(path.dirname(at), { recursive: true });
   fs.symlinkSync(to, at);
   return at;
 }
 
 /** A checkout holding the real skill `skills/x`, with `notes.md` beside its SKILL.md, a workflow folder and an empty `.claude/skills/`. */
-function checkout(): string {
+function checkout() {
   const repo = scratch('wf-skill-links-');
   written(repo, { 'skills/x/SKILL.md': SKILL, 'skills/x/notes.md': 'Notes.\n' });
   fs.mkdirSync(path.join(repo, '.claude', 'skills'), { recursive: true });
@@ -60,7 +60,7 @@ function checkout(): string {
 }
 
 /** A checkout (`checkout`) holding the nested skills `app:y` and `other:z` too. */
-function nestedCheckout(): string {
+function nestedCheckout() {
   const repo = checkout();
   written(repo, {
     'app/.claude/skills/y/SKILL.md': SKILL,
@@ -72,20 +72,20 @@ function nestedCheckout(): string {
 }
 
 /** The skill `name` of the repository `repo`'s `.claude/skills/`. */
-const given = (repo: string, name = 'x'): string => path.join(repo, '.claude', 'skills', name);
+const given = (repo: string, name = 'x') => path.join(repo, '.claude', 'skills', name);
 
 /** What a start of `repo`'s workflow `dev` finds under `name`. */
 const found = (repo: string, name = 'x', home?: string) =>
   skillsFor(path.join(repo, 'workflows', 'dev'), { repo, ...(home ? { home } : {}) }).at.get(name);
 
 /** The refusal `at` is, by its message; a failed assertion for a skill that is found. */
-function refusalOf(at: string | WorkflowError | undefined): string {
+function refusalOf(at: string | WorkflowError | undefined) {
   assert.ok(at instanceof WorkflowError, `refused, not ${String(at)}`);
   return at.message;
 }
 
 /** Every entry under `dir` that is a link, by its path in it. */
-const linksUnder = (dir: string): string[] =>
+const linksUnder = (dir: string) =>
   (fs.readdirSync(dir, { recursive: true }) as string[]).filter((entry) => fs.lstatSync(path.join(dir, entry)).isSymbolicLink());
 
 describe('given: a skill read through links that stay inside the checkout, or inside the folder its line names', () => {

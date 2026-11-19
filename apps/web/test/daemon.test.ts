@@ -11,46 +11,48 @@ const NOW = new Date('2026-09-22T10:00:00.000Z');
 const at = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
 
 const START = 'npm start in apps/api';
-const held = (over: Partial<Daemon> = {}): Daemon => ({
-  kind: 'ticking',
-  by: 'nemia up',
-  url: null,
-  start: START,
-  ticking: true,
-  pid: 4242,
-  cwd: '/work/hkb-v2',
-  every: 4_000,
-  startedAt: at(60),
-  passedAt: at(0.1),
-  lastHeardAt: at(0.1),
-  stoppedAt: null,
-  staleAfterMs: 15 * 60_000,
-  identity: 'same',
-  line: 'nemia up: ticking, pid 4242',
-  unobserved: [],
-  ...over,
-});
-const free = (kind: 'none' | 'unreadable'): Daemon => ({
-  kind,
-  by: null,
-  url: null,
-  start: START,
-  ticking: false,
-  pid: null,
-  cwd: null,
-  every: null,
-  startedAt: null,
-  passedAt: null,
-  lastHeardAt: null,
-  stoppedAt: null,
-  staleAfterMs: null,
-  identity: null,
-  line: `nemia up: ${kind}`,
-  unobserved: [],
-});
-const said = (d: Daemon): string | null => {
+const held = (over: Partial<Daemon> = {}) =>
+  ({
+    kind: 'ticking',
+    by: 'nemia up',
+    url: null,
+    start: START,
+    ticking: true,
+    pid: 4242,
+    cwd: '/work/hkb-v2',
+    every: 4_000,
+    startedAt: at(60),
+    passedAt: at(0.1),
+    lastHeardAt: at(0.1),
+    stoppedAt: null,
+    staleAfterMs: 15 * 60_000,
+    identity: 'same',
+    line: 'nemia up: ticking, pid 4242',
+    unobserved: [],
+    ...over,
+  }) satisfies Daemon;
+const free = (kind: 'none' | 'unreadable') =>
+  ({
+    kind,
+    by: null,
+    url: null,
+    start: START,
+    ticking: false,
+    pid: null,
+    cwd: null,
+    every: null,
+    startedAt: null,
+    passedAt: null,
+    lastHeardAt: null,
+    stoppedAt: null,
+    staleAfterMs: null,
+    identity: null,
+    line: `nemia up: ${kind}`,
+    unobserved: [],
+  }) satisfies Daemon;
+const said = (d: Daemon) => {
   const words = daemonWords(d, NOW);
-  return words && daemonSentence(words);
+  return (words && daemonSentence(words)) satisfies string | null;
 };
 
 describe('daemonSentence and daemonWords: what is said of the daemon, kind by kind', () => {

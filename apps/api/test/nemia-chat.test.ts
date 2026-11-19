@@ -37,7 +37,7 @@ async function asked(method: string, url: string, body?: unknown) {
 }
 
 /** A standing token minted through the token door over the harness's store, named `name`: the person's, or held by the agent `agent`. */
-const minted = (name: string, agent?: string): string =>
+const minted = (name: string, agent?: string) =>
   Effect.runSync(
     Effect.gen(function* () {
       const door = yield* TokenDoor;
@@ -60,7 +60,7 @@ async function sentBy(presented: Record<string, string>, body: unknown) {
 type Block = { event?: string; data?: string; id?: string };
 
 /** The server-sent events of `text`, each block a record of its fields. */
-const blocks = (text: string): Block[] =>
+const blocks = (text: string) =>
   text
     .split('\n\n')
     .filter((block) => block.trim())
@@ -69,7 +69,7 @@ const blocks = (text: string): Block[] =>
     );
 
 /** The stream's blocks once `enough` holds of them, the reader cancelled after. */
-async function streamed(res: Response, enough: (said: Block[]) => boolean): Promise<Block[]> {
+async function streamed(res: Response, enough: (said: Block[]) => boolean) {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let text = '';
@@ -207,7 +207,7 @@ describe('A person talks with Nemia in her chat: a page of history, a send to he
       const { sessionId } = withHer(['One.', 'Two.']);
       const first = await streamed(await app.request('/api/nemia/chat/stream'), (said) => textsOf(said).length >= 2);
       assert.equal(first[0]?.event, 'presence');
-      assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2, wakes: true });
+      assert.deepEqual(JSON.parse(first[0].data), { up: true, answering: true, waitsOnYou: 0, unread: 2, wakes: true });
       assert.deepEqual(textsOf(first), ['One.', 'Two.']);
       const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
       assert.equal(cursor, '1.2.0.0.0.0.0.0.0');
@@ -249,7 +249,7 @@ const ASK: Ask = {
 };
 
 /** Plants `ask` in her chat, where the keeper's copy of her session's questions lives. */
-function waiting(ask: Ask = ASK): Ask {
+function waiting(ask: Ask = ASK) {
   const file = path.join(root, 'nemia', 'chat', 'asks.jsonl');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.appendFileSync(file, `${JSON.stringify(ask)}\n`);
@@ -360,7 +360,7 @@ test('a read that fails under an open stream is `unreadable` with retrying, and 
     return textsOf(got).includes('Two.');
   });
   mended();
-  const notice = JSON.parse(beats.find((b) => b.event === 'unreadable')!.data!) as { error: string; retrying: boolean };
+  const notice = JSON.parse(beats.find((b) => b.event === 'unreadable')!.data) as { error: string; retrying: boolean };
   assert.equal(notice.retrying, true, 'a read that failed is a notice: the next beat reads again');
   assert.match(notice.error, /is not a line of the chat's record/, "and it says what the api could not read, in the store's own words");
   assert.equal(

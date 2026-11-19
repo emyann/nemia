@@ -11,7 +11,7 @@ import { OUT, store } from '../world.ts';
 const CARD = 'tag-the-cards-by-factory-e2e0';
 
 /** Open `route` of the board `page` shows, and wait for its reads. */
-async function open(page: Page, route: string): Promise<void> {
+async function open(page: Page, route: string) {
   await page.goto(new URL(route, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }

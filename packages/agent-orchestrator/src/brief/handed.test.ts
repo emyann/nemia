@@ -14,14 +14,15 @@ import { TASK_HEADINGS } from './brief-sections.ts';
 import type { StepSpec } from '../step/step.ts';
 import { run, step, STEPS } from '../../test/assessed.ts';
 
-const source = (over: Partial<Extract<ParentCloseout, { asked: string }>> = {}): ParentCloseout => ({
-  run: 'cache-a1b2',
-  asked: 'Cache the views between passes.',
-  steps: [{ name: 'implement', unreadable: 'its task is gone' }],
-  how: 'read',
-  landed: true,
-  ...over,
-});
+const source = (over: Partial<Extract<ParentCloseout, { asked: string }>> = {}) =>
+  ({
+    run: 'cache-a1b2',
+    asked: 'Cache the views between passes.',
+    steps: [{ name: 'implement', unreadable: 'its task is gone' }],
+    how: 'read',
+    landed: true,
+    ...over,
+  }) satisfies ParentCloseout;
 
 /** A root of a run after three parents, and the brief it composes with none handed. */
 const implement = step('implement');

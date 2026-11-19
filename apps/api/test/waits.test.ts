@@ -16,7 +16,7 @@ import { WAITED } from 'agent-runtime/testing';
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
 /** The default timeout a package's `vitest.config.ts` gives every test (`testTimeout: <ms>`), or null for none. */
-const defaultTimeout = (config: string): number | null => {
+const defaultTimeout = (config: string) => {
   const m = /^\s*testTimeout:\s*([1-9][\d_]*),/m.exec(config);
   return m ? Number(m[1].replaceAll('_', '')) : null;
 };
@@ -28,7 +28,7 @@ const defaultTimeout = (config: string): number | null => {
  * @param config the text of the package's `vitest.config.ts`
  * @returns one line per break, empty when every test is bounded at `WAITED`'s timeout
  */
-const timeoutBreaks = (config: string): string[] =>
+const timeoutBreaks = (config: string) =>
   defaultTimeout(config) === WAITED.timeout
     ? []
     : [`the Vitest config gives no testTimeout: ${WAITED.timeout}, so a test given no \`WAITED\` that waits is never bounded: add it`];
@@ -64,11 +64,10 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
 const DEADLINE = new RegExp(['(?:Date|performance)', '\\.now\\(\\)\\s*', '(?:\\+|-\\s*[\\w.]+\\s*<)'].join(''), 'g');
 
 /** How many hand-written deadlines `text` holds. */
-const deadlinesIn = (text: string): number => text.match(DEADLINE)?.length ?? 0;
+const deadlinesIn = (text: string) => text.match(DEADLINE)?.length ?? 0;
 
 /** The package's test files and the helpers beside them, by their path from the package. */
-const testFiles = (): string[] =>
-  [...fs.globSync('src/**/*.test.ts', { cwd: PACKAGE }), ...fs.globSync('test/**/*.ts', { cwd: PACKAGE })].sort();
+const testFiles = () => [...fs.globSync('src/**/*.test.ts', { cwd: PACKAGE }), ...fs.globSync('test/**/*.ts', { cwd: PACKAGE })].sort();
 
 /**
  * What breaks the allowances: a file with more than its count, and an allowance left above what its file has, or for a file gone.
@@ -77,7 +76,7 @@ const testFiles = (): string[] =>
  * @param allowed the allowances
  * @returns one line per break, empty when every count is held
  */
-const deadlineBreaks = (counts: ReadonlyMap<string, number>, allowed: Readonly<Record<string, Allowance>>): string[] => [
+const deadlineBreaks = (counts: ReadonlyMap<string, number>, allowed: Readonly<Record<string, Allowance>>) => [
   ...[...counts].flatMap(([file, n]) =>
     n > (allowed[file]?.count ?? 0)
       ? [

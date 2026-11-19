@@ -8,7 +8,7 @@ import { validate } from '../workflow/validate.ts';
 import { parseWorkflow, renderStep } from '../workflow/step-file.ts';
 import { DEFAULT_ROUNDS, WorkflowError, type StepSpec } from '../step/step.ts';
 
-const step = (name: string, after: string[] = []): StepSpec => ({ name, after, body: `do ${name}` });
+const step = (name: string, after: string[] = []) => ({ name, after, body: `do ${name}` });
 
 /** `plan` declares `surface`, a fact: the surface the change touches, one of three. */
 const PLAN_SCHEMA = {
@@ -20,7 +20,7 @@ const PLAN_SCHEMA = {
 const TABLE = { kind: 'table' as const, from: 'plan.surface', table: { web: 'web', backend: 'backend', docs: 'docs' } };
 
 /** plan → triage (a table over plan's surface, docs ends the run) → build-web | build-backend → notes. */
-const TRIAGE = (): StepSpec[] => [
+const TRIAGE = () => [
   { ...step('plan'), output: { file: 'plan.schema.json', schema: PLAN_SCHEMA } },
   { ...step('triage', ['plan']), input: ['plan'], routes: ['web', 'backend', 'docs'], route: TABLE, ends: ['docs'] },
   { ...step('build-web', ['triage']), when: ['web'] },
@@ -29,11 +29,11 @@ const TRIAGE = (): StepSpec[] => [
 ];
 
 /** The triage workflow with the step `name` replaced by what `change` makes of it, or added where it has none. */
-const changed = (name: string, change: (s: StepSpec) => StepSpec, steps = TRIAGE()): StepSpec[] =>
+const changed = (name: string, change: (s: StepSpec) => StepSpec, steps = TRIAGE()) =>
   steps.some((s) => s.name === name) ? steps.map((s) => (s.name === name ? change(s) : s)) : [...steps, change(step(name))];
 
 /** The triage workflow with triage a judge on the reviewer, read-only (`dontAsk`), with what `keys` change of it. */
-const judged = (keys: Partial<StepSpec> = {}): StepSpec[] =>
+const judged = (keys: Partial<StepSpec> = {}) =>
   changed('triage', (s) => ({
     ...s,
     route: { kind: 'judge' },
@@ -42,7 +42,7 @@ const judged = (keys: Partial<StepSpec> = {}): StepSpec[] =>
     ...keys,
   }));
 
-const refusedAtLoad = (steps: StepSpec[]): void => {
+const refusedAtLoad = (steps: StepSpec[]) => {
   assert.throws(
     () => validate(steps),
     (e: unknown) => e instanceof WorkflowError && e.exitCode === 2,
@@ -172,7 +172,7 @@ describe('load takes a workflow whose routes close', () => {
 });
 
 /** A step file with `keys` in its frontmatter. */
-const file = (keys: string): string => `---\nplace: git\n${keys}\n---\nroute the change\n`;
+const file = (keys: string) => `---\nplace: git\n${keys}\n---\nroute the change\n`;
 
 describe('a step file reads route: in its three shapes, and refuses any other', () => {
   test('a table', () => {

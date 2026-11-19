@@ -47,14 +47,14 @@ const OLD = 4242;
 const NEW = 5151;
 
 /** The stage's engine with a pass of its own that does nothing, and no tally: what a whole-store pass asks of the engine first. */
-const ticking = (): Board => {
+const ticking = () => {
   const b = stage.board();
   Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
-  return b;
+  return b satisfies Board;
 };
 
 /** The store's lines of the feed whose reason is `reason`. */
-const storeLines = (reason: string): FeedLine[] => readFeed(ROOT, 0).lines.filter((l) => 'store' in l && l.reason === reason);
+const storeLines = (reason: string) => readFeed(ROOT, 0).lines.filter((l) => 'store' in l && l.reason === reason) satisfies FeedLine[];
 
 /**
  * A take-over's process: a child of this test, on its `WF_ROOT`, that puts the store's pause through the live host's `pause` and then
@@ -188,7 +188,7 @@ describe("a restart with only a landing's check running restarts at once, and th
 });
 
 /** A lease of the daemon `pid`, standing as `kind` and confirmed, with a pass completed when `passed`. */
-function leaseOf(pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false): DaemonStanding {
+function leaseOf(pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = false) {
   return {
     kind,
     file: {
@@ -203,5 +203,5 @@ function leaseOf(pid: number, kind: 'ticking' | 'stopped' = 'ticking', passed = 
     last: Date.now(),
     quiet: 0,
     identity: 'same',
-  };
+  } satisfies DaemonStanding;
 }

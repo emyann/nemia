@@ -84,7 +84,7 @@ const runtime = () => {
 };
 
 /** A repository with one commit and the tests' team under `workflows/`, so a factory's run has a base and a folder. */
-const aTeamRepo = (): string => {
+const aTeamRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
@@ -95,7 +95,7 @@ const aTeamRepo = (): string => {
  * A store with no runs, cards, tries, pause or factories, then the factory `solo` on a repository of its own, attaching the team's `dev`,
  * and the clock at `now`. The cap as given: `undefined` unsets it.
  */
-const aStore = (t: Finishes, now: string, cap?: string): string => {
+const aStore = (t: Finishes, now: string, cap?: string) => {
   for (const dir of ['runs', 'inbox', 'queue', 'schedules', 'factories', 'nemia', 'cordon', 'tick.json']) {
     fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
   }
@@ -112,7 +112,7 @@ const weekly = () =>
   setScheduleAt(ROOT, { factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
 
 /** The runs a schedule started, oldest fire first: the fire each was started for. */
-const scheduledDues = (): string[] =>
+const scheduledDues = () =>
   listRuns(ROOT)
     .flatMap((r) => (r.scheduled ? [r.scheduled.due] : []))
     .sort();
@@ -120,7 +120,7 @@ const scheduledDues = (): string[] =>
 const MONDAY = '2026-10-05T13:00:00.000Z';
 
 /** The run a pass's scheduled start started, or none. */
-const startedBy = (pass: { scheduled?: unknown }): string | undefined => {
+const startedBy = (pass: { scheduled?: unknown }) => {
   const at = pass.scheduled as { run?: string } | undefined;
   return at?.run;
 };
@@ -276,7 +276,7 @@ test('across the end of daylight saving in Montreal, 2026-11-01, a daily fire at
 });
 
 /** The schedule `schedule` planted in the factory `name`'s file by hand, as an older `nemia` wrote it: no write's refusal reads it. */
-const planted = (name: string, workflow: string, schedule: Record<string, string>): void => {
+const planted = (name: string, workflow: string, schedule: Record<string, string>) => {
   const file = path.join(ROOT, 'factories', `${name}.json`);
   const was = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   fs.writeFileSync(file, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);

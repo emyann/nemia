@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Page } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
 import { cardOf, dragBy, placeOf, zoomOf } from '../canvas.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
@@ -31,19 +31,19 @@ const bodyOf = (page: Page) => cardOf(page, RUN).locator('[data-run-says="id"]')
 const barInUrl = (page: Page) => new URL(page.url()).searchParams.get('bar');
 
 /** Goes to `to` in this tab and waits for its reads. */
-async function visit(page: Page, to: string): Promise<void> {
+async function visit(page: Page, to: string) {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 }
 
 /** Refuses unless no bar is drawn and the address names none. */
-async function expectNoBar(page: Page, assertion: string): Promise<void> {
+async function expectNoBar(page: Page, assertion: string) {
   await expectCount(page.locator('aside[data-bar]'), 0, assertion);
   if (barInUrl(page) !== null) throw new Refused(`${assertion}: the address names no bar — it is ${page.url()}`);
 }
 
 /** Refuses unless the bar shows RUN, the address names it, and its card is marked as inspected. */
-async function expectRun(page: Page, assertion: string): Promise<Locator> {
+async function expectRun(page: Page, assertion: string) {
   const bar = runBar(page);
   await expectVisible(bar, assertion);
   if (barInUrl(page) !== `run:${RUN}`) throw new Refused(`${assertion}: the address names bar=run:${RUN} — it is ${page.url()}`);
@@ -52,7 +52,7 @@ async function expectRun(page: Page, assertion: string): Promise<Locator> {
 }
 
 /** Refuses unless the page reaches `pathname` within the wait. */
-async function expectAt(page: Page, pathname: string, assertion: string): Promise<void> {
+async function expectAt(page: Page, pathname: string, assertion: string) {
   try {
     await page.waitForURL((url) => url.pathname === pathname, { timeout: WAIT_MS });
   } catch {
@@ -61,7 +61,7 @@ async function expectAt(page: Page, pathname: string, assertion: string): Promis
 }
 
 /** A point of the floor with nothing drawn on it, where a click lands on the empty pane. */
-async function emptySpot(page: Page): Promise<{ x: number; y: number }> {
+async function emptySpot(page: Page) {
   const spot = await floorOf(page).evaluate((floor) => {
     const box = floor.getBoundingClientRect();
     for (let y = box.top + box.height - 24; y > box.top + 24; y -= 24)
@@ -74,19 +74,19 @@ async function emptySpot(page: Page): Promise<{ x: number; y: number }> {
 }
 
 /** Fits the floor, which brings every card back into view, wherever the bar's last run left it. */
-async function fit(page: Page): Promise<void> {
+async function fit(page: Page) {
   await page.getByRole('button', { name: 'Fit view' }).click();
   await settled(page);
 }
 
 /** Clicks the floor's empty pane. */
-async function clickPane(page: Page): Promise<void> {
+async function clickPane(page: Page) {
   const { x, y } = await emptySpot(page);
   await page.mouse.click(x, y);
 }
 
 /** A click on the card's body shows the run, its card and the floor's panels clear of the bar; again closes it; Enter, and the pane. */
-async function presses(page: Page): Promise<void> {
+async function presses(page: Page) {
   await bodyOf(page).click();
   await expectRun(page, `a click on ${RUN}'s card shows the run in the bar`);
   await expectCount(laneOf(page), 0, "the queue's lane gives its room to the floor while the bar shows a run");
@@ -114,7 +114,7 @@ async function presses(page: Page): Promise<void> {
 }
 
 /** The run bar holds the run's title and id, its banners, its steps each with its status, and its brief; a step's button shows it. */
-async function contents(page: Page): Promise<void> {
+async function contents(page: Page) {
   await bodyOf(page).click();
   const bar = await expectRun(page, `a click on ${RUN}'s card shows the run`);
   await expectVisible(bar.getByRole('heading', { name: FAKE.title }), `the bar is titled ${FAKE.title}`);
@@ -146,7 +146,7 @@ async function contents(page: Page): Promise<void> {
  * With the card unfolded by its chevron, a tile shows its step in the bar, the card whole on the floor left of it, and is pressed;
  * pressed again, it closes the bar.
  */
-async function tiles(page: Page): Promise<void> {
+async function tiles(page: Page) {
   await fit(page);
   const card = cardOf(page, RUN);
   await card.getByRole('button', { name: 'Show steps' }).click();
@@ -168,7 +168,7 @@ async function tiles(page: Page): Promise<void> {
 }
 
 /** The bar's Open and a double click on the card each open the run's page, with no bar. */
-async function opens(page: Page): Promise<void> {
+async function opens(page: Page) {
   await fit(page);
   await bodyOf(page).click();
   const bar = await expectRun(page, `a click on ${RUN}'s card shows the run`);
@@ -182,7 +182,7 @@ async function opens(page: Page): Promise<void> {
 }
 
 /** The start of a run in the bar survives a click on the empty floor; a queue's ghost is a link to its card's page. */
-async function others(page: Page): Promise<void> {
+async function others(page: Page) {
   const start = 'start:default';
   await visit(page, `${FLOOR}?bar=${start}`);
   const bar = page.locator(`aside[data-bar="${start}"]`);
@@ -220,7 +220,7 @@ async function others(page: Page): Promise<void> {
  * A card dragged to the floor's right edge, which the sheet narrows past it, is brought back into the floor once inspected: from a fresh
  * layout, along the lowest row, whose right end no card holds, so the card dropped there lies on no other.
  */
-async function edge(page: Page): Promise<void> {
+async function edge(page: Page) {
   await page.getByRole('button', { name: 'Reset layout' }).click();
   await settled(page);
   await fit(page);

@@ -8,7 +8,7 @@
  * refused with words that name it, its kind, its first wrong field and the fix (`rolloutRecordOf`): a refused record is never read
  * as saying nothing.
  */
-import { Result, Schema } from 'effect';
+import { Predicate, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
 
 const Time = Schema.String.check(Schema.makeFilter((t: string) => Number.isFinite(Date.parse(t)) || 'Expected a date and time'));
@@ -104,11 +104,9 @@ const FIX =
   'A rollout that holds it is not read until it decodes, never read as saying nothing: run a Codex whose rollout records this' +
   ' runtime reads, or a runtime whose schema for the record in `ROLLOUT` (`harness/codex/rollout.ts`) reads this one.';
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /** The kind of `entry` when it is a JSON object of a kind the runtime reads, or `undefined` for anything else. */
 const kindOf = (entry: unknown): RolloutKind | undefined => {
-  if (!isObject(entry) || !isObject(entry.payload)) return undefined;
+  if (!Predicate.isObject(entry) || !Predicate.isObject(entry.payload)) return undefined;
   const kind = `${String(entry.type)} ${String(entry.payload.type)}`;
   return KINDS.find((k) => k === kind);
 };

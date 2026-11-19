@@ -18,7 +18,7 @@ import { metricsOf, type MetricRead } from './ceilings.ts';
 const RECENT = path.join(root, 'tick-recent.json');
 
 /** A pass of `ms` at the `k`th second, all of it in `git`, that saw `runs` runs. */
-const recent = (k: number, ms: number, runs: number): RecentPass => ({
+const recent = (k: number, ms: number, runs: number) => ({
   at: new Date(Date.UTC(2026, 9, 5, 10, 0, k)).toISOString(),
   ms,
   records: runs,
@@ -31,7 +31,7 @@ const recent = (k: number, ms: number, runs: number): RecentPass => ({
   phases: Object.fromEntries(PHASES.map((p) => [p, p === 'place' ? ms : 0])) as RecentPass['phases'],
 });
 
-const passes = async (query = ''): Promise<{ status: number; body: unknown }> => {
+const passes = async (query = '') => {
   const res = await app.request(`/api/passes${query}`);
   return { status: res.status, body: await res.json() };
 };
@@ -75,7 +75,7 @@ describe('The board reads the passes the tick kept and the api process metrics: 
     }
   });
   s.test("GET /api/metrics counts each request's reads under its route's pattern, never its path", async () => {
-    const pollsOf = async (route: string): Promise<number> => {
+    const pollsOf = async (route: string) => {
       const res = await app.request('/api/metrics');
       assert.equal(res.status, 200);
       const metric = ((await res.json()) as MetricRead[]).find((m) => m.name === 'api.poll.reads' && m.attributes.route === route);

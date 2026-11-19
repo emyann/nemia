@@ -67,7 +67,7 @@ const printed: Print = (script) => {
 };
 
 /** The block a begin marker at line `at` opens: its lines, or why the lines after it are not a fenced block closed by its end. */
-function blockAfter(lines: string[], at: number, name: string): { body: string[]; next: number } | { breach: string } {
+function blockAfter(lines: string[], at: number, name: string) {
   const end = `<!-- diagram:${name}:end -->`;
   if (lines[at + 1] !== '```mermaid') return { breach: `the line after it is not \`\`\`mermaid` };
   const close = lines.indexOf('```', at + 2);
@@ -76,7 +76,7 @@ function blockAfter(lines: string[], at: number, name: string): { body: string[]
 }
 
 /** The diagrams a doc holds, and a breach for each marker line of another shape, a block unclosed, or a doc outside a package. */
-function blocksIn(file: string, text: string): { blocks: Block[]; breaches: string[] } {
+function blocksIn(file: string, text: string) {
   const lines = text.split('\n');
   const blocks: Block[] = [];
   const breaches: string[] = [];
@@ -103,7 +103,7 @@ function blocksIn(file: string, text: string): { blocks: Block[]; breaches: stri
 }
 
 /** Where one block is not what its command prints, each breach naming the command. */
-function driftOf(block: Block, print: Print): string[] {
+function driftOf(block: Block, print: Print) {
   const { file, name, command } = block;
   const got = print(block.script);
   if ('error' in got)
@@ -118,7 +118,7 @@ function driftOf(block: Block, print: Print): string[] {
 }
 
 /** Every breach across `docs`: a marker's shape, a name begun twice in the repository, and a block that drifted from its machine. */
-function driftIn(docs: Array<{ file: string; text: string }>, print: Print): string[] {
+function driftIn(docs: Array<{ file: string; text: string }>, print: Print) {
   const read = docs.map(({ file, text }) => blocksIn(file, text));
   const blocks = read.flatMap((r) => r.blocks);
   const seen = new Map<string, string>();
@@ -148,7 +148,7 @@ const WORKFLOW_DOC = 'packages/agent-orchestrator/docs/model.md';
 const LOST = '  working --> ending: LOST / record-end';
 
 /** The runtime's README as it is on disk: the lifecycle's diagram, the one every refusal below is planted in. */
-const readme = (): string => {
+const readme = () => {
   const text = textOf(RUNTIME_README) ?? '';
   assert.ok(text.includes(LOST), `${RUNTIME_README} holds the lifecycle's diagram`);
   return text;
@@ -158,7 +158,7 @@ const readme = (): string => {
  * The lifecycle's block as its marker names it. Its command is the runtime's README's own words: this package names no path into
  * another's src (the runtime's `contract.test.ts`).
  */
-const lifecycle = (): Block => {
+const lifecycle = () => {
   const block = blocksIn(RUNTIME_README, readme()).blocks.find((b) => b.name === 'lifecycle');
   assert.ok(
     block && block.command.endsWith('.then((m) => console.log(m.diagram()))"'),

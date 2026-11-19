@@ -34,7 +34,7 @@ const H: Rgb = [200, 0, 0];
 const S: Rgb = [0, 200, 0];
 const F: Rgb = [0, 0, 200];
 /** The colour of content row `i`: each its own, none a frame part's. */
-const rowColour = (i: number): Rgb => [20 + 10 * i, 100, 150];
+const rowColour = (i: number) => [20 + 10 * i, 100, 150] satisfies Rgb;
 const css = ([r, g, b]: Rgb) => `rgb(${r},${g},${b})`;
 
 /** The board's frame in solid colours, around `rows` content rows of `ROW` pixels each. */
@@ -52,8 +52,9 @@ const framed = (rows: number) => `<!doctype html><body style="margin:0;backgroun
 </body>`;
 
 /** A 1280 × 800 page showing `framed(rows)`, scrolled down `scrollY` pixels. */
-async function framedPage(rows: number, scrollY = 0): Promise<Page> {
+async function framedPage(rows: number, scrollY = 0) {
   const page = await (await browser.newContext({ viewport: WINDOW })).newPage();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- the runner's check needs a page, not a board
   await page.route('http://e2e.test/**', (route) => route.fulfill({ contentType: 'text/html', body: framed(rows) }));
   await page.goto('http://e2e.test/');
   await page.evaluate((y) => scrollTo(0, y), scrollY);
@@ -65,7 +66,7 @@ async function framedPage(rows: number, scrollY = 0): Promise<Page> {
  * header in the top band alone, the footer in the bottom band alone, the sidebar at the left of every row between them, each content row
  * its own colour all the way down, and the picture as tall as the page. Read in a blank page of the same browser, on a canvas.
  */
-async function wrongIn(file: string, rows: number): Promise<string[]> {
+async function wrongIn(file: string, rows: number) {
   const page = await browser.newPage();
   try {
     const url = `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;

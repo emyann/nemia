@@ -7,13 +7,13 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { Effect, Exit } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import { feedUnread, followedFeed, type FollowedMemo } from './rest.verb.ts';
+import { feedUnread, followedFeed } from './rest.verb.ts';
 
 /** An engine whose feed answers `feed`, and nothing else. */
-const feeding = (feed: Engine['feed']): Engine => ({ feed }) as unknown as Engine;
+const feeding = (feed: Engine['feed']) => ({ feed }) as unknown as Engine;
 
 /** A memo that has read to 3 and holds two runs. */
-const held = (): FollowedMemo => ({
+const held = () => ({
   cursor: 3,
   runs: new Map([
     ['r-1', 1],

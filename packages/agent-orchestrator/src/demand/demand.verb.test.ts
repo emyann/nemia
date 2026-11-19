@@ -43,7 +43,7 @@ afterAll(() => {
 });
 
 /** A host over the scratch store that keeps what it says, refuses a spawn and every program, and finds no service unless `over` says. */
-function hostOf(over: Partial<DemandHost> = {}): { host: DemandHost; said: string[]; calls: string[] } {
+function hostOf(over: Partial<DemandHost> = {}) {
   const said: string[] = [];
   const calls: string[] = [];
   const host: DemandHost = {
@@ -68,7 +68,7 @@ function hostOf(over: Partial<DemandHost> = {}): { host: DemandHost; said: strin
 }
 
 /** Waits, a beat at a time, until the store's lease reads as `done` says. */
-async function leaseUntil(done: (kind: string) => boolean): Promise<void> {
+async function leaseUntil(done: (kind: string) => boolean) {
   while (!done(daemonStanding(ROOT).kind)) await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
@@ -84,7 +84,7 @@ const specOf = (name: string, root: string) => ({
 });
 
 /** A systemd unit named `name` for the store `root`. */
-function unitFor(name: string, root: string): void {
+function unitFor(name: string, root: string) {
   const dir = path.join(CONFIG, 'systemd', 'user');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, `${name}.service`), unitText(specOf(name, root)));

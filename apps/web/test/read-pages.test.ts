@@ -12,22 +12,19 @@ import { decisionQuery, type RunDecision } from '../src/lib/api/decision.ts';
 import { everyPage, runs, steps, workflows } from '../src/lib/api/objects.ts';
 import { QueryClient } from '@tanstack/react-query';
 import { readTranscript, transcriptQuery } from '../src/lib/api/steps.ts';
-import { listOfItems, workflow, workflowObject } from './library-fixtures.ts';
-import { decidable, step, transcript } from './run-fixtures.ts';
+import { listOfItems, workflow, workflowObject } from './library.fixture.ts';
+import { decidable, step, transcript } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** Every request the test's `fetch` was asked, its url read against a stand-in origin, answered by `answer` as JSON. */
-function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown): URL[] {
+function answering(t: { onTestFinished: (fn: () => void) => void }, answer: (url: URL) => unknown) {
   const asked: URL[] = [];
-  const before = globalThis.fetch;
-  globalThis.fetch = async (input) => {
-    const url = new URL(input instanceof Request ? input.url : String(input), 'http://board.invalid');
+  apiAnswers(async (input) => {
+    const url = new URL(input, 'http://board.invalid');
     asked.push(url);
     return new Response(JSON.stringify(answer(url)), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
-  return asked;
+  return asked satisfies URL[];
 }
 
 /** A page of `items` of `kind` that says `next` is the page after it, where there is one. */
@@ -118,20 +115,16 @@ test("a step's conversation is read on at once from each cursor while the api sa
   assert.ok(asked.every((url) => url.searchParams.get('limit') === String(TRANSCRIPT_PAGE.most)));
 });
 
-test("a step's conversation read through its query is read once by the readers that come while it is out, and none that leaves aborts it", async (t) => {
+test("a step's conversation read through its query is read once by the readers that come while it is out, and none that leaves aborts it", async () => {
   const signals: (AbortSignal | null | undefined)[] = [];
   let answer: () => void = () => {};
   const held = new Promise<void>((done) => {
     answer = done;
   });
-  const before = globalThis.fetch;
-  globalThis.fetch = async (_input, init) => {
+  apiAnswers(async (_input, init) => {
     signals.push(init?.signal);
     await held;
     return new Response(JSON.stringify(transcript({ live: false })), { status: 200, headers: { 'content-type': 'application/json' } });
-  };
-  t.onTestFinished(() => {
-    globalThis.fetch = before;
   });
   const client = new QueryClient();
   const query = transcriptQuery('r-1', 'tokens', 'task-1');

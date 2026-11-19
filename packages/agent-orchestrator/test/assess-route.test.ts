@@ -52,10 +52,10 @@ const passOf = ({ filed = {}, surface = 'web', steps = TRIAGE, records = {} }: P
   const r: Run = run(Object.fromEntries(NAMES.map((n) => [n, n in filed ? `t-${n}` : null])));
   for (const [name, extra] of Object.entries(records)) r.steps[name] = { taskId: r.steps[name]?.taskId ?? null, ...extra };
   const phaseOf = phases(Object.fromEntries(Object.entries(filed).map(([n, p]) => [`t-${n}`, p])));
-  const said = (name: string): Closeout | undefined =>
-    filed[name] === 'succeeded'
+  const said = (name: string) =>
+    (filed[name] === 'succeeded'
       ? { outcome: 'done', summary: `did ${name}`, artifacts: [], ...(name === 'plan' ? { output: { surface } } : {}) }
-      : undefined;
+      : undefined) satisfies Closeout | undefined;
   const asked = () => true;
   return {
     run: r,
@@ -152,8 +152,10 @@ test("a table's copied route yields to its producer tried again, until a node af
 test("a gated condition's row says the route it proposes beside its gate", () => {
   const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
   const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
-  const said = (name: string): Closeout | undefined =>
-    name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+  const said = (name: string) =>
+    (name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined) satisfies
+      | Closeout
+      | undefined;
   const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
   const rows = routedRows(input, listedWords(listingInput(input).read));
   assert.deepEqual(rows.get('triage'), { besides: 'proposes web' });
@@ -162,8 +164,10 @@ test("a gated condition's row says the route it proposes beside its gate", () =>
 test('nemia ls and nemia decide read a gated condition whose table answered as at its gate, waiting on you', () => {
   const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
   const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
-  const said = (name: string): Closeout | undefined =>
-    name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+  const said = (name: string) =>
+    (name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined) satisfies
+      | Closeout
+      | undefined;
   const phaseOf = phases({ 't-plan': 'succeeded' });
   const l = listing({ steps: gated, run: held.run, phaseOf, closeoutOf: said, askedCloseout: () => true });
   const triage = l.steps.find((s) => s.name === 'triage');
@@ -280,7 +284,7 @@ describe("a run's listing stands no step itself: each step's standing is its ass
   };
   test('a workflow with none of the routing keys: the words are the standings', () => {
     const r = run({ implement: 't-implement', review: null });
-    const said = (): Closeout => ({ outcome: 'done', summary: 'did implement', artifacts: [] });
+    const said = () => ({ outcome: 'done', summary: 'did implement', artifacts: [] }) satisfies Closeout;
     const { l, moved } = planted({ steps: STEPS, run: r, phaseOf: phases({ 't-implement': 'succeeded' }), closeoutOf: said }, 'implement');
     assert.notEqual(l.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted');
     assert.equal(moved.steps.find((s) => s.name === 'implement')?.message, 'rounds exhausted', 'the planted standing is what it says');
@@ -288,8 +292,10 @@ describe("a run's listing stands no step itself: each step's standing is its ass
   test('a routed workflow: its rows still routed over the standings', () => {
     const gated = TRIAGE.map((s) => (s.name === 'triage' ? { ...s, gate: true as const } : s));
     const held = passOf({ filed: { plan: 'succeeded' }, steps: gated });
-    const said = (name: string): Closeout | undefined =>
-      name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined;
+    const said = (name: string) =>
+      (name === 'plan' ? { outcome: 'done', summary: 'did plan', artifacts: [], output: { surface: 'web' } } : undefined) satisfies
+        | Closeout
+        | undefined;
     const input = { steps: gated, run: held.run, phaseOf: phases({ 't-plan': 'succeeded' }), closeoutOf: said, askedCloseout: () => true };
     const { l, moved } = planted(input, 'plan');
     assert.equal(l.steps.find((s) => s.name === 'triage')?.message, 'awaiting approval · proposes web');

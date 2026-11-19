@@ -32,11 +32,11 @@ const ENV: NodeJS.ProcessEnv = {
   GIT_COMMITTER_EMAIL: 'place@example.test',
 };
 
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A repository on `main` with one commit. */
-function repository(): string {
+function repository() {
   const dir = scratch('wf-git-place-');
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'commit', '-q', '--allow-empty', '-m', 'base');
@@ -46,7 +46,7 @@ function repository(): string {
 const PLACE = gitPlace({ env: ENV });
 
 /** What an unread outcome said; fails on any other. */
-function saidOf(outcome: PlaceOutcome<PlaceVerb>, verb: PlaceVerb): string {
+function saidOf(outcome: PlaceOutcome<PlaceVerb>, verb: PlaceVerb) {
   assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
   assert.equal(outcome.unread.verb, verb);
   assert.ok(!Number.isNaN(Date.parse(outcome.unread.at)), `at is a time: ${outcome.unread.at}`);
@@ -57,7 +57,7 @@ function saidOf(outcome: PlaceOutcome<PlaceVerb>, verb: PlaceVerb): string {
  * A repository whose `handoff` is held: a clean filter runs `/bin/sh` on a script that starts a child deaf to SIGTERM, which writes its
  * pid to `marker` once deaf, and waits on it. The repository, the child's script and the marker.
  */
-function heldByDeaf(): { dir: string; child: string; marker: string } {
+function heldByDeaf() {
   const dir = repository();
   const held = scratch('wf-git-place-held-');
   const marker = path.join(held, 'deaf');
@@ -92,7 +92,7 @@ const GRACE_MS = 200;
 const FIRST_DEADLINE_MS = 500;
 
 /** The deadline's words for a group that outlived SIGTERM for the grace the tests give. */
-const killedWords = (deadlineMs: number): string =>
+const killedWords = (deadlineMs: number) =>
   `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped, and a process it started outlived SIGTERM for ` +
   `${GRACE_MS / 1000} s and was killed, so a lock it held may be left`;
 

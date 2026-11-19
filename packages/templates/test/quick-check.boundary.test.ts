@@ -52,14 +52,14 @@ const TEXT = fs.readFileSync(SCRIPT, 'utf8');
 const MANY = 1000;
 
 /** Run git in `dir`, as nobody in particular. */
-const git = (dir: string, ...args: string[]): string =>
+const git = (dir: string, ...args: string[]) =>
   execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
 /** Write `files` into `dir`, each at its path, and commit them all as `message`. */
-const commit = (dir: string, files: Record<string, string>, message: string): void => {
+const commit = (dir: string, files: Record<string, string>, message: string) => {
   for (const [name, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     fs.writeFileSync(path.join(dir, name), text);
@@ -69,17 +69,17 @@ const commit = (dir: string, files: Record<string, string>, message: string): vo
 };
 
 /** `n` lines, each unlike any other and unlike any line of another `tag`. */
-const lines = (n: number, tag = 'line'): string => Array.from({ length: n }, (_, i) => `${tag} ${i}\n`).join('');
+const lines = (n: number, tag = 'line') => Array.from({ length: n }, (_, i) => `${tag} ${i}\n`).join('');
 
 /** `n` files of one line each, under `dir`. */
-const files = (n: number, dir = 'src'): Record<string, string> =>
+const files = (n: number, dir = 'src') =>
   Object.fromEntries(Array.from({ length: n }, (_, i) => [`${dir}/f${i}.ts`, `export const f${i} = ${i};\n`]));
 
 /** The branch a run's work is on, which the pull-request script the shipped check runs requires (`wf/<run>/run` for a run's own line). */
 const BRANCH = 'wf/r-1/run';
 
 /** A scratch repository on `main` holding `base`, with the run's branch checked out on it, a bare `origin`, and the base's commit. */
-function based(base: Record<string, string> = {}): { repo: string; base: string } {
+function based(base: Record<string, string> = {}) {
   const repo = scratch('wf-quick-repo-');
   git(repo, 'init', '-q', '-b', 'main');
   commit(repo, { 'README.md': 'base\n', ...base }, 'base');
@@ -90,7 +90,7 @@ function based(base: Record<string, string> = {}): { repo: string; base: string 
 }
 
 /** A scratch repository whose `HEAD`, one commit past its base, adds `work`. */
-function workOn(work: Record<string, string>, base: Record<string, string> = {}): { repo: string; base: string } {
+function workOn(work: Record<string, string>, base: Record<string, string> = {}) {
   const made = based(base);
   commit(made.repo, work, 'work');
   return made;
@@ -103,7 +103,7 @@ type Failing = { npx?: number; e2e?: number; npm?: number; claude?: number };
  * A folder holding an `npx`, an `npm` and a `claude` that exit 0 but as `failing` says, the first two writing their arguments as a
  * line of `log` first.
  */
-function stubs(failing: Failing = {}): { bin: string; said: () => string[] } {
+function stubs(failing: Failing = {}) {
   const bin = scratch('wf-quick-bin-');
   const log = path.join(bin, 'said.log');
   const exits = { npx: `exit ${failing.npx ?? 0}`, npm: `case "$*" in *e2e*) exit ${failing.e2e ?? 0};; esac; exit ${failing.npm ?? 0}` };
@@ -116,7 +116,7 @@ function stubs(failing: Failing = {}): { bin: string; said: () => string[] } {
 type Ran = { code: number | null; out: string; err: string; said: string[] };
 
 /** The environment a check has in `repo` on `base`: the stubs first on the path, the run's variables, and nothing of this process's. */
-const envOf = (repo: string, base: string, bin: string, more: Record<string, string> = {}): Record<string, string> => ({
+const envOf = (repo: string, base: string, bin: string, more: Record<string, string> = {}) => ({
   PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   HOME: repo,
   TMPDIR: scratch('wf-quick-tmp-'),
@@ -126,7 +126,7 @@ const envOf = (repo: string, base: string, bin: string, more: Record<string, str
 });
 
 /** Run the script's `verb` in `repo` on `base`, bounded; its exit, its streams, and what the stubs were handed. */
-function change(repo: string, base: string, verb: string, ...args: string[]): Ran {
+function change(repo: string, base: string, verb: string, ...args: string[]) {
   const { bin, said } = stubs();
   const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
     cwd: repo,
@@ -138,7 +138,7 @@ function change(repo: string, base: string, verb: string, ...args: string[]): Ra
 }
 
 /** A closeout as the check is handed it (`WF_CLOSEOUT`), written to a scratch file: its path. */
-function closeoutFile(more: Record<string, unknown>): string {
+function closeoutFile(more: Record<string, unknown>) {
   const file = path.join(scratch('wf-quick-closeout-'), 'closeout.json');
   fs.writeFileSync(file, JSON.stringify({ outcome: 'done', summary: 's', artifacts: [], ...more }));
   return file;
@@ -171,7 +171,7 @@ const TREES = await (async () => {
     { name: 'github', template: copyOf(SDLC), sets: ['github=true', `implementCheck=${OWN_COMMAND}`] },
     { name: 'local', template: copyOf(SDLC), sets: ['localCheck=local-check', `implementCheck=${OWN_COMMAND}`] },
   ]);
-  const treeOf = (name: 'sdlc' | 'checkout' | 'github' | 'local'): Rendered => {
+  const treeOf = (name: 'sdlc' | 'checkout' | 'github' | 'local') => {
     const at = all[name];
     assert.ok(at?.tree, `${name} was rendered: ${JSON.stringify(at?.conditions)}`);
     return { tree: at.tree, store: at.store };
@@ -201,7 +201,7 @@ const LOCAL_CHECK = stepsOf(LOCAL, 'quick').find((step) => step.name === 'implem
 const OWN_RENDERED = { github: TREES.github, local: TREES.local };
 
 /** Where a rendered check `check` branches on its way: what runs before, the GitHub branch, and the local one (`; else …`). */
-function waysOf(check: string): { before: string; github: string; local: string } {
+function waysOf(check: string) {
   const opens = /if \[ "(?:true|false)" = true \]; then /.exec(check);
   assert.ok(opens, `the check branches on its way:\n${check}`);
   const otherwise = check.lastIndexOf('; else { ');
@@ -226,7 +226,7 @@ function shipped(
   files = scratch('wf-quick-files-'),
   rules?: readonly Rule[],
   more: Record<string, string> = FROZEN,
-): Ran {
+) {
   assert.ok(CHECK, "sdlc's quick has an implement step with a check");
   const { bin, said } = stubs(failing);
   const gh = ghIn(bin, rules ?? passing(repo));
@@ -284,7 +284,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
   const { repo, base } = workOn({ 'apps/api/src/a.ts': 'x\n', 'apps/web/src/routes/x.tsx': 'export const x = 1;\n' });
   const files = scratch('wf-quick-files-');
   const signed = { plan: 'p' };
-  const run = (closeout: Record<string, unknown>, failing: Failing = {}, rules?: readonly Rule[]): Ran =>
+  const run = (closeout: Record<string, unknown>, failing: Failing = {}, rules?: readonly Rule[]) =>
     shipped(repo, base, closeout, { ...UNRUNNABLE, ...failing }, files, rules);
   const PRINTS = [
     /nemia size: 2 files, 2 lines/,
@@ -293,7 +293,7 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
     /nemia pr: #7 is at [0-9a-f]{12}, the commit this check judges/,
     /nemia ci: `ci` passed on/,
   ];
-  const printed = (ran: Ran): number[] => PRINTS.map((line) => ran.out.search(line));
+  const printed = (ran: Ran) => PRINTS.map((line) => ran.out.search(line));
 
   const passed = run(signed);
   assert.equal(passed.code, 0, passed.out + passed.err);
@@ -358,8 +358,8 @@ test("REFUSED at shipped defaults: implement's check, as rendered, runs its five
 
 test("REFUSED at shipped defaults, in the checkout: implement's check runs the size, the probes, the parts and the local check, in that order, pushes nothing and calls no gh", () => {
   const { repo, base } = workOn({ 'src/a.ts': 'x\n' });
-  const bareTip = (): string => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
-  const run = (exit: number): Ran => {
+  const bareTip = () => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
+  const run = (exit: number) => {
     const { bin, said } = stubs();
     fs.writeFileSync(path.join(bin, 'local-check'), `#!/bin/sh\necho "local check ran"\nexit ${exit}\n`, { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'gh'), `#!/bin/sh\nprintf '%s\\n' "gh $*" >> '${path.join(bin, 'said.log')}'\nexit 1\n`, {
@@ -376,7 +376,7 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
     return { code: ran.status, out: ran.stdout, err: ran.stderr, said: said() };
   };
   const PRINTS = [/nemia size: 1 files, 1 lines/, /no live probe of run r-1/, /nemia parts: run r-1 has no branch but/, /local check ran/];
-  const printed = (ran: Ran): number[] => PRINTS.map((line) => ran.out.search(line));
+  const printed = (ran: Ran) => PRINTS.map((line) => ran.out.search(line));
 
   const passed = run(0);
   assert.equal(passed.code, 0, passed.out + passed.err);
@@ -398,8 +398,8 @@ test("REFUSED at shipped defaults, in the checkout: implement's check runs the s
 });
 
 test("the factory's own check, set, runs after the parts and before the push or the local check, either way, and its refusal pushes nothing", () => {
-  const bareTip = (repo: string): string => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
-  const run = ({ repo, base }: { repo: string; base: string }, way: keyof typeof OWN_RENDERED, exit: number): Ran => {
+  const bareTip = (repo: string) => execFileSync('git', ['-C', repo, 'ls-remote', 'origin'], { encoding: 'utf8' });
+  const run = ({ repo, base }: { repo: string; base: string }, way: keyof typeof OWN_RENDERED, exit: number) => {
     const { bin, said } = stubs();
     for (const [name, line] of [
       ['own-check', 'own check ran for $1'],
@@ -435,7 +435,7 @@ test("the factory's own check, set, runs after the parts and before the push or 
     local: [...ahead, /local check ran/],
   };
   for (const way of ['github', 'local'] as const) {
-    const printed = (ran: Ran): number[] => PRINTS[way].map((line) => ran.out.search(line));
+    const printed = (ran: Ran) => PRINTS[way].map((line) => ran.out.search(line));
     const made = workOn({ 'src/a.ts': 'x\n' });
     const passed = run(made, way, 0);
     assert.equal(passed.code, 0, passed.out + passed.err);
@@ -557,7 +557,7 @@ const OWN_SAID =
 const WAIT_FLAG = '(?:\\s+--check\\s+<name>)?';
 
 test("REFUSED: a note or a README that says a bound on the size, or other clauses than the check's", () => {
-  const said = (file: string): string => fs.readFileSync(path.join(QUICK, file), 'utf8');
+  const said = (file: string) => fs.readFileSync(path.join(QUICK, file), 'utf8');
   const bound = /at\s+most\s+(?:\*\*)?\d+\s+(?:lines|files)/;
   assert.match('a change of at most **300 lines** changed', bound, 'a bound in the words the notes once said is caught');
   for (const file of ['implement.md', 'review.md', 'README.md']) assert.doesNotMatch(said(file), bound, `${file} bounds no size`);

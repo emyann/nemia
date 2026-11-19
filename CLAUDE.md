@@ -50,6 +50,10 @@ holds what every change needs.
   the 27 files that import its compiler API, the editor, and a step's `npx tsc --noEmit` where tsc 6 is still wanted: the steps
   measure with `npx tsrs --noEmit`, the compiler `ci` judges with.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
+  `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. It extends
+  `@interfere/landmines`' recommended config, pinned exactly, which holds how a test is written (no double but a watching spy, MSW for
+  the network, no fixed sleep, no retry or raised timeout); its settings, and the allowlists of `no-fixed-sleep` and `no-flake-masking`
+  with a count for each file, are in `.oxlintrc.json`'s top-level rules, and a count only shrinks.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it. A commit
   formats and lints its staged files (husky and lint-staged, `.husky/pre-commit`), and `npm run lint:fast` checks the whole tree.
 - `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their

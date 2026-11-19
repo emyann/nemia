@@ -41,8 +41,6 @@ import { Effect } from 'effect';
 import { listedRuns as runList, objectOf } from './run-reads.ts';
 import type { Run } from 'objects';
 
-type Wait = import('agent-orchestrator').Wait;
-
 /** The environment this file's api and programs read: the harness's, at shipped defaults, with neither of the daemon's two ceilings set. */
 const ENV: NodeJS.ProcessEnv = { ...process.env, WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const { app } = appOf(liveOf(ENV));
@@ -50,7 +48,7 @@ const { app } = appOf(liveOf(ENV));
 const runWith = <A, E>(
   e: Parameters<typeof runEngine>[0],
   program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot | StoreConfig>,
-): Promise<A> => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
+) => runEngine(e, builtin(program.pipe(Effect.provide(storeConfigLayer(ENV)))));
 const git = (...args: string[]) =>
   execFileSync(
     'git',
@@ -65,7 +63,7 @@ git('commit', '-q', '-m', 'base');
 const base = git('rev-parse', 'HEAD').trim();
 
 /** A result branch off main with a file of its own committed; merged back into main with `--no-ff` when `merge` says so. */
-function branch(name: string, merge: boolean): void {
+function branch(name: string, merge: boolean) {
   git('checkout', '-q', '-b', name);
   fs.writeFileSync(path.join(repo, `${name.replaceAll('/', '-')}.txt`), `${name}\n`);
   git('add', '-A');
@@ -112,7 +110,7 @@ const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness
  * Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `nemia cancel` does, in a file of its
  * own beside the record.
  */
-function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}): void {
+function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}) {
   const { cancelledAt, ...rest } = fields;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
@@ -160,13 +158,13 @@ await runWith(engine(ENV), passStanding(runsAtOnce(root).runs.list()));
 type Listed = Run['status'] & { after: readonly string[]; createdAt: string };
 
 /** Each run of the RunList, by name (`Listed`). */
-const listedRuns = async (): Promise<Map<string, Listed>> =>
+const listedRuns = async () =>
   new Map(
     (await runList(app)).map((r) => [r.metadata.name, { ...r.status, after: r.spec.after, createdAt: r.metadata.creationTimestamp }]),
   );
 
 /** The waits as the api gives them, back in the package's shape. */
-const asWaits = (waiting: Listed['waiting']): Wait[] =>
+const asWaits = (waiting: Listed['waiting']) =>
   (waiting?.runs ?? []).map((w) => ({
     run: w.run,
     ...(w.missing ? { missing: true as const } : {}),

@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 
-const git = (cwd: string, ...args: string[]): string =>
+const git = (cwd: string, ...args: string[]) =>
   execFileSync(
     'git',
     [
@@ -36,7 +36,7 @@ const git = (cwd: string, ...args: string[]): string =>
     },
   );
 
-const writeAll = (root: string, files: Record<string, string>): void => {
+const writeAll = (root: string, files: Record<string, string>) => {
   for (const [file, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), text);
@@ -47,11 +47,7 @@ const writeAll = (root: string, files: Record<string, string>): void => {
  * A repository holding `base`, and two branches off it, `one` and `other`, each writing its own files over it; then `other` merged into
  * `one`, as a person merges main into a branch. Answers the repository, and whether the merge was clean.
  */
-function mergeOf(
-  base: Record<string, string>,
-  one: Record<string, string>,
-  other: Record<string, string>,
-): { repo: string; clean: boolean; said: string } {
+function mergeOf(base: Record<string, string>, one: Record<string, string>, other: Record<string, string>) {
   const repo = scratch('nemia-e2e-merge-');
   git(repo, 'init', '-q', '-b', 'main');
   writeAll(repo, base);
@@ -74,14 +70,14 @@ function mergeOf(
   }
 }
 
-const pageFile = (name: string): string =>
+const pageFile = (name: string) =>
   `import type { PageSpec } from '../visit.ts';\n\nexport default {\n  name: '${name}',\n  route: '/',\n  expect: async () => {},\n} satisfies PageSpec;\n`;
 
 /** Where the pages sit in the repository, and so in a throwaway one: `.gitattributes` names NAMES by this path. */
 const PAGES = path.relative(REPO, PAGES_DIR);
 
 /** The repository's pages and NAMES, and its .gitattributes, at their paths. */
-const shippedPages = (): Record<string, string> => ({
+const shippedPages = () => ({
   ...Object.fromEntries(
     fs.readdirSync(PAGES_DIR).map((file) => [path.join(PAGES, file), fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')]),
   ),
@@ -89,13 +85,13 @@ const shippedPages = (): Record<string, string> => ({
 });
 
 /** The last page there is, and the number after it, as two runs would each take it, so adding a page does not move the tests. */
-const lastAndNext = (): [string, string] => {
+const lastAndNext = () => {
   const last = pageFiles(PAGES_DIR).at(-1)!;
   return [last, String(Number(last.slice(0, 3)) + 10).padStart(3, '0')];
 };
 
 /** A page added as a run adds one: its file, and its line at the end of NAMES. */
-const added = (base: Record<string, string>, file: string, name: string): Record<string, string> => ({
+const added = (base: Record<string, string>, file: string, name: string) => ({
   [path.join(PAGES, file)]: pageFile(name),
   [path.join(PAGES, NAMES)]: `${base[path.join(PAGES, NAMES)]}${name}\n`,
 });
@@ -132,7 +128,7 @@ test('the old shape — one array of pages every run appends to — conflicts on
 });
 
 /** The repository's CLAUDE.md with `lesson` added as the last line of its first section, where a run adds what it learned. */
-function withLesson(claude: string, lesson: string): string {
+function withLesson(claude: string, lesson: string) {
   const next = claude.indexOf('\n## ', claude.indexOf('\n## ') + 1);
   assert.ok(next > 0, 'CLAUDE.md has a second section');
   return `${claude.slice(0, next).trimEnd()}\n${lesson}\n${claude.slice(next)}`;

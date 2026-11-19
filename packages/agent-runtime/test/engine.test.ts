@@ -1183,27 +1183,29 @@ describe("the pass's refusals: an argument a pass, a step or a settle was never 
 });
 
 /** A time `ms` after the journals' epoch, as a journal writes it. */
-const atMs = (ms: number): string => new Date(ms).toISOString();
+const atMs = (ms: number) => new Date(ms).toISOString();
 
 /**
  * Journals that reach each of `decide`'s readings: queued, starting, at work, ended each way, held open and asked, past a deadline,
  * asked to stop, a spawn that failed, and a long-lived task between restarts, whose backoff alone reads an end time.
  */
 const JUDGED: Record<string, Event[]> = (() => {
-  const filed = (fields: Record<string, unknown> = {}): Event => ({ kind: 'filed', at: atMs(0), brief: 'b', cwd: '/r', ...fields });
+  const filed = (fields: Record<string, unknown> = {}) =>
+    ({ kind: 'filed', at: atMs(0), brief: 'b', cwd: '/r', ...fields }) satisfies Event;
   const started: Event[] = [
     { kind: 'starting', at: atMs(1_000), attempt: 1 },
     { kind: 'spawned', at: atMs(2_000), attempt: 1 },
   ];
-  const ended = (observed: 'succeeded' | 'failed' | 'stopped', reason: 'harness' | 'deadline' | 'operator'): Event => ({
-    kind: 'ended',
-    at: atMs(3_000),
-    attempt: 1,
-    sessionId: 's',
-    observed,
-    reason,
-    nativeId: 's',
-  });
+  const ended = (observed: 'succeeded' | 'failed' | 'stopped', reason: 'harness' | 'deadline' | 'operator') =>
+    ({
+      kind: 'ended',
+      at: atMs(3_000),
+      attempt: 1,
+      sessionId: 's',
+      observed,
+      reason,
+      nativeId: 's',
+    }) satisfies Event;
   return {
     filed: [filed()],
     queued: [filed({ queued: true })],

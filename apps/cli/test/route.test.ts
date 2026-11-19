@@ -124,7 +124,7 @@ test('a moved command of each group asks the api under both contexts and with --
 });
 
 /** A laptop whose config's context in use is a remote daemon nothing serves, and whose store root is never made. */
-function remoteLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } {
+function remoteLaptop(prefix: string) {
   const folder = scratch(prefix);
   const env = {
     ...ambient(),
@@ -142,7 +142,7 @@ function remoteLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } 
  * `src/local.ts`, its one resolver, resolves to the package's `bin/nemia.ts` — which prints the words it was spawned with, what it read
  * on stdin and `WF_ROOT`, as one JSON line.
  */
-function plantedEntry(prefix: string): string {
+function plantedEntry(prefix: string) {
   const entry = path.join(scratch(prefix), 'planted.mjs');
   fs.writeFileSync(
     entry,
@@ -160,11 +160,7 @@ function plantedEntry(prefix: string): string {
  * `nemia <argv>` on `env`, waited on for its end: its code, all it said and its stdout, the planted entry of `hook` in the old path's
  * place where one is given.
  */
-async function nemia(
-  argv: readonly string[],
-  env: NodeJS.ProcessEnv,
-  hook?: string,
-): Promise<{ code: number | null; said: string; out: string }> {
+async function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, hook?: string) {
   const child = spawn(process.execPath, [...(hook === undefined ? [] : ['--import', hook]), CLI, ...argv], {
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -261,7 +257,7 @@ test("a bare `nemia upgrade` under a remote context upgrades this machine, then 
 });
 
 /** A laptop whose context in use is this machine's own, its store scratch and served by no daemon, none started on demand. */
-function localLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } {
+function localLaptop(prefix: string) {
   const folder = scratch(prefix);
   const env = {
     ...ambient(),

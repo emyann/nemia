@@ -24,7 +24,7 @@ type Followed = Stream.Success<NonNullable<Effect.Success<ReturnType<Engine['Ser
 const TASK = 'her-followed';
 const AT = '2026-10-15T12:00:00.000Z';
 
-const herWords = (id: string, text: string): TranscriptEvent => ({ id, at: AT, role: 'assistant', kind: 'text', text });
+const herWords = (id: string, text: string) => ({ id, at: AT, role: 'assistant', kind: 'text', text }) satisfies TranscriptEvent;
 
 /**
  * Her task on an engine that is the api's own but for `view`, `transcript` and `follow`: one attempt at work, its conversation
@@ -73,7 +73,7 @@ function appOver(t: TestContext, e: ReturnType<typeof engine>) {
 }
 
 type Block = { event?: string; data?: string; id?: string };
-const blocks = (text: string): Block[] =>
+const blocks = (text: string) =>
   text
     .split('\n\n')
     .filter((b) => b.trim())
@@ -84,7 +84,7 @@ const blocks = (text: string): Block[] =>
         if (at > 0) block[line.slice(0, at) as keyof Block] = line.slice(at + 1).trimStart();
       }
       return block;
-    });
+    }) satisfies Block[];
 
 const textsOf = (said: Block[]) => said.filter((b) => b.event === 'chat').map((b) => (JSON.parse(b.data!) as { text?: string }).text);
 
@@ -97,7 +97,7 @@ async function reader(t: TestContext, app: ReturnType<typeof appOver>['app']) {
   let text = '';
   const rung = bell();
   const said = () => blocks(text.slice(0, text.lastIndexOf('\n\n') + 2));
-  const pump = async (): Promise<void> => {
+  const pump = async () => {
     const { done, value } = await body.read();
     if (done) return;
     text += decoder.decode(value, { stream: true });

@@ -167,7 +167,7 @@ export const subscriptionFileAt = (home: string, name: string): string => path.j
 export const deliveryFileAt = (home: string, name: string): string => path.join(subscriptionsAt(home), `${name}${STATE}`);
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
-const Bytes = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Bytes = Schema.Natural;
 
 /** A word of a subscription's file that is text and not empty: a selector as a person typed it, or a wake word a former nemia wrote. */
 const Word = Schema.String.check(Schema.isNonEmpty());

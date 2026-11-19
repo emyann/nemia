@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
 import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage, UNDECIDED_SELECTOR, undecidedRunsQuery } from '../src/lib/api/runs.ts';
 import { finishedSearch, newerOf, olderTrailOf, pageSaid, pastLast, rowsSaid, trailOf, trailSearch } from '../src/lib/finished.ts';
-import { detail, runList, runObject } from './run-fixtures.ts';
+import { detail, runList, runObject } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 /** Where a finished run's wall time went, as the api answers it: five parts that add up to its `wallMs`. */
 const CLOCK = { wallMs: 1_660_000, sessionsMs: 1_200_000, checksMs: 300_000, personMs: 100_000, slotMs: 60_000, restMs: 0 };
@@ -33,15 +34,13 @@ const answer = (next: string | null = 'f.next') =>
   });
 
 /** The board's read of a page of the finished runs from the token `from`, the api answering `value`. */
-async function read(value: unknown, older: string[] = []): Promise<FinishedPage> {
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
+async function read(value: unknown, older: string[] = []) {
+  apiAnswers(async () => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } }));
   const client = new QueryClient();
   try {
-    return await client.fetchQuery(finishedRunsQuery(undefined, older));
+    return (await client.fetchQuery(finishedRunsQuery(undefined, older))) satisfies FinishedPage;
   } finally {
     client.clear();
-    globalThis.fetch = before;
   }
 }
 
@@ -116,15 +115,13 @@ describe('finishedRunsQuery: the RunList asked by state read as a page, nine at 
   });
   test('the query asks the finished state nine a page, by factory and token, under a key of its factory and token', async (t) => {
     const asked: string[] = [];
-    const before = globalThis.fetch;
-    globalThis.fetch = async (input) => {
+    apiAnswers(async (input) => {
       asked.push(String(input));
       return new Response(JSON.stringify(answer()), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
+    });
     const client = new QueryClient();
     t.onTestFinished(() => {
       client.clear();
-      globalThis.fetch = before;
     });
     await client.fetchQuery(finishedRunsQuery('harbour', ['f.a', 'f.b']));
     await client.fetchQuery(finishedRunsQuery(undefined, []));
@@ -143,19 +140,17 @@ describe('finishedRunsQuery: the RunList asked by state read as a page, nine at 
 
 test('undecidedRunsQuery: the finished runs nobody decided, every page of them, under the finished runs’ key', async (t) => {
   const asked: string[] = [];
-  const before = globalThis.fetch;
   const pages = [answer('f.more'), answer(null)];
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     asked.push(String(input));
     return new Response(JSON.stringify(pages[asked.length - 1] ?? answer(null)), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
-  };
+  });
   const client = new QueryClient();
   t.onTestFinished(() => {
     client.clear();
-    globalThis.fetch = before;
   });
   const runs = await client.fetchQuery(undecidedRunsQuery('harbour'));
   const urls = asked.map((at) => new URL(at, 'http://board'));

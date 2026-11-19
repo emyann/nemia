@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { fireWord, scheduleDue, scheduleLine, scheduleLines, settledFire, type ScheduleListed } from './schedule.ts';
 
 const HOUR = 3_600_000;
-const fire = (n: number): number => Date.parse('2026-10-05T13:00:00Z') + n * HOUR;
-const iso = (at: number): string => new Date(at).toISOString();
+const fire = (n: number) => Date.parse('2026-10-05T13:00:00Z') + n * HOUR;
+const iso = (at: number) => new Date(at).toISOString();
 
 describe('scheduleDue: the latest fire is due once, after the schedule was written and after the run it last started', () => {
   const rows: Array<[string, Parameters<typeof scheduleDue>[0], boolean]> = [
@@ -72,7 +72,7 @@ const ROW: ScheduleListed = {
 
 describe('scheduleLines and `nemia ls`: each schedule with its next fire and last run, a kept refusal under it, after the runs', () => {
   let now!: number;
-  const clock = (at: string): string => `<${at.slice(0, 10)}>`;
+  const clock = (at: string) => `<${at.slice(0, 10)}>`;
   test('its zone, its next fire and its last run', () =>
     assert.deepEqual(scheduleLines([ROW], clock), [
       'scheduled  nemia/janitor  0 9 * * 1 (America/Montreal)  next <2026-10-12>  last read-the-stats-ab12 (<2026-10-05>)',

@@ -8,14 +8,14 @@ import { claudeTrust } from './claude/trust.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A `.claude.json` in a scratch folder holding `projects`, and its path. */
-const configWith = (projects: unknown): string => {
+const configWith = (projects: unknown) => {
   const file = path.join(scratch('ae-trust-'), '.claude.json');
   fs.writeFileSync(file, JSON.stringify({ projects }));
   return file;
 };
 
 /** `body` run with `CLAUDE_CONFIG_DIR` set to `dir`, and the variable put back as it was. */
-const inConfigDir = <T>(dir: string, body: () => T): T => {
+const inConfigDir = <T>(dir: string, body: () => T) => {
   const before = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = dir;
   try {
@@ -27,8 +27,7 @@ const inConfigDir = <T>(dir: string, body: () => T): T => {
 };
 
 /** The file of the trustedFolder rows: one folder trusted, one refused. */
-const TRUSTED = (): string =>
-  configWith({ '/srv/home': { hasTrustDialogAccepted: true }, '/srv/home/no': { hasTrustDialogAccepted: false } });
+const TRUSTED = () => configWith({ '/srv/home': { hasTrustDialogAccepted: true }, '/srv/home/no': { hasTrustDialogAccepted: false } });
 
 describe('trustedFolder: a folder is trusted only by its own entry with the prompt accepted, in the file its harness reads', () => {
   const rows: { name: string; check: () => void }[] = [
@@ -67,11 +66,10 @@ describe('trustedFolder: a folder is trusted only by its own entry with the prom
 });
 
 /** What `file` holds, parsed. */
-const held = (file: string): { projects: Record<string, Record<string, unknown>> } & Record<string, unknown> =>
-  JSON.parse(fs.readFileSync(file, 'utf8'));
+const held = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
 /** The names beside `file`, itself included. */
-const beside = (file: string): string[] => fs.readdirSync(path.dirname(file)).sort();
+const beside = (file: string) => fs.readdirSync(path.dirname(file)).sort();
 
 test('a folder nobody trusted is given the one key under its own path, and under its repository where one is named', () => {
   const file = configWith({});
@@ -188,7 +186,7 @@ describe('trustFolder: what a folder is given, what a file that cannot take the 
 test('a write that lands between the read and the replace is not lost', () => {
   const file = configWith({ '/srv/a': { hasTrustDialogAccepted: true } });
   let reads = 0;
-  const read = (at: string): Buffer => {
+  const read = (at: string) => {
     const bytes = fs.readFileSync(at);
     reads += 1;
     if (reads === 1) fs.writeFileSync(at, JSON.stringify({ projects: { ...held(at).projects, '/srv/session': { lastCost: 2 } } }));
@@ -206,7 +204,7 @@ test('a write that lands between the read and the replace is not lost', () => {
 test('REFUSED: a file that changes under every write is left as its other writer last wrote it, and the answer says what to do', () => {
   const file = configWith({});
   let reads = 0;
-  const read = (at: string): Buffer => {
+  const read = (at: string) => {
     const bytes = fs.readFileSync(at);
     reads += 1;
     fs.writeFileSync(at, JSON.stringify({ projects: {}, n: reads }));

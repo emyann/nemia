@@ -25,7 +25,8 @@ import {
 } from 'objects';
 import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
-import { isRecord, objectsOf, type Read, readOf, servedOf, textOf } from './apply.ts';
+import { objectsOf, type Read, readOf, servedOf, textOf } from './apply.ts';
+import { isObject } from 'effect/Predicate';
 
 export const PROPOSE_HELP = `nemia propose -f <file|-> [-n <factory>] [--at approval|run-end] [--why <text>]
 nemia propose --objects '<json>' [-n <factory>] [--at approval|run-end] [--why <text>]
@@ -146,7 +147,7 @@ function proposable(read: Read): ProposableKind {
 async function proposedOf(object: unknown, resources: readonly APIResource[], namespace: string): Promise<ProposedObject> {
   const read = readOf(object, resources, namespace, 'propose');
   const kind = proposable(read);
-  const said = isRecord(object) ? object.verb : undefined;
+  const said = isObject(object) ? object.verb : undefined;
   if (said !== undefined && !oneOf(CHANGE_VERBS, said))
     throw new Refused(
       `nemia propose: ${read.resource.name}/${read.name} says verb ${JSON.stringify(said)}: set ${CHANGE_VERBS.join(', ')}, or leave it out`,
@@ -167,7 +168,7 @@ async function proposedOf(object: unknown, resources: readonly APIResource[], na
 function namespaceOf(objects: readonly unknown[], namespace: string | undefined): string {
   if (namespace !== undefined) return namespace;
   const named = new Set(
-    objects.flatMap((o) => (isRecord(o) && isRecord(o.metadata) && typeof o.metadata.namespace === 'string' ? [o.metadata.namespace] : [])),
+    objects.flatMap((o) => (isObject(o) && isObject(o.metadata) && typeof o.metadata.namespace === 'string' ? [o.metadata.namespace] : [])),
   );
   if (named.size > 1)
     throw new Refused(

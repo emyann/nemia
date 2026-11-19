@@ -32,7 +32,7 @@ const FOLDERS = [
 const decode = Schema.decodeUnknownResult(FrozenStepSchema);
 
 /** A step as a record holds it: through JSON, as `nemia start` writes it and `readRun` reads it. */
-const frozen = (step: StepSpec): unknown => JSON.parse(JSON.stringify(step));
+const frozen = (step: StepSpec) => JSON.parse(JSON.stringify(step));
 
 test("every step of the tests' team, of its copy with a step's own schema and of the examples, frozen, reads back by the schema as it was frozen", () => {
   assert.ok(FOLDERS.includes(TEAM_DEV), `the team is read: ${FOLDERS.join(', ')}`);
@@ -197,8 +197,8 @@ test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now
 
 test('the decoded step, read under the names its keys have now, is a `StepSpec`, and a `StepSpec` is a decoded step', () => {
   type Decoded = typeof FrozenStepSchema.Type;
-  const toWorkflow = (step: Decoded): StepSpec => asNamed(step);
-  const fromWorkflow = (step: StepSpec): Decoded => step;
+  const toWorkflow = (step: Decoded) => asNamed(step);
+  const fromWorkflow = (step: StepSpec) => step;
   const step: StepSpec = { name: 'implement', after: [], body: '' };
   assert.deepEqual(toWorkflow(fromWorkflow(step)), step);
 });
@@ -207,7 +207,7 @@ test('the decoded step, read under the names its keys have now, is a `StepSpec`,
  * A field map without a field for a key of `STEP_KEYS` does not typecheck. Nothing calls this: the typecheck reads its lines, and an
  * `@ts-expect-error` over code that stops erring is the failure.
  */
-function _shortFieldMap(fields: FrozenStepFields): FrozenStepFields {
+function _shortFieldMap(fields: FrozenStepFields) {
   const { rounds: _, ...rest } = fields;
   // @ts-expect-error -- a field map missing `rounds` is no `FrozenStepFields`, as one missing any key of `STEP_KEYS` is not
   const missing: FrozenStepFields = rest;

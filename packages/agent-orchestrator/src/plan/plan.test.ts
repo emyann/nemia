@@ -4,9 +4,9 @@
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { WorkflowError } from '../step/step.ts';
-import { CARD_KEYS, cardToStart, parsePlan, planLines, planOrder, planStopped, type PlanFile, type Planned } from './plan.ts';
+import { CARD_KEYS, cardToStart, parsePlan, planLines, planOrder, planStopped, type PlanFile } from './plan.ts';
 
-const card = (name: string, keys: string, body = `do ${name}`): PlanFile => ({ file: `${name}.md`, text: `---\n${keys}\n---\n${body}\n` });
+const card = (name: string, keys: string, body = `do ${name}`) => ({ file: `${name}.md`, text: `---\n${keys}\n---\n${body}\n` });
 
 const DIAMOND: readonly PlanFile[] = [
   card('a', 'workflow: dev'),
@@ -285,7 +285,7 @@ describe("REFUSED by name at shipped defaults: a plan's card, its `after:` and i
 });
 
 const IDS: Record<string, string> = { a: 'parse-the-flag-1x2y', b: 'document-it-3z4w', c: 'store-it-5v6u', d: 'show-it-7t8s' };
-const startedOf = (names: readonly string[]): Planned[] =>
+const startedOf = (names: readonly string[]) =>
   planOrder(parsePlan(DIAMOND))
     .filter((c) => names.includes(c.name))
     .map((c) => ({ card: c, runId: IDS[c.name], workflowDir: `/repo/workflows/${c.workflow}` }));

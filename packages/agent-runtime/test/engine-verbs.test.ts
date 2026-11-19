@@ -20,7 +20,7 @@ import { story } from 'test-kit/checkpoints';
 import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */
-const memoryJournal = (): AsyncJournal => {
+const memoryJournal = () => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -37,24 +37,25 @@ const memoryJournal = (): AsyncJournal => {
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** A harness in eight. */
-const fakeHarness = (sessions: Map<string, Sighting>): AsyncRunner => ({
-  async spawn(r) {
-    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
-  },
-  async observe() {
-    return new Map(sessions);
-  },
-  async stop(id) {
-    for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
-  },
-  async logs() {
-    return 'fake logs';
-  },
-});
+const fakeHarness = (sessions: Map<string, Sighting>) =>
+  ({
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
+    async stop(id) {
+      for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
+    },
+    async logs() {
+      return 'fake logs';
+    },
+  }) satisfies AsyncRunner;
 
 /** The engine over a store in memory and `harness`, its default. */
 const engineOver = (harness: AsyncRunner) =>

@@ -14,12 +14,10 @@ import { Markdown } from '../../markdown/Markdown';
 import { Json } from '../../step/Outcome';
 import { Questions } from '../../gate/Questions';
 import { GateBudgetRows, type GateBudgets } from '../../gate/GateBudgets';
+import { isObject } from 'effect/Predicate';
 
 /** A value as one line of text: a string as it is, anything else as its JSON. */
 const textOf = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
-
-/** Whether `value` is an object that is no list. */
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** What says nothing was given: a dash, muted. */
 const Dash = () => (
@@ -48,7 +46,7 @@ function List({ items }: { items: readonly unknown[] }) {
 
 /** A table of objects: a column for each key any row has, in the order they first come, and a row for each object. */
 function Table({ rows }: { rows: readonly unknown[] }) {
-  const records = rows.filter(isRecord);
+  const records = rows.filter(isObject);
   if (records.length === 0) return <Dash />;
   const keys = [...new Set(records.flatMap((r) => Object.keys(r)))];
   return (
@@ -143,7 +141,7 @@ const DRAWS: Record<FieldWidget, (given: Given) => ReactNode | null> = {
   ),
   list: ({ value }) => (Array.isArray(value) ? <List items={value} /> : null),
   table: ({ value }) => (Array.isArray(value) ? <Table rows={value} /> : null),
-  record: ({ value }) => (isRecord(value) ? <Rows value={value} /> : null),
+  record: ({ value }) => (isObject(value) ? <Rows value={value} /> : null),
   yesNo: ({ value, schema }) => <YesNo value={value} schema={schema} />,
   number: ({ value }) => <span className="font-mono text-body-large">{textOf(value)}</span>,
   link: ({ value }) => (typeof value === 'string' ? <Link value={value} /> : null),

@@ -28,7 +28,7 @@ const DOOR_FILES = [
 ];
 
 /** Every module `text` imports for a value: a type-only import, or braces of `type` names only, is erased and left out. */
-function valueImports(text: string): string[] {
+function valueImports(text: string) {
   const out: string[] = [];
   for (const m of text.matchAll(/^\s*(?:import|export)\s+(type\s+)?([^'"`;]*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm)) {
     const braces = /^\{([\s\S]*)\}$/.exec(m[2].trim());
@@ -49,7 +49,7 @@ function valueImports(text: string): string[] {
  * Where the door's value graph, read through `read`, reaches what it may not: a file outside `DOOR_FILES`, Effect, or any module that is
  * not a file of the package, each worded with what to do instead.
  */
-function doorBreaches(read: (file: string) => string): string[] {
+function doorBreaches(read: (file: string) => string) {
   const out: string[] = [];
   const seen = new Set<string>();
   const queue = ['src/vocabulary.ts'];
@@ -70,7 +70,7 @@ function doorBreaches(read: (file: string) => string): string[] {
   return out;
 }
 
-const onDisk = (file: string): string => fs.readFileSync(path.join(PKG, file), 'utf8');
+const onDisk = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
 test('REFUSED: a door file that imports a module of node, Effect, or a runner', () => {
   const planting = (file: string, line: string) => (f: string) => (f === file ? `${line}\n${onDisk(f)}` : onDisk(f));

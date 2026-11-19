@@ -36,7 +36,7 @@ const PLANTED = [
 ].join('\n');
 
 /** What a write of every key of the planted card as it is sends. */
-const asIs = (): CardWrite => ({
+const asIs = () => ({
   metadata: {},
   spec: { workflow: 'build', gate: 'design', from: ['r-1'], queued: QUEUED, body: '\nCache the views.' },
 });
@@ -62,7 +62,7 @@ function over<A, E>(program: Effect.Effect<A, E>, opts: { text?: string; started
 }
 
 /** The refusal an exit failed with: its kind and exit code. */
-function refusal(exit: Exit.Exit<unknown, unknown>): [string, number] {
+function refusal(exit: Exit.Exit<unknown, unknown>) {
   if (!Exit.isFailure(exit)) assert.fail('refused');
   const failure = exit.cause.reasons.find((r) => r._tag === 'Fail');
   if (failure === undefined || failure._tag !== 'Fail') assert.fail(`a failure, not a defect: ${String(exit.cause)}`);
@@ -171,7 +171,7 @@ describe("an old card's retired repo: written back as read is kept, changed is r
   beforeAll(() => {
     old = PLANTED.replace('workflow: build\n', 'workflow: build\nrepo: /x\n');
   });
-  const withRepo = (repo?: string): CardWrite => ({ ...asIs(), spec: { ...asIs().spec, ...(repo !== undefined ? { repo } : {}) } });
+  const withRepo = (repo?: string) => ({ ...asIs(), spec: { ...asIs().spec, ...(repo !== undefined ? { repo } : {}) } });
   test('written back with the same repo: accepted, the file unchanged', () => {
     const { exit, text } = over(replaceCard('cache-a1', 'alpha', withRepo('/x')), { text: old });
     assert.equal(Exit.isSuccess(exit), true, String(exit));

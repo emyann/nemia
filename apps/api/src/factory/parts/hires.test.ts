@@ -21,7 +21,7 @@ const folder = scratch('nemia-api-hires-folder-');
 addFactory({ name: 'mill', volumes: [folder].map((r) => `${r}:rw`) });
 attachWorkflow({ factory: 'mill', workflow: 'make' });
 /** A step file `step` of the workflow `workflow` in `dir`'s `workflows/`, which works on a git repository. */
-const stepIn = (dir: string, workflow: string, step: string): void => {
+const stepIn = (dir: string, workflow: string, step: string) => {
   const file = path.join(dir, 'workflows', workflow, `${step}.md`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `---\nplace: git\n---\nDo ${step}.\n`);
@@ -40,11 +40,10 @@ const send = (method: string, url: string, body: unknown, headers: Record<string
   app.request(url, { method, headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** The hires the factory's file holds. */
-const hires = (): Record<string, string> | undefined =>
-  (JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { hires?: Record<string, string> }).hires;
+const hires = () => (JSON.parse(fs.readFileSync(RECORD, 'utf8')) as { hires?: Record<string, string> }).hires;
 
 /** What the request answered, its status asserted. */
-async function answered<T>(res: Response | Promise<Response>, status = 200): Promise<T> {
+async function answered<T>(res: Response | Promise<Response>, status = 200) {
   const answer = await res;
   const body = (await answer.json()) as T;
   assert.equal(answer.status, status, JSON.stringify(body));
@@ -52,7 +51,7 @@ async function answered<T>(res: Response | Promise<Response>, status = 200): Pro
 }
 
 /** A request refused with `status`: its words, and the factory's file as it was. */
-async function refused(res: () => Response | Promise<Response>, status: number): Promise<string> {
+async function refused(res: () => Response | Promise<Response>, status: number) {
   const before = fs.readFileSync(RECORD, 'utf8');
   const answer = await res();
   const body = (await answer.json()) as { error: string };
@@ -97,7 +96,7 @@ describe('a person hires an agent into a step, replaces it, and fires it', () =>
 });
 
 /** A step whose own file names its agent: `step` in `dir`'s `workflows/make`, naming `agent`. */
-const naming = (dir: string, step: string, agent: string): string => {
+const naming = (dir: string, step: string, agent: string) => {
   const file = path.join(dir, 'workflows', 'make', `${step}.md`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `---\nagent: ${agent}\n---\nDo it.\n`);

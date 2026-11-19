@@ -13,7 +13,7 @@
  */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { behind, coded, detail as detailOf, readsOf, step, unpinned } from './run-fixtures.ts';
+import { behind, coded, detail as detailOf, readsOf, step, unpinned } from './run.fixture.ts';
 import './tsx.ts';
 import {
   at,
@@ -29,7 +29,7 @@ import {
   UNMEASURED,
   WAIT,
   withClient,
-} from './markup-fixtures.ts';
+} from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -66,26 +66,22 @@ test("the run page's timeline: a row per try's session and per check, in the api
   type TaskSpan = NonNullable<RunDetail['steps'][number]['timeline'][number]['session']>;
   type TimelineTotal = RunDetail['timeline']['run'];
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
-  const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan => ({
-    taskId,
-    at,
-    filedAt: null,
-    spawnedAt: null,
-    endedAt: null,
-    attempts: 1,
-    queuedMs: null,
-    ranMs: null,
-    queued,
-    ran,
-    ...times,
-  });
-  const total = (
-    round: number | null,
-    queued: string,
-    ran: string,
-    wall: string,
-    loop: string | null = round === null ? null : 'review',
-  ): TimelineTotal => ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall, cost: null });
+  const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}) =>
+    ({
+      taskId,
+      at,
+      filedAt: null,
+      spawnedAt: null,
+      endedAt: null,
+      attempts: 1,
+      queuedMs: null,
+      ranMs: null,
+      queued,
+      ran,
+      ...times,
+    }) satisfies TaskSpan;
+  const total = (round: number | null, queued: string, ran: string, wall: string, loop: string | null = round === null ? null : 'review') =>
+    ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall, cost: null }) satisfies TimelineTotal;
   const base = runWith(null);
   const used: StepUsed = {
     ...UNMEASURED,
@@ -230,11 +226,12 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
     queued: '0s',
     ran: '0s',
   });
-  const used = (cost: number | null): StepUsed => ({
-    ...UNMEASURED,
-    cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`,
-    costUsd: cost,
-  });
+  const used = (cost: number | null) =>
+    ({
+      ...UNMEASURED,
+      cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`,
+      costUsd: cost,
+    }) satisfies StepUsed;
   const base = runWith(null);
   const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
   const run: RunDetail = {
@@ -285,7 +282,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
  * A card's start form, rendered as a server renders it: the workflow it runs on, and the card's `repo:` when it names one. A folder
  * team's start looks at no repository, and the form says so — before the start, since a start the api takes opens the run's page.
  */
-async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> {
+async function startMarkup(folderTeam: boolean, repo?: string) {
   const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
   const { StartRun } = await import('../src/components/run/StartRun.tsx');
   const workflow = {
@@ -362,7 +359,7 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
-async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = [], open = false): Promise<string> {
+async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = [], open = false) {
   const { RunNode } = await import('../src/components/run/RunNode.tsx');
   const data = {
     run,
@@ -505,7 +502,7 @@ const clocked = (more: object = {}) => ({
 });
 
 /** The Clock cell of `run` drawn at eleven, an hour after the fixture was created. */
-const clockCell = (run: object, finished = false): string =>
+const clockCell = (run: object, finished = false) =>
   renderToStaticMarkup(createElement(RunClockCell, { run: run as never, asOf: new Date('2026-10-12T11:00:00.000Z'), finished }));
 
 test("REFUSED: a Clock cell that says the run's wall time — it says the time at work, and `not started` for a run nothing of which is filed", () => {
@@ -541,7 +538,7 @@ test("a breakdown's rows are terms with their amounts, each named by what it cou
 });
 
 /** The Cost cell of a row with `cost` and `tokens`. */
-const costCell = (cost: object | null, tokens: object | null): string =>
+const costCell = (cost: object | null, tokens: object | null) =>
   renderToStaticMarkup(createElement(RunCostCell, { run: { cost, tokens } as never }));
 
 const COST = { usd: 5.63, measured: 3, unmeasured: 0, said: '$5.63' };

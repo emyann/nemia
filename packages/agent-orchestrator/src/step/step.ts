@@ -633,12 +633,6 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
 }
 
 /**
- * Whether `v` is an object that is no list and not null, as a YAML or JSON map reads.
- * @param v Any value read.
- */
-export const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-
-/**
  * A folder's README, in any case — `readme.md` is the same file to the person who wrote it. It says what the workflow
  * is for, and is never a step: read as one, it would be an agent told the folder's documentation.
  * @param file A file's name.

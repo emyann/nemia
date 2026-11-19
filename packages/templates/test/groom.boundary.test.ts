@@ -22,7 +22,7 @@ const PERIOD = { period: { from: '2026-09-15', to: '2026-09-28' }, against: { fr
 const LONG_AGO = new Date('2026-01-05T10:00:00Z');
 
 /** Plants the card `name` in the inbox of `root`, filed `at`, in the factory acme unless `factory` is null: its path. */
-function plant(root: string, name: string, body: string, at = LONG_AGO, factory: string | null = 'acme'): string {
+function plant(root: string, name: string, body: string, at = LONG_AGO, factory: string | null = 'acme') {
   const dir = path.join(root, 'inbox');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${name}.md`);
@@ -32,7 +32,7 @@ function plant(root: string, name: string, body: string, at = LONG_AGO, factory:
 }
 
 /** A scratch repository whose `main` holds one commit and a side branch another: the two commits. */
-function repository(): { dir: string; onBase: string; aside: string } {
+function repository() {
   const dir = scratch('nemia-groom-repo-');
   const git = (...args: string[]) => {
     const ran = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, encoding: 'utf8', timeout: 30_000 });
@@ -61,16 +61,14 @@ const verdict = (card: string, word: string, over: Record<string, unknown> = {})
 });
 
 /** A closeout with `fields` over the period, written to a scratch file: its path. */
-function closeoutFile(fields: Record<string, unknown>): string {
+function closeoutFile(fields: Record<string, unknown>) {
   const file = path.join(scratch('nemia-groom-closeout-'), 'closeout.json');
   fs.writeFileSync(file, JSON.stringify({ outcome: 'done', summary: 's', report: '# r', cards: [], ...PERIOD, ...fields }));
   return file;
 }
 
-type Ran = { code: number | null; out: string; err: string };
-
 /** The script run over `args` in the world `env`, in `repo`, writing under `artifacts`, bounded. */
-function run(env: NodeJS.ProcessEnv, wf: string, repo: string, artifacts: string, args: string[], over: NodeJS.ProcessEnv = {}): Ran {
+function run(env: NodeJS.ProcessEnv, wf: string, repo: string, artifacts: string, args: string[], over: NodeJS.ProcessEnv = {}) {
   const ran = spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd: repo,
     env: { ...env, WF_WORKSPACE: repo, WF_BASE_REF: 'main', WF_ARTIFACTS: artifacts, WF_RUN: wf, ...over },
@@ -81,7 +79,7 @@ function run(env: NodeJS.ProcessEnv, wf: string, repo: string, artifacts: string
 }
 
 /** `nemia <argv>` typed by a person in the world `env`: its exit and streams. */
-const typed = (env: NodeJS.ProcessEnv, argv: string[]): Ran => {
+const typed = (env: NodeJS.ProcessEnv, argv: string[]) => {
   const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 };
@@ -91,7 +89,7 @@ const typed = (env: NodeJS.ProcessEnv, argv: string[]): Ran => {
  * is handed as `WF_RUN` and reads its factory by. The workflow is a folder step and its agent a stand-in, the run's subject being its
  * namespace alone.
  */
-async function groomWorld(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; root: string; wf: string }> {
+async function groomWorld(t: TestContext) {
   const { env, root } = await world(t);
   fs.mkdirSync(path.join(root, 'workflows', 'janitor'), { recursive: true });
   fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
@@ -107,7 +105,7 @@ async function groomWorld(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; roo
 }
 
 /** What the check wrote under `artifacts`, each file by its path from there, with its text. */
-const written = (artifacts: string): Record<string, string> =>
+const written = (artifacts: string) =>
   Object.fromEntries(
     (fs.readdirSync(artifacts, { recursive: true }) as string[])
       .filter((f) => fs.statSync(path.join(artifacts, f)).isFile())

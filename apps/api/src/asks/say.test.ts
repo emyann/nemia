@@ -23,7 +23,7 @@ import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
 import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
-import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
+import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { list, PERSON, runsAtOnce, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { story } from 'test-kit/checkpoints';
 
@@ -102,7 +102,7 @@ const written = () => ({
 });
 
 /** What the package's `sayRun` refuses the words for, word for word: what `nemia say` prints. */
-const sayRefuses = async (step: string, text: string, run = R): Promise<string> => {
+const sayRefuses = async (step: string, text: string, run = R) => {
   try {
     await runWith(engine(), sayRun(run, step, text, { caller: PERSON }));
   } catch (err) {
@@ -112,16 +112,16 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
 };
 
 /** The steps of the run object of `id` (`GET /api/runs/:id`, `status.steps`). */
-const detailSteps = async (id = R): Promise<readonly ObjectStep[]> => (await objectOf(app(), id)).status.steps;
+const detailSteps = async (id = R) => (await objectOf(app(), id)).status.steps;
 
 /** The store at semi-auto, as `nemia level semi-auto` writes it: the least an agent's standing token acts at (its floor). */
-const storeAtSemiAuto = (): void => {
+const storeAtSemiAuto = () => {
   fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
   fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0) }));
 };
 
 /** The error a refused request answered with, its status `status`. */
-const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
+const refusedWith = async (res: Response, status: number, said: string) => {
   assert.equal(res.status, status, said);
   return ((await res.json()) as { error: string }).error;
 };

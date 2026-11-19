@@ -25,9 +25,9 @@ export type Walk = { readonly name: string; readonly walk: (side: Side, area: st
 const OWN = new Set(['.git', '.test-place']);
 
 /** The files of `dir` by path, in folders too, without a place's own. */
-function filesIn(dir: string): Record<string, string> {
+function filesIn(dir: string) {
   const files: Record<string, string> = {};
-  const read = (at: string, prefix: string): void => {
+  const read = (at: string, prefix: string) => {
     for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
       if (OWN.has(entry.name)) continue;
       if (entry.isDirectory()) read(path.join(at, entry.name), `${prefix}${entry.name}/`);
@@ -35,20 +35,21 @@ function filesIn(dir: string): Record<string, string> {
     }
   };
   read(dir, '');
-  return files;
+  return files satisfies Record<string, string>;
 }
 
 /** What `told` knows as it reads: the area, and each commit's name by the order it was first read. */
 type Telling = { readonly area: string; readonly commits: Map<string, string> };
 
 /** A string as both sides say it: the area as `<area>`, and each commit id as the name of its first reading. */
-const toldText = (text: string, telling: Telling): string =>
+const toldText = (text: string, telling: Telling) =>
   text.replaceAll(telling.area, '<area>').replace(/\b[0-9a-f]{40}\b/g, (id) => {
     if (!telling.commits.has(id)) telling.commits.set(id, `commit-${telling.commits.size + 1}`);
     return telling.commits.get(id)!;
   });
 
 /** `value` as both sides say it, its keys read in order: see the file's head. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function toldOf(value: unknown, telling: Telling): unknown {
   if (typeof value === 'string') return toldText(value, telling);
   if (Array.isArray(value)) return value.map((one) => toldOf(one, telling));
@@ -64,7 +65,7 @@ function toldOf(value: unknown, telling: Telling): unknown {
 }
 
 /** What a walk answered in `area`, as both sides say it. */
-export const told = (value: unknown, area: string): unknown => toldOf(value, { area: fs.realpathSync(area), commits: new Map() });
+export const told = (value: unknown, area: string) => toldOf(value, { area: fs.realpathSync(area), commits: new Map() }) satisfies unknown;
 
 /** A repository at `<area>/repo` holding `files`, and its first commit. */
 function repoIn({ world }: Side, area: string, files: Record<string, string> = { 'a.txt': 'one\n' }) {
@@ -90,11 +91,11 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
 }
 
 /** `open` of `root`, its file of a merge in progress read as whether it is there. */
-function opened({ place }: Side, root: string): unknown {
+function opened({ place }: Side, root: string) {
   const outcome = place.askNow('open', { root, isolate: false });
-  if (!('answer' in outcome)) return outcome;
+  if (!('answer' in outcome)) return outcome satisfies unknown;
   const { inProgressFile } = outcome.answer;
-  return { ...outcome.answer, inProgressFile: inProgressFile !== undefined && fs.existsSync(inProgressFile) };
+  return { ...outcome.answer, inProgressFile: inProgressFile !== undefined && fs.existsSync(inProgressFile) } satisfies unknown;
 }
 
 /** `standing` of `branches` in `root` against main. */
@@ -102,11 +103,13 @@ const stand = ({ place }: Side, root: string, branches: PlaceRequests['standing'
   place.askNow('standing', { repo: root, base: 'main', branches });
 
 /** The lines a diff adds and takes away, without the lines that name its two files. */
-const changedLines = (diff: string): string[] => diff.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+const changedLines = (diff: string) => diff.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)) satisfies string[];
 
 /** A trial as both sides say it: what is not known, in no place's words. */
-const triedOf = (trials: PlaceOutcome<'trial'>): unknown =>
-  'answer' in trials ? { ...trials.answer, trials: trials.answer.trials.map((t) => ('unknown' in t ? { unknown: true } : t)) } : trials;
+const triedOf = (trials: PlaceOutcome<'trial'>) =>
+  ('answer' in trials
+    ? { ...trials.answer, trials: trials.answer.trials.map((t) => ('unknown' in t ? { unknown: true } : t)) }
+    : trials) satisfies unknown;
 
 /** A repository whose `work` branch adds `b.txt`, and `clash` and main each change `a.txt` their own way. */
 function forked(side: Side, area: string) {
@@ -192,18 +195,18 @@ const OPEN: readonly Walk[] = [
 ];
 
 /** A clone of `root` at `<area>/<name>`, made by the place. */
-function cloneOf({ place }: Side, area: string, root: string, name = 'clone'): string {
+function cloneOf({ place }: Side, area: string, root: string, name = 'clone') {
   const into = path.join(area, name);
   answerOf(place.askNow('clone', { url: `file://${root}`, into }));
   return into;
 }
 
 /** `follow` of `repo`, its message read as whether there is one: the two places word it their own way. */
-function followed({ place }: Side, repo: string): unknown {
+function followed({ place }: Side, repo: string) {
   const outcome = place.askNow('follow', { repo });
-  if (!('answer' in outcome) || !('message' in outcome.answer)) return outcome;
+  if (!('answer' in outcome) || !('message' in outcome.answer)) return outcome satisfies unknown;
   const { message, ...rest } = outcome.answer;
-  return { answer: { ...rest, said: message.length > 0 } };
+  return { answer: { ...rest, said: message.length > 0 } } satisfies unknown;
 }
 
 const FOLLOW: readonly Walk[] = [
@@ -1111,10 +1114,10 @@ function twoWorkspaces(side: Side, area: string) {
 }
 
 /** `inventory` of `root` under `under`, its workspaces by path. */
-function listed(side: Side, root: string, under: string): unknown {
+function listed(side: Side, root: string, under: string) {
   const outcome = side.place.askNow('inventory', { repo: root, under, run: 'r', base: 'main' });
-  if (!('answer' in outcome)) return outcome;
-  return { ...outcome.answer, workspaces: [...outcome.answer.workspaces].sort((a, b) => (a.path < b.path ? -1 : 1)) };
+  if (!('answer' in outcome)) return outcome satisfies unknown;
+  return { ...outcome.answer, workspaces: [...outcome.answer.workspaces].sort((a, b) => (a.path < b.path ? -1 : 1)) } satisfies unknown;
 }
 
 const INVENTORY: readonly Walk[] = [
@@ -1213,11 +1216,11 @@ const INVENTORY: readonly Walk[] = [
 ];
 
 /** `remove` asked of `root`, what was left and kept said without the place's words. */
-function removed(side: Side, root: string, workspaces: readonly string[], branches: readonly string[]): unknown {
+function removed(side: Side, root: string, workspaces: readonly string[], branches: readonly string[]) {
   const outcome = side.place.askNow('remove', { repo: root, workspaces, branches });
-  if (!('answer' in outcome)) return outcome;
+  if (!('answer' in outcome)) return outcome satisfies unknown;
   const { left, kept, ...rest } = outcome.answer;
-  return { ...rest, left: left.map((l) => l.path), kept: kept.map((k) => k.branch) };
+  return { ...rest, left: left.map((l) => l.path), kept: kept.map((k) => k.branch) } satisfies unknown;
 }
 
 const REMOVE: readonly Walk[] = [
@@ -1467,17 +1470,17 @@ export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
 };
 
 /** The verbs of `verbs` that `walks` holds no walk for. */
-export const unwalked = (verbs: readonly string[], walks: Readonly<Record<string, readonly Walk[] | undefined>>): string[] =>
-  verbs.filter((verb) => !walks[verb]?.length);
+export const unwalked = (verbs: readonly string[], walks: Readonly<Record<string, readonly Walk[] | undefined>>) =>
+  verbs.filter((verb) => !walks[verb]?.length) satisfies string[];
 
 /** What `walk` answers on `side`, in an area of its own, as both sides say it. */
-export function walked(walk: Walk, side: Side): unknown {
+export function walked(walk: Walk, side: Side) {
   const area = scratch('wf-place-walk-');
-  return told(walk.walk(side, area), area);
+  return told(walk.walk(side, area), area) satisfies unknown;
 }
 
 /** The walks of `verb` that a side `sideOf` makes, a new one for each, does not answer as the contract says, by name. */
-export const failing = (verb: PlaceVerb, sideOf: () => Side): string[] =>
+export const failing = (verb: PlaceVerb, sideOf: () => Side) =>
   WALKS[verb]
     .filter((walk) => {
       try {
@@ -1487,13 +1490,13 @@ export const failing = (verb: PlaceVerb, sideOf: () => Side): string[] =>
         return true;
       }
     })
-    .map((walk) => walk.name);
+    .map((walk) => walk.name) satisfies string[];
 
 /**
  * Every walk of the contract as a test of the side `sideOf` makes, a new one for each: its name, `<verb>: <walk>`, and its body. The
  * file of a side declares each with `test`, so the runner counts the test as that file's.
  */
-export const walksOn = (sideOf: () => Side): (readonly [name: string, body: () => void])[] =>
+export const walksOn = (sideOf: () => Side) =>
   Object.entries(WALKS).flatMap(([verb, walks]) =>
     walks.map((walk) => [`${verb}: ${walk.name}`, () => assert.deepStrictEqual(walked(walk, sideOf()), walk.says)] as const),
-  );
+  ) satisfies (readonly [name: string, body: () => void])[];

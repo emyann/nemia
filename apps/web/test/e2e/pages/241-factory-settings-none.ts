@@ -7,12 +7,12 @@ import type { PageSpec } from '../visit.ts';
 const UNKNOWN = 'no-such-factory';
 
 /** The requests `page` sends to a factory's instruction, from now on. */
-function instructionReads(page: Page): () => string[] {
+function instructionReads(page: Page) {
   const seen: string[] = [];
   page.on('request', (request) => {
     if (/^\/api\/factories\/[^/]+\/instruction(\/|$)/.test(new URL(request.url()).pathname)) seen.push(request.url());
   });
-  return () => [...seen];
+  return (() => [...seen]) satisfies () => string[];
 }
 
 export default {

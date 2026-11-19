@@ -49,7 +49,7 @@ test("each label has a colour and a description GitHub takes (each one's bump is
 });
 
 /** `release.ts check` on `labels`, as the pull_request event hands them: its exit code and what it said. */
-const check = async (labels: unknown): Promise<{ code: number; said: string }> => {
+const check = async (labels: unknown) => {
   const lines: string[] = [];
   const code = await main(['check'], { LABELS: JSON.stringify(labels), PR_NUMBER: '7' }, (line) => lines.push(line));
   return { code, said: lines.join('\n') };

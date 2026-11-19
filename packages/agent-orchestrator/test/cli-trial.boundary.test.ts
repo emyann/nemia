@@ -13,7 +13,7 @@ import { scratch } from 'test-kit/scratch';
 const NEMIA = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
 /** A store, with a release `v1` built under it and pointed at where `installed` says. */
-function store(installed: boolean): string {
+function store(installed: boolean) {
   const root = path.join(scratch('wf-cli-trial-'), 'store');
   fs.mkdirSync(root);
   if (!installed) return root;
@@ -26,7 +26,7 @@ function store(installed: boolean): string {
 }
 
 /** `nemia <argv>` from this checkout over the store at `root`, with `env` over the test's own. */
-function nemia(root: string, argv: string[], env: NodeJS.ProcessEnv = {}): { status: number | null; stdout: string; stderr: string } {
+function nemia(root: string, argv: string[], env: NodeJS.ProcessEnv = {}) {
   const { NEMIA_ON_INSTALLED: _set, ...ambient } = process.env;
   const { status, stdout, stderr } = spawnSync(process.execPath, [NEMIA, ...argv], {
     cwd: path.dirname(root),

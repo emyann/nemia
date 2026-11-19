@@ -42,7 +42,7 @@ const engine = eachTest(testEngine);
 heldUnasked(engine);
 
 /** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
-function run<A>(program: Effect.Effect<A, unknown, Root>): A {
+function run<A>(program: Effect.Effect<A, unknown, Root>) {
   const exit = Effect.runSyncExit(Effect.provideService(program, StoreRoot, ROOT));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);
@@ -78,26 +78,26 @@ const refusedWith =
     err._tag === tag && err.exitCode === 2 && named.every((n) => (typeof n === 'string' ? err.message.includes(n) : n.test(err.message)));
 
 /** A repository holding the tests' team as its `workflows/`: `dev`, its agents and skills. */
-function repoWithTeam(): string {
+function repoWithTeam() {
   const repo = scratch('wf-template-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   return repo;
 }
 
 /** A folder to export into, not there yet. */
-const target = (name = 'team'): string => path.join(scratch('wf-template-out-'), name);
+const target = (name = 'team') => path.join(scratch('wf-template-out-'), name);
 
 /** The document at `file` of the folder `dir`, read back. */
-const readBack = (dir: string, file: string): Record<string, unknown> => parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+const readBack = (dir: string, file: string) => parse(fs.readFileSync(path.join(dir, file), 'utf8'));
 
 /** The steps of the workflow `name` exported to `dir`, by name. */
-const stepsOf = (dir: string, name: string): Map<string, Record<string, unknown>> => {
+const stepsOf = (dir: string, name: string) => {
   const spec = readBack(dir, `workflows/${name}/workflow.yaml`).spec as { steps: Array<Record<string, unknown>> };
   return new Map(spec.steps.map((step) => [step.name as string, step]));
 };
 
 /** A repository holding the tests' team, its step `implement` given the skill `x`, a link of `.claude/skills/` to the folder `to`. */
-function repoGivenLinked(to: (repo: string) => string): string {
+function repoGivenLinked(to: (repo: string) => string) {
   const repo = repoWithTeam();
   fs.mkdirSync(path.join(repo, 'skills', 'x'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'skills', 'x', 'SKILL.md'), '---\ndescription: Linked.\n---\nDo it.\n');
@@ -110,7 +110,7 @@ function repoGivenLinked(to: (repo: string) => string): string {
 }
 
 /** A repository holding the tests' team, its step `implement` given the nested skill `app:y`, which the repository holds when `held`. */
-function repoGivenNested(held = true): string {
+function repoGivenNested(held = true) {
   const repo = repoWithTeam();
   if (held) {
     fs.mkdirSync(path.join(repo, 'app', '.claude', 'skills', 'y'), { recursive: true });
@@ -122,7 +122,7 @@ function repoGivenNested(held = true): string {
 }
 
 /** A repository holding the team and a second workflow, `solo`, whose one step names no agent; and a factory on it attaching `solo`. */
-function factoryOnTeam(name: string): string {
+function factoryOnTeam(name: string) {
   const repo = repoWithTeam();
   fs.mkdirSync(path.join(repo, 'workflows', 'solo'));
   fs.writeFileSync(path.join(repo, 'workflows', 'solo', 'work.md'), '---\nplace: git\n---\nDo the work.\n');
@@ -133,7 +133,7 @@ function factoryOnTeam(name: string): string {
 }
 
 /** The tests' team exported to a folder named `team`, with a script of mode 0755 and a file of all 256 bytes. */
-function exported(): string {
+function exported() {
   const dir = target();
   const repo = repoWithTeam();
   fs.writeFileSync(path.join(repo, 'workflows', 'skills', 'review-a-change', 'look.sh'), '#!/bin/sh\n', { mode: 0o755 });
@@ -236,7 +236,7 @@ describe('what export writes from a repository and a factory, read back as it wa
     const step = stepsOf(dir, 'dev').get('review');
     assert.deepEqual([step?.input, step?.reads, step?.tally], [['implement'], ['inbox'], ['findings']]);
   });
-  const routedRepo = (route: string): string => {
+  const routedRepo = (route: string) => {
     const repo = repoWithTeam();
     const dev = path.join(repo, 'workflows', 'dev');
     fs.writeFileSync(

@@ -15,7 +15,7 @@ import { cancelFile, holdFile, marksAt, pruneFile, removeHold, runsDir, writeHol
 const ID = 'a-run-m4rk';
 
 /** A store whose run `ID` carries the marks of `mark`, each file planted as its writer leaves it. */
-function arranged(mark: RunMark): string {
+function arranged(mark: RunMark) {
   const home = scratch('wf-marks-walk-');
   fs.mkdirSync(runsDir(home), { recursive: true });
   if (mark.includes('called-off')) fs.writeFileSync(cancelFile(home, ID), '2026-11-14T00:00:00.000Z');
@@ -46,7 +46,7 @@ describe('the store writes the moves the marks machine makes and no other: each 
 });
 
 /** The files among `sources`, each a path from `src` and its text, outside `record/` that name a mark's file. */
-const namesAMark = (sources: ReadonlyMap<string, string>): string[] =>
+const namesAMark = (sources: ReadonlyMap<string, string>) =>
   [...sources]
     .filter(([file, text]) => !file.startsWith('record/') && /\b(?:cancelFile|pruneFile|holdFile|unheldFile)\(/.test(text))
     .map(([file]) => file);

@@ -21,7 +21,7 @@ const WRITES = Object.values(Api.groups)
   .filter((e) => e.method !== 'GET');
 
 /** `path` with every name filled in by one no object has. */
-const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
+const filled = (path: string) => path.replace(/:[A-Za-z]+/g, 'nothing-here');
 
 /** What `method` on `path` answers with `headers`, a JSON `{}` body but where `headers` says otherwise: its status and its body. */
 const asked = async (method: string, path: string, headers: Record<string, string>) => {

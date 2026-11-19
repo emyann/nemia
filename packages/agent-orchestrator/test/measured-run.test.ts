@@ -62,7 +62,7 @@ const used = (costUsd: number) => ({ costUsd, inputTokens: 1200, outputTokens: 3
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 
 /** A workflow folder of `files`, each a step's file by its name, or a schema beside them. */
-const folder = (files: Record<string, string>): string => {
+const folder = (files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
   return dir;
@@ -98,21 +98,21 @@ const daemon = () => {
 type Daemon = ReturnType<typeof daemon>;
 
 /** The stage's engine as a whole-store pass asks it: a pass of its own that does nothing, and no tally. */
-const ticking = (): Board => {
+const ticking = () => {
   const b = stage.board();
   Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
-  return b;
+  return b satisfies Board;
 };
 
 /** The names of `span`'s ancestors, its parent first. */
-const ancestorsOf = (span: Tracer.Span): string[] => {
+const ancestorsOf = (span: Tracer.Span) => {
   const names: string[] = [];
   let at: Tracer.AnySpan | undefined = Option.getOrUndefined(span.parent);
   while (at?._tag === 'Span') {
     names.push(at.name);
     at = Option.getOrUndefined(at.parent);
   }
-  return names;
+  return names satisfies string[];
 };
 
 /** One number as a line a person reads: what it is of, its row, which number, its try and its value. */

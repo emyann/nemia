@@ -67,10 +67,10 @@ const MOVES: Readonly<Record<string, Entry>> = {
 };
 
 /** Every module a piece of source names outside its comment lines: imports and re-exports, type-only included, and a whole `import()`. */
-const importsIn = (text: string): string[] => specifiersIn(withoutComments(text), { calls: ['import'], closed: true });
+const importsIn = (text: string) => specifiersIn(withoutComments(text), { calls: ['import'], closed: true });
 
 /** The impure globals a piece of source reads outside its comment lines. */
-function globalsIn(text: string): string[] {
+function globalsIn(text: string) {
   const code = withoutComments(text);
   const found: string[] = [];
   if (PROCESS_ENV.test(code)) found.push('global:process.env');
@@ -79,7 +79,7 @@ function globalsIn(text: string): string[] {
 }
 
 /** What a piece of source reaches of the machine, sorted: the `IMPURE` modules it imports, a subpath as its package, and the globals. */
-const reachesIn = (text: string): string[] =>
+const reachesIn = (text: string) =>
   [
     ...new Set([
       ...importsIn(text)
@@ -90,7 +90,7 @@ const reachesIn = (text: string): string[] =>
   ].sort();
 
 /** Every `.ts` under `src` but the tests beside the code, by its path from the package, with its text. */
-const sourceTexts = (): Map<string, string> =>
+const sourceTexts = () =>
   new Map(
     fs
       .readdirSync(path.join(API, 'src'), { recursive: true, encoding: 'utf8' })
@@ -101,11 +101,11 @@ const sourceTexts = (): Map<string, string> =>
   );
 
 /** Each file's reaches, for the files that reach anything. */
-const measured = (texts: ReadonlyMap<string, string>): Record<string, string[]> =>
+const measured = (texts: ReadonlyMap<string, string>) =>
   Object.fromEntries([...texts].map(([file, text]) => [file, reachesIn(text)]).filter(([, reaches]) => reaches.length > 0));
 
 /** What an entry fails to name: a card `cards` knows, else a move with where it goes. */
-function namingBreak(file: string, entry: Entry, cards: Readonly<Record<string, string>>): string | undefined {
+function namingBreak(file: string, entry: Entry, cards: Readonly<Record<string, string>>) {
   if ('card' in entry)
     return entry.card in cards
       ? undefined
@@ -119,7 +119,7 @@ function namingBreak(file: string, entry: Entry, cards: Readonly<Record<string, 
 type Where = { exists: (file: string) => boolean; cards: Readonly<Record<string, string>> };
 
 /** What one entry of `MOVES` and its file's reaches disagree on. */
-function entryBreaks(file: string, entry: Entry, reaches: readonly string[], at: Where): string[] {
+function entryBreaks(file: string, entry: Entry, reaches: readonly string[], at: Where) {
   const { exists, cards } = at;
   if (ENTRY.includes(file)) return [`${file} is an entry file, free to reach the machine: take its entry off MOVES`];
   if (!exists(file)) return [`${file} has an entry in MOVES but is not on disk: where it moved, rename its entry; else take it off`];
@@ -153,7 +153,7 @@ function kindBreaks(
   return out;
 }
 
-const onDisk = (file: string): boolean => fs.existsSync(path.join(API, file));
+const onDisk = (file: string) => fs.existsSync(path.join(API, file));
 
 test('the scan sees each module a reader imports and each global it reads, outside its comment lines', () => {
   const text = [
@@ -195,8 +195,8 @@ test('only main.ts, app.ts and layer.ts touch the machine; every reader that doe
 });
 
 test('REFUSED: a reader that imports the disk or the node server, reads the environment or fetch', () => {
-  const planted = (text: string): string[] => kindBreaks(measured(new Map([...sourceTexts(), ['src/x/x.ts', text]])), MOVES, onDisk);
-  const refused = (reach: string): string =>
+  const planted = (text: string) => kindBreaks(measured(new Map([...sourceTexts(), ['src/x/x.ts', text]])), MOVES, onDisk);
+  const refused = (reach: string) =>
     `src/x/x.ts is a reader and reaches ${reach}: only src/main.ts, src/app.ts, src/layer.ts touch the machine; reach it through the orchestrator`;
   assert.deepEqual(planted("import fs from 'node:fs';\n"), [refused('node:fs')]);
   assert.deepEqual(planted("import { serve } from '@hono/node-server';\n"), [refused('@hono/node-server')]);
@@ -216,10 +216,10 @@ test('REFUSED: a reader that imports the disk or the node server, reads the envi
 });
 
 test('REFUSED: a baselined reader reaching more, an entry listing a reach gone, an entry for an entry file or a file gone, and one unnamed', () => {
-  const exists = (file: string): boolean => file !== 'src/gone.ts';
+  const exists = (file: string) => file !== 'src/gone.ts';
   const held: Entry = { reaches: ['node:fs'], card: 'c-1' };
   const cards = { 'c-1': 'A card filed to move the reach' };
-  const breaks = (reached: Record<string, string[]>, moves: Record<string, Entry>): string[] => kindBreaks(reached, moves, exists, cards);
+  const breaks = (reached: Record<string, string[]>, moves: Record<string, Entry>) => kindBreaks(reached, moves, exists, cards);
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs'] }, { 'src/a.ts': held }), [], 'the reaches the entry lists are let through');
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs', 'node:os'] }, { 'src/a.ts': held }), [
     'src/a.ts is a reader and reaches node:os: only src/main.ts, src/app.ts, src/layer.ts touch the machine; reach it through the orchestrator',
@@ -245,7 +245,7 @@ test('REFUSED: a baselined reader reaching more, an entry listing a reach gone, 
  * The files of `texts` that name the tick's own write of where the branches stand (`passStanding`) outside their comment lines: none,
  * since only the tick writes `standing.json`, and the api's tests call it alone, to stand for a pass.
  */
-const tickWritersIn = (texts: ReadonlyMap<string, string>): string[] =>
+const tickWritersIn = (texts: ReadonlyMap<string, string>) =>
   [...texts].filter(([, text]) => /\bpassStanding\b/.test(withoutComments(text))).map(([file]) => file);
 
 test('only the tick writes standing.json: no file under src calls `passStanding`', () => {
@@ -253,7 +253,7 @@ test('only the tick writes standing.json: no file under src calls `passStanding`
 });
 
 test('REFUSED: a file under src that calls `passStanding`, imported or named off the package', () => {
-  const planted = (text: string): string[] => tickWritersIn(new Map([...sourceTexts(), ['src/x/x.ts', text]]));
+  const planted = (text: string) => tickWritersIn(new Map([...sourceTexts(), ['src/x/x.ts', text]]));
   assert.deepEqual(planted("import { passStanding } from 'agent-orchestrator';\n"), ['src/x/x.ts']);
   assert.deepEqual(planted('export const pass = (o: typeof import("agent-orchestrator")) => o.passStanding([]);\n'), ['src/x/x.ts']);
   assert.deepEqual(planted('/** Never calls `passStanding`: the tick does. */\nexport const x = 1;\n'), [], 'a JSDoc that names it');
@@ -267,7 +267,7 @@ const TELEMETRY = 'src/app.ts';
  * since the app's layer provides it once (`liveOf` in src/app.ts) and a second provider in the process exports every metric twice —
  * Effect's metric registry is a reference whose default map every context that does not override it shares.
  */
-const telemetryProvidersIn = (texts: ReadonlyMap<string, string>): string[] =>
+const telemetryProvidersIn = (texts: ReadonlyMap<string, string>) =>
   [...texts].filter(([file, text]) => file !== TELEMETRY && /\btelemetryLayer\b/.test(withoutComments(text))).map(([file]) => file);
 
 test('the api provides its telemetry once, in app.ts: no other file under src names `telemetryLayer`', () => {
@@ -277,7 +277,7 @@ test('the api provides its telemetry once, in app.ts: no other file under src na
 });
 
 test('REFUSED: a second file under src that names `telemetryLayer`, main.ts among them, imported or off the package', () => {
-  const planted = (file: string, text: string): string[] => telemetryProvidersIn(new Map([...sourceTexts(), [file, text]]));
+  const planted = (file: string, text: string) => telemetryProvidersIn(new Map([...sourceTexts(), [file, text]]));
   assert.deepEqual(planted('src/main.ts', "import { telemetryLayer } from 'agent-orchestrator';\n"), ['src/main.ts']);
   assert.deepEqual(planted('src/x/x.ts', 'export const t = (o: typeof import("agent-orchestrator")) => o.telemetryLayer({});\n'), [
     'src/x/x.ts',

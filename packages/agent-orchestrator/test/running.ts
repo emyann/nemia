@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 
 /** The processes whose command line names `file`, read from /proc. */
-export function running(file: string): number[] {
+export function running(file: string) {
   return fs
     .readdirSync('/proc')
     .filter((entry) => /^\d+$/.test(entry))
@@ -13,5 +13,5 @@ export function running(file: string): number[] {
         return false;
       }
     })
-    .map(Number);
+    .map(Number) satisfies number[];
 }

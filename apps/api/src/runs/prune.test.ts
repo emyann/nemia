@@ -72,7 +72,7 @@ const branchOf = (id: string) => `wf/${id}/implement`;
  * merged back with `--no-ff` when `merge` says so — checked out in the step's worktree under the store, a file in the run's files
  * directory, and the step's task signed off and handed off, or still working.
  */
-function repositoryRun(id: string, { merge, working: busy = false }: { merge: boolean; working?: boolean }): void {
+function repositoryRun(id: string, { merge, working: busy = false }: { merge: boolean; working?: boolean }) {
   const branch = branchOf(id);
   git('checkout', '-q', '-b', branch);
   fs.writeFileSync(path.join(repo, `${id}.txt`), `${id}\n`);

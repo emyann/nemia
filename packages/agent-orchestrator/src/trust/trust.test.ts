@@ -9,7 +9,7 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { trustedLines, untrustedLines, untrustedNote, type PlaceTrust, type Untrusted } from './trust.ts';
 
-const asked = (over: Partial<Extract<PlaceTrust, { harness: string }>>): PlaceTrust => ({
+const asked = (over: Partial<Extract<PlaceTrust, { harness: string }>>) => ({
   place: '/code/one',
   harness: 'A harness',
   folder: '/code/one',
@@ -42,7 +42,7 @@ describe("a place's trust in words: the lines of each place asked, a factory's l
     ]);
   });
   test("a listing says a factory's own untrusted places alone, each with the line that trusts it, or why nothing can", () => {
-    const lacking = (over: Partial<Untrusted>): Untrusted => ({
+    const lacking = (over: Partial<Untrusted>) => ({
       factory: 'nemia',
       place: '/code/one',
       harness: 'A harness',

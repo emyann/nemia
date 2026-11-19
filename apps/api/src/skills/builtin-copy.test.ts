@@ -16,7 +16,7 @@ const COPIES = path.join(root, 'workflows', 'copies.json');
 const json = { 'content-type': 'application/json' };
 
 /** The library's skill `name`, read at the store's level. */
-const read = async (name: string): Promise<Skill> => {
+const read = async (name: string) => {
   const res = await app.request(`/api/skills/${name}`);
   assert.equal(res.status, 200, await res.clone().text());
   return (await res.json()) as Skill;

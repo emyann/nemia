@@ -33,7 +33,7 @@ const DRAWN: { part: string; element: string; property: 'background-color' | 'co
 ];
 
 /** The colour the page computes for a theme variable, read off a probe that paints with it. */
-function colourOf(page: Page, variable: string): Promise<string> {
+function colourOf(page: Page, variable: string) {
   return page.evaluate((name) => {
     const probe = document.createElement('div');
     probe.style.backgroundColor = `var(${name})`;
@@ -45,7 +45,7 @@ function colourOf(page: Page, variable: string): Promise<string> {
 }
 
 /** What each part of the story draws secondary with, as `part: colour`. */
-function drawnOf(page: Page): Promise<string[]> {
+function drawnOf(page: Page) {
   return Promise.all(
     DRAWN.map(async ({ part, element, property }) => {
       const colour = await page

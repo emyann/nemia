@@ -95,7 +95,7 @@ const FILES = [
 ];
 
 /** The files a folder's door exports from, when `at` is a folder with a door (`index.ts`): each sibling it names, as a component's file. */
-function throughDoor(at: string): string[] {
+function throughDoor(at: string) {
   const door = path.join(SRC, at, 'index.ts');
   if (!fs.existsSync(door)) return [];
   return [...fs.readFileSync(door, 'utf8').matchAll(/from\s*'\.\/([^']+)'/g)].map(([, name]) => `${at}/${name}.tsx`);
@@ -122,7 +122,7 @@ test('every file that draws the Runs page is on the list: each part the route an
 });
 
 /** A focus ring written by hand: a ring or an outline class behind a focus state, which the kit's `focusRing` writes once for all. */
-const handRings = (text: string): string[] => text.match(/(?<![\w-])(?:data-)?focus(?:-visible|-within)?:(?:ring|outline)-[\w-]+/g) ?? [];
+const handRings = (text: string) => text.match(/(?<![\w-])(?:data-)?focus(?:-visible|-within)?:(?:ring|outline)-[\w-]+/g) ?? [];
 
 /** The parts of the Runs page that take the focus as a box, each ringed by the kit. */
 const RINGED = ['components/look/StatTile.tsx', 'components/look/Pager.tsx', 'components/look/TextLink.tsx'];

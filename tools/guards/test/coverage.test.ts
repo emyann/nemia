@@ -37,29 +37,31 @@ const section = (file: string, hit: number[], missed: number[], branches: { take
   ].join('\n');
 
 /** A file's coverage with `hitLines` hit of `found`, and `branchHit` branches of `branchFound`: no arm, as lcov alone leaves it. */
-const cover = (hitLines: number[], found: number, branchHit = 0, branchFound = 0): FileCoverage => ({
-  lines: { found, hit: hitLines.length, hitLines },
-  branches: { found: branchFound, hit: branchHit },
-  arms: { taken: {}, untaken: {} },
-});
+const cover = (hitLines: number[], found: number, branchHit = 0, branchFound = 0) =>
+  ({
+    lines: { found, hit: hitLines.length, hitLines },
+    branches: { found: branchFound, hit: branchHit },
+    arms: { taken: {}, untaken: {} },
+  }) satisfies FileCoverage;
 
 /** A record of package `p` holding `files`. */
-const recordWith = (files: Record<string, FileCoverage>): CoverageRecord => ({ version: 3, package: 'p', files });
+const recordWith = (files: Record<string, FileCoverage>) => ({ version: 3, package: 'p', files }) satisfies CoverageRecord;
 
 /**
  * Vitest's istanbul coverage of `src/pick.ts`, whose one `if` opens on line 2: its arm taken `yes` times and the `else` it leaves out,
  * which has no place of its own, `no` times, each count already the sum over every test process.
  */
-const ran = (yes: number, no: number): Istanbul => ({
-  [`${PKG}/src/pick.ts`]: {
-    branchMap: { '0': { line: 2, loc: { start: { line: 2 } }, locations: [{ start: { line: 2 } }, { start: {} }] } },
-    b: { '0': [yes, no] },
-  },
-});
+const ran = (yes: number, no: number) =>
+  ({
+    [`${PKG}/src/pick.ts`]: {
+      branchMap: { '0': { line: 2, loc: { start: { line: 2 } }, locations: [{ start: { line: 2 } }, { start: {} }] } },
+      b: { '0': [yes, no] },
+    },
+  }) satisfies Istanbul;
 
 /** The record of `src/pick.ts` from `istanbul`, its lines all hit in the lcov, as both arms of one file would leave them. */
-const pickRecord = (istanbul: Istanbul): CoverageRecord =>
-  recordOf(section(`${PKG}/src/pick.ts`, [1, 2, 3, 4, 5, 6], [], { taken: 2, not: 0 }), PKG, istanbul);
+const pickRecord = (istanbul: Istanbul) =>
+  recordOf(section(`${PKG}/src/pick.ts`, [1, 2, 3, 4, 5, 6], [], { taken: 2, not: 0 }), PKG, istanbul) satisfies CoverageRecord;
 
 describe('a record keeps the package’s own sources and drops its tests, its helpers, its fixtures and what lies outside it', () => {
   const rows: { name: string; lcov: string; files: Record<string, FileCoverage> }[] = [
@@ -131,10 +133,13 @@ describe('a branch is judged by its arms, each taken when any test took it, by t
 describe('records on either side tell a line or an arm the records disagree on, which varies, from one no test takes any more', () => {
   const two = recordWith({ 'src/a.ts': cover([1, 2], 2) });
   const one = recordWith({ 'src/a.ts': cover([1], 2) });
-  const arm = (taken: boolean): CoverageRecord => ({
-    ...two,
-    files: { 'src/a.ts': { ...cover([1, 2], 2), arms: { taken: taken ? { '0.0': 2 } : {}, untaken: taken ? {} : { '0.0': 2 } } } },
-  });
+  const arm = (taken: boolean) => {
+    const made: CoverageRecord = {
+      ...two,
+      files: { 'src/a.ts': { ...cover([1, 2], 2), arms: { taken: taken ? { '0.0': 2 } : {}, untaken: taken ? {} : { '0.0': 2 } } } },
+    };
+    return made;
+  };
   const rows: [
     name: string,
     before: CoverageRecord[],

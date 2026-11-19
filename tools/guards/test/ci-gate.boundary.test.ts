@@ -19,7 +19,7 @@ import { gateSteps, readWorkflow } from './ci-workflow.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** The gate's script, run as GitHub runs it: `bash -e` over a file, with the results in the environment and nothing else of the run's. */
-function verdictOf(run: string, results: string): { status: number; said: string } {
+function verdictOf(run: string, results: string) {
   const file = path.join(scratch('ci-gate-'), 'gate.sh');
   fs.writeFileSync(file, run);
   const ran = spawnSync('bash', ['-e', file], {
@@ -31,7 +31,7 @@ function verdictOf(run: string, results: string): { status: number; said: string
 }
 
 /** The results GitHub hands the gate, as `toJSON(needs)` writes them: a result per needed job. */
-const resultsOf = (results: Record<string, string>): string =>
+const resultsOf = (results: Record<string, string>) =>
   JSON.stringify(Object.fromEntries(Object.entries(results).map(([job, result]) => [job, { result, outputs: {} }])), undefined, 2);
 
 test('the gate reports the ci context green only when every job it needs read success', () => {

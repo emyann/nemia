@@ -67,7 +67,7 @@ import { OUT, store } from '../world.ts';
  * COSTLY's card says what the run took, in its footer and whole: its time at work, what it cost and its tokens, the split on hover. A
  * run that waits on you, so at work and not over; photographed.
  */
-async function tookOnTheCard(page: Page): Promise<void> {
+async function tookOnTheCard(page: Page) {
   const costly = cardOf(page, COSTLY.id);
   await expectVisible(
     costly.locator('[data-cost-words]', { hasText: new RegExp(`^${literal(COSTLY.cost)}$`) }),
@@ -86,7 +86,7 @@ async function tookOnTheCard(page: Page): Promise<void> {
  * The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of
  * its sides.
  */
-async function expectDiamond(page: Page, when: string): Promise<void> {
+async function expectDiamond(page: Page, when: string) {
   const { top, landed, running, bottom } = DIAMOND;
   await settled(page);
   await expectLeftOf(

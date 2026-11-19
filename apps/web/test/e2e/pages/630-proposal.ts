@@ -15,10 +15,10 @@ const FACTORY = 'proposing-e2e';
 const HIRE = `${WORKFLOWS.yours.name}.plan`;
 
 /** Her message, linking the proposal by its board page, as `nemia.md` teaches her. */
-const said = (name: string): string =>
+const said = (name: string) =>
   `I proposed [${name}](/factories/${FACTORY}/proposals/${name}): it hires ${AGENTS.seeded.name} into plan, and it widens access.`;
 
-const goto = async (page: Page, to: string): Promise<void> => {
+const goto = async (page: Page, to: string) => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
   await idle(page);
 };
@@ -27,7 +27,7 @@ const goto = async (page: Page, to: string): Promise<void> => {
 const QUEUE_POLL_MS = 5_000;
 
 /** Each request the page makes while `work` runs. */
-async function heardDuring(page: Page, work: () => Promise<void>): Promise<Request[]> {
+async function heardDuring(page: Page, work: () => Promise<void>) {
   const heard: Request[] = [];
   const hear = (request: Request) => heard.push(request);
   page.on('request', hear);
@@ -40,7 +40,7 @@ async function heardDuring(page: Page, work: () => Promise<void>): Promise<Reque
 }
 
 /** The path of a request's address. */
-const pathOf = (request: Request): string => new URL(request.url()).pathname;
+const pathOf = (request: Request) => new URL(request.url()).pathname;
 
 /**
  * The reads of `asked` the page made as it mounted, by the browser's own clock: each sent before `QUEUE_POLL_MS` had passed since the
@@ -48,16 +48,16 @@ const pathOf = (request: Request): string => new URL(request.url()).pathname;
  * poll is never counted, however long the page took to load and settle, and a second read as it mounts always is.
  * @param asked The requests of one read, as the page sent them.
  */
-function mountReads(asked: readonly Request[]): Request[] {
+function mountReads(asked: readonly Request[]) {
   const timed = asked.filter((r) => r.timing().startTime > 0).sort((a, b) => a.timing().startTime - b.timing().startTime);
   const first = timed[0];
-  if (first === undefined) return [];
+  if (first === undefined) return [] satisfies Request[];
   const answered = first.timing().startTime + first.timing().responseEnd;
-  return timed.filter((r) => r.timing().startTime < answered + QUEUE_POLL_MS);
+  return timed.filter((r) => r.timing().startTime < answered + QUEUE_POLL_MS) satisfies Request[];
 }
 
 /** The proposal `name` of FACTORY written again as one already applied, under `applied`: a proposal that waits no more beside it. */
-function appliedBeside(name: string, applied: string): void {
+function appliedBeside(name: string, applied: string) {
   const dir = path.join(store!, 'factories', FACTORY, 'proposals');
   const proposal = JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')) as {
     metadata: { name: string };
@@ -76,7 +76,7 @@ function appliedBeside(name: string, applied: string): void {
  * @param page The page.
  * @param name The proposal that waits.
  */
-async function floorReads(page: Page, name: string): Promise<void> {
+async function floorReads(page: Page, name: string) {
   const proposals = `/api/namespaces/${FACTORY}/proposals`;
   const applied = `${name}-applied`;
   appliedBeside(name, applied);
@@ -107,17 +107,17 @@ async function floorReads(page: Page, name: string): Promise<void> {
 }
 
 /** A POST to the api from the page, as the board makes one: no session token, so the person's. Its status and answer. */
-const post = (page: Page, at: string, body: unknown): Promise<{ status: number; answer: unknown }> =>
+const post = (page: Page, at: string, body: unknown) =>
   page.evaluate(
     async ([to, sent]) => {
       const res = await fetch(to, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(sent) });
       return { status: res.status, answer: (await res.json()) as unknown };
     },
     [at, body] as const,
-  );
+  ) satisfies Promise<{ status: number; answer: unknown }>;
 
 /** A write to the api from the page, as the board makes one: its status. */
-const send = (page: Page, method: 'PUT' | 'DELETE', at: string, body: unknown): Promise<number> =>
+const send = (page: Page, method: 'PUT' | 'DELETE', at: string, body: unknown) =>
   page.evaluate(
     async ([how, to, sent]) =>
       (
@@ -128,13 +128,13 @@ const send = (page: Page, method: 'PUT' | 'DELETE', at: string, body: unknown): 
         })
       ).status,
     [method, at, body] as const,
-  );
+  ) satisfies Promise<number>;
 
 /**
  * The proposal made through the api's door, an update of the hire at the version it reads, then its file made Nemia's and widening, as her
  * session would have made it: the door's own decode reads it back. Its name.
  */
-async function proposed(page: Page): Promise<string> {
+async function proposed(page: Page) {
   const hire = await page.evaluate(
     async (to) => (await (await fetch(to)).json()) as { metadata: { resourceVersion: string } },
     `/api/namespaces/${FACTORY}/hires/${HIRE}`,
@@ -164,7 +164,7 @@ async function proposed(page: Page): Promise<string> {
 }
 
 /** Her message draws the proposal under her words, widening; a click on Approve applies it, and no button remains. */
-async function approvedInChat(page: Page, name: string): Promise<void> {
+async function approvedInChat(page: Page, name: string) {
   const panel = await openChat(page);
   const part = panel.locator(`[data-chat-proposal="${name}"]`);
   await expectVisible(part.locator(`[data-proposal="${name}"][data-proposal-phase="waiting"]`), 'her message draws the proposal, waiting');
@@ -180,7 +180,7 @@ async function approvedInChat(page: Page, name: string): Promise<void> {
 }
 
 /** The pane's Proposals, lit on the page at hand, and alone lit. */
-async function proposalsLit(page: Page, where: string): Promise<void> {
+async function proposalsLit(page: Page, where: string) {
   await expectVisible(placeOf(page, 'Proposals').and(placeLitOf(page)), `${where}: the pane's Proposals is lit`);
   await expectCount(placeLitOf(page), 1, `${where}: and it alone`);
 }
@@ -189,7 +189,7 @@ async function proposalsLit(page: Page, where: string): Promise<void> {
  * Waiting, the proposal is listed on the factory's proposals page, and the pane's Proposals counts it as one that waits on you; the floor
  * draws no proposal and no template, and asks the cards once and no whole list of proposals (`floorReads`).
  */
-async function listedWaiting(page: Page, name: string): Promise<void> {
+async function listedWaiting(page: Page, name: string) {
   await floorReads(page, name);
   await expectCount(page.locator('[data-factory-proposals], [data-factory-proposal]'), 0, 'the floor lists no proposal');
   await expectCount(page.locator('[data-template]'), 0, 'nor any template');
@@ -209,7 +209,7 @@ async function listedWaiting(page: Page, name: string): Promise<void> {
  * Applied, the proposals page lists it so and the pane's Proposals says none waits; its link opens the proposal page with the same part,
  * Proposals still lit, whose way back leads to the proposals page.
  */
-async function listedOnPage(page: Page, name: string): Promise<void> {
+async function listedOnPage(page: Page, name: string) {
   await goto(page, `/factories/${FACTORY}/proposals`);
   const row = page.locator(`[data-factory-proposal="${name}"][data-proposal-phase="applied"]`);
   await expectVisible(row, 'the proposals page lists the proposal, applied');
@@ -231,7 +231,7 @@ async function listedOnPage(page: Page, name: string): Promise<void> {
  * @param page The page on the factory's settings.
  * @param text What is typed.
  */
-async function agentTyped(page: Page, text: string): Promise<Locator> {
+async function agentTyped(page: Page, text: string) {
   const field = page.locator('[data-delegation-form]').getByRole('combobox', { name: 'Agent' });
   await idle(page);
   await field.evaluate(async (input) => {
@@ -246,7 +246,7 @@ async function agentTyped(page: Page, text: string): Promise<Locator> {
  * Her delegation, written through the factory's settings: `nemia` is no agent the factory serves, so the list holds nothing it names,
  * and the name typed is written as it is.
  */
-async function herDelegationWritten(page: Page): Promise<void> {
+async function herDelegationWritten(page: Page) {
   await goto(page, `/factories/${FACTORY}/settings`);
   const form = page.locator('[data-delegation-form]');
   await agentTyped(page, 'nemia');
@@ -267,7 +267,7 @@ async function herDelegationWritten(page: Page): Promise<void> {
  * On the settings, the form writes a delegation of the seeded agent, picked from the list its first letters narrow, over hires' updates; it
  * is listed, then removed.
  */
-async function delegated(page: Page): Promise<void> {
+async function delegated(page: Page) {
   await goto(page, `/factories/${FACTORY}/settings`);
   const form = page.locator('[data-delegation-form]');
   const field = await agentTyped(page, AGENTS.seeded.name.slice(0, 3));
@@ -303,7 +303,7 @@ const PROPOSAL_RULE = {
 };
 
 /** Press `control` and refuse any answer but a 200 to the write of her rule by `method`. */
-async function ruleWritten(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string): Promise<void> {
+async function ruleWritten(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string) {
   const [answer] = await Promise.all([
     page.waitForResponse(
       (r) => r.request().method() === method && new URL(r.url()).pathname === `/api/policy/nemia/rules/${PROPOSAL_RULE.id}`,
@@ -322,7 +322,7 @@ async function ruleWritten(page: Page, control: Locator, method: 'PUT' | 'DELETE
  * with a Drop, and reads in force among what she proposed, once her delegation, written through the factory's settings, grants what it
  * reaches; dropped, it is out of force again. The folder of her rules is taken back.
  */
-async function ruledOverProposals(page: Page): Promise<void> {
+async function ruledOverProposals(page: Page) {
   const auto = path.join(store!, 'auto');
   fs.mkdirSync(auto, { recursive: true });
   fs.writeFileSync(
@@ -372,7 +372,7 @@ export default {
       factoryFile,
       JSON.stringify({ volumes: worked([path.join(store!, 'checkout')]), workflows: [WORKFLOWS.yours.name] }, null, 2),
     );
-    let back = (): void => undefined;
+    let back: () => void = () => undefined;
     try {
       const name = await proposed(page);
       back = herChat({ session: 'up', said: [{ text: said(name) }] });

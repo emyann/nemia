@@ -6,7 +6,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { resultOf, resultStepsOf, runEndOf, standsOf } from '../src/lib/runResult.ts';
-import { coded, detail, step } from './run-fixtures.ts';
+import { coded, detail, step } from './run.fixture.ts';
 
 test('resultStepsOf: final where no after or route edge leaves the step, a loop back aside; where it stands; whether its try gave', () => {
   const view = detail({

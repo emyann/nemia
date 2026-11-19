@@ -14,7 +14,7 @@ import { releaseDir, switchCurrent } from './release.store.ts';
 import { currentNemia, linkNemia, toolsNemia } from './nemia-link.store.ts';
 
 /** A release `tag` unpacked in the store at `home`, its launcher a script. */
-const unpacked = (home: string, tag: string): string => {
+const unpacked = (home: string, tag: string) => {
   const bin = path.join(releaseDir(tag, home), 'bin');
   fs.mkdirSync(bin, { recursive: true });
   fs.writeFileSync(path.join(bin, 'nemia'), `#!/bin/sh\necho ${tag}\n`, { mode: 0o755 });

@@ -17,17 +17,18 @@ import type { TreeFile } from '../src/archive/archive.ts';
 type Walk = DoorWalk<TemplateDoorShape>;
 
 /** The place `parts` name under the side's root. */
-const at = (root: string, ...parts: string[]): TemplateSource => TemplateSource.read(path.join(root, ...parts));
+const at = (root: string, ...parts: string[]) => TemplateSource.read(path.join(root, ...parts)) satisfies TemplateSource;
 
 /** A tree named `name`: its manifest, and an executable script beside it. */
-export const aTree = (name: string, more: TreeFile[] = []): { name: string; files: TreeFile[] } => ({
-  name,
-  files: [
-    { path: 'nemia.yaml', mode: 0o644, bytes: Buffer.from('apiVersion: nemia.dev/v1alpha1\nkind: FactoryTemplate\n') },
-    { path: 'workflows/dev/run.sh', mode: 0o755, bytes: Buffer.from('#!/bin/sh\necho run\n') },
-    ...more,
-  ],
-});
+export const aTree = (name: string, more: TreeFile[] = []) =>
+  ({
+    name,
+    files: [
+      { path: 'nemia.yaml', mode: 0o644, bytes: Buffer.from('apiVersion: nemia.dev/v1alpha1\nkind: FactoryTemplate\n') },
+      { path: 'workflows/dev/run.sh', mode: 0o755, bytes: Buffer.from('#!/bin/sh\necho run\n') },
+      ...more,
+    ],
+  }) satisfies { name: string; files: TreeFile[] };
 
 /** A tree as read, in a shape each side says alike: its name, each file's path, mode and text in path order, and its problems. */
 const seen = (tree: TemplateTree) => ({

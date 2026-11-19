@@ -23,32 +23,32 @@ import { scratch } from 'test-kit/scratch';
 type Turbo = { tasks: Record<string, { inputs?: string[] }> };
 type Manifest = { name: string; scripts?: { test?: string }; dependencies?: object; devDependencies?: object };
 
-const manifestOf = (root: string, dir: string): Manifest =>
-  JSON.parse(fs.readFileSync(path.join(root, dir, 'package.json'), 'utf8')) as Manifest;
+const manifestOf = (root: string, dir: string) => JSON.parse(fs.readFileSync(path.join(root, dir, 'package.json'), 'utf8')) as Manifest;
 
 /** The files a workspace's suite runs first: each setup file of its Vitest config and each file its `include` matches, from its folder. */
-function entries(root: string, dir: string): string[] {
+function entries(root: string, dir: string) {
   const at = path.join(root, dir);
   const suite = suiteOf(at);
-  if (!suite) return [];
+  if (!suite) return [] satisfies string[];
   const files = fs
     .readdirSync(at, { recursive: true, encoding: 'utf8' })
     .filter((file) => !file.split(path.sep).includes('node_modules') && suite.include.some((glob) => path.matchesGlob(file, glob)));
-  return [...suite.setupFiles.map((file) => path.join(at, file)), ...files.map((file) => path.join(at, file))];
+  return [...suite.setupFiles.map((file) => path.join(at, file)), ...files.map((file) => path.join(at, file))] satisfies string[];
 }
 
-const literal = (node: ts.Node): string | undefined =>
-  ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : undefined;
+const literal = (node: ts.Node) =>
+  (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : undefined) satisfies string | undefined;
 
-const isMeta = (node: ts.Node, name: string): boolean =>
+const isMeta = (node: ts.Node, name: string) =>
   ts.isPropertyAccessExpression(node) && node.name.text === name && ts.isMetaProperty(node.expression);
 
 /** The paths `file` builds from a folder it knows, as far as their literal parts go, and the files it imports by a relative path. */
-function readsOf(root: string, file: string): { reads: string[]; imports: string[] } {
+function readsOf(root: string, file: string) {
   const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
   const known = new Map<string, string>();
   const reads = new Set<string>();
   const imports: string[] = [];
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const built = (node: ts.Node): { at: string; whole: boolean } | undefined => {
     if (isMeta(node, 'dirname')) return { at: path.dirname(file), whole: true };
     if (ts.isIdentifier(node) && known.has(node.text)) return { at: known.get(node.text) ?? '', whole: true };
@@ -77,7 +77,7 @@ function readsOf(root: string, file: string): { reads: string[]; imports: string
     }
     return undefined;
   };
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const from = node.moduleSpecifier && literal(node.moduleSpecifier);
       if (from?.startsWith('.')) imports.push(path.join(path.dirname(file), from));
@@ -96,13 +96,13 @@ function readsOf(root: string, file: string): { reads: string[]; imports: string
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { reads: [...reads], imports };
+  return { reads: [...reads], imports } satisfies { reads: string[]; imports: string[] };
 }
 
 /** The workspaces `dir` depends on, by its manifest and theirs in turn: their files reach its task's hash through `^transit`. */
-function dependencies(root: string, dir: string, folders: Map<string, string>): Set<string> {
+function dependencies(root: string, dir: string, folders: Map<string, string>) {
   const out = new Set<string>();
-  const visit = (at: string): void => {
+  const visit = (at: string) => {
     const manifest = manifestOf(root, at);
     for (const name of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) {
       const folder = folders.get(name);
@@ -113,17 +113,17 @@ function dependencies(root: string, dir: string, folders: Map<string, string>): 
     }
   };
   visit(dir);
-  return out;
+  return out satisfies Set<string>;
 }
 
-const posix = (file: string): string => file.split(path.sep).join('/');
+const posix = (file: string) => file.split(path.sep).join('/');
 
 /**
  * Each workspace's reads outside its folder, by path from `root`, with the test file that makes each: from the files its test script
  * runs and the helpers beside them they import, each read that is on disk, outside every workspace it depends on and outside a
  * `node_modules`.
  */
-function outsideReads(root: string): Map<string, Map<string, string>> {
+function outsideReads(root: string) {
   const dirs = workspaces(root);
   const folders = new Map(dirs.map((dir) => [manifestOf(root, dir).name, dir]));
   const out = new Map<string, Map<string, string>>();
@@ -149,28 +149,28 @@ function outsideReads(root: string): Map<string, Map<string, string>> {
     }
     out.set(dir, found);
   }
-  return out;
+  return out satisfies Map<string, Map<string, string>>;
 }
 
 /** The files under `relative`, a folder of `root`, by path from the root: what a read of a folder reads. */
-const filesUnder = (root: string, relative: string): string[] =>
+const filesUnder = (root: string, relative: string) =>
   fs
     .readdirSync(path.join(root, relative), { recursive: true, encoding: 'utf8' })
     .filter((file) => !file.split(path.sep).includes('node_modules'))
-    .map((file) => `${relative}/${posix(file)}`);
+    .map((file) => `${relative}/${posix(file)}`) satisfies string[];
 
 /**
  * Each read of a workspace's tests that no input of its task in `turbo` covers, as a sentence naming the fix: a file is covered by a
  * glob that matches it, a folder by a glob that matches a file under it.
  */
-function uncovered(root: string, turbo: Turbo): string[] {
+function uncovered(root: string, turbo: Turbo) {
   const out: string[] = [];
   for (const [dir, reads] of outsideReads(root)) {
     const task = `${manifestOf(root, dir).name}#test`;
     const globs = (turbo.tasks[task]?.inputs ?? [])
       .filter((glob) => glob.startsWith('$TURBO_ROOT$/'))
       .map((glob) => glob.slice('$TURBO_ROOT$/'.length));
-    const covers = (file: string): boolean => globs.some((glob) => path.matchesGlob(file, glob));
+    const covers = (file: string) => globs.some((glob) => path.matchesGlob(file, glob));
     for (const [read, by] of reads) {
       const isFolder = fs.statSync(path.join(root, read)).isDirectory();
       if (isFolder ? filesUnder(root, read).some(covers) : covers(read)) continue;
@@ -179,10 +179,10 @@ function uncovered(root: string, turbo: Turbo): string[] {
       );
     }
   }
-  return out;
+  return out satisfies string[];
 }
 
-const readTurbo = (root: string): Turbo => JSON.parse(fs.readFileSync(path.join(root, 'turbo.json'), 'utf8')) as Turbo;
+const readTurbo = (root: string) => JSON.parse(fs.readFileSync(path.join(root, 'turbo.json'), 'utf8')) as Turbo;
 
 test("each workspace's test that reads a file outside its package finds it among its task's inputs in turbo.json", () => {
   const found = outsideReads(REPO);
@@ -194,9 +194,9 @@ test("each workspace's test that reads a file outside its package finds it among
 });
 
 /** A repository of two workspaces: `a`, whose tests read files outside it, and `b`, which `a` depends on; `turbo` its turbo.json. */
-function planted(turbo: Turbo): string {
+function planted(turbo: Turbo) {
   const root = scratch('turbo-inputs-');
-  const write = (file: string, text: string): void => {
+  const write = (file: string, text: string) => {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), text);
   };
@@ -225,7 +225,7 @@ function planted(turbo: Turbo): string {
   return root;
 }
 
-const taskA = (inputs?: string[]): Turbo => ({ tasks: { 'a#test': inputs ? { inputs } : {} } });
+const taskA = (inputs?: string[]) => ({ tasks: { 'a#test': inputs ? { inputs } : {} } }) satisfies Turbo;
 
 test('the finder reads a path built from import.meta.dirname, from a constant, in a helper the test imports, and none in a dependency', () => {
   assert.deepEqual(Object.fromEntries(outsideReads(planted(taskA())).get('packages/a') ?? []), {

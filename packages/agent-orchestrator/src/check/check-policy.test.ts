@@ -11,7 +11,7 @@ import { parseWorkflow, renderStep } from '../workflow/step-file.ts';
 import { WorkflowError } from '../step/step.ts';
 
 /** A step file of `lines`, with a place and a body. */
-const step = (lines: string): string => `---\nplace: git\n${lines}\n---\nDo the work.\n`;
+const step = (lines: string) => `---\nplace: git\n${lines}\n---\nDo the work.\n`;
 
 const PERSONS: CheckFailurePolicy = { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }] };
 

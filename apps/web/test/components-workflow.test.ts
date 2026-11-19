@@ -14,7 +14,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import './tsx.ts';
-import { classesAt, routedWith, textsOf } from './markup-fixtures.ts';
+import { classesAt, routedWith, textsOf } from './markup.fixture.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -23,11 +23,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
  * The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder
  * again.
  */
-async function refusedMarkup(
-  message: string,
-  steps: string[],
-  status: number | null,
-): Promise<{ head: string; reread: boolean; said: string }> {
+async function refusedMarkup(message: string, steps: string[], status: number | null) {
   const { SaveRefused } = await import('../src/components/workflow/WorkflowBuilder.tsx');
   const { BuildRefusal } = await import('../src/lib/api/workflows.ts');
   const html = renderToStaticMarkup(

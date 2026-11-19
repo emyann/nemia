@@ -18,6 +18,7 @@ const STAMP = '.e2e-built';
 const NOT_READ = new Set(['dist', 'node_modules', 'test', '.e2e', 'storybook-static', '.turbo', '.tanstack']);
 
 /** Every file under `dir`, by its path from `from`, but those under a folder of `skipped` directly in `dir`. */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 function filesOf(dir: string, from: string, skipped: ReadonlySet<string>): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
@@ -33,7 +34,7 @@ function filesOf(dir: string, from: string, skipped: ReadonlySet<string>): strin
  * The fingerprint of what a build of the board at `web` reads, in the repository at `repo`: the board's own files, `objects`' and the
  * lockfile, each by path, size and time of change. Two trees with one fingerprint build one app.
  */
-export function inputsOf(web: string, repo: string): string {
+export function inputsOf(web: string, repo: string) {
   const objects = path.join(repo, 'packages', 'objects');
   const lock = path.join(repo, 'package-lock.json');
   const files = [
@@ -50,12 +51,12 @@ export function inputsOf(web: string, repo: string): string {
 }
 
 /** Leaves `inputs` in `web`'s `dist/`, as the fingerprint of what that build read. */
-export function stamp(web: string, inputs: string): void {
+export function stamp(web: string, inputs: string) {
   fs.writeFileSync(path.join(web, 'dist', STAMP), `${inputs}\n`);
 }
 
 /** Whether `web`'s `dist/` is the build of `inputs`: it has a page, and its stamp says so. Never under `CI`. */
-export function current(web: string, inputs: string, env: NodeJS.ProcessEnv = process.env): boolean {
+export function current(web: string, inputs: string, env: NodeJS.ProcessEnv = process.env) {
   if (env.CI) return false;
   const file = path.join(web, 'dist', STAMP);
   return fs.existsSync(path.join(web, 'dist', 'index.html')) && fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() === inputs;

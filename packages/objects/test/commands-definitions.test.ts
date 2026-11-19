@@ -22,7 +22,7 @@ import {
 } from 'objects';
 
 /** What `words` refuses of `argv`: the parser's refusal, else its check's, else nothing. */
-function refusalOf(words: CommandWords, argv: readonly string[]): string | null {
+function refusalOf(words: CommandWords, argv: readonly string[]) {
   let args: Args | undefined;
   try {
     args = parseArgv(words.spec, argv);
@@ -34,7 +34,7 @@ function refusalOf(words: CommandWords, argv: readonly string[]): string | null 
 }
 
 /** Each fragment of `facts` in `said`. */
-const naming = (said: string | null, facts: readonly string[], row: string): void => {
+const naming = (said: string | null, facts: readonly string[], row: string) => {
   assert.ok(said !== null, `${row}: refused`);
   for (const fact of facts) assert.ok(said.includes(fact), `${row}: names ${fact} in ${said}`);
 };

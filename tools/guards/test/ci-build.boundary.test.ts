@@ -27,7 +27,7 @@ const ROUTE_TREE = 'apps/web/src/routeTree.gen.ts';
 const THEME_FILE = 'apps/web/theme/theme.css';
 
 /** A git repository holding both generated files committed, as a runner's checkout holds them after `actions/checkout`. */
-function checkout(): string {
+function checkout() {
   const dir = scratch('ci-build-');
   const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
   git('init', '-b', 'main');
@@ -43,7 +43,7 @@ function checkout(): string {
 }
 
 /** The staleness step, run as GitHub runs it: `bash -e` over a file, in `dir`, with nothing of the run's in its environment. */
-function verdictOf(run: string, dir: string): { status: number; said: string } {
+function verdictOf(run: string, dir: string) {
   const file = path.join(scratch('ci-build-step-'), 'stale.sh');
   fs.writeFileSync(file, run);
   const ran = spawnSync('bash', ['-e', file], {
@@ -56,7 +56,7 @@ function verdictOf(run: string, dir: string): { status: number; said: string } {
 }
 
 /** `file` left holding bytes its generator would not write, as a commit that forgot to run the generator leaves it. */
-const dirty = (dir: string, file: string): void => fs.appendFileSync(path.join(dir, file), 'a line a person typed by hand\n');
+const dirty = (dir: string, file: string) => fs.appendFileSync(path.join(dir, file), 'a line a person typed by hand\n');
 
 test('the build job refuses a generated file whose committed bytes are not its generator’s, by name and by the command that writes it', () => {
   const step = staleStep(readWorkflow());

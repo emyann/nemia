@@ -12,7 +12,8 @@ import { MutationObserver, QueryClient, QueryObserver, type QueryKey } from '@ta
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
 import { bell, until, WAITED } from './waits.ts';
-import { runList } from './run-fixtures.ts';
+import { runList } from './run.fixture.ts';
+import { apiAnswers } from './network.ts';
 
 const SRC = path.resolve(import.meta.dirname, '../src');
 const COMPONENTS = path.join(SRC, 'components');
@@ -33,11 +34,11 @@ const WRITES = [
  * Every invalidation of one run's own record (`['runs', id]`) written by hand in `text`, across line breaks: `runsMoved` given the run
  * reads it, with the list, so a write that refreshes it by hand is one that forgot the list or calls twice.
  */
-const recordByHand = (text: string): number =>
+const recordByHand = (text: string) =>
   [...text.matchAll(/invalidateQueries\(\s*\{\s*queryKey:\s*\[\s*'runs'\s*,\s*[^,\]\s]+\s*\]/g)].length;
 
 /** Every source file under `dir` that refreshes a run's record by hand, by its path from `dir`, and how many times. */
-const recordByHandIn = (dir: string): Array<{ file: string; times: number }> =>
+const recordByHandIn = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.tsx?$/.test(file))
@@ -51,10 +52,10 @@ const recordByHandIn = (dir: string): Array<{ file: string; times: number }> =>
 const RECORD_ALONE = [{ file: 'components/step/session/SessionComposer.tsx', times: 1 }];
 
 /** Whether `text` invalidates the whole list of the runs by its bare key, in place of `runsMoved`. */
-const byHand = (text: string): boolean => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);
+const byHand = (text: string) => /queryKey:\s*\[\s*'runs'\s*\]/.test(text);
 
 /** Every source file under `dir` that spells the bare key of the whole list, by its path from `dir`, and how many times. */
-const byHandIn = (dir: string): Array<{ file: string; times: number }> =>
+const byHandIn = (dir: string) =>
   fs
     .readdirSync(dir, { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.tsx?$/.test(file))
@@ -68,13 +69,12 @@ describe("runsMoved: a write that changes a run reads the frame's answer and eac
   test('a write that changes a run reads each page of the finished runs again', WAITED, async (t) => {
     const asked: string[] = [];
     const rang = bell();
-    const before = globalThis.fetch;
-    globalThis.fetch = async (input) => {
+    apiAnswers(async (input) => {
       asked.push(String(input));
       rang.ring();
       const metadata = { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting: 0, inFlight: 0, finished: asked.length } };
       return new Response(JSON.stringify(runList([], metadata)), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
+    });
     const client = new QueryClient();
     const page = new QueryObserver(client, finishedRunsQuery('harbour', ['f.a']));
     const seen = bell();
@@ -82,7 +82,6 @@ describe("runsMoved: a write that changes a run reads the frame's answer and eac
     t.onTestFinished(() => {
       stop();
       client.clear();
-      globalThis.fetch = before;
     });
     const total = () => page.getCurrentResult().data?.total;
     await until(t, () => total() === 1, 'the first read of the page', { bell: seen });
@@ -102,14 +101,13 @@ describe("runsMoved: a write that changes a run reads the frame's answer and eac
   test("REFUSED: a write that changes a run reads the frame's answer again at once, a factory's with it", WAITED, async (t) => {
     const asked: string[] = [];
     const rang = bell();
-    const before = globalThis.fetch;
-    globalThis.fetch = async (input) => {
+    apiAnswers(async (input) => {
       asked.push(String(input));
       const waiting = asked.filter((url) => url === String(input)).length === 1 ? 2 : 1;
       rang.ring();
       const metadata = { asOf: '2026-10-12T12:00:00.000Z', counts: { waiting, inFlight: 0, finished: 0 } };
       return new Response(JSON.stringify(runList([], metadata)), { status: 200, headers: { 'content-type': 'application/json' } });
-    };
+    });
     const client = new QueryClient();
     const every = new QueryObserver(client, openRunsQuery());
     const one = new QueryObserver(client, openRunsQuery('harbour'));
@@ -118,7 +116,6 @@ describe("runsMoved: a write that changes a run reads the frame's answer and eac
     t.onTestFinished(() => {
       for (const stop of stops) stop();
       client.clear();
-      globalThis.fetch = before;
     });
     const counts = () => [every.getCurrentResult().data?.counts.waiting, one.getCurrentResult().data?.counts.waiting];
     await until(t, () => counts().every((count) => count === 2), 'the first read of each light answer', { bell: seen });
@@ -222,19 +219,17 @@ describe("the writes that change a run, in src: none refreshes a run's record by
 test("useRound: a round asked for reads the run's record and the run list again, since the api changes what the list shows at once", async (t) => {
   await import('./tsx.ts');
   const { roundAsk } = await import('../src/components/gate/Ask.tsx');
-  const before = globalThis.fetch;
   const sent: string[] = [];
-  globalThis.fetch = async (input) => {
+  apiAnswers(async (input) => {
     sent.push(String(input));
     return new Response(JSON.stringify({ step: 'review', round: 3, file: '/store/runs/r-1.asks/round-review-3' }), {
       status: 202,
       headers: { 'content-type': 'application/json' },
     });
-  };
+  });
   const client = new QueryClient();
   t.onTestFinished(() => {
     client.clear();
-    globalThis.fetch = before;
   });
   const moved: QueryKey[] = [['runs'], ['runs-open', 'harbour'], ['runs-finished', 'harbour', 'f.a'], ['runs', 'r-1']];
   const kept: QueryKey[] = [

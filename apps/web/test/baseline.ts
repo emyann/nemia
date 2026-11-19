@@ -18,7 +18,7 @@ export const FOLDER = 'apps/web/test/baseline/';
 const SRC = 'apps/web/src/';
 
 /** The source file an entry names: all of it before its first `#`, or all of it where it has none. */
-const sourceOf = (entry: string): string => (entry.includes('#') ? entry.slice(0, entry.indexOf('#')) : entry);
+const sourceOf = (entry: string) => (entry.includes('#') ? entry.slice(0, entry.indexOf('#')) : entry);
 
 /**
  * The file of the baseline that `entry` is filed in on `list`: its source file's path under src, as text, in the list's folder.
@@ -28,10 +28,10 @@ const sourceOf = (entry: string): string => (entry.includes('#') ? entry.slice(0
 export const shardOf: ShardOf = (list, entry) => FOLDER + list + '/' + sourceOf(entry).slice(SRC.length) + '.txt';
 
 /** The file `entry` belongs in on `list`, or none where it names no source file under src. */
-const homeOf = (list: BaselineList, entry: string): string | undefined =>
-  sourceOf(entry).startsWith(SRC) && sourceOf(entry).length > SRC.length
+const homeOf = (list: BaselineList, entry: string) =>
+  (sourceOf(entry).startsWith(SRC) && sourceOf(entry).length > SRC.length
     ? FOLDER + list + '/' + sourceOf(entry).slice(SRC.length) + '.txt'
-    : undefined;
+    : undefined) satisfies string | undefined;
 
 /**
  * Whether `entry` sits astray in `file`: the file is not the one its source file has on `list`.
@@ -48,7 +48,7 @@ export const isAstray: IsAstray = (list, file, entry) => homeOf(list, entry) !==
  */
 export const misfiled: Misfiled = (list, files) => ({
   astray: files
-    .flatMap(({ file, entries }) => entries.map((entry): Astray => ({ file, entry })))
+    .flatMap(({ file, entries }) => entries.map((entry) => ({ file, entry }) satisfies Astray))
     .filter(({ file, entry }) => isAstray(list, file, entry)),
   empty: files.filter(({ entries }) => entries.length === 0).map(({ file }) => file),
 });
@@ -57,31 +57,31 @@ export const misfiled: Misfiled = (list, files) => ({
 export type Baseline = { readonly lists: Readonly<Record<BaselineList, readonly Filed[]>>; readonly strays: readonly string[] };
 
 /** Every file under `dir`, by its path from `root`, in a stable order. */
-const filesUnder = (root: string, dir: string): string[] =>
-  fs.existsSync(path.join(root, dir))
+const filesUnder = (root: string, dir: string) =>
+  (fs.existsSync(path.join(root, dir))
     ? fs
         .readdirSync(path.join(root, dir), { recursive: true, withFileTypes: true })
         .filter((it) => it.isFile())
         .map((it) => path.relative(root, path.join(it.parentPath, it.name)).split(path.sep).join('/'))
         .sort()
-    : [];
+    : []) satisfies string[];
 
 /** The list whose text file `file` is, or none where it is not one. */
-const listOf = (file: string): BaselineList | undefined =>
-  file.endsWith('.txt') ? LISTS.find((list) => file.startsWith(`${FOLDER}${list}/`)) : undefined;
+const listOf = (file: string) =>
+  (file.endsWith('.txt') ? LISTS.find((list) => file.startsWith(`${FOLDER}${list}/`)) : undefined) satisfies BaselineList | undefined;
 
 /**
  * Reads the baseline's folder: each list's text files with their lines, a last empty line left out, and each other file as a stray.
  * @param root The workspace root the folder is read under.
  */
-export const readBaseline = (root: string): Baseline => {
+export const readBaseline = (root: string) => {
   const all = filesUnder(root, FOLDER);
-  const lines = (file: string): string[] => {
+  const lines = (file: string) => {
     const text = fs.readFileSync(path.join(root, file), 'utf8');
-    return text === '' ? [] : text.replace(/\n$/, '').split('\n');
+    return (text === '' ? [] : text.replace(/\n$/, '').split('\n')) satisfies string[];
   };
   const lists = Object.fromEntries(
-    LISTS.map((list) => [list, all.filter((file) => listOf(file) === list).map((file): Filed => ({ file, entries: lines(file) }))]),
+    LISTS.map((list) => [list, all.filter((file) => listOf(file) === list).map<Filed>((file) => ({ file, entries: lines(file) }))]),
   ) as Record<BaselineList, Filed[]>;
-  return { lists, strays: all.filter((file) => listOf(file) === undefined) };
+  return { lists, strays: all.filter((file) => listOf(file) === undefined) } satisfies Baseline;
 };

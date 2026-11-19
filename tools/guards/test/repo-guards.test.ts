@@ -40,7 +40,7 @@ export const PRIVATE = ['packages/agent-orchestrator', 'packages/agent-runtime',
  * pattern is kept byte for byte — a leading `/` anchors it to the root and its absence does not, and a clause that stripped it could
  * not tell the two apart.
  */
-const owned = (text: string): { pattern: string; owners: string[] }[] =>
+const owned = (text: string) =>
   text
     .split('\n')
     .map((line) => line.replace(/#.*$/, '').trim())
@@ -51,7 +51,7 @@ const owned = (text: string): { pattern: string; owners: string[] }[] =>
     });
 
 /** A path of `OWNED` that no line owns, and one owned by somebody else: each a path a branch could then edit unreviewed. */
-function ownerDrift(text: string, paths: readonly string[] = OWNED): string[] {
+function ownerDrift(text: string, paths: readonly string[] = OWNED) {
   const lines = owned(text);
   return paths.flatMap((path_) => {
     const line = lines.find((line) => line.pattern === path_);
@@ -72,7 +72,7 @@ function ownerDrift(text: string, paths: readonly string[] = OWNED): string[] {
 }
 
 /** A package that npm would publish: `npm publish -w` is refused by npm itself only where the package says it is private. */
-function privateDrift(root = ROOT, packages: readonly string[] = PRIVATE): string[] {
+function privateDrift(root = ROOT, packages: readonly string[] = PRIVATE) {
   return packages.flatMap((dir) => {
     const file = path.join(dir, 'package.json');
     const pkg = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) as { private?: unknown };

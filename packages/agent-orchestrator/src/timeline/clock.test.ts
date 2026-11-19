@@ -17,13 +17,14 @@ const MIN = 60_000;
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 4, h, m)).toISOString();
 
 /** A task that spawned at `from` and ended at `to`, settled; still running, and not settled, where `to` is null. */
-const ran = (from: string, to: string | null, more: Partial<AttemptClock> = {}): TaskClock => ({
-  state: {
-    brief: 'filed',
-    settled: to ? 'succeeded' : null,
-    attempts: [{ startedAt: from, spawnedAt: from, endedAt: to, reason: to ? 'harness' : null, usage: null, ...more }],
-  },
-});
+const ran = (from: string, to: string | null, more: Partial<AttemptClock> = {}) =>
+  ({
+    state: {
+      brief: 'filed',
+      settled: to ? 'succeeded' : null,
+      attempts: [{ startedAt: from, spawnedAt: from, endedAt: to, reason: to ? 'harness' : null, usage: null, ...more }],
+    },
+  }) satisfies TaskClock;
 
 /** A task filed and given no attempt yet: waiting for a slot. */
 const QUEUED: TaskClock = { state: { brief: 'filed', settled: null, attempts: [] } };
@@ -38,22 +39,23 @@ const STEPS = [
  * A run created at 10:00 that waited on another run until 10:10, then for a run slot until its first filing at 10:20. `plan`, gated,
  * ran 10:22 → 10:40 and its check 10:41 → 10:45; `side`, filed beside it, waited for a slot until 10:50 and ran until 11:10.
  */
-const run = (more: Partial<RepositoryRun> = {}): RepositoryRun => ({
-  id: 'r-1',
-  repo: '/repo',
-  workspace: '/wt',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/wf',
-  workflow: STEPS,
-  createdAt: at(10),
-  after: ['r-0'],
-  slotHeldAt: at(10, 10),
-  steps: { plan: { taskId: 'p', check: { taskId: 'pc' } }, side: { taskId: 's' }, build: { taskId: null } },
-  ...more,
-});
+const run = (more: Partial<RepositoryRun> = {}) =>
+  ({
+    id: 'r-1',
+    repo: '/repo',
+    workspace: '/wt',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'add a flag',
+    workflowDir: '/wf',
+    workflow: STEPS,
+    createdAt: at(10),
+    after: ['r-0'],
+    slotHeldAt: at(10, 10),
+    steps: { plan: { taskId: 'p', check: { taskId: 'pc' } }, side: { taskId: 's' }, build: { taskId: null } },
+    ...more,
+  }) satisfies RepositoryRun;
 
 const VIEWS = new Map<string, TaskClock>([
   ['p', ran(at(10, 22), at(10, 40))],

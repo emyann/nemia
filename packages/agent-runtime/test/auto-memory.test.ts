@@ -12,7 +12,7 @@ import type { ClaudeFlags } from '../src/harness/claude/vocabulary.ts';
 import { scratch } from 'test-kit/scratch';
 
 /** A task on `cwd`, with the Claude Code flags `claude`. */
-const taskOf = (cwd: string, claude?: ClaudeFlags): SpawnRequest => ({
+const taskOf = (cwd: string, claude?: ClaudeFlags) => ({
   name: 'ae/t/1',
   brief: 'the brief',
   cwd,

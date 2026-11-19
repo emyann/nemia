@@ -14,7 +14,7 @@ const IMPORTED = 'importee';
  * folder, `CLAUDE_CONFIG_DIR` in `apiEnvOf`), listed by the api's own read. Its Import copies it through the api into the user library,
  * the Library then lists it as the user library's, and the row says it is held; the page takes back the file, the copy and its record.
  */
-async function imports(page: Page): Promise<void> {
+async function imports(page: Page) {
   const dir = path.join(store!, 'claude', 'agents');
   const file = path.join(dir, `${IMPORTED}.md`);
   const copied = [path.join(store!, 'workflows', 'agents', `${IMPORTED}.md`), path.join(store!, 'agent-sources', `${IMPORTED}.json`)];

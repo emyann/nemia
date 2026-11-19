@@ -38,7 +38,7 @@ fs.writeFileSync(
 );
 
 /** The api's answer to a GET of `url`: its status and its body. */
-async function get(url: string): Promise<{ status: number; body: unknown }> {
+async function get(url: string) {
   const res = await app.request(url);
   return { status: res.status, body: await res.json() };
 }

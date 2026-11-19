@@ -14,6 +14,7 @@ export default defineConfig({
     maxWorkers: 2,
     testTimeout: 120_000,
     hookTimeout: 120_000,
+    silent: 'passed-only',
     setupFiles: ['./test/harness.ts', '../../tools/test-kit/seat.ts'],
   },
 });

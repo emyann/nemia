@@ -100,7 +100,7 @@ const OTTO = parseAgent(
 );
 const LANDS = "Land this run's result on the base branch: stage the merge of its branch and sign off with the commit message.";
 /** `implement → review → land`, land an ending led by `otto`, with the note `note` below its frontmatter. */
-const landing = (note: string): StepSpec[] => [
+const landing = (note: string) => [
   step('implement'),
   step('review', ['implement']),
   parseWorkflow(
@@ -137,7 +137,7 @@ const SAY = {
   lastMerge: 'git log --merges -1',
 };
 /** `s`'s brief in `r`, told the git place's words for reading the work. */
-const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]): string =>
+const placed = (s: StepSpec, r: Run, steps: readonly StepSpec[]) =>
   composeBrief(
     s,
     r,
@@ -160,7 +160,7 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
   );
 const nothingShipped = () => false;
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
-const said = (outcome: Closeout['outcome']): Closeout => ({
+const said = (outcome: Closeout['outcome']) => ({
   outcome,
   summary: 'rewrote the parser\nand the three tests that pinned it',
   artifacts: [],
@@ -171,7 +171,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 const LANDER: StepSpec = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed. */
-const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
+const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}) => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
   steps: {
     implement: { taskId: 't-impl', branch: 'wf/r-1/implement' },
@@ -903,7 +903,7 @@ describe("decision: landed is asked of git and never stored, and a finished run 
   });
   test('REFUSED: a result branch with nothing past the base is landed only when every step succeeded — failed, blocked, unsigned or refused by its check, the run is decided; work past the base on the base branch is landed whatever the steps said', () => {
     const unchanged = () => 'unchanged' as const;
-    const says = (outcome: Closeout['outcome']) => (): Closeout => ({ outcome, summary: 's', artifacts: [] });
+    const says = (outcome: Closeout['outcome']) => () => ({ outcome, summary: 's', artifacts: [] });
     const cases: Array<[string, Decision, string, string[]]> = [
       [
         'failed',
@@ -1481,12 +1481,12 @@ describe('an ending that lands on its check: who files it, whether it stopped on
   });
   test('an ending that stopped on the base branch is read so whether a person filed it or its workflow did: the send-back and its own try are offered either way', () => {
     const ungated = { ...LANDER, gate: undefined };
-    const shipFiledAndSettled = (rest: Partial<RepositoryRun> = {}): Run => ({
+    const shipFiledAndSettled = (rest: Partial<RepositoryRun> = {}) => ({
       ...run({ implement: 't-impl' }, rest),
       steps: { implement: { taskId: 't-impl', branch: 'wf/r-1/implement' }, ship: { taskId: 't-ship' } },
     });
     const settled = () => 'succeeded' as TaskPhase;
-    const did = (ending: StepSpec, outcome: Closeout['outcome'] = 'blocked', rest: Partial<RepositoryRun> = {}): boolean =>
+    const did = (ending: StepSpec, outcome: Closeout['outcome'] = 'blocked', rest: Partial<RepositoryRun> = {}) =>
       endingStopped(
         ending,
         shipFiledAndSettled(rest),
@@ -1534,7 +1534,7 @@ describe('an ending that lands on its check: who files it, whether it stopped on
   test("REFUSED: nemia rm of a run whose ending's merge is staged and not landed, with nothing of it running", () => {
     const r = atLanding();
     const ph = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded' });
-    const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
+    const closeoutOf = () => ({ ...signedDone(), output: { message: 'Add a flag' } });
     const forget = (at: Run, merging: MergeState['merging']) =>
       forgetRefusal(
         LANDING_STEPS,
@@ -1570,7 +1570,7 @@ describe('an ending that lands on its check: who files it, whether it stopped on
 
 describe("`heldCheckouts` and `branchWord`: the repository's checkout goes to one run's ending, and where a result branch stands", () => {
   test("the repository's own checkout goes to one run's ending step: a step in it keeps it, the oldest word takes a free one, and the words say which run has it", () => {
-    const claim = (id: string, over: Partial<MainClaim> = {}): MainClaim => ({
+    const claim = (id: string, over: Partial<MainClaim> = {}) => ({
       id,
       repo: '/repo',
       step: 'ship',

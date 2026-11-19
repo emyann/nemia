@@ -43,7 +43,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_CONCURRENT: '10000', WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined };
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
-const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
+const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>) => Effect.runSync(storeGiven(ROOT, ENV)(program)) satisfies A;
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const readInbox = () => atRoot(verbs.readInbox());
@@ -53,7 +53,7 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
-const aRepo = (): string => {
+const aRepo = () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stand().world.repository(repo, {});
   return repo;
@@ -78,7 +78,7 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
 type Tasks = Map<string, Parameters<AsyncJournal['append']>[1][]>;
 
 /** The engine's store, in memory, in `tasks`, noting in `starts` when each attempt began, by its session's name. */
-const memoryJournal = (tasks: Tasks, starts: Map<string, number>): AsyncJournal => {
+const memoryJournal = (tasks: Tasks, starts: Map<string, number>) => {
   const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
@@ -95,7 +95,7 @@ const memoryJournal = (tasks: Tasks, starts: Map<string, number>): AsyncJournal 
     async feed(after) {
       return { entries: feed.slice(after), cursor: feed.length };
     },
-  };
+  } satisfies AsyncJournal;
 };
 
 /** What no runtime writes: a `measured` whose responses are a word. */
@@ -159,7 +159,7 @@ const MEMO = freshRestMemo();
 const pass = (memo = MEMO) => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: true }));
 const begun = async (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
   await runPlaced(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
-const taskOf = (run: Run, step: string): string | undefined => runRecord(ROOT, run.id).steps[step]?.taskId ?? undefined;
+const taskOf = (run: Run, step: string) => (runRecord(ROOT, run.id).steps[step]?.taskId ?? undefined) satisfies string | undefined;
 /** The row `nemia ls` lists for `step` of `run`: its word and its note. */
 const rowOf = async (run: Run, step: string) => {
   const [{ listed }] = (await runWith(h.e, runsListed(run.id))).runs;
@@ -237,7 +237,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
 
   const first = await pass();
   const byStep = (a: Finishing, b: Finishing) => `${a.run}${a.step}`.localeCompare(`${b.run}${b.step}`);
-  const sorted = <P extends { finishing: Finishing[] }>(p: P): P => ({ ...p, finishing: [...p.finishing].sort(byStep) });
+  const sorted = <P extends { finishing: Finishing[] }>(p: P) => ({ ...p, finishing: [...p.finishing].sort(byStep) }) satisfies P;
   const atWork = (
     [
       { run: running.id, step: 'plan', kind: 'session' },

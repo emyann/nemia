@@ -24,7 +24,7 @@ afterAll(() => store.stop());
 const firstWords = (out: string) => out.split('\n').map((line) => line.split(' ')[0]);
 
 /** The bin `bin` run with `argv`, its stdout read through a pipe left full until the child exits or `holdMs` has passed. */
-const slowlyRead = (argv: readonly string[], bin = 'nemia', holdMs = 1000): Promise<Said> =>
+const slowlyRead = (argv: readonly string[], bin = 'nemia', holdMs = 1000) =>
   new Promise((resolve, reject) => {
     const run = spawn(process.execPath, [path.join(BIN, `${bin}.ts`), ...argv], { env: store.env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
@@ -40,7 +40,7 @@ const slowlyRead = (argv: readonly string[], bin = 'nemia', holdMs = 1000): Prom
     run.stderr.on('data', (chunk) => (err += chunk));
     run.on('error', reject);
     run.on('close', (code) => resolve({ code, out, err }));
-  });
+  }) satisfies Promise<Said>;
 
 test('`nemia inbox --all` and `wf inbox --all`, longer than a pipe holds, reach a slow reader whole, with exit 0', async () => {
   const eager = await store.nemia(['inbox', '--all']);

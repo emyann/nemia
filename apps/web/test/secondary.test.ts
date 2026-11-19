@@ -20,17 +20,17 @@ const FAMILY = /(?<![\w-])--color-(?:on-)?secondary[\w-]*\s*:/g;
 const SHADCN = /(?<![\w-])--secondary(?![\w])|secondary-foreground/g;
 
 /** Each `line` (1-based) of `text` where `pattern` matches, with the words found. */
-function placesOf(text: string, pattern: RegExp): string[] {
+function placesOf(text: string, pattern: RegExp) {
   return [...text.matchAll(pattern)].map((m) => `${text.slice(0, m.index).split('\n').length} (${m[0].replace(/\s+/g, ' ')})`);
 }
 
 /** Where a stylesheet declares a colour of the secondary family over the theme's, as `line (words)`. */
-export function familyIn(css: string): string[] {
+export function familyIn(css: string) {
   return placesOf(css, FAMILY);
 }
 
 /** Every file of `root`'s `src` outside the kit that names shadcn's `secondary` tone, as `path:line (words)`. */
-export function shadcnSecondaryIn(root: string): string[] {
+export function shadcnSecondaryIn(root: string) {
   return fs
     .readdirSync(path.join(root, 'src'), { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && /\.(ts|tsx|css)$/.test(e.name))

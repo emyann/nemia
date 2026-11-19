@@ -47,11 +47,11 @@ afterAll(async () => {
 const e = engine(ENV);
 
 /** The exporting process as a shell line, its one span named `span`. */
-const exporting = (span: string): string =>
+const exporting = (span: string) =>
   `${JSON.stringify(process.execPath)} ${JSON.stringify(path.join(import.meta.dirname, 'exporting-child.ts'))} ${span}`;
 
 /** The posts whose body names `span`. */
-const naming = (span: string): string[] => posts.filter((p) => p.body.includes(span)).map((p) => p.path);
+const naming = (span: string) => posts.filter((p) => p.body.includes(span)).map((p) => p.path);
 
 /** Ticks the engine in test `t` until the task `id` has settled; answers how. */
 const settled = (t: Waiter, id: string) => {

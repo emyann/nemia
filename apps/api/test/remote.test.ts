@@ -25,7 +25,7 @@ type TaskView = import('agent-orchestrator').TaskView;
 type Run = import('agent-orchestrator/run').Run;
 type RunAnswer = import('objects').Run;
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
@@ -38,7 +38,7 @@ const completed = (taskId: string, harness: string) => {
 };
 
 /** A run of one step, `ask`, on `harness`, whose task is `taskId`. */
-const oneStep = (id: string, harness: string, taskId: string): Run => {
+const oneStep = (id: string, harness: string, taskId: string) => {
   const run = {
     id,
     place: { kind: 'folder' },
@@ -103,37 +103,38 @@ describe('needsOf: where a step whose Task waits on its caller is answered, by t
   beforeAll(() => {
     run = oneStep('r-asks', 'a2a:reviewer', 't-asks');
   });
-  const view = (harness: string): TaskView => ({
-    id: 't-asks',
-    phase: 'needs-human',
-    waitingFor: 'input',
-    sessionId: 'ctx-1',
-    state: {
-      taskId: 't-asks',
-      brief: 'Ask it.',
-      cwd: root,
-      harness,
-      attempts: [
-        {
-          n: 1,
-          startedAt: at(1),
-          spawnedAt: at(1),
-          ended: null,
-          endedAt: null,
-          reason: null,
-          nativeId: 'ctx-1',
-          usage: null,
-          exitCode: null,
-        },
-      ],
-      said: [],
-      inputs: [],
-      closed: false,
-      stopRequested: false,
-      settled: null,
-      filedAt: at(0),
-    },
-  });
+  const view = (harness: string) =>
+    ({
+      id: 't-asks',
+      phase: 'needs-human',
+      waitingFor: 'input',
+      sessionId: 'ctx-1',
+      state: {
+        taskId: 't-asks',
+        brief: 'Ask it.',
+        cwd: root,
+        harness,
+        attempts: [
+          {
+            n: 1,
+            startedAt: at(1),
+            spawnedAt: at(1),
+            ended: null,
+            endedAt: null,
+            reason: null,
+            nativeId: 'ctx-1',
+            usage: null,
+            exitCode: null,
+          },
+        ],
+        said: [],
+        inputs: [],
+        closed: false,
+        stopRequested: false,
+        settled: null,
+        filedAt: at(0),
+      },
+    }) satisfies TaskView;
   const judged = {
     codes: new Map([['ask', { phase: 'waiting', reason: 'AwaitingAnswer', on: null, via: 'session', verdict: null } as const]]),
     waitingOnYou: [] as string[],

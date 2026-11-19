@@ -42,26 +42,30 @@ const { runPlaced } = stage;
 const RULES = 'Reply in German.';
 
 /** Where `text` is in `told`, which must hold it. */
-const at = (told: string, text: string): number => {
+const at = (told: string, text: string) => {
   const i = told.indexOf(text);
   assert.ok(i >= 0, `told ${JSON.stringify(text)}:\n${told}`);
   return i;
 };
 
 /** A git repository with one commit on `main`, for a start. */
-function aRepo(): string {
+function aRepo() {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   stage.place().world.repository(repo, {});
   return repo;
 }
 
 /** The factory `pipao`, filed afresh on a repository of its own, offering the tests' team's workflow `dev`: its steps name their agents. */
-function fresh(): { repo: string; dev: string; file: string } {
+function fresh() {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const repo = aRepo();
   addFactoryAt(ROOT, { name: 'pipao', volumes: [repo].map((r) => `${r}:rw`) });
   attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'dev' });
-  return { repo, dev: path.join(teamCopy('wf-factory-rules-team-'), 'dev'), file: path.join(ROOT, 'factories', 'pipao', 'RULES.md') };
+  return {
+    repo,
+    dev: path.join(teamCopy('wf-factory-rules-team-'), 'dev'),
+    file: path.join(ROOT, 'factories', 'pipao', 'RULES.md'),
+  } satisfies { repo: string; dev: string; file: string };
 }
 
 /** A run of `dev` started in `factory`, the default when none is named. */
@@ -69,14 +73,14 @@ const started = (here: { repo: string; dev: string }, brief: string, factory?: s
   runPlaced(startRun({ brief, repo: here.repo, workflowDir: here.dev, ...(factory !== undefined && { factory }) }));
 
 /** The steps a run froze at its start. */
-const frozen = (id: string): readonly StepSpec[] => runRecord(ROOT, id).workflow ?? [];
+const frozen = (id: string) => (runRecord(ROOT, id).workflow ?? []) satisfies readonly StepSpec[];
 
 /** The prompt rendered for a step of a run at its start. */
-const promptOf = (run: Parameters<typeof agentFilesDir>[1], step: string): string =>
+const promptOf = (run: Parameters<typeof agentFilesDir>[1], step: string) =>
   fs.readFileSync(path.join(agentFilesDir(ROOT, run, step), 'prompt.md'), 'utf8');
 
 /** The runs written under the store. */
-const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
+const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []) satisfies string[];
 
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
 const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
@@ -85,7 +89,7 @@ const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.run
 type Instruction = ReturnType<typeof factoryInstruction> & { removed?: boolean };
 
 /** What `nemia <argv>` answers, run onto its entry's handler as the api calls it. */
-const answeredBy = async (...argv: string[]): Promise<Instruction> => (await stage.main(argv)) as Instruction;
+const answeredBy = async (...argv: string[]) => (await stage.main(argv)) as Instruction;
 
 /** A step's keys, its words and its rules set aside: what the rules must not move. */
 const keysOf = (steps: readonly StepSpec[]) =>
@@ -172,9 +176,9 @@ describe("a factory's rules and its instruction, from none to cleared: told as t
     fs.rmSync(path.join(ROOT, 'factories', 'default'), { recursive: true });
   });
   s.test("a factory's page of a step loads it with the rules, and leaves out rules that cannot be told, refusing nothing", async () => {
-    const step = async (): Promise<StepSpec> => {
+    const step = async () => {
       const args = { from: 'user', name: 'dev', step: 'implement', dir: here.dev, factory: 'pipao' };
-      return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step!;
+      return (await stage.runWith(stage.board().e, WORKFLOWS_STEP.handler(args))).step! satisfies StepSpec;
     };
     clearRules(ROOT, { name: 'pipao' });
     assert.equal((await step()).agent?.factoryRules, undefined);

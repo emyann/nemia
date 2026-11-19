@@ -22,7 +22,7 @@ const ROOT = scratch('wf-pause-store-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
 /** Whether `fn` refuses with exit 2, of `kind`, its message naming each of `facts`: the command its fix names, and who and when. */
-function refusedAs(fn: () => unknown, kind: string, ...facts: string[]): void {
+function refusedAs(fn: () => unknown, kind: string, ...facts: string[]) {
   try {
     fn();
   } catch (err) {
@@ -164,7 +164,7 @@ describe('the store writes the moves its machine makes and no other: each event 
 });
 
 /** The files among `sources`, each a path and its text, that name the pause's file and are not the store's own. */
-const namesTheFile = (sources: ReadonlyMap<string, string>): string[] =>
+const namesTheFile = (sources: ReadonlyMap<string, string>) =>
   [...sources]
     .filter(([file, text]) => file !== 'pause/pause.store.ts' && /\bpauseFile\(|\bresumedFile\(/.test(text))
     .map(([file]) => file);

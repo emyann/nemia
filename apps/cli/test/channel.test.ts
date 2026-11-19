@@ -49,17 +49,19 @@ function storeOf() {
   return { root, pass, size, linesAfter };
 }
 
-const stepAt = (word: string, note?: string): FeedWords => ({
-  run: { word: 'running' },
-  steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
-});
+const stepAt = (word: string, note?: string) =>
+  ({
+    run: { word: 'running' },
+    steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
+  }) satisfies FeedWords;
 
 /** `words` of the run `id` stamped with the label a person put on it, `team=core`. */
-const teamCore = (id: string, words: FeedWords): FeedWords => ({
-  ...words,
-  labels: { run: id, team: 'core' },
-  steps: words.steps.map((s) => ({ ...s, labels: { run: id, step: s.name, team: 'core' } })),
-});
+const teamCore = (id: string, words: FeedWords) =>
+  ({
+    ...words,
+    labels: { run: id, team: 'core' },
+    steps: words.steps.map((s) => ({ ...s, labels: { run: id, step: s.name, team: 'core' } })),
+  }) satisfies FeedWords;
 
 /** A wait on `holds` over what changes, told by `tell`, rejected once `done` says the source ended. */
 function waiter(done: () => boolean, describe: () => string) {
@@ -67,7 +69,7 @@ function waiter(done: () => boolean, describe: () => string) {
   const tell = () => {
     for (const l of listeners) l();
   };
-  const until = <T>(holds: () => T | undefined | false): Promise<T> =>
+  const until = <T>(holds: () => T | undefined | false) =>
     new Promise((resolve, reject) => {
       const check = () => {
         const got = holds();
@@ -81,7 +83,7 @@ function waiter(done: () => boolean, describe: () => string) {
       };
       listeners.add(check);
       check();
-    });
+    }) satisfies Promise<T>;
   return { tell, until };
 }
 
@@ -136,7 +138,7 @@ const nemia = (t: TestContext, root: string, args: readonly string[], env: NodeJ
   );
 
 /** A transport of the MCP client over a child's pipes, as Claude Code's stdio transport speaks to the server it spawned. */
-function piped(proc: ChildProcess): Transport {
+function piped(proc: ChildProcess) {
   const buffer = new ReadBuffer();
   const transport: Transport = {
     start: async () => {
@@ -150,7 +152,7 @@ function piped(proc: ChildProcess): Transport {
       new Promise<void>((resolve, reject) => proc.stdin?.write(serializeMessage(message), (e) => (e ? reject(e) : resolve()))),
     close: async () => void proc.stdin?.end(),
   };
-  return transport;
+  return transport satisfies Transport;
 }
 
 /** A notification of the channel: its body and its attributes. */
@@ -175,8 +177,11 @@ async function channel(t: TestContext, root: string, args: readonly string[], en
   void c.ended.then(w.tell);
   await client.connect(piped(c.proc));
   t.onTestFinished(() => client.close().catch(() => undefined));
-  const got = <T>(holds: (all: readonly Notice[]) => T | undefined | false): Promise<T> =>
-    Promise.race([w.until(() => holds(notices)), c.ended.then(() => holds(notices) || Promise.reject(new Error(`ended: ${c.err()}`)))]);
+  const got = <T>(holds: (all: readonly Notice[]) => T | undefined | false) =>
+    Promise.race([
+      w.until(() => holds(notices)),
+      c.ended.then(() => holds(notices) || Promise.reject(new Error(`ended: ${c.err()}`))),
+    ]) satisfies Promise<T>;
   return { ...c, client, notices, got };
 }
 

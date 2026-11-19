@@ -15,14 +15,14 @@ import type { ApproveForm } from '../gate/gate.ts';
 import { names } from '../../test/assessed.ts';
 
 /** The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, and no other run is there. */
-const waitOf = (runId: string, step: string): string | undefined =>
-  runId !== 'r'
+const waitOf = (runId: string, step: string) =>
+  (runId !== 'r'
     ? `is not there: there is no run ${runId}`
     : step === 'check'
       ? undefined
       : step === 'gate'
-        ? 'is awaiting approval'
-        : 'is not there';
+        ? ('is awaiting approval' as const)
+        : ('is not there' as const)) satisfies string | undefined;
 
 /** Admission's answer for a shell line, with no floor and no rules. */
 const answerOf = (command: string, tool = 'Bash') => admissionOf({ tool, input: { command }, cwd: '/w' }, TABLE, waitOf);
@@ -117,12 +117,13 @@ const atAuto = (
   level: Level = 'auto',
   facts: Facts | 'unread' = ALL_AGREE,
   form: ApproveForm | 'unread' = 'gate',
-): PolicyReads => ({
-  list,
-  levelOf: (runId) => (runId === 'r' ? level : undefined),
-  factsOf: (runId) => (runId === 'r' && facts !== 'unread' ? facts : undefined),
-  formOf: (runId) => (runId === 'r' && form !== 'unread' ? form : undefined),
-});
+) =>
+  ({
+    list,
+    levelOf: (runId) => (runId === 'r' ? level : undefined),
+    factsOf: (runId) => (runId === 'r' && facts !== 'unread' ? facts : undefined),
+    formOf: (runId) => (runId === 'r' && form !== 'unread' ? form : undefined),
+  }) satisfies PolicyReads;
 
 /** Admission's decision for a shell line at auto, or undefined for none. */
 const decidedAt = (command: string, auto: PolicyReads | undefined) =>

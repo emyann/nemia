@@ -38,9 +38,9 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
     later: 'file a factory',
   },
   volume: {
-    done: 'a volume is mounted and trusted',
-    next: 'give a factory a volume its runs mount',
-    later: 'give a factory a volume',
+    done: 'a writable volume is mounted and trusted',
+    next: 'give a factory a writable volume, trusted, that its runs work in',
+    later: 'give a factory a writable volume, trusted',
   },
   landed: {
     done: "a run's change is merged into its base branch",
@@ -48,3 +48,11 @@ export const MILESTONE_WORDS: Readonly<Record<Milestone, Readonly<Record<Milesto
     later: 'merge a first change into its base branch',
   },
 };
+
+/**
+ * What the volume milestone says while it is next and a writable volume of `factory` waits on a harness's trust, left at "Not now": how to
+ * give it.
+ * @param factory The factory whose writable volume no harness's trust holds yet.
+ */
+export const volumeWaitsOnTrust = (factory: string): string =>
+  `the factory ${factory} has a writable volume that waits on your trust: trust it from the factory's Settings, or type nemia factory trust ${factory}`;

@@ -63,7 +63,8 @@ export function addressOf(base: string, uid: string, picks: Picks, now?: number)
 }
 
 /** Every panel of `panels` that draws, a row's own among them and no row. */
-export const drawing = (panels: readonly DashboardPanel[]) =>
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+export const drawing = (panels: readonly DashboardPanel[]): DashboardPanel[] =>
   panels.flatMap((panel) => (panel.type === 'row' ? drawing(panel.panels ?? []) : [panel]));
 
 /**

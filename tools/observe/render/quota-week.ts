@@ -3,6 +3,7 @@
  * five-hour windows, sampled every five minutes as the daemon's gauges are exported, read every ten, through one reset of the week and
  * the five-hour windows' resets, used while a person works, twelve hours a day.
  */
+import type { MetricSeed } from './seed.ts';
 
 /**
  * A gauge's history, in place of its last minute: `count` samples `every` ms apart up to the stamp, each series' value at a sample `ago`
@@ -45,15 +46,16 @@ function quotaAt(window: string, ago: number) {
 const QUOTA_WEEK = { every: 5 * 60_000, count: (7 * DAY_MS) / (5 * 60_000) + 1 };
 
 /** The seeded quota of the week and of the five-hour window, each a gauge `quota.used` or `quota.resets_at`. */
-export const quota = (name: 'quota.used' | 'quota.resets_at') => ({
-  name,
-  kind: 'gauge',
-  series: ['seven_day', 'five_hour'].map((window) => [{ harness: 'claude', window }, 0]),
-  sampled: {
-    ...QUOTA_WEEK,
-    at: ({ window }, ago, now) => {
-      const at = quotaAt(window, ago);
-      return name === 'quota.used' ? at.used : (now - WEEK_RUN_MS + at.resetsAt) / 1000;
+export const quota = (name: 'quota.used' | 'quota.resets_at') =>
+  ({
+    name,
+    kind: 'gauge',
+    series: ['seven_day', 'five_hour'].map((window) => [{ harness: 'claude', window }, 0] satisfies [Record<string, string>, number]),
+    sampled: {
+      ...QUOTA_WEEK,
+      at: ({ window }, ago, now) => {
+        const at = quotaAt(window, ago);
+        return name === 'quota.used' ? at.used : (now - WEEK_RUN_MS + at.resetsAt) / 1000;
+      },
     },
-  },
-});
+  }) satisfies MetricSeed;

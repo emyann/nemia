@@ -144,7 +144,7 @@ export function remove(name: string) {
 }
 
 /** Wait `ms`. */
-export const sleep = (ms: number) => new Promise((resolve) => void setTimeout(resolve, ms));
+export const sleep = (ms: number) => new Promise((resolve) => void setTimeout(resolve, ms)) satisfies Promise<void>;
 
 /**
  * Ask `probe` once a second until it answers something, for `seconds` at most on a monotonic clock; its answer, or an error naming

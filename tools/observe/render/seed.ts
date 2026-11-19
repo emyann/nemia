@@ -36,7 +36,7 @@ export type MetricSeed = {
 };
 
 /** `metric`, seeded across a restart of the daemon (`MetricSeed`'s `restarted`). */
-const restarted = (metric: MetricSeed) => ({ ...metric, restarted: true });
+const restarted = (metric: MetricSeed) => ({ ...metric, restarted: true }) satisfies MetricSeed;
 
 /** What one service says in the seed: its resource's attributes beside its name, its root spans, its logs and its metrics. */
 export type ServiceSeed = {
@@ -200,14 +200,15 @@ const failed = (step: typeof IMPLEMENT, count: number, name?: string, parameters
   }));
 
 /** A metric kept by step: each of `values` a series of `IMPLEMENT` or `REVIEW` with an outcome. */
-const bySteps = (name: string, kind: MetricSeed['kind'], values: [typeof IMPLEMENT, string, number][]) => ({
-  name,
-  kind,
-  series: values.map(([step, outcome, value]) => [{ ...step, outcome }, value]),
-});
+const bySteps = (name: string, kind: MetricSeed['kind'], values: [typeof IMPLEMENT, string, number][]) =>
+  ({
+    name,
+    kind,
+    series: values.map(([step, outcome, value]) => [{ ...step, outcome }, value]),
+  }) satisfies MetricSeed;
 
 /** A metric with one series and no attribute. */
-const lone = (name: string, kind: MetricSeed['kind'], value: number) => ({ name, kind, series: [[{}, value]] });
+const lone = (name: string, kind: MetricSeed['kind'], value: number) => ({ name, kind, series: [[{}, value]] }) satisfies MetricSeed;
 
 /** A step whose sessions the seed counts by kind of token and by task beside the two it tells of: a third agent for the Spending bars. */
 const PLAN = { factory: 'nemia', workflow: 'intake', step: 'plan', agent: 'iris' };
@@ -218,10 +219,10 @@ const done = (name: string, values: [number, number, number]) =>
     name,
     'total',
     values.map((value, i) => [[IMPLEMENT, REVIEW, PLAN][i], 'done', value]),
-  );
+  ) satisfies MetricSeed;
 
 /** A metric kept by a step's four labels and no outcome, as `step.tasks` is: each of `values` a series. */
-const byKeys = (name: string, values: [typeof IMPLEMENT, number][]) => ({ name, kind: 'total', series: values });
+const byKeys = (name: string, values: [typeof IMPLEMENT, number][]) => ({ name, kind: 'total', series: values }) satisfies MetricSeed;
 
 /** What the daemon says in the seed. */
 const DAEMON: ServiceSeed = {
@@ -443,11 +444,14 @@ const resourceOf = (seed: ServiceSeed) => ({
 /** Hex ids that differ at each call, `width` characters, from a counter of the stamp's own. */
 const ids = (now: number) => {
   let next = 0;
-  return (width) => (BigInt(now) * 1_000_000n + BigInt((next += 1))).toString(16).padStart(width, '0').slice(-width);
+  return ((width) => (BigInt(now) * 1_000_000n + BigInt((next += 1))).toString(16).padStart(width, '0').slice(-width)) satisfies (
+    width: number,
+  ) => string;
 };
 
 /** `span` and every span under it as OTLP spans of one trace, stamped against `now`. */
-function spansOf(span: SpanSeed, now: number, id: (width: number) => string, traceId = id(32), parentSpanId?: string) {
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
+function spansOf(span: SpanSeed, now: number, id: (width: number) => string, traceId = id(32), parentSpanId?: string): object[] {
   const spanId = id(16);
   const start = now - span.ago;
   const own = {
@@ -477,7 +481,7 @@ function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value:
     return Array.from({ length: sampled.count }, (_, i) => {
       const ago = (sampled.count - 1 - i) * sampled.every;
       return { attributes: listed(attributes), timeUnixNano: nanos(now - ago), asDouble: sampled.at(attributes, ago, now) };
-    });
+    }) satisfies object[] as object[];
   const timeOf = (i: number) => now - (POINTS - 1 - i) * POINT_GAP_MS;
   const bucket = BOUNDS.findIndex((bound) => value <= bound);
   return Array.from({ length: POINTS }, (_, i) => {
@@ -493,7 +497,7 @@ function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value:
     if (kind !== 'histogram') return { ...at, asDouble: (value * n) / of };
     const counts = [...BOUNDS, Infinity].map((_, at) => String(at === (bucket < 0 ? BOUNDS.length : bucket) ? n : 0));
     return { ...at, count: String(n), sum: value * n, bucketCounts: counts, explicitBounds: BOUNDS };
-  });
+  }) satisfies object[] as object[];
 }
 
 /** One metric of the seed as OTLP's, stamped against `now`. */

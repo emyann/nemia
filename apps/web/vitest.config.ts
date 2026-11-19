@@ -24,6 +24,7 @@ export default mergeConfig(
   { ...vite, plugins: withoutTheRouter(vite.plugins) },
   defineConfig({
     test: {
+      silent: 'passed-only',
       projects: [
         {
           test: {

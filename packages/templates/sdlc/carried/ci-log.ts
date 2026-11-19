@@ -298,12 +298,12 @@ export function reddened(l: Landing, sha: string, entries: readonly Check[], non
   ];
 }
 
-/** A file that declares a GitHub Actions workflow: a `.yml` or `.yaml` directly under `.github/workflows/`. */
+/** A file that declares a GitHub Actions workflow: a `.yml` or `.yaml` directly under `.github/workflows`. */
 const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/;
 
 /**
  * Whether a tree whose files are `paths`, each from the repository's root, declares any CI on GitHub: a workflow file under
- * `.github/workflows/`. A tree that declares none will have no context reported on it, so nothing waits on one.
+ * `.github/workflows`. A tree that declares none will have no context reported on it, so nothing waits on one.
  * @param paths The tree's files, each by its path from the repository's root.
  */
 export const declaresCi = (paths: readonly string[]): boolean => paths.some((p) => WORKFLOW_FILE.test(p));

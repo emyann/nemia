@@ -124,7 +124,7 @@ test('applied with no --set, each parameter takes its default', () => {
     const check = checkOf(tree, workflow, step);
     assert.ok(check.includes(branchOn(false)), `${workflow}/${step} is in the checkout by default:\n${check}`);
     assert.ok(
-      check.endsWith('; else { node "$WF_CARRIED_FILES/local-check.ts"; }; fi'),
+      check.endsWith('; else { node "$WF_CARRIED_FILES/local-check.ts" --runner npm; }; fi'),
       `and the local check it runs there is the carried local-check.ts:\n${check}`,
     );
     assert.match(stepIn(tree, workflow, step).body, answer(false), `${workflow}/${step}'s note opens with the way`);

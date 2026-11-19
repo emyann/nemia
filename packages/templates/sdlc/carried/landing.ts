@@ -11,7 +11,7 @@
  *   a person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's
  *   own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's result branch and the sha
  *   the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha — or no context at all where that sha's
- *   tree declares no CI workflow under `.github/workflows/` (`declaresCi`), which its round's local check judged — and every other
+ *   tree declares no CI workflow under `.github/workflows` (`declaresCi`), which its round's local check judged — and every other
  *   `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with
  *   a merge commit whose subject and body are the ones it was given (`gh pr merge --merge --match-head-commit <sha>`, never
  *   `--delete-branch`: the repository auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge
@@ -306,7 +306,7 @@ const ciAtCommit = (sha: string): boolean =>
 
 /** The line that says no CI context was waited on at `sha`, which declares no CI workflow, and what judged it instead. */
 const noCi = (sha: string, instead: string): string =>
-  `${sha.slice(0, 12)} declares no CI workflow under .github/workflows/, so no context was waited on there: ${instead}`;
+  `${sha.slice(0, 12)} declares no CI workflow under .github/workflows, so no context was waited on there: ${instead}`;
 
 /** The pull request read as the merge requires it: this run's own, green, and at the sha the reviewer read. */
 function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): string[] {

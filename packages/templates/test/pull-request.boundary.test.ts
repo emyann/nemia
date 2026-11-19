@@ -204,7 +204,7 @@ test('REFUSED: open with no title or no body file, and a verb the script has not
   }
   const unknown = pr(at, 'merge');
   assert.equal(unknown.code, 1);
-  assert.match(unknown.err, /`merge` is no verb: give open, push or wait/);
+  assert.match(unknown.err, /`merge` is no verb: give open, push, wait or declares-ci/);
   assert.deepEqual(unknown.calls, []);
 });
 

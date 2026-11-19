@@ -27,7 +27,7 @@ steps' checks are each one shell `if` on the rendered value, and the notes of im
 hold a part for each.
 
 - **`github: false`, the default: in this checkout.** The implement step's check runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's
-  own check, its `implementCheck` parameter, and the local check, in that order, and nothing else: the local check is the factory's `localCheck` parameter (by default `local-check.ts`, carried: the repository's npm `lint`, `typecheck` and `test`, each where its `package.json` declares it, npm init's
+  own check, its `implementCheck` parameter, and the local check, in that order, and nothing else: the local check is the factory's `localCheck` parameter (by default `local-check.ts`, carried: the repository's `lint`, `typecheck` and `test` scripts, run by the package manager its `--runner` names, each where its `package.json` declares it, a package manager's init's
   placeholder test left out, and nothing where it has no `package.json`), on the round's tree. Nothing is pushed and no pull request is opened. Land stages every result branch in one
   `git merge --no-ff --no-commit`, as the git place's skill says (*Stage a landing*); its check runs `localCheck` again, on the merged
   tree, and the run commits the merge on its exit 0 and takes it back otherwise.
@@ -45,7 +45,7 @@ not measured yet, as that section says.
 
 On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its
 `implementCheck` parameter, `pull-request.ts push`, `pull-request.ts declares-ci` and `pull-request.ts wait --check <name>`, in that order, and
-nothing else. Where the head's tree declares no CI workflow under `.github/workflows/`, `declares-ci` says so and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
+nothing else. Where the head's tree declares no CI workflow under `.github/workflows`, `declares-ci` says so and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
 Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
 workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
 `parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts` and `refresh.ts`, which they import — from its frozen carried files

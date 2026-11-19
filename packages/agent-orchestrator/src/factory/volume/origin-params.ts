@@ -1,7 +1,8 @@
 /**
  * The parameters a templated factory's first writable volume sets (`originParams`, typed by `contracts/origin-params.contract.ts`): each
- * boolean the template declares with `whenOrigin: <host>`, true where the volume was cloned from that host, false otherwise; nothing
- * once the factory works on a writable volume already. And the host of a git URL (`originHostOf`), which it is asked with.
+ * boolean the template declares with `whenOrigin: <host>` (a bare lower-case host, as the template's check holds it), true where the
+ * volume was cloned from that host, false otherwise; nothing once the factory works on a writable volume already. And the host of a git
+ * URL (`originHostOf`), which it is asked with.
  */
 import type { OriginParams } from '../../../contracts/origin-params.contract.ts';
 
@@ -14,7 +15,7 @@ import type { OriginParams } from '../../../contracts/origin-params.contract.ts'
 export const originParams: OriginParams = (declared, volume) =>
   volume.firstWritable
     ? Object.entries(declared).flatMap(([name, p]) =>
-        p.type === 'boolean' && p.whenOrigin !== undefined ? [`${name}=${String(p.whenOrigin.toLowerCase() === volume.originHost)}`] : [],
+        p.type === 'boolean' && p.whenOrigin !== undefined ? [`${name}=${String(p.whenOrigin === volume.originHost)}`] : [],
       )
     : [];
 

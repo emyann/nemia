@@ -54,7 +54,7 @@
  *   as any other.
  *
  * - `declares-ci`, which the round's check asks before it waits: exit 0 where `HEAD`'s tree declares a CI workflow under
- *   `.github/workflows/` (`declaresCi`, `ci-log.ts`), and 1 where it declares none, so the check runs the factory's local check in place
+ *   `.github/workflows` (`declaresCi`, `ci-log.ts`), and 1 where it declares none, so the check runs the factory's local check in place
  *   of a wait on a context no CI will report.
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
@@ -893,8 +893,8 @@ function declaresCiAtHead(args: string[]): string[] {
   if (args.length) throw new Refusal(`declares-ci takes nothing, and was given ${args.join(' ')}: type it alone`);
   const paths = git('the files of HEAD', 'ls-tree', '-r', '--name-only', 'HEAD', '--', '.github/workflows').split('\n');
   if (!declaresCi(paths))
-    throw new Refusal('HEAD declares no CI workflow under .github/workflows/, so no context will come: the local check judges it');
-  return ['HEAD declares a CI workflow under .github/workflows/: its context judges the round'];
+    throw new Refusal('HEAD declares no CI workflow under .github/workflows, so no context will come: the local check judges it');
+  return ['HEAD declares a CI workflow in .github/workflows: its context judges the round'];
 }
 
 /** The verbs, by name, each with the tag its lines are printed under. */

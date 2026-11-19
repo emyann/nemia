@@ -33,7 +33,7 @@ its slot and its context for nothing.
 
 **Nothing runs your tests for you.** The check measures the change, proves the probes and the parts, then pushes the branch and waits on CI: it
 runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its `implementCheck` parameter (`${{ parameters.implementCheck }}`; `true` checks nothing), `pull-request.ts push`, `pull-request.ts declares-ci` and `pull-request.ts wait`, in that order, and nothing else; where the head declares
-no CI workflow under `.github/workflows/`, it runs the local check (`${{ parameters.localCheck }}`) in place of the wait. Run them yourself
+no CI workflow under `.github/workflows`, it runs the local check (`${{ parameters.localCheck }}`) in place of the wait. Run them yourself
 before you sign off, as the repository's instructions say of a session's checks: the tests of what you changed, the types and the
 lint. CI's `${{ parameters.ciCheck }}` context runs the repository's suite on the commit your check pushed, before the review, and that
 is the last thing any suite reads: the landing merges that same commit and its check is only the receipt that it was merged. A red

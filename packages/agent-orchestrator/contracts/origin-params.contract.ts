@@ -7,7 +7,10 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** A parameter as a template declares it, as far as the rule goes: its type, and the host it follows, where it follows one. */
+/**
+ * A parameter as a template declares it, as far as the rule goes: its type, and the host it follows, where it follows one, a bare
+ * lower-case host as the template's check holds it.
+ */
 export type FollowedParameter = { readonly type: 'string' | 'number' | 'boolean'; readonly whenOrigin?: string };
 
 /**
@@ -33,9 +36,7 @@ const originParamsSpec = spec<(declared: Readonly<Record<string, FollowedParamet
         'On the first writable volume, each boolean that follows a host is set: true where the volume was cloned from that host, false otherwise',
       condition: ({ input: [declared, volume], output }) =>
         !volume.firstWritable ||
-        Object.entries(declared).every(
-          ([name, p]) => !follows(p) || output.includes(setOf(name, p.whenOrigin?.toLowerCase() === volume.originHost)),
-        ),
+        Object.entries(declared).every(([name, p]) => !follows(p) || output.includes(setOf(name, p.whenOrigin === volume.originHost))),
     },
     noOtherParameterTouched: {
       description: 'Nothing is set but the booleans that follow a host, each once: every other parameter stays as the factory holds it',
@@ -43,8 +44,13 @@ const originParamsSpec = spec<(declared: Readonly<Record<string, FollowedParamet
         output.every((set) => {
           const name = set.slice(0, set.indexOf('='));
           const p = Object.hasOwn(declared, name) ? declared[name] : undefined;
-          return p !== undefined && follows(p) && output.filter((s) => s.startsWith(`${name}=`)).length === 1;
+          return p !== undefined && follows(p);
         }),
+    },
+    eachSetOnce: {
+      description: 'Each parameter is set once at most: no two words of the answer name the same parameter',
+      condition: ({ output }) =>
+        output.every((set, i) => output.every((other, j) => i === j || !other.startsWith(set.slice(0, set.indexOf('=') + 1)))),
     },
   },
 });

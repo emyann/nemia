@@ -27,9 +27,9 @@ describe('the scripts a local check runs: lint, typecheck and test, each where d
   for (const [name, manifest, plan] of rows) test(name, () => assert.deepEqual(localPlan(manifest), plan));
 });
 
-/** The script run in `dir`: its exit. */
-const ran = (dir: string): number | null =>
-  spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 }).status;
+/** The script run in `dir` with `args`, by default naming npm as its runner: its exit. */
+const ran = (dir: string, args: readonly string[] = ['--runner', 'npm']): number | null =>
+  spawnSync(process.execPath, [SCRIPT, ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 }).status;
 
 test('a folder with no package.json, and one whose only test is the placeholder, pass; a lint that fails refuses', () => {
   assert.equal(ran(scratch('wf-local-none-')), 0);
@@ -39,4 +39,11 @@ test('a folder with no package.json, and one whose only test is the placeholder,
   const failing = scratch('wf-local-lint-');
   fs.writeFileSync(path.join(failing, 'package.json'), JSON.stringify({ name: 'x', scripts: { lint: 'exit 3' } }));
   assert.notEqual(ran(failing), 0);
+});
+
+test('REFUSED: no runner named, or one with no command after it, exits 2 and runs nothing', () => {
+  const failing = scratch('wf-local-runner-');
+  fs.writeFileSync(path.join(failing, 'package.json'), JSON.stringify({ name: 'x', scripts: { lint: 'exit 3' } }));
+  assert.equal(ran(failing, []), 2);
+  assert.equal(ran(failing, ['--runner']), 2);
 });

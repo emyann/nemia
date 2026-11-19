@@ -45,6 +45,17 @@
         ]
       }
     ],
+    // A refusal is read off Effect's issue tree by each issue's `_tag` and the input Effect kept, never off the English its
+    // Standard Schema formatter writes: that formatter's hooks never see a union no member matches (every optional field, every
+    // union of literals), so each copy of it reworked Effect's sentences by hand. `no-restricted-properties`, since a layer's block
+    // that sets `no-restricted-imports` replaces this one's options on that file.
+    "no-restricted-properties": [
+      "error",
+      {
+        "property": "makeFormatterStandardSchemaV1",
+        "message": "Read a refused decode with refusedIn (objects' entry; the runtime's src/core/refused.ts), decoding with { reportInput: true }, and word it by each place's _tag."
+      }
+    ],
     // A bare sort of strings is in code-unit order, which is what a test comparing two lists as sets wants; one of numbers or tuples is not.
     "typescript/require-array-sort-compare": ["error", { "ignoreStringArrays": true }],
     // An ARIA role is the right tool where the tag the rule names is the wrong element: a drawn status dot is no `<img>`, and a live

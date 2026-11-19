@@ -15,7 +15,7 @@ export {
   TryShort,
   RunUnjudged,
 } from './run.ts';
-export { Spent, StepAttempts, StepCheck, StepUsed } from './run-step.ts';
+export { Spent, StepAttempts, StepCheck, StepLog, StepUsed } from './run-step.ts';
 export {
   StepCloseout,
   type BodyPage,
@@ -395,7 +395,6 @@ export {
   StepTranscript,
   TranscriptEvent,
 } from './step-api.ts';
-export { StepLog } from './run-step.ts';
 export {
   LIFECYCLE_STATES,
   type LifecycleState,

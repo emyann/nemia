@@ -333,6 +333,8 @@ export const firstRefusal = (
   return place === undefined ? { path: [], words: `is not what ${holder}` } : { path: place.path, words: wordsOf(place, holder) };
 };
 
+const fieldNamed = (path: readonly PropertyKey[]): string => (path.length ? `\`${path.map(String).join('.')}\`` : 'shape');
+
 /**
  * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: `where` the entry is, and the
  * first field of it that is wrong. `entry` is a task's event, or a feed entry when `feed` is set; a line the store could not parse is
@@ -347,15 +349,14 @@ export const entryWords = (where: string, entry: unknown, schema: Schema.Decoder
   if (place === undefined) return `${where} is not what the runtime writes.`;
   const { path } = place;
   const words = wordsOf(place, 'the runtime writes');
-  const rest = path.slice(feed ? 1 : 0);
   const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');
   const what =
     typeof entry === 'string'
       ? `is no JSON object, as a write cut short leaves a line: it reads ${shown(entry)}`
       : feed && path[0] !== 'event'
-        ? `is no feed entry: its ${path.length ? `\`${String(path[0])}\`` : 'shape'} ${words}`
+        ? `is no feed entry: its ${fieldNamed(path.slice(0, 1))} ${words}`
         : typeof kind !== 'string' || !EVENT_KINDS.includes(kind)
           ? `is no event this runtime writes (its kind is ${JSON.stringify(kind) ?? 'missing'}; the kinds are ${EVENT_KINDS.join(', ')})`
-          : `is a \`${kind}\` event, and its ${rest.length ? `\`${rest.map(String).join('.')}\`` : 'shape'} ${words}`;
+          : `is a \`${kind}\` event, and its ${fieldNamed(path.slice(feed ? 1 : 0))} ${words}`;
   return `${where} ${what}. A journal is written by the runtime alone, and never edited: if a person or another program wrote this entry, take it out; if a newer runtime did, read this store with that runtime.`;
 };

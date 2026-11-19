@@ -421,7 +421,7 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
  * @param control The test's hold on the harness: `sessions`, the map it moves by hand, and `spawned`, where each spawn request is pushed;
  *   each a new one where unset.
  */
-export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
+export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }) => {
   const sessions = control?.sessions ?? new Map<string, Sighting>();
   const spawned = control?.spawned ?? [];
   let n = 0;
@@ -439,7 +439,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
       }),
     logs: () => Effect.succeed('(fake runner: no logs)'),
     interrupt: () => Effect.void,
-  };
+  } satisfies RunnerOps as RunnerOps;
 };
 
 /**
@@ -447,7 +447,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
  * harness name; returns every sighting, every unread name, what failed (`why`) after its harness's name, and why each session alone
  * was unread (`unreadWhy`) as its harness said it.
  */
-const merged = (results: readonly (readonly [string, Observation])[], owner: Map<string, string>): Observation => {
+const merged = (results: readonly (readonly [string, Observation])[], owner: Map<string, string>) => {
   const seen = new Map<string, Sighting>();
   const unread = new Set<string>();
   for (const [harness, o] of results) {
@@ -495,11 +495,7 @@ const merged = (results: readonly (readonly [string, Observation])[], owner: Map
  *   instead, a release would ask the wrong registry to remove something by an id it never gave.
  */
 /** `answer` routed to `ops`, or refused where that harness holds no call open for a person. */
-const answerOn = (
-  ops: RunnerOps,
-  session: { name: string; sessionId: string },
-  given: { id: string; answers: Record<string, string> },
-): Effect.Effect<void, RunnerError> =>
+const answerOn = (ops: RunnerOps, session: { name: string; sessionId: string }, given: { id: string; answers: Record<string, string> }) =>
   ops.answer
     ? ops.answer(session, given)
     : Effect.fail(
@@ -511,7 +507,7 @@ const answerOn = (
       );
 
 /** The runner of `fallback`, the harness of `harnesses` a session no other owns goes to: one not among them is thrown, naming them. */
-const fallbackOf = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
+const fallbackOf = (harnesses: Record<string, RunnerOps>, fallback: string) => {
   const ops = own(harnesses, fallback);
   if (ops === undefined)
     throw new Error(
@@ -527,17 +523,17 @@ const fallbackOf = (harnesses: Record<string, RunnerOps>, fallback: string): Run
  * @param harnesses The runner of each harness, by its name.
  * @param fallback The harness a task that names none goes to, one of `harnesses`: one not among them is thrown.
  */
-export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
+export const composite = (harnesses: Record<string, RunnerOps>, fallback: string) => {
   const fallbackOps = fallbackOf(harnesses, fallback);
   const pick = (name?: string) => (name === undefined ? undefined : own(harnesses, name)) ?? fallbackOps;
 
   const owner = new Map<string, string>();
 
-  const routeOf = (asked?: string): string | undefined => {
+  const routeOf = (asked?: string) => {
     const name = asked ?? fallback;
     return Object.hasOwn(harnesses, name) ? name : undefined;
   };
-  const opsOf = (asked?: string): RunnerOps | undefined => own(harnesses, asked ?? fallback);
+  const opsOf = (asked?: string) => own(harnesses, asked ?? fallback);
 
   const notHere = (asked: string) =>
     Effect.fail(
@@ -568,7 +564,7 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       { concurrency: 'unbounded' },
     ).pipe(Effect.map((results) => merged(results, owner)));
 
-  const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
+  const listing = (ops: RunnerOps) => ops.observe.pipe(Effect.map((seen) => ({ seen, unread: new Set() }) satisfies Observation));
 
   return {
     spawn: (r) => {
@@ -586,9 +582,9 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
         const mine = expected.filter((e) => routeOf(e.harness) === name);
         return { read: ops.observeFor ? ops.observeFor(mine) : listing(ops), expected: mine.map((e) => e.name) };
       }).pipe(
-        Effect.map((o): Observation => {
+        Effect.map((o) => {
           const nowhere = expected.filter((e) => routeOf(e.harness) === undefined);
-          return nowhere.length ? { ...o, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o;
+          return (nowhere.length ? { ...o, unread: new Set([...o.unread, ...nowhere.map((e) => e.name)]) } : o) satisfies Observation;
         }),
       ),
 
@@ -617,7 +613,7 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       const ops = owner.has(session.sessionId) ? pick(owner.get(session.sessionId)) : undefined;
       return ops?.release ? ops.release(session, task) : Effect.succeed(undefined);
     },
-  };
+  } satisfies RunnerOps;
 };
 
 /**

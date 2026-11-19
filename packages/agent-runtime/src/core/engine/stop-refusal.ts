@@ -15,7 +15,7 @@ export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused'
  * @param taskId The task's id, named in the words of a refusal.
  * @param state The task's fold, or undefined where the runtime has no record of it.
  */
-export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+export const stopRefusalOf = (taskId: string, state: State | undefined) => {
   if (!state) return unknownTask(taskId);
   if (verbTakes('requestStop', state)) return undefined;
   if (state.settled)

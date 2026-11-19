@@ -26,7 +26,7 @@ const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
 
 /** Why `mcp.<name>`, a server with a `command`, is not one a harness can start — or `undefined`. */
-const localRefuses = (name: string, server: Record<string, unknown>): string | undefined => {
+const localRefuses = (name: string, server: Record<string, unknown>) => {
   const at = `\`mcp.${name}\``;
   if (typeof server.command !== 'string' || !server.command)
     return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
@@ -44,7 +44,7 @@ const localRefuses = (name: string, server: Record<string, unknown>): string | u
  * Why `mcp.<name>.oauth` is not an OAuth client — or `undefined`. It holds what a sign-in needs and no secret: a task's `config` is
  * journalled with it, and the harness reads a secret from its own store alone, so one named here is refused by name.
  */
-const oauthRefuses = (name: string, oauth: unknown): string | undefined => {
+const oauthRefuses = (name: string, oauth: unknown) => {
   if (!isMap(oauth)) return `\`mcp.${name}.oauth\` is not an OAuth client. Give it as { "clientId": "Iv23li...", "callbackPort": 8791 }.`;
   const odd = Object.keys(oauth).find((k) => !['clientId', 'callbackPort'].includes(k));
   if (odd) {
@@ -60,7 +60,7 @@ const oauthRefuses = (name: string, oauth: unknown): string | undefined => {
 };
 
 /** Why `mcp.<name>`, a server with a `url`, is not one a harness can reach — or `undefined`. */
-const remoteRefuses = (name: string, server: Record<string, unknown>, at: string): string | undefined => {
+const remoteRefuses = (name: string, server: Record<string, unknown>, at: string) => {
   if (typeof server.url !== 'string' || !server.url)
     return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
   if (server.type !== 'http' && server.type !== 'sse') {
@@ -77,7 +77,7 @@ const remoteRefuses = (name: string, server: Record<string, unknown>, at: string
  * use: a `url` with no `type` loads no server and says nothing.
  * @param mcp The task's `config.mcp` as filed, of any shape.
  */
-export const mcpRefuses = (mcp: unknown): string | undefined => {
+export const mcpRefuses = (mcp: unknown) => {
   const shape =
     'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...}, "oauth": { "clientId": "..." } }, as in a `.mcp.json`.';
   if (!isMap(mcp)) return `\`mcp: ${JSON.stringify(mcp)}\` is not a map of MCP servers by name. ${shape}`;
@@ -115,7 +115,7 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
  * finding 6). Pure.
  * @param server The recorded remote server.
  */
-export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
+export const mcpServerOf = (server: RemoteMcpServer) => ({
   type: server.type,
   url: server.url,
   ...(server.headers === undefined
@@ -140,7 +140,7 @@ export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
  * the CLI before a session exists ("MCP config is not a valid JSON").
  * @param cwd The task's working folder, the checkout whose `.mcp.json` is looked for.
  */
-export const projectMcpConfig = (cwd: string): string | undefined => {
+export const projectMcpConfig = (cwd: string) => {
   const file = path.resolve(cwd, '.mcp.json');
   let text: string;
   try {
@@ -167,7 +167,7 @@ export const projectMcpConfig = (cwd: string): string | undefined => {
  * @param cwd The task's working folder, the checkout whose `.mcp.json` is read.
  * @param names The servers the task's `projectMcp` names; none reads no file.
  */
-export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<string, unknown> => {
+export const pickedProjectMcp = (cwd: string, names: readonly string[]) => {
   if (!names.length) return {};
   const file = path.resolve(cwd, '.mcp.json');
   const asked = `\`projectMcp: ${JSON.stringify(names)}\``;
@@ -207,7 +207,7 @@ export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<
  * @param cwd The task's working folder, the checkout whose `.mcp.json` its `projectMcp` picks from.
  * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
-export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> | undefined =>
+export const sessionMcp = (cwd: string, config: HarnessArgs | undefined) =>
   config?.projectMcp ? { ...pickedProjectMcp(cwd, config.projectMcp), ...config.mcp } : config?.mcp;
 
 /**
@@ -221,7 +221,7 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  * @param cwd The task's working folder, the checkout whose `.mcp.json` is read.
  * @param config The task's configuration, by its `projectMcp` and `mcp`; undefined where it has none.
  */
-export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
+export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined) => {
   const checkout = config?.projectMcp ? undefined : projectMcpConfig(cwd);
   const theirs = checkout ? ((JSON.parse(fs.readFileSync(checkout, 'utf8')) as { mcpServers?: object }).mcpServers ?? {}) : {};
   return { ...theirs, ...sessionMcp(cwd, config) };
@@ -238,7 +238,7 @@ export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Re
  * @param file The config file's path, relative to the engine's folder where not absolute.
  * @param mcp The session's servers by name; undefined or empty to clear the file.
  */
-export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined): string | undefined => {
+export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined) => {
   if (!mcp || !Object.keys(mcp).length) {
     fs.rmSync(file, { force: true });
     return undefined;
@@ -254,7 +254,7 @@ export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | unde
  * so a name it misses is left to Codex's own merge.
  * @param toml The text of the harness's config file.
  */
-export const codexMcpServerNames = (toml: string): Set<string> => {
+export const codexMcpServerNames = (toml: string) => {
   const names = new Set<string>();
   for (const raw of toml.split('\n')) {
     const [, quoted, bare] = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim()) ?? [];
@@ -285,7 +285,7 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
  * them, and the state a page reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
  * @param mcp The task's servers by name.
  */
-export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
+export const codexMcpServers = (mcp: Record<string, McpServer>) =>
   tomlTable(
     Object.entries(mcp).map(
       ([name, s]) =>

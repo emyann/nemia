@@ -15,7 +15,7 @@ type Leased = { sentAt: string; taskId?: string; sending?: { mono?: Monotonic } 
  * @param now The time the lease is read at.
  * @param sendMs How long a send holds its lease, in milliseconds.
  */
-export const sendHeld = (e: Leased, now: Instant, sendMs: number): boolean =>
+export const sendHeld = (e: Leased, now: Instant, sendMs: number) =>
   e.sending !== undefined &&
   e.taskId === undefined &&
   elapsedMs({ at: Date.parse(e.sentAt), ...(e.sending.mono ? { mono: e.sending.mono } : {}) }, now) < sendMs;

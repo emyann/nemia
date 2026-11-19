@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import type { AskQuestion, PermissionFacts, SessionAsk, SessionState } from '../../core/index.ts';
+import type { AskQuestion, PermissionFacts, SessionAsk } from '../../core/index.ts';
 import { BridgeFactsSchema } from './session-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
@@ -116,10 +116,10 @@ export type AttachedRun = typeof RunFileSchema.Type;
 const decode = Schema.decodeUnknownOption(RunFileSchema);
 
 /** The folder of an engine's attached sessions: the store's drains' folder too (`drainFolder`), where they are kept beside them. */
-const attachedDir = (root: string): string => drainFolder(root);
+const attachedDir = (root: string) => drainFolder(root);
 
 /** A session's name as a file name: the engine's `ae/<task>/<n>`, its slashes taken out. */
-const safe = (name: string): string => name.replace(/[^A-Za-z0-9._-]/g, '_');
+const safe = (name: string) => name.replace(/[^A-Za-z0-9._-]/g, '_');
 
 /**
  * The files of the session under `name`: its run file, its stop, the interrupt another process asks its turn's end with, the words said
@@ -174,11 +174,13 @@ const PermissionFactsSchema = Schema.Struct({
 const decodePermission = Schema.decodeUnknownOption(PermissionFactsSchema);
 
 /** The ask an opening line says: a question, or a permission whose facts decode; nothing where they do not, which is unread. */
-const askOf = (l: AskLine & { questions: AskQuestion[] }): SessionAsk[] => {
-  if (l.kind === undefined) return [{ id: l.id, at: l.at, kind: 'question', questions: l.questions }];
-  if (l.kind !== 'permission') return [];
+const askOf = (l: AskLine & { questions: AskQuestion[] }) => {
+  if (l.kind === undefined) return [{ id: l.id, at: l.at, kind: 'question', questions: l.questions }] satisfies SessionAsk[];
+  if (l.kind !== 'permission') return [] satisfies SessionAsk[];
   const facts = decodePermission(l.permission);
-  return facts._tag === 'Some' ? [{ id: l.id, at: l.at, kind: 'permission', questions: l.questions, permission: facts.value }] : [];
+  return (
+    facts._tag === 'Some' ? [{ id: l.id, at: l.at, kind: 'permission', questions: l.questions, permission: facts.value }] : []
+  ) satisfies SessionAsk[];
 };
 
 /** One line of a session's answers file: a person's answer to the ask `id`, each question's by the question's own text. */
@@ -210,7 +212,7 @@ const AnswerLineSchema = Schema.Struct({ id: Schema.String, at: Schema.String, a
 type DecodedLines<A> = { readonly lines: A[]; readonly unread: number };
 
 /** The lines of the JSONL file `file`, each decoded by `schema` (`DecodedLines`); none, and none unread, where there is no file. */
-const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> => {
+const jsonLines = <A>(file: string, schema: Schema.Decoder<A>) => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -242,7 +244,7 @@ const jsonLines = <A>(file: string, schema: Schema.Decoder<A>): DecodedLines<A> 
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> => {
+export const askLinesOf = (root: string, name: string) => {
   const read = jsonLines(filesOf(root, name).asks, AskLineSchema);
   return {
     lines: read.lines.map((l) => ({ ...l, ...(l.questions ? { questions: [...l.questions] } : {}) }) as AskLine),
@@ -251,7 +253,7 @@ export const askLinesOf = (root: string, name: string): DecodedLines<AskLine> =>
 };
 
 /** Appends `line` to `file`, its folder made first. */
-const append = (file: string, line: unknown): void => {
+const append = (file: string, line: unknown) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.appendFileSync(file, `${JSON.stringify(line)}\n`);
 };
@@ -262,7 +264,7 @@ const append = (file: string, line: unknown): void => {
  * @param name The session's name.
  * @param line The ask opened or closed.
  */
-export const appendAsk = (root: string, name: string, line: AskLine): void => append(filesOf(root, name).asks, line);
+export const appendAsk = (root: string, name: string, line: AskLine) => append(filesOf(root, name).asks, line);
 
 /**
  * Appends `line` to the answers file of the session `name`. The answer verb is the one writer.
@@ -270,14 +272,14 @@ export const appendAsk = (root: string, name: string, line: AskLine): void => ap
  * @param name The session's name.
  * @param line The person's answer to one ask.
  */
-export const appendAnswer = (root: string, name: string, line: AnswerLine): void => append(filesOf(root, name).answers, line);
+export const appendAnswer = (root: string, name: string, line: AnswerLine) => append(filesOf(root, name).answers, line);
 
 /**
  * Every answer written for the session `name`, oldest first.
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLines(filesOf(root, name).answers, AnswerLineSchema).lines;
+export const readAnswers = (root: string, name: string) => jsonLines(filesOf(root, name).answers, AnswerLineSchema).lines;
 
 /**
  * The asks of the session `name` still waiting on a person: each opened and not closed, oldest first, in the order they were asked.
@@ -286,10 +288,12 @@ export const readAnswers = (root: string, name: string): AnswerLine[] => jsonLin
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const openAsks = (root: string, name: string): SessionAsk[] => {
+export const openAsks = (root: string, name: string) => {
   const { lines } = askLinesOf(root, name);
   const closed = new Set(lines.filter((l) => l.closed !== undefined).map((l) => l.id));
-  return lines.flatMap((l) => (l.questions === undefined || closed.has(l.id) ? [] : askOf({ ...l, questions: l.questions })));
+  return lines.flatMap((l) =>
+    l.questions === undefined || closed.has(l.id) ? [] : askOf({ ...l, questions: l.questions }),
+  ) satisfies SessionAsk[];
 };
 
 /**
@@ -298,7 +302,7 @@ export const openAsks = (root: string, name: string): SessionAsk[] => {
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const asksTaken = (root: string, name: string): string[] =>
+export const asksTaken = (root: string, name: string) =>
   askLinesOf(root, name)
     .lines.filter((l) => l.how === 'taken')
     .map((l) => l.id);
@@ -309,7 +313,7 @@ export const asksTaken = (root: string, name: string): string[] =>
  * @param root The engine's store root.
  * @param name The session's name.
  */
-export const cutAsks = (root: string, name: string): void => {
+export const cutAsks = (root: string, name: string) => {
   for (const ask of openAsks(root, name)) {
     const at = new Date().toISOString();
     appendAsk(root, name, { id: ask.id, at, closed: at, how: 'cut' });
@@ -320,7 +324,7 @@ export const cutAsks = (root: string, name: string): void => {
  * The run file at `file`, or undefined when there is none, or it is not one a holder writes (a holder caught mid-write is not).
  * @param file The path of the session's run file (`filesOf`).
  */
-export const readRun = (file: string): AttachedRun | undefined => {
+export const readRun = (file: string) => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -340,13 +344,13 @@ export const readRun = (file: string): AttachedRun | undefined => {
  * @param root The engine's store root.
  * @param run The run file to write, under its session's name.
  */
-export const writeRun = (root: string, run: AttachedRun): void => writeWhole(filesOf(root, run.name).run, run);
+export const writeRun = (root: string, run: AttachedRun) => writeWhole(filesOf(root, run.name).run, run);
 
 /**
  * Every attached run file under `root`, by its session's name: neither drain's file (`DRAIN_FILE`, `SESSION_DRAIN_FILE`) is one.
  * @param root The engine's store root.
  */
-export const everyRun = (root: string): Map<string, AttachedRun> => {
+export const everyRun = (root: string) => {
   const dir = attachedDir(root);
   let names: string[];
   try {
@@ -360,10 +364,10 @@ export const everyRun = (root: string): Map<string, AttachedRun> => {
 };
 
 /** The spawn as a run file keeps it: everything but the brief, which a resume does not say again. */
-export const keptRequest = ({ brief: _, ...kept }: SpawnRequest): Record<string, unknown> => kept;
+export const keptRequest = ({ brief: _, ...kept }: SpawnRequest) => kept;
 
 /** This process, as a run file names its holder: its pid, when it started, and the code it runs (`IMAGE`). */
-export const thisHolder = (): { owner: number; ownerStart?: string; image: string } => {
+export const thisHolder = () => {
   const start = processStart(process.pid);
   return { owner: process.pid, ...(start ? { ownerStart: start } : {}), image: IMAGE };
 };
@@ -373,14 +377,14 @@ export const thisHolder = (): { owner: number; ownerStart?: string; image: strin
  * holder did, its pid taken since.
  * @param run The session's run file, read for its holder's pid and start.
  */
-export const holderGone = (run: AttachedRun): boolean =>
+export const holderGone = (run: AttachedRun) =>
   !alive(run.owner) || (run.ownerStart !== undefined && processStart(run.owner) !== run.ownerStart);
 
 /**
  * Whether `run` is held by this very process: its pid, started when this one did.
  * @param run The session's run file, read for its holder's pid and start.
  */
-export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid && !holderGone(run);
+export const heldHere = (run: AttachedRun) => run.owner === process.pid && !holderGone(run);
 
 /**
  * A run file's state as a sighting says it, the harness's word translated to A2A's at this edge. A session nobody holds now, its holder
@@ -389,7 +393,7 @@ export const heldHere = (run: AttachedRun): boolean => run.owner === process.pid
  * branch of its own.
  * @param run The session's run file, read for its state.
  */
-export const attachedStateOf = (run: AttachedRun): SessionState =>
+export const attachedStateOf = (run: AttachedRun) =>
   run.state === 'parked' ? 'working' : run.state === 'idle' ? 'input-required' : run.state;
 
 /** The states a holder still runs a session in: one it works, one it waits in with its input open, and one it was let go in. */
@@ -399,7 +403,7 @@ const OPEN_STATES: readonly AttachedState[] = ['working', 'idle', 'parked'];
  * Whether `state` is one a holder still runs the session in (`OPEN_STATES`).
  * @param state The state a run file says.
  */
-export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(state);
+export const isOpen = (state: AttachedState) => OPEN_STATES.includes(state);
 
 /**
  * The drain put for the holder `pid`: its new calls wait until it is lifted, or until the process that put it ends. Written by that
@@ -408,14 +412,14 @@ export const isOpen = (state: AttachedState): boolean => OPEN_STATES.includes(st
  * @param root The engine's store root, where the drain's file is.
  * @param pid The pid of the holder whose new calls are to wait.
  */
-export const putDrain = (root: string, pid: number): void => {
+export const putDrain = (root: string, pid: number) => {
   const start = processStart(pid);
   const byStart = processStart(process.pid);
   putHolderDrain(root, { pid, ...(start ? { start } : {}), by: { pid: process.pid, ...(byStart ? { start: byStart } : {}) } });
 };
 
 /** Whether the process that put a drain (`by`) is gone: its pid dead, or another process's now, where the drain says when it started. */
-const putterGone = (by: HolderDrain['by']): boolean =>
+const putterGone = (by: HolderDrain['by']) =>
   by !== undefined && (!alive(by.pid) || (by.start !== undefined && processStart(by.pid) !== by.start));
 
 /**
@@ -424,7 +428,7 @@ const putterGone = (by: HolderDrain['by']): boolean =>
  * did, is never read as one whose putter is gone; one whose file does not decode drains nothing.
  * @param root The engine's store root, where the drain's file is.
  */
-export const drainsThis = (root: string): boolean => {
+export const drainsThis = (root: string) => {
   const drain = holderDrainOf(root);
   return (
     drain !== null &&
@@ -440,7 +444,7 @@ export const drainsThis = (root: string): boolean => {
  * whose leader died is still the session's.
  * @param run The session's run file, read for its Claude Code's pid and start.
  */
-export const childOf = (run: AttachedRun): number | undefined => {
+export const childOf = (run: AttachedRun) => {
   const pid = run.childPid;
   if (pid === undefined) return undefined;
   const taken = run.childStart !== undefined && alive(pid) && processStart(pid) !== run.childStart;
@@ -451,7 +455,7 @@ export const childOf = (run: AttachedRun): number | undefined => {
  * `pid` as a run file names a session's Claude Code: the pid, and when it started.
  * @param pid The pid of the session's Claude Code.
  */
-export const childFacts = (pid: number): { childPid: number; childStart?: string } => {
+export const childFacts = (pid: number) => {
   const start = processStart(pid);
   return { childPid: pid, ...(start ? { childStart: start } : {}) };
 };
@@ -464,4 +468,4 @@ export const CARRY_ON = 'The session was paused between two tool calls and is re
  * rather than wait longer for it.
  * @param tool The name of the tool whose call did not finish.
  */
-export const crashNote = (tool: string): string => `the daemon stopped during its call to ${tool} and the call did not finish`;
+export const crashNote = (tool: string) => `the daemon stopped during its call to ${tool} and the call did not finish`;

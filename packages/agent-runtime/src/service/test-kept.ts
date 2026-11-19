@@ -1,8 +1,7 @@
 /** The stand-in's `kept` (`testEngine`), in a file of its own: `test-engine.ts` is at its length. */
 import { Effect } from 'effect';
 import { JournalError } from '../core/engine/index.ts';
-import type { EngineShape } from './engine.ts';
-import { KeptRefused, type KeptReport } from './kept.ts';
+import { KeptRefused } from './kept.ts';
 /** What `kept` reads of a task the stand-in holds: the harness it was filed on. */
 type Held = ReadonlyMap<string, { readonly spec: { readonly harness?: string } }>;
 
@@ -23,7 +22,7 @@ export type TestKeeps = {
  * @param sizes What a test planted of each task, by its id.
  * @param failures How many calls are left to fail; each failure takes one.
  */
-export const keptVerbOf = (tasks: Held, sizes: Map<string, TestKeeps>, failures: { left: number }): EngineShape['kept'] =>
+export const keptVerbOf = (tasks: Held, sizes: Map<string, TestKeeps>, failures: { left: number }) =>
   function () {
     if (arguments.length > 0) {
       return Effect.fail(
@@ -36,7 +35,7 @@ export const keptVerbOf = (tasks: Held, sizes: Map<string, TestKeeps>, failures:
       failures.left -= 1;
       return Effect.fail(new JournalError({ taskId: '*', message: 'the test engine was told to fail this kept: its store does not list' }));
     }
-    const of = (taskId: string): KeptReport['tasks'][number] => {
+    const of = (taskId: string) => {
       const { journal = 0, bodies = 0, output = 0, files = 0, records } = sizes.get(taskId) ?? {};
       return {
         taskId,

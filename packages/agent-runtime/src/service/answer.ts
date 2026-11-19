@@ -37,7 +37,7 @@ export type AskAnswered = { at: string; attempt: number };
  * Why the harness `name` is refused an answer to an ask: it declares none, or its runner holds no call open.
  * @param name The harness's name.
  */
-export const noCallHeld = (name: string): string =>
+export const noCallHeld = (name: string) =>
   `the \`${name}\` harness holds no call open for a person to answer: a question of its session's is denied where no person is there.`;
 
 /** `answerAsk`'s refusal, in its words. */

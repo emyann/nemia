@@ -52,7 +52,7 @@ type AttachedOptions = Pick<
 >;
 
 /** One flag's value as `extraArgs` takes it: a string, or null for a switch; refused where it repeats the flag. */
-const extraValueOf = (key: string, value: string | number | true | string[]): string | null => {
+const extraValueOf = (key: string, value: string | number | true | string[]) => {
   if (value === true) return null;
   if (!Array.isArray(value)) return String(value);
   const [only, ...more] = value;
@@ -67,7 +67,7 @@ const extraValueOf = (key: string, value: string | number | true | string[]): st
  * flag's path from inside the child's cwd, and as the plugin folders are resolved — and refused, saying what to do, where it cannot be
  * read.
  */
-const promptText = (key: string, cwd: string, file: string): string => {
+const promptText = (key: string, cwd: string, file: string) => {
   const at = path.resolve(cwd, file);
   try {
     return fs.readFileSync(at, 'utf8');
@@ -90,18 +90,18 @@ const promptText = (key: string, cwd: string, file: string): string => {
  * Refused, naming both keys, where a task gives both: the SDK has the one option where the CLI had two flags, and what Claude Code
  * does given both is unmeasured, so the runtime does not choose for the person.
  */
-const promptOf = (cwd: string, append: string | undefined, replace: string | undefined): Options['systemPrompt'] => {
+const promptOf = (cwd: string, append: string | undefined, replace: string | undefined) => {
   if (append !== undefined && replace !== undefined) {
     throw new Error(
       "`config.claude.appendSystemPromptFile` and `config.claude.systemPromptFile` are both given, and an attached session carries the one `systemPrompt` the Agent SDK takes: a prompt appended to Claude Code's own, or a prompt in place of it, never both. Give one of the two: put the text of the other in it, or leave the other out.",
     );
   }
-  if (replace !== undefined) return promptText('systemPromptFile', cwd, replace);
+  if (replace !== undefined) return promptText('systemPromptFile', cwd, replace) satisfies Options['systemPrompt'];
   return {
     type: 'preset',
     preset: 'claude_code',
     ...(append === undefined ? {} : { append: promptText('appendSystemPromptFile', cwd, append) }),
-  };
+  } satisfies Options['systemPrompt'];
 };
 
 /**
@@ -114,15 +114,7 @@ const promptOf = (cwd: string, append: string | undefined, replace: string | und
  * The settings go apart because `Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its
  * values (`sdk.mjs`): an object left in that bag would reach the CLI as `[object Object]`.
  */
-const extraOf = (
-  cwd: string,
-  flags: ClaudeFlags | undefined,
-): {
-  extra: Record<string, string | null>;
-  plugins: string[];
-  settings: Options['settings'];
-  systemPrompt: Options['systemPrompt'];
-} => {
+const extraOf = (cwd: string, flags: ClaudeFlags | undefined) => {
   const { pluginDir, settings, appendSystemPromptFile, systemPromptFile, remoteControl: _bridge, ...rest } = flags ?? {};
   const given = Object.entries(rest).filter((e): e is [string, string | number | true | string[]] => e[1] !== undefined);
   return {
@@ -130,6 +122,11 @@ const extraOf = (
     plugins: pluginDir ?? [],
     settings: memorylessSettings(settings) ?? settings,
     systemPrompt: promptOf(cwd, appendSystemPromptFile, systemPromptFile),
+  } satisfies {
+    extra: Record<string, string | null>;
+    plugins: string[];
+    settings: Options['settings'];
+    systemPrompt: Options['systemPrompt'];
   };
 };
 
@@ -147,7 +144,7 @@ const TOOL_SEARCH = 'ToolSearch';
  * each on the list itself. `'default'`, or none, leaves `skills` out, which is Claude Code's own set, never `'all'`. A closed `tools`
  * list is given `TOOL_SEARCH` beside it where the session has a server (`served`), so the servers' tools load on demand.
  */
-const fenceOf = (c: SpawnRequest['config'], served: boolean): AttachedOptions => {
+const fenceOf = (c: SpawnRequest['config'], served: boolean) => {
   const denies = claudeDenies(c);
   const allows = claudeAllows(c);
   const tools = c?.tools && served && !c.tools.includes(TOOL_SEARCH) ? [...c.tools, TOOL_SEARCH] : c?.tools;
@@ -161,13 +158,14 @@ const fenceOf = (c: SpawnRequest['config'], served: boolean): AttachedOptions =>
 };
 
 /** The model, the effort, the closing statement's schema handed on unread, the session to resume, and the spend cap. */
-const askedOf = (r: SpawnRequest): AttachedOptions => ({
-  ...(r.config?.model ? { model: r.config.model } : {}),
-  ...(r.config?.effort ? { effort: r.config.effort as Options['effort'] } : {}),
-  ...(r.closeoutSchema ? { outputFormat: { type: 'json_schema', schema: r.closeoutSchema as Record<string, unknown> } } : {}),
-  ...(r.resumeFrom ? { resume: r.resumeFrom } : {}),
-  ...(r.config?.budgetUsd !== undefined ? { maxBudgetUsd: r.config.budgetUsd } : {}),
-});
+const askedOf = (r: SpawnRequest) =>
+  ({
+    ...(r.config?.model ? { model: r.config.model } : {}),
+    ...(r.config?.effort ? { effort: r.config.effort as Options['effort'] } : {}),
+    ...(r.closeoutSchema ? { outputFormat: { type: 'json_schema', schema: r.closeoutSchema as Record<string, unknown> } } : {}),
+    ...(r.resumeFrom ? { resume: r.resumeFrom } : {}),
+    ...(r.config?.budgetUsd !== undefined ? { maxBudgetUsd: r.config.budgetUsd } : {}),
+  }) satisfies AttachedOptions;
 
 /**
  * `r` as the SDK takes it, in this order:
@@ -195,7 +193,7 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  * for the two prompt files given together or a prompt file that cannot be read (`promptOf`).
  * @param r The spawn request whose task's options are translated.
  */
-export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
+export const attachedOptions = (r: SpawnRequest) => {
   const c = r.config;
   const { extra, plugins, settings, systemPrompt } = extraOf(r.cwd, admittedFlags(c));
   const servers = everyMcpServer(r.cwd, c);
@@ -233,5 +231,5 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
       ...(c?.worktree ? { worktree: worktreeName(r) } : {}),
     },
     env: { ...withoutTelemetry(process.env), ...c?.env, ...CLAUDE_JOB_ENV, ...claudeTelemetryEnv(r) },
-  };
+  } satisfies AttachedOptions as AttachedOptions;
 };

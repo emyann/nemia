@@ -24,7 +24,6 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { Option, Result, Schema } from 'effect';
 import { firstRefusal, noneOf } from '../../core/index.ts';
-import type { PartialMark } from '../detached/follow.ts';
 
 const Count = Schema.Natural;
 
@@ -54,7 +53,7 @@ export const reading = <S extends Schema.Top>(schema: S) => ({
    * `schema`, once `Sdk` is assignable to its encoded type and holds every key it reads.
    * @param _notInSdk Nothing: required only when the schema reads a key `Sdk` lacks, which the typecheck then names.
    */
-  of: <Sdk extends S['Encoded']>(..._notInSdk: [NotIn<Sdk, S>] extends [never] ? [] : [NotIn<Sdk, S>]): S => schema,
+  of: <Sdk extends S['Encoded']>(..._notInSdk: [NotIn<Sdk, S>] extends [never] ? [] : [NotIn<Sdk, S>]) => schema,
 });
 
 /** A block of an assistant message, as the SDK types it. */
@@ -236,7 +235,7 @@ const FIX =
   ' `PRINTED` (`harness/claude/stream.ts`) reads this one.';
 
 /** The kind of `value` when it is a JSON object of one of `kinds`, or `undefined` for anything else. */
-const kindOf = (value: unknown, kinds: readonly PrintedKind[]): PrintedKind | undefined => {
+const kindOf = (value: unknown, kinds: readonly PrintedKind[]) => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
   const { type, subtype } = value as { type?: unknown; subtype?: unknown };
   const kind = type === 'system' && typeof subtype === 'string' ? `system ${subtype}` : type;
@@ -244,7 +243,7 @@ const kindOf = (value: unknown, kinds: readonly PrintedKind[]): PrintedKind | un
 };
 
 /** The JSON object `text` holds, when it parses: `undefined` for a line torn mid-write, stderr, or prose. */
-const parsed = (text: string): unknown => {
+const parsed = (text: string) => {
   try {
     return JSON.parse(text);
   } catch {
@@ -257,14 +256,14 @@ const parsed = (text: string): unknown => {
  * or subtype, and `undefined` for a line that is no JSON object (stderr, a line torn mid-write, prose). Decodes nothing.
  * @param text One line of the session's output.
  */
-export const printedKindOf = (text: string): PrintedKind | 'other' | undefined => {
+export const printedKindOf = (text: string) => {
   const value = parsed(text);
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
   return kindOf(value, KINDS) ?? 'other';
 };
 
 /** Why `value`, a `kind` line at line `at`, is refused: the line, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.SchemaError): string => {
+const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.SchemaError) => {
   const { path, words } = firstRefusal(value, error, 'Claude Code prints');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
@@ -281,7 +280,7 @@ const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.Sc
  * @param output What the session's stream printed, line by line.
  * @param kinds The line kinds to decode; every other line is left unread.
  */
-export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): { lines: PrintedLine[] } | { wrong: string } => {
+export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]) => {
   const types = [...new Set(kinds.map((k) => `"${k.split(' ')[0]}"`))];
   const lines: PrintedLine[] = [];
   for (const [at, text] of output.split('\n').entries()) {
@@ -290,10 +289,13 @@ export const printedLinesOf = (output: string, kinds: readonly PrintedKind[]): {
     const kind = kindOf(value, kinds);
     if (kind === undefined) continue;
     const decoded = DECODERS[kind](value);
-    if (Result.isFailure(decoded)) return { wrong: refusal(at + 1, kind, value, decoded.failure) };
+    if (Result.isFailure(decoded))
+      return { wrong: refusal(at + 1, kind, value, decoded.failure) } satisfies { lines: PrintedLine[] } | { wrong: string } as
+        | { lines: PrintedLine[] }
+        | { wrong: string };
     lines.push({ kind, line: decoded.success } as PrintedLine);
   }
-  return { lines };
+  return { lines } satisfies { lines: PrintedLine[] } | { wrong: string } as { lines: PrintedLine[] } | { wrong: string };
 };
 
 /** A line of `kind`, as its schema in `PRINTED` decodes it. */
@@ -303,13 +305,13 @@ export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
  * The mode an `init` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`.
  * @param line The decoded `init` line.
  */
-export const initRanIn = (line: Printed<'system init'>): string | undefined => line.permissionMode;
+export const initRanIn = (line: Printed<'system init'>) => line.permissionMode;
 
 /**
  * The mode a `status` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`, absent from most of them.
  * @param line The decoded `status` line.
  */
-export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
+export const statusRanIn = (line: Printed<'system status'>) => line.permissionMode;
 
 /**
  * What a capture keeps of an `init` line: the fields a reader reads, as the line names them, but the mode, in the runtime's word
@@ -321,10 +323,10 @@ type InitText = Pick<Printed<'system init'>, 'cwd' | 'model' | 'claude_code_vers
  * A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read.
  * @param ranIn The mode the line named.
  */
-export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
+export const statusLineText = (ranIn: string) => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
 
 /** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
-export const initLineText = ({ ranIn, ...read }: InitText): string =>
+export const initLineText = ({ ranIn, ...read }: InitText) =>
   JSON.stringify({ type: 'system', subtype: 'init', ...read, permissionMode: ranIn });
 
 const decodeEvent = Schema.decodeUnknownOption(Events);
@@ -339,7 +341,7 @@ const decodeEvent = Schema.decodeUnknownOption(Events);
  * @returns nothing for anything else — a piece of a tool call's input among them, so a partial never carries unvalidated input —
  *   and for an event that does not decode
  */
-export const partialMarksOf = (event: unknown): PartialMark[] =>
+export const partialMarksOf = (event: unknown) =>
   Option.match(decodeEvent(event), {
     onNone: () => [],
     onSome: Events.match({

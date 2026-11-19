@@ -1,6 +1,6 @@
 import type { PermissionFacts } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type VerbGuard, type VerbName } from './lifecycle.ts';
-import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
+import { elapsedMs, type Monotonic } from './clock.ts';
 import { backoffOf, endedWhen, restartWords } from './restart.ts';
 import { deadlineOf, heldNow, holdFacts } from './deadline.ts';
 import { turnOf } from './turn.ts';
@@ -49,13 +49,13 @@ export type { PermissionFacts };
  * A denial as a person reads it, and as a permission rule is written: `Bash(pytest)`, `Skill(look)`, `WebFetch`.
  * @param d The denial: the tool refused, and what it was asked to do where that was recorded.
  */
-export const denialText = (d: Denial): string => (d.what ? `${d.tool}(${d.what})` : d.tool);
+export const denialText = (d: Denial) => (d.what ? `${d.tool}(${d.what})` : d.tool);
 
 /**
  * The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`.
  * @param name The session's name, as its harness lists it.
  */
-export const nameParts = (name: string): { taskId: string; n: number } | undefined => {
+export const nameParts = (name: string) => {
   const [, taskId, n] = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name) ?? [];
   if (taskId === undefined || n === undefined) return undefined;
   const parts = { taskId, n: Number(n) };
@@ -75,7 +75,7 @@ const startedParts = (s: State, e: Extract<Event, { kind: 'starting' }>) => ({
  * one of denials never takes away a denial seen while it ran (`denied`), and an end with no usage keeping what was counted while it ran
  * (`counted`).
  */
-function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
+function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>) {
   a.ended = e.observed;
   a.endedAt = e.at;
   if (e.mono) a.endedMono = e.mono;
@@ -99,14 +99,14 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
 }
 
 /** An event about one attempt, `e`, written into that attempt's fold when `s` holds it: its end here, every other in `foldInto`. */
-function intoAttempt(s: State, e: Extract<Event, { kind: 'ended' } | Parameters<typeof foldInto>[1]>): void {
+function intoAttempt(s: State, e: Extract<Event, { kind: 'ended' } | Parameters<typeof foldInto>[1]>) {
   const a = s.attempts.find((x) => x.n === e.attempt);
   if (a && e.kind === 'ended') endAttempt(a, e);
   else if (a && e.kind !== 'ended') foldInto(a, e);
 }
 
 /** The task as the `filed` event `e` states it, written into the fold `s`. */
-function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
+function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>) {
   s.filedAt = e.at;
   s.brief = e.brief;
   s.cwd = e.cwd;
@@ -125,7 +125,7 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
 }
 
 /** A `waits` entry into `s`: the wait it says, or none where it says none (a pass that judged nothing took it off). */
-function waitInto(s: State, wait: AdmissionWait | undefined): void {
+function waitInto(s: State, wait: AdmissionWait | undefined) {
   if (wait === undefined) delete s.waits;
   else s.waits = wait;
 }
@@ -135,7 +135,7 @@ function waitInto(s: State, wait: AdmissionWait | undefined): void {
  * @param taskId The task's id.
  * @param events The task's journal, in the order it was written.
  */
-export function fold(taskId: string, events: readonly Event[]): State {
+export function fold(taskId: string, events: readonly Event[]) {
   const s: State = {
     taskId,
     brief: '',
@@ -203,10 +203,10 @@ export function fold(taskId: string, events: readonly Event[]): State {
 export { turnOf } from './turn.ts';
 
 /** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
-const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
+const stoppable = (state: State) => !state.settled && !state.stopRequested;
 
 /** A task a person may answer or close: waiting on their word (`waitsForInput`), and not asked to stop, which outranks it. */
-const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
+const awaitsWord = (state: State) => waitsForInput(state) && !state.stopRequested;
 
 /**
  * Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state.
@@ -219,7 +219,7 @@ export const VERB_GUARDS: Record<VerbGuard, (state: State) => boolean> = { stopp
  * @param verb The person's verb.
  * @param state The task's fold.
  */
-export const verbTakes = (verb: VerbName, state: State): boolean => {
+export const verbTakes = (verb: VerbName, state: State) => {
   const guard = VERBS.find((v) => v.verb === verb)?.guard;
   return guard !== undefined && VERB_GUARDS[guard](state);
 };
@@ -239,7 +239,7 @@ export { backoffOf, cutWords, PARKED_WORDS, RESTART_BACKOFF, RESTART_WORDS } fro
  * on every pass — and the one a pass may ask to skip a settled task before it reads anything else of it.
  * @param state The task's fold.
  */
-export const settledQuiet = (state: State): boolean => state.settled !== null;
+export const settledQuiet = (state: State) => state.settled !== null;
 
 /**
  * One step toward the desired state. Pure, total, and safe to call as often as you like —
@@ -382,7 +382,7 @@ export const observe: Observe = (state, observed, now) => {
  * where that attempt of the current turn was parked — a restart inside the task, never a new try; else, for a long-lived task, the
  * current turn's `ended`, unless its harness refused the spawn (`unstartable`), which waiting would not change.
  */
-const restartFrom = (state: State, last?: Attempt, ended?: Attempt): { from: Attempt; parked?: Parked } | undefined => {
+const restartFrom = (state: State, last?: Attempt, ended?: Attempt) => {
   if (last?.parked && (last.turn ?? 0) === state.inputs.length) return { from: last, parked: last.parked };
   return ended && state.restartPolicy === 'Always' && ended.reason !== 'unstartable' ? { from: ended } : undefined;
 };
@@ -392,27 +392,40 @@ const restartFrom = (state: State, last?: Attempt, ended?: Attempt): { from: Att
  * refused the spawn, since a spawn error on an attempt that ended otherwise is not why it ended, and the reason an older
  * runtime gave its end (`former`) where it gave one.
  */
-function attemptEnded(ended: Attempt, attempts: number, turn: number): LifecycleEvent {
+function attemptEnded(ended: Attempt, attempts: number, turn: number) {
   const refusal = ended.reason === 'unstartable' && ended.error !== undefined ? { error: ended.error } : {};
   const former = ended.former === undefined ? {} : { former: ended.former };
-  return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts, turn, ...refusal, ...former };
+  return {
+    type: 'ATTEMPT_ENDED',
+    ended: ended.ended,
+    reason: ended.reason,
+    attempts,
+    turn,
+    ...refusal,
+    ...former,
+  } satisfies LifecycleEvent;
 }
 
 /** Whether an overdue attempt's session is live, with the sighting that says so: a stop needs a session to send to. */
-const liveOf = (sighting: Sighting | undefined): { live: true; sighting: Sighting } | { live: false; sighting?: Sighting } =>
-  sighting && isLive(sighting.state) ? { live: true, sighting } : { live: false, sighting };
+const liveOf = (sighting: Sighting | undefined) =>
+  (sighting && isLive(sighting.state) ? { live: true, sighting } : { live: false, sighting }) satisfies
+    | { live: true; sighting: Sighting }
+    | { live: false; sighting?: Sighting };
 
 /** What `observe` reads off an attempt in flight, by its rules 2 to 4: its deadline, its sighting, or its absence. */
-function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, overdue: boolean): LifecycleEvent {
+function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, overdue: boolean) {
   const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
   const paused = now.drained === true || heldNow(last);
-  if (overdue && !paused && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, ...liveOf(sighting) };
-  if (sighting) return sessionEvent(state, last, sighting, now);
-  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
-  if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
-  return elapsedMs({ at: Date.parse(last.spawnedAt), mono: last.spawnedMono }, instantOf(now)) < now.graceMs
-    ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
-    : { type: 'LOST', attempt: last.n };
+  if (overdue && !paused && !state.stopRequested && !endedOwn)
+    return { type: 'DEADLINE_PASSED', attempt: last.n, ...liveOf(sighting) } satisfies LifecycleEvent;
+  if (sighting) return sessionEvent(state, last, sighting, now) satisfies LifecycleEvent;
+  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue } satisfies LifecycleEvent;
+  if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) } satisfies LifecycleEvent;
+  return (
+    elapsedMs({ at: Date.parse(last.spawnedAt), mono: last.spawnedMono }, instantOf(now)) < now.graceMs
+      ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
+      : { type: 'LOST', attempt: last.n }
+  ) satisfies LifecycleEvent;
 }
 
 /**
@@ -423,7 +436,7 @@ function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined
  * @param state The task's fold.
  * @param sighting What the pass saw of the session, or undefined where it saw nothing.
  */
-export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
+export const idleOf = (state: State, sighting: Sighting | undefined) => {
   if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
   if (sighting.state === 'input-required') return sighting.waitingFor === undefined;
   return sighting.state === 'completed' || (RUNNING.has(sighting.state) && sighting.quietMs !== undefined);
@@ -436,14 +449,14 @@ export const idleOf = (state: State, sighting: Sighting | undefined): boolean =>
  * @param state The task's fold.
  * @param sighting What the pass saw of the session, or undefined where it saw nothing.
  */
-export const respawning = (state: State, sighting: Sighting | undefined): boolean =>
+export const respawning = (state: State, sighting: Sighting | undefined) =>
   state.restartPolicy === 'Always' && !state.stopRequested && sighting?.held === false && isLive(sighting.state);
 
 /**
  * What the sighting of the attempt in flight, `last`, says of its session: the second of `observe`'s rules for an attempt in
  * flight, with what ending it now would lead to.
  */
-function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now): LifecycleEvent {
+function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now) {
   const ending = endOf(sighting.state);
   const seen = {
     attempt: last.n,
@@ -453,12 +466,13 @@ function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now)
   };
   if (respawning(state, sighting)) {
     const gap = last.gapSince === undefined ? 0 : elapsedMs({ at: Date.parse(last.gapSince), mono: last.gapMono }, instantOf(now));
-    return { type: gap < RESPAWN_GAP_MS ? 'SESSION_RESPAWNING' : 'RESPAWN_OVERDUE', ...seen };
+    return { type: gap < RESPAWN_GAP_MS ? 'SESSION_RESPAWNING' : 'RESPAWN_OVERDUE', ...seen } satisfies LifecycleEvent;
   }
-  if (idleOf(state, sighting)) return { type: 'SESSION_IDLE', ...seen };
-  if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
-  if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
-  return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
+  if (idleOf(state, sighting)) return { type: 'SESSION_IDLE', ...seen } satisfies LifecycleEvent;
+  if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen } satisfies LifecycleEvent;
+  if (RUNNING.has(sighting.state))
+    return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen } satisfies LifecycleEvent;
+  return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen } satisfies LifecycleEvent;
 }
 
 /**
@@ -470,12 +484,12 @@ function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now)
  * @param error The harness's words for the refusal.
  * @param move The lifecycle's edge for an event in a state (`transition`).
  */
-export function spawnRefused(state: State, attempt: number, error: string, move: Move = transition): Action {
+export function spawnRefused(state: State, attempt: number, error: string, move: Move = transition) {
   const from = lifecycleOf(state);
   const moved = move(from, { type: 'SPAWN_REFUSED', attempt, error });
-  return 'refused' in moved
-    ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused }
-    : moved.action;
+  return (
+    'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused } : moved.action
+  ) satisfies Action;
 }
 
 /**
@@ -483,7 +497,7 @@ export function spawnRefused(state: State, attempt: number, error: string, move:
  * @param state The task's fold.
  * @param observed The pass's sightings, by session name.
  */
-export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>): boolean {
+export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>) {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
   const seen = observed.get(nameFor(state.taskId, last.n));
@@ -498,19 +512,21 @@ export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>
  * told `RESTART_WORDS`, or, parked, the call that did not finish (`cutWords`) or `PARKED_WORDS` (`restartWords`, `restart.ts`); with
  * none recorded, what the turn continues, told the brief.
  */
-function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, parked?: Parked): LifecycleEvent {
-  if (parked && now.drained === true) return { type: 'PARK_HELD', attempt: last.n };
-  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue: false };
-  if (sighting && (sighting.held === true || isLive(sighting.state))) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
+function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, parked?: Parked) {
+  if (parked && now.drained === true) return { type: 'PARK_HELD', attempt: last.n } satisfies LifecycleEvent;
+  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue: false } satisfies LifecycleEvent;
+  if (sighting && (sighting.held === true || isLive(sighting.state)))
+    return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId } satisfies LifecycleEvent;
   const backoffMs = backoffOf(state.attempts);
-  if (elapsedMs(endedWhen(last), instantOf(now)) < backoffMs) return { type: 'BACKING_OFF', attempt: last.n, backoffMs };
+  if (elapsedMs(endedWhen(last), instantOf(now)) < backoffMs)
+    return { type: 'BACKING_OFF', attempt: last.n, backoffMs } satisfies LifecycleEvent;
   const session = [...state.attempts].reverse().find((a) => a.nativeId !== null)?.nativeId ?? undefined;
   const from = session ? { resumeFrom: session, nudge: restartWords(parked) } : { resumeFrom: turnOf(state).continues };
-  return { type: 'RESTART_DUE', attempt: state.attempts.length + 1, ...from };
+  return { type: 'RESTART_DUE', attempt: state.attempts.length + 1, ...from } satisfies LifecycleEvent;
 }
 
 /** Now as `decide` is handed it, as an `Instant`. */
-const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono });
+const instantOf = (now: Now) => ({ at: now.at.getTime(), mono: now.mono });
 
 /**
  * What the engine journals of an attempt in flight off its sighting, before it decides: for any task, its hold and its release
@@ -523,19 +539,19 @@ const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono
  * @param at The moment each entry is stamped, an ISO time.
  * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
-export function sightingFacts(state: State, sighting: Sighting | undefined, at: string, mono?: Monotonic): Event[] {
+export function sightingFacts(state: State, sighting: Sighting | undefined, at: string, mono?: Monotonic) {
   const last = state.attempts.at(-1);
-  if (state.settled || !sighting || !last || last.ended !== null) return [];
+  if (state.settled || !sighting || !last || last.ended !== null) return [] satisfies Event[];
   const held = holdFacts(last, sighting, at, mono);
-  return state.restartPolicy === 'Always' ? [...held, ...processFacts(state, last, sighting, at, mono)] : held;
+  return (state.restartPolicy === 'Always' ? [...held, ...processFacts(state, last, sighting, at, mono)] : held) satisfies Event[];
 }
 
 /** A long-lived attempt in flight's `gap` and `process`, as `sightingFacts` says. */
-function processFacts(state: State, last: Attempt, sighting: Sighting, at: string, mono?: Monotonic): Event[] {
+function processFacts(state: State, last: Attempt, sighting: Sighting, at: string, mono?: Monotonic) {
   if (respawning(state, sighting))
-    return last.gapSince === undefined ? [{ kind: 'gap', at, attempt: last.n, ...(mono ? { mono } : {}) }] : [];
-  if (sighting.held !== true) return [];
+    return (last.gapSince === undefined ? [{ kind: 'gap', at, attempt: last.n, ...(mono ? { mono } : {}) }] : []) satisfies Event[];
+  if (sighting.held !== true) return [] satisfies Event[];
   const moved = sighting.pid !== undefined && sighting.pid !== last.processes?.at(-1);
-  if (last.gapSince === undefined && !moved) return [];
-  return [{ kind: 'process', at, attempt: last.n, ...(sighting.pid !== undefined ? { pid: sighting.pid } : {}) }];
+  if (last.gapSince === undefined && !moved) return [] satisfies Event[];
+  return [{ kind: 'process', at, attempt: last.n, ...(sighting.pid !== undefined ? { pid: sighting.pid } : {}) }] satisfies Event[];
 }

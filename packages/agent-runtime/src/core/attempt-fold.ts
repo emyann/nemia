@@ -6,7 +6,7 @@ import type { Attempt, Event } from './domain.ts';
 import { holdInto } from './deadline.ts';
 
 /** An `image` entry `e` written into its attempt's fold `a`: each of the code, the harness's version and the mode it names, the latest. */
-function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>): void {
+function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>) {
   if (e.image !== undefined) a.image = e.image;
   if (e.harnessVersion !== undefined) a.harnessVersion = e.harnessVersion;
   if (e.ranIn !== undefined) a.ranIn = e.ranIn;
@@ -20,7 +20,7 @@ function imageInto(a: Attempt, e: Extract<Event, { kind: 'image' }>): void {
 export function foldInto(
   a: Attempt,
   e: Extract<Event, { kind: 'spawned' | 'measured' | 'exited' | 'counted' | 'denied' | 'image' | 'gap' | 'process' | 'held' | 'released' }>,
-): void {
+) {
   switch (e.kind) {
     case 'spawned':
       a.spawnedAt = e.at;

@@ -105,14 +105,14 @@ const FIX =
   ' runtime reads, or a runtime whose schema for the record in `ROLLOUT` (`harness/codex/rollout.ts`) reads this one.';
 
 /** The kind of `entry` when it is a JSON object of a kind the runtime reads, or `undefined` for anything else. */
-const kindOf = (entry: unknown): RolloutKind | undefined => {
+const kindOf = (entry: unknown) => {
   if (!Predicate.isObject(entry) || !Predicate.isObject(entry.payload)) return undefined;
   const kind = `${String(entry.type)} ${String(entry.payload.type)}`;
   return KINDS.find((k) => k === kind);
 };
 
 /** Why `entry`, a `kind` record at `where`, is refused: the record, its kind, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema.SchemaError): string => {
+const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema.SchemaError) => {
   const { path, words } = firstRefusal(entry, error, 'Codex writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   const named = kind
@@ -129,7 +129,7 @@ const refusal = (where: string, kind: RolloutKind, entry: unknown, error: Schema
  * @param entry A record of the rollout, parsed from its JSON line, of any shape.
  * @param where Where the record is, in words a refusal names it by.
  */
-export const rolloutRecordOf = (entry: unknown, where: string): RolloutRecord | { wrong: string } | undefined => {
+export const rolloutRecordOf = (entry: unknown, where: string) => {
   const kind = kindOf(entry);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);

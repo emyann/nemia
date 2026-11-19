@@ -19,8 +19,8 @@ export type Instant = { at: number; mono?: Monotonic };
  * @param from The earlier moment.
  * @param to The later moment.
  */
-export const elapsedMs = (from: Instant, to: Instant): number =>
-  from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
+export const elapsedMs = (from: Instant, to: Instant) =>
+  (from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at) satisfies number as number;
 
 /**
  * How much of a budget of `ms`, taken at `from`, is left at `now`: never below zero, so a budget already spent cuts at once rather
@@ -31,7 +31,7 @@ export const elapsedMs = (from: Instant, to: Instant): number =>
  * @param ms The whole budget, in milliseconds.
  * @param now The moment the budget is asked at.
  */
-export const leftOf = (from: Instant, ms: number, now: Instant): number => Math.max(0, ms - elapsedMs(from, now));
+export const leftOf = (from: Instant, ms: number, now: Instant) => Math.max(0, ms - elapsedMs(from, now));
 
 /** One budget's hand to the waits that share it: `take` what is left, and `given`, what every take so far answered. */
 export type Purse = { readonly take: (share?: number) => number; readonly given: readonly number[] };
@@ -45,7 +45,7 @@ export type Purse = { readonly take: (share?: number) => number; readonly given:
  * @param ms the whole budget
  * @param now the clock it is spent on, read when the budget is taken and at each `take`
  */
-export const purseOf = (ms: number, now: () => Instant): Purse => {
+export const purseOf = (ms: number, now: () => Instant) => {
   const from = now();
   const given: number[] = [];
   return {

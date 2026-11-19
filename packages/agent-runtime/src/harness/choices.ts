@@ -14,7 +14,7 @@ export const HARNESS_KNOBS: Readonly<Record<string, HarnessKnobs>> = Object.from
 );
 
 /** The harnesses whose fence is named by `key`, with the words it takes. */
-const fencedBy = (key: HarnessKnobs['fence']['key']): Record<string, readonly string[]> =>
+const fencedBy = (key: HarnessKnobs['fence']['key']) =>
   Object.fromEntries(Object.entries(HARNESS_KNOBS).flatMap(([name, k]) => (k.fence.key === key ? [[name, k.fence.words] as const] : [])));
 
 /** Each default harness's words for its effort and its fence, by key, then by harness. */

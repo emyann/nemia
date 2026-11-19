@@ -104,13 +104,13 @@ const decodeCard = Schema.decodeUnknownResult(CardSchema);
 
 const HOLDER = 'an A2A 1.0 card holds';
 
-const hasKey = (value: unknown, key: string): boolean => typeof value === 'object' && value !== null && Object.hasOwn(value, key);
+const hasKey = (value: unknown, key: string) => typeof value === 'object' && value !== null && Object.hasOwn(value, key);
 
 /**
  * The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write.
  * Each key of the path is quoted, since a served card is another party's, which may name a key of any length.
  */
-const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
+const wrongOf = (json: unknown, error: Schema.SchemaError) => {
   const { path, words } = firstRefusal(json, error, HOLDER);
   const keys = path.map(String);
   const shown = keys.map((k) => quote(k));
@@ -134,19 +134,22 @@ const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
  * begins `its` or `it`). A scheme in the SDK's form is kept as it was given; the rest is the SDK's parse of the decoded card.
  * @param json The card as JSON, as served at the agent's URL or configured in a harness, unchecked.
  */
-export const cardOfJson = (json: unknown): { card: AgentCard } | { wrong: string } => {
+export const cardOfJson = (json: unknown) => {
   const decoded = decodeCard(json);
-  if (Result.isFailure(decoded)) return { wrong: wrongOf(json, decoded.failure) };
+  if (Result.isFailure(decoded))
+    return { wrong: wrongOf(json, decoded.failure) } satisfies { card: AgentCard } | { wrong: string } as
+      | { card: AgentCard }
+      | { wrong: string };
   const parsed = AgentCard.fromJSON(decoded.success);
   const sdk = Object.entries(decoded.success.securitySchemes ?? {}).filter(([, s]) => s.scheme !== undefined);
-  if (!sdk.length) return { card: parsed };
+  if (!sdk.length) return { card: parsed } satisfies { card: AgentCard } | { wrong: string } as { card: AgentCard } | { wrong: string };
   return {
     card: { ...parsed, securitySchemes: { ...parsed.securitySchemes, ...(Object.fromEntries(sdk) as Record<string, SecurityScheme>) } },
-  };
+  } satisfies { card: AgentCard } | { wrong: string } as { card: AgentCard } | { wrong: string };
 };
 
 /** Why a remote agent's `url` cannot be taken, or `undefined`. */
-const urlRefusal = (harness: string, given: unknown): string | undefined => {
+const urlRefusal = (harness: string, given: unknown) => {
   const url = typeof given === 'string' && URL.canParse(given) ? new URL(given) : undefined;
   if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
     return `the \`${harness}\` harness's \`url\` is ${typeof given === 'string' ? `\`${url ? `${url.protocol}…` : given}\`` : `a ${typeof given}`}, and a remote A2A agent is reached over HTTP: give its \`http://\` or \`https://\` address.`;
@@ -158,7 +161,7 @@ const urlRefusal = (harness: string, given: unknown): string | undefined => {
 };
 
 /** Why a remote agent's `card` cannot be taken, or `undefined`: it is an object, and it decodes. */
-const cardRefusal = (harness: string, card: unknown): string | undefined => {
+const cardRefusal = (harness: string, card: unknown) => {
   if (typeof card !== 'object' || card === null || Array.isArray(card)) {
     return `the \`${harness}\` harness's \`card\` is not an agent card: give the JSON object the agent serves at \`/.well-known/agent-card.json\`, or its \`url\`.`;
   }
@@ -175,7 +178,7 @@ const cardRefusal = (harness: string, card: unknown): string | undefined => {
  * @param harness The name of the remote harness, said in the refusal.
  * @param agent The harness's configuration as given: one of `url` or `card`.
  */
-export const remoteConfigRefusal = (harness: string, agent: Record<string, unknown>): string | undefined => {
+export const remoteConfigRefusal = (harness: string, agent: Record<string, unknown>) => {
   const keys = Object.keys(agent);
   const extra = keys.filter((k) => k !== 'url' && k !== 'card');
   if (extra.length) {

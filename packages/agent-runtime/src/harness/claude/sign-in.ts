@@ -42,7 +42,7 @@ const decodeStatus = Schema.decodeUnknownOption(AuthStatusSchema);
  * The answer `stdout` carries, or `undefined` where it is not JSON of that shape: unread, never read as signed out.
  * @param stdout What `auth status` printed on its stdout.
  */
-export const authStatusOf = (stdout: string): AuthStatus | undefined => {
+export const authStatusOf = (stdout: string) => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stdout);
@@ -70,7 +70,7 @@ export const claudeSignInOf: ClaudeSignInOf = (ask) => {
  * `pathToClaudeCodeExecutable` by, so the ask runs the Claude Code the session would.
  * @param executable The path of the Claude Code to start.
  */
-export const claudeLaunch = (executable: string): { cmd: string; args: string[] } =>
+export const claudeLaunch = (executable: string) =>
   ['.js', '.mjs', '.ts', '.tsx', '.jsx'].includes(path.extname(executable))
     ? { cmd: process.execPath, args: [executable] }
     : { cmd: executable, args: [] };
@@ -79,22 +79,22 @@ export const claudeLaunch = (executable: string): { cmd: string; args: string[] 
 type Asked = { ask: ClaudeSignInAsk; status: AuthStatus | undefined };
 
 /** One ask of `<executable> auth status` in `cwd`, under `env`, bounded by `ms`. */
-const askedIn = (executable: string, cwd: string | undefined, env: NodeJS.ProcessEnv, ms: number): Asked => {
+const askedIn = (executable: string, cwd: string | undefined, env: NodeJS.ProcessEnv, ms: number) => {
   const { cmd, args } = claudeLaunch(executable);
   const ran = spawnSync(cmd, [...args, 'auth', 'status'], { cwd, encoding: 'utf8', timeout: ms, env });
   if (ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT')
-    return { ask: { kind: 'timed-out' }, status: undefined };
-  if (ran.error !== undefined || ran.status === null) return { ask: { kind: 'not-run' }, status: undefined };
+    return { ask: { kind: 'timed-out' }, status: undefined } satisfies Asked;
+  if (ran.error !== undefined || ran.status === null) return { ask: { kind: 'not-run' }, status: undefined } satisfies Asked;
   const status = authStatusOf(ran.stdout ?? '');
-  return { ask: { kind: 'exited', code: ran.status, loggedIn: status?.loggedIn }, status };
+  return { ask: { kind: 'exited', code: ran.status, loggedIn: status?.loggedIn }, status } satisfies Asked;
 };
 
 /**
  * Asks `<executable> auth status` in the session's working root and environment — the engine's, less its telemetry, under the task's
  * own `config.env`, where a token given to the session is — as the user the engine runs as, bounded by `ms`.
  */
-const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked =>
-  askedIn(executable, r.cwd, { ...withoutTelemetry(process.env), ...r.config?.env }, ms);
+const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number) =>
+  askedIn(executable, r.cwd, { ...withoutTelemetry(process.env), ...r.config?.env }, ms) satisfies Asked;
 
 /**
  * Whether Claude Code is signed in on this machine under `env` (less its telemetry), by `auth status` as a job's spawn asks it: the
@@ -106,7 +106,7 @@ const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked
  * @param cwd The folder the ask runs in; absent, this process's.
  * @param harnessBin The folder a Claude Code is looked for in where no variable names one.
  */
-export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string, harnessBin?: string): ClaudeSignIn => {
+export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string, harnessBin?: string) => {
   const claude = claudeExecutableOf(env.AE_CLAUDE_EXECUTABLE ?? process.env.AE_CLAUDE_EXECUTABLE, harnessBin);
   return claude === undefined ? 'unknown' : claudeSignInOf(askedIn(claude, cwd, withoutTelemetry(env), ms).ask);
 };
@@ -127,7 +127,7 @@ export const claudeSignedOutRefusal = (
   executable: string | undefined,
   ms: number = CLAUDE_SIGN_IN_MS,
   harnessBin?: string,
-): string | undefined => {
+) => {
   const claude = claudeExecutableOf(executable ?? process.env.AE_CLAUDE_EXECUTABLE, harnessBin);
   if (claude === undefined) return undefined;
   const { ask, status } = askClaudeSignIn(claude, r, ms);

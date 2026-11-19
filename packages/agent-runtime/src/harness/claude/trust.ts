@@ -9,10 +9,10 @@ import path from 'node:path';
 import { replaceFile } from '../../core/replace.ts';
 
 /** Claude Code's config folder when `CLAUDE_CONFIG_DIR` moves it nowhere: `.claude` in the home, read at call time. */
-export const claudeHome = (): string => path.join(os.homedir(), '.claude');
+export const claudeHome = () => path.join(os.homedir(), '.claude');
 
 /** Claude Code's own `.claude.json`: in `CLAUDE_CONFIG_DIR` when it is set, else beside `~/.claude`, read at call time. */
-export const claudeConfigFile = (): string =>
+export const claudeConfigFile = () =>
   process.env.CLAUDE_CONFIG_DIR ? path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : path.join(os.homedir(), '.claude.json');
 
 /**
@@ -21,16 +21,16 @@ export const claudeConfigFile = (): string =>
  * @param dir The folder a session runs in.
  * @param repository The root of the repository's main checkout; absent where the folder is in no repository.
  */
-export const claudeTrustKey = (dir: string, repository?: string): string => path.resolve(repository ?? dir);
+export const claudeTrustKey = (dir: string, repository?: string) => path.resolve(repository ?? dir);
 
 /**
  * Whether `key` is the home directory, whose trust Claude Code holds for one session and never keeps in its file.
  * @param key The path a trust is kept under (`claudeTrustKey`).
  */
-export const claudeNeverKeeps = (key: string): boolean => key === path.resolve(os.homedir());
+export const claudeNeverKeeps = (key: string) => key === path.resolve(os.homedir());
 
 /** `value` as an object with keys, or undefined for anything else, an array included. */
-const record = (value: unknown): Record<string, unknown> | undefined =>
+const record = (value: unknown) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 
 /**
@@ -39,7 +39,7 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
  * @param dir The folder asked about.
  * @param file The `.claude.json` to read; Claude Code's own (`claudeConfigFile`) unless given.
  */
-export const claudeTrusts = (dir: string, file: string = claudeConfigFile()): boolean => {
+export const claudeTrusts = (dir: string, file: string = claudeConfigFile()) => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -64,29 +64,29 @@ type TrustText = { readonly trusted: true } | { readonly text: string } | { read
  * @param text The `.claude.json`'s text, as read.
  * @param key The path the trust is kept under (`claudeTrustKey`).
  */
-export function claudeTrustText(text: string, key: string): TrustText {
+export function claudeTrustText(text: string, key: string) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { unread: 'it is not JSON' };
+    return { unread: 'it is not JSON' } satisfies TrustText as TrustText;
   }
   const config = record(parsed);
-  if (!config) return { unread: 'it holds no JSON object' };
+  if (!config) return { unread: 'it holds no JSON object' } satisfies TrustText as TrustText;
   const projects = config.projects === undefined ? {} : record(config.projects);
-  if (!projects) return { unread: 'its `projects` is no object' };
+  if (!projects) return { unread: 'its `projects` is no object' } satisfies TrustText as TrustText;
   const entry = Object.hasOwn(projects, key) ? record(projects[key]) : {};
-  if (!entry) return { unread: `its \`projects\` entry for ${key} is no object` };
-  if (entry.hasTrustDialogAccepted === true) return { trusted: true };
+  if (!entry) return { unread: `its \`projects\` entry for ${key} is no object` } satisfies TrustText as TrustText;
+  if (entry.hasTrustDialogAccepted === true) return { trusted: true } satisfies TrustText as TrustText;
   const next = { ...config, projects: { ...projects, [key]: { ...entry, hasTrustDialogAccepted: true } } };
-  return { text: `${JSON.stringify(next, null, 2)}${text.endsWith('\n') ? '\n' : ''}` };
+  return { text: `${JSON.stringify(next, null, 2)}${text.endsWith('\n') ? '\n' : ''}` } satisfies TrustText as TrustText;
 }
 
 /** What `claudeTrust` answers: whether it wrote the key, and why it could not where it neither wrote it nor found it set. */
 type TrustWritten = { readonly wrote: boolean; readonly refused: string | null };
 
 /** The bytes of `file`, or null where there is none. */
-const bytesOf = (file: string): Buffer | null => {
+const bytesOf = (file: string) => {
   try {
     return fs.readFileSync(file);
   } catch (err) {
@@ -99,7 +99,7 @@ const bytesOf = (file: string): Buffer | null => {
 const WRITES = 5;
 
 /** `file` made holding the one key for `key`, only where there is still none: false where one appeared meanwhile. */
-function created(file: string, key: string): boolean {
+function created(file: string, key: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   try {
     fs.writeFileSync(file, `${JSON.stringify({ projects: { [key]: { hasTrustDialogAccepted: true } } }, null, 2)}\n`, {
@@ -117,7 +117,7 @@ function created(file: string, key: string): boolean {
  * `text` put in place of `file`, only while `file` still holds `was`: written beside it under the file's own mode, the file read again
  * through `read`, and renamed over it where nothing changed. False, and nothing left beside it, where another writer got there first.
  */
-function replaced(file: string, was: Buffer, text: string, read: (file: string) => Buffer | null): boolean {
+function replaced(file: string, was: Buffer, text: string, read: (file: string) => Buffer | null) {
   return replaceFile(file, text, {
     mode: fs.statSync(file).mode,
     still: () => {
@@ -137,7 +137,7 @@ function replaced(file: string, was: Buffer, text: string, read: (file: string) 
  * @param file The `.claude.json` to read and write; Claude Code's own (`claudeConfigFile`) unless given.
  * @param read What reads the file's bytes, null where it is not there; the file's own bytes unless a test hands its own.
  */
-export function claudeTrust(key: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf): TrustWritten {
+export function claudeTrust(key: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf) {
   const byHand = `run Claude Code in ${key} once and accept its prompt`;
   for (let attempt = 0; attempt < WRITES; attempt += 1) {
     const target = fs.existsSync(file) ? fs.realpathSync(file) : file;

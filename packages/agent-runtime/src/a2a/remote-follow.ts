@@ -15,7 +15,7 @@
  * is, without counting as one: an agent may work that long in silence.
  */
 import { Effect, Schedule, Schema, Stream } from 'effect';
-import type { StreamResponse, Task } from '@a2a-js/sdk';
+import type { StreamResponse } from '@a2a-js/sdk';
 import { TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { RunnerError, type Followed, type Transcript, type TranscriptCursor, type TranscriptEvent } from '../harness/index.ts';
 import type { Entry } from './entry.ts';
@@ -85,7 +85,7 @@ const inDoubt = (d: FollowDeps, name: string) =>
  * @param answers The subscription's answers.
  * @param stop The controller of the subscription's request, aborted as the stream is asked to end.
  */
-export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController): AsyncIterable<StreamResponse> => ({
+export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: AbortController) => ({
   [Symbol.asyncIterator]: () => {
     const it = answers[Symbol.asyncIterator]();
     return {
@@ -99,7 +99,7 @@ export const abortedOnReturn = (answers: AsyncIterable<StreamResponse>, stop: Ab
 });
 
 /** The Task `taskId` read whole, its history in full; `undefined` when the agent no longer has it. */
-const taskRead = async (d: FollowDeps, taskId: string): Promise<Task | undefined> => {
+const taskRead = async (d: FollowDeps, taskId: string) => {
   try {
     return await d.connection.ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined }));
   } catch (e) {
@@ -113,12 +113,7 @@ const taskRead = async (d: FollowDeps, taskId: string): Promise<Task | undefined
  * that ends the turn or the agent no longer has the Task: a follow that does not subscribe. A read that fails gives nothing and is
  * made again; after `RESUBSCRIBES` in a row, the follow fails as a refusal naming the last failure.
  */
-const readEvery = (
-  d: FollowDeps,
-  taskId: string,
-  relay: Relay,
-  said: (answer: StreamResponse) => Followed[],
-): Stream.Stream<Followed, RunnerError> => {
+const readEvery = (d: FollowDeps, taskId: string, relay: Relay, said: (answer: StreamResponse) => Followed[]) => {
   let fails = 0;
   let gone = false;
   const read: Effect.Effect<Followed[], RunnerError> = Effect.tryPromise({ try: () => taskRead(d, taskId), catch: (cause) => cause }).pipe(
@@ -152,16 +147,17 @@ const readEvery = (
  * schedule again at an attempt's first output, an empty array included. After `RESUBSCRIBES` in a row, the Task is read every
  * `readEveryMs` from where the follow stands.
  */
+// oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
 const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean, streams: boolean): Stream.Stream<Followed, RunnerError> => {
   const relay = relayOf(e.sentAt, e.whole ?? 0);
   let fresh = !given;
   let gone = false;
   let rounds = 0;
   let drops = 0;
-  const said = (answer: StreamResponse): Followed[] => {
+  const said = (answer: StreamResponse) => {
     const moments = followedOfRemote(relay, answer, fresh);
     fresh = false;
-    return moments;
+    return moments satisfies Followed[];
   };
   if (!streams) return readEvery(d, taskId, relay, said);
   const dropped = (cause: unknown) => new Dropped({ message: wordsOf(cause) });
@@ -176,6 +172,7 @@ const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean, str
       return t ? said({ payload: { $case: 'task', value: t } }) : [];
     }),
   );
+  // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
   const subscribed = (): Stream.Stream<Followed[], Dropped> =>
     Stream.unwrap(
       Effect.gen(function* () {
@@ -200,7 +197,7 @@ const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean, str
       }),
       Stream.timeoutOrElse({ duration: d.quietMs, orElse: () => round(false) }),
     );
-  const round = (first: boolean): Stream.Stream<Followed[], Dropped> =>
+  const round = (first: boolean) =>
     Stream.concat(
       first ? Stream.empty : reconciled,
       Stream.suspend(() => (relayOver(relay) || gone ? Stream.empty : Stream.concat(subscribed(), over))),
@@ -215,16 +212,17 @@ const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean, str
 };
 
 /** The agent's answer to the session `e` where it made no Task: its words as one event, and where a read of it ends. */
-const replyOf = (e: Entry & { reply: string }): { events: TranscriptEvent[]; cursor: TranscriptCursor } => ({
-  events: [{ id: `reply:${e.messageId}`, at: e.sentAt, role: 'assistant', kind: 'text', text: e.reply }],
-  cursor: remoteCursorOf(e.messageId, 1),
-});
+const replyOf = (e: Entry & { reply: string }) =>
+  ({
+    events: [{ id: `reply:${e.messageId}`, at: e.sentAt, role: 'assistant', kind: 'text', text: e.reply }],
+    cursor: remoteCursorOf(e.messageId, 1),
+  }) satisfies { events: TranscriptEvent[]; cursor: TranscriptCursor };
 
 /**
  * The session `e` followed once its send has an answer: a reply as its words then its state, a send refused as its state, and a Task
  * followed, the follow already begun on it, subscribed to where the agent streams (`streams`).
  */
-const followAnswered = (d: FollowDeps, e: Entry, streams: boolean): Stream.Stream<Followed, RunnerError> => {
+const followAnswered = (d: FollowDeps, e: Entry, streams: boolean) => {
   if (e.reply !== undefined)
     return Stream.fromIterable<Followed>([
       { kind: 'events', ...replyOf({ ...e, reply: e.reply }) },
@@ -238,7 +236,7 @@ const followAnswered = (d: FollowDeps, e: Entry, streams: boolean): Stream.Strea
  * The session `name`'s entry once its send has an answer, read every second while it is under way; `undefined` once it has none, the
  * session forgotten. Refused where the send falls into doubt: no answer was recorded, and there is no Task to follow.
  */
-const answered = (d: FollowDeps, name: string): Effect.Effect<Entry | undefined, RunnerError> =>
+const answered = (d: FollowDeps, name: string) =>
   Effect.sync(() => d.entryOf(name)).pipe(
     Effect.repeat({ schedule: Schedule.spaced(SENDING_POLL), until: (e) => !e || e.taskId !== undefined || !d.sendingLive(e) }),
     Effect.flatMap((e) => (e && e.taskId === undefined ? Effect.fail(inDoubt(d, name)) : Effect.succeed(e))),
@@ -251,44 +249,39 @@ const answered = (d: FollowDeps, name: string): Effect.Effect<Entry | undefined,
  * state alone; one still being sent is `submitted` until the agent answers, then given its answer (`followAnswered`).
  * @param d What the follow needs of the remote harness: its name, its entries, its connection and its paces.
  */
-export const remoteFollowOf =
-  (d: FollowDeps) =>
-  (name: string): Stream.Stream<Followed, RunnerError> =>
-    Stream.unwrap(
-      Effect.gen(function* () {
-        const e = d.entryOf(name);
-        if (!e)
-          return yield* Effect.fail(refusal(`no session goes by \`${name}\` on the \`${d.harness}\` harness: follow it once it is sent.`));
-        const { card } = yield* Effect.tryPromise({
-          try: () => d.connection.client(),
-          catch: (cause) => refusal(`the \`${d.harness}\` agent's card could not be read (${wordsOf(cause)}): ${UNFOLLOWED}`),
-        });
-        const streams = card.capabilities?.streaming === true;
-        if (e.ended && e.seen) return Stream.succeed<Followed>({ kind: 'state', state: e.seen.state });
-        if (e.taskId !== undefined) return followTask(d, e, e.taskId, false, streams);
-        if (!d.sendingLive(e)) return yield* Effect.fail(inDoubt(d, name));
-        const later = Stream.unwrap(answered(d, name).pipe(Effect.map((a) => (a ? followAnswered(d, a, streams) : Stream.empty))));
-        return Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'submitted' }), later);
-      }),
-    );
+export const remoteFollowOf = (d: FollowDeps) => (name: string) =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const e = d.entryOf(name);
+      if (!e)
+        return yield* Effect.fail(refusal(`no session goes by \`${name}\` on the \`${d.harness}\` harness: follow it once it is sent.`));
+      const { card } = yield* Effect.tryPromise({
+        try: () => d.connection.client(),
+        catch: (cause) => refusal(`the \`${d.harness}\` agent's card could not be read (${wordsOf(cause)}): ${UNFOLLOWED}`),
+      });
+      const streams = card.capabilities?.streaming === true;
+      if (e.ended && e.seen) return Stream.succeed<Followed>({ kind: 'state', state: e.seen.state });
+      if (e.taskId !== undefined) return followTask(d, e, e.taskId, false, streams);
+      if (!d.sendingLive(e)) return yield* Effect.fail(inDoubt(d, name));
+      const later = Stream.unwrap(answered(d, name).pipe(Effect.map((a) => (a ? followAnswered(d, a, streams) : Stream.empty))));
+      return Stream.concat(Stream.succeed<Followed>({ kind: 'state', state: 'submitted' }), later);
+    }),
+  );
 
 /**
  * The conversation of the session `e` from `after` on, read off the Task `taskId`, none where it has none: `remoteTranscriptOf`'s and
  * `remoteTranscriptByName`'s.
  */
-const transcriptOfEntry = async (
-  d: FollowDeps,
-  e: Entry | undefined,
-  taskId: string | undefined,
-  after?: TranscriptCursor,
-): Promise<Transcript> => {
+const transcriptOfEntry = async (d: FollowDeps, e: Entry | undefined, taskId: string | undefined, after?: TranscriptCursor) => {
   const none: Transcript = { events: [], cursor: after ?? remoteCursorOf('', 0) };
   if (e?.reply !== undefined) {
     const reply = replyOf({ ...e, reply: e.reply });
-    return after === reply.cursor ? { events: [], cursor: reply.cursor } : reply;
+    return (after === reply.cursor ? { events: [], cursor: reply.cursor } : reply) satisfies Transcript as Transcript;
   }
   const task = taskId === undefined ? undefined : await taskRead(d, taskId);
-  return task ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after) : none;
+  return (task
+    ? transcriptOfTask(task, e?.sentAt ?? task.status?.timestamp ?? '', e?.whole ?? 0, after)
+    : none) satisfies Transcript as Transcript;
 };
 
 /**
@@ -296,20 +289,16 @@ const transcriptOfEntry = async (
  * one event, the agent's words; a session with no Task — sent, refused or in doubt — and a Task the agent no longer has say nothing.
  * @param d What the read needs of the remote harness: its entries by session id and its connection.
  */
-export const remoteTranscriptOf =
-  (d: FollowDeps) =>
-  (sessionId: string, after?: TranscriptCursor): Promise<Transcript> => {
-    const e = d.bySession(sessionId);
-    return transcriptOfEntry(d, e, e ? e.taskId : sessionId, after);
-  };
+export const remoteTranscriptOf = (d: FollowDeps) => (sessionId: string, after?: TranscriptCursor) => {
+  const e = d.bySession(sessionId);
+  return transcriptOfEntry(d, e, e ? e.taskId : sessionId, after) satisfies Promise<Transcript>;
+};
 
 /**
  * The remote harness's `transcriptOf`: `remoteTranscriptOf`'s read of the session `name`; `null` when no session goes by it.
  * @param d What the read needs of the remote harness: its entries by name and its connection.
  */
-export const remoteTranscriptByName =
-  (d: FollowDeps) =>
-  async (name: string, after?: TranscriptCursor): Promise<Transcript | null> => {
-    const e = d.entryOf(name);
-    return e ? transcriptOfEntry(d, e, e.taskId, after) : null;
-  };
+export const remoteTranscriptByName = (d: FollowDeps) => async (name: string, after?: TranscriptCursor) => {
+  const e = d.entryOf(name);
+  return (e ? transcriptOfEntry(d, e, e.taskId, after) : null) satisfies Transcript | null;
+};

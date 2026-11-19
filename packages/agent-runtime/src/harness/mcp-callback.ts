@@ -9,7 +9,7 @@ import type { PastedCallback, Redirect } from '../../contracts/mcp-callback.cont
 export type { PastedCallback, Redirect, CallbackRefusal } from '../../contracts/mcp-callback.contract.ts';
 
 /** Whether an OAuth parameter was given, and given something. */
-const given = (value: string | null): boolean => value !== null && value !== '';
+const given = (value: string | null) => value !== null && value !== '';
 
 /**
  * Whether `pasted` completes the sign-in that asked for `redirect`, or why not: no address, another address than the redirect, the
@@ -30,7 +30,7 @@ export const callbackRefusal: CallbackRefusalOf = (pasted, redirect) => {
  * `text` read as an address, `new URL`'s origin, path and OAuth parameters, or `undefined` where it does not parse.
  * @param text What the person pasted, whitespace around it ignored.
  */
-export const pastedOf = (text: string): PastedCallback | undefined => {
+export const pastedOf = (text: string) => {
   let url: URL;
   try {
     url = new URL(text.trim());
@@ -45,7 +45,7 @@ export const pastedOf = (text: string): PastedCallback | undefined => {
  * The redirect a sign-in on `callbackPort` asks the harness to send the browser to, as `pastedOf` would read it.
  * @param callbackPort The local port the sign-in's callback listens on.
  */
-export const redirectOf = (callbackPort: number): Redirect => {
+export const redirectOf = (callbackPort: number) => {
   const url = new URL(redirectUriOf(callbackPort));
   return { origin: url.origin, pathname: url.pathname };
 };
@@ -54,4 +54,4 @@ export const redirectOf = (callbackPort: number): Redirect => {
  * The redirect URI a sign-in on `callbackPort` hands the harness: Claude Code's child listens there.
  * @param callbackPort The local port the sign-in's callback listens on.
  */
-export const redirectUriOf = (callbackPort: number): string => `http://localhost:${callbackPort}/callback`;
+export const redirectUriOf = (callbackPort: number) => `http://localhost:${callbackPort}/callback`;

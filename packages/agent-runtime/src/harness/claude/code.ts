@@ -29,7 +29,7 @@ import { Effect, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Parked, Sighting } from '../../core/index.ts';
+import type { Sighting } from '../../core/index.ts';
 import { claudeQuota } from './quota.ts';
 import { claudeHeardFile } from './heard.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
@@ -50,7 +50,7 @@ import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detache
 import { projectMcpConfig } from '../mcp.ts';
 import { programIn } from '../harness-bin.ts';
 import { RunnerError } from '../error.ts';
-import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
+import { BridgeFactsSchema, bridgeOf } from './session-bridge.ts';
 import type { Attached } from './attached.ts';
 import { claudeSignedOutRefusal } from './sign-in.ts';
 
@@ -117,7 +117,7 @@ const claudePrepare = (
   executable?: string,
   signInMs?: number,
   harnessBin?: string,
-): Partial<HarnessIO> => {
+) => {
   const signedOut = claudeSignedOutRefusal(r, executable, signInMs, harnessBin);
   if (signedOut) throw new Error(signedOut);
   const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
@@ -137,7 +137,7 @@ const claudePrepare = (
  * The hold a job's process is handed (`claudePrepare`): none without a store, its hold file cleared of a former attempt's; and with the
  * store, the file its sessions keep the newest event they heard of the plan on (`claudeHeardFile`).
  */
-const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
+const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions) => {
   if (hold === undefined) return {};
   const holdFile = beside(HOLD_END);
   const heardFile = claudeHeardFile(hold.root);
@@ -203,42 +203,43 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  * @param signInMs How long the sign-in check is given before the spawn, in ms; absent, `CLAUDE_SIGN_IN_MS`.
  * @param harnessBin The folder a Claude Code is looked for in at each spawn where `executable` names none.
  */
-export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number, harnessBin?: string): HarnessSpec => ({
-  name: 'claude',
-  command: (_r, io) => {
-    const requestFile = io?.requestFile;
-    if (requestFile === undefined)
-      throw new Error('a Claude Code job starts on its spawn request file, and none was given: its runner writes one for `needsRequest`');
-    const named = executable || io?.program;
-    return {
-      cmd: process.execPath,
-      args: [CLAUDE_JOB_BIN, requestFile],
-      ...(named ? { env: { AE_CLAUDE_EXECUTABLE: named } } : {}),
-    };
-  },
-  needsRequest: true,
-  input: {
-    line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
-    closesOn: { key: 'type', value: 'result' },
-  },
-  readOutput: claudeStreamOutput,
-  keepOutput: claudeStreamKept,
-  start: CLAUDE_INIT_START,
-  transcript: {
-    file: claudeTranscriptFile,
-    events: claudeTranscriptEvents,
-    records: claudeTranscriptRecords,
-    spent: claudeTranscriptSpent,
-  },
-  streams: true,
-  partials: claudePartials,
-  prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs, harnessBin),
-  refuses: claudeRefuses,
-  bridgeAsked,
-  can: CLAUDE_DECLARATION.can,
-  contextTokens: CLAUDE_CONTEXT_TOKENS,
-  resumeCostCarried: true,
-});
+export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number, harnessBin?: string) =>
+  ({
+    name: 'claude',
+    command: (_r, io) => {
+      const requestFile = io?.requestFile;
+      if (requestFile === undefined)
+        throw new Error('a Claude Code job starts on its spawn request file, and none was given: its runner writes one for `needsRequest`');
+      const named = executable || io?.program;
+      return {
+        cmd: process.execPath,
+        args: [CLAUDE_JOB_BIN, requestFile],
+        ...(named ? { env: { AE_CLAUDE_EXECUTABLE: named } } : {}),
+      };
+    },
+    needsRequest: true,
+    input: {
+      line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
+      closesOn: { key: 'type', value: 'result' },
+    },
+    readOutput: claudeStreamOutput,
+    keepOutput: claudeStreamKept,
+    start: CLAUDE_INIT_START,
+    transcript: {
+      file: claudeTranscriptFile,
+      events: claudeTranscriptEvents,
+      records: claudeTranscriptRecords,
+      spent: claudeTranscriptSpent,
+    },
+    streams: true,
+    partials: claudePartials,
+    prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs, harnessBin),
+    refuses: claudeRefuses,
+    bridgeAsked,
+    can: CLAUDE_DECLARATION.can,
+    contextTokens: CLAUDE_CONTEXT_TOKENS,
+    resumeCostCarried: true,
+  }) satisfies HarnessSpec as HarnessSpec;
 
 /**
  * A job's spec as the engine runs it with the Claude Code on the PATH: `claudeJobSpec()`, named for the readers that take a spec.
@@ -250,14 +251,14 @@ export const claudeJob: HarnessSpec = claudeJobSpec();
  * Why a long-lived Claude Code spawn is refused where no process holds this runtime's sessions: such a session runs attached, in the
  * holder, and nowhere else. A `RunnerError` with `refused`, so the attempt ends `unstartable` in these words and is not restarted.
  */
-const LONG_LIVED_UNHELD = (name: string): string =>
+const LONG_LIVED_UNHELD = (name: string) =>
   `\`${name}\` is a long-lived Claude Code session (\`restartPolicy: 'Always'\`), which runs attached in the process that holds this runtime's sessions, and no process holds them now: start the daemon that holds them, then file the task again — or leave \`restartPolicy\` off to run it as a job.`;
 
 /**
  * The bridge a job's process wrote beside its run under `name` (`HarnessIO.bridgeFile`), decoded (`BridgeFactsSchema`): nothing where
  * there is no file, and why where one is there that does not read — never read as no bridge.
  */
-const bridgeFileOf = (root: string, name: string): AttachedBridge | undefined => {
+const bridgeFileOf = (root: string, name: string) => {
   const file = besideRun(claudeJob, root, name, BRIDGE_END);
   let text: string;
   try {
@@ -275,16 +276,16 @@ const bridgeFileOf = (root: string, name: string): AttachedBridge | undefined =>
 };
 
 /** A job's sightings, each with the bridge its process wrote beside its run, where it wrote one (`bridgeFileOf`). */
-const bridgedJobs = (root: string, seen: ReadonlyMap<string, Sighting>): Map<string, Sighting> =>
+const bridgedJobs = (root: string, seen: ReadonlyMap<string, Sighting>) =>
   new Map([...seen].map(([name, s]) => [name, { ...s, ...bridgeOf(bridgeFileOf(root, name)) }]));
 
 /** The jobs' runner `job`, its looks reading each job's bridge file into its sighting (`bridgedJobs`). */
-const withBridgeFiles = (job: RunnerOps, root: string): RunnerOps => ({
-  ...job,
-  observe: job.observe.pipe(Effect.map((seen) => bridgedJobs(root, seen))),
-  observeFor: (expected) =>
-    verbOf(job, 'observeFor')(expected).pipe(Effect.map((o): Observation => ({ ...o, seen: bridgedJobs(root, o.seen) }))),
-});
+const withBridgeFiles = (job: RunnerOps, root: string) =>
+  ({
+    ...job,
+    observe: job.observe.pipe(Effect.map((seen) => bridgedJobs(root, seen))),
+    observeFor: (expected) => verbOf(job, 'observeFor')(expected).pipe(Effect.map((o) => ({ ...o, seen: bridgedJobs(root, o.seen) }))),
+  }) satisfies RunnerOps as RunnerOps;
 
 /**
  * A job's sighting `s` with what its process wrote on its hold file (`hold`), as the job's own word on what it was doing:
@@ -297,28 +298,28 @@ const withBridgeFiles = (job: RunnerOps, root: string): RunnerOps => ({
  *
  * A job stopped by a person (`canceled`) is read as its worker wrote it.
  */
-const heldSighting = (s: Sighting, hold: JobHold | null, lost: () => boolean, drained: () => boolean): Sighting => {
-  if (s.state === 'working') return workingWith(s, hold);
-  if (hold?.parked && s.state !== 'canceled') return { ...s, state: 'failed', parked: callOf(hold.parked.calling) };
+const heldSighting = (s: Sighting, hold: JobHold | null, lost: () => boolean, drained: () => boolean) => {
+  if (s.state === 'working') return workingWith(s, hold) satisfies Sighting;
+  if (hold?.parked && s.state !== 'canceled') return { ...s, state: 'failed', parked: callOf(hold.parked.calling) } satisfies Sighting;
   const held = () => hold?.heldBack !== undefined || hold?.draining !== undefined || drained();
-  return s.state === 'failed' && s.nativeId && lost() && held() ? { ...s, parked: callOf(hold?.calling) } : s;
+  return (s.state === 'failed' && s.nativeId && lost() && held() ? { ...s, parked: callOf(hold?.calling) } : s) satisfies Sighting;
 };
 
 /** A working job's sighting `s` with the call its hold file says it is in, and the call it holds back. */
-const workingWith = (s: Sighting, hold: JobHold | null): Sighting => ({
+const workingWith = (s: Sighting, hold: JobHold | null) => ({
   ...s,
   ...(hold?.calling && !s.calling ? { calling: hold.calling } : {}),
   ...(hold?.heldBack ? { heldBack: hold.heldBack } : {}),
 });
 
 /** A park's facts with the call it cut, where there was one. */
-const callOf = (calling: JobHold['calling']): Parked => (calling ? { calling: { tool: calling.tool, since: calling.since } } : {});
+const callOf = (calling: JobHold['calling']) => (calling ? { calling: { tool: calling.tool, since: calling.since } } : {});
 
 /**
  * A job's sightings, each with what its process wrote on its hold file beside its run (`heldSighting`): the sessions' drain read once per
  * look, and only where a job's lease is gone.
  */
-const heldJobs = (spec: HarnessSpec, root: string, seen: ReadonlyMap<string, Sighting>): Map<string, Sighting> => {
+const heldJobs = (spec: HarnessSpec, root: string, seen: ReadonlyMap<string, Sighting>) => {
   let drain: boolean | undefined;
   const drained = () => (drain ??= sessionDrainOf(sessionDrainFile(root)) !== null);
   return new Map(
@@ -326,22 +327,23 @@ const heldJobs = (spec: HarnessSpec, root: string, seen: ReadonlyMap<string, Sig
       name,
       heldSighting(s, readJobHold(besideRun(spec, root, name, HOLD_END)), () => leaseGone(spec, root, name), drained),
     ]),
-  );
+  ) satisfies Map<string, Sighting>;
 };
 
 /** The jobs' runner `job`, its looks reading each job's hold file into its sighting (`heldJobs`). */
-const withHoldFiles = (job: RunnerOps, spec: HarnessSpec, root: string): RunnerOps => ({
-  ...job,
-  observe: job.observe.pipe(Effect.map((seen) => heldJobs(spec, root, seen))),
-  observeFor: (expected) =>
-    verbOf(job, 'observeFor')(expected).pipe(Effect.map((o): Observation => ({ ...o, seen: heldJobs(spec, root, o.seen) }))),
-});
+const withHoldFiles = (job: RunnerOps, spec: HarnessSpec, root: string) =>
+  ({
+    ...job,
+    observe: job.observe.pipe(Effect.map((seen) => heldJobs(spec, root, seen))),
+    observeFor: (expected) =>
+      verbOf(job, 'observeFor')(expected).pipe(Effect.map((o) => ({ ...o, seen: heldJobs(spec, root, o.seen) }) satisfies Observation)),
+  }) satisfies RunnerOps as RunnerOps;
 
 /**
  * The verb `verb` of `ops`, one of the runners this module composes, each of which gives it: a runner without it was composed
  * wrong, and is thrown naming the verb rather than called as absent.
  */
-const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable<RunnerOps[K]> => {
+const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K) => {
   const given = ops[verb];
   if (given === undefined || given === null)
     throw new Error(`Claude Code's runner was composed of one with no \`${String(verb)}\`: compose it of runners that give it`);
@@ -358,7 +360,7 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
  * @param options The runner's store root, the Claude Code it runs, and the bounds and scope parent its jobs are given.
  * @param attached The attached sessions this process holds; absent where it holds none, so a long-lived task is refused.
  */
-export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
+export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached) => {
   const root = options.root;
   const { holdMs, holdPollMs } = options;
   const spec = claudeJobSpec(
@@ -391,14 +393,14 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
       ...(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
       ...(options.harnessBin === undefined ? {} : { harnessBin: options.harnessBin }),
     }),
-  };
+  } satisfies RunnerOps;
 };
 
 /**
  * The turn of `session` ended through `ops`, or refused in words where that runner cannot end one: a job on its own process, which runs
  * its brief to its end.
  */
-const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: string }): Effect.Effect<void, RunnerError> =>
+const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: string }) =>
   ops.interrupt
     ? ops.interrupt(session)
     : Effect.fail(
@@ -414,7 +416,7 @@ const interruptThrough = (ops: RunnerOps, session: { name: string; sessionId: st
  * in a session this process drives on the Agent SDK, so an engine with no holder offers no verb at all, and a question of a job's on
  * its own process is refused where it is read rather than routed to a runner with no call waiting.
  */
-const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ? { answer: attached.ops.answer } : {});
+const answerOf = (attached?: Attached) => (attached ? { answer: attached.ops.answer } : {});
 
 /**
  * Whether a request runs attached: one filed `restartPolicy: 'Always'` while this process holds the attached sessions, and no other.
@@ -426,7 +428,7 @@ const answerOf = (attached?: Attached): Pick<RunnerOps, 'answer'> => (attached ?
  * @param r The spawn request, read for its restart policy.
  * @param attached The attached sessions, asked whether this process holds them; absent where the engine has none.
  */
-export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>): boolean =>
+export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attached?: Pick<Attached, 'holding'>) =>
   r.restartPolicy === 'Always' && attached?.holding() === true;
 
 /**
@@ -436,7 +438,7 @@ export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attach
  * a session it has, which ends what is left in the session's scope once it has ended, and to the jobs' otherwise; the holder kills its
  * session's child group itself, before a resume.
  */
-const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
+const withAttached = (job: RunnerOps, attached: Attached) => {
   const a = attached.ops;
   const to = (name: string) => (attached.has(name) ? a : job);
   return {
@@ -450,7 +452,7 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
         theirs.length ? verbOf(job, 'observeFor')(theirs) : Effect.succeed(undefined),
         verbOf(a, 'observeFor')(ours),
       ]).pipe(
-        Effect.map(([jobs, mine]): Observation => ({
+        Effect.map(([jobs, mine]) => ({
           ...jobs,
           seen: new Map([...(jobs?.seen ?? []), ...mine.seen]),
           unread: jobs?.unread ?? new Set(),
@@ -467,5 +469,5 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     transcript: (name, after) => verbOf(to(name), 'transcript')(name, after),
     say: (session, text) => verbOf(to(session.name), 'say')(session, text),
     follow: (name) => verbOf(to(name), 'follow')(name),
-  };
+  } satisfies RunnerOps;
 };

@@ -12,7 +12,6 @@
 import path from 'node:path';
 import { Option, Schema } from 'effect';
 import { decodedFile, writeWhole } from '../../core/engine/drain.ts';
-import type { HeardLimit, HeardQuota } from '../seam.ts';
 
 /** A window's status, as the SDK words the event's own (`SDKRateLimitInfo.status`, `sdk.d.ts:6135`). */
 const Status = Schema.Literals(['allowed', 'allowed_warning', 'rejected']);
@@ -48,7 +47,7 @@ const decodeHeard = Schema.decodeUnknownOption(HeardSchema);
  * Where the store at `root` keeps the newest event its Claude Code sessions heard: one file, for every session.
  * @param root The store's root folder.
  */
-export const claudeHeardFile = (root: string): string => path.join(root, 'quota', 'claude.json');
+export const claudeHeardFile = (root: string) => path.join(root, 'quota', 'claude.json');
 
 /**
  * What an event's `rate_limit_info` says, received at `at` (ms since the epoch): each window of its `unifiedWindows`, its use in percent
@@ -56,11 +55,11 @@ export const claudeHeardFile = (root: string): string => path.join(root, 'quota'
  * @param info The event's `rate_limit_info`, as the SDK handed it, undecoded.
  * @param at When the event was received, in ms since the epoch.
  */
-export function heardOf(info: unknown, at: number): HeardQuota | null {
+export function heardOf(info: unknown, at: number) {
   const decoded = Option.getOrNull(decodeInfo(info));
   const windows = Object.entries(decoded?.unifiedWindows ?? {});
   if (!windows.length) return null;
-  const limits = windows.map(([key, w]): HeardLimit => ({
+  const limits = windows.map(([key, w]) => ({
     key,
     usedPercentage: Math.round(w.utilization * 1000) / 10,
     resetsAt: w.resetsAt === undefined ? null : new Date(w.resetsAt * 1000).toISOString(),
@@ -73,7 +72,7 @@ export function heardOf(info: unknown, at: number): HeardQuota | null {
  * The newest reading the store's sessions heard, kept on `file`; null where none is, or it does not decode.
  * @param file The store's heard file (`claudeHeardFile`).
  */
-export const readHeard = (file: string): HeardQuota | null => {
+export const readHeard = (file: string) => {
   const held = decodedFile(file, decodeHeard);
   return held && { at: held.at, limits: held.limits.map((l) => ({ ...l })) };
 };
@@ -86,7 +85,7 @@ export const readHeard = (file: string): HeardQuota | null => {
  * @param info The event's `rate_limit_info`, as the SDK handed it, undecoded.
  * @param at When the session received the event, in ms since the epoch.
  */
-export const keepHeard = (file: string, info: unknown, at: number): boolean => {
+export const keepHeard = (file: string, info: unknown, at: number) => {
   const heard = heardOf(info, at);
   if (heard === null) return false;
   const held = readHeard(file);

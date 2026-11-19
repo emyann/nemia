@@ -76,18 +76,22 @@ type Beaten = { state: string; heartbeatAt: string; beat?: Monotonic };
  * @param now The instant the run is read as of.
  * @param worker Whether the worker is seen running, or a thunk that looks, asked only where the beat is stale.
  */
-export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): string => {
+export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)) => {
   const age = elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now);
   const fresh = run.state !== 'working' || age <= STALE_MS;
-  return leaseWord(run.state, age, STALE_MS, fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker);
+  return leaseWord(
+    run.state,
+    age,
+    STALE_MS,
+    fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker,
+  ) satisfies string as string;
 };
 
 /**
  * A word of a run file as a sighting says it. A word no worker writes is `failed`, as a lease gone is.
  * @param word The state a run file says.
  */
-export const stateOfWord = (word: string): SessionState =>
-  Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
+export const stateOfWord = (word: string) => (Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed');
 
 /**
  * A run file's state as a sighting says it, as of `now`, its worker as `worker` found it (`leased`).
@@ -95,7 +99,7 @@ export const stateOfWord = (word: string): SessionState =>
  * @param now The instant the run is read as of.
  * @param worker Whether the worker is seen running, or a thunk that looks, asked only where the beat is stale.
  */
-export const detachedStateOf = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): SessionState =>
+export const detachedStateOf = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)) =>
   stateOfWord(leased(run, now, worker));
 
 /**
@@ -238,7 +242,7 @@ const isRunFile = Schema.is(RunFileSchema);
  * is none too — a worker rewriting it is caught mid-write, and the next read finds it whole.
  * @param text The run file's text, as read from disk.
  */
-export const runFileIn = (text: string): RunFile | string => {
+export const runFileIn = (text: string) => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -260,7 +264,7 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
  * code it is spawned from (`image`).
  * @param plan What the spawn plans for the run, written onto the run file for the worker to read.
  */
-export const firstRunFile = (plan: object): string => {
+export const firstRunFile = (plan: object) => {
   const now = instantNow();
   return JSON.stringify({ ...plan, image: IMAGE, state: 'working', pid: 0, heartbeatAt: new Date(now.at).toISOString(), beat: now.mono });
 };

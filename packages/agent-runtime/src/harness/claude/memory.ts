@@ -20,7 +20,7 @@ const AUTO_MEMORY_OFF: Readonly<Record<string, boolean>> = { autoMemoryEnabled: 
  * takes picomatch globs there (`sdk.d.ts:9957`) and nothing else.
  * @param read The task's settings, as an object.
  */
-const checkExcludes = (read: Record<string, unknown>): void => {
+const checkExcludes = (read: Record<string, unknown>) => {
   const own = read.claudeMdExcludes;
   if (own === undefined || (Array.isArray(own) && own.every((g) => typeof g === 'string'))) return;
   throw new Error(
@@ -34,7 +34,7 @@ const checkExcludes = (read: Record<string, unknown>): void => {
  * does not rewrite: such a session keeps its auto-memory.
  * @param settings The task's Claude Code settings, as JSON or a file's path; absent, none of its own.
  */
-export const memorylessSettings = (settings: string | undefined): Record<string, unknown> | undefined => {
+export const memorylessSettings = (settings: string | undefined) => {
   const read = settingsObject(settings ?? '{}');
   if (read === undefined) return undefined;
   checkExcludes(read);

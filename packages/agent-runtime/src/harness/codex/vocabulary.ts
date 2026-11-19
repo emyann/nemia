@@ -57,17 +57,18 @@ export const CODEX_DEFAULT_SANDBOX = 'workspace-write';
  * Codex's fence: its sandboxes, narrowest first, none of which it drops or stops to ask in. Its sandbox takes no allow rule, so no
  * sandbox refuses what a rule would have reached, and no tool is unruled or granted.
  */
-const codexReach = (): FenceReach => ({
-  by: 'sandbox',
-  rank: Object.fromEntries(CODEX_SANDBOXES.map((sandbox, i) => [sandbox, i])),
-  given: CODEX_DEFAULT_SANDBOX,
-  writes: CODEX_SANDBOXES.indexOf('workspace-write'),
-  unasking: [],
-  dropped: [],
-  refusing: [],
-  unfenced: [],
-  granted: {},
-});
+const codexReach = () =>
+  ({
+    by: 'sandbox',
+    rank: Object.fromEntries(CODEX_SANDBOXES.map((sandbox, i) => [sandbox, i])),
+    given: CODEX_DEFAULT_SANDBOX,
+    writes: CODEX_SANDBOXES.indexOf('workspace-write'),
+    unasking: [],
+    dropped: [],
+    refusing: [],
+    unfenced: [],
+    granted: {},
+  }) satisfies FenceReach;
 
 /**
  * What Codex declares: its own `config.codex`, the checkout's MCP servers it is handed, an environment, a read-only mount (its sandbox

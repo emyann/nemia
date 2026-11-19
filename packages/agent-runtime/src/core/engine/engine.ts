@@ -20,19 +20,17 @@ import {
   type Action,
   type Bridge,
   type Event,
-  type Now,
   type SessionAsk,
   type Sighting,
   type Attempt,
   type State,
-  type TaskResources,
   type SpentSoFar,
   type Usage,
 } from '../domain.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
-import { Runner, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
+import { Runner, type ExpectedSession, type Observation, type RunnerOps } from '../../harness/seam.ts';
 import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, keptIn, keptLooked, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
@@ -80,7 +78,7 @@ type World = { readonly unread: ReadonlySet<string>; readonly drained: DrainedOn
  * The clock `decide` is handed for the task `state`: now, on the wall clock and the monotonic one, with the grace, the unread names
  * and whether the sessions' drain holds it — it stands, and the task's harness declares `drain`.
  */
-const nowFor = ({ unread, drained }: World, state: State): Now => {
+const nowFor = ({ unread, drained }: World, state: State) => {
   const now = instantNow();
   const held = drained(state.harness);
   return {
@@ -106,7 +104,7 @@ export type RefusedMove = { taskId: string } & Refusal;
  * A refused move as a person reads it, in a log or `ae tick`'s output: what did not move, and why nothing will until something changes.
  * @param m The refused move: its task, and the state and event the lifecycle had no edge for.
  */
-export const refusedText = (m: RefusedMove): string =>
+export const refusedText = (m: RefusedMove) =>
   `${m.taskId}  stalled: its lifecycle has no edge from ${m.state} on ${m.event}, so nothing is done; it is asked again each pass`;
 
 export type TaskView = {
@@ -215,7 +213,7 @@ export type TaskView = {
  *
  * So the engine can say a task waits before its harness has let the session go: a test asserts both sides, or waits for the Task.
  */
-const endedOnStatement = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
+const endedOnStatement = (state: State, observed: ReadonlyMap<string, Sighting>) => {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return observed;
   const name = nameFor(state.taskId, last.n);
@@ -239,7 +237,7 @@ type Observed = ReadonlyMap<string, Sighting>;
 const ALL_READ: ReadonlySet<string> = new Set();
 
 /** The pass's world with nothing left unread, the drain read now: what `reconcile` and `settleTask` decide on. */
-const allRead = Effect.map(SessionsDrained, (drained): World => ({ unread: ALL_READ, drained: drained() }));
+const allRead = Effect.map(SessionsDrained, (drained) => ({ unread: ALL_READ, drained: drained() }));
 
 /**
  * One task, one step. Returns the action taken, so a caller can loop until nothing moves.
@@ -274,7 +272,7 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
 });
 
 /** What attempt `attempt` of `state` runs under: what its `starting` entry recorded, else the filing's (`runsUnder`). */
-const attemptRuns = (state: State, attempt: Attempt | undefined): TaskResources | undefined =>
+const attemptRuns = (state: State, attempt: Attempt | undefined) =>
   runsUnder({ filed: state.resources, inFlight: { resources: attempt?.resources }, defaults: undefined });
 
 /**
@@ -283,7 +281,7 @@ const attemptRuns = (state: State, attempt: Attempt | undefined): TaskResources 
  * session it continues, the labels its telemetry says, the task's id among them, and what its process tree may use of the host: what
  * its `starting` entry recorded (`runsUnder`), else, on an attempt an older runtime started, what the task was filed with.
  */
-const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
+const spawnRequestOf = (taskId: string, state: State, name: string, n: number) => {
   const attempt = state.attempts.find((a) => a.n === n);
   const resources = attemptRuns(state, attempt);
   return {
@@ -446,8 +444,7 @@ const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: Re
 const PROGRESSES = new Set(['start', 'spawn', 'record-end', 'settle']);
 
 /** Whether a pass wrote to a task's journal: the facts its sighting noted first, or an action that progresses. */
-const wroteAny = (noted: readonly Event[], actions: readonly Action[]): boolean =>
-  noted.length > 0 || actions.some((a) => PROGRESSES.has(a.do));
+const wroteAny = (noted: readonly Event[], actions: readonly Action[]) => noted.length > 0 || actions.some((a) => PROGRESSES.has(a.do));
 
 /**
  * One task, stepped until nothing moves — against ONE observation — at most `maxSteps` times. Returns the actions taken.
@@ -594,7 +591,7 @@ export class TickRefused extends Schema.TaggedError<TickRefused>()('TickRefused'
  * passing a ceiling, `tick(3)`, would otherwise have it dropped without a word.
  * @param args Every argument the pass was called with.
  */
-export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
+export const tickRefusalOf = (args: readonly unknown[]) =>
   args.length === 0
     ? undefined
     : `the pass takes no arguments, and was handed ${args.length}: a ceiling and its pools are the engine's own, never a pass's. ${CEILING_INSTEAD}`;
@@ -603,7 +600,7 @@ export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
  * Whether an unsettled task's session is at work as the pass left it: its last attempt open, and its harness listing it
  * `submitted` or `working` — or not yet listing it, as one started this pass is not. One waiting on a person is not.
  */
-const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean => {
+const atWork = (state: State, observed: ReadonlyMap<string, Sighting>) => {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
   const seen = observed.get(nameFor(state.taskId, last.n));
@@ -624,7 +621,7 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  */
 const expectedOf = (
   states: Iterable<Pick<State, 'taskId' | 'harness' | 'restartPolicy'> & { attempts: ReadonlyArray<{ n: number; startedAt: string }> }>,
-): ExpectedSession[] => {
+) => {
   const expected: ExpectedSession[] = [];
   for (const state of states) {
     for (const a of state.attempts) {
@@ -632,7 +629,7 @@ const expectedOf = (
       expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness, ...since });
     }
   }
-  return expected;
+  return expected satisfies ExpectedSession[] as ExpectedSession[];
 };
 
 /**
@@ -674,7 +671,7 @@ const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: Read
 export const ROOM_STEP = 256 * 2 ** 20;
 
 /** Whether two waits say the same to a person: the same pool and ceiling, or the same need and room in one grain (`ROOM_STEP`). */
-const sameWait = (a: AdmissionWait | undefined, b: AdmissionWait): boolean => {
+const sameWait = (a: AdmissionWait | undefined, b: AdmissionWait) => {
   if (a === undefined || a.for !== b.for) return false;
   if (a.for === 'slot' && b.for === 'slot') return a.pool === b.pool && a.ceiling === b.ceiling;
   return (
@@ -686,7 +683,7 @@ const sameWait = (a: AdmissionWait | undefined, b: AdmissionWait): boolean => {
 };
 
 /** `view` with no `waits` of its own: admitted, it waits for nothing. */
-const unwaiting = ({ waits: _, ...view }: TaskView): TaskView => view;
+const unwaiting = ({ waits: _, ...view }: TaskView) => view;
 
 /**
  * Admits the queued tasks the engine's ceiling and the machine's memory have room for (`toAdmit`), off the views the pass built,
@@ -715,14 +712,14 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
     yield* journal.append(TaskId.read(v.id), { kind: 'waits', at: new Date().toISOString() });
     unjudged.add(v.id);
   }
-  return views.map((v): TaskView => {
-    if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' };
+  return views.map((v) => {
+    if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' } satisfies TaskView;
     if (unjudged.has(v.id)) {
       const { waits: _, ...state } = v.state;
-      return { ...unwaiting(v), state };
+      return { ...unwaiting(v), state } satisfies TaskView;
     }
     const wait = recorded.get(v.id);
-    return wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v;
+    return (wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v) satisfies TaskView;
   });
 });
 
@@ -733,7 +730,7 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
 const lookAt = (runner: RunnerOps, expected: readonly ExpectedSession[]) =>
   (runner.observeFor
     ? runner.observeFor(expected)
-    : runner.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: ALL_READ })))
+    : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ }) satisfies Observation as Observation))
   ).pipe(Effect.map((o) => ({ ...o, unobserved: [...(o.why ?? [])] })));
 
 /**
@@ -910,7 +907,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
     ? yield* (
         runner.observeFor
           ? runner.observeFor(expectedOf(open.map((state) => ({ ...state, attempts: state.attempts.slice(-1) }))))
-          : runner.observe.pipe(Effect.map((seen): Observation => ({ seen, unread: ALL_READ })))
+          : runner.observe.pipe(Effect.map((seen) => ({ seen, unread: ALL_READ })))
       ).pipe(Effect.catchCause(() => Effect.succeed<Observation>({ seen: new Map(), unread: ALL_READ })))
     : { seen: new Map<string, Sighting>(), unreadWhy: undefined };
   return { views: states.map((state) => viewOfState(state, seen, unreadWhy, runner.bridgeAsked)), unreadable } satisfies TaskList;
@@ -930,7 +927,7 @@ export const everyView = Effect.fn('everyView')(function* () {
 });
 
 /** The phase `viewOfState` gives a task, by its rules in order, off its record and the sighting of its last attempt. */
-function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sighting: Sighting | undefined): TaskPhase {
+function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sighting: Sighting | undefined) {
   const last = state.attempts.at(-1);
   if (state.settled) return state.settled;
   if (waitsForInput(state)) return 'input-required';
@@ -944,7 +941,7 @@ function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sigh
 }
 
 /** Why the look left a task's last session unread, by its name in `unreadWhy`; none for a task never spawned. */
-const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | undefined): string | undefined => {
+const unreadOfTask = (state: State, unreadWhy: ReadonlyMap<string, string> | undefined) => {
   const last = state.attempts.at(-1);
   return last ? unreadWhy?.get(nameFor(state.taskId, last.n)) : undefined;
 };
@@ -972,7 +969,7 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
  * there is none; else no link, and why, by whether the task is `settled`. Never `undefined` for a task that asked: an absent link is
  * not "not bridged".
  */
-const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined): Bridge | undefined => {
+const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined) => {
   if (!asked) return undefined;
   if (seen) return seen;
   return {
@@ -1021,7 +1018,7 @@ export function viewOfState(
   observed: ReadonlyMap<string, Sighting>,
   unreadWhy?: ReadonlyMap<string, string>,
   bridgeAsked?: RunnerOps['bridgeAsked'],
-): TaskView {
+) {
   const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
@@ -1042,5 +1039,5 @@ export function viewOfState(
     ...(admission === 'queued' && state.waits ? { waits: state.waits } : {}),
     ...(bridge ? { bridge } : {}),
     ...(unread ? { unreadWhy: unread } : {}),
-  };
+  } satisfies TaskView;
 }

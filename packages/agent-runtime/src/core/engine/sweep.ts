@@ -3,8 +3,8 @@
  * feed from its start, and every body's time — and carries nothing to the next.
  */
 import { Effect } from 'effect';
-import type { BodiedJournalOps, JournalError, SweepReport } from './journal.ts';
-import { BODY_GRACE_MS, BODY_REF, BodyRefused, refsOf, type BodyEntry, type BodyError, type BodyRef } from './bodies.ts';
+import type { BodiedJournalOps, SweepReport } from './journal.ts';
+import { BODY_GRACE_MS, BODY_REF, BodyRefused, refsOf, type BodyEntry, type BodyRef } from './bodies.ts';
 
 /** Who names a body first: a task's journal, or the feed's entry for a task. */
 type Referrers = Map<BodyRef, string>;
@@ -59,10 +59,7 @@ export const sweep = Effect.fn('sweep')(function* (ops: BodiedJournalOps, option
  * Remove the body `ref` of `ops`. Refused, saying what to do, when `ref` is no reference, there is no such body, a journal or the
  * feed names it, or it was put within the grace.
  */
-export const removeBody = Effect.fn('removeBody')(function* (
-  ops: BodiedJournalOps,
-  ref: BodyRef,
-): Effect.fn.Return<void, JournalError | BodyError | BodyRefused> {
+export const removeBody = Effect.fn('removeBody')(function* (ops: BodiedJournalOps, ref: BodyRef) {
   if (typeof ref !== 'string' || !BODY_REF.test(ref)) {
     return yield* Effect.fail(
       new BodyRefused({

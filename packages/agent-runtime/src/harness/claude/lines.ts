@@ -167,14 +167,14 @@ const FIX =
   ' lines this runtime reads, or a runtime whose schema for the line in `harness/claude/lines.ts` reads this one.';
 
 /** The `type` of `entry` when it is a JSON object whose `type` is one of `kinds`, or `undefined` for anything else. */
-const kindOf = <K extends LineKind>(entry: unknown, kinds: readonly K[]): K | undefined => {
+const kindOf = <K extends LineKind>(entry: unknown, kinds: readonly K[]) => {
   if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return undefined;
   const { type } = entry as { type?: unknown };
   return kinds.find((k) => k === type);
 };
 
 /** Why `entry`, a `kind` line at `where`, is refused: the line, its first wrong field, what is there, and the fix. */
-const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.SchemaError): string => {
+const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.SchemaError) => {
   const { path, words } = firstRefusal(entry, error, 'Claude Code writes');
   const field = path.length ? `\`${path.map(String).join('.')}\`` : 'shape';
   return `${where} is ${kind.startsWith('a') ? 'an' : 'a'} \`${kind}\` line whose ${field} ${words}. ${FIX}`;
@@ -188,11 +188,7 @@ const refusal = (where: string, kind: LineKind, entry: unknown, error: Schema.Sc
  * @param kinds The line types to decode; a line of any other type is left unread.
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
-export const decodeLine = <K extends LineKind>(
-  entry: unknown,
-  kinds: readonly K[],
-  where: string,
-): { line: Line<K> } | { wrong: string } | undefined => {
+export const decodeLine = <K extends LineKind>(entry: unknown, kinds: readonly K[], where: string) => {
   const kind = kindOf(entry, kinds);
   if (kind === undefined) return undefined;
   const decoded = DECODERS[kind](entry);
@@ -206,7 +202,7 @@ export const decodeLine = <K extends LineKind>(
  * @param kinds The line types to decode; a line of any other type is left unread.
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
-export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], where: string): Line<K> | undefined => {
+export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], where: string) => {
   let entry: unknown;
   try {
     entry = JSON.parse(text);
@@ -225,7 +221,7 @@ export const lineOf = <K extends LineKind>(text: string, kinds: readonly K[], wh
  * @param text The line's text, as the transcript holds it.
  * @param where Where the line is, as a refusal names it: its offset, and its transcript's path where known.
  */
-export const writtenAt = (text: string, where: string): number | undefined => {
+export const writtenAt = (text: string, where: string) => {
   let entry: unknown;
   try {
     entry = JSON.parse(text);

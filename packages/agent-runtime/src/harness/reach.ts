@@ -13,7 +13,7 @@ export type { FenceReach } from './declaration.ts';
  * @param harness The harness's name.
  * @param model The model the session runs on, or undefined for the harness's default.
  */
-export const fenceReach = (harness: string, model?: string): FenceReach | undefined => own(HARNESS_DECLARATIONS, harness)?.reach?.(model);
+export const fenceReach = (harness: string, model?: string) => own(HARNESS_DECLARATIONS, harness)?.reach?.(model);
 
 /**
  * The first character of `path` that a permission rule of harness `harness` cannot carry, so that a rule naming the path would end, or
@@ -22,5 +22,4 @@ export const fenceReach = (harness: string, model?: string): FenceReach | undefi
  * @param harness The harness's name.
  * @param path The path a rule would name.
  */
-export const unruledIn = (harness: string, path: string): string | undefined =>
-  own(HARNESS_DECLARATIONS, harness)?.unruled?.exec(path)?.[0];
+export const unruledIn = (harness: string, path: string) => own(HARNESS_DECLARATIONS, harness)?.unruled?.exec(path)?.[0];

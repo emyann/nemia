@@ -8,7 +8,7 @@ import type { SpawnRequest } from '../seam.ts';
  * `resource` as OpenTelemetry's `OTEL_RESOURCE_ATTRIBUTES`: `key=value` pairs, by key, joined by commas, each value percent-encoded so
  * that a `,`, a `=` or a `%` in it is read back as itself.
  */
-const resourceAttributes = (resource: Record<string, string>): string =>
+const resourceAttributes = (resource: Record<string, string>) =>
   Object.entries(resource)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
@@ -21,8 +21,8 @@ const resourceAttributes = (resource: Record<string, string>): string =>
  * the tools' inputs — a command's text, a file's path, an error's words — unless the collector asks for them (`toolDetails`).
  * @param r The spawn request, read for its telemetry, its resource and its trace context.
  */
-export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
-  if (!r.telemetry) return {};
+export const claudeTelemetryEnv = (r: SpawnRequest) => {
+  if (!r.telemetry) return {} satisfies Record<string, string> as Record<string, string>;
   return {
     CLAUDE_CODE_ENABLE_TELEMETRY: '1',
     CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '1',
@@ -34,5 +34,5 @@ export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
     ...(r.telemetry.toolDetails === true ? { OTEL_LOG_TOOL_DETAILS: '1' } : {}),
     ...(r.resource ? { OTEL_RESOURCE_ATTRIBUTES: resourceAttributes(r.resource) } : {}),
     ...(r.traceparent ? { TRACEPARENT: r.traceparent } : {}),
-  };
+  } satisfies Record<string, string> as Record<string, string>;
 };

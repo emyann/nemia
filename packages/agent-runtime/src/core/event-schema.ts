@@ -288,7 +288,7 @@ export const StoredEventsSchema = Schema.Array(StoredEventSchema);
 /** One entry of the store's feed as a store holds it: which task an event happened to. */
 export const StoredFeedEntrySchema = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest);
 
-const fieldOf = (value: unknown, key: PropertyKey): unknown =>
+const fieldOf = (value: unknown, key: PropertyKey) =>
   typeof value === 'object' && value !== null && key in value ? (value as Record<PropertyKey, unknown>)[key] : undefined;
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
@@ -306,7 +306,7 @@ export const noneOf = (known: { readonly discriminants: ReadonlyArray<PropertyKe
   Schema.String.check(Schema.makeFilter((tag: string) => !known.discriminants.includes(tag) || refused(tag)));
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
-const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');
+const shown = (value: unknown) => quote(JSON.stringify(value) ?? 'undefined');
 
 /**
  * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds
@@ -316,11 +316,7 @@ const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefi
  * @param error The schema's refusal of it.
  * @param holder What the value's writer is said as, in the words of what it holds there.
  */
-export const firstRefusal = (
-  value: unknown,
-  error: Schema.SchemaError,
-  holder = 'the runtime writes',
-): { path: readonly PropertyKey[]; words: string } => {
+export const firstRefusal = (value: unknown, error: Schema.SchemaError, holder = 'the runtime writes') => {
   const [first] = formatter(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
@@ -341,7 +337,7 @@ export const firstRefusal = (
  * @param error The schema's refusal of the entry.
  * @param feed Whether the entry is a feed entry rather than a task's event.
  */
-export const entryWords = (where: string, entry: unknown, error: Schema.SchemaError, feed: boolean): string => {
+export const entryWords = (where: string, entry: unknown, error: Schema.SchemaError, feed: boolean) => {
   const { path, words } = firstRefusal(entry, error);
   const rest = path.slice(feed ? 1 : 0);
   const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');

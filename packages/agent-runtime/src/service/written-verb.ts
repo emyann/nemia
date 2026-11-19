@@ -14,7 +14,7 @@ import type { Harnessed } from './harnessed.ts';
  * What failed, in words, off a cause: its error's message, or the value itself.
  * @param e What failed.
  */
-export const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+export const wordsOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** What a verb written to a session says where no session of a task is there to take it. */
 type OpenWords = {
@@ -30,15 +30,26 @@ type OpenWords = {
  * The attempt a verb written from outside a session acts on, read off the journal: the last, still running. Refused, in the verb's
  * `words`, for a task settled, asked to stop, not started, or whose last attempt has ended.
  */
-const openAttemptOf = (taskId: string, state: State, words: OpenWords): { last: Attempt } | { refused: string } => {
+const openAttemptOf = (taskId: string, state: State, words: OpenWords) => {
   const last = state.attempts.at(-1);
   const instead = words.instead === undefined ? '' : ` ${words.instead}`;
   if (state.settled)
-    return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running${words.settled}.${instead}` };
-  if (state.stopRequested) return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered.${instead}` };
-  if (!last) return { refused: `\`${taskId}\` has not started an attempt yet, so there is ${words.unstarted}` };
-  if (last.ended !== null) return { refused: `\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`.${instead}` };
-  return { last };
+    return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running${words.settled}.${instead}` } satisfies
+      | { last: Attempt }
+      | { refused: string } as { last: Attempt } | { refused: string };
+  if (state.stopRequested)
+    return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered.${instead}` } satisfies
+      | { last: Attempt }
+      | { refused: string } as { last: Attempt } | { refused: string };
+  if (!last)
+    return { refused: `\`${taskId}\` has not started an attempt yet, so there is ${words.unstarted}` } satisfies
+      | { last: Attempt }
+      | { refused: string } as { last: Attempt } | { refused: string };
+  if (last.ended !== null)
+    return { refused: `\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`.${instead}` } satisfies
+      | { last: Attempt }
+      | { refused: string } as { last: Attempt } | { refused: string };
+  return { last } satisfies { last: Attempt } | { refused: string } as { last: Attempt } | { refused: string };
 };
 
 /** The engine's reads a verb written to a session is made over: its journal (`read`, `go`) and the harness a task runs on. */
@@ -85,7 +96,7 @@ type Reached<Reach> = {
  */
 export const unsentOf =
   <Unsent>(verb: Pick<WrittenVerb<unknown, Unsent, unknown>, 'unsent'>, message: (e: unknown) => string) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, Unsent, R> =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.catchCause((cause: Cause.Cause<E>) => {
         const e = Cause.squash(cause);
@@ -101,9 +112,9 @@ export const unsentOf =
  */
 export const handedOver =
   <Refused, Unsent>(verb: Pick<WrittenVerb<Refused, Unsent, unknown>, 'refused' | 'unsent'>, message: (words: string) => string) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, Refused | Unsent, R> =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.catchCause((cause: Cause.Cause<E>): Effect.Effect<never, Refused | Unsent> => {
+      Effect.catchCause((cause: Cause.Cause<E>) => {
         const e = Cause.squash(cause) as { refused?: boolean };
         return Effect.fail(e.refused === true ? verb.refused(wordsOf(e)) : verb.unsent(message(wordsOf(e)), e));
       }),
@@ -118,11 +129,7 @@ export const handedOver =
  * @param verb The verb written to the session.
  * @param taskId The task's id.
  */
-export const sessionReached = <Refused, Unsent, Reach>(
-  ports: WrittenPorts,
-  verb: WrittenVerb<Refused, Unsent, Reach>,
-  taskId: string,
-): Effect.Effect<Reached<Reach>, Refused | Unsent | JournalError> =>
+export const sessionReached = <Refused, Unsent, Reach>(ports: WrittenPorts, verb: WrittenVerb<Refused, Unsent, Reach>, taskId: string) =>
   Effect.gen(function* () {
     const events = yield* ports.read(taskId);
     if (!events.length) return yield* Effect.fail(verb.refused(unknownTask(taskId)));

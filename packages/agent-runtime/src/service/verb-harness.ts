@@ -2,7 +2,7 @@
  * Which harness an Engine verb that only some harnesses answer goes to, read off what each declares (`verbHarnessOf`): the engine's and
  * the stand-in's one road, so neither picks a harness by its name.
  */
-import { DEFAULT_HARNESS, verbHarnessOf, type Capability, type HarnessDeclared, type VerbHarness } from '../harness/declaration.ts';
+import { DEFAULT_HARNESS, verbHarnessOf, type Capability, type HarnessDeclared } from '../harness/declaration.ts';
 import type { RunnerOps } from '../harness/seam.ts';
 import { declarationOf, type HarnessConfig } from './options.ts';
 
@@ -18,7 +18,7 @@ const RUNNER_VERBS: readonly (readonly [Capability, keyof RunnerOps])[] = [
  * has none, the verbs it has an op for — a runner is never asked a verb it cannot answer, and never refused one it can.
  * @param config The harness as configured.
  */
-export const canOf = (config: HarnessConfig): readonly Capability[] => {
+export const canOf = (config: HarnessConfig) => {
   const declared = declarationOf(config);
   if (declared !== undefined) return declared.can;
   if (typeof config !== 'object' || !('spawn' in config)) return [];
@@ -29,7 +29,7 @@ export const canOf = (config: HarnessConfig): readonly Capability[] => {
  * Each harness of `harnesses`, in the engine's order, with what it declares (`canOf`).
  * @param harnesses The engine's harnesses, each by its name.
  */
-export const declaredOf = (harnesses: Record<string, HarnessConfig>): HarnessDeclared[] =>
+export const declaredOf = (harnesses: Record<string, HarnessConfig>) =>
   Object.entries(harnesses).map(([name, config]) => ({ name, can: canOf(config) }));
 
 /**
@@ -37,7 +37,7 @@ export const declaredOf = (harnesses: Record<string, HarnessConfig>): HarnessDec
  * @param harnesses The engine's harnesses, each by its name.
  * @param defaultHarness The engine's `defaultHarness`, or undefined where it names none.
  */
-export const fallbackOf = (harnesses: Record<string, HarnessConfig>, defaultHarness: string | undefined): string =>
+export const fallbackOf = (harnesses: Record<string, HarnessConfig>, defaultHarness: string | undefined) =>
   defaultHarness ?? Object.keys(harnesses)[0] ?? DEFAULT_HARNESS;
 
 /**
@@ -48,12 +48,7 @@ export const fallbackOf = (harnesses: Record<string, HarnessConfig>, defaultHarn
  * @param declared The engine's harnesses, each with what it declares.
  * @param fallback The default harness, asked first where none is named.
  */
-export const verbHarnessIn = (
-  verb: Capability,
-  name: string | undefined,
-  declared: readonly HarnessDeclared[],
-  fallback: string,
-): VerbHarness =>
+export const verbHarnessIn = (verb: Capability, name: string | undefined, declared: readonly HarnessDeclared[], fallback: string) =>
   verbHarnessOf(
     verb,
     name,

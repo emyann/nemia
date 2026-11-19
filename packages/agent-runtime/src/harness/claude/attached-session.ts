@@ -17,7 +17,6 @@ import {
   type HookCallbackMatcher,
   type HookEvent,
   type SDKMessage,
-  type SpawnedProcess,
   type SpawnOptions,
 } from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './session-options.ts';
@@ -40,7 +39,7 @@ import { claudeStreamKept, initLineKept } from '../detached/output.ts';
 import type { InitRead } from '../../../contracts/capture.contract.ts';
 import { ASK_CUT, permissionAnswered, permissionAskOf } from './permission.ts';
 import type { SpawnRequest } from '../seam.ts';
-import type { AskOption, AskQuestion } from '../../core/index.ts';
+import type { AskQuestion } from '../../core/index.ts';
 import { own } from '../../core/own.ts';
 import { cutWords } from '../../core/restart.ts';
 import { claudeHeardFile, keepHeard } from './heard.ts';
@@ -73,7 +72,7 @@ const inputOf = () => {
     wake = undefined;
   };
   return {
-    push: (content: string): UserLine['uuid'] => {
+    push: (content: string) => {
       const uuid = randomUUID();
       items.push({ type: 'user', uuid, message: { role: 'user', content }, parent_tool_use_id: null, session_id: '' });
       ring();
@@ -86,7 +85,7 @@ const inputOf = () => {
     get closed() {
       return closed;
     },
-    async *[Symbol.asyncIterator](): AsyncGenerator<UserLine> {
+    async *[Symbol.asyncIterator]() {
       for (;;) {
         for (let item = items.shift(); item !== undefined; item = items.shift()) yield item;
         if (closed) return;
@@ -137,7 +136,7 @@ export type Live = {
  * session answering under the same id, its turn ending with a result of its own. Answers whether the request was sent at all.
  * @param live The session at work in this process; absent where this process runs none by that name.
  */
-export const interruptTurn = async (live: Live | undefined): Promise<boolean> => {
+export const interruptTurn = async (live: Live | undefined) => {
   const ask = live?.q?.interrupt;
   if (ask === undefined || live === undefined || live.letGo) return false;
   await ask.call(live.q);
@@ -180,12 +179,7 @@ export type HookHold = {
  * @param id The call's id as the hook names it; absent, the call is not kept in flight.
  * @param signal The call's own signal, aborted where the SDK gives the call up.
  */
-export const heldAtHook = async (
-  hold: HookHold,
-  input: unknown,
-  id: string | undefined,
-  signal: AbortSignal,
-): Promise<object | undefined> => {
+export const heldAtHook = async (hold: HookHold, input: unknown, id: string | undefined, signal: AbortSignal) => {
   if (!inside(input)) {
     if (hold.held()) {
       const since = new Date().toISOString();
@@ -199,20 +193,20 @@ export const heldAtHook = async (
         hold.waited(since);
       }
     }
-    if (hold.over()) return await cutWhileHeld(signal, hold.ends);
+    if (hold.over()) return (await cutWhileHeld(signal, hold.ends)) satisfies object | undefined;
   }
   callStarted(hold.calls, id, input);
-  return undefined;
+  return undefined satisfies object | undefined;
 };
 
 /** Nothing, once the call's `signal` or the session's end (`ends`) says it is over. */
-const cutWhileHeld = (signal: AbortSignal, ends: AbortSignal | undefined): Promise<object> =>
+const cutWhileHeld = (signal: AbortSignal, ends: AbortSignal | undefined) =>
   new Promise((resolve) => {
     const over = () => resolve({});
     if (signal.aborted || ends?.aborted) return over();
     signal.addEventListener('abort', over, { once: true });
     ends?.addEventListener('abort', over, { once: true });
-  });
+  }) satisfies Promise<object>;
 
 /** The tool a session calls to ask a person a question, as Claude Code names it. */
 const ASK_TOOL = 'AskUserQuestion';
@@ -230,7 +224,7 @@ export { ASK_CUT };
 export const ASK_ANSWERED = 'The person answered this question where it was shown, and their answer is in the call.';
 
 /** One choice of a question, as the call's input gave it: nothing where it names no label. */
-const optionOf = (raw: unknown): AskOption[] => {
+const optionOf = (raw: unknown) => {
   const o = (raw ?? {}) as { label?: unknown; description?: unknown; preview?: unknown };
   if (typeof o.label !== 'string' || o.label === '') return [];
   return [
@@ -246,7 +240,7 @@ const optionOf = (raw: unknown): AskOption[] => {
  * The questions of an `AskUserQuestion` call's input, as the harness gave them: none where the input holds no question with a text and
  * a choice, so a call this runtime cannot draw is never written down as an ask a person could answer.
  */
-const questionsOf = (input: unknown): AskQuestion[] => {
+const questionsOf = (input: unknown) => {
   const asked = (input as { questions?: unknown })?.questions;
   if (!Array.isArray(asked)) return [];
   return asked.flatMap((raw) => {
@@ -275,7 +269,7 @@ const questionsOf = (input: unknown): AskQuestion[] => {
  * promises nothing of the call's signal on an interrupt — it documents it only as signalled "if the operation should be aborted" —
  * and the call is told what every cut call is told (`ASK_CUT`), which names the turn's end among its causes.
  */
-const heldFor = async (root: string, live: Live, line: AskLine, signal: AbortSignal): Promise<Record<string, string> | undefined> => {
+const heldFor = async (root: string, live: Live, line: AskLine, signal: AbortSignal) => {
   const { id } = line;
   if (!live.asking.has(id)) {
     live.asking.add(id);
@@ -298,13 +292,7 @@ const heldFor = async (root: string, live: Live, line: AskLine, signal: AbortSig
  * The person's answers to the `AskUserQuestion` call `id`, held for them (`heldFor`), with the questions its input asked; nothing where
  * the input holds no question this runtime can draw, or no answer came.
  */
-const askedOf = async (
-  root: string,
-  live: Live,
-  id: string,
-  input: unknown,
-  signal: AbortSignal,
-): Promise<{ questions: AskQuestion[]; answers: Record<string, string> } | undefined> => {
+const askedOf = async (root: string, live: Live, id: string, input: unknown, signal: AbortSignal) => {
   const questions = questionsOf(input);
   if (questions.length === 0) return undefined;
   const answers = await heldFor(root, live, { id, at: new Date().toISOString(), questions }, signal);
@@ -343,7 +331,7 @@ export const DENIED_HERE =
  * and since when one is held there, after which call, as `hold`; nothing once the session is let go, its file its holder's last word
  * (`parked`).
  */
-const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): void => {
+const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}) => {
   if (live.letGo) return;
   const first = firstCall(live.calls);
   const { calling: _, heldBack: __, hold: ___, ...rest } = live.run;
@@ -368,7 +356,7 @@ const rewrite = (root: string, live: Live, patch: Partial<AttachedRun> = {}): vo
  * @param live The session at work in this process.
  * @param tool The name of the tool whose call the drain cut.
  */
-export const cutTurn = async (root: string, live: Live, tool: string): Promise<boolean> => {
+export const cutTurn = async (root: string, live: Live, tool: string) => {
   if (live.letGo) return false;
   rewrite(root, live, { cut: { tool, since: new Date().toISOString() } });
   return interruptTurn(live);
@@ -381,7 +369,7 @@ export const cutTurn = async (root: string, live: Live, tool: string): Promise<b
  * @param root The engine's store root, where the session's run file is.
  * @param live The session at work in this process.
  */
-export const toldCut = (root: string, live: Live): void => {
+export const toldCut = (root: string, live: Live) => {
   const cut = live.run.cut;
   if (cut === undefined || live.letGo) return;
   const { cut: _, ...rest } = live.run;
@@ -392,13 +380,7 @@ export const toldCut = (root: string, live: Live): void => {
 };
 
 /** The hooks that keep the call in flight, a new one held while `held` says so, read every `pollMs` (`heldAtHook`). */
-const hooksOf = (
-  root: string,
-  live: Live,
-  held: Held,
-  mayAsk: boolean,
-  pollMs: number,
-): Partial<Record<HookEvent, HookCallbackMatcher[]>> => {
+const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean, pollMs: number) => {
   const hold: HookHold = {
     held: () => held(live),
     over: () => live.letGo,
@@ -438,14 +420,14 @@ const hooksOf = (
     ],
     PostToolUse: [{ hooks: [ended] }],
     PostToolUseFailure: [{ hooks: [ended] }],
-  };
+  } satisfies Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 };
 
 /**
  * Appends `line` to the session's capture, as a reader of a job's stream reads it: an `init` line only where it changes what the
  * process's earlier ones said (`initLineKept`, folding `live.initRead`), every other line as `claudeStreamKept` keeps it.
  */
-const capture = (root: string, live: Live, line: object): void => {
+const capture = (root: string, live: Live, line: object) => {
   const text = JSON.stringify(line);
   const init = initLineKept(text, live.initRead);
   if (init) live.initRead = init.read;
@@ -468,9 +450,8 @@ const capture = (root: string, live: Live, line: object): void => {
  * the installed CLI consults, the ask is written down once (`heldFor`) and answered the same way. A permission is not: the hook runs
  * before Claude Code checks its rules, so it cannot know a call will prompt, and held there every call would wait on a person.
  */
-const decidedHere =
-  (root: string, live: Live, mayAsk: boolean): CanUseTool =>
-  async (tool, input, { toolUseID, signal, ...offer }) => {
+const decidedHere = (root: string, live: Live, mayAsk: boolean) =>
+  (async (tool, input, { toolUseID, signal, ...offer }) => {
     const denied = (message: string) => {
       capture(root, live, { type: 'system', subtype: 'permission_denied', tool_name: tool, tool_use_id: toolUseID });
       return { behavior: 'deny' as const, message };
@@ -489,10 +470,10 @@ const decidedHere =
       answers === undefined ? undefined : (own(answers, question) ?? ''),
     );
     return answer.behavior === 'deny' ? denied(answer.message) : answer;
-  };
+  }) satisfies CanUseTool;
 
 /** The ids of the calls a message says are over: a tool's result, or a denial. */
-const callsEndedBy = (m: SDKMessage): string[] => {
+const callsEndedBy = (m: SDKMessage) => {
   const line = m as { type: string; subtype?: string; tool_use_id?: string; message?: { content?: unknown } };
   if (line.type === 'system' && line.subtype === 'permission_denied') return line.tool_use_id ? [line.tool_use_id] : [];
   if (line.type !== 'user' || !Array.isArray(line.message?.content)) return [];
@@ -506,7 +487,7 @@ const callsEndedBy = (m: SDKMessage): string[] => {
  * every one folded into it as it ran; the single `user_message_uuid` where a producer lists only that; and all of them where it names
  * none, so a producer that says nothing leaves no session answering for words no result will ever name.
  */
-const answered = (live: Live, m: SDKMessage): void => {
+const answered = (live: Live, m: SDKMessage) => {
   const said = m as { user_message_uuids?: unknown; user_message_uuid?: unknown };
   const named = Array.isArray(said.user_message_uuids)
     ? said.user_message_uuids
@@ -537,7 +518,7 @@ const answered = (live: Live, m: SDKMessage): void => {
  * `live.pushed` is called first, with every message and before the capture's guard, so whoever follows the session live is given its
  * `stream_event` lines too — the pieces of the text it is writing — which the capture goes on dropping.
  */
-const took = (root: string, live: Live, m: SDKMessage): void => {
+const took = (root: string, live: Live, m: SDKMessage) => {
   live.pushed?.(m);
   scopeSeen(root, live);
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live, m);
@@ -555,14 +536,14 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
  * moved its Claude Code into the scope and run it, so its cgroup is the scope's. A read taken earlier would be the holder's own, which
  * `scopeToEnd` refuses to end. Nothing for a session with no scope, or one recorded already.
  */
-const scopeSeen = (root: string, live: Live): void => {
+const scopeSeen = (root: string, live: Live) => {
   if (!live.scoped || live.run.cgroup !== undefined || live.run.childPid === undefined) return;
   const cgroup = cgroupNow(live.run.childPid);
   if (cgroup !== undefined) rewrite(root, live, { cgroup });
 };
 
 /** The turn of `live` ended by its result `m`: its calls and asks cleared, and the session written as `took` says. */
-const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'result' }>): void => {
+const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'result' }>) => {
   live.calls.clear();
   live.asking.clear();
   cutAsks(root, live.run.name);
@@ -582,7 +563,7 @@ const turnEnded = (root: string, live: Live, m: Extract<SDKMessage, { type: 'res
  * @param root The engine's store root, where the session's say file and run file are.
  * @param live The session at work in this process.
  */
-export const hear = (root: string, live: Live): void => {
+export const hear = (root: string, live: Live) => {
   if (live.input.closed || live.letGo) return;
   let said: Buffer;
   try {
@@ -603,7 +584,7 @@ export const hear = (root: string, live: Live): void => {
  * @param pid The process waited on; absent, nothing is waited on.
  * @param everyMs How often it is read again, in ms; `GONE_POLL_MS` unless given.
  */
-export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_MS): Promise<void> => {
+export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_MS) => {
   for (;;) {
     if (pid === undefined || !alive(pid)) return;
     await new Promise((r) => setTimeout(r, everyMs));
@@ -615,7 +596,7 @@ export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_
  * `cgroup.kill`, at once, as its group is killed, so a process its commands started out of the group goes with it.
  * @param recorded The scope's folder the session's run file recorded (`cgroup`); absent where it ran in none.
  */
-export const endScopeOf = (recorded: string | undefined): void => {
+export const endScopeOf = (recorded: string | undefined) => {
   if (recorded !== undefined && scopeToEnd(recorded, cgroupNow('self'))) endScopeIn(recorded, 'SIGKILL');
 };
 
@@ -623,7 +604,7 @@ export const endScopeOf = (recorded: string | undefined): void => {
  * Kills the process group `pid` leads, and whatever is left of it: nothing when it is gone.
  * @param pid The pid of the group's leader; absent, nothing is killed.
  */
-export const killGroup = (pid: number | undefined): void => {
+export const killGroup = (pid: number | undefined) => {
   if (pid === undefined) return;
   try {
     process.kill(-pid, 'SIGKILL');
@@ -638,31 +619,29 @@ export const killGroup = (pid: number | undefined): void => {
  * falls back to a bare start where it cannot be made (`scopedOrBare`), and the run file says why (`unscoped`); a limited one does not,
  * and its session fails as a session whose Claude Code would not start.
  */
-const spawnerOf =
-  (root: string, live: Live, scope: { memoryLimit?: number; argv: string[] } | undefined) =>
-  (o: SpawnOptions): SpawnedProcess => {
-    if (scope !== undefined && scope.memoryLimit === undefined) {
-      let pid: number | undefined;
-      o.signal.addEventListener('abort', () => killGroup(pid), { once: true });
-      return scopedOrBare(
-        scope.argv,
-        o,
-        (child) => {
-          pid = child.pid;
-          if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
-        },
-        (why) => {
-          delete live.scoped;
-          rewrite(root, live, { unscoped: `its scope could not be made (${why}), so it runs with no scope` });
-        },
-      );
-    }
-    const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];
-    const child = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
-    o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
-    if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
-    return child;
-  };
+const spawnerOf = (root: string, live: Live, scope: { memoryLimit?: number; argv: string[] } | undefined) => (o: SpawnOptions) => {
+  if (scope !== undefined && scope.memoryLimit === undefined) {
+    let pid: number | undefined;
+    o.signal.addEventListener('abort', () => killGroup(pid), { once: true });
+    return scopedOrBare(
+      scope.argv,
+      o,
+      (child) => {
+        pid = child.pid;
+        if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
+      },
+      (why) => {
+        delete live.scoped;
+        rewrite(root, live, { unscoped: `its scope could not be made (${why}), so it runs with no scope` });
+      },
+    );
+  }
+  const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];
+  const child = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
+  if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
+  return child;
+};
 
 /**
  * Starts the session `run` and answers it at once: `r` its spawn, `first` the first words on its input, `resume` the Claude Code session
@@ -694,7 +673,7 @@ export const startSession = (
     pushed?: (m: SDKMessage) => void;
     scope?: ScopeAt;
   },
-): Live => {
+) => {
   const abort = new AbortController();
   const open = r.restartPolicy === 'Always';
   const mayAsk = r.config?.mayAsk === true;
@@ -761,7 +740,7 @@ export const startSession = (
  * session keeps its claude.ai session past this process (`keepSessionOnExit`), and a resume re-attaches the one its run file kept; a
  * job's claude.ai session ends with it, and re-attaches none.
  */
-const bridgeOn = async (root: string, live: Live, q: unknown, name: string): Promise<void> => {
+const bridgeOn = async (root: string, live: Live, q: unknown, name: string) => {
   if (live.letGo) return;
   const reattach = live.open ? live.run.bridge?.bridgeSessionId : undefined;
   const bridge = await enableBridge(q, name, { keepSessionOnExit: live.open, ...(reattach ? { reattach } : {}) });

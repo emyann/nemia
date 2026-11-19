@@ -6,7 +6,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { SpentSoFar, Usage } from '../../core/index.ts';
 import { originOf, type TranscriptEvent, type TranscriptOriginKind } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 import { Attachments, Blocks, type ContentBlock, decodeLine, type Line, lineOf, ResultTexts, writtenAt } from './lines.ts';
@@ -16,7 +15,7 @@ const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir
 const transcripts = new Map<string, string>();
 
 /** Where a Claude Code session's transcript is, found once and remembered — or `undefined` while no project folder holds it. */
-const transcriptFile = (sessionId: string): string | undefined => {
+const transcriptFile = (sessionId: string) => {
   const known = transcripts.get(sessionId);
   if (known && fs.existsSync(known)) return known;
   let dirs: string[];
@@ -40,7 +39,7 @@ const transcriptFile = (sessionId: string): string | undefined => {
  * where it keeps one. Found in one pass over the project folders, each listed once, whatever the count of ids; an id no folder
  * holds has no key, and a record under an id not asked is never named.
  */
-const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => {
+const transcriptRecords = (sessionIds: readonly string[]) => {
   const asked = new Set(sessionIds);
   const found = new Map<string, string[]>();
   if (!asked.size) return found;
@@ -72,7 +71,7 @@ const transcriptRecords = (sessionIds: readonly string[]): Map<string, string[]>
  * Exported only for the tests that import it.
  * @param sessionId The Claude Code session's id, its transcript's file name.
  */
-export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
+export const transcriptWrittenAt = async (sessionId: string) => {
   const file = transcriptFile(sessionId);
   if (!file) return undefined;
   try {
@@ -91,16 +90,16 @@ type BlockOf<T extends string> = Extract<ContentBlock, { type: T }>;
  * A Claude Code session's transcript file, for the runners that read one by a spec (`claudeJobSpec`).
  * @param sessionId The Claude Code session's id, its transcript's file name.
  */
-export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
+export const claudeTranscriptFile = (sessionId: string) => transcriptFile(sessionId);
 
 /**
  * A detached spec's `transcript.records` for Claude Code: `transcriptRecords`.
  * @param sessionIds The Claude Code sessions' ids whose transcript files are looked for.
  */
-export const claudeTranscriptRecords = (sessionIds: readonly string[]): Map<string, string[]> => transcriptRecords(sessionIds);
+export const claudeTranscriptRecords = (sessionIds: readonly string[]) => transcriptRecords(sessionIds);
 
 /** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
-const resultText = (content: BlockOf<'tool_result'>['content']): string =>
+const resultText = (content: BlockOf<'tool_result'>['content']) =>
   typeof content === 'string'
     ? content
     : Array.isArray(content)
@@ -118,21 +117,26 @@ const blockEvents = (
   at: string,
   role: TranscriptEvent['role'],
   origin?: { kind: TranscriptOriginKind },
-): TranscriptEvent[] => {
-  const said = (text: string): TranscriptEvent => ({
-    id: `${id}:${i}`,
-    at,
-    role,
-    kind: role === 'system' ? 'system' : 'text',
-    text,
-    ...(origin ? { origin } : {}),
-  });
-  if (Blocks.guards.text(block)) return [said(block.text ?? '')];
+) => {
+  const said = (text: string) =>
+    ({
+      id: `${id}:${i}`,
+      at,
+      role,
+      kind: role === 'system' ? 'system' : 'text',
+      text,
+      ...(origin ? { origin } : {}),
+    }) satisfies TranscriptEvent;
+  if (Blocks.guards.text(block)) return [said(block.text ?? '')] satisfies TranscriptEvent[];
   if (Blocks.guards.thinking(block) || Blocks.guards.redacted_thinking(block)) {
-    return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) }];
+    return [
+      { id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) },
+    ] satisfies TranscriptEvent[];
   }
   if (Blocks.guards.tool_use(block)) {
-    return [{ id: block.id ?? `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } }];
+    return [
+      { id: block.id ?? `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } },
+    ] satisfies TranscriptEvent[];
   }
   if (Blocks.guards.tool_result(block)) {
     return [
@@ -143,20 +147,20 @@ const blockEvents = (
         kind: 'tool_result',
         result: { text: resultText(block.content), isError: block.is_error === true },
       },
-    ];
+    ] satisfies TranscriptEvent[];
   }
-  return [said(`[${block.type}]`)];
+  return [said(`[${block.type}]`)] satisfies TranscriptEvent[];
 };
 
 /** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
-const queuedEvents = (line: Line<'attachment'>, id: string, at: string): TranscriptEvent[] => {
+const queuedEvents = (line: Line<'attachment'>, id: string, at: string) => {
   const a = line.attachment;
-  if (a === undefined || !Attachments.guards.queued_command(a) || typeof a.prompt !== 'string') return [];
+  if (a === undefined || !Attachments.guards.queued_command(a) || typeof a.prompt !== 'string') return [] satisfies TranscriptEvent[];
   const from = a.origin?.kind;
-  if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
-  return a.commandMode === 'prompt' && (from === 'human' || from === undefined)
-    ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
-    : [];
+  if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }] satisfies TranscriptEvent[];
+  return (
+    a.commandMode === 'prompt' && (from === 'human' || from === undefined) ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }] : []
+  ) satisfies TranscriptEvent[];
 };
 
 /**
@@ -198,24 +202,27 @@ const queuedEvents = (line: Line<'attachment'>, id: string, at: string): Transcr
  * @param offset The line's offset in the transcript, in bytes.
  * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
  */
-export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
+export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string) => {
   const where = `the line at byte ${offset} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
   const read = decodeLine(entry, ['user', 'assistant', 'system', 'attachment'], where);
-  if (read === undefined) return [];
+  if (read === undefined) return [] satisfies TranscriptEvent[];
   if ('wrong' in read) throw new Error(read.wrong);
   const { line } = read;
   const at = isoTime(line.timestamp);
-  if (!at || line.isSidechain === true) return [];
+  if (!at || line.isSidechain === true) return [] satisfies TranscriptEvent[];
   const id = line.uuid || `@${offset}`;
-  if (line.type === 'system') return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }];
-  if (line.type === 'attachment') return queuedEvents(line, id, at);
+  if (line.type === 'system')
+    return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }] satisfies TranscriptEvent[];
+  if (line.type === 'attachment') return queuedEvents(line, id, at) satisfies TranscriptEvent[];
   const role = line.isMeta === true ? 'system' : line.type;
   const from =
     line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: originOf(line.origin.kind) } : undefined;
   const content = line.message.content;
   if (typeof content === 'string')
-    return [{ id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) }];
-  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role, from));
+    return [
+      { id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) },
+    ] satisfies TranscriptEvent[];
+  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role, from)) satisfies TranscriptEvent[];
 };
 
 /**
@@ -234,7 +241,7 @@ type CostState = {
 type Tokens = { inputTokens?: number; uncachedTokens?: number; cacheWriteTokens?: number; cacheReadTokens?: number; outputTokens?: number };
 
 /** The tokens of a `cost-state`'s `modelUsage`, every model's together — or none, when any model's count is not all there. */
-const tokensOf = (modelUsage: Line<'cost-state'>['modelUsage']): Tokens => {
+const tokensOf = (modelUsage: Line<'cost-state'>['modelUsage']) => {
   if (modelUsage === undefined) return {};
   const sum = { uncachedTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 };
   for (const m of Object.values(modelUsage)) {
@@ -249,7 +256,7 @@ const tokensOf = (modelUsage: Line<'cost-state'>['modelUsage']): Tokens => {
 };
 
 /** A decoded `cost-state` line as what it says the session cost. */
-const costStateOf = (line: Line<'cost-state'>): CostState => ({
+const costStateOf = (line: Line<'cost-state'>) => ({
   costUsd: line.totalCostUSD,
   apiMs: line.totalAPIDuration,
   toolMs: line.totalToolDuration,
@@ -285,7 +292,7 @@ const COST_START_SLACK_MS = 5_000;
  * `since` is when the attempt began, `begunAt` when its first line was written; `tokens`: its tokens too, the same way — for an
  * attempt whose transcript cannot count them (`transcriptUsage`).
  */
-const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | 'begunAt'>, since: number, tokens = false): Usage => {
+const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | 'begunAt'>, since: number, tokens = false) => {
   if (after?.startTime === undefined || !(after.startTime <= begunAt + COST_START_SLACK_MS)) return {};
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
@@ -354,7 +361,7 @@ const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | '
  * @param since When the attempt began, in ms since the epoch.
  * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
  */
-export const transcriptUsage = (jsonl: string, since: number, file?: string): Usage => {
+export const transcriptUsage = (jsonl: string, since: number, file?: string) => {
   const attempt = attemptIn(jsonl, since, file);
   const { responses, toolCalls, compactions, summarised } = attempt;
   const counted = [...responses.values()];
@@ -387,7 +394,7 @@ export const transcriptUsage = (jsonl: string, since: number, file?: string): Us
 type Response = { uncached: number; write: number; read: number; output: number } | null;
 
 /** The counts of a decoded `assistant` line's response (`Response`). */
-const responseOf = ({ message: { usage: u } }: Line<'assistant'>): Response =>
+const responseOf = ({ message: { usage: u } }: Line<'assistant'>) =>
   u?.input_tokens !== undefined && u.output_tokens !== undefined
     ? { uncached: u.input_tokens, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0, output: u.output_tokens }
     : null;
@@ -410,7 +417,7 @@ type Attempt = {
 };
 
 /** What `transcriptUsage` reads of an attempt (`Attempt`), in one pass over its transcript, from its first line to its last. */
-const attemptIn = (jsonl: string, since: number, file?: string): Attempt => {
+const attemptIn = (jsonl: string, since: number, file?: string) => {
   const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, begunAt: NaN, compactions: 0, summarised: 0 };
   for (const [i, text] of jsonl.split('\n').entries()) if (!took(attempt, text, since, () => lineAt(i, file))) break;
   return attempt;
@@ -420,7 +427,7 @@ const attemptIn = (jsonl: string, since: number, file?: string): Attempt => {
  * One transcript line taken into `a`, `where` it is: `false` when it says the session was continued under another name, which
  * ends the attempt, and `true` otherwise.
  */
-const took = (a: Attempt, text: string, since: number, where: () => string): boolean => {
+const took = (a: Attempt, text: string, since: number, where: () => string) => {
   const state = text.includes('"cost-state"') ? lineOf(text, ['cost-state'], where()) : undefined;
   if (state) {
     if (a.begun) a.after = costStateOf(state);
@@ -442,7 +449,7 @@ const took = (a: Attempt, text: string, since: number, where: () => string): boo
 };
 
 /** A line of a begun attempt taken into `a`, `where` it is: a `compact_boundary`, or a response made at or after `since`. */
-const tookSaid = (a: Attempt, text: string, since: number, where: () => string): void => {
+const tookSaid = (a: Attempt, text: string, since: number, where: () => string) => {
   const boundary = text.includes('"compact_boundary"') ? lineOf(text, ['system'], where()) : undefined;
   if (boundary?.subtype === 'compact_boundary') {
     a.compactions += 1;
@@ -460,7 +467,7 @@ const tookSaid = (a: Attempt, text: string, since: number, where: () => string):
  * `since`; `'before'` when the latest was written before it, a line a resumed transcript carries from its parent; `undefined` when
  * `text` holds none. A line that does not decode throws, as `lineOf` does.
  */
-const latestSpent = (text: string, since: number, file?: string): SpentSoFar | 'before' | undefined => {
+const latestSpent = (text: string, since: number, file?: string) => {
   const lines = text.split('\n');
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     const line = lines[i];
@@ -487,7 +494,7 @@ const latestSpent = (text: string, since: number, file?: string): SpentSoFar | '
  * @param since When the attempt began, in ms since the epoch.
  * @param file The transcript's path, named in a refusal; absent, the refusal says only the transcript.
  */
-export const transcriptSpent = (text: string, since: number, file?: string): SpentSoFar | undefined => {
+export const transcriptSpent = (text: string, since: number, file?: string) => {
   const said = latestSpent(text, since, file);
   return said === 'before' ? undefined : said;
 };
@@ -504,7 +511,7 @@ const SPENT_FIRST_BYTES = 256 * 1024;
  * @param file The transcript's path.
  * @param since When the attempt began, in ms since the epoch.
  */
-export const claudeTranscriptSpent = (file: string, since: number): SpentSoFar | undefined => {
+export const claudeTranscriptSpent = (file: string, since: number) => {
   for (let want = SPENT_FIRST_BYTES; ; want *= 2) {
     const end = transcriptEnd(file, Math.min(want, SPENT_SCAN_BYTES));
     if (end === undefined) return undefined;
@@ -515,7 +522,7 @@ export const claudeTranscriptSpent = (file: string, since: number): SpentSoFar |
 };
 
 /** The last `bytes` of `file` as text, and whether that is the whole of it; undefined where it cannot be read. */
-const transcriptEnd = (file: string, bytes: number): { text: string; whole: boolean } | undefined => {
+const transcriptEnd = (file: string, bytes: number) => {
   let fd: number | undefined;
   try {
     fd = fs.openSync(file, 'r');
@@ -535,7 +542,7 @@ const transcriptEnd = (file: string, bytes: number): { text: string; whole: bool
  * One line per message of the Agent SDK's. Its messages vary in shape, so every field is read as one that may be absent.
  * @param messages The SDK's messages, unchecked.
  */
-export const renderTranscript = (messages: readonly unknown[]): string =>
+export const renderTranscript = (messages: readonly unknown[]) =>
   messages
     .map((m) => {
       const msg = m as { type?: string; message?: { content?: unknown } };

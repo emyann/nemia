@@ -15,14 +15,14 @@ import type { Event, Sighting, State } from '../domain.ts';
  * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
  * @param at The moment the entry is stamped, an ISO time.
  */
-export function imageFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
+export function imageFacts(state: State, sighting: Sighting | undefined, at: string) {
   const last = state.attempts.at(-1);
-  if (state.settled || !last || last.ended !== null || !sighting) return [];
+  if (state.settled || !last || last.ended !== null || !sighting) return [] satisfies Event[];
   const image = sighting.image !== undefined && sighting.image !== last.image ? sighting.image : undefined;
   const harnessVersion =
     sighting.harnessVersion !== undefined && sighting.harnessVersion !== last.harnessVersion ? sighting.harnessVersion : undefined;
   const ranIn = sighting.ranIn !== undefined && sighting.ranIn !== last.ranIn ? sighting.ranIn : undefined;
-  if (image === undefined && harnessVersion === undefined && ranIn === undefined) return [];
+  if (image === undefined && harnessVersion === undefined && ranIn === undefined) return [] satisfies Event[];
   return [
     {
       kind: 'image',
@@ -32,5 +32,5 @@ export function imageFacts(state: State, sighting: Sighting | undefined, at: str
       ...(harnessVersion !== undefined ? { harnessVersion } : {}),
       ...(ranIn !== undefined ? { ranIn } : {}),
     },
-  ];
+  ] satisfies Event[];
 }

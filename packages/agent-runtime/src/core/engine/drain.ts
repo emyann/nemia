@@ -21,20 +21,20 @@ export const SESSION_DRAIN_FILE = 'sessions-drain.json';
  * The folder of the store at `root` both drains are kept in: the attached sessions' folder, beside their run files.
  * @param root The store's folder.
  */
-export const drainFolder = (root: string): string => path.join(root, 'runs', 'attached');
+export const drainFolder = (root: string) => path.join(root, 'runs', 'attached');
 
 /**
  * The holder's drain file of the store at `root`.
  * Exported only for the tests that import it.
  * @param root The store's folder.
  */
-export const holderDrainFile = (root: string): string => path.join(drainFolder(root), DRAIN_FILE);
+export const holderDrainFile = (root: string) => path.join(drainFolder(root), DRAIN_FILE);
 
 /**
  * The sessions' drain file of the store at `root`, apart from the holder's.
  * @param root The store's folder.
  */
-export const sessionDrainFile = (root: string): string => path.join(drainFolder(root), SESSION_DRAIN_FILE);
+export const sessionDrainFile = (root: string) => path.join(drainFolder(root), SESSION_DRAIN_FILE);
 
 const SessionDrainSchema = Schema.Struct({
   /** When the drain was put (ISO), what its grace and a job's hold bound are counted from. */
@@ -60,7 +60,7 @@ export type HolderDrain = typeof HolderDrainSchema.Type;
  * @param file The path of the file to read.
  * @param decode The schema's decoder of the parsed JSON, answering none for a value it refuses.
  */
-export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Option<A>): A | null => {
+export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Option<A>) => {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -79,7 +79,7 @@ export const decodedFile = <A>(file: string, decode: (u: unknown) => Option.Opti
  * @param file The path of the file to write.
  * @param value What the file is to hold, written as JSON.
  */
-export const writeWhole = (file: string, value: unknown): void => {
+export const writeWhole = (file: string, value: unknown) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   replaceFile(file, JSON.stringify(value));
 };
@@ -93,7 +93,7 @@ const decodeHolderDrain = Schema.decodeUnknownOption(HolderDrainSchema);
  * another grace is stamped now, which is how a grace of 0 cuts a standing drain's calls at once.
  * @param root The store's folder.
  */
-export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }): void => {
+export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }) => {
   if (sessionDrainOf(sessionDrainFile(root))?.graceMs === graceMs) return;
   writeWhole(sessionDrainFile(root), { at: new Date(instantNow().at).toISOString(), graceMs } satisfies SessionDrain);
 };
@@ -102,29 +102,29 @@ export const putSessionDrain = (root: string, { graceMs }: { graceMs: number }):
  * The sessions' drain lifted: no session waits.
  * @param root The store's folder.
  */
-export const liftSessionDrain = (root: string): void => fs.rmSync(sessionDrainFile(root), { force: true });
+export const liftSessionDrain = (root: string) => fs.rmSync(sessionDrainFile(root), { force: true });
 
 /**
  * The sessions' drain `file` says stands; `null` where none does, or the file does not decode.
  * @param file The path of the sessions' drain file (`sessionDrainFile`).
  */
-export const sessionDrainOf = (file: string): SessionDrain | null => decodedFile(file, decodeSessionDrain);
+export const sessionDrainOf = (file: string) => decodedFile(file, decodeSessionDrain);
 
 /**
  * The holder's drain `drain` put on the store at `root`, written whole.
  * @param root The store's folder.
  * @param drain The process whose attached sessions' new calls wait, and who put the drain.
  */
-export const putHolderDrain = (root: string, drain: HolderDrain): void => writeWhole(holderDrainFile(root), drain);
+export const putHolderDrain = (root: string, drain: HolderDrain) => writeWhole(holderDrainFile(root), drain);
 
 /**
  * The holder's drain lifted: none waits.
  * @param root The store's folder.
  */
-export const liftHolderDrain = (root: string): void => fs.rmSync(holderDrainFile(root), { force: true });
+export const liftHolderDrain = (root: string) => fs.rmSync(holderDrainFile(root), { force: true });
 
 /**
  * The holder's drain the store at `root` holds; `null` where none does, or its file does not decode.
  * @param root The store's folder.
  */
-export const holderDrainOf = (root: string): HolderDrain | null => decodedFile(holderDrainFile(root), decodeHolderDrain);
+export const holderDrainOf = (root: string) => decodedFile(holderDrainFile(root), decodeHolderDrain);

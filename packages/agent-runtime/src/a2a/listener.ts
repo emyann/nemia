@@ -24,7 +24,7 @@
  */
 import http from 'node:http';
 import type { Socket } from 'node:net';
-import { Effect, type Scope } from 'effect';
+import { Effect } from 'effect';
 import { JsonRpcTransportHandler, ServerCallContext, STATE_HEADERS_KEY } from '@a2a-js/sdk/server';
 import { firstPiece, type Event } from '../core/index.ts';
 import type { RunnerOps } from '../harness/index.ts';
@@ -56,26 +56,26 @@ export type Served = {
 type Port = { transport: JsonRpcTransportHandler; card: Record<string, unknown> };
 
 /** A JSON answer, whatever its status. */
-const answerJson = (res: http.ServerResponse, status: number, body: unknown): void => {
+const answerJson = (res: http.ServerResponse, status: number, body: unknown) => {
   const text = JSON.stringify(body);
   res.writeHead(status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text) });
   res.end(text);
 };
 
 /** The refusal of a request whose token is absent or wrong: no JSON-RPC body, since the kind is read off the status. */
-const answerUnauthorized = (res: http.ServerResponse): void => {
+const answerUnauthorized = (res: http.ServerResponse) => {
   res.writeHead(401, { 'www-authenticate': 'Bearer', 'content-length': 0 });
   res.end();
 };
 
 /** A plain refusal in words, as text: a path, a method or a body this port does not take. */
-const answerPlain = (res: http.ServerResponse, status: number, why: string): void => {
+const answerPlain = (res: http.ServerResponse, status: number, why: string) => {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'content-length': Buffer.byteLength(why) });
   res.end(why);
 };
 
 /** The request's body, or `undefined` once it is past `MOST_BYTES`, which is answered 413. */
-const bodyOf = async (req: http.IncomingMessage): Promise<string | undefined> => {
+const bodyOf = async (req: http.IncomingMessage) => {
   let text = '';
   let bytes = 0;
   for await (const chunk of req) {
@@ -87,7 +87,7 @@ const bodyOf = async (req: http.IncomingMessage): Promise<string | undefined> =>
 };
 
 /** The `id` of a JSON-RPC request body, for the error answered before a stream has said anything; `null` where there is none. */
-const idOf = (body: string): string | number | null => {
+const idOf = (body: string) => {
   try {
     const parsed = JSON.parse(body) as { id?: unknown };
     return typeof parsed.id === 'string' || typeof parsed.id === 'number' ? parsed.id : null;
@@ -111,7 +111,7 @@ const answerStream = async (
   id: string | number | null,
   answers: AsyncGenerator<unknown, void, undefined>,
   gone: AbortController,
-): Promise<void> => {
+) => {
   const it = answers[Symbol.asyncIterator]();
   res.on('close', () => {
     gone.abort();
@@ -140,7 +140,7 @@ const answerStream = async (
  * The harness a request's path names, with its port, and whether it asks for that harness's card; `undefined` for a path this port
  * has none for.
  */
-const routeOf = (url: string | undefined, ports: Map<string, Port>): { harness: string; port: Port; card: boolean } | undefined => {
+const routeOf = (url: string | undefined, ports: Map<string, Port>) => {
   const at = decodeURIComponent(firstPiece(url ?? '/', '?'));
   for (const [harness, port] of ports) {
     if (at === `/${harness}`) return { harness, port, card: false };
@@ -150,7 +150,7 @@ const routeOf = (url: string | undefined, ports: Map<string, Port>): { harness: 
 };
 
 /** One request answered, its token already checked: the card, the JSON-RPC road, or a refusal naming what this port has. */
-const answerOf = async (req: http.IncomingMessage, res: http.ServerResponse, ports: Map<string, Port>): Promise<void> => {
+const answerOf = async (req: http.IncomingMessage, res: http.ServerResponse, ports: Map<string, Port>) => {
   const route = routeOf(req.url, ports);
   if (!route) {
     return answerPlain(res, 404, `this port serves ${[...ports.keys()].map((h) => `/${h}`).join(', ')} and nothing else.\n`);
@@ -185,7 +185,7 @@ const listenerOf = (token: string, ports: Map<string, Port>) => (req: http.Incom
 };
 
 /** The server listening on an ephemeral loopback port, its address answered; a bind that cannot happen dies. */
-const listening = (server: http.Server): Promise<number> =>
+const listening = (server: http.Server) =>
   new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, HOST, () => {
@@ -193,14 +193,14 @@ const listening = (server: http.Server): Promise<number> =>
       if (address === null || typeof address === 'string') return reject(new Error(`the holder's port bound to ${String(address)}`));
       resolve(address.port);
     });
-  });
+  }) satisfies Promise<number>;
 
 /** The server closed, every open socket destroyed, so a subscription still being read does not hold the hold open. */
-const closed = (server: http.Server, sockets: Set<Socket>): Promise<void> =>
+const closed = (server: http.Server, sockets: Set<Socket>) =>
   new Promise((resolve) => {
     server.close(() => resolve());
     for (const socket of sockets) socket.destroy();
-  });
+  }) satisfies Promise<void>;
 
 /**
  * The port of a holder, for the scope it is taken in: one `ops` per harness served, each behind its own reading surface over a
@@ -209,13 +209,9 @@ const closed = (server: http.Server, sockets: Set<Socket>): Promise<void> =>
  * @param served The store folder the token is written under (`root`), the driver of each harness served by its name (`ops`), and what reads
  * the events journaled for a task by its id (`events`).
  */
-export const servedOf = (served: {
-  root: string;
-  ops: Record<string, RunnerOps>;
-  events: (taskId: string) => Promise<readonly Event[]>;
-}): Effect.Effect<Served, never, Scope.Scope> =>
+export const servedOf = (served: { root: string; ops: Record<string, RunnerOps>; events: (taskId: string) => Promise<readonly Event[]> }) =>
   Effect.acquireRelease(
-    Effect.promise(async (): Promise<{ answer: Served; server: http.Server; sockets: Set<Socket> }> => {
+    Effect.promise(async () => {
       const ports = new Map<string, Port>();
       const sockets = new Set<Socket>();
       const token = tokenOf();

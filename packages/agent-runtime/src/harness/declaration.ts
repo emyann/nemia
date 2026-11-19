@@ -173,8 +173,7 @@ export const DEFAULT_SIGN_IN: { readonly variable: string; readonly maker: strin
  * @param can The capabilities the declaration lists, or undefined for a runner of the consumer's.
  * @param capability The capability looked for.
  */
-export const declares = (can: readonly Capability[] | undefined, capability: Capability): boolean =>
-  can !== undefined && can.includes(capability);
+export const declares = (can: readonly Capability[] | undefined, capability: Capability) => can !== undefined && can.includes(capability);
 
 /**
  * The first capability a task asks of its harness that the harness's declaration does not list, or `undefined`.
@@ -218,7 +217,7 @@ export const verbHarnessOf: VerbHarnessOf = (verb, name, harnesses) => {
 export const ownArgsOf = (
   declaration: HarnessDeclaration | undefined,
   asked: { readonly trustRepository?: () => string | undefined; readonly remoteControl?: boolean },
-): OwnArgs => {
+) => {
   const trust = declaration?.asks?.trustRepository;
   const repo = trust === undefined ? undefined : asked.trustRepository?.();
   const bridge = asked.remoteControl === true ? declaration?.asks?.remoteControl : undefined;

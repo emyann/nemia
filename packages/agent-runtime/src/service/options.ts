@@ -12,10 +12,9 @@ import { claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { memoryBytesOf, memoryQuantityRefusal } from '../core/memory.ts';
 import { machineMemory, type MachineReading } from './machine.ts';
-import type { AdmissionRule } from '../core/admission.ts';
 import type { TaskResources } from '../core/domain.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
-import { CAPABILITIES, type HarnessDeclaration } from '../harness/declaration.ts';
+import { CAPABILITIES } from '../harness/declaration.ts';
 import { CLAUDE_DECLARATION } from '../harness/claude/vocabulary.ts';
 import { REMOTE_DECLARATION } from '../a2a/vocabulary.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
@@ -290,7 +289,7 @@ export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
  * @param events The task's journal.
  * @param attempt The number of the attempt.
  */
-export const handleOf = (events: readonly Event[], attempt: number): string | undefined => {
+export const handleOf = (events: readonly Event[], attempt: number) => {
   const end = [...events].reverse().find((e) => e.kind === 'ended' && e.attempt === attempt);
   return end?.kind === 'ended' && !['(never seen)', '(never started)'].includes(end.sessionId) ? end.sessionId : undefined;
 };
@@ -312,7 +311,7 @@ export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'ob
  * its own, the consumer's, which is asked nothing. Every check of what a harness takes reads this, never the harness's kind or name.
  * @param h The harness as configured.
  */
-export const declarationOf = (h: HarnessConfig): HarnessDeclaration | undefined =>
+export const declarationOf = (h: HarnessConfig) =>
   h === 'claude'
     ? CLAUDE_DECLARATION
     : isSpec(h)
@@ -346,31 +345,33 @@ type RunnersGiven = {
  * @param harnesses The engine's harnesses, each by its name.
  * @param given What every runner is made with: the store's root, the credentials, the telemetry and where programs are found.
  */
-export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: RunnersGiven): Record<string, RunnerOps> =>
+export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: RunnersGiven) =>
   Object.fromEntries(
-    Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
+    Object.entries(harnesses).map(([name, h]) => {
       const ops = runnerOf(name, h, given);
-      return [name, given.telemetry ? telemetered(ops, given.telemetry) : ops];
+      return [name, given.telemetry ? telemetered(ops, given.telemetry) : ops] satisfies [string, RunnerOps];
     }),
-  );
+  ) satisfies Record<string, RunnerOps>;
 
 /**
  * The harness `h`, configured under `name`, as the seam's value: a spec that looks for its program (`inHarnessBin`) looks in the
  * engine's `harnessBin` first.
  */
-const runnerOf = (name: string, h: HarnessConfig, given: RunnersGiven): RunnerOps => {
+const runnerOf = (name: string, h: HarnessConfig, given: RunnersGiven) => {
   const { root, credentials, missingCredential, harnessBin, cgroupParent } = given;
-  return h === 'claude'
-    ? claudeOf(given)
-    : isSpec(h)
-      ? detachedOps(harnessBin && h.inHarnessBin ? h.inHarnessBin(harnessBin) : h, root, cgroupParent ? { cgroupParent } : {})
-      : isRemote(h)
-        ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
-        : h;
+  return (
+    h === 'claude'
+      ? claudeOf(given)
+      : isSpec(h)
+        ? detachedOps(harnessBin && h.inHarnessBin ? h.inHarnessBin(harnessBin) : h, root, cgroupParent ? { cgroupParent } : {})
+        : isRemote(h)
+          ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
+          : h
+  ) satisfies RunnerOps;
 };
 
 /** Claude Code's runner, built from what `runnersOf` is given. */
-const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }: RunnersGiven): RunnerOps =>
+const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }: RunnersGiven) =>
   claudeCodeOps(
     {
       root,
@@ -379,7 +380,7 @@ const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }
       ...(cgroupParent ? { cgroupParent } : {}),
     },
     attached,
-  );
+  ) satisfies RunnerOps;
 
 /**
  * Which of `harnesses` a holder can hold: those whose declaration declares `hold` — Claude Code configured as the literal `'claude'`, and
@@ -389,7 +390,7 @@ const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }
  * configures a viewer off the runtime's door: a copy of it elsewhere drifts the day the rule changes.
  * @param harnesses The engine's harnesses, each by its name.
  */
-export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>): string[] =>
+export const heldHarnessesOf = (harnesses: Record<string, HarnessConfig>) =>
   Object.entries(harnesses)
     .filter(([, h]) => declarationOf(h)?.can.includes('hold') === true)
     .map(([name]) => name);
@@ -401,7 +402,7 @@ const RETIRED_SPEC_FIELDS = ['claudeFlags', 'codexArgs', 'commandArgs', 'env', '
  * Why a spec's declaration cannot be read, or `undefined`: a boolean `can` replaced, which would be read as nothing; a `can` that is no
  * list of capability words; a range of windows with no `contextTokens` in `can`, or that word with no range.
  */
-const specRefusalOf = (name: string, h: HarnessSpec): string | undefined => {
+const specRefusalOf = (name: string, h: HarnessSpec) => {
   const retired = RETIRED_SPEC_FIELDS.find((field) => Object.hasOwn(h, field));
   if (retired !== undefined) {
     return `the \`${name}\` harness's spec carries \`${retired}\`, which a spec no longer says what it takes by: list it in \`can\` instead (\`can: ['${retired === 'mounts' ? 'readOnlyMount' : retired}', ...]\`, the words of \`CAPABILITIES\`), and take \`${retired}\` off.`;
@@ -424,7 +425,7 @@ const specRefusalOf = (name: string, h: HarnessSpec): string | undefined => {
  * are read here, and that each entry is a function at all: what a function *answers* is refused at the follow that asks it
  * (`holderAgentRefusal`).
  */
-const holdersRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
+const holdersRefusalOf = (options: Omit<EngineOptions, 'root'>) => {
   const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
   const names = Object.keys(harnesses);
   const held = heldHarnessesOf(harnesses);
@@ -436,7 +437,7 @@ const holdersRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefi
 };
 
 /** Why `maxConcurrent` is not a ceiling, or `undefined`: anything but a whole number from 1. */
-const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
+const ceilingRefusalOf = (maxConcurrent: unknown) =>
   maxConcurrent === undefined || (Number.isInteger(maxConcurrent) && (maxConcurrent as number) >= 1)
     ? undefined
     : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
@@ -448,7 +449,7 @@ const SLICE = /^[A-Za-z0-9:_.\\-]+\.slice$/;
  * Why the option `name`, a `{ memory }` of one quantity, cannot be held, or `undefined`: anything but `{ memory }` alone, its quantity
  * one `memoryBytesOf` does not read (`memoryQuantityRefusal`'s words). `what` says what the quantity is for, in the refusal's words.
  */
-const memoryOptionRefusalOf = (name: string, given: unknown, what: string): string | undefined => {
+const memoryOptionRefusalOf = (name: string, given: unknown, what: string) => {
   if (given === undefined) return undefined;
   const memory = Predicate.isObject(given) ? given.memory : undefined;
   if (!Predicate.isObject(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
@@ -463,7 +464,7 @@ const memoryOptionRefusalOf = (name: string, given: unknown, what: string): stri
  * default limit, which would file every task promised more than it may use; a `machine` that is not a function; a `cgroupParent`
  * that is not a slice's unit name.
  */
-const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
+const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>) => {
   const refused =
     memoryOptionRefusalOf(
       'defaultLimits',
@@ -495,7 +496,7 @@ const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefin
  * road a former runtime had, named with what replaced it — a `pool` that is not a name, a spec's declaration (`specRefusalOf`) and a
  * remote agent's config.
  */
-const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
+const harnessConfigRefusalOf = (name: string, h: HarnessConfig) => {
   if ((h as unknown) === 'claude-bg') {
     return `the \`${name}\` harness is \`'claude-bg'\`, Claude Code's \`--bg\` sessions, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Configure it as \`'claude'\`, and file a session meant to stay open with \`restartPolicy: 'Always'\`, which runs attached while a daemon holds the sessions.`;
   }
@@ -520,7 +521,7 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
  * function; and a `telemetry` that names no collector.
  * @param options The engine's options as handed in, its `root` aside.
  */
-export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
+export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>) => {
   if (Object.hasOwn(options, 'sayTimeoutMs')) {
     return "`sayTimeoutMs` bounded a `say` to a Claude Code `--bg` session's inbox, and this runtime runs no such session: a job and a held session take words on their own input. Leave `sayTimeoutMs` out.";
   }
@@ -550,7 +551,7 @@ export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string |
  * The machine an engine over `options` admits against, as one pass reads it (`AdmissionRule.machine`): its `machine`'s reading, else
  * `/proc/meminfo`'s, with the floor `reserved` keeps off it — and nothing where `reserved` is not given, or the reading answers none.
  */
-const machineOf = (options: EngineOptions): AdmissionRule['machine'] => {
+const machineOf = (options: EngineOptions) => {
   const reservedBytes = options.reserved === undefined ? undefined : memoryBytesOf(options.reserved.memory);
   if (reservedBytes === undefined) return undefined;
   const read = options.machine ?? machineMemory;
@@ -602,7 +603,7 @@ export const admissionOf = (options: EngineOptions, harnesses: Record<string, Ha
  * Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`.
  * @param servers What `mcpState` was handed: the remote servers, by name.
  */
-export const mcpStateRefusal = (servers: unknown): string | undefined => {
+export const mcpStateRefusal = (servers: unknown) => {
   if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
     return `takes a map of remote MCP servers by name, as a record holds them; it was handed ${JSON.stringify(servers)}. Give { "<name>": { "type": "http", "url": "https://..." } }.`;
   }

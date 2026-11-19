@@ -65,7 +65,7 @@ export type BodyOps = {
  * Exported only for the tests that import it.
  * @param text The text to name.
  */
-export const refOf = (text: string): BodyRef => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+export const refOf = (text: string) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
 const wellFormed = (text: string) => Buffer.from(text, 'utf8').toString('utf8') === text;
 
@@ -78,7 +78,7 @@ const missing = (cause: unknown) => (cause as NodeJS.ErrnoException | undefined)
  * of one already there only sets its time. A read is counted (`io().reads`).
  * @param root The store's folder, under which `bodies/` is kept.
  */
-export const filesBodies = (root: string): BodyOps => {
+export const filesBodies = (root: string) => {
   const dir = path.join(root, 'bodies');
   const at = (ref: BodyRef) => path.join(dir, ref);
   return {
@@ -130,11 +130,11 @@ export const filesBodies = (root: string): BodyOps => {
           }),
       catch: failure,
     }),
-  };
+  } satisfies BodyOps;
 };
 
 /** Bodies in memory, for tests: each with the time of its latest put. */
-export const memoryBodies = (): BodyOps => {
+export const memoryBodies = () => {
   const kept = new Map<BodyRef, { text: string; atMs: number }>();
   return {
     put: (ref, text) => Effect.sync(() => void kept.set(ref, { text: kept.get(ref)?.text ?? text, atMs: Date.now() })),
@@ -145,14 +145,14 @@ export const memoryBodies = (): BodyOps => {
         return body !== undefined && body.atMs < before && kept.delete(ref);
       }),
     list: Effect.sync(() => [...kept].map(([ref, { text, atMs }]) => ({ ref, atMs, bytes: Buffer.byteLength(text) }))),
-  };
+  } satisfies BodyOps;
 };
 
 /** What a field kept as a body is stored as, and the field it is read back as. */
 const STANDS_FOR = { briefParts: 'brief', closeoutSchemaBody: 'closeoutSchema', nudgeBody: 'nudge', textBody: 'text' } as const;
 
 /** `entry`'s keys in order, each key `swaps` names replaced in its place by the fields it maps to. */
-const swapped = (entry: object, swaps: Record<string, Record<string, unknown>>): Record<string, unknown> => {
+const swapped = (entry: object, swaps: Record<string, Record<string, unknown>>) => {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(entry)) {
     if (Object.hasOwn(swaps, key)) Object.assign(out, swaps[key]);
@@ -170,9 +170,9 @@ const swapped = (entry: object, swaps: Record<string, Record<string, unknown>>):
  * @param parts The parts the brief of a `filed` event was given in, or undefined where it was given whole; parts that do not join
  *   into the brief are not used.
  */
-export const split = (event: Event, parts?: readonly string[]): { entry: Event | StoredEvent; bodies: Map<BodyRef, string> } => {
+export const split = (event: Event, parts?: readonly string[]) => {
   const bodies = new Map<BodyRef, string>();
-  const keep = (text: string): BodyRef | undefined => {
+  const keep = (text: string) => {
     if (Buffer.byteLength(text) < BODY_MIN_BYTES || !wellFormed(text)) return undefined;
     const ref = refOf(text);
     bodies.set(ref, text);
@@ -201,7 +201,7 @@ export const split = (event: Event, parts?: readonly string[]): { entry: Event |
  * The bodies `entry` names, as a store holds it, in the order of its keys: anything that is no entry names none.
  * @param entry A line of a journal as the store holds it, read as JSON.
  */
-export const refsOf = (entry: unknown): BodyRef[] => {
+export const refsOf = (entry: unknown) => {
   if (typeof entry !== 'object' || entry === null) return [];
   const fields = entry as Record<string, unknown>;
   const parts = Array.isArray(fields.briefParts) ? (fields.briefParts as unknown[]) : [];
@@ -235,7 +235,7 @@ export const resolver = (bodies: BodyOps | undefined) => {
   const texts = new Map<BodyRef, string>();
   const done = new WeakMap<object, Resolved>();
   const where = (ref: BodyRef) => `body ${ref}${bodies?.located ? ` (${bodies.located(ref)})` : ''}`;
-  const text = (ref: BodyRef): Effect.Effect<string, BodyError> => {
+  const text = (ref: BodyRef) => {
     const known = texts.get(ref);
     if (known !== undefined) return Effect.succeed(known);
     if (!bodies)
@@ -256,7 +256,7 @@ export const resolver = (bodies: BodyOps | undefined) => {
       return Effect.succeed(got);
     });
   };
-  const field = (key: keyof typeof STANDS_FOR, value: unknown): Effect.Effect<unknown, BodyError> => {
+  const field = (key: keyof typeof STANDS_FOR, value: unknown) => {
     if (key !== 'briefParts')
       return key === 'closeoutSchemaBody'
         ? Effect.map(text(value as BodyRef), (json) => JSON.parse(json) as unknown)
@@ -287,7 +287,7 @@ export const resolver = (bodies: BodyOps | undefined) => {
     /** Whether any of `entries` must be read back before it is an event. */
     needed: (entries: readonly StoredEvent[]) => entries.some(unresolved),
     /** `entry` read back, its bodies' texts in their fields' places. */
-    resolve: (entry: StoredEvent): Effect.Effect<Resolved, BodyError> => {
+    resolve: (entry: StoredEvent) => {
       if (!unresolved(entry)) return Effect.succeed(entry as Resolved);
       const known = done.get(entry);
       return known ? Effect.succeed(known) : read(entry);

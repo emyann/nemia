@@ -11,7 +11,7 @@ import path from 'node:path';
  * @param harnessBin The folder the engine keeps harness programs in, or undefined where it has none.
  * @param program The program's file name.
  */
-export const programIn = (harnessBin: string | undefined, program: string): string | undefined => {
+export const programIn = (harnessBin: string | undefined, program: string) => {
   if (!harnessBin) return undefined;
   const at = path.join(harnessBin, program);
   return fs.existsSync(at) ? at : undefined;
@@ -21,7 +21,7 @@ export const programIn = (harnessBin: string | undefined, program: string): stri
  * `program` as `PATH` finds it now: the first of its folders holding it as a file this user may run, or `undefined`.
  * @param program The program's file name.
  */
-export const programOnPath = (program: string): string | undefined => {
+export const programOnPath = (program: string) => {
   for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
     if (!dir) continue;
     const at = path.join(dir, program);

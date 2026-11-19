@@ -13,4 +13,4 @@ export const CONFIG_FOLDERS: readonly string[] = [...new Set(CLAUDE_CONFIG_FOLDE
  * whole and in its case: `.claude-notes` and `claude` are not `.claude`.
  * @param path The path to look in, relative or absolute, with either separator.
  */
-export const configFolderIn = (path: string): string | undefined => path.split(/[\\/]/).find((part) => CONFIG_FOLDERS.includes(part));
+export const configFolderIn = (path: string) => path.split(/[\\/]/).find((part) => CONFIG_FOLDERS.includes(part));

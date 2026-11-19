@@ -5,7 +5,7 @@ import fs from 'node:fs';
  * is there too. `ESRCH`, or any other refusal of the signal, reads as gone. The runtime's one reading: a leaf every folder may import.
  * @param pid The process's id.
  */
-export const alive = (pid: number): boolean => {
+export const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
     return true;
@@ -21,7 +21,7 @@ export const alive = (pid: number): boolean => {
  * from the last `)`. Imports nothing but node's own, as `alive` does: `bin/ae-worker.ts` reads it, and stays dependency-free.
  * @param pid The process's id.
  */
-export const processStart = (pid: number): string | undefined => {
+export const processStart = (pid: number) => {
   let stat: string;
   try {
     stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');

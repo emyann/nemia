@@ -14,5 +14,5 @@ import { DEFAULT_HARNESSES } from './default-harnesses.ts';
  * @param harness The name of the harness the task would be filed on.
  * @param config The task's `config`, the harness's arguments.
  */
-export const configRefusal = (harness: string, config: HarnessArgs): string | undefined =>
+export const configRefusal = (harness: string, config: HarnessArgs) =>
   argsRefusalOf({ config }) ?? harnessRefusalOf({ brief: '', cwd: '', harness, config }, DEFAULT_HARNESSES);

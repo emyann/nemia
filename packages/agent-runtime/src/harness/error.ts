@@ -28,7 +28,7 @@ export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE'
  * Exported only for the tests that import it.
  * @param cause What the spawn failed with: an error with a `code`, or any value.
  */
-export const refusedOsError = (cause: unknown): boolean => {
+export const refusedOsError = (cause: unknown) => {
   const code = (cause as NodeJS.ErrnoException | undefined)?.code;
   return typeof code !== 'string' || !TRANSIENT_ERRNOS.includes(code);
 };
@@ -39,7 +39,7 @@ export const refusedOsError = (cause: unknown): boolean => {
  * @param cause Why an Effect failed, as `Effect.catchCause` is handed it.
  * @returns One sentence a person can be shown as it is.
  */
-export const causeWords = (cause: Cause.Cause<unknown>): string => {
+export const causeWords = (cause: Cause.Cause<unknown>) => {
   const error = Cause.squash(cause);
   return error instanceof Error ? error.message : String(error);
 };

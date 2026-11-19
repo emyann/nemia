@@ -40,20 +40,20 @@ const commandKeyOf = (spec: Filed) =>
   (['command', 'niceness', 'terminationMessagePath'] as const).find((k) => spec.config?.[k] !== undefined);
 
 /** The capability a mount asks, by its mode. */
-const mountWord = (mount: { readOnly?: boolean }): Capability => (mount.readOnly ? 'readOnlyMount' : 'writableMount');
+const mountWord = (mount: { readOnly?: boolean }) => (mount.readOnly ? 'readOnlyMount' : 'writableMount');
 
 /** A mount's mode, in words. */
 const modeWords = (capability: Capability) => (capability === 'readOnlyMount' ? 'read-only' : 'writable');
 
 /** `capability`, asked where the task gives its key (`asked`), else nothing. */
-const askedIf = (asked: boolean, capability: Capability): readonly Capability[] => (asked ? [capability] : []);
+const askedIf = (asked: boolean, capability: Capability) => (asked ? [capability] : []);
 
 /**
  * Why a task's `config.mayAsk: true` cannot go to its harness: a call is held open at the hook of a session this runtime holds attached,
  * a long-lived one (`restartPolicy: 'Always'`) of a harness that declares `holdsCalls`, and no other. Every other session ends its turn
  * with the call, so a call held in one would be cut before an answer could reach it. `held`: the harness is one a holder holds.
  */
-const mayAskWords = (spec: Filed, held: boolean): string =>
+const mayAskWords = (spec: Filed, held: boolean) =>
   `\`mayAsk: true\` holds a call that would ask a person open until one answers it, and only a session this runtime holds attached can hold one: the \`${spec.harness}\` harness${held ? ' runs this task as a job, which ends its session with its turn' : ' has no session this runtime holds attached'}. File the task \`restartPolicy: 'Always'\` on a harness configured \`'claude'\`, which this runtime holds attached, or leave \`mayAsk\` off.`;
 
 /**
@@ -181,13 +181,13 @@ const ASKED: readonly Asked[] = [
 ];
 
 /** The row of `ASKED` each capability is asked by. */
-const ROW_OF: ReadonlyMap<Capability, Asked> = new Map(ASKED.flatMap((row) => row.words.map((word): [Capability, Asked] => [word, row])));
+const ROW_OF: ReadonlyMap<Capability, Asked> = new Map(ASKED.flatMap((row) => row.words.map((word) => [word, row])));
 
 /**
  * The fix a refusal of `capability` offers: the harnesses of this engine that declare it (`takersOf`), else the one fix left. The takers'
  * sentence, written once for every key.
  */
-const fixOf = (fix: Fix, spec: Filed, capability: Capability, harnesses: Record<string, HarnessConfig>): string => {
+const fixOf = (fix: Fix, spec: Filed, capability: Capability, harnesses: Record<string, HarnessConfig>) => {
   const declared = Object.entries(harnesses).map(([name, o]) => ({ name, can: declarationOf(o)?.can }));
   const takers = takersOf(capability, declared).map((name) => `\`${name}\``);
   const leave = fix.leave(spec);
@@ -200,7 +200,7 @@ const fixOf = (fix: Fix, spec: Filed, capability: Capability, harnesses: Record<
  * Why a task's `contextTokens` is outside the windows its harness takes — or `undefined`: Claude Code refuses one outside its range while
  * it parses its arguments, at every spawn. Asked where the harness declares `contextTokens`; one that does not is refused it by `ASKED`.
  */
-const rangeRefusalOf = (spec: Filed, range: { least: number; most: number } | undefined): string | undefined => {
+const rangeRefusalOf = (spec: Filed, range: { least: number; most: number } | undefined) => {
   const tokens = spec.config?.contextTokens;
   if (tokens === undefined || range === undefined || (tokens >= range.least && tokens <= range.most)) return undefined;
   return `\`contextTokens: ${tokens}\` is outside the windows the \`${spec.harness}\` harness takes, and it would refuse the session at every spawn. Give a whole number of tokens from ${range.least} to ${range.most}, or leave it out for the harness's own window.`;
@@ -210,7 +210,7 @@ const rangeRefusalOf = (spec: Filed, range: { least: number; most: number } | un
  * What a harness refuses in its own words: Claude Code's lists, a spec's `refuses`, a remote agent's; a `RunnerOps` brought as its
  * own, nothing here.
  */
-const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string | undefined) | undefined =>
+const ownRefuses = (h: HarnessConfig, name: string) =>
   h === 'claude' ? claudeRefuses : isSpec(h) ? h.refuses : isRemote(h) ? remoteRefuses(name) : undefined;
 
 /**
@@ -233,7 +233,7 @@ const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string
  * @param spec The task as filed.
  * @param harnesses The engine's harnesses, each by its name.
  */
-export const harnessRefusalOf = (spec: Filed, harnesses: Record<string, HarnessConfig>): string | undefined => {
+export const harnessRefusalOf = (spec: Filed, harnesses: Record<string, HarnessConfig>) => {
   const h = own(harnesses, spec.harness);
   if (h === undefined) {
     const former =

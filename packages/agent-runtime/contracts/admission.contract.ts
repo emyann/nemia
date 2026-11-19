@@ -63,7 +63,7 @@ export type Admitted = {
 const MOST = 2 ** 50;
 
 /** A whole number of bytes from nothing to `MOST`. */
-const bytes = (n: number): boolean => Number.isInteger(n) && n >= 0 && n <= MOST;
+const bytes = (n: number) => Number.isInteger(n) && n >= 0 && n <= MOST;
 
 /**
  * One waiter as a pass meets it, in turn: the ceiling per pool, how many tasks of its pool hold a slot by then (`inPool`: the holders
@@ -83,7 +83,7 @@ export type OneWaiter = {
 export type Admit = { readonly for: 'admitted'; readonly roomBytes: number | null; readonly inPool: number };
 
 /** Whether the room the machine has left takes a need: a need of nothing always fits, and with no reading only the ceiling decides. */
-const fits = (one: OneWaiter): boolean => {
+const fits = (one: OneWaiter) => {
   const room = one.roomBytes;
   return room === null || one.needBytes === 0 || one.needBytes <= room;
 };

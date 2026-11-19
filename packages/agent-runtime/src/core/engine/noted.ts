@@ -9,7 +9,7 @@ import { deniedFacts } from './denied.ts';
 import { imageFacts } from './image.ts';
 
 /** The sighting of a task's last attempt in one observation, as the harness gave it. */
-const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Sighting | undefined => {
+const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>) => {
   const last = state.attempts.at(-1);
   return last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
 };
@@ -23,12 +23,12 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
  * @param at The moment each entry is stamped, an ISO time.
  * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
-export const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
+export const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic) => {
   const sighting = lastSighting(state, observed);
   return [
     ...sightingFacts(state, sighting, at, mono),
     ...countedFacts(state, sighting, at),
     ...deniedFacts(state, sighting, at),
     ...imageFacts(state, sighting, at),
-  ];
+  ] satisfies Event[];
 };

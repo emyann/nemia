@@ -225,7 +225,7 @@ export const TAKEN_ARGS: Readonly<Record<string, string>> = {
 export const TURN_ARGS: ReadonlyArray<keyof HarnessArgs> = ['budgetUsd'];
 
 /** Dollars above 0: what a spend cap is. */
-const isDollars = (usd: unknown): boolean => typeof usd === 'number' && Number.isFinite(usd) && usd > 0;
+const isDollars = (usd: unknown) => typeof usd === 'number' && Number.isFinite(usd) && usd > 0;
 const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
 
 /**
@@ -234,7 +234,7 @@ const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringif
  * @param base The task's own configuration, or undefined where it was filed with none.
  * @param turn What the turn gave for itself, or undefined where it gave nothing: the task's configuration then stands as it is.
  */
-export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined): HarnessArgs | undefined =>
+export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined) =>
   turn === undefined ? base : { ...base, ...turn };
 
 /**
@@ -242,7 +242,7 @@ export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs |
  * the words a filing's have, except that leaving a cap out keeps the task's own.
  * @param turn What an answer gives its turn, as filed, of any shape; undefined where it gives nothing, which is no refusal.
  */
-export const turnArgsRefusalOf = (turn: unknown): string | undefined => {
+export const turnArgsRefusalOf = (turn: unknown) => {
   if (turn === undefined) return undefined;
   if (typeof turn !== 'object' || turn === null || Array.isArray(turn)) {
     return `\`config: ${JSON.stringify(turn)}\` is not a turn's configuration. Give an object, like { "budgetUsd": 2 }, or leave it out for the task's own.`;
@@ -284,7 +284,7 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  * 3. `config` itself, then each of its arguments.
  * @param spec The task as filed: its `config`, and any key beside it, read for a former name or an argument filed outside `config`.
  */
-export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefined => {
+export const argsRefusalOf = (spec: { config?: HarnessArgs }) => {
   const moved = movedRefusalOf(spec);
   if (moved) return moved;
   const loose = HARNESS_ARGS.find((key) => Object.hasOwn(spec, key) && (spec as Record<string, unknown>)[key] !== undefined);
@@ -335,7 +335,7 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
  * one that Claude Code's flags replace (`FORMER_ARGS`), naming where it went, or one taken away (`TAKEN_ARGS`), naming what to do
  * instead. Each an own key, under `config` or beside it, whatever its value.
  */
-const movedRefusalOf = (spec: object): string | undefined => {
+const movedRefusalOf = (spec: object) => {
   const filed = (spec as { config?: unknown }).config;
   const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
   const was = Object.entries(RENAMED_ARGS).find(([key]) => at(spec, key) || at(filed, key));
@@ -355,7 +355,7 @@ const movedRefusalOf = (spec: object): string | undefined => {
  * Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or the
  * mounts and the admission every harness renders its own way, or a `projectMcp` that names no servers, or `undefined`.
  */
-const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
+const ownArgsRefusalOf = (config: HarnessArgs) =>
   claudeFlagsRefusalOf(config.claude) ??
   codexArgsRefusalOf(config.codex) ??
   commandArgsRefusalOf(config) ??
@@ -366,7 +366,7 @@ const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   enabledSkillsRefusalOf(config);
 
 /** Why a task's `enabledSkills` names no set of skills — or `undefined`: neither `'default'` nor a list of names, or a name twice. */
-const enabledSkillsRefusalOf = ({ enabledSkills }: HarnessArgs): string | undefined => {
+const enabledSkillsRefusalOf = ({ enabledSkills }: HarnessArgs) => {
   if (enabledSkills === undefined || enabledSkills === 'default') return undefined;
   const names: unknown = enabledSkills;
   if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w.-]+(:[\w.-]+)?$/.test(n)))) {
@@ -377,7 +377,7 @@ const enabledSkillsRefusalOf = ({ enabledSkills }: HarnessArgs): string | undefi
 };
 
 /** Why a task's `mayAsk` is not whether a person can be asked through its session — or `undefined`: anything but true or false. */
-const mayAskRefusalOf = ({ mayAsk }: HarnessArgs): string | undefined =>
+const mayAskRefusalOf = ({ mayAsk }: HarnessArgs) =>
   mayAsk === undefined || typeof mayAsk === 'boolean'
     ? undefined
     : `\`mayAsk: ${JSON.stringify(mayAsk)}\` is not true or false. Give true to hold a call that would ask a person while one answers it, or leave it out to have such a call denied.`;
@@ -386,7 +386,7 @@ const mayAskRefusalOf = ({ mayAsk }: HarnessArgs): string | undefined =>
  * Why a task's `projectMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name
  * twice, or a name the task's own `mcp` gives too, where one would hide the other.
  */
-const projectMcpRefusalOf = ({ projectMcp, mcp }: HarnessArgs): string | undefined => {
+const projectMcpRefusalOf = ({ projectMcp, mcp }: HarnessArgs) => {
   if (projectMcp === undefined) return undefined;
   const names: unknown = projectMcp;
   if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w-]+$/.test(n)))) {
@@ -408,7 +408,7 @@ const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;
  * Why `config.claude` cannot be handed to Claude Code as flags — or `undefined`. Each value must say one thing on the
  * command line: `false` and `null` would be dropped, an object has no flag's form, and an empty list gives nothing.
  */
-const claudeFlagsRefusalOf = (flags: unknown): string | undefined => {
+const claudeFlagsRefusalOf = (flags: unknown) => {
   if (flags === undefined) return undefined;
   if (typeof flags !== 'object' || flags === null || Array.isArray(flags)) {
     return `\`claude: ${JSON.stringify(flags)}\` is not a set of Claude Code's flags. Give an object keyed by flag in camelCase, like { "appendSystemPromptFile": "prompt.md" }, or leave it out.`;
@@ -436,7 +436,7 @@ const CODEX_FLAGS: readonly string[] = ((flags) => (flags !== undefined && 'only
  * absolute path: a key misspelled would name no directory, and a relative one would be read against a `cwd` it was not
  * written for.
  */
-const codexArgsRefusalOf = (args: unknown): string | undefined => {
+const codexArgsRefusalOf = (args: unknown) => {
   if (args === undefined) return undefined;
   if (typeof args !== 'object' || args === null || Array.isArray(args)) {
     return `\`codex: ${JSON.stringify(args)}\` is not a set of Codex's arguments. Give an object, like { "trustFrom": "/path/to/repo" }, or leave it out.`;
@@ -464,7 +464,7 @@ const isArg = (v: unknown): v is string => typeof v === 'string' && !v.includes(
  * variable names to strings with no NUL; a `niceness` that is not a whole number from 0 to 19; a `terminationMessagePath` that is not
  * an absolute path with no NUL.
  */
-const commandArgsRefusalOf = ({ command, env, niceness, terminationMessagePath }: HarnessArgs): string | undefined => {
+const commandArgsRefusalOf = ({ command, env, niceness, terminationMessagePath }: HarnessArgs) => {
   if (command !== undefined && !(Array.isArray(command) && command.length > 0 && command[0] !== '' && command.every(isArg))) {
     return `\`command: ${JSON.stringify(command)}\` is not a command. Give the program and its arguments as a list of strings, the program first, like ["sh", "-c", "npm test"].`;
   }
@@ -488,7 +488,7 @@ const commandArgsRefusalOf = ({ command, env, niceness, terminationMessagePath }
 };
 
 /** Why a `terminationMessagePath` names no file the runtime can read at exit — or `undefined`: it is absolute, with no NUL. */
-const terminationPathRefusal = (terminationMessagePath: string | undefined): string | undefined =>
+const terminationPathRefusal = (terminationMessagePath: string | undefined) =>
   terminationMessagePath !== undefined && !(isArg(terminationMessagePath) && path.isAbsolute(terminationMessagePath))
     ? `\`terminationMessagePath: ${JSON.stringify(terminationMessagePath)}\` is not an absolute path. Give the file the command writes its last words to from the root, like "/tmp/run/said", or leave it out.`
     : undefined;

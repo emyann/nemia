@@ -5,10 +5,9 @@
 import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
 import { nameFor, own, type State } from '../core/index.ts';
-import { diskBytesOf, journalsKept, type Journal, type JournalError, type JournalKept, type StoreOps } from '../core/engine/index.ts';
+import { diskBytesOf, journalsKept, type Journal, type JournalKept, type StoreOps } from '../core/engine/index.ts';
 import type { Runner, SessionKept } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
-import type { EngineShape } from './engine.ts';
 import { forgetVerbOf, journalBytesOf } from './forget.ts';
 import { compactVerbOf } from './compact.ts';
 
@@ -55,7 +54,7 @@ const sessionsByHarness = (tasks: readonly JournalKept[], harnessNamed: (harness
 };
 
 /** The bytes of `paths` on the disk, each counted once across the ask (`seen`), and what did not read, put into `unread`. */
-const bytesOf = (paths: readonly string[], seen: Set<string>, unread: string[]): number => {
+const bytesOf = (paths: readonly string[], seen: Set<string>, unread: string[]) => {
   let bytes = 0;
   for (const file of paths) {
     try {
@@ -72,7 +71,7 @@ const bytesOf = (paths: readonly string[], seen: Set<string>, unread: string[]):
  * its sessions (`asked`), each counted once across the ask (`seen`). `asked` is the harness's answer, why it gave none, or, as a
  * string, the name of a harness this engine does not have; what could not be measured is said on `unread`.
  */
-const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Set<string>): KeptReport['tasks'][number] => {
+const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Set<string>) => {
   const unread = task.unread === undefined ? [] : [task.unread];
   const ran = task.attempts.length > 0;
   if (typeof asked === 'string' && ran)
@@ -119,14 +118,14 @@ const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, harnessNa
     const kept = own(runners, harness)?.kept;
     if (!kept || !sessions.length) return Effect.succeed<Asked>({ kept: {} });
     return kept(sessions).pipe(
-      Effect.map((answer): Asked => ({ kept: answer })),
+      Effect.map((answer) => ({ kept: answer })),
       Effect.catchCause((cause) =>
         Effect.succeed<Asked>({ why: `the \`${harness}\` harness did not say what it keeps: ${String(cause)}` }),
       ),
     );
   };
 
-  return Effect.fn('Engine.kept')(function* (): Effect.fn.Return<KeptReport, KeptRefused | JournalError> {
+  return Effect.fn('Engine.kept')(function* () {
     if (arguments.length > 0) {
       return yield* Effect.fail(
         new KeptRefused({
@@ -164,7 +163,7 @@ export const keepingVerbsOf = (
   runners: Record<string, SeamOps>,
   harnessOf: (state: State) => Harnessed,
   fallback: string,
-): Pick<EngineShape, 'forget' | 'kept' | 'compact'> => ({
+) => ({
   forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(store)),
   compact: compactVerbOf(runners),
   kept: keptVerbOf(store, runners, (harness = fallback) => (Object.hasOwn(runners, harness) ? harness : undefined)),

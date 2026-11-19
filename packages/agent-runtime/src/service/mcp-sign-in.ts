@@ -49,7 +49,7 @@ export class McpSignInRefused extends Schema.TaggedError<McpSignInRefused>()('Mc
 }) {}
 
 /** The words of a refused callback for the server `name`, whose sign-in waits on `port`: each names what to paste instead. */
-const callbackWords = (name: string, port: number, why: CallbackRefusal): string => {
+const callbackWords = (name: string, port: number, why: CallbackRefusal) => {
   const redirect = redirectUriOf(port);
   switch (why) {
     case 'unreadable':
@@ -66,7 +66,7 @@ const callbackWords = (name: string, port: number, why: CallbackRefusal): string
 };
 
 /** The refusal of a callback pasted for `name` where no sign-in to it waits. */
-const noneWaiting = (name: string): McpSignInRefused =>
+const noneWaiting = (name: string) =>
   new McpSignInRefused({
     message: `no sign-in to \`${name}\` waits on this engine, so there is nothing to complete. Sign in again, approve in your browser, then paste the address it lands on.`,
     held: false,
@@ -81,7 +81,7 @@ const noneWaiting = (name: string): McpSignInRefused =>
  * @param port The callback port of the sign-in waiting for `name`, or undefined where none waits.
  * @param url The address pasted.
  */
-export const callbackRefused = (name: string, port: number | undefined, url: string): McpSignInRefused | undefined => {
+export const callbackRefused = (name: string, port: number | undefined, url: string) => {
   if (port === undefined) return noneWaiting(name);
   const why = callbackRefusal(pastedOf(url), redirectOf(port));
   return why === undefined ? undefined : new McpSignInRefused({ message: callbackWords(name, port, why), held: false, callback: why });
@@ -112,7 +112,7 @@ type Held = { readonly name: string; readonly session: McpSignInSession; readonl
  * `held` watched until it settles: `connected` or `failed` as its session says, or `expired` once `withinMs` passes with neither.
  * Whichever comes first is said once; `settle` ignores a hold already let go.
  */
-const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) => void): void => {
+const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) => void) => {
   const timer = setTimeout(() => settle({ state: 'expired', why: `no sign-in was approved by ${held.until}` }), withinMs);
   timer.unref();
   void held.session.settled.then(
@@ -131,7 +131,7 @@ const watched = (held: Held, withinMs: number, settle: (state: McpSignInState) =
 type SignInSeams = { readonly cli?: McpCli; readonly ask?: McpSignInAsk; readonly withinMs?: number };
 
 /** The server a sign-in or sign-out may be asked of, or why not: a remote server with an OAuth client and a callback port. */
-const signInRefusal = (name: unknown, server: unknown): string | undefined => {
+const signInRefusal = (name: unknown, server: unknown) => {
   if (typeof name !== 'string' || !/^[\w-]+$/.test(name)) {
     return `takes a server's name, letters, digits, - and _; it was handed ${JSON.stringify(name)}.`;
   }
@@ -143,7 +143,7 @@ const signInRefusal = (name: unknown, server: unknown): string | undefined => {
 };
 
 /** Why the server `name` cannot be signed in to: it names no OAuth client with a callback port. */
-const noClient = (name: string): string =>
+const noClient = (name: string) =>
   `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one. Give it \`oauth: { "clientId": "…", "callbackPort": 8791 }\`, as its app is registered.`;
 
 /**
@@ -174,7 +174,7 @@ const portsHeld = (states: Map<string, McpSignInState>) => {
  * Why a sign-in verb is refused by an engine none of whose harnesses, `declared`, declares `mcp`: the harnesses it has.
  * @param declared The engine's harnesses, each with what it declares.
  */
-export const noSignInHarness = (declared: readonly HarnessDeclared[]): string =>
+export const noSignInHarness = (declared: readonly HarnessDeclared[]) =>
   `a sign-in is made inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${declared.map((h) => h.name).join(', ') || 'none'}.`;
 
 /**
@@ -202,12 +202,14 @@ export const mcpSignInVerbsOf = (
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
   const declared = declaredOf(harnesses);
   const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
-  const cliOf = (): McpCli | string => {
-    if (seams.cli) return seams.cli;
+  const cliOf = () => {
+    if (seams.cli) return seams.cli satisfies McpCli | string;
     const claude = claudeExecutableOf(executable, harnessBin);
-    return claude === undefined
-      ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
-      : claudeCli(claude);
+    return (
+      claude === undefined
+        ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
+        : claudeCli(claude)
+    ) satisfies McpCli | string;
   };
   const opened = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, port: number, clientSecret?: string) {
     mkdirSync(cwd, { recursive: true });
@@ -245,7 +247,7 @@ export const mcpSignInVerbsOf = (
     return yield* opened(name, server, port, clientSecret).pipe(Effect.ensuring(Effect.sync(() => claimed.delete(port))));
   });
 
-  const mcpSignInState = (name: string): Effect.Effect<McpSignInState> => Effect.sync(() => states.get(name) ?? { state: 'none' });
+  const mcpSignInState = (name: string) => Effect.sync(() => states.get(name) ?? { state: 'none' }) satisfies Effect.Effect<McpSignInState>;
 
   const mcpSignOut = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer) {
     const refused = signInRefusal(name, server) ?? noClaude();
@@ -292,4 +294,4 @@ const callbackVerbOf = (byPort: ReadonlyMap<number, Held>, states: ReadonlyMap<s
   });
 
 /** `text` with every appearance of the pasted `url` taken out: its code and state are a sign-in's, and no refusal quotes them. */
-const withoutUrl = (text: string, url: string): string => (url ? text.split(url).join('<the pasted address>') : text);
+const withoutUrl = (text: string, url: string) => (url ? text.split(url).join('<the pasted address>') : text);

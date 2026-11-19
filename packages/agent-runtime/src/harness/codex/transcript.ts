@@ -19,7 +19,7 @@ const rollouts = new Map<string, string>();
  * id is made of (hex digits and `-`) finds none, so nothing else goes into a file name.
  * @param threadId The thread's id, as `exec --json` gave it.
  */
-export const codexRolloutFile = (threadId: string): string | undefined => {
+export const codexRolloutFile = (threadId: string) => {
   if (!/^[0-9a-f-]+$/.test(threadId)) return undefined;
   const known = rollouts.get(threadId);
   if (known && fs.existsSync(known)) return known;
@@ -48,16 +48,18 @@ export const codexRolloutFile = (threadId: string): string | undefined => {
 };
 
 /** The text of a list of content blocks, as far as each has any. */
-const textsOf = (blocks: readonly (string | { readonly text?: string })[] | undefined): string[] =>
+const textsOf = (blocks: readonly (string | { readonly text?: string })[] | undefined) =>
   (blocks ?? []).map((b) => (typeof b === 'string' ? b : b.text)).filter((t): t is string => t !== undefined);
 
 /** A completed thread item as events, under `id` and at `at`. */
-const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[] => {
-  if (Items.guards.UserMessage(item)) return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }];
-  if (Items.guards.AgentMessage(item)) return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }];
+const itemEvents = (item: RolloutItem, id: string, at: string) => {
+  if (Items.guards.UserMessage(item))
+    return [{ id, at, role: 'user', kind: 'text', text: textsOf(item.content).join('\n') }] satisfies TranscriptEvent[];
+  if (Items.guards.AgentMessage(item))
+    return [{ id, at, role: 'assistant', kind: 'text', text: textsOf(item.content).join('\n') }] satisfies TranscriptEvent[];
   if (Items.guards.Reasoning(item)) {
     const text = [...textsOf(item.summary_text), ...textsOf(item.raw_content)].join('\n');
-    return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }];
+    return [{ id, at, role: 'assistant', kind: 'thinking', ...(text ? { text } : {}) }] satisfies TranscriptEvent[];
   }
   if (Items.guards.CommandExecution(item)) {
     return [
@@ -69,7 +71,7 @@ const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[
         kind: 'tool_result',
         result: { text: item.aggregated_output ?? '', isError: !(item.status === 'completed' && item.exit_code === 0) },
       },
-    ];
+    ] satisfies TranscriptEvent[];
   }
   if (Items.guards.FileChange(item)) {
     return [
@@ -84,9 +86,9 @@ const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[
           isError: item.status !== 'completed',
         },
       },
-    ];
+    ] satisfies TranscriptEvent[];
   }
-  return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }];
+  return [{ id, at, role: 'system', kind: 'system', text: `[${String(item.type)}]` }] satisfies TranscriptEvent[];
 };
 
 /**
@@ -117,13 +119,13 @@ const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[
  * @param offset Where the record's line starts in the rollout, in bytes: its events' fallback id, and where a refusal says it is.
  * @param file The rollout's path, named in a refusal; undefined to say only the rollout.
  */
-export const codexRolloutEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
+export const codexRolloutEvents = (entry: unknown, offset: number, file?: string) => {
   const where = `the line at byte ${offset} of ${file ? `the rollout \`${file}\`` : 'the rollout'}`;
   const read = rolloutRecordOf(entry, where);
-  if (read === undefined) return [];
+  if (read === undefined) return [] satisfies TranscriptEvent[];
   if ('wrong' in read) throw new Error(read.wrong);
   const at = isoTime(read.record.timestamp);
-  if (!at) return [];
+  if (!at) return [] satisfies TranscriptEvent[];
   if (read.kind === 'event_msg task_complete') {
     const { turn_id: turn, error } = read.record.payload;
     return [
@@ -134,8 +136,8 @@ export const codexRolloutEvents = (entry: unknown, offset: number, file?: string
         kind: 'system',
         text: error?.message ?? 'task_complete',
       },
-    ];
+    ] satisfies TranscriptEvent[];
   }
   const { item } = read.record.payload;
-  return item ? itemEvents(item, item.id || `@${offset}`, at) : [];
+  return (item ? itemEvents(item, item.id || `@${offset}`, at) : []) satisfies TranscriptEvent[];
 };

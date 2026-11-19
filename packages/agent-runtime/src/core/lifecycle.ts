@@ -187,30 +187,33 @@ type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
  * the helpers below give its words: the `Action` `decide` returns. A live session is one at work, `submitted` or `working`
  * (`RUNNING`), and runs in A2A's `working`, so a remote Task `submitted` runs as `working` does, to the word.
  */
-const said = (event: LifecycleEvent): Action => {
+const said = (event: LifecycleEvent) => {
   switch (event.type) {
     case 'SESSION_LIVE':
-      return { do: 'nothing', why: 'running (working)' };
+      return { do: 'nothing', why: 'running (working)' } satisfies Action;
     case 'SESSION_IDLE':
-      return { do: 'nothing', why: 'idle — open until stopped' };
+      return { do: 'nothing', why: 'idle — open until stopped' } satisfies Action;
     case 'SESSION_BLOCKED':
-      return { do: 'nothing', why: 'blocked — needs a person' };
+      return { do: 'nothing', why: 'blocked — needs a person' } satisfies Action;
     case 'SESSION_RESPAWNING':
-      return { do: 'nothing', why: 'restarting — its harness respawns its process' };
+      return { do: 'nothing', why: 'restarting — its harness respawns its process' } satisfies Action;
     case 'BACKING_OFF':
-      return { do: 'nothing', why: `restarting — backing off ${event.backoffMs / 1000}s after attempt ${event.attempt} ended` };
+      return {
+        do: 'nothing',
+        why: `restarting — backing off ${event.backoffMs / 1000}s after attempt ${event.attempt} ended`,
+      } satisfies Action;
     case 'PARK_HELD':
-      return { do: 'nothing', why: `parked — attempt ${event.attempt} continues once the sessions' drain is lifted` };
+      return { do: 'nothing', why: `parked — attempt ${event.attempt} continues once the sessions' drain is lifted` } satisfies Action;
     case 'UNSEEN_IN_GRACE':
-      return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
+      return { do: 'nothing', why: 'spawned, waiting for the harness to register it' } satisfies Action;
     case 'UNREAD':
-      return { do: 'nothing', why: 'its harness could not be read this pass' };
+      return { do: 'nothing', why: 'its harness could not be read this pass' } satisfies Action;
     case 'QUEUED':
-      return { do: 'nothing', why: 'queued — waits to be admitted' };
+      return { do: 'nothing', why: 'queued — waits to be admitted' } satisfies Action;
     case 'AWAITING_INPUT':
-      return { do: 'nothing', why: 'input-required' };
+      return { do: 'nothing', why: 'input-required' } satisfies Action;
     default:
-      return { do: 'nothing', why: event.type };
+      return { do: 'nothing', why: event.type } satisfies Action;
   }
 };
 
@@ -220,18 +223,19 @@ const said = (event: LifecycleEvent): Action => {
  * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
  * `closedOut`, where the task asked for a closing statement: whether it came, a fact for the layer above, which judges it.
  */
-const harnessEnd = (e: Sessioned): Action => ({
-  do: 'record-end',
-  attempt: e.attempt,
-  sessionId: e.sighting.sessionId,
-  observed: endedOf(e),
-  reason: 'harness',
-  nativeId: e.sighting.nativeId,
-  closeout: e.sighting.closeout?.payload,
-  ...(e.asked ? { closedOut: e.sighting.closeout !== undefined } : {}),
-});
+const harnessEnd = (e: Sessioned) =>
+  ({
+    do: 'record-end',
+    attempt: e.attempt,
+    sessionId: e.sighting.sessionId,
+    observed: endedOf(e),
+    reason: 'harness',
+    nativeId: e.sighting.nativeId,
+    closeout: e.sighting.closeout?.payload,
+    ...(e.asked ? { closedOut: e.sighting.closeout !== undefined } : {}),
+  }) satisfies Action;
 
-const endedOf = (e: Sessioned): Outcome => {
+const endedOf = (e: Sessioned) => {
   const end = endOf(e.sighting.state);
   if (!end)
     throw new Error(
@@ -244,15 +248,16 @@ const endedOf = (e: Sessioned): Outcome => {
  * An attempt cut short with its harness holding no end of its own: the cut is its reason. A person's stop records it
  * `stopped`, the deadline `failed`; whatever the harness last showed of it is kept.
  */
-const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sighting): Action => ({
-  do: 'record-end',
-  attempt,
-  sessionId: sighting?.sessionId ?? '(never seen)',
-  observed: reason === 'operator' ? 'stopped' : 'failed',
-  reason,
-  nativeId: sighting?.nativeId,
-  closeout: sighting?.closeout?.payload,
-});
+const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sighting) =>
+  ({
+    do: 'record-end',
+    attempt,
+    sessionId: sighting?.sessionId ?? '(never seen)',
+    observed: reason === 'operator' ? 'stopped' : 'failed',
+    reason,
+    nativeId: sighting?.nativeId,
+    closeout: sighting?.closeout?.payload,
+  }) satisfies Action;
 
 /**
  * The note a turn with no successful attempt settles `failed` with: how many attempts it had — a journal an older runtime
@@ -524,9 +529,8 @@ export const MACHINE = machineOf(CONFIG);
  * refused. Every edge names one action (`src/core/lifecycle.test.ts`): anything else is the table's mistake, not the task's, and
  * is thrown.
  */
-const moveOn =
-  (machine: ReturnType<typeof machineOf>): Move =>
-  (from, event) => {
+const moveOn = (machine: ReturnType<typeof machineOf>) =>
+  ((from, event) => {
     const snapshot = machine.resolveState({ value: from });
     if (!snapshot.can(event)) return { refused: { state: from, event: event.type } };
     const [next, actions] = xTransition(machine, snapshot, event);
@@ -534,7 +538,7 @@ const moveOn =
     if (params.length !== 1 || !params[0])
       throw new Error(`the lifecycle's edge from ${from} on ${event.type} gave ${params.length} actions, not one`);
     return { to: next.value as LifecycleState, action: params[0] };
-  };
+  }) satisfies Move;
 
 /** The shipped lifecycle's move: the one state and action an event leads to, or a refusal when the state has no edge for it. */
 export const transition: Move = moveOn(MACHINE);
@@ -561,7 +565,7 @@ export const machineWithout = (from: LifecycleState, event: EventType) => {
  * @param from The state whose edges are taken away.
  * @param event The kind of event whose edges are taken away.
  */
-export const withoutEdge = (from: LifecycleState, event: EventType): Move => moveOn(machineWithout(from, event));
+export const withoutEdge = (from: LifecycleState, event: EventType) => moveOn(machineWithout(from, event));
 
 /** One edge of the machine, as its table says it: where it leaves from, on what, under which guard, to where, doing what. */
 type Edge = { from: LifecycleState; event: EventType; guard?: string; to: LifecycleState; action: string };
@@ -574,7 +578,7 @@ const nodesOf = (machine: ReturnType<typeof machineOf>) => toDirectedGraph(machi
  * Exported only for the tests that import it.
  * @param machine The machine to read, the shipped lifecycle's by default.
  */
-export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine).map((n) => n.stateNode.key as LifecycleState);
+export const statesOf = (machine = MACHINE) => nodesOf(machine).map((n) => n.stateNode.key as LifecycleState);
 
 /**
  * Every edge of a machine, read off XState's public graph of it (`toDirectedGraph`), so the list is the machine and not a
@@ -583,7 +587,7 @@ export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine
  * Exported only for the tests that import it.
  * @param machine The machine to read, the shipped lifecycle's by default.
  */
-export const edgesOf = (machine = MACHINE): Edge[] =>
+export const edgesOf = (machine = MACHINE) =>
   nodesOf(machine).flatMap((node) =>
     node.edges.map(({ source, target, label, transition: t }) => ({
       from: source.key as LifecycleState,
@@ -613,7 +617,7 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
  * @param machine The machine to read, the shipped lifecycle's by default.
  * @param verbs The person's verbs to draw beside the edges, the shipped `VERBS` by default.
  */
-export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS): string => {
+export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS) => {
   const id = (s: string) => s.replace(/-/g, '_');
   return [
     'stateDiagram-v2',
@@ -647,7 +651,7 @@ export type LifecycleGraph = {
  * The shipped lifecycle as data a page draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`, `VERBS`).
  * Each call returns a fresh copy that survives a JSON round trip: it takes nothing, and hands out no machine and no move.
  */
-export const lifecycleGraph = (): LifecycleGraph => ({
+export const lifecycleGraph = () => ({
   initial: CONFIG.initial,
   states: statesOf(),
   final: [...FINAL],

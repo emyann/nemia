@@ -12,7 +12,7 @@
  */
 import { Result, Schema } from 'effect';
 import { firstRefusal, own, type Usage } from '../../core/index.ts';
-import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
+import type { StartEvent } from '../detached/detached.ts';
 import type { PartialMark } from '../detached/follow.ts';
 
 const Count = Schema.Natural;
@@ -67,7 +67,7 @@ const FIX =
  * The object `line` holds when it is one whose `type` the runtime reads, with the decoder of that type, or `undefined` for any other
  * line.
  */
-const ours = (line: string): { event: Record<string, unknown> & { type: string }; decode: (typeof DECODERS)[string] } | undefined => {
+const ours = (line: string) => {
   if (!line.includes('"type"')) return undefined;
   let parsed: unknown;
   try {
@@ -82,7 +82,7 @@ const ours = (line: string): { event: Record<string, unknown> & { type: string }
 };
 
 /** The sum of `key` over `turns`, or `undefined` where there are no turns to count or one of them did not say it. */
-const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | undefined, key: 'input' | 'read'): number | undefined => {
+const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | undefined, key: 'input' | 'read') => {
   if (turns === undefined) return undefined;
   let n = 0;
   for (const t of turns) {
@@ -100,7 +100,7 @@ const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | und
  * Exported only for the tests that import it.
  * @param output What the harness printed on stdout, whole lines of JSON.
  */
-export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wrong: string } => {
+export const codexEventsOf = (output: string) => {
   const events: CodexEvent[] = [];
   const lines = output.split('\n');
   for (const [at, line] of lines.entries()) {
@@ -116,9 +116,9 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
     const field = path.map(String).join('.');
     return {
       wrong: `line ${at + 1} of the \`codex exec --json\` stream is a \`${event.type}\` event whose \`${field}\` ${words}. ${FIX}`,
-    };
+    } satisfies { events: CodexEvent[] } | { wrong: string } as { events: CodexEvent[] } | { wrong: string };
   }
-  return { events };
+  return { events } satisfies { events: CodexEvent[] } | { wrong: string } as { events: CodexEvent[] } | { wrong: string };
 };
 
 /**
@@ -128,9 +128,11 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
  * @param output The whole lines of stdout read this time.
  * @param before How many lines of stdout came before `output`, so that a refusal numbers its line in the whole output.
  */
-export const codexPartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
+export const codexPartials = (output: string, before: number) => {
   const read = codexEventsOf('\n'.repeat(before) + output);
-  return 'wrong' in read ? read : { marks: [] };
+  return ('wrong' in read ? read : { marks: [] }) satisfies { marks: PartialMark[] } | { wrong: string } as
+    | { marks: PartialMark[] }
+    | { wrong: string };
 };
 
 /**
@@ -150,7 +152,7 @@ type Turn = { input?: number; read?: number; output: number };
  * One completed turn's counts: its input unless it wrote to the cache, since whether `input_tokens` counts those writes is not
  * known; its cache reads when they are a part of that input and it wrote nothing; and its output.
  */
-const turnOf = ({ usage }: typeof TurnCompletedSchema.Type): Turn => ({
+const turnOf = ({ usage }: typeof TurnCompletedSchema.Type) => ({
   input: usage.cache_write_input_tokens ? undefined : usage.input_tokens,
   ...(usage.cached_input_tokens <= usage.input_tokens && usage.cache_write_input_tokens === 0 ? { read: usage.cached_input_tokens } : {}),
   output: usage.output_tokens,
@@ -175,7 +177,7 @@ const turnOf = ({ usage }: typeof TurnCompletedSchema.Type): Turn => ({
  * read as saying nothing.
  * @param output What the harness printed on stdout, as JSON lines, over the whole session.
  */
-export const codexOutput = (output: string): HarnessOutput => {
+export const codexOutput = (output: string) => {
   const read = codexEventsOf(output);
   if ('wrong' in read) throw new Error(read.wrong);
   let started = 0;

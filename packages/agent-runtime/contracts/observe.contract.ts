@@ -27,10 +27,10 @@ export const backoff = assume(backoffOf, {
 });
 
 /** A moment as the runtime stamps one: whole milliseconds, after 1970 and before 2^52 of them. */
-const stamped = (ms: number): boolean => Number.isInteger(ms) && ms >= 0 && ms <= 2 ** 52;
-const monoStamped = (m: Monotonic | undefined): boolean => m === undefined || stamped(m.ms);
-const wallStamped = (at: string | null | undefined): boolean => at === null || at === undefined || stamped(Date.parse(at));
-const attemptStamped = (a: Attempt): boolean =>
+const stamped = (ms: number) => Number.isInteger(ms) && ms >= 0 && ms <= 2 ** 52;
+const monoStamped = (m: Monotonic | undefined) => m === undefined || stamped(m.ms);
+const wallStamped = (at: string | null | undefined) => at === null || at === undefined || stamped(Date.parse(at));
+const attemptStamped = (a: Attempt) =>
   wallStamped(a.startedAt) &&
   monoStamped(a.startedMono) &&
   wallStamped(a.spawnedAt) &&
@@ -69,17 +69,17 @@ export const deadline = assume(deadlineOf, {
 });
 
 /** The last attempt, while it has not ended. */
-const inFlight = (state: State): Attempt | undefined => {
+const inFlight = (state: State) => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.ended === null ? last : undefined;
 };
 /** Whether the last attempt, of the current turn, was parked under a sessions' drain (`Attempt.parked`, which only an end carries). */
-const parkedLast = (state: State): boolean => {
+const parkedLast = (state: State) => {
   const last = state.attempts.at(-1);
   return last !== undefined && last.parked !== undefined && (last.turn ?? 0) === state.inputs.length;
 };
 /** Whether the last attempt is in flight and held back at its hook: seen held, and not seen going on since. */
-const heldInFlight = (state: State): boolean => {
+const heldInFlight = (state: State) => {
   const last = inFlight(state);
   return last !== undefined && last.heldSince !== undefined && last.releasedAt === undefined;
 };
@@ -100,12 +100,12 @@ const SESSION_EVENTS = [
 ];
 
 /** What the pass saw of the attempt in flight. */
-const sightingOf = (state: State, observed: ReadonlyMap<string, Sighting>): Sighting | undefined => {
+const sightingOf = (state: State, observed: ReadonlyMap<string, Sighting>) => {
   const last = inFlight(state);
   return last === undefined ? undefined : observed.get(nameFor(state.taskId, last.n));
 };
 /** Whether the pass could not read the harness that holds the attempt in flight. */
-const unreadOf = (state: State, now: { readonly unread?: ReadonlySet<string> }): boolean => {
+const unreadOf = (state: State, now: { readonly unread?: ReadonlySet<string> }) => {
   const last = inFlight(state);
   return last !== undefined && now.unread !== undefined && now.unread.has(nameFor(state.taskId, last.n));
 };

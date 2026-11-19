@@ -19,7 +19,7 @@ export class DrainRefused extends Schema.TaggedError<DrainRefused>()('DrainRefus
  * Why `drain` refuses its holder, or `undefined` for a process id or null.
  * @param holder What `drain` was handed: the process id of the engine that holds the attached sessions, or null to let their calls go.
  */
-export const drainRefusalOf = (holder: unknown): string | undefined =>
+export const drainRefusalOf = (holder: unknown) =>
   holder === null || (Number.isInteger(holder) && (holder as number) > 0)
     ? undefined
     : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
@@ -28,7 +28,7 @@ export const drainRefusalOf = (holder: unknown): string | undefined =>
  * `drain`'s check of its holder: fails with `DrainRefused` for what `drainRefusalOf` refuses, and does nothing otherwise.
  * @param holder What `drain` was handed, as `drainRefusalOf` reads it.
  */
-export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused> => {
+export const drainChecked = (holder: unknown) => {
   const refused = drainRefusalOf(holder);
   return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
 };
@@ -38,7 +38,7 @@ export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused>
  * grace that is no length of time, or a key it does not read, would put a drain no job judges as asked.
  * @param args Every argument `drainSessions` was handed: one `{ graceMs }`, or null to lift the drain.
  */
-export const drainSessionsRefusalOf = (args: readonly unknown[]): string | undefined => {
+export const drainSessionsRefusalOf = (args: readonly unknown[]) => {
   const [given] = args;
   const grace = (o: object) => Object.keys(o).length === 1 && Number.isSafeInteger((o as { graceMs?: unknown }).graceMs);
   return args.length === 1 &&
@@ -51,7 +51,7 @@ export const drainSessionsRefusalOf = (args: readonly unknown[]): string | undef
  * `drainSessions`' check of what it was handed: fails with `DrainRefused` for what `drainSessionsRefusalOf` refuses, and nothing else.
  * @param args Every argument `drainSessions` was handed, as `drainSessionsRefusalOf` reads them.
  */
-export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<void, DrainRefused> => {
+export const drainSessionsChecked = (args: readonly unknown[]) => {
   const refused = drainSessionsRefusalOf(args);
   return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
 };
@@ -67,8 +67,7 @@ export const drainSessionsChecked = (args: readonly unknown[]): Effect.Effect<vo
  * @param fallback The harness that takes a task that names none.
  */
 export const drainHolds =
-  (stands: boolean, harnesses: Record<string, HarnessConfig>, fallback: string) =>
-  (harness: string | undefined): boolean => {
+  (stands: boolean, harnesses: Record<string, HarnessConfig>, fallback: string) => (harness: string | undefined) => {
     const config = own(harnesses, harness ?? fallback);
     if (!stands || config === undefined) return false;
     const can = declarationOf(config)?.can;

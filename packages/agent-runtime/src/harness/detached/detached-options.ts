@@ -24,7 +24,7 @@ export type DetachedOptions = {
  * the lease would read a live worker beating so as dead.
  * @param options The runner's options, whose `stopGraceMs` and `beatMs` are read, in milliseconds.
  */
-export function workerBoundsOf(options: DetachedOptions): { stopGraceMs: number; beatMs: number } {
+export function workerBoundsOf(options: DetachedOptions) {
   const stopGraceMs = options.stopGraceMs ?? WORKER_STOP_GRACE_MS;
   const beatMs = options.beatMs ?? WORKER_BEAT_MS;
   if (!(beatMs > 0 && beatMs < STALE_MS))

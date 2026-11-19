@@ -49,17 +49,17 @@ export const NEEDS_HUMAN: ReadonlySet<SessionState> = new Set(['input-required',
  * A session its harness still holds and the engine still waits on: at work, or waiting on a person.
  * @param s The session's state as its harness gave it, or undefined where it gave none.
  */
-export const isLive = (s: SessionState | undefined): boolean => s !== undefined && (RUNNING.has(s) || NEEDS_HUMAN.has(s));
+export const isLive = (s: SessionState | undefined) => s !== undefined && (RUNNING.has(s) || NEEDS_HUMAN.has(s));
 /**
  * A session waiting on a person: for words or to sign in.
  * @param s The session's state as its harness gave it, or undefined where it gave none.
  */
-export const waitsOnPerson = (s: SessionState | undefined): boolean => s !== undefined && NEEDS_HUMAN.has(s);
+export const waitsOnPerson = (s: SessionState | undefined) => s !== undefined && NEEDS_HUMAN.has(s);
 /**
  * A session at work: submitted or working.
  * @param s The session's state as its harness gave it, or undefined where it gave none.
  */
-export const atWorkState = (s: SessionState | undefined): boolean => s !== undefined && RUNNING.has(s);
+export const atWorkState = (s: SessionState | undefined) => s !== undefined && RUNNING.has(s);
 
 /**
  * The end each state records when its harness lets the session go, as the journal records it (`ended.observed`, the
@@ -82,7 +82,7 @@ const ENDS: Record<SessionState, Outcome | undefined> = {
  * The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person.
  * @param state The session's state when its harness let it go.
  */
-export const endOf = (state: SessionState): Outcome | undefined => ENDS[state];
+export const endOf = (state: SessionState) => ENDS[state];
 
 /**
  * A2A's name for one of the runtime's own former words for a session's state — `working`, `blocked`, `done`, `failed`,
@@ -90,7 +90,7 @@ export const endOf = (state: SessionState): Outcome | undefined => ENDS[state];
  * `blocked` is `input-required`, since those words never said which wait; `undefined` for any other word.
  * @param word The word a registry entry says for the session's state.
  */
-export const formerStateOf = (word: unknown): SessionState | undefined =>
+export const formerStateOf = (word: unknown) =>
   typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;
 const FORMER = {
   working: 'working',

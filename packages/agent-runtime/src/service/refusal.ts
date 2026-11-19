@@ -55,12 +55,10 @@ const UNSENT = new Set([SayUnsent, InterruptUnsent, AnswerUnsent].map((unsent) =
  * `exitCode`, and anything else — a `JournalError`, a `RunnerError` — as it is.
  * @param verb The name of the verb that failed, which leads the words.
  */
-export const refusalWords =
-  (verb: string) =>
-  (e: unknown): unknown => {
-    const { _tag, message, cause } = (e ?? {}) as { _tag?: unknown; message?: unknown; cause?: unknown };
-    if (typeof _tag !== 'string' || typeof message !== 'string') return e;
-    if (REFUSALS.has(_tag)) return Object.assign(new Error(`${verb}: ${message}`), { exitCode: 2 });
-    if (UNSENT.has(_tag)) return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
-    return e;
-  };
+export const refusalWords = (verb: string) => (e: unknown) => {
+  const { _tag, message, cause } = (e ?? {}) as { _tag?: unknown; message?: unknown; cause?: unknown };
+  if (typeof _tag !== 'string' || typeof message !== 'string') return e;
+  if (REFUSALS.has(_tag)) return Object.assign(new Error(`${verb}: ${message}`), { exitCode: 2 });
+  if (UNSENT.has(_tag)) return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
+  return e;
+};

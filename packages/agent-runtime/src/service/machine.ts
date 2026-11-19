@@ -9,7 +9,7 @@ import fs from 'node:fs';
 export type MachineReading = { totalBytes: number; availableBytes: number };
 
 /** A line of `/proc/meminfo` in kibibytes, as the kernel writes each: `MemTotal:       16318412 kB`. */
-const lineOf = (text: string, name: string): number | undefined => {
+const lineOf = (text: string, name: string) => {
   const found = new RegExp(`^${name}:\\s+(\\d+) kB$`, 'm').exec(text);
   return found?.[1] === undefined ? undefined : Number(found[1]) * 1024;
 };
@@ -19,7 +19,7 @@ const lineOf = (text: string, name: string): number | undefined => {
  * older than 3.14 writes no `MemAvailable`, and a guess at it from free and cached memory is no reading.
  * @param text The text of `/proc/meminfo`.
  */
-export const meminfoOf = (text: string): MachineReading | undefined => {
+export const meminfoOf = (text: string) => {
   const totalBytes = lineOf(text, 'MemTotal');
   const availableBytes = lineOf(text, 'MemAvailable');
   return totalBytes === undefined || availableBytes === undefined ? undefined : { totalBytes, availableBytes };
@@ -29,7 +29,7 @@ export const meminfoOf = (text: string): MachineReading | undefined => {
  * The machine's memory as `/proc/meminfo` says it now, or `undefined` where the file cannot be read (not Linux) or says too little:
  * the engine then admits by its ceiling alone, as before it read the machine.
  */
-export const machineMemory = (): MachineReading | undefined => {
+export const machineMemory = () => {
   try {
     return meminfoOf(fs.readFileSync('/proc/meminfo', 'utf8'));
   } catch {

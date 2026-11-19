@@ -306,14 +306,18 @@ test.skipIf(skip)(
   },
 );
 
-/** The one command the probe's home allows, and the brief that asks for it. */
-const PROBE = 'echo nemia-trust-probe';
+/**
+ * The one command the probe's home allows, and the brief that asks for it. It writes nothing, and no read-only rule of Claude Code's
+ * covers it, so only the home's allow can let it run. Not `echo`: Claude Code runs a command it holds read-only with no allow at all
+ * (its permissions page, *Read-only commands*), so an untrusted home's `echo` ran on 2.1.325 as its trusted one did, and showed nothing.
+ */
+const PROBE = 'npm --version';
 const PROBE_BRIEF = `Run exactly this command with the Bash tool, once: ${PROBE}. Then answer with what it printed, or DENIED where it was refused.`;
 
 test.skipIf(skip)(
   "a home's `permissions.allow` is refused while Claude Code was never asked to trust it, and applies once `trustFolder` trusts it",
   async () => {
-    const settings = { '.claude/settings.json': `${JSON.stringify({ permissions: { allow: [`Bash(${PROBE}:*)`] } })}\n` };
+    const settings = { '.claude/settings.json': `${JSON.stringify({ permissions: { allow: [`Bash(${PROBE})`] } })}\n` };
     const untrusted = fs.realpathSync(folderOf('ae-live-allow-untrusted-', settings));
     const trusted = fs.realpathSync(folderOf('ae-live-allow-trusted-', settings));
     const config = { model: 'haiku', effort: 'low', tools: ['Bash'], permissionMode: 'dontAsk' };
@@ -338,7 +342,8 @@ test.skipIf(skip)(
         [],
         `the trusted home's allow applies: ${JSON.stringify(results.trusted)} ${ran.err}`,
       );
-      assert.match(answerOf(ran.stdout), /nemia-trust-probe/, 'and the command ran');
+      const version = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim();
+      assert.ok(answerOf(ran.stdout).includes(version), `and the command ran, printing npm's ${version}: ${answerOf(ran.stdout)}`);
       assert.equal(trustFolder('claude', trusted)?.wrote, false, 'the record still reads trusted after the session');
     } finally {
       const taken = [untrusted, trusted].map((dir) => untrustFolder('claude', dir));

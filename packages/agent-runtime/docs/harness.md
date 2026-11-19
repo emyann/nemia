@@ -289,9 +289,11 @@ longer so fails, and a bump runs them again:
   every added folder's;
 - a job whose `cwd` is a folder Claude Code was never asked to trust applies that folder's `.claude/settings.json` (an output style,
   read off its `init` line) and lists its skills;
-- but not its `permissions.allow`: in `dontAsk`, a home allowing `Bash(echo nemia-trust-probe:*)` is refused the command while it is
+- but not its `permissions.allow`: in `dontAsk`, a home allowing `Bash(npm --version)` is refused the command while it is
   untrusted (the result line's `permission_denials`), and runs it once `trustFolder` has written its record, which still reads trusted
-  after the session; `untrustFolder` then takes back every record under both homes (`sdk-<version>-trusted-home.json`).
+  after the session; `untrustFolder` then takes back every record under both homes (`sdk-<version>-trusted-home.json`). The probe is
+  no `echo`: a command Claude Code holds read-only runs with no allow at all, in an untrusted home as in a trusted one (seen on the
+  bundled 2.1.325 with `echo nemia-trust-probe`), so it cannot show an allow dropped.
 
 Measured by the operator on **Claude Code 2.1.328, 2026-11-19**, `claude -p --setting-sources project --permission-mode dontAsk`
 (the card `factory: a run's home is trusted before its first session, so its settings' allows apply`):

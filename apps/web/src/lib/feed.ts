@@ -1,4 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query';
+import { Option, Schema } from 'effect';
+import { FeedStreamLine, FeedStreamUnreadable } from 'objects';
 import { END_GRACE_MS, type Frames, type StreamLike } from './follow.ts';
 
 /**
@@ -162,15 +164,23 @@ type Timers = {
 
 const browserTimers: Timers = { set: (f, ms) => setTimeout(f, ms), clear: (t) => clearTimeout(t) };
 
+/** Decodes a line event's data by `objects`' `FeedStreamLine`, none where it does not. */
+const lineOf = Schema.decodeUnknownOption(Schema.fromJsonString(FeedStreamLine));
+
+/** Whether an `unreadable` event says the api reads again, decoded by `objects`' `FeedStreamUnreadable`: none where it does not decode. */
+const retryingOf = (data: string): boolean | undefined =>
+  Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(FeedStreamUnreadable))(data))?.retrying;
+
 /**
- * The queries a line of the feed moves, read off the event it arrived as and the line's own JSON: a daemon's line names no run and moves
- * the daemon's standing alone, the store's its pause; a run's event whose line names no run moves nothing, since every key of one is keyed
- * by the run.
+ * The queries a line of the feed moves, read off the event it arrived as and the line, decoded (`lineOf`): a daemon's line names no run
+ * and moves the daemon's standing alone, the store's its pause; a run's event whose line names no run moves nothing, since every key of
+ * one is keyed by the run. None where the line does not decode.
  */
-const keysFor = (event: FeedEvent, data: string): QueryKey[] => {
-  const { run } = JSON.parse(data) as { run?: unknown };
+const keysFor = (event: FeedEvent, data: string): QueryKey[] | undefined => {
+  const line = Option.getOrUndefined(lineOf(data));
+  if (line === undefined) return undefined;
   if (event === 'daemon' || event === 'store' || event === 'factory') return keysOf(event);
-  return typeof run === 'string' ? keysOf(event, run) : [];
+  return line.run !== undefined ? keysOf(event, line.run) : [];
 };
 
 /** `EventSource.CLOSED`, named here so a stream can be followed where there is no EventSource. */
@@ -229,6 +239,8 @@ const gathered = (sink: FeedSink, frames: Frames, timers: Timers) => {
  * (`unreadable`, not `retrying`) and the api ends the response: closed then, on the `error` fired as the response ends, or after
  * `END_GRACE_MS` — never on the event itself, which aborts a request answered in full (`follow`) — and opened again from the end.
  * A listener of a stream closed and replaced does nothing with what that stream still dispatches.
+ * An event whose data does not decode by `objects`' schema of it (`FeedStreamLine`, `FeedStreamUnreadable`) is left out, as an event
+ * of a name it does not listen to is.
  *
  * Returns what stops following.
  * @param open Opens a stream of the feed from where it starts: after an event it was sent, or at the feed's end.
@@ -266,9 +278,9 @@ export function followFeed(
     stream = s;
     const current = () => !stopped && stream === s;
     const read = (event: FeedEvent) => (message: MessageEvent) => {
-      if (!current()) return;
-      if (message.lastEventId) last = message.lastEventId;
       const keys = keysFor(event, message.data);
+      if (!current() || keys === undefined) return;
+      if (message.lastEventId) last = message.lastEventId;
       if (keys.length) reads.arrive(keys);
     };
     for (const event of ['run', 'step', 'removed', 'daemon', 'store', 'factory'] as const) s.addEventListener(event, read(event));
@@ -278,10 +290,10 @@ export function followFeed(
       say('open');
     });
     s.addEventListener('unreadable', (message) => {
-      if (!current()) return;
-      const { retrying } = JSON.parse(message.data) as { retrying?: unknown };
+      const retrying = retryingOf(message.data);
+      if (!current() || retrying === undefined) return;
       say('down');
-      if (retrying !== true) grace ??= timers.set(again, END_GRACE_MS);
+      if (!retrying) grace ??= timers.set(again, END_GRACE_MS);
     });
     s.addEventListener('readable', () => {
       if (current() && grace === undefined) say('open');

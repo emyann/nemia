@@ -91,7 +91,7 @@ function feedEndOf(home: string, raw: string | undefined): number | undefined | 
 }
 
 /** A hint for a selector a reader typed (`formerHints`), as an event of its own: its data the sentence a person reads. */
-const hinted = (message: string): SSEMessage => ({ event: 'hint', data: JSON.stringify({ message }) });
+const hinted = (message: string): SSEMessage => ({ event: 'hint', data: { message } });
 
 /**
  * How a selector reaches this stream, said after the package's refusal of one and a full stop, since the package's words end on its
@@ -104,7 +104,7 @@ const SELECTOR_ASKED =
 /** A failure of a read as an event with `retrying`: true while the reader reads again on its next beat, false when it ends the stream. */
 const unreadable = (err: unknown, retrying: boolean): SSEMessage => ({
   event: 'unreadable',
-  data: JSON.stringify({ error: err instanceof Error ? err.message : String(err), retrying }),
+  data: { error: err instanceof Error ? err.message : String(err), retrying },
 });
 
 /**
@@ -116,10 +116,10 @@ const bookmark = (cursor: number): SSEMessage => ({ event: 'bookmark', data: '',
 /** What the reader handed on, as the stream's event: a line, its id the cursor after it; a failed read; and the read after it. */
 const messageOf = (f: Followed): SSEMessage =>
   f.kind === 'line'
-    ? { event: feedEventOf(f.line), data: JSON.stringify(f.line), id: String(f.cursor) }
+    ? { event: feedEventOf(f.line), data: f.line, id: String(f.cursor) }
     : f.kind === 'unreadable'
       ? unreadable(f.error, true)
-      : { event: 'readable', data: '{}' };
+      : { event: 'readable', data: {} };
 
 /**
  * What the stream sends the moment it opens, before any line: an event of its own, `opened`, with nothing in it, which every reader of the

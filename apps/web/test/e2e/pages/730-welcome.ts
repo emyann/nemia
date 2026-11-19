@@ -226,16 +226,23 @@ async function unlabelRun(page: Page, id: string) {
 /** The workflows sdlc's render gives a factory made from it, which the board's first card picks quick among. */
 const SDLC_WORKFLOWS = ['build', 'intake', 'janitor', 'quick'];
 
+/** The folder the store keeps beside the factory `name`'s file: its rendered tree, which its removal leaves. */
+const factoryFolder = (name: string) => {
+  if (store === undefined) throw new Refused("the worker's store is not known, so the made factory's folder cannot be named");
+  return path.join(store, 'factories', name);
+};
+
 /**
- * The factory `name`'s file given `workflows`, as the daemon's render of its template writes them: the worker's api ticks nothing, so a
- * factory just made from a template offers none until a pass renders it. The factory is taken back whole at the page's end.
+ * The factory `name`'s tree given `workflows`, as the daemon's render of its template writes its wiring (`tree/factory.json`): the
+ * worker's api ticks nothing, so a factory just made from a template offers none until a pass renders it, and a templated factory reads
+ * its workflows from its tree, never its file. The folder is taken back whole at the page's end (`factoryFolder`).
  * @param name The factory's name.
  * @param workflows The workflows its render offers.
  */
 function rendered(name: string, workflows: readonly string[]) {
-  if (store === undefined) throw new Refused("the worker's store is not known, so the made factory's workflows cannot be written");
-  const file = path.join(store, 'factories', `${name}.json`);
-  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), workflows }, null, 2));
+  const tree = path.join(factoryFolder(name), 'tree');
+  fs.mkdirSync(tree, { recursive: true });
+  fs.writeFileSync(path.join(tree, 'factory.json'), JSON.stringify({ workflows, hires: {} }, null, 2));
 }
 
 /**
@@ -252,6 +259,8 @@ async function startsTheFirstCard(page: Page, filed: string[]) {
   const choice = card.locator(`[data-first-factory="${MADE}"]`);
   if ((await choice.count()) > 0) await choice.click();
   await card.locator('[data-first-suggestion]').first().click();
+  const offered = card.locator('[data-first-workflow]');
+  if ((await offered.count()) > 0) await offered.first().click();
   await expectVisible(card.locator('[data-cost-line]'), 'the cost line stands above Start');
   await settled(page);
   await photograph(page, path.join(OUT, `welcome-card-${await themeOf(page)}.png`));
@@ -444,6 +453,7 @@ export default {
       if (new URL(page.url()).pathname !== '/') throw new Refused(`skipped in this browser, / stays / — it went to ${page.url()}`);
     } finally {
       await asked(page, 'DELETE', `/api/factories/${MADE}`);
+      if (store !== undefined) fs.rmSync(factoryFolder(MADE), { recursive: true, force: true });
       takeBackFolders();
       await page.unroute(MILESTONES_ROUTE, milestones);
       await page.evaluate((key) => localStorage.removeItem(key), HARNESS_SKIP_KEY);

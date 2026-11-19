@@ -19,7 +19,7 @@ import type { FeedConflicts } from '../../feed/index.ts';
 import { clonesOf, FactoryDoor, factoryOrNone, refuseName, volumesGiven } from '../door/factories.store.ts';
 import { volumesTrusted, writableRooted } from '../volume/volume.verb.ts';
 import { cloned } from '../clones/clones.verb.ts';
-import { originSetsAt } from './declared.store.ts';
+import { originSetsAt } from './declared.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate, Volume } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';

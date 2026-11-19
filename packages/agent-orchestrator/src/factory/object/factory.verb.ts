@@ -25,7 +25,7 @@ import {
   type ObjectMeta,
 } from 'objects';
 import { readStatus } from '../applied/applied.store.ts';
-import { declaredAt } from '../applied/declared.store.ts';
+import { declaredAt } from '../applied/declared.verb.ts';
 import type { Parameter } from '../../template/index.ts';
 import { commandLine } from '../../command/command.ts';
 import { COMMANDS } from '../../command/commands.verb.ts';

@@ -1,9 +1,10 @@
 /**
  * What a template declares of its parameters, read through the Template door (`declaredAt`), and the `--set` words a factory's first
- * writable volume gives them (`originSetsAt`), which `factory apply`, `factory volume add` and a factory's commands read alike.
+ * writable volume gives them (`originSetsAt`), which `factory apply`, `factory volume add` and a factory's commands read alike. A
+ * controller beneath them, which imports none: it reads the template's stores, which no store file of the factory's may.
  */
 import { Effect } from 'effect';
-import { fromThrow } from '../../door/door.store.ts';
+import { tried } from '../../runtime-client.ts';
 import type { Volume } from '../factory.ts';
 import { originHostOf, originParams } from '../volume/origin-params.ts';
 import { openedTree, packageSkillNames } from '../../template/template.store.ts';
@@ -19,7 +20,7 @@ import type { FactorySpec } from '../../template/index.ts';
 export const declaredAt = Effect.fn('declaredAt')(function* (source: string) {
   const place = yield* templatePlace(source);
   const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(place));
-  const read = yield* fromThrow(() => openedTree(place, tree, packageSkillNames()));
+  const read = yield* tried(() => openedTree(place, tree, packageSkillNames()));
   if (read.problems.length) return {};
   return (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec.parameters ?? {};
 });

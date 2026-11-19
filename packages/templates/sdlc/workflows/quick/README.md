@@ -45,7 +45,7 @@ not measured yet, as that section says.
 
 On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its
 `implementCheck` parameter, `pull-request.ts push`, `pull-request.ts declares-ci` and `pull-request.ts wait --check <name>`, in that order, and
-nothing else. Where the head's tree declares no CI workflow under `.github/workflows`, `declares-ci` says so and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
+nothing else. Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
 Each script is read from what the run froze when it began, never from the tree it judges: `change.ts`, quick's own, from its frozen
 workflow files (`node "$WF_WORKFLOW_FILES/change.ts"`, the copy of this folder), and the scripts it runs as `build` does — `probe.ts`,
 `parts.ts`, `pull-request.ts` and `landing.ts`, with `ci-log.ts`, `exec.ts`, `rerun.ts` and `refresh.ts`, which they import — from its frozen carried files

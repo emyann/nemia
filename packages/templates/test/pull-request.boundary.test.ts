@@ -920,6 +920,38 @@ test('wait reads the CI context --check names and no other: a green `ci` is no v
   assert.match(passed.out, /nemia ci: `gate` passed on/);
 });
 
+test('declares-ci passes where HEAD or the remote default branch declares a CI workflow, the base read only where HEAD declares none; REFUSED where neither does', () => {
+  const withCi = (repo: string) => {
+    fs.mkdirSync(path.join(repo, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(repo, '.github', 'workflows', 'ci.yml'), 'name: ci\n');
+    gitIn(repo, 'add', '-A');
+    gitIn(repo, 'commit', '-qm', 'ci');
+  };
+  const baseOf = (at: ReturnType<typeof placed>, ci: boolean) => {
+    gitIn(at.repo, 'switch', '-q', '-c', 'main');
+    if (ci) withCi(at.repo);
+    else commit(at.repo, 'm.ts');
+    gitIn(at.repo, 'push', '-q', 'origin', 'main');
+    gitIn(at.repo, 'switch', '-q', at.branch);
+  };
+
+  const head = placed();
+  withCi(head.repo);
+  const own = pr(head, 'declares-ci');
+  assert.equal(own.code, 0, own.err);
+  assert.equal(head.gh.calls().length, 0, 'a head that declares CI asks nothing of the base');
+
+  const removed = placed();
+  baseOf(removed, true);
+  const kept = pr(removed, 'declares-ci');
+  assert.equal(kept.code, 0, kept.err);
+
+  const none = placed();
+  baseOf(none, false);
+  const local = pr(none, 'declares-ci');
+  assert.equal(local.code, 1, local.out);
+});
+
 test('REFUSED: a wait with no --check, a --check with no name, or more after it, before anything calls gh', () => {
   const at = placed();
   for (const given of [[], ['--check'], ['--check', '--x'], ['--check', 'ci', 'more']]) {

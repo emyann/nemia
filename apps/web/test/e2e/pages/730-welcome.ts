@@ -305,7 +305,8 @@ async function hints(page: Page, id: string, beat: 'gate' | 'landed') {
 /**
  * The first card's whole way: started (`startsTheFirstCard`), its gate's hint on the seeded gated run labelled as the first card, its
  * landed hint on the seeded landed run, whose button leads to "You are set", drawing its three next steps once the milestones say a
- * change landed. The labels and the card are taken back.
+ * change landed: connecting GitHub among them, with the follow line the api reads off the template, since the factory made was given a
+ * folder of this machine. The labels and the card are taken back.
  */
 async function runsTheFirstCard(page: Page, milestones: { answer: object }) {
   const filed: string[] = [];
@@ -319,6 +320,10 @@ async function runsTheFirstCard(page: Page, milestones: { answer: object }) {
     await idle(page);
     await expectVisible(page.locator('article[data-you-are-set="set"]'), 'a change landed: the last page says You are set');
     await expectVisible(page.locator('[data-next-step="level"]'), 'its first next step is the level of the factory');
+    await expectVisible(
+      page.locator('[data-next-step="github"] [data-follow-line]'),
+      `${MADE} was given a folder of this machine and sdlc follows github.com: connecting it is a next step, with the line the api answers`,
+    );
     await expectVisible(page.locator('[data-next-step="terminal"]'), 'and one is the terminal');
     await settled(page);
     await photograph(page, path.join(OUT, `welcome-next-${await themeOf(page)}.png`));

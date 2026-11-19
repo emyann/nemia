@@ -53,9 +53,10 @@
  *   naming the command to type. A dispatched run's entry links its run, not a job: its failing jobs are read from the run, re-run and read
  *   as any other.
  *
- * - `declares-ci`, which the round's check asks before it waits: exit 0 where `HEAD`'s tree declares a CI workflow under
- *   `.github/workflows` (`declaresCi`, `ci-log.ts`), and 1 where it declares none, so the check runs the factory's local check in place
- *   of a wait on a context no CI will report.
+ * - `declares-ci`, which the round's check asks before it waits: exit 0 where `HEAD`'s tree, or else the remote default branch's as
+ *   fetched now, declares a CI workflow under `.github/workflows` (`declaresCi`, `ci-log.ts`), and 1 where neither does, so the check
+ *   runs the factory's local check in place of a wait on a context no CI will report. A change that removes the base's CI workflow is
+ *   still waited on: the gate is the base's, and no change turns it off.
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
@@ -885,17 +886,28 @@ function wait(args: string[]): string[] {
 }
 
 /**
- * `declares-ci`: passes where `HEAD`'s tree declares a CI workflow (`declaresCi`), so the round's check waits on its context, and refuses,
- * exit 1, where it declares none, so the check judges the round by the factory's local check in place of a wait on a context that will
- * not come.
+ * `declares-ci`: passes where `HEAD`'s tree declares a CI workflow (`declaresCi`), or else the remote default branch's, fetched now, so
+ * the round's check waits on its context, and refuses, exit 1, where neither declares one, so the check judges the round by the factory's
+ * local check in place of a wait on a context that will not come. The base is read only where the head declares none.
  */
 function declaresCiAtHead(args: string[]): string[] {
   if (args.length) throw new Refusal(`declares-ci takes nothing, and was given ${args.join(' ')}: type it alone`);
-  const paths = git('the files of HEAD', 'ls-tree', '-r', '--name-only', 'HEAD', '--', '.github/workflows').split('\n');
-  if (!declaresCi(paths))
-    throw new Refusal('HEAD declares no CI workflow under .github/workflows, so no context will come: the local check judges it');
-  return ['HEAD declares a CI workflow in .github/workflows: its context judges the round'];
+  if (declaresCi(workflowsAt('HEAD'))) return ['HEAD declares a CI workflow in .github/workflows: its context judges the round'];
+  const onto = base('the round', gh);
+  git(`the remote default branch \`${onto}\``, 'fetch', '-q', 'origin', onto);
+  if (declaresCi(workflowsAt('FETCH_HEAD')))
+    return [
+      `HEAD declares no CI workflow, and \`${onto}\` does: the base's context judges the round, which a change that removes its ` +
+        'workflow does not turn off',
+    ];
+  throw new Refusal(
+    `neither HEAD nor \`${onto}\` declares a CI workflow under .github/workflows, so no context will come: the local check judges it`,
+  );
 }
+
+/** The paths under `.github/workflows` in the tree of `rev`, a revision of this checkout. */
+const workflowsAt = (rev: string): string[] =>
+  git(`the files of ${rev}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
 
 /** The verbs, by name, each with the tag its lines are printed under. */
 const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> = {

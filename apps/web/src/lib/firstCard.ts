@@ -12,7 +12,7 @@ import type { RunView } from './api/judged.ts';
 export const FIRST_WORKFLOW = 'quick';
 
 /** The step a first run in `FIRST_WORKFLOW` is gated at: the landing, so the person approves what lands. */
-export const FIRST_GATE = 'land';
+const FIRST_GATE = 'land';
 
 /** The label a first card is filed with, which its run is started with: how the run's page knows to draw the hints. */
 export const FIRST_CARD_LABEL = 'onboarding=first-card';
@@ -72,7 +72,8 @@ export const firstBeatOf: FirstBeatOf = (run) => {
 };
 
 /**
- * The run as the hints read it: the first card's where it carries `FIRST_CARD_LABEL`, a step filed, at a gate, landed, or ended.
+ * The run as the hints read it: the first card's where it carries `FIRST_CARD_LABEL`, a step filed, at a gate, landed — succeeded with
+ * an ending step (`workspace: base`), which is what lands; a run of a workflow with none lands nothing — or ended.
  * @param run The run's view, as its page reads it.
  */
 export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>): FirstRunRead => {
@@ -81,7 +82,7 @@ export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>): F
     first: run.labels[key] === value,
     filed: run.steps.some((step) => step.filed !== null),
     waitsOnYou: run.status === 'awaiting approval',
-    landed: run.status === 'succeeded',
+    landed: run.status === 'succeeded' && run.steps.some((step) => step.spec?.workspace === 'base'),
     ended: run.status === 'failed' || run.status === 'cancelled',
   };
 };
@@ -93,3 +94,20 @@ export const firstRunOf = (run: Pick<RunView, 'labels' | 'status' | 'steps'>): F
  */
 export const nextStepsOf: NextStepsOf = (factory) =>
   factory.local && factory.follows ? ['level', 'github', 'terminal'] : ['level', 'terminal'];
+
+/**
+ * The gates a first card's run is started with, so it waits on the person before what it does lands: `FIRST_GATE` in `FIRST_WORKFLOW`,
+ * else the workflow's ending step (`workspace: base`) where its listing has one, else none.
+ * @param workflow The workflow the card runs in.
+ * @param steps The workflow's steps as the factory lists it; undefined where they were not read.
+ */
+export const firstGatesOf = (
+  workflow: string,
+  steps: readonly { name: string; spec: { workspace?: string | null } }[] | undefined,
+): string[] =>
+  workflow === FIRST_WORKFLOW
+    ? [FIRST_GATE]
+    : (steps ?? [])
+        .filter((step) => step.spec.workspace === 'base')
+        .map((step) => step.name)
+        .slice(0, 1);

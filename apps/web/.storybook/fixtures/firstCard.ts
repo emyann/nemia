@@ -2,11 +2,25 @@
  * The first card's reads and writes, and "You are set"'s, as the api answers them, for their stories (`Pages/Welcome first card`,
  * `Pages/You are set`), each typed by `objects`' own types so a key the api renames fails the typecheck here: the factory `acme` with the
  * workflows it offers and its first volume (`Factory`), its lines with and without the host its template follows (`FactoryCommands`),
- * the stats of a workflow's landed runs (`Stats`), the quota, the milestones, a card filed (`Card`) and started (`CardStarted`). Each
+ * each workflow it offers, an `implement` step then its ending step `land` (`Workflow`), the stats of a workflow's landed runs (`Stats`),
+ * the quota, the milestones, a card filed (`Card`) and started (`CardStarted`). Each
  * story makes its own store (`firstCardStore`); `filed` holds what the page wrote, in order.
  */
 import { delay, http, HttpResponse } from 'msw';
-import type { Card, CardStarted, Factory, FactoryCommands, FactoryList, FactoryVolume, Milestones, Quota, Stats } from 'objects';
+import type {
+  Card,
+  CardStarted,
+  Factory,
+  FactoryCommands,
+  FactoryList,
+  FactoryVolume,
+  Milestones,
+  Quota,
+  Stats,
+  Workflow,
+  WorkflowList,
+} from 'objects';
+import { UNSET } from '../../src/lib/builder';
 
 /** The factory the card is filed in. */
 const ACME = 'acme';
@@ -87,6 +101,45 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
   return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
 };
 
+/** A step of a listed workflow, every key unset but where it works: `base` for its ending step, which lands. */
+const listedStep = (name: string, workspace: 'base' | null) => ({
+  name,
+  spec: { ...UNSET, workspace },
+  body: '',
+  own: null,
+  hired: null,
+  layers: null,
+  mcp: [],
+});
+
+/** The workflow `name` as `acme` lists it on its repository: an `implement` step, then `land`, its ending step. */
+const workflowFixture = (name: string): Workflow => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Workflow',
+  metadata: { name, namespace: ACME, creationTimestamp: '2026-11-01T00:00:00.000Z', resourceVersion: `${name}-1` },
+  spec: { steps: [] },
+  status: {
+    origin: 'factory',
+    dir: `/home/you/.agent-workflows/factories/${ACME}/tree/workflows/${name}`,
+    description: null,
+    needs: [],
+    readmeBody: null,
+    graph: {
+      roots: ['implement'],
+      edges: [{ from: 'implement', to: 'land', kind: 'after' }],
+      nodes: [
+        { name: 'implement', kind: 'step' },
+        { name: 'land', kind: 'step' },
+      ],
+    },
+    steps: [listedStep('implement', null), listedStep('land', 'base')],
+    schemas: [],
+    folderTeam: false,
+    error: null,
+    unfilled: null,
+  },
+});
+
 /** What a store of a story holds: the workflows `acme` offers, its first volume's origin, how many quick runs landed, and more. */
 type Held = {
   workflows?: string[];
@@ -113,6 +166,9 @@ export const firstCardStore = ({ workflows = ['build', 'quick'], origin, landedR
       } satisfies FactoryList),
     ),
     http.get('/api/factories/:name/commands', () => HttpResponse.json(commandsOf(follows))),
+    http.get('/api/namespaces/:namespace/workflows', () =>
+      HttpResponse.json({ apiVersion: 'nemia/v1', kind: 'WorkflowList', metadata: {}, items: workflows.map(workflowFixture) } satisfies WorkflowList),
+    ),
     http.get('/api/namespaces/:namespace/schedules', () =>
       HttpResponse.json({ apiVersion: 'nemia/v1', kind: 'ScheduleList', metadata: {}, items: [] }),
     ),

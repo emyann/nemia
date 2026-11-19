@@ -3,11 +3,17 @@ import { expect } from 'storybook/test';
 import type { RunView } from '@/lib/api/judged';
 import { FirstHint } from './FirstHint';
 
-/** A first card's run as the hints read it: labelled, in `status`, with one step filed where `filed`. */
+/**
+ * A first card's run as the hints read it: labelled, in `status`, its first step filed where `filed`, and `land` its ending step
+ * (`workspace: base`), so a run that succeeded landed.
+ */
 const runOf = (status: RunView['status'], filed: boolean): Pick<RunView, 'labels' | 'status' | 'steps'> => ({
   labels: { onboarding: 'first-card', workflow: 'quick' },
   status,
-  steps: [{ name: 'implement', filed: filed ? {} : null }] as unknown as RunView['steps'],
+  steps: [
+    { name: 'implement', filed: filed ? {} : null, spec: { workspace: null } },
+    { name: 'land', filed: null, spec: { workspace: 'base' } },
+  ] as unknown as RunView['steps'],
 });
 
 /** The hint of one beat, on a run that stands at it: one story a beat. */

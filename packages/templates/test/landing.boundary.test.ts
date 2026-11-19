@@ -457,6 +457,24 @@ test('a head that declares no CI workflow merges with no context reported, sayin
   assert.equal(waited(receipt.calls).length, 0, 'nor is the merge commit waited on');
 });
 
+test("REFUSED: a head that removes the CI workflow its base declares is still judged by the base's context: none reported, nothing merged", () => {
+  const w = world();
+  gitIn(w.repo, 'switch', '-q', RESULT);
+  gitIn(w.repo, 'rm', '-q', path.join('.github', 'workflows', 'ci.yml'));
+  gitIn(w.repo, 'commit', '-qm', 'the work takes the CI workflow out');
+  const tip = gitIn(w.repo, 'rev-parse', 'HEAD').trim();
+  gitIn(w.repo, 'push', '-q', 'origin', RESULT);
+  gitIn(w.repo, 'switch', '-q', 'main');
+  w.gh.answers([
+    ...mergeable(w, { headRefOid: tip }).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [] }) },
+  ]);
+  const r = land(w, 'merge', args());
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, new RegExp(`no \`ci\` context was reported for #7 at ${tip.slice(0, 12)}`));
+  assert.equal(asked(r.calls, 'pr', 'merge').length, 0, 'a change never turns off the gate its base declares');
+});
+
 test('merge reads the latest run of its check, as the wait does: a red run a later green one replaced is no verdict, and a green one a later red replaced is none either', () => {
   const rollup = (...runs: Array<{ conclusion: string; startedAt: string }>) =>
     JSON.stringify({ statusCheckRollup: runs.map((run) => ({ name: 'ci', workflowName: 'ci', status: 'COMPLETED', ...run })) });

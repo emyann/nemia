@@ -64,14 +64,24 @@ export const Measured: Story = {
   },
 };
 
-/** A factory with no quick: its own workflows are offered to choose from, and Start waits for one. */
+/**
+ * A factory with no quick: its own workflows are offered to choose from, and Start waits for one. The one picked is started gated at its
+ * ending step, `land`, read off the factory's listing of it, so its run waits on the person as quick's does.
+ */
 export const NoQuick: Story = {
   parameters: { msw: firstCardStore({ workflows: ['build', 'janitor'] }) },
   play: async ({ canvasElement, userEvent }) => {
     await waitFor(() => expect(canvasElement.querySelectorAll('[data-first-workflow]')).toHaveLength(2), { timeout: 5000 });
     await expect(canvasElement.querySelector('[data-cost-line]')).toBeNull();
     await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-first-workflow="build"]')!);
-    await loaded(canvasElement, 'estimate');
+    const page = await loaded(canvasElement, 'estimate');
+    await userEvent.click(page.querySelector<HTMLElement>('[data-first-suggestion="Say what the repository is"]')!);
+    const start = within(page).getByRole('button', { name: /^Start/ });
+    await waitFor(() => expect(start).toHaveAccessibleName('Start, gated before it lands'), { timeout: 5000 });
+    filed.length = 0;
+    await userEvent.click(start);
+    await waitFor(() => expect(filed.map((w) => w.route)).toEqual(['POST cards', 'POST start']));
+    await expect(filed[1]?.body).toMatchObject({ workflow: 'build', gates: ['land'] });
   },
 };
 

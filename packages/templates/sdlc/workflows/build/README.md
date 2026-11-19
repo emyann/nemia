@@ -29,7 +29,7 @@ notes of implement, review and land each open with the answer and hold a part fo
   tree, and the run commits the merge on its exit 0 and takes it back otherwise. `localCheck` is the only judge, so it runs the tests.
 - **`github: true`: on GitHub** (`nemia factory apply … --set github=true`). Implement pushes and opens a pull request, its check runs
   `roundCheck` and waits on the CI context `ciCheck` names, and land merges that pull request on GitHub; the land step's check is a receipt.
-  Where the head's tree declares no CI workflow under `.github/workflows`, `declares-ci` says so and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
+  Where neither the head's tree nor the base branch's declares a CI workflow under `.github/workflows`, `declares-ci` says so (a change that removes the base's workflow is still waited on) and the check runs the factory's `localCheck` in place of the wait, and the landing merges the pull request with no context: nothing waits on CI that will not come.
   The rest of this README, but where it says otherwise, is this way's.
 
 The CI context the scripts wait on and land on is the factory's `ciCheck` parameter (`ci` by default), handed to each script as

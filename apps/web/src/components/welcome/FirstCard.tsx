@@ -4,6 +4,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { PageName, RadioTile, RadioTileGroup } from '@/components/look';
 import { Button, TextField } from '@/components/ui/ds';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
+import { factoryWorkflowsQuery } from '@/lib/api/workflows';
+import { startRepo } from '@/lib/factories';
 import { fileCard, startCard } from '@/lib/api/inbox';
 import { quotaQuery } from '@/lib/api/quota';
 import { workflowStatsQuery } from '@/lib/api/stats';
@@ -15,9 +17,9 @@ import {
   costLineOf,
   ESTIMATE_WORDS,
   FIRST_CARD_LABEL,
-  FIRST_GATE,
   FIRST_RUN_ESTIMATE,
   FIRST_WORKFLOW,
+  firstGatesOf,
   firstWorkflowOf,
   SUGGESTIONS,
 } from '@/lib/firstCard';
@@ -28,18 +30,18 @@ const factoryFiledIn = (factories: readonly Factory[], chosen: string | undefine
   return own.find((f) => f.name === chosen) ?? own.find((f) => f.worksOn.length > 0) ?? own[0];
 };
 
-/** The start of a first card: file it labelled as the first card, start it, gated at its landing in quick, and open the run's page. */
+/**
+ * The start of a first card: file it labelled as the first card, start it gated at its ending (`firstGatesOf`), and open the run's page.
+ */
 function useFirstStart() {
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const [refused, setRefused] = useState<string | undefined>(undefined);
-  const start = (factory: string, workflow: string, body: string) => {
+  const start = (factory: string, workflow: string, body: string, gates: readonly string[]) => {
     setPending(true);
     setRefused(undefined);
     fileCard({ factory, body, workflow, label: [FIRST_CARD_LABEL] })
-      .then((card) =>
-        startCard({ name: card.name, factory }, { workflow, brief: body, ...(workflow === FIRST_WORKFLOW ? { gates: [FIRST_GATE] } : {}) }),
-      )
+      .then((card) => startCard({ name: card.name, factory }, { workflow, brief: body, ...(gates.length ? { gates } : {}) }))
       .then(
         (started) => void navigate({ to: '/runs/$runId', params: { runId: started.id } }),
         (err: unknown) => {
@@ -67,6 +69,7 @@ export function FirstCard() {
   const [picked, setPicked] = useState<string | undefined>(undefined);
   const workflow = first ?? (picked !== undefined && offered.includes(picked) ? picked : undefined);
   const [body, setBody] = useState('');
+  const gates = useFirstGates(factory, workflow);
   const { pending, refused, start } = useFirstStart();
   const navigate = useNavigate();
   const own = factories.filter((f) => !f.default);
@@ -112,15 +115,34 @@ export function FirstCard() {
           <Button
             variant="filled"
             data-first-start
-            isDisabled={pending || workflow === undefined || body.trim() === ''}
-            onPress={() => workflow !== undefined && start(factory.name, workflow, body.trim())}
+            isDisabled={pending || workflow === undefined || gates === undefined || body.trim() === ''}
+            onPress={() => workflow !== undefined && gates !== undefined && start(factory.name, workflow, body.trim(), gates)}
           >
-            {workflow === FIRST_WORKFLOW ? 'Start, gated before it lands' : 'Start'}
+            {gates !== undefined && gates.length > 0 ? 'Start, gated before it lands' : 'Start'}
           </Button>
         )}
       </footer>
     </article>
   );
+}
+
+/**
+ * The gates the first card's run is started with (`firstGatesOf`): quick's at once; another workflow's once the factory's listing of it
+ * is read, which says its ending step; undefined while it is read. A workflow the factory wires to no one repository is started with none,
+ * and the start says the api's refusal.
+ */
+function useFirstGates(factory: Factory | undefined, workflow: string | undefined): readonly string[] | undefined {
+  const on = factory !== undefined && workflow !== undefined && workflow !== FIRST_WORKFLOW ? startRepo(factory, workflow) : undefined;
+  const repo = on !== undefined && 'repo' in on ? on.repo : undefined;
+  const listed = useQuery({
+    ...factoryWorkflowsQuery({ factory: factory?.name ?? '', repo: repo ?? '' }),
+    enabled: repo !== undefined,
+  });
+  if (workflow === undefined) return undefined;
+  if (workflow === FIRST_WORKFLOW || repo === undefined) return firstGatesOf(workflow, undefined);
+  if (listed.isError) return firstGatesOf(workflow, undefined);
+  if (!listed.data) return undefined;
+  return firstGatesOf(workflow, listed.data.find((w) => w.name === workflow && w.error === null)?.steps);
 }
 
 /** The card's words: the three suggestions, a press filling the field, and the field the person may write in. */

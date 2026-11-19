@@ -10,9 +10,10 @@
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on
  *   a person's approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses anything but this run's
  *   own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's result branch and the sha
- *   the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha — or no context at all where that sha's
- *   tree declares no CI workflow under `.github/workflows` (`declaresCi`), which its round's local check judged — and every other
- *   `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with
+ *   the reviewer read, `mergeable` MERGEABLE, the CI context `--check` names SUCCESS at that sha — or no context at all where neither that
+ *   sha's tree nor its base's declares a CI workflow under `.github/workflows` (`declaresCi`), which its round's local check judged —
+ *   and every other `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) —
+ *   then merges it with
  *   a merge commit whose subject and body are the ones it was given (`gh pr merge --merge --match-head-commit <sha>`, never
  *   `--delete-branch`: the repository auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge
  *   --ff-only origin/<base>`). **Level-triggered**: it reads the world rather than what a last try left, so a retry after a merge that
@@ -36,7 +37,8 @@
  *   the head holds `origin/<base>` (a base that moved past it refuses with the land step's retry line) — by `gh pr merge --merge
  *   --match-head-commit <head>` with the subject and body the session gave, and fast-forwards the checkout, then receipts as above.
  *   Then, last, so a receipt that refuses never waits, and only where `--wait-on-ci` is `true` (the factory's `landingWaitsOnCi`) and the
- *   merge commit's tree declares a CI workflow (`declaresCi`; a refreshed head that declares none is merged with no wait either), it
+ *   merge commit's tree or its first parent's declares a CI workflow (`declaresCi`; a refreshed head that declares none, on a base that
+ *   declares none, is merged with no wait either), it
  *   waits on the CI context `--check` names at the merge commit on the base branch, read over REST (its check runs and its status
  *   contexts; the combined `state` is never a verdict): 1800 s for it to be reported
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
@@ -280,7 +282,7 @@ function sole(found: readonly Pr[], id: string, state: string, open: string): Pr
  * of the head leaves its earlier one in the rollup, and that one is no verdict. Refuses a head nothing judged, or one it did not pass.
  */
 function green(pr: Pr, check: string): string[] {
-  if (!ciAtCommit(pr.headRefOid)) return [noCi(pr.headRefOid, "its round was judged by the factory's local check")];
+  if (!ciAtCommit(pr.headRefOid, pr.baseRefName)) return [noCi(pr.headRefOid, "its round was judged by the factory's local check")];
   const text = gh('pr', 'view', String(pr.number), '--json', 'statusCheckRollup');
   const entries = latest(parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${pr.number}`, text).statusCheckRollup ?? []);
   const ours = entries.filter((entry) => (entry.name ?? entry.context ?? '') === check);
@@ -300,13 +302,20 @@ function green(pr: Pr, check: string): string[] {
   return [];
 }
 
-/** Whether the tree of `sha`, a commit of this checkout, declares any CI workflow (`declaresCi`): where none, no context will come. */
-const ciAtCommit = (sha: string): boolean =>
-  declaresCi(git(`the files of ${sha.slice(0, 12)}`, 'ls-tree', '-r', '--name-only', sha, '--', '.github/workflows').split('\n'));
+/**
+ * Whether the tree of `sha`, a commit of this checkout, or else the tree of `base`, the base it lands on, declares any CI workflow
+ * (`declaresCi`): where neither does, no context will come. The base counts too, so a change that removes the base's CI workflow is
+ * still judged by its context, never landed with none.
+ */
+const ciAtCommit = (sha: string, base: string): boolean => declaresCi(workflowsAt(sha)) || declaresCi(workflowsAt(base));
 
-/** The line that says no CI context was waited on at `sha`, which declares no CI workflow, and what judged it instead. */
+/** The paths under `.github/workflows` in the tree of `rev`, a revision of this checkout. */
+const workflowsAt = (rev: string): string[] =>
+  git(`the files of ${rev.slice(0, 12)}`, 'ls-tree', '-r', '--name-only', rev, '--', '.github/workflows').split('\n');
+
+/** The line that says no CI context was waited on at `sha`, which with its base declares no CI workflow, and what judged it instead. */
 const noCi = (sha: string, instead: string): string =>
-  `${sha.slice(0, 12)} declares no CI workflow under .github/workflows, so no context was waited on there: ${instead}`;
+  `${sha.slice(0, 12)} declares no CI workflow under .github/workflows, nor does its base, so no context was waited on there: ${instead}`;
 
 /** The pull request read as the merge requires it: this run's own, green, and at the sha the reviewer read. */
 function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): string[] {
@@ -539,7 +548,7 @@ function receipt(args: string[]): string[] {
       ...proven,
       `\`${check}\` at ${oid.slice(0, 12)} on \`${onto}\` was not waited on: the factory's \`landingWaitsOnCi\` is false`,
     ];
-  if (!ciAtCommit(oid)) return [...before, ...proven, noCi(oid, 'nothing will report a context on the base branch')];
+  if (!ciAtCommit(oid, `${oid}^1`)) return [...before, ...proven, noCi(oid, 'nothing will report a context on the base branch')];
   if (fresh && treeOf(oid) === treeOf(fresh.headRefOid))
     return [
       ...before,
@@ -649,7 +658,7 @@ function holds(pr: Pr, onto: string, id: string): void {
  */
 function greenAtHead(pr: Pr, check: string, id: string, began: number): string {
   const head = pr.headRefOid;
-  if (!ciAtCommit(head)) return noCi(head, "the refresh is judged by the factory's local check of the round before it");
+  if (!ciAtCommit(head, pr.baseRefName)) return noCi(head, "the refresh is judged by the factory's local check of the round before it");
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const l: Landing = { number: pr.number, url: pr.url, oid: head, onto: pr.headRefName, check };

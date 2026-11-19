@@ -44,7 +44,7 @@ afterAll(store.stop);
 /** The home's memory file in the store's tree, which a second open reads changed. */
 const TREE_MEMORY = path.join(store.env.WF_ROOT ?? assert.fail('the store has a root'), 'factories', 'mill', 'tree', 'home', 'CLAUDE.md');
 
-/** A stub `claude`, alone in its folder: it writes what it was started with to `$STUB_SAW` and exits 7. */
+/** A stub `claude`, alone in its folder: it writes what it was started with to the file its environment names, `SAW` and exits 7. */
 const STUB_BIN = scratch('nemia-home-stub-');
 write(
   path.join(STUB_BIN, 'claude'),

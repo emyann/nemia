@@ -446,7 +446,7 @@ export {
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { runWatchVersion } from './runlist/runlist.ts';
-export { factoryCommandsOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
+export { factoryCommandsOf, factoryHomeOf, factoryList, factoryObject } from './factory/object/factory.verb.ts';
 export { objectsListed, type ObjectQuery } from './object/listed.verb.ts';
 export { builtinServerList, mcpServerList, mcpServerObject } from './factory/object/mcp-server.verb.ts';
 export { scheduleList, scheduleObject } from './factory/object/schedule.verb.ts';
@@ -616,7 +616,6 @@ export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrad
 export { withResolutionProposerAs } from './factory/upgrade/proposed.verb.ts';
 export { sentTemplatesDir, templateGiven, withTemplateTaken } from './template/given.store.ts';
 export { factoryExported, factoryImported } from './factory/move/move.verb.ts';
-export { factoryHomeOf } from './factory/home/home.verb.ts';
 export { libraryAddList, libraryAddNamed, libraryAddWritten, libraryUsers, refOf, type FactoryAdds } from './library/library.verb.ts';
 export {
   libraryServerList,

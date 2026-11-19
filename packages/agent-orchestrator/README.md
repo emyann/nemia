@@ -3607,7 +3607,7 @@ start in their workspace, filed as they were.
 
 A person sees the home as a step does with `nemia factory home <factory> [<repo>]`, a verb of the client's own: the api serves the home
 whole, its files and the digest a run's copy is named by (`GET /api/factories/:name/home`, `factoryHomeOf`,
-`src/factory/home/home.verb.ts`, read through the Factory door with `homeFilesOf`), and the client renders it read-only into its own
+`src/factory/object/factory.verb.ts`, read through the Factory door with `homeFilesOf`), and the client renders it read-only into its own
 cache under that digest and starts the person's session there, their repository added beside it (`apps/cli`, *Own session* in its
 glossary). Nothing of the store is written, and the live tree is never handed out to edit: a home changes by a proposal.
 

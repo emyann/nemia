@@ -76,6 +76,11 @@ const ATTACHMENT = {
     origin: { kind: 'peer', from: 'unknown' },
   },
 };
+const BUDGET = {
+  type: 'attachment',
+  timestamp: '2026-11-18T23:16:38.018Z',
+  attachment: { type: 'budget_usd', used: 16.26, total: 23.94, remaining: 7.68 },
+};
 const COST = {
   type: 'cost-state',
   sessionId: 's',
@@ -180,6 +185,10 @@ const REFUSED = [
   [{ type: 'attachment', attachment: { type: 'queued_command', prompt: 12 } }, 'attachment.prompt'],
   [{ type: 'attachment', attachment: { type: 'queued_command', commandMode: true } }, 'attachment.commandMode'],
   [{ type: 'attachment', attachment: { type: 7 } }, 'attachment.type'],
+  [{ type: 'attachment', attachment: { type: 'budget_usd', used: '1', total: 20, remaining: 19 } }, 'attachment.used'],
+  [{ type: 'attachment', attachment: { type: 'budget_usd', used: -1, total: 20, remaining: 21 } }, 'attachment.used'],
+  [{ type: 'attachment', attachment: { type: 'budget_usd', used: 1, total: null, remaining: 19 } }, 'attachment.total'],
+  [{ type: 'attachment', attachment: { type: 'budget_usd', used: 1, total: 20 } }, 'attachment.remaining'],
   [{ type: 'cost-state', modelUsage: { 'claude-x': { inputTokens: '3' } } }, 'modelUsage.claude-x.inputTokens'],
   [{ type: 'cost-state', modelUsage: { 'claude-x': { outputTokens: -2 } } }, 'modelUsage.claude-x.outputTokens'],
   [{ type: 'cost-state', modelUsage: { 'claude-x': { cacheReadInputTokens: 0.5 } } }, 'modelUsage.claude-x.cacheReadInputTokens'],
@@ -227,6 +236,14 @@ const DECODE_ROWS: Row[] = [
     name: `a line decodes with every optional field absent: ${JSON.stringify(entry)}`,
     holds: () => assert.equal(decoded(entry).type, entry.type),
   })),
+  {
+    name: 'a `budget_usd` attachment keeps what the session spent, its cap and what is left',
+    holds: () => {
+      const line = decoded(BUDGET);
+      assert.ok(line.type === 'attachment');
+      assert.deepEqual(line.attachment, { type: 'budget_usd', used: 16.26, total: 23.94, remaining: 7.68 });
+    },
+  },
   {
     name: 'a `tool_use` block keeps its id, its name and its input, and nothing the runtime does not read',
     holds: () => {

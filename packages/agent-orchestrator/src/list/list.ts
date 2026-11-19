@@ -26,6 +26,7 @@ import {
   runSpend,
   sendBackTo,
   unfiledBack,
+  spendKnown,
   spentWord,
   standing,
   stepSpend,
@@ -407,7 +408,7 @@ function listedSteps(
   const rows = steps.map((step) => {
     const row = lineOf(step);
     const spent = stepSpend(run, step.name, spendOf);
-    const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
+    const cost = spendKnown(spent) && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
@@ -494,7 +495,7 @@ function listedSteps(
     waiting,
     ...(run.hold && !run.cancelledAt ? { holding: holds ? [...holds] : run.hold.until.map((id) => ({ run: id })) } : {}),
     ...(held ? { slot: held } : {}),
-    ...(total.measured ? { cost: spentWord(total) } : {}),
+    ...(spendKnown(total) ? { cost: spentWord(total) } : {}),
     ...(decide ? { toDecide: decide } : {}),
   };
 }

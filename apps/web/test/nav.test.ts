@@ -30,6 +30,8 @@ describe('seatOf: each page of the seat table at its level, under its destinatio
   test('a page of the store sits under the rail’s destination that holds it', () => {
     const rows: [string, string][] = [
       ['/', 'factories'],
+      ['/welcome', 'factories'],
+      ['/welcome/factory', 'factories'],
       ['/runs', 'waiting'],
       ['/runs/r-1', 'waiting'],
       ['/runs/r-1/steps/s', 'waiting'],
@@ -75,7 +77,17 @@ describe('seatOf: each page of the seat table at its level, under its destinatio
     assert.deepEqual(seatOf('/factories/a%20b/runs'), { level: 'factory', factory: 'a b', place: 'runs' });
   });
   test('REFUSED: an address no route has, or one that only begins with a destination’s name, has no seat', () => {
-    for (const path of ['/nowhere', '/chatx', '/agentsx', '/runsx', '/statsx', '/settingsx', '/factories', '/factories/kit/nowhere'])
+    for (const path of [
+      '/nowhere',
+      '/welcomex',
+      '/chatx',
+      '/agentsx',
+      '/runsx',
+      '/statsx',
+      '/settingsx',
+      '/factories',
+      '/factories/kit/nowhere',
+    ])
       assert.equal(seatOf(path), undefined, path);
   });
 });

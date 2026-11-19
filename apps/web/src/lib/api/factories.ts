@@ -9,8 +9,10 @@ import { queryOptions } from '@tanstack/react-query';
 import {
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
+  type FactoryApplied,
   type FactoryCommands,
   type FactoryCondition,
+  type FactoryCreated,
   type FactoryInstruction,
   type FactoryInstructionWrite,
   type FactoryRules,
@@ -169,6 +171,33 @@ const viewRead = async (factory: FactoryObject): Promise<Factory> => {
 export const factoriesQuery = queryOptions({
   queryKey: ['factories'],
   queryFn: async (): Promise<Factory[]> => Promise.all((await factories.listAll()).items.map(viewRead)),
+});
+
+/**
+ * File an empty factory named `name`, with no volume: what the filing answered. Rejects with a `WriteRefusal` in the package's words: a
+ * name it does not take, or a factory of that name already filed.
+ * @param name The factory's name.
+ */
+export const createFactory = (name: string): Promise<FactoryCreated> => factories.create({ name });
+
+/**
+ * Make the factory `name` from the builtin template `template`, with no volume and every parameter at its default: what the apply
+ * answered. Rejects with a `WriteRefusal` in the package's words: a name it does not take, a factory of that name already filed, a
+ * template it cannot read.
+ * @param name The factory's name.
+ * @param template The builtin template's name.
+ */
+export const applyTemplate = (name: string, template: string): Promise<FactoryApplied> =>
+  factories.apply(name, { template: { name: template } });
+
+/**
+ * The names of the factories a person made, the default factory left out, in the order the api lists them: what the welcome's factory
+ * step names once the store holds one. Under `['factories']`, so a write that reads the factories again reads it too.
+ */
+export const factoryNamesQuery = queryOptions({
+  queryKey: ['factories', 'names'],
+  queryFn: async (): Promise<string[]> =>
+    (await factories.listAll()).items.map((f) => f.metadata.name).filter((name) => name !== DEFAULT_NAMESPACE),
 });
 
 /**

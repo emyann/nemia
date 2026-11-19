@@ -295,6 +295,9 @@ const withSpent = (spec: HarnessSpec, run: RunFile, sighting: Sighting, warning?
   return { sighting: live ? { ...sighting, spent: live.spent } : sighting, ...(warning === undefined ? {} : { warning }) };
 };
 
+/** The spend cap a request asked for, as its run file keeps it (`RunFile.capUsd`): none where it asked none. */
+const capOf = (r: SpawnRequest): { capUsd?: number } => (r.config?.budgetUsd !== undefined ? { capUsd: r.config.budgetUsd } : {});
+
 /** The file a command's worker reads once at its exit, for a spec that runs a task's command and a task that names one. */
 const terminationOf = (spec: HarnessSpec, r: SpawnRequest): { terminationMessagePath?: string } =>
   spec.can.includes('commandArgs') && r.config?.terminationMessagePath ? { terminationMessagePath: r.config.terminationMessagePath } : {};
@@ -984,9 +987,8 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
               ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }
               : {}),
             ...(input ? { input } : {}),
-            ...(r.config?.budgetUsd !== undefined ? { capUsd: r.config.budgetUsd } : {}),
           };
-          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
+          fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...capOf(r), ...bounds, ...limit, ranIn }));
 
           const pid = startWorker(runFile(r.name), r.cwd, argv, { log: logFile(r.name), bareIfRefused: limit.memoryLimit === undefined });
           if (pid !== undefined) writeLaunched(launchedFile(r.name), pid);

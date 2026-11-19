@@ -344,7 +344,8 @@ release: `LINES.attachment` decodes it (`harness/claude/lines.ts`), and a line o
 The runtime reads the latest one written since the attempt began, from the end of the transcript and afresh on every look
 (`claudeTranscriptSpent`, `harness/claude/transcript.ts`), as a job's sighting's `spent`, which the task's view carries while the
 attempt is at work (`TaskView.spent`): a figure still growing, never the measured cost, which replaces it once the attempt ends. A
-resumed transcript holds its parent's lines, so one written before the attempt began is not read as its own. The step transcript the
+resumed transcript holds its parent's lines, so one written before the attempt began is not read as its own. A run spawned with no cap
+(`RunFile.capUsd` absent) has its transcript left unread: it writes no such line. The step transcript the
 board and the MCP port read keeps leaving these lines out.
 
 ## The claude.ai bridge

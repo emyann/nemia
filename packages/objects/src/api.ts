@@ -46,6 +46,7 @@ import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
 import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
 import { ReadinessGroup } from './readiness.ts';
+import { FoldersGroup } from './folders.ts';
 import { UpgradesGroup } from './upgrade.ts';
 import { LinksGroup, PairingsGroup } from './pairing.ts';
 import { SessionGroup } from './session.ts';
@@ -278,6 +279,7 @@ export const Api = HttpApi.make('nemia')
   .add(ServerGroup)
   .add(NemiaGroup)
   .add(ReadinessGroup)
+  .add(FoldersGroup)
   .add(UpgradesGroup)
   .add(PairingsGroup)
   .add(LinksGroup)

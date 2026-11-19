@@ -296,6 +296,16 @@
     {
       "term": "Factory import",
       "meaning": "a factory filed on this store from another's export (`factoryImported`, `packages/agent-orchestrator/src/factory/move/move.verb.ts`), all or nothing: every refusal first, each repository and volume the target cannot take named together by its flag; then its repositories cloned, its template kept, its folder placed, its file filed and its cards filed, each card without its `repo:`, `from:` and `queued:` and ending with the line that says where it came from (`cardMoved`, `packages/agent-orchestrator/src/factory/move/move.ts`). A failure after a write takes back its cards, its file and its folder. Its places are left untrusted."
+    },
+    {
+      "term": "Folder roots",
+      "meaning": "the folders under which the person's folder listing names folders, and under which it makes a folder a repository: `WF_FOLDER_ROOTS`, absolute paths split by the system's path delimiter, else the home of the user the daemon runs as (`folderRoots`, in `packages/agent-orchestrator/src/config/config.store.ts`). A folder is judged where its links lead, and none inside a store is ever listed (`folderReach`, proved by `packages/agent-orchestrator/contracts/folder-reach.contract.ts`, in `packages/agent-orchestrator/src/factory/folders/folders.ts`). The listing answers names of folders alone, at most 50.",
+      "type": "FolderReach"
+    },
+    {
+      "term": "Made repository",
+      "meaning": "an empty git repository Nemia makes in its store for a factory to work on, at `<WF_ROOT>/repositories/<name>`, with one empty first commit so a run can cut a worktree (`repositoryNew`, in `packages/agent-orchestrator/src/factory/folders/folders.verb.ts`, by the place's `init`).",
+      "type": "RepositoryMadeRead"
     }
   ]
 }

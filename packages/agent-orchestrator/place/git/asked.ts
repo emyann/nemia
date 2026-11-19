@@ -107,6 +107,7 @@ const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[
   export: [each(text, 'repo', 'tag', 'into')],
   seal: [each(text, 'tree')],
   clone: [each(text, 'url', 'into')],
+  init: [each(text, 'dir')],
 };
 
 /** Throws `Malformed` for a `request` that `verb` cannot read. */

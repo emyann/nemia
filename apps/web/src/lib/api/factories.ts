@@ -16,6 +16,7 @@ import {
   type FactoryInstruction,
   type FactoryInstructionWrite,
   type FactoryRules,
+  type FactoryTrusted,
   type Hire,
   type McpServer,
   type McpServerWrite,
@@ -24,6 +25,7 @@ import {
   type SignedOut,
   type SignInStarted,
   type SignInState,
+  type VolumeAdded,
 } from 'objects';
 import { factories, library, hireName, hires, mcpServers, schedules } from './objects.ts';
 
@@ -172,6 +174,35 @@ export const factoriesQuery = queryOptions({
   queryKey: ['factories'],
   queryFn: async (): Promise<Factory[]> => Promise.all((await factories.listAll()).items.map(viewRead)),
 });
+
+/**
+ * The volume `volume` given to the factory `name`, a writable one left untrusted for the page to ask its trust: what the api answered.
+ * Rejects with a `WriteRefusal` in the package's words.
+ * @param name The factory's name.
+ * @param volume The volume as the factory's volume line spells it: a path or a git URL, marked `:ro` or `:rw`.
+ */
+export const addVolumeUntrusted = (name: string, volume: string): Promise<VolumeAdded> =>
+  factories.addVolume(name, { volume, noTrust: true });
+
+/**
+ * The places of the factory `name` trusted, asking each harness that keeps a trust. Rejects with a `WriteRefusal` in the package's words.
+ * @param name The factory's name.
+ */
+export const trustFactory = (name: string): Promise<FactoryTrusted> => factories.trust(name);
+
+/**
+ * The view of the factory `name` alone, with its lines and no schedules: what the volume step reads of the factory it gives a volume, its
+ * volumes and the places a harness does not trust now. Under `['factories']`, so a write that reads the factories again reads it too.
+ * @param name The factory's name.
+ */
+export const factoryViewQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['factories', 'view', name],
+    queryFn: async (): Promise<Factory> => {
+      const [factory, commands] = await Promise.all([factories.get(name), factories.commands(name)]);
+      return factoryViewOf(factory, commands);
+    },
+  });
 
 /**
  * File an empty factory named `name`, with no volume: what the filing answered. Rejects with a `WriteRefusal` in the package's words: a

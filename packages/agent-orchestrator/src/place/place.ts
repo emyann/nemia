@@ -25,6 +25,7 @@ export const PLACE_VERBS = [
   'export',
   'seal',
   'clone',
+  'init',
 ] as const;
 
 /** A verb a place may answer. */
@@ -32,7 +33,7 @@ export type PlaceVerb = (typeof PLACE_VERBS)[number];
 
 /**
  * How long a verb may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow, and for
- * `clone`, which fetches a whole repository.
+ * `clone`, which fetches a whole repository; `init` makes one folder a repository with one empty commit, in two.
  */
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   root: 120_000,
@@ -50,6 +51,7 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   export: 120_000,
   seal: 120_000,
   clone: 600_000,
+  init: 120_000,
 };
 
 /**
@@ -224,6 +226,12 @@ export type Sealed = { readonly removed: boolean };
  */
 export type Cloned = { readonly repo: string; readonly made: boolean };
 
+/**
+ * What `init` answers: the repository at the folder asked of, with a first commit a run can cut a worktree from, and whether it made
+ * either now (`made`) or found the folder a repository with a commit already.
+ */
+export type Initialized = { readonly repo: string; readonly made: boolean };
+
 /** Each verb's answer. */
 export type PlaceAnswers = {
   readonly root: Rooted;
@@ -241,6 +249,7 @@ export type PlaceAnswers = {
   readonly export: Exported;
   readonly seal: Sealed;
   readonly clone: Cloned;
+  readonly init: Initialized;
 };
 
 /**
@@ -289,6 +298,7 @@ export type PlaceRequests = {
   readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
   readonly seal: { readonly tree: string };
   readonly clone: { readonly url: string; readonly into: string };
+  readonly init: { readonly dir: string };
 };
 
 /** A verb that gave no answer: which, the place's words on why it was not heard, and when, as an ISO time. */

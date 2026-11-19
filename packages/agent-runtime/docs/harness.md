@@ -81,10 +81,13 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
-- **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
+- **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout. A run's
+  frozen home is trusted by the orchestrator before its first session, so its settings' allows apply, and its records are taken back at
+  `nemia rm` (`untrustFolder`; *A session in one folder, working on another*).
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
-  kept per path in `.claude.json` (`src/harness/claude/trust.ts`): read by `trustedFolder`, written by `trustFolder` alone, one key,
-  under the main checkout's root the caller names, never by a session.
+  kept per path in `.claude.json` (`src/harness/claude/trust.ts`): read by `trustedFolder`, written by `trustFolder`, one key, under
+  the main checkout's root the caller names, and taken back by `untrustFolder`, every key at or under a folder Nemia made and is
+  removing; never by a session.
 - **A `--bg` session stays in `--permission-mode auto`, and an `ask` rule in `--settings` outranks its classifier** (2.1.289,
   2026-10-05): `Bash(x:*)` prompts ("Ask rule … overrides auto mode"), listed `waitingFor: "permission prompt"`; `Edit(//<file>)`
   prompts the Write tool, unruled it writes unasked. No `Edit` or `Write` ask reaches a Bash `>` there: the classifier judges it.
@@ -285,11 +288,32 @@ longer so fails, and a bump runs them again:
   to User, Project and Local memory, and an added folder's may be none of them: where this stops holding, a volume switched on loads
   every added folder's;
 - a job whose `cwd` is a folder Claude Code was never asked to trust applies that folder's `.claude/settings.json` (an output style,
-  read off its `init` line) and lists its skills.
+  read off its `init` line) and lists its skills;
+- but not its `permissions.allow`: in `dontAsk`, a home allowing `Bash(echo nemia-trust-probe:*)` is refused the command while it is
+  untrusted (the result line's `permission_denials`), and runs it once `trustFolder` has written its record, which still reads trusted
+  after the session; `untrustFolder` then takes back every record under both homes (`sdk-<version>-trusted-home.json`).
+
+Measured by the operator on **Claude Code 2.1.328, 2026-11-19**, `claude -p --setting-sources project --permission-mode dontAsk`
+(the card `factory: a run's home is trusted before its first session, so its settings' allows apply`):
+
+- in an untrusted folder, Claude Code prints "Ignoring 2 permissions.allow entries from .claude/settings.json: this workspace has not
+  been trusted…", and a command those allows name is refused: `npx oxlint --version` against `Bash(npx oxlint:*)`;
+- trusting the parent folder (`projects["<parent>"].hasTrustDialogAccepted: true`) does not cover a child folder outside a git
+  repository: the child's allows are still ignored. Claude Code's permissions page, *Project allow rules and workspace trust*, says so
+  ("Trusting a parent folder doesn't count for these rules"), and that outside a repository the trust is keyed on the folder itself;
+- allows passed as `--allowedTools`, which is how a step's fence arrives, apply in the untrusted folder;
+- from a home with the workspace added, a bare `cd <workspace>` held for the session's next Bash call, and `git log` then ran in the
+  workspace under `dontAsk`. A compound `cd <workspace> && git …` asks first, as the permissions page says ("`cd` with `git`: prompts
+  when the `cd` changes into a different directory");
+- a home's `.mcp.json` naming `${WF_WORKSPACE:-.}/node_modules/@playwright/mcp/cli.js` connected, with `WF_WORKSPACE` set, through the
+  CLI. Through `Options.mcpServers` it is not measured.
+
+So the orchestrator trusts a run's home under its own record (`trustFolder`) as `nemia start` makes it and again at any filing that
+finds it untrusted, refuses the start where the record cannot be written, and takes back every record at or under `runs/<id>/home`
+at `nemia rm` (`untrustFolder`), Claude Code's own records of each folder a session started in included.
 
 Not measured yet, and leaned on (the card that added the home, `factory: where a session starts, and the folder it works on`):
 
-- whether a Bash `cd <added folder>` holds for the session's next Bash call;
 - whether a skill of an added folder's `.claude/skills` is enabled by its bare name in `Options.skills`.
 
 ## A permission prompt, as `canUseTool` is handed it

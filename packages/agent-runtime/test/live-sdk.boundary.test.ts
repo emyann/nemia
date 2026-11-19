@@ -46,6 +46,12 @@
  * started in a folder Claude Code was never asked to trust takes its `.claude/settings.json` (an output style, read off the `init`
  * line) and lists its skills. Each answer is handed over as `sdk-<version>-excludes.json` and `sdk-<version>-untrusted-home.json`.
  *
+ * The last measures what the orchestrator's trust of a run's home is for: a home whose `.claude/settings.json` allows one command, run
+ * in `dontAsk`, is refused it while Claude Code was never asked to trust the folder, and runs it once `trustFolder` has written the
+ * folder's record; the record still reads trusted after the session, and `untrustFolder` takes back every record under both folders,
+ * in a `finally`, so the machine's `.claude.json` is left with none of them whatever failed. The two result lines are handed over as
+ * `sdk-<version>-trusted-home.json`.
+ *
  * `OPUS_TODAY` in `sdk-pin.ts` is what this asserts, and the one constant of the three a bump cannot infer: an alias can move under a
  * version that did not.
  */
@@ -56,7 +62,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
-import { Engine as EngineService, type TaskView } from '../src/index.ts';
+import { Engine as EngineService, type TaskView, trustedFolder, trustFolder, untrustFolder } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
@@ -139,6 +145,7 @@ type Line = {
   output_style?: string;
   skills?: string[];
   result?: string;
+  permission_denials?: unknown[];
 };
 const linesOf = (out: string) =>
   out.split('\n').flatMap((text) => {
@@ -296,5 +303,45 @@ test.skipIf(skip)(
     assert.equal(init.output_style, 'Explanatory', "the folder's settings are applied: its output style");
     assert.ok(init.skills?.includes('steer'), `and its skills listed: ${JSON.stringify(init.skills)}`);
     assert.equal(code, 0, `and the session ran to a result: ${err}`);
+  },
+);
+
+/** The one command the probe's home allows, and the brief that asks for it. */
+const PROBE = 'echo nemia-trust-probe';
+const PROBE_BRIEF = `Run exactly this command with the Bash tool, once: ${PROBE}. Then answer with what it printed, or DENIED where it was refused.`;
+
+test.skipIf(skip)(
+  "a home's `permissions.allow` is refused while Claude Code was never asked to trust it, and applies once `trustFolder` trusts it",
+  { timeout: 10 * 60_000 },
+  async () => {
+    const settings = { '.claude/settings.json': `${JSON.stringify({ permissions: { allow: [`Bash(${PROBE}:*)`] } })}\n` };
+    const untrusted = fs.realpathSync(folderOf('ae-live-allow-untrusted-', settings));
+    const trusted = fs.realpathSync(folderOf('ae-live-allow-trusted-', settings));
+    const config = { model: 'haiku', effort: 'low', tools: ['Bash'], permissionMode: 'dontAsk' };
+    try {
+      assert.equal(trustFolder('claude', trusted)?.trusted, true, 'the trusted home is given its record');
+      const [refused, ran] = await Promise.all([
+        jobRun('ae/live/allow-untrusted', config, { cwd: untrusted, brief: PROBE_BRIEF }),
+        jobRun('ae/live/allow-trusted', config, { cwd: trusted, brief: PROBE_BRIEF }),
+      ]);
+      const resultOf = (stdout: string) => linesOf(stdout).filter((line) => line.type === 'result').at(-1);
+      const results = { untrusted: resultOf(refused.stdout), trusted: resultOf(ran.stdout) };
+      handOver(`sdk-${SDK_VERSION}-trusted-home.json`, `${JSON.stringify(results)}\n`);
+      assert.ok(
+        (results.untrusted?.permission_denials?.length ?? 0) > 0,
+        `the untrusted home's allow is dropped, and the command refused (the control): ${JSON.stringify(results.untrusted)} ${refused.err}`,
+      );
+      assert.deepEqual(results.trusted?.permission_denials ?? [], [], `the trusted home's allow applies: ${JSON.stringify(results.trusted)} ${ran.err}`);
+      assert.match(answerOf(ran.stdout), /nemia-trust-probe/, 'and the command ran');
+      assert.equal(trustFolder('claude', trusted)?.wrote, false, 'the record still reads trusted after the session');
+    } finally {
+      const taken = [untrusted, trusted].map((dir) => untrustFolder('claude', dir));
+      assert.deepEqual(
+        taken.map((t) => t?.refused),
+        [null, null],
+        'every record under both homes is taken back',
+      );
+    }
+    assert.equal(trustedFolder('claude', trusted), false, 'and the record is gone');
   },
 );

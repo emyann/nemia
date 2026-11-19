@@ -8,7 +8,7 @@
 /*
  * The look's faces, each under the family its package registers, bundled by the build and served from the board's own origin: the brand
  * face (Michroma), the plain face (Chakra Petch), the mono face (Share Tech Mono, one weight) and the label face (Archivo Variable, its
- * width axis from 62% to 125%).
+ * width axis from 62% to 125%), and the symbols none of them has (`look/symbols.css`).
  */
 @import '@fontsource/michroma/400.css';
 @import '@fontsource/chakra-petch/400.css';
@@ -17,6 +17,8 @@
 @import '@fontsource/chakra-petch/700.css';
 @import '@fontsource/share-tech-mono/400.css';
 @import '@fontsource-variable/archivo/wdth.css';
+/* The symbols none of the four faces has, from one face served with them, under each of their families. */
+@import './components/look/symbols.css';
 /* Blobatar's motion, then its gaze, which reads the properties motion registers: what a following agent face moves with. */
 @import 'blobatar/motion.css';
 @import 'blobatar/gaze.css';

@@ -62,10 +62,16 @@ applies: ["apps/web/**"]
    opens) is the story's play function, asserting what it must; what reads pixels, or needs the browser's own Enter on a link, its
    `:hover`, reduced motion or the dark theme, is a test under `apps/web/test/e2e/` that opens the story alone in Storybook's static
    build (`openStory`, `test/e2e/stories/built.ts`). `npm run stories`, from `apps/web`, runs every story in Chromium (its render,
-   its play function, axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. `node
-   test/e2e/stories/shoot.ts --base main-worktree/HEAD --out <your files>` pictures each story the change touches, light and dark, and
-   the before, after and diff of each whose pixels moved; it refuses a changed part no story reaches, and copies from its cache each
-   picture whose story's inputs have not changed (`--no-cache` draws them all). **Look through `storybook
+   its play function, axe as `error`); one file with `npx vitest run --project=storybook <file>.stories.tsx`. Each story has an approved
+   picture in the dark theme, and the light canaries one in light too (`apps/web/test/approved/`, `.storybook/approved.ts`): `npm
+   run stories` compares every story against its picture in the pinned place (Ubuntu 24.04, the lockfile's Chromium:
+   `test/e2e/stories/pinned.ts`; anywhere else it compares nothing and says so, and CI's `e2e-look` decides), and a story that differs
+   fails, its reference, actual and diff left under the stories project's attachments folder. A change that means to move the look
+   runs `npm run stories -- --update <file>.stories.tsx` for the stories it changed, reads the pictures it wrote, and commits them with
+   the change; then `node test/e2e/stories/changed.ts --base main-worktree/HEAD --out <your files>` hands the before, after and diff
+   of each approved picture the work changed, and lists those it added and removed (`approved.json`); it refuses a changed part no
+   story reaches. Light is held by the theme (`test/palette.test.ts`, `test/theme-contrast.test.ts`), not a picture of every story:
+   the toolbar of `storybook dev` switches a story to light to see it. **Look through `storybook
    dev`** while you work: from `apps/web`, `npx storybook dev -p <a port of its own> --no-open --ci &`, its pid kept in your step's
    files, never port 6007 (the person's); read a story at `http://localhost:<port>/iframe.html?id=<story id>`, which shows an edit in
    under a second against a static build's 20 s. It holds about 2.5 GB while it runs, counted against your step's memory limit: stop

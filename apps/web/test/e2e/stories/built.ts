@@ -1,7 +1,7 @@
 /**
  * Storybook's static build of the board, made and opened: `buildStorybook` builds it into a folder the caller gives, `serveBuilt`
  * answers it on loopback (MSW's worker needs a secure origin, which loopback is), and `openStory` opens one story's `iframe.html` in a
- * page of a browser. `shoot.ts` pictures the stories through them, and the look's browser tests read a story's pixels through them
+ * page of a browser. `look-photos.ts` pictures the stories through them, and the look's browser tests read a story's pixels through them
  * (`storybookFor`): `npm run e2e -- --look` builds it once before them and names the folder in `LOOK_STORYBOOK` (`look.ts`), and a
  * test run alone builds its own.
  */
@@ -98,11 +98,15 @@ export const builtIds = (dir: string): string[] => {
   return Object.entries(index.entries).flatMap(([id, entry]) => (entry.type === 'story' ? [id] : []));
 };
 
-/** What a story is drawn in by `openStory`: pixels of a picture to one of the page, and whether nothing may move. */
-export type Look = { scale?: number; still?: boolean };
+/**
+ * What a story is drawn in by `openStory`: pixels of a picture to one of the page, whether nothing may move, and the theme Storybook's
+ * toolbar is set to, where it is not the page's own.
+ */
+export type Look = { scale?: number; still?: boolean; toolbar?: 'light' | 'dark' };
 
 /**
- * A 1280 × 800 page in `theme`, open on the story `id` of the static build served at `at`, alone in Storybook's frame (`iframe.html`):
+ * A 1280 × 800 page in `theme`, open on the story `id` of the static build served at `at`, alone in Storybook's frame (`iframe.html`),
+ * its toolbar's theme the same unless `look.toolbar` names another (the global `theme`, `.storybook/preview.tsx`):
  * waits until it is drawn, Storybook has finished it (its play function run, which moves the focus: `data-story-finished`, set by
  * `.storybook/preview.tsx`) and its fonts are in, and throws where it threw or another story is drawn beside it.
  * @param browser The browser the page is opened in.
@@ -110,7 +114,8 @@ export type Look = { scale?: number; still?: boolean };
  * @param theme The colour scheme the page asks for.
  * @param id Storybook's id of the story.
  * @param look `scale`, how many pixels of a picture draw one of the page, for a picture enlarged with the pointer's state kept; and
- *   `still`, whether the page is told nothing may move, so that a colour is read with no transition to wait out
+ *   `still`, whether the page is told nothing may move, so that a colour is read with no transition to wait out; and `toolbar`, the
+ *   theme Storybook's toolbar is set to, where it is not `theme`
  */
 export async function openStory(browser: Browser, at: string, theme: 'light' | 'dark', id: string, look: Look = {}): Promise<Page> {
   const context = await browser.newContext({
@@ -120,7 +125,7 @@ export async function openStory(browser: Browser, at: string, theme: 'light' | '
     reducedMotion: look.still ? 'reduce' : 'no-preference',
   });
   const page = await context.newPage();
-  await page.goto(`${at}/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`);
+  await page.goto(`${at}/iframe.html?id=${encodeURIComponent(id)}&viewMode=story&globals=theme:${look.toolbar ?? theme}`);
   await page.locator('#storybook-root [data-story-ground], #storybook-root [data-broken]').first().waitFor();
   await page.locator(`body[data-story-finished="${id}"]`).waitFor({ state: 'attached' });
   const broken = await page.locator('#storybook-root [data-broken]').allTextContents();

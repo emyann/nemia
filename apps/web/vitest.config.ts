@@ -2,7 +2,9 @@
  * The board's Vitest, two projects. `node`, its tests under `test/` as `npm test` runs them (`vitest run --project=node`), as every
  * workspace's suite runs: each file in a process of its own, two files at a time (`tools/guards/test/suite.test.ts` holds every package's
  * bound equal, reading this project's, named first), a test and a hook timed out at 120 s, and the kit's `seat.ts` loaded before each
- * file. `look`, the look's browser tests under `test/e2e/`, bounded as `node` is, which `npm run e2e -- --look` runs (`e2e/look.ts`). And
+ * file; Material's colour utilities, which the kit's theme module imports by paths Node does not resolve, transformed rather than
+ * loaded as Node would (`test/theme-contrast.test.ts`). `look`, the look's browser tests under `test/e2e/`, bounded as `node` is, which
+ * `npm run e2e -- --look` runs (`e2e/look.ts`). And
  * `storybook`, which runs every story Storybook finds (`.storybook/main.ts`) in Playwright's Chromium, headless: each a smoke test that it
  * renders, its play function where it has one, and axe as the preview sets it (`error`). `npm run stories` runs it alone
  * (`--project=storybook`), and `npm run e2e -- --look` after the look's tests (`e2e/look.ts`), so CI's `e2e-look` job runs it; `npm test`
@@ -18,7 +20,13 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import vite from './vite.config.ts';
+import path from 'node:path';
 import { withoutTheRouter } from './.storybook/router.ts';
+import { APPROVED, pictureFile } from './.storybook/approved.ts';
+import { scheme, schemePlugins } from './.storybook/schemeBuild.ts';
+
+/** The variable the pinned place sets (`test/e2e/stories/pinned.ts`): the stories are compared against their approved pictures. */
+const PINNED = 'STORIES_PINNED';
 
 export default mergeConfig(
   { ...vite, plugins: withoutTheRouter(vite.plugins) },
@@ -29,6 +37,7 @@ export default mergeConfig(
           test: {
             name: 'node',
             include: ['test/*.test.ts'],
+            server: { deps: { inline: ['@material/material-color-utilities'] } },
             pool: 'forks',
             isolate: true,
             maxWorkers: 2,
@@ -52,15 +61,30 @@ export default mergeConfig(
         {
           extends: true,
           plugins: [storybookTest({ configDir: '.storybook', storybookScript: 'npm run storybook' })],
+          css: { postcss: { plugins: schemePlugins() } },
           test: {
             name: 'storybook',
             maxWorkers: 1,
+            setupFiles: ['.storybook/compare.ts'],
+            provide: { approvedCompare: process.env[PINNED] === '1' },
             browser: {
               enabled: true,
               headless: true,
-              provider: playwright({}),
+              provider: playwright({
+                contextOptions: { colorScheme: 'dark', reducedMotion: 'reduce', timezoneId: 'UTC', locale: 'en-US' },
+              }),
               instances: [{ browser: 'chromium' }],
               viewport: { width: 1280, height: 800 },
+              commands: { scheme },
+              expect: {
+                toMatchScreenshot: {
+                  comparatorName: 'pixelmatch',
+                  comparatorOptions: { threshold: 0.1, includeAA: false, allowedMismatchedPixels: 0 },
+                  resolveScreenshotPath: ({ arg, ext, root }) => path.join(root, APPROVED, `${pictureFile(arg)}${ext}`),
+                  resolveDiffPath: ({ arg, ext, root, attachmentsDir }) =>
+                    path.join(root, attachmentsDir, 'approved', `${pictureFile(arg)}${ext}`),
+                },
+              },
             },
           },
         },

@@ -16,11 +16,11 @@ export type FolderNamesShown = { readonly names: readonly string[]; readonly mor
 const named = (e: FolderEntry, prefix: string): boolean =>
   e.folder && e.name.startsWith(prefix) && (!e.name.startsWith('.') || prefix.startsWith('.'));
 
-/** The names of the folders among `entries` the listing would name for `prefix`, in the order of their code units, as JavaScript sorts. */
-const inOrder = (entries: readonly FolderEntry[], prefix: string): readonly string[] => {
-  const found = entries.filter((e) => named(e, prefix)).map((e) => e.name);
-  return [...found].sort();
-};
+/**
+ * Whether the name `a` comes before the name `b`, and is not it, in the order of their code units, as JavaScript sorts strings: the sort
+ * of the two alone puts `a` first.
+ */
+const before = (a: string, b: string): boolean => a !== b && [a, b].sort()[0] === a;
 
 const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: string, most: number) => FolderNamesShown>({
   requires: ({ input: [entries, , most] }) =>
@@ -38,12 +38,14 @@ const folderNamesShownSpec = spec<(entries: readonly FolderEntry[], prefix: stri
       description: 'No more than the bound is answered',
       condition: ({ input: [, , most], output }) => output.names.length <= most,
     },
-    inOrderOnce: {
-      description: 'The names are answered in order, the first ones up to the bound, each once as the entries name each once',
-      condition: ({ input: [entries, prefix, most], output }) => {
-        const ordered = inOrder(entries, prefix).slice(0, most);
-        return ordered.every((n, i) => output.names[i] === n) && output.names.every((n, i) => ordered[i] === n);
-      },
+    ascendingOnce: {
+      description: 'The names are answered in order, each once: each comes before the next',
+      condition: ({ output }) => output.names.slice(1).every((n, i) => before(output.names[i] ?? n, n)),
+    },
+    firstOnes: {
+      description: 'The names answered are the first ones: every folder the listing would name and left out comes after each one answered',
+      condition: ({ input: [entries, prefix], output }) =>
+        entries.every((e) => !named(e, prefix) || output.names.includes(e.name) || output.names.every((n) => before(n, e.name))),
     },
     noneLeftOutUnsaid: {
       description: 'Every folder the listing would name is answered, or the answer says more were left out, and says so only then',

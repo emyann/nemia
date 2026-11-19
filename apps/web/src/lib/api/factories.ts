@@ -68,7 +68,7 @@ export type FactoryUntrusted = { place: string; harness: string; withheld: strin
 /**
  * A volume of a factory: a folder of the person's machine or a repository Nemia cloned (`origin`, its git URL, null where none), by
  * its path, and its stored name (`name`, null where it has none, and its switches are then set by no write); whether it is read-only
- * (`:ro`), mounted for every local step, or writable (`:rw`), a repository the factory works on; its two switches, whether its CLAUDE.md
+ * (`:ro`), mounted for every local step, or writable (`:rw`), a repository the factory works on; its two switches, whether its memory
  * files load into the factory's sessions (`claudeMd`, off where the api says nothing) and its skills are offered to them (`skills`, on
  * where it says nothing); and the line that takes it back.
  */

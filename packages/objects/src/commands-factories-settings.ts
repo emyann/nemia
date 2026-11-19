@@ -149,7 +149,7 @@ export const FACTORY_VOLUME_SET_WORDS = {
   served: [{ endpoint: 'volumes.patch' }],
   usage: VOLUME_SET_USAGE,
   help: [
-    "set a volume's switches, by its stored name: whether its CLAUDE.md files load",
+    "set a volume's switches, by its stored name: whether its memory files load",
     "and its skills are offered to the factory's sessions; one not given is kept",
   ],
   spec: {

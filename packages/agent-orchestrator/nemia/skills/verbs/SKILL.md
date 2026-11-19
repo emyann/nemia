@@ -497,7 +497,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                (:rw), a writable one a repository it works on, trusted unless --no-trust
                                on the port: factory_volume_add
   nemia factory volume set <factory> <volume> [--claude-md on|off] [--skills on|off]
-                               set a volume's switches, by its stored name: whether its CLAUDE.md files load
+                               set a volume's switches, by its stored name: whether its memory files load
                                and its skills are offered to the factory's sessions; one not given is kept
                                on the port: factory_volume_set
   nemia factory volume rm <factory> <path>

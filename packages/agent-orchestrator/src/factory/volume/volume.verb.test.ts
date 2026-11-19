@@ -35,14 +35,15 @@ async function refused(run: Promise<unknown>, tag: 'Invalid' | 'Missing' | 'Conf
   assert.equal(fs.readFileSync(file, 'utf8'), before);
 }
 
-test('a switch given is written on the volume named, its name stored, its folder, its mark and the other volume unmoved', async () => {
+test('a switch given is written on the volume named, its name stored, its folder, its mark and the other volume as they read', async () => {
   const answered = await set({ factory: 'mill', volume: 'notes', claudeMd: true });
   assert.deepEqual(answered, { file, name: 'notes' });
   const notes = stored().find((v) => v.path === NOTES);
   assert.deepEqual(notes, { path: NOTES, readOnly: true, name: 'notes', claudeMd: true });
   assert.deepEqual(
     stored().find((v) => v.path === DOCS),
-    { path: DOCS, readOnly: true },
+    { path: DOCS, readOnly: true, name: 'docs' },
+    'the other volume as it read, its read name stored as an add stores every name',
   );
 });
 

@@ -19,6 +19,7 @@
 import { Effect } from 'effect';
 import {
   API_VERSION,
+  COMMAND_WORDS,
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
   type FactoryCommands,
@@ -312,11 +313,12 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
 
 /**
  * The line that opens a person's own session in the home of the factory `name`, typed in the folder it adds beside it: its optional
- * repository left unsaid.
+ * repository left unsaid. `nemia factory home` is the client's own verb, whose words `objects` holds and this table does not.
  * @param name The factory's name.
  */
 const homeLine = (name: string): string => {
-  const home = named('factory home');
+  const home = COMMAND_WORDS.find((c) => c.name === 'factory home');
+  if (home === undefined) throw new Error("No command 'factory home' in objects' COMMAND_WORDS: name one it holds.");
   const positionals = home.spec.positionals.filter((p) => p.takes === 'required');
   return commandLine({ name: home.name, spec: { ...home.spec, positionals } }, { factory: name });
 };

@@ -2,7 +2,7 @@
  * A factory's volumes, on its settings page: each folder or git URL its runs reach, its path as the api resolved it, its mark (`:ro` or
  * `:rw`, as docker compose marks it), the origin it was cloned from, and Remove, which takes it back. A writable volume is a repository
  * the factory works on, and says so. Each has its two switches, set as `nemia factory volume set` sets them (a PATCH on the Volume):
- * whether its CLAUDE.md files load into the factory's sessions, and whether its skills are offered to them. Under them, the form that
+ * whether its memory files load into the factory's sessions, and whether its skills are offered to them. Under them, the form that
  * gives one: a path or a git URL and its mode, sent as the CLI's `nemia factory volume add` sends it, the api's refusal shown in its words
  * under the form. Each write reads the factories again.
  */
@@ -31,13 +31,13 @@ type Change =
 const SWITCHES: ReadonlyArray<{ key: SwitchKey; label: string; means: string }> = [
   {
     key: 'claudeMd',
-    label: 'Load its CLAUDE.md',
-    means: "Its CLAUDE.md files load into the sessions of this factory's runs. Off unless you turn it on.",
+    label: 'Load its memory files',
+    means: "The memory files it holds load into the sessions of this factory's runs. Off unless you turn it on.",
   },
   {
     key: 'skills',
     label: 'Offer its skills',
-    means: "The skills in its .claude/skills are offered to the sessions of this factory's runs. On unless you turn it off.",
+    means: "The skills it holds are offered to the sessions of this factory's runs. On unless you turn it off.",
   },
 ];
 

@@ -6,7 +6,7 @@
  * switches, by its stored name, without giving it again.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { FACTORY_VOLUME_ADD_WORDS, FACTORY_VOLUME_RM_WORDS, FACTORY_VOLUME_SET_WORDS } from 'objects';
 import type { Args } from '../../command/command.ts';
 import { tableEntry, type Served } from '../../command/entry.verb.ts';
@@ -45,7 +45,7 @@ const flagOf = (key: 'claudeMd' | 'skills'): string =>
  * @param key The switch's key, `claudeMd` or `skills`.
  * @param flag The switch's flag, said in the refusal.
  */
-const switchOf = (args: Args, key: 'claudeMd' | 'skills', flag: string): boolean | undefined | string => {
+const switchOf = (args: Args | VolumeSetInput, key: 'claudeMd' | 'skills', flag: string): boolean | undefined | string => {
   const given: unknown = args[key];
   if (given === undefined || typeof given === 'boolean') return given;
   if (given === 'on') return true;
@@ -227,17 +227,29 @@ export const FACTORY_VOLUME_RM: Served<{ file: string; removed: string }> = {
 };
 
 /**
+ * What `nemia factory volume set` takes: the factory, the volume's name, and each switch set, as the command line types it (`on`, `off`)
+ * or as the api sends it (a boolean); a switch that is neither is refused by the handler, naming its flag.
+ */
+export const VolumeSetInput = Schema.Struct({
+  factory: Schema.String,
+  volume: Schema.String,
+  claudeMd: Schema.optionalKey(Schema.Union([Schema.Boolean, Schema.String])),
+  skills: Schema.optionalKey(Schema.Union([Schema.Boolean, Schema.String])),
+});
+export type VolumeSetInput = typeof VolumeSetInput.Type;
+
+/**
  * `nemia factory volume set`: one volume of a factory, by its stored name (`factoryVolumesNamed`), given the switches the person sets
  * (`volumeSwitched`), each one not given kept, its folder, mark, origin and name unmoved; a volume whose file stores no name has the one
  * it reads by stored, so no link to it moves (`withVolume`). Runs started after take it; a run in flight keeps what it began with.
  * Refused, and nothing written: a switch neither `on` nor `off` and neither switch given (`Invalid`), the default factory and a name with
  * no factory, and a name no volume of the factory holds (`Missing`, naming each it holds).
  */
-export const FACTORY_VOLUME_SET: Served<{ file: string; name: string }> = {
+export const FACTORY_VOLUME_SET: Served<{ file: string; name: string }, VolumeSetInput> = {
   ...FACTORY_VOLUME_SET_WORDS,
+  input: VolumeSetInput,
   handler: (args) => {
-    const name = textOf(args, 'factory');
-    const volume = textOf(args, 'volume');
+    const { factory: name, volume } = args;
     return Effect.gen(function* () {
       const claudeMd = switchOf(args, 'claudeMd', flagOf('claudeMd'));
       if (typeof claudeMd === 'string') return yield* Effect.fail(new Invalid({ message: claudeMd }));
@@ -254,7 +266,7 @@ export const FACTORY_VOLUME_SET: Served<{ file: string; name: string }> = {
       if (switched.kind === 'unasked')
         return yield* Effect.fail(
           new Invalid({
-            message: `nemia factory volume set sets a switch, and was given neither: nemia factory volume set ${name} ${volume} --claude-md on|off, or --skills on|off. Nothing was changed.`,
+            message: `nemia factory volume set sets a switch, and was given neither: nemia factory volume set ${name} ${volume} ${flagOf('claudeMd')} on|off, or ${flagOf('skills')} on|off. Nothing was changed.`,
           }),
         );
       if (switched.kind === 'missing')

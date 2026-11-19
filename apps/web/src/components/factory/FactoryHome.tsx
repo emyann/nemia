@@ -1,6 +1,6 @@
 /**
  * A factory's home, on its settings page, where the api answers the line that opens it (`commands.home`): what the home is, and that line
- * to copy, which opens a person's own Claude Code session there.
+ * to copy, which opens a person's own session there.
  */
 import { Card, CardContent, Title } from '@/components/ui/ds';
 import { CommandText } from './FactorySchedules';
@@ -19,7 +19,7 @@ export function FactoryHome({ name, line }: { name: string; line: string }) {
             Home
           </Title>
         }
-        supportingText="Where this factory's sessions start, with its CLAUDE.md, skills and settings. Open your own Claude Code session there, rendered read-only on your machine, with the folder you type it in added beside it:"
+        supportingText="Where this factory's sessions start, with its memory, skills and settings. Open your own session there, rendered read-only on your machine, with the folder you type it in added beside it:"
         classNames={{ header: 'mb-0' }}
       />
       <CommandText text={line} />

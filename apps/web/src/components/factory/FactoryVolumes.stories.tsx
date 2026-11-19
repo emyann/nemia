@@ -40,7 +40,7 @@ const labelOf = (canvasElement: HTMLElement, path: string, key: 'claudeMd' | 'sk
   canvasElement.querySelector<HTMLElement>(`[data-factory-volume="${path}"] [data-volume-switch="${key}"]`);
 
 /**
- * A read-only folder and a writable one, which is worked on; each with its Remove and its two switches, CLAUDE.md off and skills on, as
+ * A read-only folder and a writable one, which is worked on; each with its Remove and its two switches, memory files off and skills on, as
  * a volume that sets neither is.
  */
 export const Two: Story = {
@@ -53,12 +53,12 @@ export const Two: Story = {
       await expect(switchOf(canvasElement, path, 'claudeMd')).not.toBeChecked();
       await expect(switchOf(canvasElement, path, 'skills')).toBeChecked();
     }
-    await expect(canvasElement.querySelector('[data-volume-switch="claudeMd"]')).toHaveTextContent('CLAUDE.md files load');
-    await expect(canvasElement.querySelector('[data-volume-switch="skills"]')).toHaveTextContent('.claude/skills are offered');
+    await expect(canvasElement.querySelector('[data-volume-switch="claudeMd"]')).toHaveTextContent('memory files it holds load');
+    await expect(canvasElement.querySelector('[data-volume-switch="skills"]')).toHaveTextContent('skills it holds are offered');
   },
 };
 
-/** CLAUDE.md turned on for one volume: the api is sent that switch alone, on the volume by its name, and nothing is refused. */
+/** Its memory files turned on for one volume: the api is sent that switch alone, on the volume by its name, and nothing is refused. */
 export const Switched: Story = {
   args: { factory: { ...factoryView(FACTORY), volumes } },
   parameters: {

@@ -300,9 +300,10 @@ describe('a Workflow is served as its files hold it, what the store works out un
     assert.equal('agent' in (keys.review ?? {}), false, 'the review step without the agent hired into it');
     const status = Object.fromEntries(fenced.status.steps.map((s) => [s.name, s]));
     assert.equal(status.review?.hired, 'reader', 'the hire is read under status');
-    assert.ok(
-      status.design?.layers?.fence.some((f) => f.value.includes('Bash(git push:*)')),
-      "the agent's denies are read under status",
+    assert.deepEqual(
+      status.design?.spec.disallowedTools,
+      ['Bash(rm:*)', 'Bash(git push:*)', 'Bash(gh:*)'],
+      "the agent's denies after the step's own are read under status",
     );
   });
   test("dev's README whole in spec, its description, needs and instruction under status, and no needs nor description in spec", async () => {

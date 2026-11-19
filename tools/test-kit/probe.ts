@@ -29,7 +29,36 @@ export function vitestIn(dir: string, setupFiles: string[], env: NodeJS.ProcessE
     path.join(dir, 'vitest.config.mjs'),
     `export default { test: { include: ['*.test.mjs'], globals: true, pool: 'forks', setupFiles: ${JSON.stringify(setupFiles)} } };\n`,
   );
+  return spawnSync(process.execPath, [VITEST, 'run', '--root', dir], { cwd: dir, env: runnerless(env), encoding: 'utf8' });
+}
+
+/**
+ * `env` less the variables of the Vitest a test runs in, which a Vitest it starts would read as its own.
+ *
+ * @param env the environment a child Vitest is to run under
+ */
+export function runnerless(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const given = { ...env };
   for (const name of RUNNERS) delete given[name];
-  return spawnSync(process.execPath, [VITEST, 'run', '--root', dir], { cwd: dir, env: given, encoding: 'utf8' });
+  return given;
+}
+
+/**
+ * The arguments that run `files` of a workspace through Vitest, in place, as files of their own that its config does not include (a
+ * fixture a test runs to read what the runner says of it): a config naming them alone is written to `configDir`, with the setup files
+ * given. Run by `process.execPath`, under `runnerless`'s environment.
+ *
+ * @param configDir a scratch folder of the caller's, where the config is written
+ * @param root the workspace's folder, which resolves the files' imports
+ * @param files the files to run, from `root`
+ * @param setupFiles the setup files loaded before each, from `root`
+ */
+export function vitestOver(configDir: string, root: string, files: string[], setupFiles: string[] = []): string[] {
+  const config = path.join(configDir, 'vitest.config.mjs');
+  fs.writeFileSync(
+    config,
+    `export default { test: { root: ${JSON.stringify(root)}, include: ${JSON.stringify(files)}, pool: 'forks', ` +
+      `setupFiles: ${JSON.stringify(setupFiles)} } };\n`,
+  );
+  return [VITEST, 'run', '--config', config];
 }

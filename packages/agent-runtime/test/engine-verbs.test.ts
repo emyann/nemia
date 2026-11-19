@@ -5,7 +5,7 @@
  * layer and `tick` refuse, each a tagged error. What `file` refuses and takes is `test/refusal.test.ts`'s.
  */
 import { Effect } from 'effect';
-import { beforeAll, describe, test } from 'vitest';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 import { teardowns } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -78,7 +78,6 @@ describe('a consumer runs a task through its whole life in plain async/await, an
   let delivered!: import('../src/testing.ts').Bell;
   let watcher!: { stop: () => void };
   beforeAll(async () => {
-    const t = teardowns();
     sessions = new Map<string, Sighting>();
     engine = engineOver(fakeHarness(sessions));
     delivered = bell();
@@ -91,48 +90,47 @@ describe('a consumer runs a task through its whole life in plain async/await, an
         intervalMs: 20,
       }),
     );
-    try {
-      await s.test('filed, the task is pending', async () => {
-        id = await Effect.runPromise(engine.file({ brief: 'do the thing', cwd: '/repo' }));
-        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'pending');
-      });
-
-      await s.test('a pass starts it: running, one session', async () => {
-        await Effect.runPromise(engine.tick());
-        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
-        assert.equal(sessions.size, 1);
-      });
-
-      await s.test('the harness finishing it settles it succeeded: the engine found out by asking', async () => {
-        complete(sessions);
-        await Effect.runPromise(engine.tick());
-        assert.equal(
-          (await Effect.runPromise(engine.view(id))).phase,
-          'succeeded',
-          'the harness finished the work, and the engine found out by asking',
-        );
-      });
-
-      await s.test('a watcher started before the filing delivered every event, in order, once', async (sub) => {
-        await until(
-          sub,
-          () => live.length >= 5,
-          () => `five entries; saw ${live.join(', ') || 'none'}`,
-          { bell: delivered },
-        );
-        await new Promise((r) => setTimeout(r, 100));
-        assert.deepEqual(live, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
-      });
-    } finally {
-      watcher.stop();
-    }
-    return t.end;
+  });
+  afterAll(() => {
+    watcher.stop();
   });
   const s = story(test);
   const live: string[] = [];
   let id = '';
   const filed: string[] = [];
+  s.test('filed, the task is pending', async () => {
+    id = await Effect.runPromise(engine.file({ brief: 'do the thing', cwd: '/repo' }));
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'pending');
+  });
+
+  s.test('a pass starts it: running, one session', async () => {
+    await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
+    assert.equal(sessions.size, 1);
+  });
+
+  s.test('the harness finishing it settles it succeeded: the engine found out by asking', async () => {
+    complete(sessions);
+    await Effect.runPromise(engine.tick());
+    assert.equal(
+      (await Effect.runPromise(engine.view(id))).phase,
+      'succeeded',
+      'the harness finished the work, and the engine found out by asking',
+    );
+  });
+
+  s.test('a watcher started before the filing delivered every event, in order, once', async (sub) => {
+    await until(
+      sub,
+      () => live.length >= 5,
+      () => `five entries; saw ${live.join(', ') || 'none'}`,
+      { bell: delivered },
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(live, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
+  });
   s.test('the settled event in the feed drives a follow-up task', async () => {
+    watcher.stop();
     const { entries } = await Effect.runPromise(engine.feed(0));
     for (const { taskId, event } of entries) {
       if (event.kind === 'settled' && event.outcome === 'succeeded') {

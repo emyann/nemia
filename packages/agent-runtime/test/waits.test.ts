@@ -5,7 +5,7 @@
  * `src/waits/waits.ts` is the one copy: a test of a layer above takes it from `agent-runtime/testing`, and the board and the
  * documentation site, which import no package, each keep a copy this file holds to it byte for byte, since a test of theirs builds no
  * path into a package's `src`. A wait asks at
- * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested `node --test` of
+ * once, on each ring and at its pace, and ends at its test's timeout saying what never came: that is read off a nested Vitest of
  * `test/fixtures/waits/never.ts`, since a test's timeout is reported only outside it. `DEADLINES` counts, file by file, each `now()` of
  * `Date` or `performance` a number is added to, or a start taken from and held under a bound, in the package's tests: each left is a
  * mocked clock, a timestamp, a reaper's bound, a synchronous hold or an assertion, never a wait, and a count only shrinks
@@ -17,6 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { bell, until, WAITED, type Waiter } from '../src/waits/index.ts';
+import { runnerless, vitestOver } from 'test-kit/probe';
+import { scratch } from 'test-kit/scratch';
 
 const TEST = import.meta.dirname;
 const PACKAGE = path.join(TEST, '..');
@@ -168,27 +170,28 @@ test('REFUSED: a wait that says what it waits for by a function says it as it st
   assert.equal(still.message, 'never came: (the wait could not say what: the journal does not read)', 'it fails all the same');
 });
 
+/** Runs `fixture` of `fixtures/waits/` in a Vitest of its own, bounded by `timeout`: its status and what it printed. */
+const ranAlone = (fixture: string) => {
+  const over = vitestOver(scratch('ae-waits-config-'), PACKAGE, [path.join('test', 'fixtures', 'waits', fixture)]);
+  const ran = spawnSync('timeout', ['-k', '5', '120', process.execPath, ...over], {
+    cwd: PACKAGE,
+    env: runnerless(process.env),
+    encoding: 'utf8',
+  });
+  return { status: ran.status, out: `${ran.stdout}${ran.stderr}` };
+};
+
 test('REFUSED: a wait that never comes fails its test at the timeout, and the runner says what never came', () => {
-  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-  const ran = spawnSync(
-    'timeout',
-    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'never.ts')],
-    { cwd: PACKAGE, env, encoding: 'utf8' },
-  );
-  assert.equal(ran.status, 1, ran.stdout + ran.stderr);
-  assert.match(ran.stdout, /error: 'test timed out after 50ms'/, ran.stdout);
-  assert.match(ran.stdout, /^# never came: the bell that never rings$/m, ran.stdout);
+  const { status, out } = ranAlone('never.ts');
+  assert.equal(status, 1, out);
+  assert.match(out, /Test timed out in 50ms/, out);
+  assert.match(out, /^never came: the bell that never rings$/m, out);
 });
 
 test('REFUSED: a wait that cannot read its test fails at once, and its process ends on its own, holding no timer open', () => {
-  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
-  const ran = spawnSync(
-    'timeout',
-    ['-k', '5', '120', process.execPath, '--test', '--test-reporter=tap', path.join('test', 'fixtures', 'waits', 'unread.ts')],
-    { cwd: PACKAGE, env, encoding: 'utf8' },
-  );
-  assert.equal(ran.status, 0, `ended by itself, not by \`timeout\` (124): ${ran.stdout}${ran.stderr}`);
-  assert.match(ran.stdout, /^# pass 1$/m, ran.stdout);
+  const { status, out } = ranAlone('unread.ts');
+  assert.equal(status, 0, `ended by itself, not by \`timeout\` (124): ${out}`);
+  assert.match(out, /Tests\s+1 passed \(1\)/, out);
 });
 
 test("the copies of the helper outside the packages are this package's, byte for byte", () => {

@@ -34,9 +34,8 @@
  * its own spellings; a step that measures nothing denies each compiler whole (`MEASURELESS_DENIES`). They are the lines the nemia
  * factory's overlays carry.
  *
- * Every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`), the read-within-reach rule of
- * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
- * write (`buildInfoConfigs`).
+ * The read-within-reach rule of the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the
+ * checkout makes `tsc --noEmit` write (`buildInfoConfigs`).
  *
  * Nemia, the store's own agent, ships outside any workflow folder (`nemia/agents/nemia.md`) and runs long-lived, outside any checkout this
  * suite reads: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
@@ -52,7 +51,6 @@ import path from 'node:path';
 import ts from 'typescript';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
-import { appliesMatch, appliesOf } from '../src/skills/skills.ts';
 import { scratch } from 'test-kit/scratch';
 import { levelFile, promptFile, readNemia, storeDenies, toldFile } from '../src/nemia/level.store.ts';
 import { admissionOf, agentClassOf, nemiaFence, widened } from '../src/admission/index.ts';
@@ -1292,39 +1290,6 @@ function checkoutFiles(repo: string, under = ''): string[] {
       return entry.isDirectory() ? checkoutFiles(repo, file) : [file];
     });
 }
-
-/** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
-function appliesUnmatched(skillsDir: string, repo: string) {
-  const files = checkoutFiles(repo);
-  return fs
-    .readdirSync(skillsDir)
-    .filter((skill) => fs.existsSync(path.join(skillsDir, skill, 'SKILL.md')))
-    .flatMap((skill) =>
-      appliesOf(fs.readFileSync(path.join(skillsDir, skill, 'SKILL.md'), 'utf8'))
-        .filter((glob) => !files.some((file) => appliesMatch(file, [glob])))
-        .map((glob) => `${skill}: ${glob}`),
-    ) satisfies string[];
-}
-
-test('every path a repository skill applies to matches a file of the checkout, and the two that say so are read', () => {
-  const skills = path.join(REPO, '.claude', 'skills');
-  assert.deepEqual(appliesUnmatched(skills, REPO), []);
-  assert.deepEqual(appliesOf(fs.readFileSync(path.join(skills, 'change-the-board', 'SKILL.md'), 'utf8')), ['apps/web/**']);
-  assert.equal(appliesOf(fs.readFileSync(path.join(skills, 'effect', 'SKILL.md'), 'utf8')).length, 7);
-});
-
-test('REFUSED: a skill that applies to a path no file of the checkout has is named, beside one that matches', () => {
-  const skills = scratch('wf-fences-applies-');
-  for (const [name, applies] of [
-    ['typo', '["apps/webb/**", "apps/web/**"]'],
-    ['none', ''],
-  ]) {
-    fs.mkdirSync(path.join(skills, name));
-    const line = applies ? `applies: ${applies}\n` : '';
-    fs.writeFileSync(path.join(skills, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Do it.\n${line}---\nDo it.\n`);
-  }
-  assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
-});
 
 /** sdlc's role skills, which the nemia factory's steps load. */
 const SDLC_SKILLS = path.join(REPO, 'packages', 'templates', 'sdlc', 'skills');

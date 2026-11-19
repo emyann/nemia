@@ -1,7 +1,7 @@
 /**
  * The look's own parts are a group with one door (`src/components/look`): every part has its stories beside it, no file of `src`
- * outside the folder reaches past the door, and the skill a session loads before it changes the board names every part the door
- * exports. Each rule is run on a fixture that breaks it, then on the tree.
+ * outside the folder reaches past the door, and the board's CLAUDE.md (`apps/web/CLAUDE.md`, *The look's parts*) names every
+ * part the door exports. Each rule is run on a fixture that breaks it, then on the tree.
  */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -15,7 +15,8 @@ const SRC = path.join(WEB, 'src');
 const LOOK = path.join(SRC, 'components', 'look');
 /** The look's folder, from the workspace root, as the board's rules name a file. */
 const LOOK_FROM_ROOT = 'apps/web/src/components/look';
-const SKILL = path.join(WEB, '..', '..', '.claude', 'skills', 'change-the-board', 'SKILL.md');
+/** The board's facts, whose *The look's parts* names every part. */
+const FACTS = path.join(WEB, 'CLAUDE.md');
 
 /**
  * Each part among `names`, the files of the look's folder, that has no stories beside it, by its name: the board's rule
@@ -44,8 +45,8 @@ export const partsOf = (door: string) =>
     .map((name) => name.trim())
     .filter((name) => /^[A-Z][a-z]\w*$/.test(name)) satisfies string[];
 
-/** Each part of `door` that `skill` does not name in backticks. */
-export const untold = (door: string, skill: string) => partsOf(door).filter((part) => !skill.includes(`\`${part}\``)) satisfies string[];
+/** Each part of `door` that `facts` does not name in backticks. */
+export const untold = (door: string, facts: string) => partsOf(door).filter((part) => !facts.includes(`\`${part}\``)) satisfies string[];
 
 /** Every file under `dir`, by its path from `dir`. */
 // oxlint-disable-next-line landmines-types/no-explicit-return-types -- it returns its own call, whose type inference cannot give
@@ -56,7 +57,7 @@ function filesUnder(dir: string, from = dir): string[] {
   });
 }
 
-describe("the look's door: every part with its stories, no import past the door, and every part the door exports named by the skill", () => {
+describe("the look's door: every part with its stories, no import past the door, and every part the door exports named by the board's CLAUDE.md", () => {
   test('REFUSED: a part of the look with no story', () => {
     const shipped = fs.readdirSync(LOOK);
     assert.ok(shipped.includes('CutFrame.tsx') && shipped.includes('index.ts'), 'the folder is read');
@@ -84,16 +85,16 @@ describe("the look's door: every part with its stories, no import past the door,
     for (const file of files)
       assert.deepEqual(pastDoor(file, fs.readFileSync(path.join(SRC, file), 'utf8')), [], `${file} goes through the door`);
   });
-  test('REFUSED: a part the door exports that the skill does not name', () => {
+  test("REFUSED: a part the door exports that the board's CLAUDE.md does not name", () => {
     const door = fs.readFileSync(path.join(LOOK, 'index.ts'), 'utf8');
-    const skill = fs.readFileSync(SKILL, 'utf8');
+    const facts = fs.readFileSync(FACTS, 'utf8');
     assert.deepEqual(
       partsOf("export { cutRing, type CutSize } from './cut';\nexport { CutFrame, FRAMED_BOX, type FrameHue } from './CutFrame';"),
       ['CutFrame'],
     );
     assert.ok(partsOf(door).length >= 12, `the door's parts are read: ${partsOf(door).join(', ')}`);
-    assert.deepEqual(untold(`${door}export { Extra } from './Extra';\n`, skill), ['Extra'], 'a part the skill does not name is said');
-    assert.deepEqual(untold(door, skill), [], 'the skill names every part the door exports');
+    assert.deepEqual(untold(`${door}export { Extra } from './Extra';\n`, facts), ['Extra'], 'a part the facts do not name is said');
+    assert.deepEqual(untold(door, facts), [], 'the facts name every part the door exports');
     for (const name of fs.readdirSync(LOOK).filter((name) => /^[A-Z]\w*\.tsx$/.test(name)))
       assert.ok(door.includes(`from './${name.slice(0, -4)}'`), `${name}, a part of the folder, is exported by the door`);
   });

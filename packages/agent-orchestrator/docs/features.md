@@ -2469,9 +2469,11 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   that owes her session asks again. A factory's places are another matter: each is given its trust when a person adds it (`nemia
   factory add`, `apply`, `trust`), since a repository's settings are another party's.
 - **The keeper** (`keep`, `src/nemia/keep.verb.ts`), forked by `up` beside the deliverer, beats every 5 s and acts on what her
-  machine owes (`nemiaDue`, `src/nemia/nemia.ts`): at `semi-auto`, her task filed once under `nemia-<since>`, then her subscription put;
-  at `manual`, her task stopped and her subscription dropped. A task stopped or ended from outside is never filed again — the keeper
-  never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
+  machine owes (`nemiaDue`, `src/nemia/nemia.ts`): while a factory is above `manual`, her task filed, then her subscription put, and
+  she never rests; a message in her chat files her at any level, each task named `nemia-<when filed>` and listed in her record
+  (`nemia/session.json`), a new one resuming the last (`resumeFrom`); at `manual`, her subscription dropped, and after 15 quiet minutes
+  (`NEMIA_REST_AFTER`) her task put to rest. A task stopped or ended from outside is not filed again until the person speaks — the
+  keeper never fights the person — and a message or a level set then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: auto`, with every factory's folders mounted
   read-only and her memory writable; her instruction is written at filing, the shipped one followed by the person's custom one (a
   change while she is kept is told, *Her custom instruction told*, below). At 5b
@@ -2494,31 +2496,31 @@ Her machine, drawn by its code:
 <!-- diagram:nemia:begin — generated, from the repository's root: node -e "import('./packages/agent-orchestrator/src/nemia/nemia.ts').then((m) => console.log(m.nemiaDiagram()))" -->
 ```mermaid
 stateDiagram-v2
-  [*] --> off
-  due --> filed: NO_TASK / file
+  [*] --> resting
+  due --> filed: ABOVE_MANUAL / file
+  due --> talking: AT_MANUAL / file
   due --> untrusted: FOLDER_UNTRUSTED / nothing
-  untrusted --> filed: TRUST_WRITTEN / trust, file
+  untrusted --> due: TRUST_WRITTEN / trust, file
   untrusted --> untrusted: TRUST_REFUSED / trust
   filed --> kept: NOT_SUBSCRIBED / subscribe
-  filed --> stopped: SETTLED_OUTSIDE / nothing
-  kept --> stopped: SETTLED_OUTSIDE / nothing
   kept --> kept: CUSTOM_CHANGED / sayCustom
   kept --> kept: OUTBOX_OWED / sayOutbox
-  stopped --> stopped: SUBSCRIBED / drop
-  leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
-  due --> off: RAISE_ENDED / nothing
-  untrusted --> off: RAISE_ENDED / nothing
-  filed --> leaving: RAISE_ENDED / nothing
-  kept --> leaving: RAISE_ENDED / nothing
-  off --> due: level (a factory above manual) [always] (by person)
-  untrusted --> due: level (a factory above manual) [always] (by person)
+  kept --> talking: RAISE_ENDED / drop
+  talking --> talking: CUSTOM_CHANGED / sayCustom
+  talking --> talking: OUTBOX_OWED / sayOutbox
+  talking --> talking: IDLE / markIdle
+  talking --> filed: ABOVE_MANUAL / nothing
+  talking --> leaving: QUIET / rest
+  leaving --> resting: SETTLED / nothing
+  filed --> stopped: SETTLED_OUTSIDE / markStopped
+  kept --> stopped: SETTLED_OUTSIDE / drop, markStopped
+  talking --> stopped: SETTLED_OUTSIDE / markStopped
+  resting --> due: chat (a message) [always] (by person)
+  stopped --> due: chat (a message) [always] (by person)
+  resting --> due: level (a factory above manual) [always] (by person)
   stopped --> due: level (a factory above manual) [always] (by person)
-  leaving --> due: level (a factory above manual) [always] (by person)
-  due --> leaving: level (none above manual) [always] (by person)
-  untrusted --> leaving: level (none above manual) [always] (by person)
-  filed --> leaving: level (none above manual) [always] (by person)
-  kept --> leaving: level (none above manual) [always] (by person)
-  stopped --> leaving: level (none above manual) [always] (by person)
+  filed --> talking: level (none above manual) [always] (by person)
+  kept --> talking: level (none above manual) [always] (by person)
   kept --> kept: agents custom nemia (set or clear) [always] (by person)
 ```
 <!-- diagram:nemia:end -->

@@ -45,9 +45,10 @@ export const FactoryLevel = Schema.Struct({
 
 /**
  * Where Nemia is, as `nemia level --json` prints it: the store's level and since when, her task, its phase and its session where one is
- * filed, how a person reaches her session (`reach`), its web link (`bridge`, null where not bridged), whether it was stopped from
- * outside, what her ended sessions cost (`spend`), what a person allowed her at a prompt (`allows`), each factory's level, the default
- * factory first, and why the keeper could not trust her folder (`untrusted`, null where it is trusted or the write was not refused).
+ * filed, how a person reaches her session (`reach`), its web link (`bridge`, null where not bridged), whether it ended with no rest
+ * (`stopped`), whether no task of hers is open and a message starts one (`rests`), what her ended sessions cost (`spend`), what a person
+ * allowed her at a prompt (`allows`), each factory's level, the default factory first, and why the keeper could not trust her folder
+ * (`untrusted`, null where it is trusted or the write was not refused).
  */
 export const NemiaLevel = Schema.Struct({
   level: LevelWord.annotate({ description: "The store's level (`nemia level <level>`): manual, semi-auto or auto." }),
@@ -69,7 +70,14 @@ export const NemiaLevel = Schema.Struct({
   ).annotate({
     description: "Her open session's web link where one was asked, or why it is not up; null where none was asked.",
   }),
-  stopped: Schema.Boolean.annotate({ description: 'Whether her task was stopped from outside while a level above manual is in force.' }),
+  stopped: Schema.Boolean.annotate({
+    description:
+      "Whether her task ended with no rest of the keeper's (stopped from outside, or refused at its start): filed again on the person's next message or level set.",
+  }),
+  rests: Schema.Boolean.annotate({
+    description:
+      "Whether no task of hers is open, so a message in her chat starts one; false while the keeper's trust of her folder is refused.",
+  }),
   spend: Schema.NullOr(
     Schema.Struct({
       usd: describedNumber('What her sessions cost, in US dollars.'),
@@ -431,14 +439,15 @@ export const ChatEvent = Schema.Union([
 ]);
 
 /**
- * Where her task is: her session live (`up`), a turn in progress (`answering`), what waits on the person (`waitsOnYou`), and her messages
- * after the person's read mark (`unread`).
+ * Where her task is: her session live (`up`), a turn in progress (`answering`), what waits on the person (`waitsOnYou`), her messages
+ * after the person's read mark (`unread`), and whether a message starts her session where none is open (`wakes`).
  */
 export const ChatPresence = Schema.Struct({
   up: Schema.Boolean.annotate({ description: 'Whether her session is live.' }),
   answering: Schema.Boolean.annotate({ description: 'Whether a turn is in progress.' }),
   waitsOnYou: describedNumber('How many asks wait on the person.'),
   unread: describedNumber("How many of her messages come after the person's read mark."),
+  wakes: Schema.Boolean.annotate({ description: 'Whether a message to the chat starts her session where none is open.' }),
 });
 
 /**
@@ -494,10 +503,11 @@ export const ChatSent = Schema.Struct({
   from: Schema.optional(ChatSpeaker).annotate({ description: 'The agent that wrote them, where one did.' }),
 });
 
-/** A turn of hers stopped: when, and the attempt she was in. */
+/** A turn of hers stopped: when, the attempt she was in, and of which task of hers. */
 export const ChatStop = Schema.Struct({
   at: Schema.String.annotate({ description: 'When the turn was stopped, as an ISO 8601 time.' }),
   attempt: describedNumber('The attempt of her session the stopped turn was in.'),
+  task: Schema.optionalKey(Schema.String.annotate({ description: 'The task of hers whose turn was stopped.' })),
 });
 
 /** The person's pick for one question of an ask: the question by its words, and the labels chosen or words of their own. */

@@ -22,7 +22,7 @@
     },
     {
       "term": "Keeper",
-      "meaning": "the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is.",
+      "meaning": "the daemon's part that files Nemia's session while any factory is above `manual` or a message of the person's waits in her chat, keeps it operating while a factory's level asks it, and at `manual` puts her to rest once the conversation is quiet.",
       "see": {
         "label": "The keeper",
         "href": "/nemia/#the-keeper"
@@ -49,6 +49,23 @@
       "term": "Peer",
       "meaning": "another agent's words in a session's chat (`ChatFrom` `peer`), drawn under the name it spoke under and never as the person's.",
       "type": "ChatFrom"
+    },
+    {
+      "term": "Rest",
+      "meaning": "where Nemia is when no task of hers is open and nobody wants her, or the keeper stopped her task once the conversation was quiet at `manual` (`NemiaState` `resting`, the act `rest`); the person's next message files a task that continues her session.",
+      "type": "NemiaState",
+      "retired": [
+        {
+          "spelling": "'off'",
+          "card": "nemia: she answers her chat at any level, apart from operating a factory",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/nemia/nemia.ts",
+              "why": "another sense: the value of `NEMIA_DAEMON_START` in her settings, so a nemia she types starts no daemon"
+            }
+          ]
+        }
+      ]
     },
     {
       "term": "Say",

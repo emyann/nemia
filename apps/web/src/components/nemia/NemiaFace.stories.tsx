@@ -44,11 +44,29 @@ export const Happy = docked({ ...UP, unread: 1 });
 /** Her session down: sleepy. */
 export const Sleepy = docked({ ...UP, down: true });
 
+/** Her session resting, a message to wake her: sleepy. */
+export const Resting: StoryObj<{ presence: Presence }> = {
+  args: { presence: { ...UP, resting: true } },
+  render: ({ presence }) => (
+    <div style={AROUND}>
+      <NemiaFace presence={presence} />
+    </div>
+  ),
+};
+
 /** A message not sent: unsure. */
 export const Unsure = docked({ ...UP, notSent: true });
 
 /** Every presence at once: the first in the owner's order wins, surprised. */
-export const SeveralAtOnce = docked({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 1 });
+export const SeveralAtOnce = docked({
+  runsWaiting: 2,
+  asksWaiting: 1,
+  notSent: true,
+  down: true,
+  resting: false,
+  answering: true,
+  unread: 1,
+});
 
 /** At a panel header's size, 34 pixels. */
 export const InTheHeader: StoryObj = {

@@ -118,8 +118,8 @@ const AnswerSchema = Schema.Struct({ id: Moment, at: Moment, answers: Schema.Rec
 const AnswerDoneSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['return', 'words', 'mark']), at: Moment });
 const AskCloseSchema = Schema.Struct({ id: Moment, how: Schema.Literals(['cut', 'again']), at: Moment, call: Schema.optionalKey(Moment) });
 
-/** One turn the person stopped: when they stopped it, and which attempt of the task was answering. */
-export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite });
+/** One turn the person stopped: when they stopped it, which attempt was answering, and of which task (absent on an older line). */
+export const StopSchema = Schema.Struct({ at: Moment, attempt: Schema.Finite, task: Schema.optionalKey(Schema.String) });
 
 /** The text of `file`, or undefined where there is none. */
 const textOf = (file: string): string | undefined => {

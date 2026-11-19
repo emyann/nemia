@@ -123,6 +123,7 @@ export const nemiaLevel = (level: NemiaLevel['level']): NemiaLevel => ({
   sessionId: '0123456789abcdef',
   reach: ['attach 01234567'],
   bridge: null,
+  rests: false,
   stopped: false,
   spend: { usd: 1.25, measured: 2, unmeasured: 0 },
   allows: ['Bash(git status)'],

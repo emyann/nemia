@@ -52,6 +52,7 @@ async function expectClosed(page: Page): Promise<void> {
     asksWaiting: 0,
     notSent: false,
     down: false,
+    resting: false,
     answering: api.answering,
     unread: api.unread,
   };
@@ -309,7 +310,11 @@ export default {
     }
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectCues(page, (words) => words.includes('Down'), 'taken back, she has no session, and a Down cue is said at her face');
+    await expectCues(
+      page,
+      (words) => words.includes('Resting') && !words.includes('Down'),
+      'taken back, she has no session: a Resting cue is said at her face, a message to wake her',
+    );
     await page.mouse.move(640, 400);
   },
 } satisfies PageSpec;

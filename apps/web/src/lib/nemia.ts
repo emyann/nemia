@@ -10,27 +10,26 @@ import type { Presence } from './presence.ts';
 import { clockWord } from './quota.ts';
 
 /**
- * Her session's state, as the board says it: off, none kept; leaving, no factory left above Manual with a session still reached, which
- * the keeper stops; not filed since the keeper could not trust her folder; not filed yet; filed and starting, not yet
- * reachable; up, reached; and stopped from outside, not filed again.
+ * Her session's state, as the board says it: stopped from outside, filed again on the person's next word; not filed since the keeper
+ * could not trust her folder; resting, no session of hers open, which a message in her chat starts; filed and starting, not yet
+ * reachable; and up, reached. Resting with a factory above Manual, she is not filed yet: the keeper files her at its next beat.
  */
-type SessionKind = 'off' | 'leaving' | 'untrusted' | 'not-filed' | 'starting' | 'up' | 'stopped';
+type SessionKind = 'stopped' | 'untrusted' | 'resting' | 'not-filed' | 'starting' | 'up';
 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
-  off: 'Off: no session of hers runs.',
-  leaving: 'Stopping: the keeper ends her session at its next beat.',
+  stopped: 'Stopped from outside: your next message or level set starts her again.',
   untrusted: 'Not filed: the keeper could not trust her folder.',
+  resting: 'Resting: a message in her chat starts her session.',
   'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',
-  stopped: 'Stopped from outside, and not filed again.',
 };
 
 /**
  * Her session's state (`SessionKind`) and its sentence. A stop from outside is said first, whatever still reaches her session.
- * @param nemia What the api answers of her: her level, her task, the lines that reach it, whether it was stopped, why her folder could
- * not be trusted.
+ * @param nemia What the api answers of her: the lines that reach her session, whether it was stopped, whether she rests, why her folder
+ * could not be trusted.
  */
 export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string } {
   const kind = kindOf(nemia);
@@ -39,12 +38,11 @@ export function sessionOf(nemia: NemiaLevel): { kind: SessionKind; words: string
 
 /** The state alone, in the order `sessionOf` judges it. */
 function kindOf(nemia: NemiaLevel): SessionKind {
-  const { task, phase, reach, stopped, untrusted } = nemia;
-  if (stopped) return 'stopped';
-  if (task === null) return 'off';
-  if (!anyAbove(nemia)) return reach.length ? 'leaving' : 'off';
-  if (phase === null) return untrusted === null ? 'not-filed' : 'untrusted';
-  return reach.length ? 'up' : 'starting';
+  if (nemia.stopped) return 'stopped';
+  if (nemia.reach.length) return 'up';
+  if (nemia.untrusted !== null) return 'untrusted';
+  if (!nemia.rests) return 'starting';
+  return anyAbove(nemia) ? 'not-filed' : 'resting';
 }
 
 /** Whether she is kept: the store's level, or any factory's in force, above Manual. */
@@ -106,9 +104,9 @@ export const PRUNE_WORDS =
 
 /**
  * The one line under her name in her chat's header, off what the api answers of her and where she is (`presence`): `Down since 6:10 PM`
- * while her session is not up, `Answering` while a turn is in progress, else `Up: her session runs`, each followed by what her sessions
- * cost where the api counted it. The cost is what her ended sessions cost, whole (`spendWords`, which the header carries as its title),
- * never a day's: nothing the board reads counts a day of hers.
+ * while her session is not up and no message would start it, `Resting` where one would, `Answering` while a turn is in progress, else
+ * `Up: her session runs`, each followed by what her sessions cost where the api counted it. The cost is what her ended sessions cost, whole
+ * (`spendWords`, which the header carries as its title), never a day's: nothing the board reads counts a day of hers.
  * @param nemia What the api answers of her, or undefined while it is unread.
  * @param presence Where she is: down, answering, or with a message not sent.
  * @param now The instant it is now, against which the time she went down is said.
@@ -119,6 +117,7 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
     const since = nemia?.since === null || nemia?.since === undefined ? null : new Date(nemia.since);
     return `Down${since === null ? '' : ` since ${clockWord(since, now)}`}${spent}`;
   }
+  if (presence.resting) return `Resting${spent}`;
   if (presence.answering) return `Answering${spent}`;
   return `Up: her session runs${spent}`;
 }
@@ -126,7 +125,7 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
 /**
  * What her chat's composer invites, by where she is: while this browser keeps a message the api did not take, the message above acted
  * on where the api answered and refused it (`refused`), and the daemon waited on where nothing answered; her
- * reading it later while she is down, their own words while one question of hers waits on them,
+ * reading it later while she is down, their message waking her while she rests, their own words while one question of hers waits on them,
  * drawn as the form and answered by what they write (`asking`, `askInWords`, the canvas's board 7), the
  * next one or her turn stopped while she answers, else what she is for.
  * @param presence Where she is: down, answering, or with a message not sent.
@@ -136,6 +135,7 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
 export function composerWords(presence: Presence, asking = false, refused = false): string {
   if (presence.notSent) return refused ? 'Send again, edit or discard the message above' : 'Waiting for the daemon';
   if (presence.down) return 'Write now; she reads it when she is up';
+  if (presence.resting) return 'Write to her; your message wakes her';
   if (asking) return 'Or answer in your own words';
   if (presence.answering) return 'She is answering. Write the next one, or stop her';
   return 'Tell Nemia what to do, or ask';

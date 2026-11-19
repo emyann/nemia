@@ -46,7 +46,7 @@ import {
   sendingOnce,
 } from '../src/lib/chatOutbox.ts';
 import { sendChat } from '../src/lib/api/chat.ts';
-import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
+import { anyAbove, chatHeaderLine, composerButton, composerWords } from '../src/lib/nemia.ts';
 import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
 import type { AskQuestion, ChatEvent, ChatPresence, PermissionFacts } from '../src/lib/api/chat.ts';
@@ -74,7 +74,7 @@ const call = (id: string, second: number, state: ChatCall['state'], sentence = '
   state,
 });
 
-const up: ChatPresence = { up: true, answering: false, waitsOnYou: 0, unread: 0 };
+const up: ChatPresence = { up: true, answering: false, waitsOnYou: 0, unread: 0, wakes: true };
 
 /** An EventSource as far as `followChat` uses it: its state, the events it sends, and `close`. */
 class Stream implements StreamLike {
@@ -586,22 +586,34 @@ test("presenceOf: the runs that wait on the person are the run list's count, wha
 
 test('presenceOf, composerWords and composerButton: where she is, and what the composer offers for it', async (t) => {
   await t.test(
-    "her presence is the api's and this browser's kept message — and she reads as down when her session is not up, only then",
+    "her presence is the api's and this browser's kept message — resting where her session is not up and a message wakes her, down where none can",
     () => {
       assert.deepEqual(presenceOf(up, false, 0, []), {
         runsWaiting: 0,
         asksWaiting: 0,
         notSent: false,
         down: false,
+        resting: false,
         answering: false,
         unread: 0,
       });
-      assert.equal(presenceOf({ ...up, up: false }, false, 0, []).down, true);
-      assert.equal(faceOf(presenceOf({ ...up, up: false }, false, 0, [])), 'sleepy');
+      const resting = presenceOf({ ...up, up: false }, false, 0, []);
+      assert.deepEqual([resting.down, resting.resting], [false, true], 'not up, and a message wakes her: resting');
+      assert.equal(faceOf(resting), 'sleepy');
+      const down = presenceOf({ ...up, up: false, wakes: false }, false, 0, []);
+      assert.deepEqual([down.down, down.resting], [true, false], 'not up, and nothing can wake her: down');
       assert.equal(presenceOf(up, true, 0, []).notSent, true, 'a message this browser kept is hers to say');
       assert.equal(faceOf(presenceOf(up, true, 0, [])), 'unsure');
-      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3 }, true, 2, []);
-      assert.deepEqual(every, { runsWaiting: 2, asksWaiting: 0, notSent: true, down: false, answering: true, unread: 3 });
+      const every: Presence = presenceOf({ up: true, answering: true, waitsOnYou: 2, unread: 3, wakes: true }, true, 2, []);
+      assert.deepEqual(every, {
+        runsWaiting: 2,
+        asksWaiting: 0,
+        notSent: true,
+        down: false,
+        resting: false,
+        answering: true,
+        unread: 3,
+      });
       assert.equal(faceOf(every), 'surprised', 'what waits on a person comes first in the owner’s order');
     },
   );
@@ -626,6 +638,8 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
     assert.equal(composerWords(UP), 'Tell Nemia what to do, or ask');
     assert.equal(composerWords({ ...UP, answering: true }), 'She is answering. Write the next one, or stop her');
     assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
+    assert.equal(composerWords({ ...UP, resting: true }), 'Write to her; your message wakes her');
+    assert.equal(chatHeaderLine(undefined, { ...UP, resting: true }, new Date()), 'Resting', 'her header says she rests, never down');
     assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
     assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
     assert.equal(

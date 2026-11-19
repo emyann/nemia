@@ -185,13 +185,15 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
  * @param step The step: its harness, its `writable:` and its fence.
  * @param run The run's mounts and volumes, and its frozen home.
  * @param folders The folders the step is filed with beyond its mounts; none where not given.
+ * @param workspace The step's workspace, absolute, named to a session that starts in the home; none where not known.
  */
 export const mountsLine = (
   step: Pick<StepSpec, 'harness' | 'writable'> & Fenced,
   run: Pick<Run, 'mounts' | 'volumes'> & Partial<Pick<Run, 'homeFiles'>>,
   folders: FiledFolders = { handed: [], store: [], inputs: [] },
+  workspace?: string,
 ): string[] => {
-  const home = homeLines(step, run);
+  const home = homeLines(step, run, workspace);
   const lines = folderLines(step, run, folders);
   return home.length ? ['', ...home, ...lines] : lines;
 };
@@ -200,12 +202,12 @@ export const mountsLine = (
  * What a brief says of where a session starts that starts in its factory's home (`startOf`): that the home is its project, read-only,
  * and that the folder it works on, where its checks run, is its workspace, named to it as `WF_WORKSPACE`. Nothing for any other.
  */
-const homeLines = (step: Pick<StepSpec, 'harness'>, run: Partial<Pick<Run, 'homeFiles'>>): string[] =>
+const homeLines = (step: Pick<StepSpec, 'harness'>, run: Partial<Pick<Run, 'homeFiles'>>, workspace: string | undefined): string[] =>
   run.homeFiles !== undefined &&
   !isRemoteHarness(step.harness) &&
   declarationOf(step.harness ?? DEFAULT_HARNESS)?.can.includes('writableMount') === true
     ? [
-        "Your session starts in your factory's home, its CLAUDE.md and its skills yours, which you may read and must not write. The folder you work on is your workspace, added beside it, whose path is in `$WF_WORKSPACE`: run your commands there (`cd \"$WF_WORKSPACE\"`), where your checks run and your work is committed.",
+        `Your session starts in your factory's home, its CLAUDE.md and its skills yours, which you may read and must not write. The folder you work on is your workspace, added beside it${workspace === undefined ? '' : `, ${workspace}`}, whose path is in \`$WF_WORKSPACE\`: before your first command, move there by its path as it stands${workspace === undefined ? '' : ` (\`cd ${workspace}\`)`}, never through the variable, which no rule can name. Your checks run there and your work is committed there.`,
       ]
     : [];
 

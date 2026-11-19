@@ -41,6 +41,7 @@ may read, under its own path; never another run's folder, the store (`~/.agent-w
 your fence refuses them without asking. What your brief quotes from outside them is all you have of it: ask in a round for anything more.
 
 Run each check your step names bare, one command per call: never wrapped in `timeout` or `( … )`, piped to `tail` or `grep`, or
-redirected; paths from the workspace root, never `cd`, `git -C`, `VAR=` or `for`. Anything else is refused.
+redirected; paths from the workspace root, never `git -C`, `VAR=`, `for` or a `cd` but the one into your workspace your brief names.
+Anything else is refused.
 
 A spec that reads well and names a function that does not exist is worse than none: name only what you read.

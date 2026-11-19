@@ -15,7 +15,8 @@
  *   `src/where.ts` alone, which reads the lease's `url`.
  * - **One process** (`spawn`): `src/local.ts` alone names the orchestrator's CLI entries (`agent-orchestrator/bin`, `/bin/wf`), which it
  *   resolves and never imports, and alone imports `node:child_process` beside `src/browser.ts` (`BROWSER`), which runs this machine's
- *   browser opener for `nemia open`; the daemon on demand spawns through it.
+ *   browser opener for `nemia open`, and `src/home/session.ts` (`SESSION`), which starts the person's own session for `nemia factory
+ *   home`; the daemon on demand spawns through it.
  * - **The feed's stream under `src/watch/`** (`feed`): no other file names `/api/feed/stream` or an `EventSource`.
  * - **Nothing forwarded**: no file of `apps/cli/src` spells `FORWARD_VARIABLES` or `NEMIA_SERVER`, the variables a command line was
  *   once forwarded to another machine's api by; the orchestrator's side is its entries' pins (`packages/agent-orchestrator/test/
@@ -43,6 +44,9 @@ const LOCAL = 'src/local.ts';
 
 /** The one other file that imports `node:child_process`: it runs this machine's browser opener (`open`, `xdg-open`) for `nemia open`. */
 const BROWSER = 'src/browser.ts';
+
+/** And the one that starts the person's own Claude Code session in a factory's home, with their terminal, for `nemia factory home`. */
+const SESSION = 'src/home/session.ts';
 const WATCH = 'src/watch/';
 
 /** The harness SDKs, each the runtime's alone. */
@@ -179,7 +183,7 @@ function importBreak(file: string, { spec, way, typeOnly }: Named) {
     return { file, rule: 'objects', fix: `import what ${spec} names from the entry, '${OBJECTS}'` } satisfies Break | undefined;
   if (spec === 'node:child_process' || spec === 'child_process')
     return (
-      file === LOCAL || file === BROWSER
+      file === LOCAL || file === BROWSER || file === SESSION
         ? undefined
         : { file, rule: 'spawn', fix: `spawn through ${LOCAL}'s spawned, the client's one process` }
     ) satisfies Break | undefined;
@@ -386,6 +390,12 @@ test("REFUSED: the orchestrator's CLI named, or a process spawned, outside src/l
   assert.deepEqual(ruled(entryBreaks(plantedIn('src/daemon.ts', `const entry = '${ORCH}/bin/wf';`))), ['src/daemon.ts spawn']);
   assert.deepEqual(ruled(importBreaks(plantedIn('src/daemon.ts', "import { spawn } from 'node:child_process';"))), ['src/daemon.ts spawn']);
   assert.deepEqual(ruled(importBreaks(plantedIn(BROWSER, "import { spawn } from 'node:child_process';"))), [], `the opener in ${BROWSER}`);
+  assert.deepEqual(ruled(importBreaks(plantedIn(SESSION, "import { spawn } from 'node:child_process';"))), [], `the session in ${SESSION}`);
+  assert.deepEqual(
+    ruled(importBreaks(plantedIn('src/home/copy.ts', "import { spawn } from 'node:child_process';"))),
+    ['src/home/copy.ts spawn'],
+    'beside the session, still refused',
+  );
   assert.deepEqual(ruled(importBreaks(plantedIn(LOCAL, resolve))), [], `the resolve in ${LOCAL}`);
   assert.deepEqual(ruled(entryBreaks(plantedIn(LOCAL, resolve))), [], `the name in ${LOCAL}`);
   assert.deepEqual(ruled(importBreaks(plantedIn(LOCAL, `import '${ORCH}/bin';`))), [`${LOCAL} spawn`]);

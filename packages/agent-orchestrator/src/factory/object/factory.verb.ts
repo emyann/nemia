@@ -10,7 +10,9 @@
  * a write of its spec does, so a proposal read before either goes stale, and a controller's pass, which writes only the status, moves
  * nothing, so a Factory proposal recorded in that status stays fresh. That is Kubernetes' `metadata.generation`, which counts changes to
  * an object's desired state and which a status write never moves; a watch tells a change of the status by the status itself. And
- * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before.
+ * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before. And
+ * `factoryHomeOf`, a factory's home read whole for a client to render (`GET /api/factories/<name>/home`): every file of its tree's
+ * `home/`, read and refused as a run's start reads it (`homeFilesOf`), and the digest the run's copy of the same files is named by.
  *
  * Every kind of a factory's parts is listed the one way (`objectsListed`, `src/object/listed.verb.ts`).
  */
@@ -20,6 +22,7 @@ import {
   DEFAULT_NAMESPACE,
   type Factory as FactoryObject,
   type FactoryCommands,
+  type FactoryHome,
   type FactoryList,
   type FactoryStatus,
   type ObjectMeta,
@@ -33,7 +36,9 @@ import { generationOf } from '../door/generation.ts';
 import type { FactoryListing } from '../factory.ts';
 import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
-import { doorAt, doorAtOnce } from '../door/factories.store.ts';
+import { doorAt, doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
+import { fromThrow as tried } from '../../door/door.store.ts';
+import { homeFilesOf, workflowFilesDigest } from '../../frozen/frozen.store.ts';
 import { FactoryName, isDefaultFactory, type DefaultFactory } from '../factory.model.ts';
 import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
@@ -335,3 +340,32 @@ export const followOf = (name: string, version: string, declared: Readonly<Recor
   const [parameter, { whenOrigin: host }] = found;
   return { host, parameter, line: commandLine(named('factory diff'), { factory: name }, { to: version, sets: `${parameter}=true` }) };
 };
+
+/**
+ * The home of the factory `name`: its files sorted by path, each its permission bits and its bytes in base64, and their digest. Refused
+ * `Missing` where no factory has the name, where it has no tree (made by hand, or the default factory) and where its tree holds no
+ * `home/`, each naming what to type; `Invalid` where the home holds a link or what is neither a file nor a folder, as a run's start is.
+ */
+export const factoryHomeOf = Effect.fn('factoryHomeOf')(function* (name: string) {
+  const door = yield* FactoryDoor;
+  const record = yield* door.factories.read(FactoryName.read(name));
+  const tree = isDefaultFactory(record) ? undefined : record.tree;
+  if (tree === undefined)
+    return yield* Effect.fail(
+      new Missing({
+        message: `${name} has no home: it was not made from a template, and a home is a template's. Take it over by one that gives a home/ (nemia factory diff ${name} --template <folder|archive>, then nemia factory adopt), then open it again.`,
+      }),
+    );
+  const files = yield* tried(() => homeFilesOf(tree));
+  if (files === undefined)
+    return yield* Effect.fail(
+      new Missing({
+        message: `${name} has no home: its tree (${tree}) holds no home/, which its template does not give. Upgrade it onto a version of its template that does (nemia factory upgrade ${name} --to <x.y.z>), then open it again.`,
+      }),
+    );
+  return {
+    name,
+    digest: workflowFilesDigest(files),
+    files: files.map((f) => ({ path: f.path, mode: f.mode, content: Buffer.from(f.bytes).toString('base64') })),
+  } satisfies FactoryHome;
+});

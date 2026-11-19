@@ -21,7 +21,7 @@ for (const [name, body] of walksOn(TEMPLATE_WALKS, () => {
   const root = scratch('wf-template-door-');
   return { door: doorFrom(TemplateDoor, templateDoorFiles()), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh scratch folder, and the Template door over the files. */
 const place = () => ({ root: scratch('wf-template-door-'), door: doorFrom(TemplateDoor, templateDoorFiles()) });

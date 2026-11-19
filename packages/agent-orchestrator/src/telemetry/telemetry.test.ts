@@ -330,7 +330,7 @@ const OTLP: Row[] = [
 ];
 
 describe('`otlpOf` and `exportIntervalRefusalOf`: whether an environment asks for an OTLP export, to where, under what service and how often', () => {
-  for (const row of OTLP) test.todo(row.name);
+  for (const row of OTLP) test(row.name, row.check);
 });
 
 /** The environment that names a collector, with a trailing slash. */
@@ -379,7 +379,7 @@ const SESSIONS: Row[] = [
 ];
 
 describe('`sessionTelemetryOf` and `toolDetailsRefusalOf`: what the sessions a daemon starts export, and a NEMIA_TOOL_DETAILS that asks nothing', () => {
-  for (const row of SESSIONS) test.todo(row.name);
+  for (const row of SESSIONS) test(row.name, row.check);
 });
 
 /** The moment every `lineOf` row prints at. */
@@ -401,5 +401,5 @@ const LINES: Row[] = [
 ];
 
 describe('`lineOf`: the time in UTC, two spaces, then the message, its parts joined by a space', () => {
-  for (const row of LINES) test.todo(row.name);
+  for (const row of LINES) test(row.name, row.check);
 });

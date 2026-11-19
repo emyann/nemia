@@ -34,7 +34,7 @@ const ROWS: { name: string; run: () => void }[] = [
 ];
 
 describe('attachedLongLived: a long-lived request runs attached while a holder holds, and nothing else does', () => {
-  for (const row of ROWS) test.todo(row.name);
+  for (const row of ROWS) test(row.name, row.run);
 });
 
 describe('REFUSED: a long-lived spawn with nothing holding the attached sessions, refused, and its attempt never restarted', () => {

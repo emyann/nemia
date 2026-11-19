@@ -24,7 +24,7 @@ for (const [name, body] of walksOn(SKILL_WALKS, () => {
   const root = scratch('wf-skill-door-');
   return { door: doorFrom(SkillDoor, skillDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store, its library, and its Skill door over the files. */
 const store = () => {

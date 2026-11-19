@@ -71,7 +71,7 @@ async function refusedRows(rows: readonly Refused[]): Promise<void> {
 
 /** Each row of `rows` a subtest of `t`: its name, and what it asserts. */
 async function rows(all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
-  for (const [name, body] of all) test.todo(name);
+  for (const [name, body] of all) test(name, body);
 }
 
 const agent = (name: string, text: string, read?: (file: string) => string | undefined): Agent => parseAgent(name, text, read);

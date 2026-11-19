@@ -17,14 +17,14 @@ for (const [name, body] of walksOn(PROPOSAL_WALKS, () => {
   const root = scratch('wf-proposal-door-');
   return { door: doorFrom(ProposalDoor, proposalDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(`files: ${name}`);
+  test(`files: ${name}`, body);
 
 for (const [name, body] of walksOn(PROPOSAL_WALKS, () => ({
   door: doorFrom(ProposalDoor, proposalDoorMemory()),
   root: '/memory',
   layer: 'memory',
 })))
-  test.todo(`memory: ${name}`);
+  test(`memory: ${name}`, body);
 
 test('a proposal is kept at <store>/factories/<factory>/proposals/<name>.json, and a file that does not read is refused Invalid', () => {
   const root = scratch('wf-proposal-door-');

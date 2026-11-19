@@ -62,7 +62,7 @@ const pruned = (id: string): void => fs.writeFileSync(pruneFile(ROOT, id), JSON.
 /** The Run door over the files of this file's store. */
 const door = doorFrom(RunDoor, runDoorFiles(ROOT));
 
-for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test.todo(name);
+for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test(name, body);
 
 test('a record of an older shape reads through the door as the one Run type, and is written back with nothing refused or moved', () => {
   const id = 'r-older-shape';

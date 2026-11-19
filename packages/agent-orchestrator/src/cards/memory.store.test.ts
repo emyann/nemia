@@ -9,4 +9,4 @@ import { doorFrom, walksOn } from '../../test/door-walks.ts';
 import { CARD_WALKS } from '../../test/card-walks.ts';
 
 for (const [name, body] of walksOn(CARD_WALKS, () => ({ door: doorFrom(CardDoor, cardDoorMemory()), root: MEMORY_ROOT, layer: 'memory' })))
-  test.todo(name);
+  test(name, body);

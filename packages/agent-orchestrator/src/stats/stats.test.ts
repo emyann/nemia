@@ -238,7 +238,7 @@ type Row = { name: string; check: () => void };
 
 /** Runs `rows` as subtests of `t`, in order. */
 const rowsOf = async (rows: readonly Row[]) => {
-  for (const row of rows) test.todo(row.name);
+  for (const row of rows) test(row.name, row.check);
 };
 
 describe('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days off, and the keys a run carries', () => {

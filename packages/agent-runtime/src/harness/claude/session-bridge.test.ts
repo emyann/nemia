@@ -135,5 +135,5 @@ const ROWS: { name: string; run: () => Promise<void> | void }[] = [
 ];
 
 describe('the bridge’s one door: its facts read off the control request’s answer and its stream, or why there is none, never thrown', () => {
-  for (const row of ROWS) test.todo(row.name);
+  for (const row of ROWS) test(row.name, row.run);
 });

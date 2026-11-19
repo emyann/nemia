@@ -59,7 +59,7 @@ function refusal(fn: () => unknown): string {
 
 /** Each row of `all` a subtest of `t`: its name, and what it asserts. */
 async function rows(all: ReadonlyArray<readonly [string, () => void]>): Promise<void> {
-  for (const [name, body] of all) test.todo(name);
+  for (const [name, body] of all) test(name, body);
 }
 
 const SKILL = (name: string, extra = '') =>

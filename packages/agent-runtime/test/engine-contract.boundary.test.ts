@@ -57,7 +57,7 @@ function realSide(): Side {
   return { engine, settle };
 }
 
-for (const [name, walk] of walksOn(realSide)) test.todo(name);
+for (const [name, walk] of walksOn(realSide)) test(name, walk);
 
 test('every verb of the engine is walked or named unkept, and each unkept verb is one the engine has', () => {
   const { engine } = realSide();

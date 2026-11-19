@@ -144,7 +144,7 @@ type Rows = Array<[string, (t: TestContext) => void | Promise<void>]>;
 const row = (rows: Rows, name: string, claim: (t: TestContext) => void | Promise<void>) => rows.push([name, claim]);
 /** A table's rows, each a subtest of `t`. */
 const told = (rows: Rows) => async () => {
-  for (const [name, claim] of rows) test.todo(name);
+  for (const [name, claim] of rows) test(name, claim);
 };
 const FILED: Rows = [];
 

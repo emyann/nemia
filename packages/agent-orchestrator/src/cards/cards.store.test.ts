@@ -20,7 +20,7 @@ for (const [name, body] of walksOn(CARD_WALKS, () => {
   const root = scratch('wf-card-door-');
   return { door: doorFrom(CardDoor, cardDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store, its Card door over the files, and its inbox. */
 const store = () => {

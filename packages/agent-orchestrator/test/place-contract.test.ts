@@ -15,7 +15,7 @@ import { placeOver, type OwnVerbs } from './place-over.ts';
 import { scratch } from 'test-kit/scratch';
 import { failing, unwalked, walksOn, WALKS, type Side } from './place-walks.ts';
 
-for (const [name, walk] of walksOn(testPlace)) test.todo(name);
+for (const [name, walk] of walksOn(testPlace)) test(name, walk);
 
 /** A commit no walk makes. */
 const NO_COMMIT = 'f'.repeat(40);

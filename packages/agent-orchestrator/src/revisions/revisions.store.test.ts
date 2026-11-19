@@ -21,7 +21,7 @@ for (const [name, body] of walksOn(LEDGER_WALKS, () => {
   const root = scratch('wf-ledger-door-');
   return { door: doorFrom(LedgerDoor, ledgerDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store and its Ledger door over the files. */
 const store = () => {

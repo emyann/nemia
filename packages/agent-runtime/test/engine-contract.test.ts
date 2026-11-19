@@ -21,7 +21,7 @@ function standIn(): Side {
   return { engine: builtEngine(made.layer), settle: async (id, moved, end) => void made.settle(id, phaseOf(id, moved), end) };
 }
 
-for (const [name, walk] of walksOn(standIn)) test.todo(name);
+for (const [name, walk] of walksOn(standIn)) test(name, walk);
 
 /** A verb's answer, whatever its verb. */
 type Answer = Effect.Effect<unknown, unknown>;

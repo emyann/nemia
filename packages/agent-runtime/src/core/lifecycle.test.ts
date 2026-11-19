@@ -220,7 +220,7 @@ const REFUSED_ROWS: Row[] = [
 ];
 
 describe('REFUSED: an event the machine has no edge for is refused, never guessed — by the machine, and by `decide`', () => {
-  for (const row of REFUSED_ROWS) test.todo(row.name);
+  for (const row of REFUSED_ROWS) test(row.name, row.run);
 });
 
 /**
@@ -286,7 +286,7 @@ const SETTLED_ROWS: Row[] = [
 ];
 
 describe('a settled task is final: it decides nothing, before anything is observed and whatever is appended after', () => {
-  for (const row of SETTLED_ROWS) test.todo(row.name);
+  for (const row of SETTLED_ROWS) test(row.name, row.run);
 });
 
 /** The states no move reaches from `submitted`, over the machine's edges and the verbs given. */
@@ -380,7 +380,7 @@ const MACHINE_ROWS: Row[] = [
 ];
 
 describe('the machine as data: its states, edges and reach, the diagram drawn from it, and the graph a board draws', () => {
-  for (const row of MACHINE_ROWS) test.todo(row.name);
+  for (const row of MACHINE_ROWS) test(row.name, row.run);
 });
 
 test('UNREAD: a pass that could not read the harness does nothing to an attempt in flight, past its grace too, and never reads it lost', () => {

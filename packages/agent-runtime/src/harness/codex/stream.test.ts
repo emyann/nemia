@@ -153,7 +153,7 @@ const EVENTS_ROWS: Row[] = [
 ];
 
 describe('codexEventsOf: a stream decodes into the events the runtime reads, in order, passes every other line, and is refused at its first line that does not decode, by its line, its event, its field and the fix', () => {
-  for (const row of EVENTS_ROWS) test.todo(row.name);
+  for (const row of EVENTS_ROWS) test(row.name, row.holds);
 });
 
 const OUTPUT_ROWS: Row[] = [
@@ -200,5 +200,5 @@ const OUTPUT_ROWS: Row[] = [
 ];
 
 describe('codexOutput and codexPartials: what a session consumed read off a stream that decodes, nothing marked as being written, and a stream that does not decode refused in codexEventsOf’s words', () => {
-  for (const row of OUTPUT_ROWS) test.todo(row.name);
+  for (const row of OUTPUT_ROWS) test(row.name, row.holds);
 });

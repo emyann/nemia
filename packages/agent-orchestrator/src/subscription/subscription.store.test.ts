@@ -26,7 +26,7 @@ for (const [name, body] of walksOn(SUBSCRIPTION_WALKS, () => {
   const root = scratch('wf-subscription-door-');
   return { door: doorFrom(SubscriptionDoor, subscriptionDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store, its Subscription door over the files, and where its files are. */
 const store = () => {

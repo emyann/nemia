@@ -69,18 +69,14 @@ const withClaude = (claude: ClaudeFlags): SpawnRequest => ({ ...RICH, config: { 
 
 describe('attachedOptions: a rich task is fenced on the SDK’s own options, each fact of it in its place', () => {
   let given!: {
-    env?: { [envVar: string]: string | undefined } | undefined;
-    settings?: (string | import('@anthropic-ai/claude-agent-sdk').Settings) | undefined;
-    tools?: string[] | { type: 'preset'; preset: 'claude_code' } | undefined;
-    model?: string | undefined;
-    permissionMode?: import('@anthropic-ai/claude-agent-sdk').PermissionMode | undefined;
-    disallowedTools?: string[] | undefined;
-    allowedTools?: string[] | undefined;
-    effort?: import('@anthropic-ai/claude-agent-sdk').EffortLevel | undefined;
     cwd?: string | undefined;
-    skills?: string[] | 'all' | undefined;
+    tools?: string[] | { type: 'preset'; preset: 'claude_code' } | undefined;
+    allowedTools?: string[] | undefined;
+    disallowedTools?: string[] | undefined;
     additionalDirectories?: string[] | undefined;
+    permissionMode?: import('@anthropic-ai/claude-agent-sdk').PermissionMode | undefined;
     settingSources?: import('@anthropic-ai/claude-agent-sdk').SettingSource[] | undefined;
+    settings?: (string | import('@anthropic-ai/claude-agent-sdk').Settings) | undefined;
     systemPrompt?:
       | string
       | string[]
@@ -89,12 +85,16 @@ describe('attachedOptions: a rich task is fenced on the SDK’s own options, eac
       | undefined;
     mcpServers?: Record<string, import('@anthropic-ai/claude-agent-sdk').McpServerConfig> | undefined;
     strictMcpConfig?: boolean | undefined;
+    model?: string | undefined;
+    effort?: import('@anthropic-ai/claude-agent-sdk').EffortLevel | undefined;
     maxBudgetUsd?: number | undefined;
     outputFormat?: import('@anthropic-ai/claude-agent-sdk').OutputFormat | undefined;
     resume?: string | undefined;
     plugins?: import('@anthropic-ai/claude-agent-sdk').SdkPluginConfig[] | undefined;
     extraArgs?: Record<string, string | null> | undefined;
+    env?: { [envVar: string]: string | undefined } | undefined;
     includePartialMessages?: boolean | undefined;
+    skills?: string[] | 'all' | undefined;
   };
   beforeAll(() => {
     const t = teardowns();
@@ -306,5 +306,5 @@ const ROWS: { name: string; check: () => void }[] = [
 ];
 
 describe('attachedOptions: a bare task, the prompt files and the refusals of what the options cannot carry', () => {
-  for (const row of ROWS) test.todo(row.name);
+  for (const row of ROWS) test(row.name, row.check);
 });

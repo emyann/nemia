@@ -25,7 +25,7 @@ for (const [name, body] of walksOn(FACTORY_WALKS, () => {
   const root = scratch('wf-factory-door-');
   return { door: doorFrom(FactoryDoor, factoryDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store, its Factory door over the files, and the file of the factory `acme` in it. */
 const store = () => {

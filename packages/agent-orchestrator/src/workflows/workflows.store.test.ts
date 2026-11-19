@@ -31,7 +31,7 @@ for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
   const defs = { agents: doorFrom(AgentDoor, agentDoorFiles(root)), skills: doorFrom(SkillDoor, skillDoorFiles(root)) };
   return { door: doorFrom(WorkflowDoor, workflowDoorFiles(root)), root, layer: 'files', defs };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store and its Workflow door over the files. */
 const store = () => {

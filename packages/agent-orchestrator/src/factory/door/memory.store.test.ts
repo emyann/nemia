@@ -13,4 +13,4 @@ for (const [name, body] of walksOn(FACTORY_WALKS, () => ({
   root: MEMORY_ROOT,
   layer: 'memory',
 })))
-  test.todo(name);
+  test(name, body);

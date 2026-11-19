@@ -63,7 +63,7 @@ describe('trustedFolder: a folder is trusted only by its own entry with the prom
       check: () => assert.equal(trustedFolder('codex', '/srv/home', TRUSTED()), undefined),
     },
   ];
-  for (const row of rows) test.todo(row.name);
+  for (const row of rows) test(row.name, row.check);
 });
 
 /** What `file` holds, parsed. */
@@ -182,7 +182,7 @@ describe('trustFolder: what a folder is given, what a file that cannot take the 
       },
     },
   ];
-  for (const row of rows) test.todo(row.name);
+  for (const row of rows) test(row.name, row.check);
 });
 
 test('a write that lands between the read and the replace is not lost', () => {

@@ -5,7 +5,7 @@
  * A file of its own, since `tick` reads every run of its store: its own at `ROOT`, given as `ENV`. `WF_VERIFY_REST=1` judges in full
  * every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
-import { describe, test, type TestContext, vi } from 'vitest';
+import { describe, test, type TestContext } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -522,7 +522,7 @@ writes("a pass's metrics go into the registry of whoever runs it: its time, each
 
 /** A table's rows, each a subtest of `t`. */
 const told = (rows: Rows) => async () => {
-  for (const [name, claim] of rows) test.todo(name);
+  for (const [name, claim] of rows) test(name, claim);
 };
 
 describe("a pass's time is its phases and what measuring took, no more and no less", told(TIME));

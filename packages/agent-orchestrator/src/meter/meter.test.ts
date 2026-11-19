@@ -242,5 +242,5 @@ row("`nemia passes`' answer: the summary, the histogram's buckets with passes, a
 });
 
 describe("the meter's math: what a pass costs, in words, a row a claim", () => {
-  for (const [name, claim] of ROWS) test.todo(name);
+  for (const [name, claim] of ROWS) test(name, claim);
 });

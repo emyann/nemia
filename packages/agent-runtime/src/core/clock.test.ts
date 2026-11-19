@@ -71,5 +71,5 @@ const ROWS: Row[] = [
 ];
 
 describe('elapsedMs, leftOf and purseOf: the time elapsed on which clock, what a budget has left, and what the waits sharing one are given', () => {
-  for (const row of ROWS) test.todo(row.name);
+  for (const row of ROWS) test(row.name, row.run);
 });

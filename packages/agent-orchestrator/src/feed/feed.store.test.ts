@@ -24,7 +24,7 @@ for (const [name, body] of walksOn(FEED_WALKS, () => {
   const root = scratch('wf-feed-door-');
   return { door: doorFrom(FeedDoor, feedDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store, its Feed door over the files, and its feed. */
 const store = () => {

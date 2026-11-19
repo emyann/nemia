@@ -20,7 +20,7 @@ const SIDES = {
 };
 
 for (const [side, made] of Object.entries(SIDES)) {
-  for (const [name, body] of walksOn(made)) test.todo(`${side}: ${name}`);
+  for (const [name, body] of walksOn(made)) test(`${side}: ${name}`, body);
 }
 
 test('every method of the door is walked, or named as one no walk can ask of every layer', () => {

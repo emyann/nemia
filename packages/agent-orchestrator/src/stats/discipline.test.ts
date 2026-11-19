@@ -281,5 +281,5 @@ const RULES: Array<{ name: string; check: () => void }> = [
 ];
 
 describe('`rulesOfTry` and `ruleRowsOf`: a rule broken by a denied call as a fence matches it, kept otherwise, totalled over measured tries', () => {
-  for (const row of RULES) test.todo(row.name);
+  for (const row of RULES) test(row.name, row.check);
 });

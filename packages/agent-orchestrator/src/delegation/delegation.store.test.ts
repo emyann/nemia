@@ -17,14 +17,14 @@ for (const [name, body] of walksOn(DELEGATION_WALKS, () => {
   const root = scratch('wf-delegation-door-');
   return { door: doorFrom(DelegationDoor, delegationDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(`files: ${name}`);
+  test(`files: ${name}`, body);
 
 for (const [name, body] of walksOn(DELEGATION_WALKS, () => ({
   door: doorFrom(DelegationDoor, delegationDoorMemory()),
   root: '/memory',
   layer: 'memory',
 })))
-  test.todo(`memory: ${name}`);
+  test(`memory: ${name}`, body);
 
 test('a delegation is kept at <store>/factories/<factory>/delegations/<agent>.json, and a file that does not read is refused Invalid', () => {
   const root = scratch('wf-delegation-door-');

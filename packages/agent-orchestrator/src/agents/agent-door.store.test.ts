@@ -19,7 +19,7 @@ for (const [name, body] of walksOn(AGENT_WALKS, () => {
   const root = scratch('wf-agent-door-');
   return { door: doorFrom(AgentDoor, agentDoorFiles(root)), root, layer: 'files' };
 }))
-  test.todo(name);
+  test(name, body);
 
 /** A fresh store and its Agent door over the files. */
 const store = () => {

@@ -256,5 +256,5 @@ const ROWS: Array<[string, (t: TestContext) => Promise<void>]> = [
 ];
 
 describe("a remote agent's refusals: whatever another party sent is quoted cut at its bound and marked, and the advice after it is whole", () => {
-  for (const [name, run] of ROWS) test.todo(name);
+  for (const [name, run] of ROWS) test(name, run);
 });

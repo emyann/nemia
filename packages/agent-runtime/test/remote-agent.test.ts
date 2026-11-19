@@ -383,7 +383,7 @@ const UNSTARTABLE: Array<[string, (t: TestContext) => Promise<void>]> = [
 ];
 
 describe('a card or an agent the runtime cannot meet: the attempt ends unstartable, saying why, and nothing is sent', () => {
-  for (const [name, run] of UNSTARTABLE) test.todo(name);
+  for (const [name, run] of UNSTARTABLE) test(name, run);
 });
 
 /** Each row: an agent reached as its card asks, wherever it lives, and the secret that went to it, or that no secret was asked. */
@@ -498,7 +498,7 @@ const REACHED: Array<[string, (t: TestContext) => Promise<void>]> = [
 ];
 
 describe("a remote agent reached as its card asks: the secret it needs, sent where it lives, and none it doesn't", () => {
-  for (const [name, run] of REACHED) test.todo(name);
+  for (const [name, run] of REACHED) test(name, run);
 });
 
 const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };

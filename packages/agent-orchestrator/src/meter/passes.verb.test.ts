@@ -90,5 +90,5 @@ row('REFUSED: a --last that is not a whole number from 1, as Invalid, naming --l
 });
 
 describe('`nemia passes`: the recent passes read whole or the last of them, and a --last refused', () => {
-  for (const [name, claim] of ROWS) test.todo(name);
+  for (const [name, claim] of ROWS) test(name, claim);
 });

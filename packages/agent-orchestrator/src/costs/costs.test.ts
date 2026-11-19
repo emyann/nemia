@@ -80,7 +80,7 @@ const SPREAD: Row[] = [
 ];
 
 describe('`medianOf` and `p90Of`: the middle of what runs cost and its 90th percentile, nearest rank', () => {
-  for (const row of SPREAD) test.todo(row.name);
+  for (const row of SPREAD) test(row.name, row.check);
 });
 
 const FOLDED: Row[] = [
@@ -208,7 +208,7 @@ const FOLDED: Row[] = [
 ];
 
 describe('`costsOf`: what the newest finished runs of a workflow in its factory cost, a step and the whole run', () => {
-  for (const row of FOLDED) test.todo(row.name);
+  for (const row of FOLDED) test(row.name, row.check);
 });
 
 /** A window of two runs, of two steps, the whole run measured in one. */
@@ -258,5 +258,5 @@ const SAID: Row[] = [
 ];
 
 describe("`costsSection`: the brief's section that says what runs of the workflow cost", () => {
-  for (const row of SAID) test.todo(row.name);
+  for (const row of SAID) test(row.name, row.check);
 });

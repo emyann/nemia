@@ -12,7 +12,7 @@ import { GIT_ENV, gitWorld } from './git-world.ts';
 import { walksOn } from './place-walks.ts';
 import { scratch } from 'test-kit/scratch';
 
-for (const [name, walk] of walksOn(() => ({ place: gitPlace({ env: GIT_ENV }), world: gitWorld }))) test.todo(name);
+for (const [name, walk] of walksOn(() => ({ place: gitPlace({ env: GIT_ENV }), world: gitWorld }))) test(name, walk);
 
 /** Runs git with `args` in `cwd`, under the tests' own identity, a local path allowed as a submodule's source. */
 const git = (cwd: string, ...args: string[]): string =>

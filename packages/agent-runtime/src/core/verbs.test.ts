@@ -166,5 +166,5 @@ const REFUSED: Row[] = [
 ];
 
 describe('REFUSED: verbBreaches says each way a verb and its data can disagree, and nothing else', () => {
-  for (const row of REFUSED) test.todo(row.name);
+  for (const row of REFUSED) test(row.name, row.run);
 });

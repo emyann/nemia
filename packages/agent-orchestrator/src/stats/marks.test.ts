@@ -251,5 +251,5 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
 
 describe('`marksOf` and `frozenOf`: what a run froze, and each change marked against the run before it in its factory and folder', () => {
   for (const row of MARKS) test(row.name, () => assert.deepEqual(said(row.runs()), row.marks));
-  for (const row of ITEMS) test.todo(row.name);
+  for (const row of ITEMS) test(row.name, row.check);
 });

@@ -558,6 +558,6 @@ describe(
   'follow with no stream to take: an agent that does not stream is read whole, and a session ended, being sent or not there says so',
   WAITED,
   () => {
-    for (const [name, run] of UNSTREAMED) test.todo(name);
+    for (const [name, run] of UNSTREAMED) test(name, run);
   },
 );

@@ -17,4 +17,4 @@ for (const [name, body] of walksOn(WORKFLOW_WALKS, (): WorkflowSide => {
   const defs = { agents: doorFrom(AgentDoor, agentDoorMemory()), skills: doorFrom(SkillDoor, skillDoorMemory()) };
   return { door: doorFrom(WorkflowDoor, workflowDoorMemory(defs)), root: MEMORY_ROOT, layer: 'memory', defs };
 }))
-  test.todo(name);
+  test(name, body);

@@ -6,9 +6,8 @@ import { Card, CardContent, Title } from '@/components/ui/ds';
 import { CommandText } from './FactorySchedules';
 
 /**
- * The home of the factory `name`, marked `data-factory-home` with its name: what it gives a session, and the line `line` that opens one.
- * @param name The factory's name.
- * @param line The line that opens a person's own session in its home, as the api answered it.
+ * The home of the factory `name`, marked `data-factory-home` with its name: what it gives a session, and `line`, the line that opens a
+ * person's own session in it, as the api answered it.
  */
 export function FactoryHome({ name, line }: { name: string; line: string }) {
   return (

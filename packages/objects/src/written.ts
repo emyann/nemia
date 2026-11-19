@@ -1,6 +1,6 @@
 /**
  * What a write of a factory or of one of its parts did (`FactoryWritten`), carried on the answer of each write of the Factory, a Hire, a
- * Schedule and an MCP server alone, never on a read.
+ * Schedule, a Volume and an MCP server alone, never on a read.
  */
 import { Schema } from 'effect';
 

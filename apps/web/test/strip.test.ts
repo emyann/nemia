@@ -54,7 +54,7 @@ const factory = (name: string, hires: Record<string, string>) =>
     hires,
     error: null,
     schedules: [],
-    commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '' },
+    commands: { attach: '', rm: '', add: '', schedule: '', trust: '', volume: '', home: null },
     untrusted: [],
     volumes: [],
     costLines: {},

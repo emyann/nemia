@@ -44,6 +44,12 @@ function refusedBy(name: string, argv: readonly string[]) {
   }
 }
 
+test('volume set sets a switch, and is refused, naming its switches, where it is given neither', () => {
+  names(refusedBy('factory volume set', ['mill', 'notes']), 'nemia factory volume set mill notes', '--claude-md', '--skills');
+  assert.equal(refusedBy('factory volume set', ['mill', 'notes', '--claude-md', 'on']), null);
+  assert.equal(refusedBy('factory volume set', ['mill', 'notes', '--skills', 'off']), null);
+});
+
 test("retry's command line keeps today's refusals", () => {
   names(refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec), 'nemia retry', '--continue, --fresh, --model <m>, --recheck');
   names(

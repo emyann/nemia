@@ -56,7 +56,7 @@ const SPECS = {
 
 /** The person's own settings of a Factory, each with what the person types to change it: no proposal carries one. */
 const PERSONS_SETTINGS: Readonly<Record<string, string>> = {
-  volumes: 'nemia factory volume add and nemia factory volume rm',
+  volumes: 'nemia factory volume add, nemia factory volume set and nemia factory volume rm',
   harnessSettings: 'nemia factory setting set and nemia factory setting rm',
   costLines: 'nemia factory cost-line set and nemia factory cost-line rm',
   revisions: 'nemia factory revisions <factory> <policy>',

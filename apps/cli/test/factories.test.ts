@@ -112,6 +112,25 @@ describe('a person files a factory, wires its parts, sees each in the listing, a
     );
     await out(['factory', 'volume', 'rm', 'mill', 'notes']);
   });
+  s.test(
+    "`factory volume set` sets a switch by the volume's name, an add again keeps it; REFUSED: a name it holds no volume of, and neither switch",
+    async () => {
+      const notes = path.join(here, 'notes');
+      await out(['factory', 'volume', 'add', 'mill', 'notes:ro']);
+      const set = await out(['factory', 'volume', 'set', 'mill', 'notes', '--claude-md', 'on']);
+      assert.match(set, new RegExp(`^mill  volume ${notes} :ro --claude-md on$`, 'm'));
+      assert.match(set, /^changed: /m);
+      assert.match(
+        await out(['factory', 'volume', 'add', 'mill', 'notes:ro']),
+        new RegExp(`^mill  volume ${notes} :ro --claude-md on$`, 'm'),
+      );
+      const ghost = await nemia(['factory', 'volume', 'set', 'mill', 'ghost', '--skills', 'off']);
+      assert.notEqual(ghost.code, 0);
+      assert.ok(ghost.err.includes('notes'), `the refusal names the volumes the factory holds: ${ghost.err}`);
+      await refused(['factory', 'volume', 'set', 'mill', 'notes'], 2, '--claude-md');
+      await out(['factory', 'volume', 'rm', 'mill', 'notes']);
+    },
+  );
   s.test('`factory setting` and `cost-line` set and take off what the runs are given, each seen in the listing', async () => {
     assert.match(
       await out(['factory', 'setting', 'set', 'mill', 'claude.language', '"french"']),

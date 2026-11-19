@@ -13,7 +13,7 @@ const UNTRUSTED: Pick<Factory, 'name' | 'untrusted' | 'commands'> = {
   untrusted: [
     { place: '/home/you/code/acme', harness: 'the harness', withheld: "the folder's own settings, hooks and MCP servers", never: null },
   ],
-  commands: { attach, rm, add, schedule, trust, volume },
+  commands: { attach, rm, add, schedule, trust, volume, home: null },
 };
 
 /** What a story of the caution draws: the factory, and the presses where the page asks the trust itself. */

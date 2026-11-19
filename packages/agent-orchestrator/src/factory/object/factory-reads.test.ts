@@ -15,6 +15,8 @@ import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { addFactory, attachWorkflow, setSchedule } from '../../../testing.ts';
+import { addFactoryAt } from '../factory.store.ts';
+import { treeDir } from '../applied/applied.store.ts';
 import { metered } from '../../meter/tally.store.ts';
 import { recordMemo } from '../../rest/index.ts';
 import { engineOf, runWith as runEngine } from '../../runtime-client.ts';
@@ -99,6 +101,18 @@ test("a factory's commands take back each schedule its file holds, by workflow; 
   assert.deepEqual(await of('mill'), ['janitor', 'nightly'], "the factory's scheduled workflows, by name");
   assert.deepEqual(await of('default'), [], 'the default factory schedules nothing');
   assert.deepEqual(await of('stray'), [], 'a file that does not read schedules nothing');
+});
+
+test("a factory's commands give the line that opens its home where its tree holds one, and none where it holds none or has no tree", async () => {
+  placed();
+  const template = { source: path.join(ROOT, 'no-template'), version: '1.0.0', params: {} };
+  addFactoryAt(ROOT, { name: 'homed', volumes: [], template });
+  addFactoryAt(ROOT, { name: 'bare', volumes: [], template });
+  fs.mkdirSync(path.join(treeDir(ROOT, 'homed'), 'home'), { recursive: true });
+  fs.mkdirSync(treeDir(ROOT, 'bare'), { recursive: true });
+  assert.equal((await counted(factoryCommandsOf(ROOT, 'homed'))).value.home, 'nemia factory home homed');
+  assert.equal('home' in (await counted(factoryCommandsOf(ROOT, 'bare'))).value, false, 'a tree with no home/ gives no line');
+  assert.equal('home' in (await counted(factoryCommandsOf(ROOT, 'mill'))).value, false, 'a factory made by hand gives no line');
 });
 
 test("a warm read of the schedules reads no finished run's record, answers a cold read's own, and sees a run fired since", async () => {

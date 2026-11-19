@@ -6,6 +6,7 @@
  * (`harness/codex/stream.ts`).
  */
 import path from 'node:path';
+import { Predicate } from 'effect';
 import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
 import {
   initLineText,
@@ -337,7 +338,7 @@ const callKept = ({ id, name, input }: ToolUse, denied: ReadonlySet<string>): ob
   if (input === undefined) return { type: 'tool_use', id, name };
   if (denied.has(id)) return { type: 'tool_use', id, name, input };
   const key = readKeyOf(name);
-  if (key === undefined || !Object.hasOwn(input, key)) return { type: 'tool_use', id, name };
+  if (key === undefined || !Predicate.isObject(input) || !Object.hasOwn(input, key)) return { type: 'tool_use', id, name };
   const v = input[key];
   return { type: 'tool_use', id, name, input: { [key]: name === 'Bash' && typeof v === 'string' ? firstWord(v) : v } };
 };
